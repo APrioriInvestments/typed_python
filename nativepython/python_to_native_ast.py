@@ -1400,8 +1400,6 @@ class ConversionContext(object):
                                 self._varname_to_type[varname].pointer
                                 )
 
-                print ptr_expr.expr_type, val_to_store.expr_type
-
                 if op is not None:
                     val_to_store = ptr_expr.load.convert_bin_op(op, val_to_store)
 

@@ -18,3 +18,6 @@ both dynamically typed and statically typed code coexisting in a single codebase
 language. It also allows us to easily build systems that can specialize themselves for new types of
 data as they show up.
 
+## How do I run tests?
+
+run `test.py` from the root. Filter tests with a regex using `test.py -filter=PAT`.
