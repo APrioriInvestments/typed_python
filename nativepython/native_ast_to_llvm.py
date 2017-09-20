@@ -140,12 +140,12 @@ class TeardownOnReturnBlock:
                 else:
                     tags[t][b] = self.incoming_tags[b][t]
 
-        def collapse_tags(incoming):
+        def collapse_tags(t, incoming):
             if all(k is False for k in incoming.values()):
                 return None
             if all(k is True for k in incoming.values()):
                 return True
-            phinode = builder.phi(llvmlite.ir.IntType(1))
+            phinode = builder.phi(llvmlite.ir.IntType(1), name='is_initialized.' + t)
 
             for b in incoming:
                 if isinstance(incoming[b], bool):
@@ -157,7 +157,7 @@ class TeardownOnReturnBlock:
             return phinode
 
         for t in all_tags:
-            tags[t] = collapse_tags(tags[t])
+            tags[t] = collapse_tags(t, tags[t])
             if tags[t] is None:
                 del tags[t]
 
@@ -399,10 +399,12 @@ def expression_to_llvm_ir(
                 with then:
                     tags_initialized[0] = true_tags
                     true = convert(expr.true)
+                    true_tags = tags_initialized[0]
                     true_block = builder.block
                 with otherwise:
                     tags_initialized[0] = false_tags
                     false = convert(expr.false)
+                    false_tags = tags_initialized[0]
                     false_block = builder.block
 
             if true is None and false is None:
@@ -429,7 +431,7 @@ def expression_to_llvm_ir(
                     final_tags[tag] = True
                 else:
                     #it's not certain
-                    tag_llvm_value = builder.phi(llvmlite.ir.IntType(1))
+                    tag_llvm_value = builder.phi(llvmlite.ir.IntType(1), 'is_initialized.' + tag)
                     if isinstance(true_val, bool):
                         true_val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),true_val)
                     if isinstance(false_val, bool):

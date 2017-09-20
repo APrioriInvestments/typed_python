@@ -80,11 +80,11 @@ class Type(object):
 
     @property
     def is_pod(self):
-        assert False,"can't directly references instances of %s" % self
+        raise ConversionException("can't directly references instances of %s" % self)
 
     @property
     def null_value(self):
-        assert False,"can't construct a null value of type %s" % self
+        raise ConversionException("can't construct a null value of type %s" % self)
 
     def lower_as_function_arg(self):
         if self.is_pod:
@@ -92,10 +92,11 @@ class Type(object):
         return native_ast.Type.Pointer(self.lower())
 
     def lower(self):
-        assert False, "Can't directly reference instances of %s" % self
+        raise ConversionException("Can't directly reference instances of %s" % self)
 
     def convert_initialize_copy(self, context, instance_ptr, other_instance):
-        assert self.is_pod, "can't initialize %s - need a real implementation" % self
+        if not self.is_pod:
+            raise ConversionException("can't initialize %s - need a real implementation" % self)
 
         if other_instance.expr_type != self:
             other_instance = other_instance.expr_type.convert_to_type(other_instance, self)
@@ -109,7 +110,8 @@ class Type(object):
             )
 
     def convert_destroy(self, context, instance_ptr):
-        assert self.is_pod, "can't destroy %s - need a real implementation" % self
+        if not self.is_pod:
+            raise ConversionException("can't destroy %s - need a real implementation" % self)
 
         return TypedExpression(
             native_ast.nullExpr,
@@ -118,8 +120,8 @@ class Type(object):
 
     def convert_initialize(self, context, instance_ptr, args):
         assert instance_ptr.expr_type.value_type == self
-
         assert len(args) <= 1
+
         if len(args) == 1:
             return self.convert_initialize_copy(context, instance_ptr, args[0])
         else:
@@ -133,8 +135,10 @@ class Type(object):
                 )
 
     def convert_assign(self, context, instance_ptr, arg):
-        assert self.is_pod
-        assert arg.expr_type == self, "can't assign %s to %s" % (arg.expr_type, self)
+        if not self.is_pod:
+            raise ConversionException("instances of %s need an explicit assignment operator" % self)
+        if arg.expr_type != self:
+            raise ConversionException("can't assign %s to %s" % (arg.expr_type, self))
 
         return TypedExpression(
             native_ast.Expression.Store(
@@ -324,17 +328,11 @@ class Struct(Type):
     def convert_attribute(self, instance, attr):
         for i in xrange(len(self.element_types)):
             if self.element_types[i][0] == attr:
-                if self.is_pod:
-                    return TypedExpression(
-                        native_ast.Expression.Attribute(left=instance.expr,attr=attr), 
-                        self.element_types[i][1]
-                        )
-                else:
-                    address = instance.address
-                    return TypedExpression(
-                        address.expr.ElementPtrIntegers(0,i).load(),
-                        self.element_types[i][1]
-                        )
+                address = instance.address
+                return TypedExpression(
+                    address.expr.ElementPtrIntegers(0,i).load(),
+                    self.element_types[i][1]
+                    )
 
         return super(Struct,self).convert_attribute(instance, attr)
 
@@ -353,18 +351,6 @@ class Struct(Type):
                     native_instance_ptr.ElementPtrIntegers(0, i),
                     self.element_types[i][1].pointer
                     )
-
-    def field(self, native_instance, attribute_name):
-        for i in xrange(len(self.element_types)):
-            if self.element_types[i][0] == attribute_name:
-                return TypedExpression(
-                    native_ast.Expression.Attribute(
-                        left=native_instance, 
-                        attr=attribute_name
-                        ),
-                    self.element_types[i][1]
-                    )
-
 
     def convert_set_attribute(self, instance, attr, val):
         field_ptr = self.pointer_to_field(instance.address.expr, attr)
@@ -952,8 +938,9 @@ class PythonClass(Type):
     def convert_attribute(self, instance, attr):
         for i in xrange(len(self.element_types)):
             if self.element_types[i][0] == attr:
+                address = instance.address
                 return TypedExpression(
-                    native_ast.Expression.Attribute(left=instance.expr,attr=attr), 
+                    address.expr.ElementPtrIntegers(0,i).load(),
                     self.element_types[i][1]
                     )
 
@@ -975,18 +962,6 @@ class PythonClass(Type):
                     native_instance_ptr.ElementPtrIntegers(0, i),
                     self.element_types[i][1].pointer
                     )
-
-    def field(self, native_instance, attribute_name):
-        for i in xrange(len(self.element_types)):
-            if self.element_types[i][0] == attribute_name:
-                return TypedExpression(
-                    native_ast.Expression.Attribute(
-                        left=native_instance, 
-                        attr=attribute_name
-                        ),
-                    self.element_types[i][1]
-                    )
-
 
     def convert_set_attribute(self, instance, attr, val):
         field_ptr = self.pointer_to_field(instance.address.expr, attr)
@@ -1092,7 +1067,8 @@ class TypedExpression(object):
         assert isinstance(expr_type, Type) or expr_type is None
 
         if expr_type and not expr_type.is_pod:
-            assert self.is_addressable_expr(expr), expr
+            if not self.is_addressable_expr(expr):
+                raise ConversionException("Expected an addressable expression, not %s" % expr)
             
 
         self.expr = expr
@@ -1153,6 +1129,18 @@ class TypedExpression(object):
 
     @property
     def address(self):
+        # if self.expr.matches.Branch:
+        #     t = TypedExpression(self.expr.true, self.expr_type).address
+        #     f = TypedExpression(self.expr.false, self.expr_type).address
+        #     return TypedExpression(
+        #         native_ast.Expression.Branch(
+        #             cond = self.expr.cond,
+        #             true = t.expr,
+        #             false = f.expr
+        #             ),
+        #         t.expr_type
+        #         )
+
         if self.expr.matches.Sequence:
             sub = TypedExpression(self.expr.vals[-1], self.expr_type).address
             return TypedExpression(
@@ -1422,14 +1410,41 @@ class ConversionContext(object):
                     tmp_ptr.expr.load(),
                 struct_type
                 )
+        if ast.matches.IfExp:
+            test = self.convert_expression_ast(ast.test)
+            body = self.convert_expression_ast(ast.body)
+            orelse = self.convert_expression_ast(ast.orelse)
 
-        assert False, "can't handle %s" % ast
+            if body.expr_type != orelse.expr_type:
+                raise ConversionException("Expected IfExpr to have the same type, but got " + 
+                    "%s and %s" % (body.expr_type, orelse.expr_type))
+
+            if not body.expr_type.is_pod:
+                return TypedExpression(
+                    native_ast.Expression.Branch(
+                        cond=test.expr, 
+                        true=body.address.expr, 
+                        false=orelse.address.expr
+                        ),
+                    body.expr_type.pointer
+                    ).load
+            else:
+                return TypedExpression(
+                    native_ast.Expression.Branch(cond=test.expr, true=body.expr, false=orelse.expr),
+                    body.expr_type
+                    )
+
+        raise ConversionException("can't handle python expression type %s" % ast._which)
 
     def convert_statement_ast_and_teardown_tmps(self, ast):
-        assert not self._new_temporaries
+        if self._new_temporaries:
+            raise ConversionException("Expected no temporaries on %s" % ast._which)
         
         expr = self.convert_statement_ast(ast)
 
+        return self.consume_temporaries(expr)
+
+    def consume_temporaries(self, expr):
         assert expr is not None
         teardowns = []
 
@@ -1493,12 +1508,14 @@ class ConversionContext(object):
                     #we never construct new stackslots with references
                     self._varname_to_type[varname] = val_to_store.expr_type.unwrap_reference()
                 else:
-                    assert (self._varname_to_type[varname].unwrap_reference() == 
-                                    val_to_store.expr_type),\
-                        "can't assign both %s and %s to %s" % (
-                                self._varname_to_type[varname], 
-                                val_to_store.expr_type, varname
-                                )
+                    if (self._varname_to_type[varname].unwrap_reference() != 
+                                    val_to_store.expr_type.unwrap_reference()):
+                        raise ConversionException(
+                            "can't assign both\n\t%s\n\t%s\nto %s" % (
+                                    self._varname_to_type[varname], 
+                                    val_to_store.expr_type, varname
+                                    )
+                            )
 
                 if isinstance(self._varname_to_type[varname], Reference):
                     ptr_expr = TypedExpression(
@@ -1516,7 +1533,8 @@ class ConversionContext(object):
                 if op is not None:
                     val_to_store = ptr_expr.load.convert_bin_op(op, val_to_store)
 
-                return ptr_expr.expr_type.value_type.convert_assign(self, ptr_expr, val_to_store)
+                value_type = ptr_expr.expr_type.value_type
+                return value_type.convert_assign(self, ptr_expr, val_to_store.dereference)
 
             if target.matches.Subscript and target.ctx.matches.Store:
                 assert target.slice.matches.Index
@@ -1600,6 +1618,8 @@ class ConversionContext(object):
 
         if ast.matches.If:
             cond = self.convert_expression_ast(ast.test)
+
+            cond = self.consume_temporaries(cond)
 
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
@@ -1907,9 +1927,16 @@ class Converter(object):
             star_args_name = None
 
         if star_args_name is None:
-            assert len(input_types) == len(ast.args.args), (input_types, ast.args.args)
+            if len(input_types) != len(ast.args.args):
+                raise ConversionException(
+                    "Exected %s arguments but got %s" % (len(ast.args.args), len(input_types))
+                    )
         else:
-            assert len(input_types) >= len(ast.args.args), (input_types, ast.args.args)
+            if len(input_types) < len(ast.args.args):
+                raise ConversionException(
+                    "Exected at least %s arguments but got %s" % 
+                        (len(ast.args.args), len(input_types))
+                    )
 
         varname_to_type = {}
 
@@ -2036,6 +2063,7 @@ class Converter(object):
         pyast = python_ast.convertPyAstToAlgebraic(pyast, fname)
 
         freevars = dict(f.func_globals)
+
         if f.func_closure:
             for i in xrange(len(f.func_closure)):
                 freevars[f.func_code.co_freevars[i]] = f.func_closure[i].cell_contents
