@@ -381,6 +381,7 @@ class Struct(Type):
 class Reference(Type):
     def __init__(self, value_type):
         assert isinstance(value_type, Type)
+        assert not isinstance(value_type, Reference)
         self.value_type = value_type
 
     def unwrap_reference(self):
