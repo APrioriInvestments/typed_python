@@ -19,7 +19,7 @@ Python ast directly.
 """
 
 import ast
-from nativepython.algebraic import Alternative, List, Nullable
+from nativepython.algebraic import Alternative, AlternativeInstance, List, Nullable
 
 Module = Alternative("Module")
 Statement = Alternative("Statement")
@@ -201,7 +201,7 @@ Expr.Call = {
 Expr.Repr = {
    "value": Expr
    }
-Expr.Num = {"val": NumericConstant}
+Expr.Num = {"n": NumericConstant}
 Expr.Str = {"s": str}
 Expr.Attribute = {
    "value": Expr,
@@ -225,6 +225,14 @@ Expr.Tuple = {
    "elts": List(Expr),
    "ctx": ExprContext
    }
+
+Expr.add_common_field("line_number", int)
+Expr.add_common_field("col_offset", int)
+Expr.add_common_field("filename", str)
+Statement.add_common_field("line_number", int)
+Statement.add_common_field("col_offset", int)
+Statement.add_common_field("filename", str)
+
 NumericConstant.Int = {"value": int}
 NumericConstant.Long = {"value": str}
 NumericConstant.Boolean = {"value": bool}
@@ -320,21 +328,26 @@ numericConverters = {
     float: NumericConstant.Float
     }
 
-def createPythonAstConstant(n):
-    try:
-        if type(n) not in numericConverters:
-            return Expr.Num(NumericConstant.Unknown())
-        return Expr.Num(numericConverters[type(n)](n))
-    except Exception as e:
-        print e, n, type(n)
-        raise
+def createPythonAstConstant(n, **kwds):
+    if type(n) not in numericConverters:
+        return Expr.Num(
+          n=NumericConstant.Unknown(),
+          **kwds
+          )
+    return Expr.Num(
+        n=numericConverters[type(n)](n),
+        **kwds
+        )
 
-def createPythonAstString(s):
+def createPythonAstString(s, **kwds):
     #WARNING: this code deliberately discards unicode information
     try:
-        return Expr.Str(str(s))
+        return Expr.Str(s=str(s), **kwds)
     except:
-        return Expr.Num(NumericConstant.Unknown())
+        return Expr.Num(
+            n=NumericConstant.Unknown(), 
+            **kwds
+            )
 
 converters = {
     ast.Module: Module.Module,
@@ -432,24 +445,30 @@ converters = {
     ast.alias: Alias
     }
 
-def convertPyAstToAlgebraic(tree):
+def convertPyAstToAlgebraic(tree,fname):
     if issubclass(type(tree), ast.AST):
         converter = converters[type(tree)]
         args = {}
 
         for f in tree._fields:
-            args[f] = convertPyAstToAlgebraic(getattr(tree, f))
+            args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname)
+
+        try:
+            args['line_number'] = tree.lineno
+            args['col_offset'] = tree.col_offset
+            args['filename'] = fname
+        except AttributeError:
+            pass
 
         try:
             return converter(**args)
         except Exception as e:
             import traceback
-            traceback.print_exc()
             raise UserWarning(
-                "Failed to construct %s with arguments %s within %s"
-                % (type(tree), args, converter)
+                "Failed to construct %s with arguments %s within %s:\n\n%s"
+                % (type(tree), args, converter, traceback.format_exc())
                 )
 
     if isinstance(tree, list):
-        return [convertPyAstToAlgebraic(x) for x in tree]
+        return [convertPyAstToAlgebraic(x,fname) for x in tree]
     return tree

@@ -101,14 +101,14 @@ class PythonNativeRuntimeTests(unittest.TestCase):
 
     def test_decltype(self):
         addr = util.addr
-        decltype = util.decltype
+        typeof = util.typeof
 
         def f():
-            return decltype
+            return typeof
         
         result = self.runtime.wrap(f)()
 
-        self.assertIs(result, decltype)
+        self.assertIs(result, typeof)
  
     def test_pass_by_ref(self):
         ref = util.ref

@@ -235,13 +235,8 @@ class PythonToNativeAstTests(unittest.TestCase):
             return (A(c, 2), A(c,3))
 
         def g(c):
-            a1 = A(c, 0)
-            a2 = A(c, 1)
-            a3 = h(c)
-            a2 = h(c)
-            z = i(c)
-            q = z
-            return q[0]
+            (A(c, 2), A(c,3))
+            return A(c,2)
 
             
         def f(a):

@@ -23,9 +23,50 @@ class FunctionOutput:
 function_type = type(lambda d:d)
 classobj = type(FunctionOutput)
 
-class UnassignableFieldException(Exception):
+class ConversionScopeInfo(object):
+    def __init__(self, filename, line, col, types):
+        object.__init__(self)
+
+        self.filename = filename
+        self.line = line
+        self.col = col
+        self.types = {k:v for k,v in types.iteritems() if isinstance(k,str) and v is not None}
+
+    def __cmp__(self, other):
+        return cmp(
+            (self.filename,self.line,self.col,tuple(sorted(self.types.iteritems()))),
+            (other.filename,other.line,other.col,tuple(sorted(other.types.iteritems())))
+            )
+
+    @staticmethod
+    def CreateFromAst(ast, types):
+        return ConversionScopeInfo(
+            ast.filename,
+            ast.line_number,
+            ast.col_offset,
+            dict(types)
+            )
+
+    def __str__(self):
+        return "   File \"%s\", line %d\n%s" % (self.filename, self.line, 
+            "".join(["\t\t%s=%s\n" % (k,v) for k,v in self.types.iteritems()])
+            )
+
+class ConversionException(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
+        self.conversion_scope_infos=[]
+
+    def add_scope(self, new_scope):
+        if not self.conversion_scope_infos or self.conversion_scope_infos[0] != new_scope:
+            self.conversion_scope_infos = [new_scope] + self.conversion_scope_infos
+
+    def __str__(self):
+        return self.message + "\n\n" + "".join(str(x) for x in self.conversion_scope_infos)
+
+class UnassignableFieldException(ConversionException):
     def __init__(self, obj_type, attr, target_type):
-        Exception.__init__(self, "missing attribute %s in type %s" % (attr,type))
+        ConversionException.__init__(self, "missing attribute %s in type %s" % (attr,type))
         self.obj_type = obj_type
         self.attr = attr
         self.target_type = target_type
@@ -624,7 +665,13 @@ class PrimitiveNumericType(PrimitiveType):
                 other_type
                 )
 
-        assert False, "can't convert %s to %s" % (self, other_type)
+        if isinstance(other_type, Pointer) and self.t.matches.Int:
+            return TypedExpression(
+                native_ast.Expression.Cast(left=e.expr, to_type=other_type.lower()),
+                other_type
+                )
+
+        raise ConversionException("can't convert %s to %s" % (self, other_type))
 
 class RepresentationlessType(Type):
     @property
@@ -642,15 +689,30 @@ class RepresentationlessType(Type):
     def lower(self):
         return native_ast.Type.Void()
 
+    @property
+    def python_object_representation(self):
+        assert False, "Subclasses must implement"
+
+def representation_for(obj):
+    def decorator(override):
+        FreePythonObjectReference.free_python_object_overrides[obj] = override
+        return override
+    return decorator
 
 class FreePythonObjectReference(RepresentationlessType):
+    free_python_object_overrides = {}
+
     def __init__(self, obj):
         object.__init__(self)
+        self._original_obj = obj
+
+        if obj in self.free_python_object_overrides:
+            obj = self.free_python_object_overrides[obj]
         self._obj = obj
 
     @property
     def python_object_representation(self):
-        return self._obj
+        return self._original_obj
         
     def convert_attribute(self, instance, attr):
         return pythonObjectRepresentation(getattr(self._obj, attr))
@@ -689,6 +751,7 @@ class FreePythonObjectReference(RepresentationlessType):
 
             return TypedExpression(
                 cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
+                    context.activates_temporary(tmp_ptr) + 
                     context.generate_call_expr(
                         target=call_target.native_call_target,
                         args=[tmp_ptr.load.reference.expr] 
@@ -706,7 +769,9 @@ class FreePythonObjectReference(RepresentationlessType):
             tmp_ptr = context.allocate_temporary(self._obj)
 
             return TypedExpression(
-                self._obj.convert_initialize(context, tmp_ptr, args).expr + tmp_ptr.expr.load(),
+                self._obj.convert_initialize(context, tmp_ptr, args).expr + 
+                    context.activates_temporary(tmp_ptr) + 
+                    tmp_ptr.expr.load(),
                 self._obj
                 )
 
@@ -718,7 +783,13 @@ class FreePythonObjectReference(RepresentationlessType):
                     return x.expr.val.val
             return x
 
-        return pythonObjectRepresentation(self._obj(*[to_py(x) for x in args]))
+        call_args = [to_py(x) for x in args]
+        try:
+            py_call_result = self._obj(*call_args)
+        except Exception as e:
+            raise ConversionException("Failed to call %s with %s" % (self._obj, call_args))
+
+        return pythonObjectRepresentation(py_call_result)
 
     def __repr__(self):
         return "FreePythonObject(%s)" % self._obj
@@ -923,10 +994,12 @@ class PythonClass(Type):
         if field_ptr is None:
             raise UnassignableFieldException(self, attr, val.expr_type)
 
-        assert val.expr_type == field_ptr.expr_type.value_type, \
-            "Can't assign value of type %s to struct field %s" % (
-                val.expr_type,
-                field_ptr.expr_type.value_type
+        if val.expr_type != field_ptr.expr_type.value_type:
+            raise ConversionException(
+                "Can't assign value of type %s to struct field %s" % (
+                    val.expr_type,
+                    field_ptr.expr_type.value_type
+                    )
                 )
 
         return TypedExpression(
@@ -977,7 +1050,6 @@ class PythonClassMemberFunc(Type):
             self.attr, 
             ",".join(["%s=%s" % t for t in self.python_class_type.element_types])
             )
-
 
 def pythonObjectRepresentation(o):
     if isinstance(o,TypedExpression):
@@ -1143,6 +1215,22 @@ class ConversionContext(object):
         self._temp_let_var += 1
         return ".letvar.%s" % (self._temp_let_var-1)
 
+    def activates_temporary(self, slot):
+        if slot.expr_type.value_type.is_pod:
+            return native_ast.nullExpr
+
+        return native_ast.Expression.ActivatesTeardown(slot.expr.name)
+
+    def allocate_temporary(self, slot_type):
+        tname = '.temp.%s' % len(self._temporaries)
+        self._new_temporaries.add(tname)
+        self._temporaries[tname] = slot_type
+
+        return TypedExpression(
+            native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
+            slot_type.pointer
+            )
+
     def call_py_function(self, f, args, name_override=None):
         call_target = \
             self._converter.convert(
@@ -1160,7 +1248,9 @@ class ConversionContext(object):
                 self.generate_call_expr(
                     target=call_target.native_call_target,
                     args=[slot.expr] + [a.as_function_call_arg() for a in args]
-                    ) + slot.load.expr
+                    ) 
+                    + self.activates_temporary(slot)
+                    + slot.load.expr
                     ,
                 call_target.output_type
                 )        
@@ -1180,6 +1270,8 @@ class ConversionContext(object):
         actual_args = []
 
         def is_simple(expr):
+            if expr.matches.StackSlot:
+                return True
             if expr.matches.Constant:
                 return True
             if expr.matches.Variable:
@@ -1208,13 +1300,16 @@ class ConversionContext(object):
         return e
 
 
-    def allocate_temporary(self, slot_type):
-        tname = '.temp.%s' % len(self._temporaries)
-        self._new_temporaries.add(tname)
-        self._temporaries[tname] = slot_type
-        return TypedExpression(native_ast.Expression.Variable(tname), slot_type.pointer)
-
     def convert_expression_ast(self, ast):
+        try:
+            return self.convert_expression_ast_(ast)
+        except ConversionException as e:
+            e.add_scope(
+                ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type)
+                )
+            raise
+
+    def convert_expression_ast_(self, ast):
         if ast.matches.Attribute:
             attr = ast.attr
             val = self.convert_expression_ast(ast.value)
@@ -1242,17 +1337,17 @@ class ConversionContext(object):
                 )
 
         if ast.matches.Num:
-            if ast.val.matches.Int:
+            if ast.n.matches.Int:
                 return TypedExpression(
                     native_ast.Expression.Constant(
-                        native_ast.Constant.Int(val=ast.val.value,bits=64,signed=True)
+                        native_ast.Constant.Int(val=ast.n.value,bits=64,signed=True)
                         ), 
                     Int64
                     )
-            if ast.val.matches.Float:
+            if ast.n.matches.Float:
                 return TypedExpression(
                     native_ast.Expression.Constant(
-                        native_ast.Constant.Float(val=ast.val.value,bits=64)
+                        native_ast.Constant.Float(val=ast.n.value,bits=64)
                         ), 
                     Float64
                     )
@@ -1291,6 +1386,7 @@ class ConversionContext(object):
 
                 tmp_ptr = self.allocate_temporary(starargs.expr_type)
                 init = starargs.expr_type.convert_initialize_copy(self, tmp_ptr, starargs)
+                init = init + TypedExpression(self.activates_temporary(tmp_ptr), Void)
 
                 for i in xrange(len(starargs.expr_type.element_types)):
                     args.append(
@@ -1321,7 +1417,9 @@ class ConversionContext(object):
             tmp_ptr = self.allocate_temporary(struct_type)
 
             return TypedExpression(
-                struct_type.convert_initialize(self, tmp_ptr, elts).expr + tmp_ptr.expr.load(),
+                struct_type.convert_initialize(self, tmp_ptr, elts).expr + 
+                    self.activates_temporary(tmp_ptr) + 
+                    tmp_ptr.expr.load(),
                 struct_type
                 )
 
@@ -1336,15 +1434,21 @@ class ConversionContext(object):
         teardowns = []
 
         for tname in sorted(self._new_temporaries):
-            teardown = self._temporaries[tname].convert_destroy(
-                self,
-                TypedExpression(
-                    native_ast.Expression.Variable(tname),
-                    self._temporaries[tname].pointer
-                    )
-                ).expr
+            teardown = native_ast.Teardown.ByTag(
+                tag=tname,
+                expr=self._temporaries[tname].convert_destroy(
+                    self,
+                    TypedExpression(
+                        native_ast.Expression.StackSlot(
+                            name=tname,
+                            type=self._temporaries[tname].lower()
+                            ),
+                        self._temporaries[tname].pointer
+                        )
+                    ).expr
+                )
 
-            if not teardown.matches.Constant:
+            if not teardown.expr.matches.Constant:
                 teardowns.append(teardown)
         
         self._new_temporaries = set()
@@ -1358,6 +1462,14 @@ class ConversionContext(object):
             )
 
     def convert_statement_ast(self, ast):
+        try:
+            return self.convert_statement_ast_(ast)
+        except ConversionException as e:
+            e.add_scope(ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type))
+
+            raise
+
+    def convert_statement_ast_(self, ast):
         if ast.matches.Assign or ast.matches.AugAssign:
             if ast.matches.Assign:
                 assert len(ast.targets) == 1
@@ -1372,7 +1484,8 @@ class ConversionContext(object):
 
                 val_to_store = self.convert_expression_ast(ast.value)
 
-                assert varname in self._varname_to_type
+                if varname not in self._varname_to_type:
+                    raise ConversionException("Can't store in variable %s" % varname)
 
                 if self._varname_to_type[varname] is None:
                     self._new_variables.add(varname)
@@ -1510,7 +1623,67 @@ class ConversionContext(object):
         if ast.matches.Pass:
             return TypedExpression(native_ast.nullExpr, Void)
 
-        assert False, "can't handle %s" % ast
+        if ast.matches.For:
+            statements = []
+            ctx_load = python_ast.ExprContext.Load()
+            ctx_store = python_ast.ExprContext.Store()
+            iterator_name = self.let_varname()
+            self._varname_to_type[iterator_name] = None
+
+            def scope(a):
+                return {
+                    'filename': a.filename, 
+                    'line_number': a.line_number,
+                    'col_offset': a.col_offset
+                    }
+
+            with_scope = scope(ast.iter)
+
+            def name(n,c=ctx_load):
+                return python_ast.Expr.Name(id=n,ctx=c,**with_scope)
+
+            def memb(f, member):
+                return python_ast.Expr.Attribute(value=f, attr=member, ctx=ctx_load,**with_scope)
+
+            def call(f, member, args):
+                if member is not None:
+                    f = memb(f, member)
+
+                return python_ast.Expr.Call(func=f, args=args,keywords=(),
+                                            starargs=None,kwargs=None, **with_scope)
+
+            def assign(n, val):
+                return python_ast.Statement.Assign(
+                    targets=(name(n,ctx_store),),
+                    value=val,
+                    **with_scope
+                    )
+
+            statements.append(
+                assign(iterator_name, call(ast.iter, "__iter__",()))
+                )
+
+            cond = call(name(iterator_name), 'has_next',())
+
+            assign_statement = python_ast.Statement.Assign(
+                targets=(ast.target,),
+                value=call(name(iterator_name),"next",()),
+                **with_scope
+                )
+
+            statements.append(
+                python_ast.Statement.While(
+                    test=cond,
+                    body=(assign_statement,)+ast.body,
+                    orelse=ast.orelse,
+                    **with_scope
+                    )
+                )
+
+            return self.convert_statement_list_ast(statements)
+
+
+        raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 
     def convert_statement_list_ast(self, statements, toplevel=False):
         if not statements:
@@ -1640,7 +1813,11 @@ class ConversionContext(object):
                         slot_type.pointer
                         )
 
-                    destructors.append(slot_type.convert_destroy(self, slot_expr).expr)
+                    destructors.append(
+                        native_ast.Teardown.Always(
+                            slot_type.convert_destroy(self, slot_expr).expr
+                            )
+                        )
         
         expr = TypedExpression(
             native_ast.Expression.Finally(
@@ -1654,7 +1831,7 @@ class ConversionContext(object):
             if name is not FunctionOutput:
                 slot_type = self._varname_to_type[name]
 
-                if slot_type is not None:
+                if slot_type is not None and name != stararg_name:
                     slot_expr = TypedExpression(
                         native_ast.Expression.Variable(name + ".slot"),
                         slot_type.pointer
@@ -1668,23 +1845,6 @@ class ConversionContext(object):
                             ),
                         expr.expr_type
                         )
-
-        for name in sorted(list(self._temporaries)):
-            slot_type = self._temporaries[name]
-
-            slot_expr = TypedExpression(
-                native_ast.Expression.Variable(name),
-                slot_type.pointer
-                )
-
-            expr = TypedExpression(
-                native_ast.Expression.Let(
-                    var=name,
-                    val=native_ast.Expression.Alloca(slot_type.lower()),
-                    within=expr.expr
-                    ),
-                expr.expr_type
-                )
 
         return expr
 
@@ -1869,10 +2029,11 @@ class Converter(object):
         pyast = ast_util.pyAstFor(f)
 
         _, lineno = ast_util.getSourceLines(f)
+        _, fname = ast_util.getSourceFilenameAndText(f)
 
         pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
 
-        pyast = python_ast.convertPyAstToAlgebraic(pyast)
+        pyast = python_ast.convertPyAstToAlgebraic(pyast, fname)
 
         freevars = dict(f.func_globals)
         if f.func_closure:

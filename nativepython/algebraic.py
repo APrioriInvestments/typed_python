@@ -90,6 +90,10 @@ class Alternative(object):
         for k, v in kwds.iteritems():
             self.__setattr__(k,v)
 
+    def add_common_field(self, k, v):
+        for tname in self._types:
+            self._types[tname][k] = v
+
     def define(self, **kwds):
         for k,v in kwds.iteritems():
             self.__setattr__(k,v)

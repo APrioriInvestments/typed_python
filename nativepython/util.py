@@ -38,6 +38,37 @@ class ExpressionFunction(python_to_native_ast.RepresentationlessType):
     def python_object_representation(self):
         return self
 
+class TypeFun(python_to_native_ast.RepresentationlessType):
+    def __init__(self, f):
+        self.f = f
+
+    def convert_call(self, context, instance, args):
+        def unwrap(x):
+            assert isinstance(x, python_to_native_ast.TypedExpression)
+            t = x.expr_type
+            if isinstance(t, python_to_native_ast.FreePythonObjectReference):
+                return t._obj
+            else:
+                return t
+
+        def wrap(x):
+            return python_to_native_ast.pythonObjectRepresentation(x)
+
+        return wrap(self.f(*[unwrap(x) for x in args]))
+
+    def __call__(self, *args):
+        return self.f(*args)
+
+    def __repr__(self):
+        return self.f.func_name
+
+    @property
+    def python_object_representation(self):
+        return self
+
+def typefun(f):
+    return TypeFun(f)
+
 def exprfun(f):
     return ExpressionFunction(f)
 
@@ -53,10 +84,16 @@ def ref(context, args):
     return args[0].reference
 
 @exprfun
-def decltype(context, args):
+def typeof(context, args):
     assert len(args) == 1
 
     return python_to_native_ast.pythonObjectRepresentation(args[0].expr_type)
+
+@exprfun
+def typestring(context, args):
+    assert len(args) == 1
+
+    return python_to_native_ast.pythonObjectRepresentation(str(args[0].expr_type))
 
 @exprfun
 def in_place_new(context, args):
@@ -68,24 +105,15 @@ def in_place_new(context, args):
 
     return object_type.convert_initialize_copy(context, args[0], args[1])
 
-def typefun(f):
-    def unwrap(x):
-        assert isinstance(x, python_to_native_ast.TypedExpression)
-        t = x.expr_type
-        if isinstance(t, python_to_native_ast.FreePythonObjectReference):
-            return t._obj
-        else:
-            return t
+@exprfun
+def in_place_destroy(context, args):
+    assert len(args) == 1
 
-    def wrap(x):
-        return python_to_native_ast.pythonObjectRepresentation(x)
+    assert isinstance(args[0].expr_type, python_to_native_ast.Pointer)
 
-    def inner(context, args):
-        return wrap(f(*[unwrap(x) for x in args]))
+    object_type = args[0].expr_type.value_type
 
-    inner.func_name = repr(f)
-
-    return exprfun(inner)
+    return object_type.convert_destroy(context, args[0])
 
 def attribute_getter(attr):
     @exprfun
@@ -94,7 +122,6 @@ def attribute_getter(attr):
         return args[0].expr_type.convert_attribute(args[0], attr)
 
     return getter
-
 
 class ExternalFunction(python_to_native_ast.RepresentationlessType):
     def __init__(self, name, output_type, input_types, implicit_type_casting,varargs):
@@ -141,6 +168,31 @@ class ExternalFunction(python_to_native_ast.RepresentationlessType):
         return ExternalFunction(name, output_type, input_types, implicit_type_casting,varargs)
 
 malloc = ExternalFunction.make("malloc", UInt8.pointer, [Int64])
+realloc = ExternalFunction.make("realloc", UInt8.pointer, [Int64])
 free = ExternalFunction.make("free", Void, [UInt8.pointer])
 printf = ExternalFunction.make("printf", Int64, [UInt8.pointer], varargs=True)
 
+@python_to_native_ast.representation_for(len)
+def len(x):
+    return x.__len__()
+
+@python_to_native_ast.representation_for(xrange)
+class xrange_override:
+    def __init__(self, top):
+        self.top = top
+
+    def __iter__(self):
+        return xrange_iterator(0, self.top)
+
+class xrange_iterator:
+    def __init__(self, cur_value, top):
+        self.cur_value = cur_value
+        self.top = top
+
+    def has_next(self):
+        return self.cur_value < self.top
+
+    def next(self):
+        val = self.cur_value
+        self.cur_value += 1
+        return val

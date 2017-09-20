@@ -30,7 +30,7 @@ is_simple_type_tf = util.typefun(is_simple_type)
 
 def wrapping_function_call(f):
     def new_f(*args):
-        output_type = util.decltype(f(*args))
+        output_type = util.typeof(f(*args))
 
         if is_simple_type_tf(output_type):
             return f(*args)
@@ -40,7 +40,7 @@ def wrapping_function_call(f):
             util.in_place_new(raw_ptr, f(*args))
 
             return raw_ptr
-
+    new_f.func_name = "<wrapped f=%s>" % str(f)
     return new_f
 
 
@@ -98,6 +98,9 @@ class WrappedObject(object):
     def __getattr__(self, attr):
         return self._runtime._pointer_attribute_func(attr)(self)
 
+    def __len__(self):
+        return self._runtime._len_fun(self)
+
     def __call__(self, *args):
         return self._runtime._call_func(self, *args)
 
@@ -107,7 +110,15 @@ class WrappedObject(object):
     def __repr__(self):
         return "WrappedObject(t=%s,p=%s)" % (self._object_type, self._object_ptr)
 
+_singleton = [None]
+
 class Runtime:
+    @staticmethod
+    def singleton():
+        if _singleton[0] is None:
+            _singleton[0] = Runtime()
+        return _singleton[0]
+
     def __init__(self):
         self.compiler = llvm_compiler.Compiler()
         self.converter = python_to_native_ast.Converter()
@@ -119,8 +130,12 @@ class Runtime:
         def getitem_func(f_ptr, a):
             return f_ptr[0][a]
 
+        def len_func(f_ptr):
+            return len(util.ref(f_ptr[0]))
+
         self._call_func = WrappedFunction(self, call_func)
         self._getitem_func = WrappedFunction(self, getitem_func)
+        self._len_fun = WrappedFunction(self, len_func)
 
         self._pointer_attribute_funcs = {}
 
@@ -146,4 +161,5 @@ class Runtime:
 
     def native_ptr_for_typed_target(self, target):
         return self.functions_by_name[target.name]
+
 

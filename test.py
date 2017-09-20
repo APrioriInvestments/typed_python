@@ -391,8 +391,8 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
 def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
     testArgs = ["dummy"]
 
-    #if args.testHarnessVerbose or args.list:
-    #    testArgs.append('--nocapture')
+    if args.testHarnessVerbose or args.list:
+        testArgs.append('--nocapture')
 
     testArgs.append('--verbosity=0')
 

@@ -12,15 +12,23 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.python_ast as python_ast
+import nativepython.runtime as runtime
+import nativepython.util as util
+import nativepython.lib.vector as vector
 import unittest
 import ast
+import time
 
-class PythonASTTests(unittest.TestCase):
-    def test_conversion(self):
-        conversion = python_ast.convertPyAstToAlgebraic(ast.parse("lambda x: x+y+1.0", mode='eval'),"<eval>")
-        self.assertTrue(conversion.matches.Expression)
-        self.assertTrue(conversion.body.matches.Lambda)
-        self.assertTrue(conversion.body.args.matches.Item)
-        self.assertTrue(len(conversion.body.args.args) == 1)
+class VectorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.runtime = runtime.Runtime.singleton()
 
+    def test_instantiation(self):
+        v = vector.Vector(util.Int64)
+
+        vec_type = self.runtime.wrap(v)
+        vec = vec_type()
+        vec.append(20)
+
+        self.assertTrue(len(vec) == 1)

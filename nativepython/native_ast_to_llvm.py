@@ -110,6 +110,60 @@ class TypedLLVMValue(object):
         self.llvm_value = llvm_value
         self.native_type = native_type
 
+class TeardownOnReturnBlock:
+    def __init__(self, block, parent_teardowns):
+        self.incoming_tags = {} #dict from block->name->(True or llvm_value)
+        self.block = block
+        self.incoming_blocks = set()
+        self.parent_teardowns = parent_teardowns
+
+    def accept_incoming(self, block, tags):
+        self.incoming_blocks.add(block)
+        self.incoming_tags[block] = dict(tags)
+
+    def generate_tags(self, builder):
+        assert builder.block == self.block
+
+        tags = {}
+        all_tags = set()
+        for b in self.incoming_tags:
+            for t in self.incoming_tags[b]:
+                all_tags.add(t)
+
+        for t in all_tags:
+            tags[t] = {}
+
+        for b in self.incoming_tags:
+            for t in all_tags:
+                if t not in self.incoming_tags[b]:
+                    tags[t][b] = False
+                else:
+                    tags[t][b] = self.incoming_tags[b][t]
+
+        def collapse_tags(incoming):
+            if all(k is False for k in incoming.values()):
+                return None
+            if all(k is True for k in incoming.values()):
+                return True
+            phinode = builder.phi(llvmlite.ir.IntType(1))
+
+            for b in incoming:
+                if isinstance(incoming[b], bool):
+                    val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),incoming[b])
+                else:
+                    val = incoming[b]
+                phinode.add_incoming(val, b)
+
+            return phinode
+
+        for t in all_tags:
+            tags[t] = collapse_tags(tags[t])
+            if tags[t] is None:
+                del tags[t]
+
+        return tags
+
+
 def expression_to_llvm_ir(
             module, 
             converter, 
@@ -127,11 +181,55 @@ def expression_to_llvm_ir(
     #on return
     teardowns_on_return_block = [None]
 
+    stack_slots = {}
+
+    #either 'True', or an llvmlite.ir.Value that's a phi node
+    tags_initialized = [{}]
+
+    def convert_teardown(teardown):
+        if teardown.matches.Always:
+            convert(teardown.expr)
+        else:
+            assert teardown.matches.ByTag
+
+            if teardown.tag in tags_initialized[0]:
+                if tags_initialized[0][teardown.tag] is True:
+                    convert(teardown.expr)
+                else:
+                    llvm_value = tags_initialized[0][teardown.tag]
+
+                    with builder.if_then(llvm_value):
+                        convert(teardown.expr)
+
+                del tags_initialized[0][teardown.tag]
+            
     def convert(expr):
         if expr.matches.Let:
             l = convert(expr.val)
+
             arg_assignments[expr.var] = l
-            return convert(expr.within)
+
+            res = convert(expr.within)
+
+            return res
+
+        if expr.matches.StackSlot:
+            if expr.name not in stack_slots:
+                if expr.type.matches.Void:
+                    llvm_type = type_to_llvm_type(native_ast.Type.Struct(()))
+                else:
+                    llvm_type = type_to_llvm_type(expr.type)
+
+                with builder.goto_entry_block():
+                    stack_slots[expr.name] = \
+                        TypedLLVMValue(
+                            builder.alloca(llvm_type,name=expr.name), 
+                            native_ast.Type.Pointer(expr.type)
+                            )
+
+            assert stack_slots[expr.name].native_type.value_type == expr.type
+
+            return stack_slots[expr.name]
 
         if expr.matches.Alloca:
             if expr.type.matches.Void:
@@ -253,7 +351,8 @@ def expression_to_llvm_ir(
                 if teardowns_on_return_block[0] is None:
                     builder.ret_void()
                 else:
-                    builder.branch(teardowns_on_return_block[0])
+                    teardowns_on_return_block[0].accept_incoming(builder.block, tags_initialized[0])
+                    builder.branch(teardowns_on_return_block[0].block)
             else:
                 l = convert(expr.arg.val)
 
@@ -263,12 +362,14 @@ def expression_to_llvm_ir(
                 if teardowns_on_return_block[0] is None:
                     builder.ret(l.llvm_value)
                 else:
+                    teardowns_on_return_block[0].accept_incoming(builder.block, tags_initialized[0])
+
                     if output_type.matches.Void:
-                        builder.branch(teardowns_on_return_block[0])
+                        builder.branch(teardowns_on_return_block[0].block)
                     else:
                         assert return_slot is not None
                         builder.store(l.llvm_value, return_slot)
-                        builder.branch(teardowns_on_return_block[0])
+                        builder.branch(teardowns_on_return_block[0].block)
 
             return
 
@@ -290,23 +391,55 @@ def expression_to_llvm_ir(
             else:
                 return convert(expr.false)
             
+            orig_tags = dict(tags_initialized[0])
+            true_tags = dict(orig_tags)
+            false_tags = dict(orig_tags)
+
             with builder.if_else(cond_llvm) as (then, otherwise):
                 with then:
+                    tags_initialized[0] = true_tags
                     true = convert(expr.true)
                     true_block = builder.block
                 with otherwise:
+                    tags_initialized[0] = false_tags
                     false = convert(expr.false)
                     false_block = builder.block
 
             if true is None and false is None:
+                tags_initialized[0] = orig_tags
+
                 builder.unreachable()
                 return None
 
             if true is None:
+                tags_initialized[0] = false_tags
                 return false
 
             if false is None:
+                tags_initialized[0] = true_tags
                 return true
+
+            #we need to merge tags
+            final_tags = {}
+            for tag in set(true_tags.keys() + false_tags.keys()):
+                true_val = true_tags.get(tag, False)
+                false_val = false_tags.get(tag, False)
+
+                if true_val is True and false_val is True:
+                    final_tags[tag] = True
+                else:
+                    #it's not certain
+                    tag_llvm_value = builder.phi(llvmlite.ir.IntType(1))
+                    if isinstance(true_val, bool):
+                        true_val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),true_val)
+                    if isinstance(false_val, bool):
+                        false_val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),false_val)
+
+                    tag_llvm_value.add_incoming(true_val, true_block)
+                    tag_llvm_value.add_incoming(false_val, false_block)
+                    final_tags[tag] = tag_llvm_value
+                
+            tags_initialized[0] = final_tags
 
             assert true.native_type == false.native_type, (true,false)
 
@@ -320,6 +453,8 @@ def expression_to_llvm_ir(
             return TypedLLVMValue(final, true.native_type)
 
         if expr.matches.While:
+            tags = dict(tags_initialized[0])
+
             loop_block = builder.append_basic_block()
             
             builder.branch(loop_block)
@@ -334,6 +469,9 @@ def expression_to_llvm_ir(
                     
                 with otherwise:
                     false = convert(expr.orelse)
+
+            #it's currently illegal to modify the initialized set in a while loop
+            assert sorted(tags.keys()) == sorted(tags_initialized[0].keys())
 
             if false is None:
                 builder.unreachable()
@@ -470,38 +608,47 @@ def expression_to_llvm_ir(
         if expr.matches.Comment:
             return convert(expr.expr)
 
+        if expr.matches.ActivatesTeardown:
+            assert expr.name not in tags_initialized[0], "already initialized tag %s" % expr.name
+            tags_initialized[0][expr.name] = True
+            return TypedLLVMValue(None, native_ast.Type.Void())
+
         if expr.matches.Finally:
-            cur_block = builder.block
+            teardown_block = TeardownOnReturnBlock(
+                builder.append_basic_block(),
+                teardowns_on_return_block[0]
+                )
 
-            new_return_block = builder.append_basic_block()
-            builder.position_at_start(new_return_block)
+            teardowns_on_return_block[0] = teardown_block
 
-            old_teardowns_on_return = teardowns_on_return_block[0]
-            teardowns_on_return_block[0] = RETURNS_DISALLOWED
+            finally_result = convert(expr.expr)
 
-            for teardown in expr.teardowns:
-                convert(teardown)
-
-            if old_teardowns_on_return is not None:
-                builder.branch(old_teardowns_on_return)
-            else:
-                if return_slot is None:
-                    builder.ret_void()
-                else:
-                    builder.ret(builder.load(return_slot))
-
-            builder.position_at_end(cur_block)
-            teardowns_on_return_block[0] = new_return_block
-
-            e = convert(expr.expr)
-
-            if e is not None:
+            if finally_result is not None:
                 for teardown in expr.teardowns:
-                    convert(teardown)
+                    convert_teardown(teardown)
 
-            teardowns_on_return_block[0] = old_teardowns_on_return
+            with builder.goto_block(teardowns_on_return_block[0].block):
+                teardowns_on_return_block[0] = RETURNS_DISALLOWED
 
-            return e
+                old_tags = tags_initialized[0]
+                tags_initialized[0] = teardown_block.generate_tags(builder)
+
+                for teardown in expr.teardowns:
+                    convert_teardown(teardown)
+    
+                if teardown_block.parent_teardowns is not None:
+                    teardown_block.parent_teardowns.accept_incoming(builder.block, tags_initialized[0])
+                    builder.branch(teardown_block.parent_teardowns.block)
+                else:
+                    if return_slot is None:
+                        builder.ret_void()
+                    else:
+                        builder.ret(builder.load(return_slot))
+
+                tags_initialized[0] = old_tags
+                teardowns_on_return_block[0] = teardown_block.parent_teardowns
+
+            return finally_result
 
         assert False, "can't handle %s" % repr(expr)
 

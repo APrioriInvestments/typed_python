@@ -119,6 +119,12 @@ CallTarget = Alternative(
 
 #loads and stores - no assignments
 Expression = Alternative("Expression")
+Teardown = Alternative("Teardown")
+
+
+Teardown.ByTag = {'tag': str, 'expr': Expression}
+Teardown.Always = {'expr': Expression}
+
 Expression.Constant = {'val': Constant}
 Expression.Comment = {'comment': str, 'expr': Expression}
 Expression.Load = {'ptr': Expression}
@@ -143,8 +149,14 @@ Expression.While = {'cond': Expression,
                     }
 Expression.Return = {'arg': Nullable(Expression)}
 Expression.Let = {'var': str, 'val': Expression, 'within': Expression}
-Expression.Finally = {'expr': Expression, 'teardowns': List(Expression)}
+
+#evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
+#clause
+Expression.Finally = {'expr': Expression, 'teardowns': List(Teardown)}
 Expression.Sequence = {'vals': List(Expression)}
+
+Expression.ActivatesTeardown = {'name': str}
+Expression.StackSlot = {'name': str, 'type': Type}
 
 def expr_add(self, other):
     if self.matches.Constant:
@@ -157,6 +169,13 @@ def expr_add(self, other):
     if other.matches.Sequence:
         return Expression.Sequence((self,) + other.vals)
     return Expression.Sequence((self,other))
+
+def teardown_str(self):
+    if self.matches.Always:
+        return str(self.expr)
+    if self.matches.ByTag:
+        return "if slot_initialized(name=%s):\n" % self.tag + indent(str(self.expr))
+Teardown.__str__ = teardown_str
 
 def expr_str(self):
     if self.matches.Comment:
@@ -237,6 +256,10 @@ def expr_str(self):
     if self.matches.Finally:
         return "try:\n" + indent(str(self.expr)) + "\nfinally:\n"\
         + indent("\n".join(str(x) for x in self.teardowns))
+    if self.matches.ActivatesTeardown:
+        return "mark slot %s initialized" % self.name
+    if self.matches.StackSlot:
+        return "slot(name=%s)" % self.name
 
     assert False
 
