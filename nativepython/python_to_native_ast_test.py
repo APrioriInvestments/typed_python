@@ -353,7 +353,7 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         self.assertTrue(self.compile(f)(10) == f(10))
 
-    def test_branching(self):
+    def test_branching_1(self):
         def f(a):
             if a > 0:
                 return g(a)+g(1)

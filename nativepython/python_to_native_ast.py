@@ -691,6 +691,9 @@ class PrimitiveNumericType(PrimitiveType):
         return super(PrimitiveNumericType, self).convert_unary_op(instance, op)
 
     def convert_bin_op(self, op, l, r):
+        l = l.dereference()
+        r = r.dereference()
+
         target_type = self.bigger_type(r.expr_type)
 
         if r.expr_type != target_type:
@@ -698,9 +701,6 @@ class PrimitiveNumericType(PrimitiveType):
 
         if l.expr_type != target_type:
             l = l.expr_type.convert_to_type(l, target_type)
-
-        l = l.make_concrete()
-        r = r.make_concrete()
 
         if op._alternative is python_ast.BinaryOp:
             for py_op, native_op in [('Add','Add'),('Sub','Sub'),('Mult','Mul'),('Div','Div')]:
@@ -1209,13 +1209,9 @@ class TypedExpression(object):
 
         return TypedExpression(self.expr + other.expr, other.expr_type)
 
-    def make_concrete(self):
+    def dereference(self):
         if not self.expr_type.is_ref:
-            assert self.expr_type.is_pod, self.expr_type
             return self
-
-        assert self.expr_type.value_type.is_pod, self.expr_type
-
         return TypedExpression(
             self.expr.load(),
             self.expr_type.value_type
@@ -1740,38 +1736,12 @@ class ConversionContext(object):
                 
                 return cond + branch
 
-            initialized_types = dict(self._varname_to_type)
-
             true = self.convert_statement_list_ast(ast.body)
-            types_after_true = dict(self._varname_to_type)
-
-            self._varname_to_type = dict(initialized_types)
             false = self.convert_statement_list_ast(ast.orelse)
-            types_after_false = dict(self._varname_to_type)
 
             if true.expr_type is None and false.expr_type is None:
                 ret_type = None
-                self._varname_to_type = {}
-            elif true.expr_type is None and false.expr_type is not None:
-                self._varname_to_type = types_after_false
-
-                ret_type = Void
-            elif false.expr_type is None and true.expr_type is not None:
-                self._varname_to_type = types_after_true
-                ret_type = Void
-
             else:
-                final_types = {}
-                for varname in sorted(set(types_after_false.keys() + types_after_true.keys())):
-                    true_t = types_after_true.get(varname, None)
-                    false_t = types_after_false.get(varname, None)
-                    if true_t is not None and false_t is not None:
-                        if true_t != false_t:
-                            raise ConversionException("variable %s took on both %s and %s" % 
-                                    (varname, true_t, false_T))
-                        final_types[varname] = true_t
-                self._varname_to_type = final_types
-
                 ret_type = Void
 
             return TypedExpression(
@@ -1885,6 +1855,8 @@ class ConversionContext(object):
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 
     def convert_statement_list_ast(self, statements, toplevel=False):
+        orig_vars_in_scope = set(self._varname_to_type)
+
         if not statements:
             return TypedExpression(native_ast.nullExpr, Void)
 
@@ -1911,12 +1883,36 @@ class ConversionContext(object):
         if toplevel:
             assert ret_type is None, "Not all control flow paths return a value"
 
-        return TypedExpression(
-            native_ast.Expression.Sequence(
+        teardowns = []
+        for v in list(self._varname_to_type.keys()):
+            if v not in orig_vars_in_scope:
+                teardowns.append(
+                    native_ast.Teardown.ByTag(
+                        tag=v,
+                        expr=self._varname_to_type[v].convert_destroy(
+                            self,
+                            TypedExpression(
+                                native_ast.Expression.StackSlot(
+                                    name=v,
+                                    type=self._varname_to_type[v].lower()
+                                    ),
+                                self._varname_to_type[v].reference
+                                )
+                            ).expr
+                        )
+                    )
+
+                del self._varname_to_type[v]
+
+        seq_expr = native_ast.Expression.Sequence(
                 vals=[e.expr for e in exprs]
-                ),
-            ret_type
-            )
+                )
+        if teardowns:
+            seq_expr = native_ast.Expression.Finally(
+                expr=seq_expr,
+                teardowns=teardowns
+                )
+        return TypedExpression(seq_expr, ret_type)
 
     def call_expression_in_function(self, identity, name, args, expr_producer):
         varlist = []
@@ -1962,10 +1958,12 @@ class ConversionContext(object):
         destructors = []
         for name in argnames:
             if name is not FunctionOutput and name != stararg_name:
+                if name not in self._varname_to_type:
+                    raise ConversionException("Couldn't find a type for argument %s" % name)
                 slot_type = self._varname_to_type[name]
 
                 if slot_type is not None:
-                    if slot_type.is_ref:
+                    if slot_type.is_pod:
                         #we can just copy this into the stackslot directly. no destructor needed
                         to_add.append(
                             native_ast.Expression.Store(
@@ -1974,30 +1972,28 @@ class ConversionContext(object):
                                 )
                             )
                     else:
-                        if not slot_type.is_pod:
-                            raise ConversionException(
-                                "makes no sense to pass non-pod type %s by value" % slot_type
-                                )
                         #need to make a stackslot for this variable
+                        #the argument will be a pointer because it's POD
                         var_expr = TypedExpression(
                             native_ast.Expression.Variable(name),
-                            slot_type
+                            slot_type.reference
                             )
+                        
                         slot_expr = TypedExpression(
                             native_ast.Expression.StackSlot(name=name,type=slot_type.lower()),
-                            slot_type.pointer
+                            slot_type.reference
                             )
 
                         to_add.append(
                             slot_type.convert_initialize_copy(self, slot_expr, var_expr)
                                 .expr.with_comment("initialize %s from arg" % name)
                             )
+
                         destructors.append(
                             native_ast.Teardown.Always(
                                 slot_type.convert_destroy(self, slot_expr).expr
                                 )
                             )
-
 
         if to_add:
             expr = TypedExpression(
@@ -2124,7 +2120,7 @@ class Converter(object):
 
         res = subconverter.construct_stackslots_around(res, argnames, star_args_name)
 
-        return_type = varname_to_type[FunctionOutput] or Void
+        return_type = subconverter._varname_to_type[FunctionOutput] or Void
 
         return (
             native_ast.Function(
@@ -2192,7 +2188,6 @@ class Converter(object):
 
         return self._targets[new_name]
 
-
     def convert(self, f, input_types, name_override=None):
         input_types = tuple(input_types)
 
@@ -2217,39 +2212,46 @@ class Converter(object):
             for i in xrange(len(f.func_closure)):
                 freevars[f.func_code.co_freevars[i]] = f.func_closure[i].cell_contents
 
-        if isinstance(pyast, python_ast.Statement.FunctionDef):
-            definition,output_type = \
-                self.convert_function_ast(pyast, input_types, f.func_code.co_varnames, freevars)
-        else:
-            assert pyast.matches.Lambda
-            definition,output_type = self.convert_lambda_ast(pyast, input_types, freevars)
+        try:
+            if isinstance(pyast, python_ast.Statement.FunctionDef):
+                definition,output_type = \
+                    self.convert_function_ast(pyast, input_types, f.func_code.co_varnames, freevars)
+            else:
+                assert pyast.matches.Lambda
+                definition,output_type = self.convert_lambda_ast(pyast, input_types, freevars)
 
-        assert definition is not None
+            assert definition is not None
 
-        new_name = self.new_name(name_override or f.func_name)
+            new_name = self.new_name(name_override or f.func_name)
 
-        self._names_for_identifier[identifier] = new_name
+            self._names_for_identifier[identifier] = new_name
 
-        if not output_type.is_pod:
-            definition = native_ast.Function(
-                args=(('.return', output_type.pointer.lower()),) + definition.args,
-                body=definition.body,
-                output_type=native_ast.Type.Void()
+            if not output_type.is_pod:
+                definition = native_ast.Function(
+                    args=(('.return', output_type.pointer.lower()),) + definition.args,
+                    body=definition.body,
+                    output_type=native_ast.Type.Void()
+                    )
+
+            self._targets[new_name] = TypedCallTarget(
+                native_ast.CallTarget(
+                    name=new_name, 
+                    arg_types=[x[1] for x in definition.args],
+                    output_type=definition.output_type,
+                    external=False,
+                    varargs=False
+                    ),
+                input_types,
+                output_type
                 )
 
-        self._targets[new_name] = TypedCallTarget(
-            native_ast.CallTarget(
-                name=new_name, 
-                arg_types=[x[1] for x in definition.args],
-                output_type=definition.output_type,
-                external=False,
-                varargs=False
-                ),
-            input_types,
-            output_type
-            )
+            self._definitions[new_name] = definition
+            self._unconverted.add(new_name)
 
-        self._definitions[new_name] = definition
-        self._unconverted.add(new_name)
+            return self._targets[new_name]
+        except ConversionException as e:
+            e.add_scope(
+                ConversionScopeInfo.CreateFromAst(pyast, {})
+                )
+            raise
 
-        return self._targets[new_name]
