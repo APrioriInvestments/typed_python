@@ -4,6 +4,19 @@ addr = util.addr
 
 @util.typefun
 def Vector(T):
+    class Iterator:
+        def __init__(self, vec_ptr):
+            self._vec_ptr = vec_ptr
+            self._i = 0
+
+        def has_next(self):
+            return self._i < len(self._vec_ptr[0])
+
+        def next(self):
+            old_i = self._i
+            self._i += 1
+            return util.ref((self._vec_ptr[0])[old_i])
+
     class Vector:
         def __init__(self):
             self._ptr = T.pointer(0)
@@ -75,6 +88,9 @@ def Vector(T):
 
             self._ptr = new_ptr
             self._reserved = count
+
+        def __iter__(self):
+            return Iterator(util.addr(self))
     
     return Vector
 

@@ -84,6 +84,11 @@ def ref(context, args):
     return args[0].reference
 
 @exprfun
+def deref(context, args):
+    assert len(args) == 1
+    return args[0].dereference
+
+@exprfun
 def typeof(context, args):
     assert len(args) == 1
 
@@ -172,9 +177,23 @@ realloc = ExternalFunction.make("realloc", UInt8.pointer, [Int64])
 free = ExternalFunction.make("free", Void, [UInt8.pointer])
 printf = ExternalFunction.make("printf", Int64, [UInt8.pointer], varargs=True)
 
+@typefun
+def is_struct(t):
+    return isinstance(t, python_to_native_ast.Struct)
+
+@typefun
+def struct_size(t):
+    if isinstance(t, python_to_native_ast.Struct):
+        return len(t.element_types)
+    else:
+        return None
+
 @python_to_native_ast.representation_for(len)
-def len(x):
-    return x.__len__()
+def len_override(x):
+    if is_struct(typeof(x)):
+        return struct_size(typeof(x))
+    else:
+        return x.__len__()
 
 @python_to_native_ast.representation_for(xrange)
 class xrange_override:

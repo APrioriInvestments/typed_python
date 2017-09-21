@@ -207,9 +207,15 @@ def expression_to_llvm_ir(
         if expr.matches.Let:
             l = convert(expr.val)
 
+            prior = arg_assignments.get(expr.var,None)
             arg_assignments[expr.var] = l
 
             res = convert(expr.within)
+
+            if prior is not None:
+                arg_assignments[expr.var] = prior
+            else:
+                del arg_assignments[expr.var]
 
             return res
 

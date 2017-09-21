@@ -32,7 +32,7 @@ class Simple:
 class PythonNativeRuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.runtime = runtime.Runtime()
+        cls.runtime = runtime.Runtime.singleton()
 
     def test_conversion(self):
         def f(a):
@@ -170,13 +170,6 @@ class PythonNativeRuntimeTests(unittest.TestCase):
     def test_ref_of_ref(self):
         ref = util.ref
 
-        class A:
-            def __init__(self, x):
-                self.x = x
-
-            def xref(self):
-                return ref(self.x)
-
         def increment(x):
             x = x + 1
 
@@ -185,3 +178,36 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             return x
 
         self.assertEqual(self.runtime.wrap(f)(0), 1)
+
+    def test_returning_ref_through_functions(self):
+        ref = util.ref
+        deref = util.deref
+
+        class A:
+            def __init__(self, x):
+                self.x = x
+
+            def xref(self):
+                return ref(self.x)
+
+            def xref2(self):
+                return self.xref()
+
+            def xref3(self):
+                return ref(self.xref())
+
+            def xref4(self):
+                return ref(self.xref2())
+
+        def increment(x,by):
+            x = x + by
+
+        def f(x):
+            an_a = A(x)
+            increment(an_a.xref(),1)#yes
+            increment(an_a.xref2(),2)#yes
+            increment(an_a.xref3(),4)#yes
+            increment(an_a.xref4(),8)#yes
+            return an_a.x
+
+        self.assertEqual(self.runtime.wrap(f)(0), 15)

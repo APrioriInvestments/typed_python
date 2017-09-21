@@ -30,10 +30,10 @@ is_simple_type_tf = util.typefun(is_simple_type)
 
 def wrapping_function_call(f):
     def new_f(*args):
-        output_type = util.typeof(f(*args))
+        output_type = util.typeof(util.deref(f(*args)))
 
         if is_simple_type_tf(output_type):
-            return f(*args)
+            return util.deref(f(*args))
         else:
             raw_ptr = output_type.pointer(util.malloc(output_type.sizeof))
 

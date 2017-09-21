@@ -19,6 +19,10 @@ import unittest
 import ast
 import time
 
+@util.typefun
+def typename(t):
+	return str(t)
+
 class VectorTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -32,3 +36,9 @@ class VectorTests(unittest.TestCase):
         vec.append(20)
 
         self.assertTrue(len(vec) == 1)
+        self.assertEqual(vec[0], 20)
+
+        vec.append(22)
+        self.assertTrue(len(vec) == 2)
+        self.assertTrue(vec[0] == 20)
+        self.assertTrue(vec[1] == 22)

@@ -15,8 +15,8 @@
 import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
 import nativepython.native_ast as native_ast
-import llvm_compiler as llvm_compiler
 
+import llvm_compiler as llvm_compiler
 class FunctionOutput:
     pass
 
@@ -77,6 +77,10 @@ class Type(object):
 
     def unwrap_reference(self):
         return self
+
+    @property
+    def is_ref(self):
+        return False
 
     @property
     def is_pod(self):
@@ -149,29 +153,29 @@ class Type(object):
             )
 
     def convert_unary_op(self, instance, op):
-        assert False, "can't handle unary op %s on %s" % (op, self)
+        raise ConversionException("can't handle unary op %s on %s" % (op, self))
 
     def convert_bin_op(self, op, l, r):
-        assert False, "can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type)
+        raise ConversionException("can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type))
 
     def convert_to_type(self, instance, to_type):
-        assert False, "can't convert %s to type %s" % (self, to_type)
+        raise ConversionException("can't convert %s to type %s" % (self, to_type))
 
     def convert_attribute(self, instance, attr):
-        assert False, "%s has no attribute %s" % (self, attr)
+        raise ConversionException("%s has no attribute %s" % (self, attr))
 
     def convert_set_attribute(self, instance, attr, value):
-        assert False, "%s has no attribute %s" % (self, attr)
+        raise ConversionException("%s has no attribute %s" % (self, attr))
 
-    def convert_getitem(self, instance, index):
-        assert False, "%s doesn't support getting items" % self
+    def convert_getitem(self, context, instance, index):
+        raise ConversionException("%s doesn't support getting items" % self)
 
     def convert_setitem(self, instance, index, value):
-        assert False, "%s doesn't support setting items" % self
+        raise ConversionException("%s doesn't support setting items" % self)
 
     @property
     def sizeof(self):
-        assert False, "can't compute the size of %s because we can't instantiate it" % self
+        raise ConversionException("can't compute the size of %s because we can't instantiate it" % self)
 
     @property
     def pointer(self):
@@ -336,7 +340,7 @@ class Struct(Type):
 
         return super(Struct,self).convert_attribute(instance, attr)
 
-    def convert_getitem(self, instance, index):
+    def convert_getitem(self, context, instance, index):
         assert index.expr.matches.Constant and index.expr.val.matches.Int, \
             "can't index %s with %s" % (self,index)
         i = index.expr.val.val
@@ -384,6 +388,10 @@ class Reference(Type):
         assert not isinstance(value_type, Reference)
         self.value_type = value_type
 
+    @property
+    def is_ref(self):
+        return True
+
     def unwrap_reference(self):
         return self.value_type
 
@@ -418,8 +426,8 @@ class Reference(Type):
     def convert_bin_op(self, op, l, r):
         return TypedExpression(l.expr.load(), self.value_type).convert_bin_op(op, r)
 
-    def convert_getitem(self, instance, index):
-        return TypedExpression(instance.expr.load(), self.value_type).convert_getitem(index)
+    def convert_getitem(self, context, instance, index):
+        return TypedExpression(instance.expr.load(), self.value_type).convert_getitem(context, index)
 
     def convert_setitem(self, instance, index, value):
         return TypedExpression(instance.expr.load(), self.value_type).convert_setitem(index, value)
@@ -454,13 +462,13 @@ class Pointer(Type):
         if not isinstance(self.value_type, Pointer):
             return instance.load.convert_attribute(attr)
 
-        assert False, "no attribute %s in Pointer" % attr
+        raise ConversionException("no attribute %s in Pointer" % attr)
 
     def convert_set_attribute(self, instance, attr, val):
         if not isinstance(self.value_type, Pointer):
             return instance.load.convert_set_attribute(attr,val)
         
-        assert False, "no attribute %s in Pointer" % attr
+        raise ConversionException("no attribute %s in Pointer" % attr)
 
     def convert_bin_op(self, op, l, r):
         if op._alternative is python_ast.BinaryOp:
@@ -480,7 +488,7 @@ class Pointer(Type):
         return super(Pointer, self).convert_bin_op(op,l,r)
 
 
-    def convert_getitem(self, instance, index):
+    def convert_getitem(self, context, instance, index):
         assert (isinstance(index.expr_type, PrimitiveNumericType) 
                 and index.expr_type.t.matches.Int), \
             "can only index with integers, not %s" % index.expr_type
@@ -529,7 +537,7 @@ class Pointer(Type):
                 to_type
                 )
 
-        assert False, "can't convert %s to type %s" % (self, to_type)
+        raise ConversionException("can't convert %s to type %s" % (self, to_type))
 
     def __repr__(self):
         return "Pointer(%s)" % self.value_type
@@ -551,7 +559,7 @@ class PrimitiveType(Type):
         if self.t.matches.Void:
             return native_ast.Constant.Void()
 
-        assert False, self.t
+        raise ConversionException(self.t)
 
     @property
     def is_pod(self):
@@ -640,7 +648,7 @@ class PrimitiveNumericType(PrimitiveType):
                         )
 
 
-        assert False, "can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type)
+        raise ConversionException("can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type))
 
     def convert_to_type(self, e, other_type):
         if other_type == self:
@@ -678,7 +686,7 @@ class RepresentationlessType(Type):
 
     @property
     def python_object_representation(self):
-        assert False, "Subclasses must implement"
+        raise ConversionException("Subclasses must implement")
 
 def representation_for(obj):
     def decorator(override):
@@ -716,37 +724,47 @@ class FreePythonObjectReference(RepresentationlessType):
             assert len(args) == 1
             return args[0].convert_to_type(Int64)
 
-        if (isinstance(self._obj, type) 
-                and self._obj.__module__ != '__builtin__' 
-                and not issubclass(self._obj, Type) or isinstance(self._obj, classobj)):
-            init_func = getattr(self._obj, "__init__").im_func
-            
-            cur_types = ()
-            while True:
-                try:
-                    cls_type = PythonClass(self._obj, cur_types)
-                    call_target = context._converter.convert(init_func, [Reference(cls_type)] + \
-                        [a.expr_type for a in args], name_override=self._obj.__name__+".__init__")
-                    break
-                except UnassignableFieldException as e:
-                    if e.obj_type == cls_type:
-                        cur_types = cur_types + ((e.attr, e.target_type),)
-                    else:
-                        raise
+        if PythonClass.object_is_class(self._obj):
+            if not hasattr(self._obj, "__init__"):
+                cls_type = PythonClass(self._obj, ())
 
-            tmp_ptr = context.allocate_temporary(cls_type)
+                tmp_ptr = context.allocate_temporary(cls_type)
 
-            return TypedExpression(
-                cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
-                    context.activates_temporary(tmp_ptr) + 
-                    context.generate_call_expr(
-                        target=call_target.native_call_target,
-                        args=[tmp_ptr.load.reference.expr] 
-                              + [a.as_function_call_arg() for a in args]
-                        ) + 
-                    native_ast.Expression.Load(tmp_ptr.expr),
-                cls_type
-                )
+                return TypedExpression(
+                    cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
+                        context.activates_temporary(tmp_ptr) + 
+                        native_ast.Expression.Load(tmp_ptr.expr),
+                    cls_type
+                    )
+            else:
+                init_func = getattr(self._obj, "__init__").im_func
+                
+                cur_types = ()
+                while True:
+                    try:
+                        cls_type = PythonClass(self._obj, cur_types)
+                        call_target = context._converter.convert(init_func, [Reference(cls_type)] + \
+                            [a.expr_type for a in args], name_override=self._obj.__name__+".__init__")
+                        break
+                    except UnassignableFieldException as e:
+                        if e.obj_type == cls_type:
+                            cur_types = cur_types + ((e.attr, e.target_type),)
+                        else:
+                            raise
+
+                tmp_ptr = context.allocate_temporary(cls_type)
+
+                return TypedExpression(
+                    cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
+                        context.activates_temporary(tmp_ptr) + 
+                        context.generate_call_expr(
+                            target=call_target.native_call_target,
+                            args=[tmp_ptr.load.reference.expr] 
+                                  + [a.as_function_call_arg() for a in args]
+                            ) + 
+                        native_ast.Expression.Load(tmp_ptr.expr),
+                    cls_type
+                    )
 
         if isinstance(self._obj, Type):
             #we are initializing an element of the type
@@ -785,6 +803,12 @@ class PythonClass(Type):
     def __init__(self, cls, element_types):
         self.cls = cls
         self.element_types = element_types
+
+    @staticmethod
+    def object_is_class(o):
+        return (isinstance(o, type) 
+                and o.__module__ != '__builtin__' 
+                and not issubclass(o, Type) or isinstance(o, classobj))
 
     @property
     def is_pod(self):
@@ -826,7 +850,12 @@ class PythonClass(Type):
                 make_body
                 )
         else:
-            assert other_instance.expr_type == self
+            if other_instance.expr_type != self:
+                raise ConversionException(
+                    "Can't initialize %s with an instance of %s" % (
+                        self, other_instance.expr_type
+                        )
+                    )
             assert instance_ptr.expr_type.value_type == self
 
             def make_body(instance_ptr, other_instance):
@@ -986,6 +1015,17 @@ class PythonClass(Type):
             Void
             )
 
+    def convert_getitem(self, context, instance, item):
+        if hasattr(self.cls, "__getitem__"):
+            getitem = self.cls.__getitem__.im_func
+            return context.call_py_function(
+                getitem, 
+                [instance.reference, item],
+                name_override=self.cls.__name__+".__getitem__"
+                )
+
+        return super(PythonClass, self).convert_getitem(context, instance, item)
+
     @property
     def sizeof(self):
         return sum(t.sizeof for n,t in self.element_types)
@@ -1120,8 +1160,8 @@ class TypedExpression(object):
     def convert_setitem(self, index, value):
         return self.expr_type.convert_setitem(self, index, value)
 
-    def convert_getitem(self, index):
-        return self.expr_type.convert_getitem(self, index)
+    def convert_getitem(self, context, index):
+        return self.expr_type.convert_getitem(context, self, index)
 
     @property
     def load(self):
@@ -1149,8 +1189,10 @@ class TypedExpression(object):
                 sub.expr_type
                 )
 
-        assert self.expr.matches.Load, \
-            "Can't take the address of expression %s: %s" % (self, self.expr)
+        if not self.expr.matches.Load:
+            raise ConversionException(
+                "Can't take the address of expression %s: %s" % (self, self.expr)
+                )
 
         return TypedExpression(self.expr.ptr, Pointer(self.expr_type))
 
@@ -1360,7 +1402,7 @@ class ConversionContext(object):
             val = self.convert_expression_ast(ast.value)
             index = self.convert_expression_ast(ast.slice.value)
 
-            return val.convert_getitem(index)
+            return val.convert_getitem(self, index)
 
         if ast.matches.Call:
             l = self.convert_expression_ast(ast.func)
@@ -1446,7 +1488,6 @@ class ConversionContext(object):
         return self.consume_temporaries(expr)
 
     def consume_temporaries(self, expr):
-        assert expr is not None
         teardowns = []
 
         for tname in sorted(self._new_temporaries):
@@ -1468,6 +1509,9 @@ class ConversionContext(object):
                 teardowns.append(teardown)
         
         self._new_temporaries = set()
+
+        if expr is None:
+            return teardowns
 
         if not teardowns:
             return expr
@@ -1498,10 +1542,10 @@ class ConversionContext(object):
             if target.matches.Name and target.ctx.matches.Store:
                 varname = target.id
 
-                val_to_store = self.convert_expression_ast(ast.value)
-
                 if varname not in self._varname_to_type:
                     raise ConversionException("Can't store in variable %s" % varname)
+
+                val_to_store = self.convert_expression_ast(ast.value)
 
                 if self._varname_to_type[varname] is None:
                     self._new_variables.add(varname)
@@ -1545,7 +1589,7 @@ class ConversionContext(object):
                 val_to_store = self.convert_expression_ast(ast.value)
 
                 if op is not None:
-                    val_to_store = slicing.convert_getitem(index).convert_bin_op(op, val_to_store)
+                    val_to_store = slicing.convert_getitem(self, index).convert_bin_op(op, val_to_store)
 
                 return slicing.convert_setitem(index, val_to_store)
         
@@ -1566,11 +1610,13 @@ class ConversionContext(object):
                 e = self.convert_expression_ast(ast.value.val)
 
             if self._varname_to_type[FunctionOutput] is not None:
-                assert self._varname_to_type[FunctionOutput] == e.expr_type, \
-                    "Function returning multiple types (%s and %s)" % (
-                            e.expr_type, 
-                            self._varname_to_type[FunctionOutput]
-                            )
+                if self._varname_to_type[FunctionOutput] != e.expr_type:
+                    raise ConversionException(
+                        "Function returning multiple types (%s and %s)" % (
+                                e.expr_type, 
+                                self._varname_to_type[FunctionOutput]
+                                )
+                        )
             else:
                 self._varname_to_type[FunctionOutput] = e.expr_type
 
@@ -1604,6 +1650,8 @@ class ConversionContext(object):
 
         if ast.matches.While:
             cond = self.convert_expression_ast(ast.test)
+            cond = self.consume_temporaries(cond)
+
             true = self.convert_statement_list_ast(ast.body)
             false = self.convert_statement_list_ast(ast.orelse)
 
@@ -1619,7 +1667,6 @@ class ConversionContext(object):
 
         if ast.matches.If:
             cond = self.convert_expression_ast(ast.test)
-
             cond = self.consume_temporaries(cond)
 
             if cond.expr.matches.Constant:
@@ -1645,63 +1692,86 @@ class ConversionContext(object):
             return TypedExpression(native_ast.nullExpr, Void)
 
         if ast.matches.For:
-            statements = []
-            ctx_load = python_ast.ExprContext.Load()
-            ctx_store = python_ast.ExprContext.Store()
-            iterator_name = self.let_varname()
-            self._varname_to_type[iterator_name] = None
+            if not ast.target.matches.Name:
+                raise ConversionException("For loops can only have simple targets for now")
 
-            def scope(a):
-                return {
-                    'filename': a.filename, 
-                    'line_number': a.line_number,
-                    'col_offset': a.col_offset
-                    }
+            #this object needs to stay alive for the duration
+            #of the expression
+            iter_expr = (
+                self.convert_expression_ast(ast.iter)
+                    .convert_attribute("__iter__")
+                    .convert_call(self, [])
+                )
+            iter_type = iter_expr.expr_type.unwrap_reference()
 
-            with_scope = scope(ast.iter)
+            iter_ptr = self.allocate_temporary(iter_type)
 
-            def name(n,c=ctx_load):
-                return python_ast.Expr.Name(id=n,ctx=c,**with_scope)
+            iter_setup_expr = (
+                iter_type.convert_initialize_copy(self, iter_ptr, iter_expr).expr + 
+                self.activates_temporary(iter_ptr)
+                )
+                
+            iter_expr = TypedExpression(
+                native_ast.Expression.Load(iter_ptr.expr),
+                iter_type
+                )
 
-            def memb(f, member):
-                return python_ast.Expr.Attribute(value=f, attr=member, ctx=ctx_load,**with_scope)
+            teardowns_for_iter = self.consume_temporaries(None)
 
-            def call(f, member, args):
-                if member is not None:
-                    f = memb(f, member)
+            #now we need to generate a while loop
+            while_cond_expr = (
+                iter_expr.convert_attribute("has_next")
+                    .convert_call(self, [])
+                    .convert_to_type(Bool)
+                )
 
-                return python_ast.Expr.Call(func=f, args=args,keywords=(),
-                                            starargs=None,kwargs=None, **with_scope)
+            while_cond_expr = self.consume_temporaries(while_cond_expr)
 
-            def assign(n, val):
-                return python_ast.Statement.Assign(
-                    targets=(name(n,ctx_store),),
-                    value=val,
-                    **with_scope
+            next_val_expr = iter_expr.convert_attribute("next").convert_call(self, [])
+            
+            next_val_ptr = self.allocate_temporary(next_val_expr.expr_type)
+            next_val_setup_native_expr = (
+                next_val_expr.expr_type.convert_initialize_copy(self, next_val_ptr, next_val_expr).expr +
+                self.activates_temporary(next_val_ptr)
+                )
+            next_val_teardowns = self.consume_temporaries(None)
+
+            if self._varname_to_type[ast.target.id] is not None:
+                raise ConversionException(
+                    "iterator targets should only be used during the lifetime of the for loop"
                     )
 
-            statements.append(
-                assign(iterator_name, call(ast.iter, "__iter__",()))
-                )
+            self._varname_to_type[ast.target.id] = next_val_expr.expr_type.unwrap_reference()
 
-            cond = call(name(iterator_name), 'has_next',())
+            if next_val_expr.expr_type.is_ref:
+                next_val_ptr = next_val_ptr.load
 
-            assign_statement = python_ast.Statement.Assign(
-                targets=(ast.target,),
-                value=call(name(iterator_name),"next",()),
-                **with_scope
-                )
-
-            statements.append(
-                python_ast.Statement.While(
-                    test=cond,
-                    body=(assign_statement,)+ast.body,
-                    orelse=ast.orelse,
-                    **with_scope
+            body_native_expr = native_ast.Expression.Let(
+                var=ast.target.id + ".slot",
+                val=next_val_setup_native_expr + next_val_ptr.expr,
+                within=native_ast.Expression.Finally(
+                    expr=self.convert_statement_list_ast(ast.body).expr,
+                    teardowns=next_val_teardowns
                     )
                 )
+            self._varname_to_type[ast.target.id] = None
 
-            return self.convert_statement_list_ast(statements)
+            orelse_native_expr = self.convert_statement_list_ast(ast.orelse).expr
+
+            res = TypedExpression(
+                native_ast.Expression.Finally(
+                    expr=iter_setup_expr + 
+                        native_ast.Expression.While(
+                            cond=while_cond_expr.expr,
+                            while_true=body_native_expr,
+                            orelse=orelse_native_expr
+                            ),
+                    teardowns=teardowns_for_iter
+                    ),
+                Void
+                )
+
+            return res
 
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
