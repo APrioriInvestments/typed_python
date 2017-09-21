@@ -259,7 +259,7 @@ def expr_str(self):
     if self.matches.ActivatesTeardown:
         return "mark slot %s initialized" % self.name
     if self.matches.StackSlot:
-        return "slot(name=%s)" % self.name
+        return "slot(name=%s,t=%s)" % (self.name, str(self.type))
 
     assert False
 

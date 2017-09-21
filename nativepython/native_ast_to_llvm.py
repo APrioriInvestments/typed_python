@@ -689,18 +689,25 @@ class Converter(object):
             self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
             self._functions_by_name[name].linkage =  'external'
 
-        for name in names_to_definitions:
-            definition = names_to_definitions[name]
-            func = self._functions_by_name[name]
 
-            if self.verbose:
+        if self.verbose:
+            for name in names_to_definitions:
+                definition = names_to_definitions[name]
+                func = self._functions_by_name[name]
+
                 print
                 print "*************"
-                print "def %s(%s)" % (name, 
-                            ",".join(["%s=%s" % (k,str(t)) for k,t in definition.args]))
+                print "def %s(%s): #->%s" % (name, 
+                            ",".join(["%s=%s" % (k,str(t)) for k,t in definition.args]),
+                            str(definition.output_type)
+                            )
                 print native_ast.indent(str(definition.body.body))
                 print "*************"
                 print
+
+        for name in names_to_definitions:
+            definition = names_to_definitions[name]
+            func = self._functions_by_name[name]
 
             arg_assignments = {}
             for i in xrange(len(func.args)):
@@ -710,14 +717,18 @@ class Converter(object):
             block = func.append_basic_block('entry')
             builder = llvmlite.ir.IRBuilder(block)
 
-            res = expression_to_llvm_ir(
-                module, 
-                self, 
-                builder, 
-                arg_assignments, 
-                definition.output_type,
-                external_function_references
-                )(definition.body.body)
+            try:
+                res = expression_to_llvm_ir(
+                    module, 
+                    self, 
+                    builder, 
+                    arg_assignments, 
+                    definition.output_type,
+                    external_function_references
+                    )(definition.body.body)
+            except Exception as e:
+                print "function failing = " + name
+                raise
 
             if res is not None:
                 assert res.native_type == native_ast.Type.Struct(()) or\

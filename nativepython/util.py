@@ -81,12 +81,7 @@ def addr(context, args):
 @exprfun
 def ref(context, args):
     assert len(args) == 1
-    return args[0].reference
-
-@exprfun
-def deref(context, args):
-    assert len(args) == 1
-    return args[0].dereference
+    return args[0].as_creates_reference
 
 @exprfun
 def typeof(context, args):

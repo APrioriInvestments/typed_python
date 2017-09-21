@@ -270,6 +270,83 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         return self.compiler.add_functions(functions)[f_target.name]
 
+    def test_simple(self):
+        def f(a):
+            return a+1
+
+        self.assertTrue(self.compile(f)(10) == f(10))
+
+    def test_simple_2(self):
+        def f(a):
+            b = a + 1
+            return b
+
+        self.assertTrue(self.compile(f)(10) == f(10))
+
+    def test_simple_3(self):
+        def f(a):
+            if a > 0:
+                b = a + 1
+                return b
+            else:
+                return b
+
+        with self.assertRaises(python_to_native_ast.ConversionException):
+            self.compile(f)
+
+    def test_simple_4(self):
+        def g(a):
+            a = a + 1
+
+        def f(a):
+            #a is passed as a reference to 'g'
+            g(a)
+            return a
+
+        self.assertTrue(self.compile(f)(10) == 11)
+
+    def test_simple_5(self):
+        def returns(a):
+            return a
+
+        def g(a):
+            a = a + 1
+
+        def f(a):
+            #the result of 'returns' is a value, not a reference
+            g(returns(a))
+            return a
+
+        self.assertTrue(self.compile(f)(10) == 10)
+
+    def test_simple_6(self):
+        def returns(a):
+            return util.ref(a)
+
+        def g2(a):
+            a = a + 1
+
+        def f(a):
+            g2(returns(a))
+            return a
+
+        self.assertEqual(self.compile(f)(10), 11)
+
+    def test_simple_7(self):
+        def returns(a):
+            return util.ref(a)
+
+        def g2(a):
+            a = a + 1
+
+        def f(a):
+            x = 10
+            y = util.ref(x)
+            y = 20
+            return x
+
+        self.assertEqual(self.compile(f)(10), 20)
+
     def test_conversion(self):
         def f(a):
             return g(a)+g(1)
