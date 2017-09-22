@@ -15,1277 +15,11 @@
 import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
 import nativepython.native_ast as native_ast
+import nativepython.exceptions as exceptions
+from nativepython.type_model import *
 
-import llvm_compiler as llvm_compiler
 class FunctionOutput:
     pass
-
-function_type = type(lambda d:d)
-classobj = type(FunctionOutput)
-
-class ConversionScopeInfo(object):
-    def __init__(self, filename, line, col, types):
-        object.__init__(self)
-
-        self.filename = filename
-        self.line = line
-        self.col = col
-        self.types = {k:v for k,v in types.iteritems() if isinstance(k,str) and v is not None}
-
-    def __cmp__(self, other):
-        return cmp(
-            (self.filename,self.line,self.col,tuple(sorted(self.types.iteritems()))),
-            (other.filename,other.line,other.col,tuple(sorted(other.types.iteritems())))
-            )
-
-    @staticmethod
-    def CreateFromAst(ast, types):
-        return ConversionScopeInfo(
-            ast.filename,
-            ast.line_number,
-            ast.col_offset,
-            dict(types)
-            )
-
-    def __str__(self):
-        return "   File \"%s\", line %d\n%s" % (self.filename, self.line, 
-            "".join(["\t\t%s=%s\n" % (k,v) for k,v in self.types.iteritems()])
-            )
-
-class ConversionException(Exception):
-    def __init__(self, msg):
-        Exception.__init__(self, msg)
-        self.conversion_scope_infos=[]
-
-    def add_scope(self, new_scope):
-        if not self.conversion_scope_infos or self.conversion_scope_infos[0] != new_scope:
-            self.conversion_scope_infos = [new_scope] + self.conversion_scope_infos
-
-    def __str__(self):
-        return self.message + "\n\n" + "".join(str(x) for x in self.conversion_scope_infos)
-
-class UnassignableFieldException(ConversionException):
-    def __init__(self, obj_type, attr, target_type):
-        ConversionException.__init__(self, "missing attribute %s in type %s" % (attr,type))
-        self.obj_type = obj_type
-        self.attr = attr
-        self.target_type = target_type
-
-class Type(object):
-    def __init__(self):
-        object.__init__(self)
-
-    def unwrap_reference(self):
-        return self
-
-    @property
-    def is_ref(self):
-        return False
-
-    @property
-    def is_create_reference(self):
-        return False
-
-    @property
-    def is_pointer(self):
-        return False
-
-    @property
-    def is_pod(self):
-        raise ConversionException("can't directly references instances of %s" % self)
-
-    @property
-    def null_value(self):
-        raise ConversionException("can't construct a null value of type %s" % self)
-
-    def lower_as_function_arg(self):
-        if self.is_pod:
-            return self.lower()
-        return native_ast.Type.Pointer(self.lower())
-
-    def lower(self):
-        raise ConversionException("Can't directly reference instances of %s" % self)
-
-    def convert_initialize_copy(self, context, instance_ref, other_instance):
-        if not self.is_pod:
-            raise ConversionException("can't initialize %s - need a real implementation" % self)
-
-        if other_instance.expr_type != self:
-            other_instance = other_instance.expr_type.convert_to_type(other_instance, self)
-
-        return TypedExpression(
-            native_ast.Expression.Store(
-                ptr=instance_ref.expr,
-                val=other_instance.expr
-                ),
-            Void
-            )
-
-    def convert_destroy(self, context, instance_ptr):
-        if not self.is_pod:
-            raise ConversionException("can't destroy %s - need a real implementation" % self)
-
-        return TypedExpression(
-            native_ast.nullExpr,
-            Void
-            )
-
-    def convert_initialize(self, context, instance_ptr, args):
-        assert instance_ptr.expr_type.value_type == self
-        assert len(args) <= 1
-
-        if len(args) == 1:
-            return self.convert_initialize_copy(context, instance_ptr, args[0])
-        else:
-            assert self.is_pod, "can't initialize %s - need a real implementation" % self
-            return TypedExpression(
-                native_ast.Expression.Store(
-                    ptr=instance_ptr.expr,
-                    val=native_ast.Expression.Constant(self.null_value)
-                    ),
-                Void
-                )
-
-    def convert_assign(self, context, instance_ref, arg):
-        if not self.is_pod:
-            raise ConversionException("instances of %s need an explicit assignment operator" % self)
-        if arg.expr_type != self:
-            raise ConversionException("can't assign %s to %s" % (arg.expr_type, self))
-
-        if arg.expr_type.is_ref:
-            return TypedExpression(
-                native_ast.Expression.Store(
-                    ptr=instance_ref.expr,
-                    val=arg.expr.load()
-                    ),
-                Void
-                )
-        else:
-            return TypedExpression(
-                native_ast.Expression.Store(
-                    ptr=instance_ref.expr,
-                    val=arg.expr
-                    ),
-                Void
-                )
-
-    def convert_unary_op(self, instance, op):
-        raise ConversionException("can't handle unary op %s on %s" % (op, self))
-
-    def convert_bin_op(self, op, l, r):
-        raise ConversionException("can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type))
-
-    def convert_to_type(self, instance, to_type):
-        raise ConversionException("can't convert %s to type %s" % (self, to_type))
-
-    def convert_attribute(self, instance, attr):
-        raise ConversionException("%s has no attribute %s" % (self, attr))
-
-    def convert_set_attribute(self, instance, attr, value):
-        raise ConversionException("%s has no attribute %s" % (self, attr))
-
-    def convert_getitem(self, context, instance, index):
-        raise ConversionException("%s doesn't support getting items" % self)
-
-    def convert_setitem(self, instance, index, value):
-        raise ConversionException("%s doesn't support setting items" % self)
-
-    @property
-    def sizeof(self):
-        raise ConversionException("can't compute the size of %s because we can't instantiate it" % self)
-
-    @property
-    def pointer(self):
-        return Pointer(self)
-
-    @property
-    def as_call_arg(self):
-        return self
-
-    @property
-    def reference(self):
-        return Reference(self)
-
-    @property
-    def create_reference(self):
-        return CreateReference(self)
-
-    def __cmp__(self, other):
-        if not isinstance(other, type(self)):
-            return cmp(type(self), type(other))
-        for k in sorted(self.__dict__):
-            c = cmp(getattr(self,k), getattr(other,k))
-            if c:
-                return c
-        return 0
-
-    def __hash__(self):
-        return hash(tuple(sorted(self.__dict__.iteritems())))
-
-
-class Struct(Type):
-    def __init__(self, element_types=()):
-        self.element_types = tuple(element_types)
-
-    @property
-    def is_pod(self):
-        for _,e in self.element_types:
-            if not e.is_pod:
-                return False
-        return True
-
-    @property
-    def null_value(self):
-        return native_ast.Constant.Struct(
-                [(name,t.null_value) for name,t in self.element_types]
-                )
-
-    def convert_initialize_copy(self, context, instance_ptr, other_instance):
-        if self.is_pod:
-            assert other_instance.expr_type == self
-
-            return TypedExpression(
-                native_ast.Expression.Store(
-                    ptr=instance_ptr.expr,
-                    val=other_instance.expr
-                    ),
-                Void
-                )
-
-        assert other_instance.expr_type == self
-        assert instance_ptr.expr_type.value_type == self
-
-        def make_body(instance_ptr, other_instance):
-            body = native_ast.nullExpr
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.pointer_to_field(instance_ptr.expr, name)
-                source_field = other_instance.convert_attribute(name)
-
-                dest_t = dest_field.expr_type.value_type
-
-                body = body + dest_t.convert_initialize_copy(context, dest_field, source_field).expr
-
-            return TypedExpression(body, Void)
-
-        return context.call_expression_in_function(
-            (self, "initialize_copy"), 
-            "%s.initialize_copy" % (str(self)), 
-            [instance_ptr, other_instance.reference], 
-            make_body
-            )
-
-    def convert_destroy(self, context, instance_ptr):
-        if self.is_pod:
-            return TypedExpression(
-                native_ast.nullExpr,
-                Void
-                )
-
-        expr = native_ast.nullExpr
-
-        for ix,(name,e) in enumerate(self.element_types):
-            dest_field = self.pointer_to_field(instance_ptr.expr, name)
-
-            expr = expr + dest_field.expr_type.value_type.convert_destroy(context, dest_field).expr
-
-        return TypedExpression(expr, Void)
-
-    def convert_initialize(self, context, instance_ptr, args):
-        if len(args) != 0:
-            assert len(args) == len(self.element_types), (self.element_types, args)
-
-        def make_body(instance_ptr, *args):
-            expr = native_ast.nullExpr
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.pointer_to_field(instance_ptr.expr, name)
-
-                dest_t = dest_field.expr_type.value_type
-                if args:
-                    expr = expr + dest_t.convert_initialize_copy(context, dest_field, args[ix]).expr
-                else:
-                    expr = expr + dest_t.convert_initialize(context, dest_field, ()).expr
-
-            return TypedExpression(expr, Void)
-
-        return context.call_expression_in_function(
-            (self, "initialize"), 
-            "%s.initialize" % (str(self)), 
-            [instance_ptr] + list(args), 
-            make_body
-            )
-
-    def convert_assign(self, context, instance_ref, arg):
-        assert instance_ref.is_ref and self == instance_ref.value_type
-        assert arg.expr_type == self, "can't assign %s to %s" % (arg.expr_type, self)
-
-        if arg.expr_type.is_pod:
-            return TypedExpression(
-                native_ast.Expression.Store(
-                    ptr=instance_ref.expr,
-                    val=arg.expr
-                    ),
-                Void
-                )
-
-        def make_body(instance_ref, arg):
-            expr = native_ast.nullExpr
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.pointer_to_field(instance_ref.expr, name)
-                source_field = arg.convert_attribute(name)
-
-                dest_t = dest_field.expr_type.value_type
-
-                expr = expr + dest_t.convert_assign(context, dest_field, source_field).expr
-
-            return TypedExpression(expr, Void)
-
-        return context.call_expression_in_function(
-            (self, "assign"), 
-            "%s.assign" % (str(self)), 
-            [instance_ref, arg.reference], 
-            make_body
-            )
-
-    def lower(self):
-        return native_ast.Type.Struct(tuple([(a[0], a[1].lower()) for a in self.element_types]))
-
-    def with_field(self, name, type):
-        if isinstance(name, TypedExpression):
-            assert name.expr.matches.Constant and name.expr.val.matches.ByteArray, name.expr
-            name = name.expr.val.val
-
-        return Struct(element_types=self.element_types + ((name,type),))
-
-    def convert_attribute(self, instance, attr):
-        for i in xrange(len(self.element_types)):
-            if self.element_types[i][0] == attr:
-                address = instance.address
-                return TypedExpression(
-                    address.expr.ElementPtrIntegers(0,i).load(),
-                    self.element_types[i][1]
-                    )
-
-        return super(Struct,self).convert_attribute(instance, attr)
-
-    def convert_getitem(self, context, instance, index):
-        assert index.expr.matches.Constant and index.expr.val.matches.Int, \
-            "can't index %s with %s" % (self,index)
-        i = index.expr.val.val
-        assert i >= 0 and i < len(self.element_types), "can't index %s with %s" % (self, index)
-
-        return self.convert_attribute(instance, self.element_types[i][0])
-
-    def pointer_to_field(self, native_instance_ptr, attribute_name):
-        for i in xrange(len(self.element_types)):
-            if self.element_types[i][0] == attribute_name:
-                return TypedExpression(
-                    native_instance_ptr.ElementPtrIntegers(0, i),
-                    self.element_types[i][1].pointer
-                    )
-
-    def convert_set_attribute(self, instance, attr, val):
-        field_ptr = self.pointer_to_field(instance.address.expr, attr)
-
-        assert field_ptr is not None
-
-        assert val.expr_type == field_ptr.expr_type.value_type, \
-            "Can't assign value of type %s to struct field %s" % (
-                val.expr_type,
-                field_ptr.expr_type.value_type
-                )
-
-        return TypedExpression(
-            native_ast.Expression.Store(
-                ptr=field_ptr.expr,
-                val=val.expr
-                ),
-            Void
-            )
-
-    @property
-    def sizeof(self):
-        return sum(t.sizeof for n,t in self.element_types)
-
-    def __str__(self):
-        return "Struct(%s)" % (",".join(["%s=%s" % t for t in self.element_types]))
-
-class Reference(Type):
-    def __init__(self, value_type):
-        assert isinstance(value_type, Type)
-        self.value_type = value_type
-
-    @property
-    def is_ref(self):
-        return True
-
-    def unwrap_reference(self):
-        return self.value_type
-
-    def lower(self):
-        return native_ast.Type.Pointer(self.value_type.lower())
-
-    @property
-    def as_call_arg(self):
-        return self.value_type
-
-    @property
-    def create_reference(self):
-        return CreateReference(self.value_type)
-
-    @property
-    def is_pod(self):
-        return True
-
-    @property
-    def null_value(self):
-        return native_ast.Constant.NullPointer(self.value_type.lower())
-
-    @property
-    def sizeof(self):
-        return llvm_compiler.pointer_size
-
-    @property
-    def pointer(self):
-        return Pointer(self)
-
-    def convert_attribute(self, instance, attr):
-        result = TypedExpression(instance.expr.load(), self.value_type).convert_attribute(attr)
-
-        return result
-
-    def convert_set_attribute(self, instance, attr, val):
-        return TypedExpression(instance.expr.load(), self.value_type) \
-            .convert_set_attribute(attr, val)
-
-    def convert_bin_op(self, op, l, r):
-        return TypedExpression(l.expr.load(), self.value_type).convert_bin_op(op, r)
-
-    def convert_getitem(self, context, instance, index):
-        return TypedExpression(instance.expr.load(), self.value_type).convert_getitem(context, index)
-
-    def convert_setitem(self, instance, index, value):
-        return TypedExpression(instance.expr.load(), self.value_type).convert_setitem(index, value)
-
-    def convert_to_type(self, instance, to_type):
-        return TypedExpression(instance.expr.load(), self.value_type).convert_to_type(to_type)
-
-    def convert_initialize_copy(self, context, instance_ref, other_instance):
-        other_instance = other_instance.drop_create_reference()
-
-        if other_instance.expr_type != self:
-            other_instance = other_instance.expr_type.convert_to_type(other_instance, self)
-
-        return TypedExpression(
-            native_ast.Expression.Store(
-                ptr=instance_ref.expr,
-                val=other_instance.expr
-                ),
-            Void
-            )
-
-    def __repr__(self):
-        return "Reference(%s)" % self.value_type
-
-class CreateReference(Reference):
-    @property
-    def is_create_reference(self):
-        return True
-
-    @property
-    def reference(self):
-        return Reference(self.value_type)
-
-    @property
-    def as_call_arg(self):
-        return self.reference
-
-    @property
-    def create_reference(self):
-        return self
-
-    def __repr__(self):
-        return "CreateReference(%s)" % self.value_type
-
-class Pointer(Type):
-    def __init__(self, value_type):
-        assert isinstance(value_type, Type)
-        self.value_type = value_type
-
-    def lower(self):
-        return native_ast.Type.Pointer(self.value_type.lower())
-
-    @property
-    def is_pointer(self):
-        return True
-
-    @property
-    def is_pod(self):
-        return True
-
-    @property
-    def null_value(self):
-        return native_ast.Constant.NullPointer(self.value_type.lower())
-
-    @property
-    def sizeof(self):
-        return llvm_compiler.pointer_size
-
-    def convert_attribute(self, instance, attr):
-        if not isinstance(self.value_type, Pointer):
-            return instance.load.convert_attribute(attr)
-
-        raise ConversionException("no attribute %s in Pointer" % attr)
-
-    def convert_set_attribute(self, instance, attr, val):
-        if not isinstance(self.value_type, Pointer):
-            return instance.load.convert_set_attribute(attr,val)
-        
-        raise ConversionException("no attribute %s in Pointer" % attr)
-
-    def convert_bin_op(self, op, l, r):
-        if op._alternative is python_ast.BinaryOp:
-            if op.matches.Add or op.matches.Sub:
-                if isinstance(r.expr_type, PrimitiveNumericType) and r.expr_type.t.matches.Int:
-                    if op.matches.Sub:
-                        r = r.convert_unary_op(python_ast.PythonASTUnaryOp.USub())
-
-                    return TypedExpression(
-                        native_ast.Expression.ElementPtr(
-                            left=l.expr,
-                            offsets=(r.expr,)
-                            ),
-                        self
-                        )
-
-        return super(Pointer, self).convert_bin_op(op,l,r)
-
-
-    def convert_getitem(self, context, instance, index):
-        assert (isinstance(index.expr_type, PrimitiveNumericType) 
-                and index.expr_type.t.matches.Int), \
-            "can only index with integers, not %s" % index.expr_type
-
-        return TypedExpression(
-            native_ast.Expression.Load(
-                ptr=native_ast.Expression.ElementPtr(
-                    left=instance.expr,
-                    offsets=(index.expr,)
-                    )
-                ),
-            self.value_type
-            )
-
-    def convert_setitem(self, instance, index, value):
-        assert value.expr_type == self.value_type, (
-            "%s can only hold instances of %s, not %s" % 
-                (self, self.value_type, value.expr_type)
-            )
-
-        assert (isinstance(index.expr_type, PrimitiveNumericType) 
-                and index.expr_type.t.matches.Int), \
-            "can only index with integers, not %s" % index.expr_type
-
-        return TypedExpression(
-            native_ast.Expression.Store(
-                ptr=native_ast.Expression.ElementPtr(
-                    left=instance.expr,
-                    offsets=(index.expr,)
-                    ),
-                val=value.expr
-                ),
-            Void
-            )
-
-    def convert_to_type(self, instance, to_type):
-        if isinstance(to_type, Pointer):
-            return TypedExpression(
-                native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
-                to_type
-                )
-
-        if isinstance(to_type, PrimitiveType) and to_type.t.matches.Int:
-            return TypedExpression(
-                native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
-                to_type
-                )
-
-        raise ConversionException("can't convert %s to type %s" % (self, to_type))
-
-    def __repr__(self):
-        return "Pointer(%s)" % self.value_type
-
-
-class PrimitiveType(Type):
-    def __init__(self, t):
-        Type.__init__(self)
-        self.t = t
-
-    @property
-    def null_value(self):
-        if self.t.matches.Float:
-            return native_ast.Constant.Float(bits=self.t.bits,val=0.0)
-
-        if self.t.matches.Int:
-            return native_ast.Constant.Int(bits=self.t.bits,signed=self.t.signed,val=0)
-
-        if self.t.matches.Void:
-            return native_ast.Constant.Void()
-
-        raise ConversionException(self.t)
-
-    @property
-    def is_pod(self):
-        return True
-
-    def lower(self):
-        return self.t
-
-    def __repr__(self):
-        return str(self.t)
-
-class PrimitiveNumericType(PrimitiveType):
-    def __init__(self, t):
-        PrimitiveType.__init__(self, t)
-
-        assert t.matches.Float or t.matches.Int
-
-    @property
-    def sizeof(self):
-        if self.t.bits == 1:
-            return 1
-        assert self.t.bits % 8 == 0
-        return self.t.bits / 8
-
-    def bigger_type(self, other):
-        if self.t.matches.Float and other.t.matches.Int:
-            return self
-        if self.t.matches.Int and other.t.matches.Float:
-            return other
-        if self.t.matches.Int:
-            return PrimitiveNumericType(
-                native_ast.Type.Int(
-                    bits = max(self.t.bits, other.t.bits),
-                    signed = self.t.signed or other.t.signed
-                    )
-                )
-        else:
-            return PrimitiveNumericType(
-                native_ast.Type.Float(
-                    bits = max(self.t.bits, other.t.bits)
-                    )
-                )
-
-    def convert_unary_op(self, instance, op):
-        if op.matches.UAdd or op.matches.USub:
-            return TypedExpression(
-                native_ast.Expression.Unaryop(
-                    op=native_ast.UnaryOp.Add() if op.matches.UAdd else native_ast.UnaryOp.Negate(),
-                    operand=instance.expr
-                    ),
-                self
-                )
-
-        return super(PrimitiveNumericType, self).convert_unary_op(instance, op)
-
-    def convert_bin_op(self, op, l, r):
-        l = l.dereference()
-        r = r.dereference()
-
-        target_type = self.bigger_type(r.expr_type)
-
-        if r.expr_type != target_type:
-            r = r.expr_type.convert_to_type(r, target_type)
-
-        if l.expr_type != target_type:
-            l = l.expr_type.convert_to_type(l, target_type)
-
-        if op._alternative is python_ast.BinaryOp:
-            for py_op, native_op in [('Add','Add'),('Sub','Sub'),('Mult','Mul'),('Div','Div')]:
-                if getattr(op.matches, py_op):
-                    return TypedExpression(
-                        native_ast.Expression.Binop(
-                            op=getattr(native_ast.BinaryOp,native_op)(),
-                            l=l.expr,
-                            r=r.expr
-                            ),
-                        target_type
-                        )
-        if op._alternative is python_ast.ComparisonOp:
-            for opname in ['Gt','GtE','Lt','LtE','Eq','NotEq']:
-                if getattr(op.matches, opname):
-                    return TypedExpression(
-                        native_ast.Expression.Binop(
-                            op=getattr(native_ast.BinaryOp,opname)(),
-                            l=l.expr,
-                            r=r.expr
-                            ),
-                        Bool
-                        )
-
-        raise ConversionException("can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type))
-
-    def convert_to_type(self, e, other_type):
-        if other_type == self:
-            return e
-
-        if isinstance(other_type, PrimitiveNumericType):
-            return TypedExpression(
-                native_ast.Expression.Cast(left=e.expr, to_type=other_type.lower()),
-                other_type
-                )
-
-        if isinstance(other_type, Pointer) and self.t.matches.Int:
-            return TypedExpression(
-                native_ast.Expression.Cast(left=e.expr, to_type=other_type.lower()),
-                other_type
-                )
-
-        raise ConversionException("can't convert %s to %s" % (self, other_type))
-
-class RepresentationlessType(Type):
-    @property
-    def is_pod(self):
-        return True
-    
-    @property
-    def sizeof(self):
-        return 0
-
-    @property
-    def null_value(self):
-        return native_ast.Constant.Void()
-
-    def lower(self):
-        return native_ast.Type.Void()
-
-    @property
-    def python_object_representation(self):
-        raise ConversionException("Subclasses must implement")
-
-def representation_for(obj):
-    def decorator(override):
-        FreePythonObjectReference.free_python_object_overrides[obj] = override
-        return override
-    return decorator
-
-class FreePythonObjectReference(RepresentationlessType):
-    free_python_object_overrides = {}
-
-    def __init__(self, obj):
-        object.__init__(self)
-        self._original_obj = obj
-
-        if obj in self.free_python_object_overrides:
-            obj = self.free_python_object_overrides[obj]
-        self._obj = obj
-
-    @property
-    def python_object_representation(self):
-        return self._original_obj
-        
-    def convert_attribute(self, instance, attr):
-        return pythonObjectRepresentation(getattr(self._obj, attr))
-
-    def convert_call(self, context, instance, args):
-        if isinstance(self._obj, function_type):
-            return context.call_py_function(self._obj, args)
-
-        if self._obj is float:
-            assert len(args) == 1
-            return args[0].convert_to_type(Float64)
-
-        if self._obj is int:
-            assert len(args) == 1
-            return args[0].convert_to_type(Int64)
-
-        if PythonClass.object_is_class(self._obj):
-            if not hasattr(self._obj, "__init__"):
-                cls_type = PythonClass(self._obj, ())
-
-                tmp_ptr = context.allocate_temporary(cls_type)
-
-                return TypedExpression(
-                    cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
-                        context.activates_temporary(tmp_ptr) + 
-                        native_ast.Expression.Load(tmp_ptr.expr),
-                    cls_type
-                    )
-            else:
-                init_func = getattr(self._obj, "__init__").im_func
-                
-                cur_types = ()
-                while True:
-                    try:
-                        cls_type = PythonClass(self._obj, cur_types)
-                        call_target = context._converter.convert(init_func, [Reference(cls_type)] + \
-                            [a.expr_type for a in args], name_override=self._obj.__name__+".__init__")
-                        break
-                    except UnassignableFieldException as e:
-                        if e.obj_type == cls_type:
-                            cur_types = cur_types + ((e.attr, e.target_type),)
-                        else:
-                            raise
-
-                tmp_ptr = context.allocate_temporary(cls_type)
-
-                return TypedExpression(
-                    cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
-                        context.activates_temporary(tmp_ptr) + 
-                        context.generate_call_expr(
-                            target=call_target.native_call_target,
-                            args=[tmp_ptr.load.reference.expr] 
-                                  + [a.as_function_call_arg() for a in args]
-                            ) + 
-                        native_ast.Expression.Load(tmp_ptr.expr),
-                    cls_type
-                    )
-
-        if isinstance(self._obj, Type):
-            #we are initializing an element of the type
-            for a in args:
-                assert a.expr is not None
-
-            tmp_ptr = context.allocate_temporary(self._obj)
-
-            return TypedExpression(
-                self._obj.convert_initialize(context, tmp_ptr, args).expr + 
-                    context.activates_temporary(tmp_ptr) + 
-                    tmp_ptr.expr.load(),
-                self._obj
-                )
-
-        def to_py(x):
-            if isinstance(x.expr_type, FreePythonObjectReference):
-                return x.expr_type._obj
-            if x.expr is not None and x.expr.matches.Constant:
-                if x.expr.val.matches.Int or x.expr.val.matches.Float:
-                    return x.expr.val.val
-            return x
-
-        call_args = [to_py(x) for x in args]
-        try:
-            py_call_result = self._obj(*call_args)
-        except Exception as e:
-            raise ConversionException("Failed to call %s with %s" % (self._obj, call_args))
-
-        return pythonObjectRepresentation(py_call_result)
-
-    def __repr__(self):
-        return "FreePythonObject(%s)" % self._obj
-
-class PythonClass(Type):
-    def __init__(self, cls, element_types):
-        self.cls = cls
-        self.element_types = element_types
-
-    @staticmethod
-    def object_is_class(o):
-        return (isinstance(o, type) 
-                and o.__module__ != '__builtin__' 
-                and not issubclass(o, Type) or isinstance(o, classobj))
-
-    @property
-    def is_pod(self):
-        return False
-
-    def lower(self):
-        native_ast.Type.Struct([(n,t.lower()) for t in self.element_types])
-
-    @property
-    def null_value(self):
-        return native_ast.Constant.Struct(
-                [(name,t.null_value) for name,t in self.element_types]
-                )
-
-    def convert_initialize_copy(self, context, instance_ptr, other_instance):
-        if hasattr(self.cls, "__copy_constructor__"):
-            def make_body(instance_ptr, other_instance):
-                init_func = self.cls.__copy_constructor__.im_func
-
-                call_target = context._converter.convert(
-                    init_func, 
-                    [instance_ptr.expr_type, other_instance.expr_type],
-                    name_override=self.cls.__name__+".__copy_constructor__"
-                    )
-                    
-                return TypedExpression(
-                    self.convert_initialize(context, instance_ptr, ()).expr + 
-                        context.generate_call_expr(
-                            target=call_target.native_call_target,
-                            args=[instance_ptr.as_function_call_arg(), 
-                                  other_instance.as_function_call_arg()]
-                            ),
-                    Void
-                    )
-
-            return context.call_expression_in_function(
-                (self, "initialize_copy"), "%s.initialize_copy" % (self.cls.__name__), 
-                [instance_ptr.load.reference, other_instance.reference], 
-                make_body
-                )
-        else:
-            if other_instance.expr_type != self:
-                raise ConversionException(
-                    "Can't initialize %s with an instance of %s" % (
-                        self, other_instance.expr_type
-                        )
-                    )
-            assert instance_ptr.expr_type.value_type == self
-
-            def make_body(instance_ptr, other_instance):
-                body = native_ast.nullExpr
-
-                for ix,(name,e) in enumerate(self.element_types):
-                    dest_field = self.pointer_to_field(instance_ptr.expr, name)
-                    source_field = other_instance.convert_attribute(name)
-
-                    dest_t = dest_field.expr_type.value_type
-
-                    body = body + \
-                        dest_t.convert_initialize_copy(context, dest_field, source_field).expr
-
-                return TypedExpression(body, Void)
-
-            return context.call_expression_in_function(
-                (self, "initialize_copy"), 
-                "%s.initialize_copy" % (str(self)), 
-                [instance_ptr, other_instance.reference], 
-                make_body
-                )
-
-    def convert_destroy(self, context, instance_ptr):
-        assert instance_ptr.expr_type.value_type == self
-
-        def make_body(instance_ptr):
-            expr = native_ast.nullExpr
-
-            if hasattr(self.cls, "__destructor__"):
-                destructor_func = self.cls.__destructor__.im_func
-                expr = context.call_py_function(
-                    destructor_func, 
-                    [instance_ptr.load.reference],
-                    name_override=self.cls.__name__+".__destructor__").expr
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.pointer_to_field(instance_ptr.expr, name)
-
-                dest_t = dest_field.expr_type.value_type
-                expr = expr + dest_t.convert_destroy(context, dest_field).expr
-
-            return TypedExpression(expr, Void)
-
-        return context.call_expression_in_function(
-            (self,'destroy'), 
-            "%s.destroy" % (self.cls.__name__),
-            [instance_ptr],
-            make_body
-            )
-
-    def convert_initialize(self, context, instance_ptr, args):
-        if len(args) != 0:
-            assert len(args) == len(self.element_types), (len(self.element_types), len(args))
-
-        def make_body(instance_ptr, *args):
-            body = native_ast.nullExpr
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.pointer_to_field(instance_ptr.expr, name)
-
-                dest_t = dest_field.expr_type.value_type
-                if args:
-                    body = body + dest_t.convert_initialize(context, dest_field, (args[ix],)).expr
-                else:
-                    body = body + dest_t.convert_initialize(context, dest_field, ()).expr
-
-            return TypedExpression(body, Void)
-
-        return context.call_expression_in_function(
-            (self, "initialize"), 
-            "%s.initialize" % (self.cls.__name__), 
-            [instance_ptr] + list(args), 
-            make_body
-            )
-
-    def convert_assign(self, context, instance_ptr, arg):
-        assert arg.expr_type == self, "can't assign %s to %s" % (arg.expr_type, self)
-
-        def make_body(instance_ptr, arg):
-            expr = native_ast.nullExpr
-
-            if hasattr(self.cls, "__assign__"):
-                assign_func = self.cls.__assign__.im_func
-                return context.call_py_function(
-                    assign_func, 
-                    [instance_ptr.load.reference, arg],
-                    name_override=self.cls.__name__+".__assign__"
-                    )
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.pointer_to_field(instance_ptr.expr, name)
-                source_field = arg.convert_attribute(name)
-
-                dest_t = dest_field.expr_type.value_type
-                expr = expr + dest_t.convert_assign(context, dest_field, source_field).expr
-
-            return TypedExpression(expr, Void)
-
-        return context.call_expression_in_function(
-            (self,"assign"), 
-            "%s.assign" % self.cls.__name__, 
-            [instance_ptr, arg.reference], 
-            make_body
-            )
-
-    def lower(self):
-        return native_ast.Type.Struct(tuple([(a[0], a[1].lower()) for a in self.element_types]))
-
-    def convert_attribute(self, instance, attr):
-        for i in xrange(len(self.element_types)):
-            if self.element_types[i][0] == attr:
-                address = instance.address
-                return TypedExpression(
-                    address.expr.ElementPtrIntegers(0,i).load(),
-                    self.element_types[i][1]
-                    )
-
-        func = None
-        try:
-            func = getattr(self.cls, attr).im_func
-        except AttributeError:
-            pass
-
-        if func is not None:
-            return TypedExpression(instance.address.expr, PythonClassMemberFunc(self, attr))
-
-        return super(PythonClass,self).convert_attribute(instance, attr)
-
-    def pointer_to_field(self, native_instance_ptr, attribute_name):
-        for i in xrange(len(self.element_types)):
-            if self.element_types[i][0] == attribute_name:
-                return TypedExpression(
-                    native_instance_ptr.ElementPtrIntegers(0, i),
-                    self.element_types[i][1].pointer
-                    )
-
-    def convert_set_attribute(self, instance, attr, val):
-        field_ptr = self.pointer_to_field(instance.address.expr, attr)
-
-        if field_ptr is None:
-            raise UnassignableFieldException(self, attr, val.expr_type)
-
-        if val.expr_type != field_ptr.expr_type.value_type:
-            raise ConversionException(
-                "Can't assign value of type %s to struct field %s" % (
-                    val.expr_type,
-                    field_ptr.expr_type.value_type
-                    )
-                )
-
-        return TypedExpression(
-            native_ast.Expression.Store(
-                ptr=field_ptr.expr,
-                val=val.expr
-                ),
-            Void
-            )
-
-    def convert_getitem(self, context, instance, item):
-        if hasattr(self.cls, "__getitem__"):
-            getitem = self.cls.__getitem__.im_func
-            return context.call_py_function(
-                getitem, 
-                [instance.reference, item],
-                name_override=self.cls.__name__+".__getitem__"
-                )
-
-        return super(PythonClass, self).convert_getitem(context, instance, item)
-
-    @property
-    def sizeof(self):
-        return sum(t.sizeof for n,t in self.element_types)
-
-    def __str__(self):
-        return "Class(%s,%s)" % (self.cls, ",".join(["%s=%s" % t for t in self.element_types]))
-
-class PythonClassMemberFunc(Type):
-    def __init__(self, python_class_type, attr):
-        self.python_class_type = python_class_type
-        self.attr = attr
-
-    def lower(self):
-        return self.python_class_type.pointer.lower()
-
-    @property
-    def is_pod(self):
-        return True
-
-    @property
-    def sizeof(self):
-        return self.python_class_type.pointer.sizeof
-
-    def convert_call(self, context, instance, args):
-        func = getattr(self.python_class_type.cls, self.attr).im_func
-        
-        obj_ptr = TypedExpression(instance.expr, self.python_class_type.pointer)
-
-        return context.call_py_function(
-            func, 
-            [obj_ptr.load.reference] + args, 
-            name_override=self.python_class_type.cls.__name__ + "." + self.attr
-            )
-
-    def __str__(self):
-        return "ClassMemberFunction(%s,%s,%s)" % (
-            self.python_class_type.cls, 
-            self.attr, 
-            ",".join(["%s=%s" % t for t in self.python_class_type.element_types])
-            )
-
-def pythonObjectRepresentation(o):
-    if isinstance(o,TypedExpression):
-        return o
-
-    if isinstance(o, int):
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                native_ast.Constant.Int(val=o,bits=64,signed=True)
-                ), 
-            Int64
-            )
-
-    if isinstance(o, str):
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                native_ast.Constant.ByteArray(bytes(o))
-                ), 
-            UInt8.pointer
-            )
-
-    if isinstance(o, float):
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                native_ast.Constant.Float(val=o,bits=64)
-                ), 
-            Float64
-            )
-
-    if isinstance(o,RepresentationlessType):
-        return TypedExpression(native_ast.nullExpr, o)
-
-    return TypedExpression(native_ast.nullExpr, FreePythonObjectReference(o))
-
-class TypedExpression(object):
-    def __init__(self, expr, expr_type):
-        object.__init__(self)
-
-        assert expr._alternative is native_ast.Expression
-        assert isinstance(expr_type, Type) or expr_type is None
-
-        if expr_type is not None and expr is not None:
-            if expr.matches.StackSlot:
-                assert expr_type.lower().value_type == expr.type, (str(expr), str(expr_type))
-
-        if expr_type is not None:
-            assert expr_type.is_pod
-
-        self.expr = expr
-        self.expr_type = expr_type
-
-    def drop_create_reference(self):
-        return TypedExpression(self.expr, self.expr_type.value_type.reference)
-
-    def drop_double_references(self):
-        if self.expr_type.is_ref and self.expr_type.value_type.is_ref:
-            return TypedExpression(self.expr.load(), self.expr_type.value_type)\
-                .drop_double_references()
-        return self
-
-    def __add__(self, other):
-        if self.expr_type is None:
-            return self
-
-        return TypedExpression(self.expr + other.expr, other.expr_type)
-
-    def dereference(self):
-        if not self.expr_type.is_ref:
-            return self
-        return TypedExpression(
-            self.expr.load(),
-            self.expr_type.value_type
-            )
-
-    @property
-    def as_creates_reference(self):
-        if not self.expr_type.is_ref:
-            raise ConversionException("This expression is not already a reference")
-        return TypedExpression(
-            self.expr,
-            self.expr_type.create_reference
-            )
-
-    def as_function_call_arg(self):
-        """This expression is being passed to a function. Our calling convention
-        requires non-pod to be passed as a pointer. This means we need to be
-        able to find an actual stackslot for this expression."""
-        return self.expr
-
-    def convert_unary_op(self, op):
-        return self.expr_type.convert_unary_op(self, op)
-
-    def convert_bin_op(self, op, r):
-        return self.expr_type.convert_bin_op(op, self, r)
-
-    def convert_call(self, context, args):
-        return self.expr_type.convert_call(context, self, args)
-
-    def convert_attribute(self, attr):
-        return self.expr_type.convert_attribute(self, attr)
-
-    def convert_assign(self, context, other):
-        assert self.expr_type.is_ref
-        return self.expr_type.value_type.convert_assign(context, self, other)
-
-    def convert_set_attribute(self, attr, val):
-        return self.expr_type.convert_set_attribute(self, attr, val)
-
-    def convert_to_type(self, type):
-        return self.expr_type.convert_to_type(self, type)
-
-    def convert_setitem(self, index, value):
-        return self.expr_type.convert_setitem(self, index, value)
-
-    def convert_getitem(self, context, index):
-        return self.expr_type.convert_getitem(context, self, index)
-
-    @property
-    def load(self):
-        assert isinstance(self.expr_type, Pointer)
-        return TypedExpression(self.expr.load(), self.expr_type.value_type)
-
-    def __repr__(self):
-        return "TypedExpression(t=%s)" % (self.expr_type)
-
-class TypedCallTarget(object):
-    def __init__(self, native_call_target, input_types, output_type):
-        object.__init__(self)
-        self.native_call_target = native_call_target
-        self.input_types = input_types
-        self.output_type = output_type
-
-    @property
-    def name(self):
-        return self.native_call_target.name
-
-Float64 = PrimitiveNumericType(native_ast.Type.Float(bits=64))
-Int64 = PrimitiveNumericType(native_ast.Type.Int(bits=64, signed=True))
-Int32 = PrimitiveNumericType(native_ast.Type.Int(bits=32, signed=True))
-Int8 = PrimitiveNumericType(native_ast.Type.Int(bits=8, signed=True))
-UInt8 = PrimitiveNumericType(native_ast.Type.Int(bits=8, signed=False))
-Bool = PrimitiveNumericType(native_ast.Type.Int(bits=1, signed=False))
-Void = PrimitiveType(native_ast.Type.Void())
 
 class ConversionContext(object):
     def __init__(self, converter, varname_to_type, free_variable_lookup):
@@ -1312,16 +46,10 @@ class ConversionContext(object):
         self._new_temporaries.add(tname)
         self._temporaries[tname] = slot_type
 
-        if slot_type.is_ref:
-            return TypedExpression(
-                native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
-                slot_type.reference
-                )
-        else:
-            return TypedExpression(
-                native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
-                slot_type.reference
-                )
+        return TypedExpression(
+            native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
+            slot_type.reference
+            )
 
     def named_var_expr(self, name):
         if self._varname_to_type[name] is None:
@@ -1339,8 +67,13 @@ class ConversionContext(object):
             slot_type.reference
             )
 
-
     def call_py_function(self, f, args, name_override=None):
+        #force arguments to a type appropriate for argpassing
+        #e.g. drop out "CreateReference" and other syntactic sugar
+        args = [a.as_call_arg() for a in args]
+
+        native_args = [a.native_expr_for_function_call() for a in args]
+
         call_target = \
             self._converter.convert(
                 f, 
@@ -1356,7 +89,7 @@ class ConversionContext(object):
             return TypedExpression(
                 self.generate_call_expr(
                     target=call_target.native_call_target,
-                    args=[slot.expr] + [a.as_function_call_arg() for a in args]
+                    args=[slot.expr] + native_args
                     ) 
                     + self.activates_temporary(slot)
                     + slot.expr
@@ -1364,20 +97,15 @@ class ConversionContext(object):
                 call_target.output_type.reference
                 )
         else:
-            slot = self.allocate_temporary(call_target.output_type)
-
             assert len(call_target.native_call_target.arg_types) == len(args)
 
             return TypedExpression(
-                native_ast.Expression.Store(
-                    ptr = slot.expr,
-                    val = self.generate_call_expr(
-                        target=call_target.native_call_target,
-                        args=[a.as_function_call_arg() for a in args]
-                        )
-                    ) + slot.expr,
-                call_target.output_type.reference
-                ).drop_double_references()
+                self.generate_call_expr(
+                    target=call_target.native_call_target,
+                    args=native_args
+                    ),
+                call_target.output_type
+                )
 
     def generate_call_expr(self, target, args):
         lets = []
@@ -1419,7 +147,7 @@ class ConversionContext(object):
             return self.convert_expression_ast_(ast)
         except ConversionException as e:
             e.add_scope(
-                ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type)
+                exceptions.ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type)
                 )
             raise
 
@@ -1427,7 +155,7 @@ class ConversionContext(object):
         if ast.matches.Attribute:
             attr = ast.attr
             val = self.convert_expression_ast(ast.value)
-            return val.convert_attribute(attr)
+            return val.convert_attribute(self, attr)
 
         if ast.matches.Name:
             assert ast.ctx.matches.Load
@@ -1490,28 +218,14 @@ class ConversionContext(object):
 
             if not ast.starargs.matches.Null:
                 starargs = self.convert_expression_ast(ast.starargs.val)
-                starargs = self.enforce_concrete_and_return_ref(starags)
 
                 #starargs is now a reference to a tuple
                 #now we want to take each element and turn into a reference.
 
-                for i in xrange(len(starargs.expr_type.element_types)):
-                    if starargs.expr_type.element_types[i][1].is_ref:
-                        args.append(
-                            TypedExpression(
-                                native_ast.Expression.Load(
-                                    tmp_ptr.expr.ElementPtrIntegers(0,i)
-                                    ),
-                                starargs.expr_type.element_types[i][1]
-                                )
-                            )
-                    else:
-                        args.append(
-                            TypedExpression(
-                                tmp_ptr.expr.ElementPtrIntegers(0,i),
-                                starargs.expr_type.element_types[i][1].reference
-                                )
-                            )
+                for attr, t in starargs.expr_type.nonref_type.element_types:
+                    args.append(
+                        starargs.convert_attribute(self, attr)
+                        )
 
             return init + l.convert_call(self, args)
 
@@ -1529,13 +243,13 @@ class ConversionContext(object):
 
             struct_type = Struct([("f%s"%i,e.expr_type.as_call_arg) for i,e in enumerate(elts)])
 
-            tmp_ptr = self.allocate_temporary(struct_type)
+            tmp_ref = self.allocate_temporary(struct_type)
 
             return TypedExpression(
-                struct_type.convert_initialize(self, tmp_ptr, elts).expr + 
-                    self.activates_temporary(tmp_ptr) + 
-                    tmp_ptr.expr.load(),
-                struct_type
+                struct_type.convert_initialize(self, tmp_ref, elts).expr + 
+                    self.activates_temporary(tmp_ref) + 
+                    tmp_ref.expr,
+                tmp_ref.expr_type
                 )
 
         if ast.matches.IfExp:
@@ -1550,8 +264,8 @@ class ConversionContext(object):
             return TypedExpression(
                 native_ast.Expression.Branch(
                     cond=test.expr, 
-                    true=body.address.expr, 
-                    false=orelse.address.expr
+                    true=body.expr, 
+                    false=orelse.expr
                     ),
                 body.expr_type
                 )
@@ -1604,7 +318,9 @@ class ConversionContext(object):
         try:
             return self.convert_statement_ast_(ast)
         except ConversionException as e:
-            e.add_scope(ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type))
+            e.add_scope(
+                exceptions.ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type)
+                )
 
             raise
 
@@ -1628,7 +344,10 @@ class ConversionContext(object):
 
                 if self._varname_to_type[varname] is None:
                     self._new_variables.add(varname)
-                    self._varname_to_type[varname] = val_to_store.expr_type.as_call_arg
+
+                    new_variable_type = val_to_store.expr_type.as_call_arg
+                    assert new_variable_type.is_valid_as_variable
+                    self._varname_to_type[varname] = new_variable_type
 
                     slot_ref = self.named_var_expr(varname)
                     
@@ -1637,10 +356,7 @@ class ConversionContext(object):
                         self,
                         slot_ref,
                         val_to_store
-                        ) + TypedExpression(
-                            native_ast.Expression.ActivatesTeardown(varname),
-                            Void
-                            )
+                        ) + TypedExpression.Void(native_ast.Expression.ActivatesTeardown(varname))
                 else:
                     #this is an existing variable.
                     slot_ref = self.named_var_expr(varname).drop_double_references()
@@ -1660,7 +376,7 @@ class ConversionContext(object):
                 if op is not None:
                     val_to_store = slicing.convert_getitem(self, index).convert_bin_op(op, val_to_store)
 
-                return slicing.convert_setitem(index, val_to_store)
+                return slicing.convert_setitem(self, index, val_to_store)
         
             if target.matches.Attribute and target.ctx.matches.Store:
                 slicing = self.convert_expression_ast(target.value)
@@ -1668,9 +384,9 @@ class ConversionContext(object):
                 val_to_store = self.convert_expression_ast(ast.value)
 
                 if op is not None:
-                    val_to_store = slicing.convert_attribute(attr).convert_bin_op(op, val_to_store)
+                    val_to_store = slicing.convert_attribute(self, attr).convert_bin_op(op, val_to_store)
 
-                return slicing.convert_set_attribute(attr, val_to_store)
+                return slicing.convert_set_attribute(self, attr, val_to_store)
         
         if ast.matches.Return:
             if ast.value.matches.Null:
@@ -1712,7 +428,7 @@ class ConversionContext(object):
                             self,
                             TypedExpression(
                                 native_ast.Expression.Variable(".return"),
-                                output_type.pointer
+                                output_type.reference
                                 ),
                             e
                             ).expr + 
@@ -1775,64 +491,60 @@ class ConversionContext(object):
 
             #this object needs to stay alive for the duration
             #of the expression
-            iter_expr = (
+            iter_create_expr = (
                 self.convert_expression_ast(ast.iter)
-                    .convert_attribute("__iter__")
+                    .convert_attribute(self, "__iter__")
                     .convert_call(self, [])
                 )
-            iter_type = iter_expr.expr_type.unwrap_reference()
+            iter_type = iter_create_expr.expr_type.unwrap_reference()
 
-            iter_ptr = self.allocate_temporary(iter_type)
+            iter_expr = self.allocate_temporary(iter_type)
 
             iter_setup_expr = (
-                iter_type.convert_initialize_copy(self, iter_ptr, iter_expr).expr + 
-                self.activates_temporary(iter_ptr)
+                iter_type.convert_initialize_copy(self, iter_expr, iter_create_expr).expr + 
+                self.activates_temporary(iter_expr)
                 )
                 
-            iter_expr = TypedExpression(
-                native_ast.Expression.Load(iter_ptr.expr),
-                iter_type
-                )
-
             teardowns_for_iter = self.consume_temporaries(None)
 
             #now we need to generate a while loop
             while_cond_expr = (
-                iter_expr.convert_attribute("has_next")
+                iter_expr.convert_attribute(self, "has_next")
                     .convert_call(self, [])
                     .convert_to_type(Bool)
                 )
 
             while_cond_expr = self.consume_temporaries(while_cond_expr)
 
-            next_val_expr = iter_expr.convert_attribute("next").convert_call(self, [])
+            next_val_expr = iter_expr.convert_attribute(self, "next").convert_call(self, [])
             
-            next_val_ptr = self.allocate_temporary(next_val_expr.expr_type)
+            if self._varname_to_type.get(ast.target.id, None) is not None:
+                raise ConversionException(
+                    "iterator target %s already bound to a variable of type %s" % (
+                        ast.target.id,
+                        self._varname_to_type.get(ast.target.id)
+                        )
+                    )
+
+            self._varname_to_type[ast.target.id] = next_val_expr.expr_type
+
+            next_val_ref = self.named_var_expr(ast.target.id)
             next_val_setup_native_expr = (
-                next_val_expr.expr_type.convert_initialize_copy(self, next_val_ptr, next_val_expr).expr +
-                self.activates_temporary(next_val_ptr)
+                next_val_expr.expr_type.convert_initialize_copy(self, next_val_ref, next_val_expr).expr +
+                self.activates_temporary(next_val_ref)
                 )
             next_val_teardowns = self.consume_temporaries(None)
-
-            if self._varname_to_type[ast.target.id] is not None:
-                raise ConversionException(
-                    "iterator targets should only be used during the lifetime of the for loop"
-                    )
-
-            self._varname_to_type[ast.target.id] = next_val_expr.expr_type.unwrap_reference()
-
-            if next_val_expr.expr_type.is_ref:
-                next_val_ptr = next_val_ptr.load
-
-            body_native_expr = native_ast.Expression.Let(
-                var=ast.target.id + ".slot",
-                val=next_val_setup_native_expr + next_val_ptr.expr,
-                within=native_ast.Expression.Finally(
-                    expr=self.convert_statement_list_ast(ast.body).expr,
+            next_val_teardowns.append(
+                self.named_variable_teardown(ast.target.id)
+                )
+            
+            body_native_expr = native_ast.Expression.Finally(
+                    expr =  next_val_setup_native_expr 
+                          + self.convert_statement_list_ast(ast.body).expr,
                     teardowns=next_val_teardowns
                     )
-                )
-            self._varname_to_type[ast.target.id] = None
+
+            del self._varname_to_type[ast.target.id]
 
             orelse_native_expr = self.convert_statement_list_ast(ast.orelse).expr
 
@@ -1886,22 +598,8 @@ class ConversionContext(object):
         teardowns = []
         for v in list(self._varname_to_type.keys()):
             if v not in orig_vars_in_scope:
-                teardowns.append(
-                    native_ast.Teardown.ByTag(
-                        tag=v,
-                        expr=self._varname_to_type[v].convert_destroy(
-                            self,
-                            TypedExpression(
-                                native_ast.Expression.StackSlot(
-                                    name=v,
-                                    type=self._varname_to_type[v].lower()
-                                    ),
-                                self._varname_to_type[v].reference
-                                )
-                            ).expr
-                        )
-                    )
-
+                teardowns.append(self.named_variable_teardown(v))
+                    
                 del self._varname_to_type[v]
 
         seq_expr = native_ast.Expression.Sequence(
@@ -1913,6 +611,22 @@ class ConversionContext(object):
                 teardowns=teardowns
                 )
         return TypedExpression(seq_expr, ret_type)
+
+    def named_variable_teardown(self, v):
+        return native_ast.Teardown.ByTag(
+                tag=v,
+                expr=self._varname_to_type[v].convert_destroy(
+                    self,
+                    TypedExpression(
+                        native_ast.Expression.StackSlot(
+                            name=v,
+                            type=self._varname_to_type[v].lower()
+                            ),
+                        self._varname_to_type[v].reference
+                        )
+                    ).expr
+                )
+                    
 
     def call_expression_in_function(self, identity, name, args, expr_producer):
         varlist = []
@@ -1932,6 +646,9 @@ class ConversionContext(object):
 
         expr = expr_producer(*exprlist)
 
+        if expr.expr_type != Void:
+            expr = native_ast.Expression.Return(expr)
+
         call_target = self._converter.define(
             (identity, tuple(typelist)),
             name,
@@ -1948,7 +665,7 @@ class ConversionContext(object):
         return TypedExpression(
             self.generate_call_expr(
                 target=call_target.native_call_target,
-                args=[a.as_function_call_arg() for a in args]
+                args=[a.native_expr_for_function_call() for a in args]
                 ),
             expr.expr_type
             )
@@ -2017,28 +734,36 @@ class ConversionContext(object):
     def construct_starargs_around(self, res, star_args_name):
         args_type = self._varname_to_type[star_args_name]
 
-        return TypedExpression(
-            native_ast.Expression.Let(
-                var=star_args_name + ".slot",
-                val=native_ast.Expression.Alloca(args_type.lower()),
-                within=
-                    args_type.convert_initialize(
-                        self,
-                        TypedExpression(
-                            native_ast.Expression.Variable(star_args_name + ".slot"),
-                            args_type.pointer
-                            ),
-                        [TypedExpression(
-                                native_ast.Expression.Variable(".star_args.%s" % i),
-                                args_type.element_types[i][1]
-                                ) 
-                            for i in xrange(len(args_type.element_types))]
-                        ).expr.with_comment("initialize *args slot") +
-                    res.expr
-                ),
-            res.expr_type
-            )
+        stararg_slot = self.named_var_expr(star_args_name)
 
+        return args_type.convert_initialize(
+                self,
+                stararg_slot,
+                [TypedExpression(
+                        native_ast.Expression.Variable(".star_args.%s" % i),
+                        args_type.element_types[i][1]
+                        ) 
+                    for i in xrange(len(args_type.element_types))]
+            ).with_comment("initialize *args slot") + res
+
+
+class TypedCallTarget(object):
+    def __init__(self, native_call_target, input_types, output_type):
+        object.__init__(self)
+        self.native_call_target = native_call_target
+        self.input_types = input_types
+        self.output_type = output_type
+
+    @property
+    def name(self):
+        return self.native_call_target.name
+
+    def __str__(self):
+        return "TypedCallTarget(name=%s,inputs=%s,outputs=%s)" % (
+            self.name, 
+            [str(x) for x in self.input_types],
+            str(self.output_type)
+            )
 
 class Converter(object):
     def __init__(self):
@@ -2067,6 +792,14 @@ class Converter(object):
         return getname()
 
     def convert_function_ast(self, ast, input_types, local_variables, free_variable_lookup):
+        for i in input_types:
+            if i.is_ref and i.value_type.is_ref:
+                raise ConversionException(
+                    "Can't pass Ref(Ref(T)):\n" + 
+                        "\n".join(["\t" + str(x) for x in input_types]
+                        )
+                    )
+
         if ast.args.vararg.matches.Value:
             star_args_name = ast.args.vararg.val
         else:
@@ -2096,14 +829,21 @@ class Converter(object):
         if star_args_name is not None:
             star_args_count = len(input_types) - len(ast.args.args)
 
+            starargs_elts = []
             for i in xrange(len(ast.args.args), len(input_types)):
                 args.append(
                     ('.star_args.%s' % (i - len(ast.args.args)), 
                         input_types[i].lower_as_function_arg())
                     )
 
+            def stararg_field_type_for(t):
+                if t.is_ref:
+                    return t
+                if t.is_pod:
+                    return t
+
             starargs_type = Struct(
-                [('f_%s' % i, input_types[i+len(ast.args.args)]) 
+                [('f_%s' % i, stararg_field_type_for(input_types[i+len(ast.args.args)]))
                     for i in xrange(star_args_count)]
                 )
 
@@ -2116,7 +856,7 @@ class Converter(object):
         res = subconverter.convert_statement_list_ast(ast.body, toplevel=True)
 
         if star_args_name is not None:
-            res = subconverter.construct_starargs_around(res, argnames, star_args_name)
+            res = subconverter.construct_starargs_around(res, star_args_name)
 
         res = subconverter.construct_stackslots_around(res, argnames, star_args_name)
 
@@ -2130,7 +870,7 @@ class Converter(object):
                 ),
             return_type
             )
-                        
+                  
 
     def convert_lambda_ast(self, ast, input_types, free_variable_lookup):
         assert len(input_types) == len(ast.args.args)
@@ -2187,16 +927,17 @@ class Converter(object):
         self._unconverted.add(new_name)
 
         return self._targets[new_name]
+      
+    def convert_lambda_as_expression(self, lambda_func):
+        ast, free_variable_lookup = self.callable_to_ast_and_vars(lambda_func)
 
-    def convert(self, f, input_types, name_override=None):
-        input_types = tuple(input_types)
+        varname_to_type = {}
 
-        identifier = ("pyfunction", f, input_types)
+        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
 
-        if identifier in self._names_for_identifier:
-            name = self._names_for_identifier[identifier]
-            return self._targets[name]
+        return subconverter.convert_expression_ast(ast.body)
 
+    def callable_to_ast_and_vars(self, f):
         pyast = ast_util.pyAstFor(f)
 
         _, lineno = ast_util.getSourceLines(f)
@@ -2211,6 +952,23 @@ class Converter(object):
         if f.func_closure:
             for i in xrange(len(f.func_closure)):
                 freevars[f.func_code.co_freevars[i]] = f.func_closure[i].cell_contents
+
+        return pyast, freevars
+
+    def convert(self, f, input_types, name_override=None):
+        for i in input_types:
+            if not i.is_valid_as_variable:
+                raise ConversionException("Invalid argument types for %s: %s" % (f, input_types))
+
+        input_types = tuple(input_types)
+
+        identifier = ("pyfunction", f, input_types)
+
+        if identifier in self._names_for_identifier:
+            name = self._names_for_identifier[identifier]
+            return self._targets[name]
+
+        pyast, freevars = self.callable_to_ast_and_vars(f)
 
         try:
             if isinstance(pyast, python_ast.Statement.FunctionDef):
@@ -2251,7 +1009,7 @@ class Converter(object):
             return self._targets[new_name]
         except ConversionException as e:
             e.add_scope(
-                ConversionScopeInfo.CreateFromAst(pyast, {})
+                exceptions.ConversionScopeInfo.CreateFromAst(pyast, {})
                 )
             raise
 

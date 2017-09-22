@@ -28,10 +28,10 @@ def Vector(T):
 
         def __assign__(self, other):
             self._teardown()
-            self._become(util.ref(other))
+            self._become(other)
 
         def __copy_constructor__(self, other):
-            self._become(util.ref(other))
+            self._become(other)
 
         def _become(self, other):
             if other._ptr:
@@ -78,7 +78,7 @@ def Vector(T):
                 return
 
             new_ptr = T.pointer(util.malloc(T.sizeof * count))
-
+                
             for i in xrange(self._size):
                 util.in_place_new(new_ptr + i, self._ptr[i])
                 util.in_place_destroy(self._ptr + i)

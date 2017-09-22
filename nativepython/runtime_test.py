@@ -96,7 +96,6 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             return g(an_a)
         
         res = self.runtime.wrap(f)()
-
         self.assertTrue(res.f0, (res.f0, res.f1, res.f2))
 
     def test_decltype(self):
@@ -117,11 +116,13 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             x = x + 1
 
         def no_ref(x):
-            increment(x)
+            y = x
+            increment(y)
             return x
 
         def with_ref(x):
-            increment(ref(x))
+            y = ref(x)
+            increment(y)
             return x
 
         self.assertEqual(self.runtime.wrap(no_ref)(0), 0)
@@ -134,15 +135,13 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             x = x + 1
 
         def increment_2(x):
-            #because we're not passing by 'ref' again, the increment should
-            #have no effect
             increment(x)
 
         def with_ref(x):
-            increment_2(ref(x))
+            increment_2(x)
             return x
 
-        self.assertEqual(self.runtime.wrap(with_ref)(0), 0)
+        self.assertEqual(self.runtime.wrap(with_ref)(0), 1)
  
     def test_function_returning_ref(self):
         ref = util.ref
@@ -159,13 +158,13 @@ class PythonNativeRuntimeTests(unittest.TestCase):
 
         def f(x):
             an_a = A(x)
-            increment(an_a.xref())
-            xref = an_a.xref()
-            increment(xref)
-            increment(an_a.x)
+            increment(an_a.xref()) #yes
+            xref = an_a.xref()     #not a ref
+            increment(xref)        #no
+            increment(an_a.x)      #yes
             return an_a.x
 
-        self.assertEqual(self.runtime.wrap(f)(0), 1)
+        self.assertEqual(self.runtime.wrap(f)(0), 2)
 
     def test_ref_of_ref(self):
         ref = util.ref
@@ -174,7 +173,7 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             x = x + 1
 
         def f(x):
-            increment(ref(ref(x)))
+            increment(ref(x))
             return x
 
         self.assertEqual(self.runtime.wrap(f)(0), 1)
@@ -205,9 +204,8 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         def f(x):
             an_a = A(x)
             increment(an_a.xref(),1)#yes
-            increment(an_a.xref2(),2)#yes
+            increment(an_a.xref2(),2)#no
             increment(an_a.xref3(),4)#yes
-            increment(an_a.xref4(),8)#yes
             return an_a.x
 
-        self.assertEqual(self.runtime.wrap(f)(0), 15)
+        self.assertEqual(self.runtime.wrap(f)(0), 5)

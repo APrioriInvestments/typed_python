@@ -42,3 +42,16 @@ class VectorTests(unittest.TestCase):
         self.assertTrue(len(vec) == 2)
         self.assertTrue(vec[0] == 20)
         self.assertTrue(vec[1] == 22)
+
+        def increment_all(v):
+            for e in v:
+                e = e + 1
+
+        self.runtime.wrap(increment_all)(vec)
+
+        self.assertTrue(len(vec) == 2)
+        self.assertTrue(vec[0] == 21)
+        self.assertTrue(vec[1] == 23)
+
+        
+

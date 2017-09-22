@@ -13,27 +13,30 @@
 #   limitations under the License.
 
 import nativepython.python_to_native_ast as python_to_native_ast
+import nativepython.type_model as type_model
 import nativepython.native_ast as native_ast
 import nativepython.util as util
 import nativepython.llvm_compiler as llvm_compiler
 
 def is_simple_type(t):
+    t = t.nonref_type
+
     return (
-        t == python_to_native_ast.Float64 or
-        t == python_to_native_ast.Int64 or 
-        t == python_to_native_ast.Bool or 
-        t == python_to_native_ast.Void or
-        isinstance(t, python_to_native_ast.RepresentationlessType)
+        t == type_model.Float64 or
+        t == type_model.Int64 or 
+        t == type_model.Bool or 
+        t == type_model.Void or
+        isinstance(t, type_model.CompileTimeType)
         )
 
 is_simple_type_tf = util.typefun(is_simple_type)
 
 def wrapping_function_call(f):
     def new_f(*args):
-        output_type = util.typeof(util.deref(f(*args)))
+        output_type = util.deref(util.typeof(f(*args)))
 
         if is_simple_type_tf(output_type):
-            return util.deref(f(*args))
+            return f(*args)
         else:
             raw_ptr = output_type.pointer(util.malloc(output_type.sizeof))
 
@@ -53,15 +56,15 @@ class WrappedFunction(object):
     def __call__(self, *args):
         def type_for_arg(a):
             if isinstance(a, float):
-                return python_to_native_ast.Float64
+                return type_model.Float64
             if isinstance(a, bool):
-                return python_to_native_ast.Bool
+                return type_model.Bool
             if isinstance(a, int):
-                return python_to_native_ast.Int64
+                return type_model.Int64
             if isinstance(a, WrappedObject):
-                return a._object_type.pointer
+                return a._object_type.reference
 
-            return python_to_native_ast.FreePythonObjectReference(a)
+            return type_model.FreePythonObjectReference(a)
 
         def arg_for_arg(a):
             if isinstance(a, (float,int, bool)):
@@ -78,7 +81,7 @@ class WrappedFunction(object):
 
         if is_simple_type(output_type):
             simple_result = f_callable(*[arg_for_arg(a) for a in args])
-            if isinstance(output_type, python_to_native_ast.RepresentationlessType):
+            if isinstance(output_type, python_to_native_ast.CompileTimeType):
                 return output_type.python_object_representation
             return simple_result
 
@@ -124,14 +127,14 @@ class Runtime:
         self.converter = python_to_native_ast.Converter()
         self.functions_by_name = {}
 
-        def call_func(f_ptr, *args):
-            return f_ptr[0](*args)
+        def call_func(f, *args):
+            return f(*args)
 
-        def getitem_func(f_ptr, a):
-            return f_ptr[0][a]
+        def getitem_func(f, a):
+            return f[a]
 
-        def len_func(f_ptr):
-            return len(util.ref(f_ptr[0]))
+        def len_func(f):
+            return len(f)
 
         self._call_func = WrappedFunction(self, call_func)
         self._getitem_func = WrappedFunction(self, getitem_func)
@@ -142,7 +145,7 @@ class Runtime:
     def _pointer_attribute_func(self, attr):
         if attr not in self._pointer_attribute_funcs:
             getter = util.attribute_getter(attr)
-            self._pointer_attribute_funcs[attr] = WrappedFunction(self, lambda p: getter(p[0]))
+            self._pointer_attribute_funcs[attr] = WrappedFunction(self, lambda p: getter(p))
 
         return self._pointer_attribute_funcs[attr]
 

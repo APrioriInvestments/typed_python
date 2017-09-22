@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import nativepython.type_model as type_model
 import nativepython.python_to_native_ast as python_to_native_ast
 import nativepython.native_ast as native_ast
 import nativepython.util as util
@@ -21,8 +22,6 @@ import unittest
 import ast
 import time
 import numpy
-
-from types import ModuleType
 
 TEST_SEED = 1
 
@@ -263,12 +262,38 @@ class PythonToNativeAstTests(unittest.TestCase):
         cls.compiler = llvm_compiler.Compiler()
         cls.converter = python_to_native_ast.Converter()
 
+    def convert_expression(self, lambda_func):
+        return self.converter.convert_lambda_as_expression(lambda_func)
+
     def compile(self, f):
-        f_target = self.converter.convert(f, [python_to_native_ast.Float64])
+        f_target = self.converter.convert(f, [util.Float64])
 
         functions = self.converter.extract_new_function_definitions()
 
         return self.compiler.add_functions(functions)[f_target.name]
+
+    def test_typefuncs_1(self):
+        self.assertTrue(self.convert_expression(lambda: 3).expr.matches.Constant)
+
+    def test_typefuncs_2(self):
+        self.assertTrue(
+            self.convert_expression(lambda: util.typeof(3).reference).expr_type
+                .python_object_representation == type_model.Int64.reference
+            )
+        self.assertTrue(
+            self.convert_expression(lambda: util.typeof(3+3).reference).expr_type
+                .python_object_representation == type_model.Int64.reference
+            )
+
+    def test_typefuncs_3(self):
+        def f():
+            output_type = util.typeof(3)
+            return output_type.reference
+
+        self.assertTrue(
+            self.convert_expression(lambda: f()).expr_type
+                .python_object_representation == type_model.Int64.reference
+            )
 
     def test_simple(self):
         def f(a):
@@ -478,7 +503,7 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         self.assertTrue(f_comp(10.5) == 22)
 
-    def test_constructors_and_destructors(self):
+    def test_constructors_and_destructors_1(self):
         class A:
             def __init__(self, x):
                 self.x = x

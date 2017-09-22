@@ -366,7 +366,10 @@ def expression_to_llvm_ir(
                     return
 
                 if teardowns_on_return_block[0] is None:
-                    builder.ret(l.llvm_value)
+                    if l.llvm_value is None:
+                        builder.ret_void()
+                    else:
+                        builder.ret(l.llvm_value)
                 else:
                     teardowns_on_return_block[0].accept_incoming(builder.block, tags_initialized[0])
 
@@ -525,7 +528,7 @@ def expression_to_llvm_ir(
                         operand.native_type
                         )
 
-            assert False
+            assert False, "can't apply unary operand %s to %s" % (expr.op, str(operand.native_type))
 
         if expr.matches.Binop:
             l = convert(expr.l)
@@ -595,7 +598,11 @@ def expression_to_llvm_ir(
 
                     func = external_function_references[target.name]
 
-            llvm_call_result = builder.call(func, [a.llvm_value for a in args])
+            try:
+                llvm_call_result = builder.call(func, [a.llvm_value for a in args])
+            except:
+                print "failing while calling ", target.name
+                raise
 
             if target.output_type.matches.Void:
                 llvm_call_result = None
@@ -726,14 +733,17 @@ class Converter(object):
                     definition.output_type,
                     external_function_references
                     )(definition.body.body)
+
+
+                if res is not None:
+                    assert res.native_type == native_ast.Type.Struct(()) or\
+                            res.native_type.matches.Void, res.native_type
+                    builder.ret_void()
+
             except Exception as e:
                 print "function failing = " + name
                 raise
 
-            if res is not None:
-                assert res.native_type == native_ast.Type.Struct(()) or\
-                        res.native_type.matches.Void, res.native_type
-                builder.ret_void()
 
         return str(module)
 

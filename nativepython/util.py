@@ -14,17 +14,19 @@
 
 import nativepython.python_to_native_ast as python_to_native_ast
 import nativepython.native_ast as native_ast
+import nativepython.type_model as type_model
 
+from nativepython.exceptions import ConversionException
 
-Float64 = python_to_native_ast.Float64
-Int64 = python_to_native_ast.Int64
-Int32 = python_to_native_ast.Int32
-Bool = python_to_native_ast.Bool
-Void = python_to_native_ast.Void
-UInt8 = python_to_native_ast.UInt8
-Struct = python_to_native_ast.Struct
+Float64 = type_model.Float64
+Int64 = type_model.Int64
+Int32 = type_model.Int32
+Bool = type_model.Bool
+Void = type_model.Void
+UInt8 = type_model.UInt8
+Struct = type_model.Struct
 
-class ExpressionFunction(python_to_native_ast.RepresentationlessType):
+class ExpressionFunction(type_model.CompileTimeType):
     def __init__(self, f):
         self.f = f
 
@@ -38,23 +40,28 @@ class ExpressionFunction(python_to_native_ast.RepresentationlessType):
     def python_object_representation(self):
         return self
 
-class TypeFun(python_to_native_ast.RepresentationlessType):
+class TypeFun(type_model.CompileTimeType):
     def __init__(self, f):
         self.f = f
 
     def convert_call(self, context, instance, args):
         def unwrap(x):
-            assert isinstance(x, python_to_native_ast.TypedExpression)
+            if not isinstance(x, type_model.TypedExpression):
+                raise ConversionException("Expected a TypedExpression, not %s" % x)
             t = x.expr_type
-            if isinstance(t, python_to_native_ast.FreePythonObjectReference):
-                return t._obj
+            if isinstance(t.nonref_type, type_model.FreePythonObjectReference):
+                return t.nonref_type.python_object_representation
             else:
                 return t
 
         def wrap(x):
-            return python_to_native_ast.pythonObjectRepresentation(x)
+            return type_model.pythonObjectRepresentation(x)
 
-        return wrap(self.f(*[unwrap(x) for x in args]))
+        unwrapped = [unwrap(x) for x in args]
+
+        res = self.f(*unwrapped)
+        
+        return wrap(res)
 
     def __call__(self, *args):
         return self.f(*args)
@@ -74,56 +81,71 @@ def exprfun(f):
 
 @exprfun
 def addr(context, args):
-    assert len(args) == 1
+    if len(args) != 1:
+        raise ConversionException("addr takes 1 argument")
 
-    return args[0].address
+    return args[0].address_of
 
 @exprfun
 def ref(context, args):
-    assert len(args) == 1
+    if len(args) != 1:
+        raise ConversionException("ref takes 1 argument")
     return args[0].as_creates_reference
+
+@typefun
+def deref(t):
+    return t.nonref_type
 
 @exprfun
 def typeof(context, args):
-    assert len(args) == 1
-
-    return python_to_native_ast.pythonObjectRepresentation(args[0].expr_type)
+    if len(args) != 1:
+        raise ConversionException("typeof takes 1 argument")
+    return type_model.pythonObjectRepresentation(args[0].expr_type)
 
 @exprfun
 def typestring(context, args):
-    assert len(args) == 1
+    if len(args) != 1:
+        raise ConversionException("typestring takes 1 argument")
 
-    return python_to_native_ast.pythonObjectRepresentation(str(args[0].expr_type))
+    return type_model.pythonObjectRepresentation(str(args[0].expr_type))
 
 @exprfun
 def in_place_new(context, args):
-    assert len(args) == 2
+    if len(args) != 2:
+        raise ConversionException("in_place_new takes 2 arguments")
 
-    assert isinstance(args[0].expr_type, python_to_native_ast.Pointer)
+    ptr = args[0].dereference()
 
-    object_type = args[0].expr_type.value_type
+    if not ptr.expr_type.is_pointer:
+        raise ConversionException("in_place_new needs a pointer for its first argument")
 
-    return object_type.convert_initialize_copy(context, args[0], args[1])
+    object_type = ptr.expr_type.value_type
+
+    return object_type.convert_initialize_copy(context, ptr.reference_from_pointer(), args[1])
 
 @exprfun
 def in_place_destroy(context, args):
-    assert len(args) == 1
+    if len(args) != 1:
+        raise ConversionException("in_place_destroy takes 1 arguments")
 
-    assert isinstance(args[0].expr_type, python_to_native_ast.Pointer)
+    ptr = args[0].dereference()
 
-    object_type = args[0].expr_type.value_type
+    if not ptr.expr_type.is_pointer:
+        raise ConversionException("in_place_destroy needs a pointer for its first argument")
 
-    return object_type.convert_destroy(context, args[0])
+    object_type = ptr.expr_type.value_type
+
+    return object_type.convert_destroy(context, ptr.reference_from_pointer())
 
 def attribute_getter(attr):
     @exprfun
     def getter(context, args):
         assert len(args) == 1
-        return args[0].expr_type.convert_attribute(args[0], attr)
+        return args[0].convert_attribute(context, attr)
 
     return getter
 
-class ExternalFunction(python_to_native_ast.RepresentationlessType):
+class ExternalFunction(type_model.CompileTimeType):
     def __init__(self, name, output_type, input_types, implicit_type_casting,varargs):
         self.name = name
         self.output_type = output_type
@@ -137,6 +159,8 @@ class ExternalFunction(python_to_native_ast.RepresentationlessType):
         else:
             assert len(args) == len(self.input_types)
 
+        args = [a.dereference() for a in args]
+
         if not self.implicit_type_casting:
             for i in xrange(len(input_types)):
                 assert args[i].expr_type == self.input_types[i]
@@ -146,7 +170,7 @@ class ExternalFunction(python_to_native_ast.RepresentationlessType):
                 if args[i].expr_type != self.input_types[i]:
                     args[i] = args[i].convert_to_type(self.input_types[i])
 
-        return python_to_native_ast.TypedExpression(
+        return type_model.TypedExpression(
             native_ast.Expression.Call(
                 target=native_ast.CallTarget(
                     name = self.name,
@@ -174,23 +198,23 @@ printf = ExternalFunction.make("printf", Int64, [UInt8.pointer], varargs=True)
 
 @typefun
 def is_struct(t):
-    return isinstance(t, python_to_native_ast.Struct)
+    return isinstance(t, type_model.Struct)
 
 @typefun
 def struct_size(t):
-    if isinstance(t, python_to_native_ast.Struct):
+    if isinstance(t, type_model.Struct):
         return len(t.element_types)
     else:
         return None
 
-@python_to_native_ast.representation_for(len)
+@type_model.representation_for(len)
 def len_override(x):
     if is_struct(typeof(x)):
         return struct_size(typeof(x))
     else:
         return x.__len__()
 
-@python_to_native_ast.representation_for(xrange)
+@type_model.representation_for(xrange)
 class xrange_override:
     def __init__(self, top):
         self.top = top

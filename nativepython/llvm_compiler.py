@@ -101,7 +101,7 @@ class NativeFunctionPointer:
 
     def __repr__(self):
         return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" \
-            % (self.fname, self.fp, self.input_types, self.output_type)
+            % (self.fname, self.fp, [str(x) for x in self.input_types], str(self.output_type))
 
 _all_compilers_ever = []
 class Compiler:
