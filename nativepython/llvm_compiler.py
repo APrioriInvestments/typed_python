@@ -112,6 +112,14 @@ class Compiler:
 
         self.engine, self.module_pass_manager = create_execution_engine()
         self.converter = native_ast_to_llvm.Converter()
+        self.verbose = False
+        self.optimize = True
+
+    def mark_converter_verbose(self):
+        self.converter.verbose = True
+
+    def mark_llvm_codegen_verbose(self):
+        self.verbose = True
 
     def add_functions(self, functions):
         if not functions:
@@ -125,7 +133,11 @@ class Compiler:
         # Now add the module and make sure it is ready for execution
         self.engine.add_module(mod)
 
-        self.module_pass_manager.run(mod)
+        if self.optimize:
+            self.module_pass_manager.run(mod)
+
+        if self.verbose:
+            print mod
 
         self.engine.finalize_object()
 

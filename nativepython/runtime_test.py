@@ -142,6 +142,21 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             return x
 
         self.assertEqual(self.runtime.wrap(with_ref)(0), 1)
+
+    def test_refs_and_starargs(self):
+        ref = util.ref
+
+        def increment(x):
+            x = x + 1
+
+        def increment_args(*args):
+            increment(*args)
+
+        def with_ref(x):
+            increment_args(x)
+            return x
+
+        self.assertEqual(self.runtime.wrap(with_ref)(0), 1)
  
     def test_function_returning_ref(self):
         ref = util.ref

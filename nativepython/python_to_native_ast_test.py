@@ -18,6 +18,7 @@ import nativepython.native_ast as native_ast
 import nativepython.util as util
 import nativepython.python.inspect_override as inspect_override
 import nativepython.llvm_compiler as llvm_compiler
+import nativepython.test_config as test_config
 import unittest
 import ast
 import time
@@ -584,13 +585,32 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         self.assertEqual(f_comp(10), 0)
 
+    def test_constructors_and_destructors_5(self):
+        def returns_args(*args):
+            return args
+        def g(c):  #[] -> (A,A)
+            z = returns_args(A(c,2), A(c,3))
+            return z[0]
+
+        def f(a):
+            c = Counter()
+            g(util.addr(c))
+            return c.alive
+        
+        f_comp = self.compile(f)
+
+        self.assertEqual(f_comp(10), 0)
+
         
     def test_constructors_and_destructors_fuzz(self):
         #we want to generate some random functions. Signatures always take a 'c', and can take
         #int, A, or (A,A), and can return same. Our goal is to verify constructor semantics in a
         #wide variety of situations.
-        for i in xrange(10):
-            functions, text, signatures = generate_functions(TEST_SEED + i, 4)
+
+        deep = test_config.tests_are_deep
+        
+        for i in xrange(2 if not deep else 20):
+            functions, text, signatures = generate_functions(TEST_SEED + i, 4 if not deep else 16)
 
             for fname,signature in signatures.iteritems():
                 if len(signature[0]) in (0,1):

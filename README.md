@@ -20,4 +20,4 @@ data as they show up.
 
 ## How do I run tests?
 
-run `test.py` from the root. Filter tests with a regex using `test.py -filter=PAT`.
+run `test.py` from the root. Filter tests with a regex using `test.py --filter=PAT`.

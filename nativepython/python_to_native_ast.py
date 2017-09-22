@@ -258,8 +258,13 @@ class ConversionContext(object):
             orelse = self.convert_expression_ast(ast.orelse)
 
             if body.expr_type != orelse.expr_type:
-                raise ConversionException("Expected IfExpr to have the same type, but got " + 
-                    "%s and %s" % (body.expr_type, orelse.expr_type))
+                if body.expr_type.nonref_type == orelse.expr_type.nonref_type and \
+                        body.expr_type.nonref_type.is_pod:
+                    body = body.dereference()
+                    orelse = orelse.dereference()
+                else:
+                    raise ConversionException("Expected IfExpr to have the same type, but got " + 
+                        "%s and %s" % (body.expr_type, orelse.expr_type))
 
             return TypedExpression(
                 native_ast.Expression.Branch(

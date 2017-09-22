@@ -30,6 +30,8 @@ import nose.plugins.manager
 import nose.plugins.xunit
 import argparse
 import nativepython
+import nativepython.runtime as runtime
+import nativepython.test_config as test_config
 import traceback
 
 class DirectoryScope(object):
@@ -97,24 +99,48 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             help="run test harness verbosely"
             )
         self.add_argument(
-            '-list',
+            '--list',
             dest='list',
             action='store_true',
             default=False,
             required=False,
             help="don't run tests, just list them"
             )
-        self.add_argument('-filter',
+        self.add_argument(
+            '--deep',
+            dest='deep',
+            action='store_true',
+            default=False,
+            required=False,
+            help="run deeper level of testing in fuzztests"
+            )
+        self.add_argument(
+            '--dump_llvm',
+            dest='dump_llvm',
+            action='store_true',
+            default=False,
+            required=False,
+            help="dump llvm IR as it's produced"
+            )
+        self.add_argument(
+            '--dump_native',
+            dest='dump_native',
+            action='store_true',
+            default=False,
+            required=False,
+            help="dump native ast code as it's produced"
+            )
+        self.add_argument('--filter',
                             nargs = 1,
                             help = 'restrict tests to a subset matching FILTER',
                             action = OrderedFilterAction,
                             default = None)
-        self.add_argument('-add',
+        self.add_argument('--add',
                             nargs = 1,
                             help = 'add back tests matching ADD',
                             action = OrderedFilterAction,
                             default = None)
-        self.add_argument('-exclude',
+        self.add_argument('--exclude',
                             nargs = 1,
                             help = "exclude python unittests matching 'regex'. "
                                   +"These go in a second pass after -filter",
@@ -390,6 +416,15 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
 
 def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
     testArgs = ["dummy"]
+
+    if args.deep:
+        test_config.tests_are_deep = args.deep
+
+    if args.dump_llvm:
+        runtime.Runtime.singleton().compiler.mark_llvm_codegen_verbose()
+
+    if args.dump_native:
+        runtime.Runtime.singleton().compiler.mark_converter_verbose()
 
     if args.testHarnessVerbose or args.list:
         testArgs.append('--nocapture')
