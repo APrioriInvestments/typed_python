@@ -102,7 +102,7 @@ def nonref(context, args):
     if len(args) != 1:
         raise ConversionException("ref takes 1 argument")
 
-    if args[0].expr_type.is_create_reference:
+    if args[0].expr_type.is_create_ref:
         return TypedExpression(
             args[0].expr,
             args[0].expr_type.value_type.reference

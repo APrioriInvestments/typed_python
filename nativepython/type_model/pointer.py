@@ -108,5 +108,5 @@ class Pointer(Type):
         raise ConversionException("can't convert %s to type %s" % (self, to_type))
 
     def __repr__(self):
-        return "Pointer(%s)" % self.value_type
+        return "Ptr(%s)" % self.value_type
 

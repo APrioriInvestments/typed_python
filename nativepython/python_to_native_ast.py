@@ -41,14 +41,15 @@ class ConversionContext(object):
 
         return native_ast.Expression.ActivatesTeardown(slot.expr.name)
 
-    def allocate_temporary(self, slot_type):
+    def allocate_temporary(self, slot_type, type_is_temp_ref = True):
         tname = '.temp.%s' % len(self._temporaries)
         self._new_temporaries.add(tname)
         self._temporaries[tname] = slot_type
 
         return TypedExpression(
             native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
-            slot_type.reference
+            slot_type.reference_to_temporary if type_is_temp_ref else
+                slot_type.reference
             )
 
     def named_var_expr(self, name):
@@ -93,7 +94,7 @@ class ConversionContext(object):
                     + self.activates_temporary(slot)
                     + slot.expr
                     ,
-                call_target.output_type.reference
+                slot.expr_type
                 )
         else:
             assert len(call_target.native_call_target.arg_types) == len(args)
@@ -240,7 +241,7 @@ class ConversionContext(object):
         if ast.matches.Tuple:
             elts = [self.convert_expression_ast(e) for e in ast.elts]
 
-            struct_type = Struct([("f%s"%i,e.expr_type.as_call_arg) for i,e in enumerate(elts)])
+            struct_type = Struct([("f%s"%i,e.expr_type.variable_storage_type) for i,e in enumerate(elts)])
 
             tmp_ref = self.allocate_temporary(struct_type)
 
@@ -349,7 +350,7 @@ class ConversionContext(object):
                 if self._varname_to_type[varname] is None:
                     self._new_variables.add(varname)
 
-                    new_variable_type = val_to_store.expr_type.as_call_arg
+                    new_variable_type = val_to_store.expr_type.variable_storage_type
                     assert new_variable_type.is_valid_as_variable()
                     self._varname_to_type[varname] = new_variable_type
 
@@ -399,7 +400,7 @@ class ConversionContext(object):
                 e = self.convert_expression_ast(ast.value.val)
 
             if self._varname_to_type[FunctionOutput] is not None:
-                if self._varname_to_type[FunctionOutput] != e.expr_type.as_call_arg:
+                if self._varname_to_type[FunctionOutput] != e.expr_type.variable_storage_type:
                     raise ConversionException(
                         "Function returning multiple types (%s and %s)" % (
                                 e.expr_type, 
@@ -407,7 +408,7 @@ class ConversionContext(object):
                                 )
                         )
             else:
-                self._varname_to_type[FunctionOutput] = e.expr_type.as_call_arg
+                self._varname_to_type[FunctionOutput] = e.expr_type.variable_storage_type
 
             output_type = self._varname_to_type[FunctionOutput]
 
@@ -628,8 +629,9 @@ class ConversionContext(object):
                     ).expr
                 )
                     
-
     def call_expression_in_function(self, identity, name, args, expr_producer):
+        args = [a.as_call_arg(self) for a in args]
+
         varlist = []
         typelist = []
         exprlist = []

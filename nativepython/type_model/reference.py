@@ -39,7 +39,7 @@ class Reference(Type):
         return native_ast.Type.Pointer(self.value_type.lower())
 
     @property
-    def as_call_arg(self):
+    def variable_storage_type(self):
         return self.value_type
 
     @property
@@ -97,14 +97,14 @@ class Reference(Type):
             )
 
     def __repr__(self):
-        return "Reference(%s)" % self.value_type
+        return "Ref(%s)" % self.value_type
 
     def is_valid_as_variable(self):
         return not self.value_type.is_ref
 
 class CreateReference(Reference):
     @property
-    def is_create_reference(self):
+    def is_create_ref(self):
         return True
 
     def is_valid_as_variable(self):
@@ -115,7 +115,7 @@ class CreateReference(Reference):
         raise ConversionException("Can't make a reference out of %s" % self)
 
     @property
-    def as_call_arg(self):
+    def variable_storage_type(self):
         return self.value_type.reference
 
     @property
@@ -123,4 +123,23 @@ class CreateReference(Reference):
         raise ConversionException("can't make a CreateReference out of %s" % self)
 
     def __repr__(self):
-        return "CreateReference(%s)" % self.value_type
+        return "CreateRef(%s)" % self.value_type
+
+class ReferenceToTemporary(Reference):
+    @property
+    def is_ref_to_temp(self):
+        return True
+
+    def is_valid_as_variable(self):
+        return False
+
+    @property
+    def reference(self):
+        raise ConversionException("Can't make a reference out of %s" % self)
+
+    @property
+    def create_reference(self):
+        raise ConversionException("can't make a CreateReference out of %s" % self)
+
+    def __repr__(self):
+        return "TempRef(%s)" % self.value_type

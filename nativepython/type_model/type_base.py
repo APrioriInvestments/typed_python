@@ -36,7 +36,11 @@ class Type(object):
         return False
 
     @property
-    def is_create_reference(self):
+    def is_create_ref(self):
+        return False
+
+    @property
+    def is_ref_to_temp(self):
         return False
 
     @property
@@ -163,7 +167,7 @@ class Type(object):
         return nativepython.type_model.Pointer(self)
 
     @property
-    def as_call_arg(self):
+    def variable_storage_type(self):
         return self
 
     def is_valid_as_variable(self):
@@ -172,6 +176,10 @@ class Type(object):
     @property
     def reference(self):
         return nativepython.type_model.Reference(self)
+
+    @property
+    def reference_to_temporary(self):
+        return nativepython.type_model.ReferenceToTemporary(self)
 
     @property
     def create_reference(self):

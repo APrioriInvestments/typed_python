@@ -22,6 +22,8 @@ from nativepython.type_model.primitive_type import Float64, Int64, Int32, Int8, 
 
 from nativepython.type_model.pointer import Pointer
 from nativepython.type_model.reference import Reference
+from nativepython.type_model.reference import ReferenceToTemporary
+from nativepython.type_model.reference import CreateReference
 from nativepython.type_model.compile_time_type import CompileTimeType
 from nativepython.type_model.compile_time_type import FreePythonObjectReference
 from nativepython.type_model.compile_time_type import pythonObjectRepresentation

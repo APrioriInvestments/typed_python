@@ -308,6 +308,9 @@ class PythonToNativeAstTests(unittest.TestCase):
             def returns_ref_to_self(self):
                 return util.ref(self)
 
+            def returns_copy_of_self(self):
+                return self
+
         def makes_ref(x):
             return RefToSelf(x)
 
@@ -321,8 +324,13 @@ class PythonToNativeAstTests(unittest.TestCase):
             aRefToSelf = RefToSelf(0)
 
             util.assert_types_same(
-                util.typeof(RefToSelf(0)),
+                util.typeof(aRefToSelf),
                 util.typeof(aRefToSelf.returns_ref_to_self())
+                )
+
+            util.assert_types_same(
+                util.typeof(RefToSelf(0)),
+                util.typeof(aRefToSelf.returns_copy_of_self())
                 )
 
 

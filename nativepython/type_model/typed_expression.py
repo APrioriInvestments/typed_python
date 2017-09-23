@@ -93,15 +93,19 @@ class TypedExpression(object):
 
     @property
     def as_creates_reference(self):
+        if self.expr_type.is_ref_to_temp:
+            raise ConversionException("Can't create a reference on the stack to a temporary!")
+
         if not self.expr_type.is_ref:
             raise ConversionException("This expression is not already a reference")
+        
         return TypedExpression(
             self.expr,
             self.expr_type.create_reference
             )
 
     def as_call_arg(self, context):
-        if self.expr_type.is_create_reference:
+        if self.expr_type.is_create_ref or self.expr_type.is_ref_to_temp:
             return TypedExpression(
                 self.expr,
                 self.expr_type.value_type.reference
@@ -115,7 +119,7 @@ class TypedExpression(object):
         if self.expr_type.is_pod and not self.expr_type.is_ref and self.expr_type.sizeof > 0:
             #pass this as a reference so we don't end up with many copies of the same function
             #with different 'reftypes' on the arguments
-            temp_ref = context.allocate_temporary(self.expr_type)
+            temp_ref = context.allocate_temporary(self.expr_type, type_is_temp_ref=False)
             return TypedExpression(
                 native_ast.Expression.Store(
                     ptr=temp_ref.expr,
