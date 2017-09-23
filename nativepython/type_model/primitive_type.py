@@ -61,13 +61,6 @@ class PrimitiveNumericType(PrimitiveType):
     def is_primitive_numeric(self):
         return True
 
-    @property
-    def sizeof(self):
-        if self.t.bits == 1:
-            return 1
-        assert self.t.bits % 8 == 0
-        return self.t.bits / 8
-
     def bigger_type(self, other):
         if self.t.matches.Float and other.t.matches.Int:
             return self
@@ -165,3 +158,5 @@ Int8 = PrimitiveNumericType(native_ast.Type.Int(bits=8, signed=True))
 UInt8 = PrimitiveNumericType(native_ast.Type.Int(bits=8, signed=False))
 Bool = PrimitiveNumericType(native_ast.Type.Int(bits=1, signed=False))
 Void = PrimitiveType(native_ast.Type.Void())
+
+assert Void.sizeof == 0

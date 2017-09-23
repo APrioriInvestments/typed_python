@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import nativepython.type_model as type_model
+import nativepython.runtime as runtime
 import nativepython.python_to_native_ast as python_to_native_ast
 import nativepython.native_ast as native_ast
 import nativepython.util as util
@@ -260,8 +261,8 @@ def generate_functions(seed, count, add_printfs=False):
 class PythonToNativeAstTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.compiler = llvm_compiler.Compiler()
-        cls.converter = python_to_native_ast.Converter()
+        cls.compiler = runtime.Runtime.singleton().compiler
+        cls.converter = runtime.Runtime.singleton().converter
 
     def convert_expression(self, lambda_func):
         return self.converter.convert_lambda_as_expression(lambda_func)
@@ -295,6 +296,61 @@ class PythonToNativeAstTests(unittest.TestCase):
             self.convert_expression(lambda: f()).expr_type
                 .python_object_representation == type_model.Int64.reference
             )
+
+    def test_typeof(self):
+        def g(x):
+            return x + 1
+
+        class RefToSelf:
+            def __init__(self, x):
+                self.x = x
+
+            def returns_ref_to_self(self):
+                return util.ref(self)
+
+        def makes_ref(x):
+            return RefToSelf(x)
+
+        def all_pass():
+            util.assert_types_same(util.typeof(3), type_model.Int64)
+            util.assert_types_same(util.typeof(g(3)), type_model.Int64)
+
+            x = 3
+            util.assert_types_same(util.typeof(x), type_model.Int64.reference)
+            
+            aRefToSelf = RefToSelf(0)
+
+            util.assert_types_same(
+                util.typeof(RefToSelf(0)),
+                util.typeof(aRefToSelf.returns_ref_to_self())
+                )
+
+
+            return 0
+
+        self.convert_expression(lambda: all_pass())
+
+        with self.assertRaises(python_to_native_ast.ConversionException):
+            self.convert_expression(
+                lambda: util.assert_types_same(util.typeof(10), type_model.Int64.reference)
+                )
+
+    def test_agressive_branch_pruning(self):
+        def g():
+            if False:
+                return 1
+            else:
+                return 0.0
+
+        self.convert_expression(lambda: g())
+
+    def test_agressive_branch_pruning_2(self):
+        def g():
+            if True:
+                return 1
+            return 0.0
+
+        self.convert_expression(lambda: g())
 
     def test_simple(self):
         def f(a):
@@ -435,6 +491,45 @@ class PythonToNativeAstTests(unittest.TestCase):
         f_comp = self.compile(f)
 
         self.assertTrue(f_comp(10) == 11)
+
+    def test_references_to_temporaries(self):
+        def test_references_to_temporaries_increment(a):
+            a = a + 1
+
+        def f(a):
+            test_references_to_temporaries_increment(1.0+2.0)
+            test_references_to_temporaries_increment(a)
+            return a
+        
+        f_target = self.converter.convert(f, [util.Float64])
+        functions = self.converter.extract_new_function_definitions()
+        self.compiler.add_functions(functions)
+
+        subfuncs = [f for f in functions.keys() if 'test_references_to_temporaries' in f]
+
+        #ensure we only have one function
+        self.assertEqual(len(subfuncs),1, subfuncs)
+
+    def test_calling_functions_with_contentless_args(self):
+        def caller(f,a):
+            return f(a)
+
+        def g(x):
+            return x + 1
+
+        def f(a):
+            return caller(g,a)
+        
+        f_target = self.converter.convert(f, [util.Float64])
+        functions = self.converter.extract_new_function_definitions()
+        self.compiler.add_functions(functions)
+
+        subfuncs = [functions[f] for f in functions.keys() if 'caller' in f]
+        assert len(subfuncs) == 1
+
+        type_of_f = subfuncs[0].args[0][1]
+
+        self.assertEqual(type_of_f, native_ast.Type.Struct(()))
 
     def test_conversion(self):
         def f(a):
@@ -608,7 +703,7 @@ class PythonToNativeAstTests(unittest.TestCase):
         #wide variety of situations.
 
         deep = test_config.tests_are_deep
-        
+
         for i in xrange(2 if not deep else 20):
             functions, text, signatures = generate_functions(TEST_SEED + i, 4 if not deep else 16)
 

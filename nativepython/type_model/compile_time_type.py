@@ -27,19 +27,23 @@ class CompileTimeType(Type):
         return True
     
     @property
-    def sizeof(self):
-        return 0
-
-    @property
     def null_value(self):
-        return native_ast.Constant.Void()
+        return native_ast.Constant.Struct(())
 
     def lower(self):
-        return native_ast.Type.Void()
+        return native_ast.Type.Struct(())
 
     @property
     def python_object_representation(self):
         raise ConversionException("Subclasses must implement")
+
+    def as_typed_expression(self):
+        return TypedExpression(
+            native_ast.Expression.Constant(
+                native_ast.Constant.Struct(())
+                ),
+            self
+            )
 
 def representation_for(obj):
     def decorator(override):
@@ -63,6 +67,10 @@ class FreePythonObjectReference(CompileTimeType):
         return self._original_obj
         
     def convert_attribute(self, context, instance, attr):
+        if not hasattr(self._obj, attr):
+            raise ConversionException("Can't get attribute %s from %s of type %s" % 
+                    (attr,self._obj, type(self._obj)))
+
         return pythonObjectRepresentation(getattr(self._obj, attr))
 
     def convert_call(self, context, instance, args):
@@ -83,6 +91,9 @@ class FreePythonObjectReference(CompileTimeType):
             return ClassType.convert_class_call(context, self._obj, args)
 
         if isinstance(self._obj, Type):
+            if self._obj.is_ref:
+                raise ConversionException("Can't instantiate %s" % self._obj)
+
             #we are initializing an element of the type
             for a in args:
                 assert a.expr is not None
@@ -92,8 +103,8 @@ class FreePythonObjectReference(CompileTimeType):
             return TypedExpression(
                 self._obj.convert_initialize(context, tmp_ptr, args).expr + 
                     context.activates_temporary(tmp_ptr) + 
-                    tmp_ptr.expr.load(),
-                self._obj
+                    tmp_ptr.expr,
+                self._obj.reference
                 )
 
         def to_py(x):
@@ -115,7 +126,6 @@ class FreePythonObjectReference(CompileTimeType):
 
     def __repr__(self):
         return "FreePythonObject(%s)" % self._obj
-
 
 def pythonObjectRepresentation(o):
     if isinstance(o,TypedExpression):
@@ -146,6 +156,6 @@ def pythonObjectRepresentation(o):
             )
 
     if isinstance(o,CompileTimeType):
-        return TypedExpression(native_ast.nullExpr, o)
+        return o.as_typed_expression()
 
-    return TypedExpression(native_ast.nullExpr, FreePythonObjectReference(o))
+    return FreePythonObjectReference(o).as_typed_expression()

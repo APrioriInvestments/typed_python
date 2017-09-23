@@ -113,6 +113,10 @@ class WrappedObject(object):
     def __repr__(self):
         return "WrappedObject(t=%s,p=%s)" % (self._object_type, self._object_ptr)
 
+    def __del__(self):
+        self._runtime._free_func(self)
+
+
 _singleton = [None]
 
 class Runtime:
@@ -136,9 +140,15 @@ class Runtime:
         def len_func(f):
             return len(f)
 
+        def free_func(f):
+            f_ptr = util.addr(f)
+            util.in_place_destroy(f_ptr)
+            util.free(f_ptr)
+
         self._call_func = WrappedFunction(self, call_func)
         self._getitem_func = WrappedFunction(self, getitem_func)
         self._len_fun = WrappedFunction(self, len_func)
+        self._free_func = WrappedFunction(self, free_func)
 
         self._pointer_attribute_funcs = {}
 

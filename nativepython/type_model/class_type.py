@@ -81,7 +81,7 @@ class ClassType(Type):
                     context.generate_call_expr(
                         target=call_target.native_call_target,
                         args=[tmp_ref.expr] 
-                              + [a.native_expr_for_function_call() for a in args]
+                              + [a.expr for a in args]
                         ) + 
                     tmp_ref.expr,
                 tmp_ref.expr_type
@@ -105,8 +105,7 @@ class ClassType(Type):
                     self.convert_initialize(context, instance_ref, ()).expr + 
                         context.generate_call_expr(
                             target=call_target.native_call_target,
-                            args=[instance_ref.native_expr_for_function_call(), 
-                                  other_instance.native_expr_for_function_call()]
+                            args=[instance_ref.expr, other_instance.expr]
                             )
                     )
 
@@ -291,10 +290,6 @@ class ClassType(Type):
 
         return super(ClassType, self).convert_getitem(context, instance, item)
 
-    @property
-    def sizeof(self):
-        return sum(t.sizeof for n,t in self.element_types)
-
     def __str__(self):
         return "Class(%s,%s)" % (self.cls, ",".join(["%s=%s" % t for t in self.element_types]))
 
@@ -309,10 +304,6 @@ class PythonClassMemberFunc(Type):
     @property
     def is_pod(self):
         return True
-
-    @property
-    def sizeof(self):
-        return self.python_class_type.pointer.sizeof
 
     def convert_call(self, context, instance, args):
         instance = instance.dereference()

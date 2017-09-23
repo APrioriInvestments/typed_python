@@ -1,9 +1,12 @@
+import nativepython.type_model as type_model
 import nativepython.util as util
 
 addr = util.addr
 
 @util.typefun
 def Vector(T):
+    assert isinstance(T, type_model.Type)
+
     class Iterator:
         def __init__(self, vec_ptr):
             self._vec_ptr = vec_ptr
@@ -88,6 +91,23 @@ def Vector(T):
 
             self._ptr = new_ptr
             self._reserved = count
+
+        def resize(self, count):
+            count = int(count)
+            
+            if count > self._reserved:
+                self.reserve(count)
+            
+            if count < 0:
+                count = 0
+
+            while count < self._size:
+                self._size -= 1
+                util.in_place_destroy(self._ptr + self._size)
+
+            while count > self._size:
+                util.in_place_new(self._ptr + self._size, T())
+                self._size += 1
 
         def __iter__(self):
             return Iterator(util.addr(self))

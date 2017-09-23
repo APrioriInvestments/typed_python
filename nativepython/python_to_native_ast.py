@@ -70,9 +70,8 @@ class ConversionContext(object):
     def call_py_function(self, f, args, name_override=None):
         #force arguments to a type appropriate for argpassing
         #e.g. drop out "CreateReference" and other syntactic sugar
-        args = [a.as_call_arg() for a in args]
-
-        native_args = [a.native_expr_for_function_call() for a in args]
+        args = [a.as_call_arg(self) for a in args]
+        native_args = [a.expr for a in args]
 
         call_target = \
             self._converter.convert(
@@ -351,7 +350,7 @@ class ConversionContext(object):
                     self._new_variables.add(varname)
 
                     new_variable_type = val_to_store.expr_type.as_call_arg
-                    assert new_variable_type.is_valid_as_variable
+                    assert new_variable_type.is_valid_as_variable()
                     self._varname_to_type[varname] = new_variable_type
 
                     slot_ref = self.named_var_expr(varname)
@@ -577,21 +576,18 @@ class ConversionContext(object):
         if not statements:
             return TypedExpression(native_ast.nullExpr, Void)
 
-        exprs = [self.convert_statement_ast_and_teardown_tmps(s) for s in statements]
+        exprs = []
+        for s in statements:
+            conversion = self.convert_statement_ast_and_teardown_tmps(s)
+            exprs.append(conversion)
+            if conversion.expr_type is None:
+                break
 
-        #all paths must return
-        i = 0
-        while i < len(exprs) and exprs[i].expr_type is not None:
-            i += 1
-
-        #i contains index of first statement that definitely returns
-        if i < len(exprs):
-            exprs = exprs[:i+1]
-            ret_type = None
-        else:
-            #we run off the end
+        if exprs[-1].expr_type is not None:
             exprs = exprs + [TypedExpression(native_ast.nullExpr, Void)]
             ret_type = Void
+        else:
+            ret_type = None
 
         if toplevel and ret_type is not None:
             exprs = exprs + [TypedExpression(native_ast.Expression.Return(None), None)]
@@ -670,7 +666,7 @@ class ConversionContext(object):
         return TypedExpression(
             self.generate_call_expr(
                 target=call_target.native_call_target,
-                args=[a.native_expr_for_function_call() for a in args]
+                args=[a.expr for a in args]
                 ),
             expr.expr_type
             )
@@ -779,11 +775,16 @@ class Converter(object):
 
         self._unconverted = set()
 
+        self.verbose = False
+
     def extract_new_function_definitions(self):
         res = {}
 
         for u in self._unconverted:
             res[u] = self._definitions[u]
+
+            if self.verbose:
+                print self._targets[u]
         
         self._unconverted = set()
 
@@ -797,14 +798,6 @@ class Converter(object):
         return getname()
 
     def convert_function_ast(self, ast, input_types, local_variables, free_variable_lookup):
-        for i in input_types:
-            if i.is_ref and i.value_type.is_ref:
-                raise ConversionException(
-                    "Can't pass Ref(Ref(T)):\n" + 
-                        "\n".join(["\t" + str(x) for x in input_types]
-                        )
-                    )
-
         if ast.args.vararg.matches.Value:
             star_args_name = ast.args.vararg.val
         else:
@@ -962,7 +955,7 @@ class Converter(object):
 
     def convert(self, f, input_types, name_override=None):
         for i in input_types:
-            if not i.is_valid_as_variable:
+            if not i.is_valid_as_variable():
                 raise ConversionException("Invalid argument types for %s: %s" % (f, input_types))
 
         input_types = tuple(input_types)

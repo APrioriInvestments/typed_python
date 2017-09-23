@@ -123,6 +123,22 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             help="dump llvm IR as it's produced"
             )
         self.add_argument(
+            '--dump_type_signatures',
+            dest='dump_type_signatures',
+            action='store_true',
+            default=False,
+            required=False,
+            help="dump type signatures of functions as they're produced"
+            )
+        self.add_argument(
+            '--disable_optimization',
+            dest='disable_optimization',
+            action='store_true',
+            default=False,
+            required=False,
+            help="disable optimization of llvm IR"
+            )
+        self.add_argument(
             '--dump_native',
             dest='dump_native',
             action='store_true',
@@ -425,6 +441,12 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
 
     if args.dump_native:
         runtime.Runtime.singleton().compiler.mark_converter_verbose()
+
+    if args.dump_type_signatures:
+        runtime.Runtime.singleton().converter.verbose = True
+
+    if args.disable_optimization:
+        runtime.Runtime.singleton().compiler.optimize = False
 
     if args.testHarnessVerbose or args.list:
         testArgs.append('--nocapture')

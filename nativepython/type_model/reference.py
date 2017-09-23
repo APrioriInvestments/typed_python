@@ -55,10 +55,6 @@ class Reference(Type):
         return native_ast.Constant.NullPointer(self.value_type.lower())
 
     @property
-    def sizeof(self):
-        return llvm_compiler.pointer_size
-
-    @property
     def pointer(self):
         return nativepython.type_model.Pointer(self)
 
@@ -86,8 +82,12 @@ class Reference(Type):
     def convert_initialize_copy(self, context, instance_ref, other_instance):
         other_instance = other_instance.drop_create_reference()
 
-        if other_instance.expr_type != self:
-            other_instance = other_instance.expr_type.convert_to_type(other_instance, self)
+        if not (other_instance.expr_type.is_ref and other_instance.expr_type.value_type == self or 
+                other_instance.expr_type == self):
+            raise ConversionException("Can't initialize %s with %s", self, other_instance.expr_type)
+
+        if other_instance.expr_type.is_ref and other_instance.expr_type.value_type == self:
+            other_instance = other_instance.dereference()
 
         return TypedExpression.Void(
             native_ast.Expression.Store(
@@ -99,7 +99,6 @@ class Reference(Type):
     def __repr__(self):
         return "Reference(%s)" % self.value_type
 
-    @property
     def is_valid_as_variable(self):
         return not self.value_type.is_ref
 
@@ -108,7 +107,6 @@ class CreateReference(Reference):
     def is_create_reference(self):
         return True
 
-    @property
     def is_valid_as_variable(self):
         return False
 

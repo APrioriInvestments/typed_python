@@ -53,5 +53,3 @@ class VectorTests(unittest.TestCase):
         self.assertTrue(vec[0] == 21)
         self.assertTrue(vec[1] == 23)
 
-        
-

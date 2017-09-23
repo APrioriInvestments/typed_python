@@ -30,10 +30,10 @@ class Simple:
         return self
 
 class PythonNativeRuntimeTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.runtime = runtime.Runtime.singleton()
-
+    @property
+    def runtime(self):
+        return runtime.Runtime.singleton()
+    
     def test_conversion(self):
         def f(a):
             return g(a)+g(1)
@@ -98,14 +98,16 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         res = self.runtime.wrap(f)()
         self.assertTrue(res.f0, (res.f0, res.f1, res.f2))
 
-    def test_decltype(self):
+    def test_typeof(self):
         addr = util.addr
         typeof = util.typeof
 
         def f():
             return typeof
         
-        result = self.runtime.wrap(f)()
+        wrapped_f = self.runtime.wrap(f)
+
+        result = wrapped_f()
 
         self.assertIs(result, typeof)
  

@@ -40,10 +40,6 @@ class Pointer(Type):
     def null_value(self):
         return native_ast.Constant.NullPointer(self.value_type.lower())
 
-    @property
-    def sizeof(self):
-        return llvm_compiler.pointer_size
-
     def convert_attribute(self, context, instance, attr):
         instance = instance.dereference()
         ref = instance.reference_from_pointer()
@@ -95,6 +91,8 @@ class Pointer(Type):
         return self.convert_getitem(context, instance, index).convert_assign(context, value)
 
     def convert_to_type(self, instance, to_type):
+        instance = instance.dereference()
+
         if to_type.is_pointer:
             return TypedExpression(
                 native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 

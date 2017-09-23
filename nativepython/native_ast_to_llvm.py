@@ -602,6 +602,8 @@ def expression_to_llvm_ir(
                 llvm_call_result = builder.call(func, [a.llvm_value for a in args])
             except:
                 print "failing while calling ", target.name
+                for a in args:
+                    print "\t", a.llvm_value, a.native_type
                 raise
 
             if target.output_type.matches.Void:

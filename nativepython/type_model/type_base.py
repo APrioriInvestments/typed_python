@@ -15,6 +15,7 @@
 import types
 import nativepython
 import nativepython.native_ast as native_ast
+import nativepython.llvm_compiler as llvm_compiler
 
 from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.exceptions import ConversionException
@@ -155,7 +156,7 @@ class Type(object):
 
     @property
     def sizeof(self):
-        raise ConversionException("can't compute the size of %s because we can't instantiate it" % self)
+        return llvm_compiler.sizeof_native_type(self.lower())
 
     @property
     def pointer(self):
@@ -165,7 +166,6 @@ class Type(object):
     def as_call_arg(self):
         return self
 
-    @property
     def is_valid_as_variable(self):
         return True
 

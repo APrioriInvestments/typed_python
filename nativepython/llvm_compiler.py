@@ -30,6 +30,16 @@ pointer_size = (
         .get_abi_size(target_machine.target_data)
     )
 
+def sizeof_native_type(native_type):
+    if native_type.matches.Void:
+        return 0
+    
+    return (
+        native_ast_to_llvm.type_to_llvm_type(native_type)
+            .get_abi_size(target_machine.target_data)
+        )
+
+
 def create_execution_engine():
     """
     Create an ExecutionEngine suitable for JIT code generation on
@@ -76,6 +86,9 @@ def native_to_ctype(native_type):
     if native_type.matches.Void:
         return None
     
+    if native_type.matches.Struct and len(native_type.element_types) == 0:
+        return None
+    
     assert False, "Can't convert %s to a ctype" % native_type
 
 class NativeFunctionPointer:
@@ -88,8 +101,8 @@ class NativeFunctionPointer:
 
     def __call__(self, *args):
         if self._ctypes_cache is None:
-            argtypes = (native_to_ctype(x) for x in 
-                                [self.output_type] + self.input_types)
+            argtypes = [native_to_ctype(x) for x in 
+                                [self.output_type] + self.input_types]
 
             self._ctypes_cache = ctypes.CFUNCTYPE(*argtypes)(self.fp)
         

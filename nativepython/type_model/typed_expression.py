@@ -100,17 +100,31 @@ class TypedExpression(object):
             self.expr_type.create_reference
             )
 
-    def as_call_arg(self):
+    def as_call_arg(self, context):
         if self.expr_type.is_create_reference:
             return TypedExpression(
                 self.expr,
                 self.expr_type.value_type.reference
                 )
 
-        return self
+        #never bother to pass references to pod null-value types.
+        if self.expr_type.is_ref and \
+                self.expr_type.nonref_type.sizeof == 0 and self.expr_type.nonref_type.is_pod:
+            return self.dereference().as_call_arg(context)
 
-    def native_expr_for_function_call(self):
-        return self.expr
+        if self.expr_type.is_pod and not self.expr_type.is_ref and self.expr_type.sizeof > 0:
+            #pass this as a reference so we don't end up with many copies of the same function
+            #with different 'reftypes' on the arguments
+            temp_ref = context.allocate_temporary(self.expr_type)
+            return TypedExpression(
+                native_ast.Expression.Store(
+                    ptr=temp_ref.expr,
+                    val=self.expr
+                    ) + temp_ref.expr,
+                temp_ref.expr_type
+                )
+
+        return self
 
     def convert_unary_op(self, op):
         return self.actor_type.convert_unary_op(self, op)

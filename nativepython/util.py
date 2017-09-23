@@ -79,6 +79,11 @@ def typefun(f):
 def exprfun(f):
     return ExpressionFunction(f)
 
+@typefun
+def assert_types_same(t1, t2):
+    if t1 != t2:
+        raise ConversionException("Types are not the same: %s != %s" % (t1, t2))
+
 @exprfun
 def addr(context, args):
     if len(args) != 1:
@@ -91,6 +96,18 @@ def ref(context, args):
     if len(args) != 1:
         raise ConversionException("ref takes 1 argument")
     return args[0].as_creates_reference
+
+@exprfun
+def nonref(context, args):
+    if len(args) != 1:
+        raise ConversionException("ref takes 1 argument")
+
+    if args[0].expr_type.is_create_reference:
+        return TypedExpression(
+            args[0].expr,
+            args[0].expr_type.value_type.reference
+            )
+    return args[0]
 
 @typefun
 def deref(t):
