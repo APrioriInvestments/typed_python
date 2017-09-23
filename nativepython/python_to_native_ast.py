@@ -799,51 +799,45 @@ class Converter(object):
             suffix = 1 if not suffix else suffix+1
         return getname()
 
-    def convert_function_ast(self, ast, input_types, local_variables, free_variable_lookup):
-        if ast.args.vararg.matches.Value:
-            star_args_name = ast.args.vararg.val
+    def convert_function_ast(self, ast_arg, statements, input_types, local_variables, free_variable_lookup):
+        if ast_arg.vararg.matches.Value:
+            star_args_name = ast_arg.vararg.val
         else:
             star_args_name = None
 
         if star_args_name is None:
-            if len(input_types) != len(ast.args.args):
+            if len(input_types) != len(ast_arg.args):
                 raise ConversionException(
-                    "Exected %s arguments but got %s" % (len(ast.args.args), len(input_types))
+                    "Exected %s arguments but got %s" % (len(ast_arg.args), len(input_types))
                     )
         else:
-            if len(input_types) < len(ast.args.args):
+            if len(input_types) < len(ast_arg.args):
                 raise ConversionException(
                     "Exected at least %s arguments but got %s" % 
-                        (len(ast.args.args), len(input_types))
+                        (len(ast_arg.args), len(input_types))
                     )
 
         varname_to_type = {}
 
         args = []
-        for i in xrange(len(ast.args.args)):
-            varname_to_type[ast.args.args[i].id] = input_types[i]
-            args.append((ast.args.args[i].id, input_types[i].lower_as_function_arg()))
+        for i in xrange(len(ast_arg.args)):
+            varname_to_type[ast_arg.args[i].id] = input_types[i]
+            args.append((ast_arg.args[i].id, input_types[i].lower_as_function_arg()))
 
         argnames = [a[0] for a in args]
 
         if star_args_name is not None:
-            star_args_count = len(input_types) - len(ast.args.args)
+            star_args_count = len(input_types) - len(ast_arg.args)
 
             starargs_elts = []
-            for i in xrange(len(ast.args.args), len(input_types)):
+            for i in xrange(len(ast_arg.args), len(input_types)):
                 args.append(
-                    ('.star_args.%s' % (i - len(ast.args.args)), 
+                    ('.star_args.%s' % (i - len(ast_arg.args)), 
                         input_types[i].lower_as_function_arg())
                     )
 
-            def stararg_field_type_for(t):
-                if t.is_ref:
-                    return t
-                if t.is_pod:
-                    return t
-
             starargs_type = Struct(
-                [('f_%s' % i, stararg_field_type_for(input_types[i+len(ast.args.args)]))
+                [('f_%s' % i, input_types[i+len(ast_arg.args)])
                     for i in xrange(star_args_count)]
                 )
 
@@ -853,7 +847,7 @@ class Converter(object):
 
         subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
 
-        res = subconverter.convert_statement_list_ast(ast.body, toplevel=True)
+        res = subconverter.convert_statement_list_ast(statements, toplevel=True)
 
         if star_args_name is not None:
             res = subconverter.construct_starargs_around(res, star_args_name)
@@ -872,33 +866,20 @@ class Converter(object):
             )
                   
 
-    def convert_lambda_ast(self, ast, input_types, free_variable_lookup):
-        assert len(input_types) == len(ast.args.args)
-        varname_to_type = {}
-
-        args = []
-        argnames = []
-        for i in xrange(len(input_types)):
-            varname_to_type[ast.args.args[i].id] = input_types[i]
-            args.append((ast.args.args[i].id, input_types[i].lower_as_function_arg()))
-            argnames.append(ast.args.args[i].id)
-
-        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
-
-        expr = subconverter.convert_expression_ast(ast.body)
-
-        expr = subconverter.construct_stackslots_around(expr, argnames, None)
-
-        return (
-            native_ast.Function(
-                args=args, 
-                body=native_ast.FunctionBody.Internal(
-                    native_ast.Expression.Return(expr.expr)
-                    ),
-                output_type=expr.expr_type.lower()
-                ),
-            expr.expr_type
+    def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup):
+        return self.convert_function_ast(
+            ast.args, 
+            [python_ast.Statement.Return(
+                value=ast.body,
+                line_number=ast.body.line_number,
+                col_offset=ast.body.col_offset,
+                filename=ast.body.filename
+                )],
+            input_types,
+            local_variables,
+            free_variable_lookup
             )
+
 
     def define(self, identifier, name, input_types, output_type, native_function_definition):
         identifier = ("defined", identifier)
@@ -973,10 +954,16 @@ class Converter(object):
         try:
             if isinstance(pyast, python_ast.Statement.FunctionDef):
                 definition,output_type = \
-                    self.convert_function_ast(pyast, input_types, f.func_code.co_varnames, freevars)
+                    self.convert_function_ast(
+                        pyast.args, 
+                        pyast.body, 
+                        input_types, 
+                        f.func_code.co_varnames, 
+                        freevars
+                        )
             else:
                 assert pyast.matches.Lambda
-                definition,output_type = self.convert_lambda_ast(pyast, input_types, freevars)
+                definition,output_type = self.convert_lambda_ast(pyast, input_types, f.func_code.co_varnames, freevars)
 
             assert definition is not None
 

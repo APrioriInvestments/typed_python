@@ -25,6 +25,9 @@ from nativepython.type_model.reference import Reference
 from nativepython.type_model.reference import ReferenceToTemporary
 from nativepython.type_model.reference import CreateReference
 from nativepython.type_model.compile_time_type import CompileTimeType
+from nativepython.type_model.compile_time_type import ExternalFunction
+from nativepython.type_model.compile_time_type import TypeFunction
+from nativepython.type_model.compile_time_type import ExpressionFunction
 from nativepython.type_model.compile_time_type import FreePythonObjectReference
 from nativepython.type_model.compile_time_type import pythonObjectRepresentation
 from nativepython.type_model.compile_time_type import representation_for

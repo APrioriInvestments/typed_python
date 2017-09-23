@@ -30,6 +30,14 @@ class Struct(ClassType):
         return "Struct(%s)" % (",".join(["%s=%s" % t for t in self.element_types]))
 
     @property
+    def is_class(self):
+        return False
+
+    @property
+    def is_struct(self):
+        return True
+
+    @property
     def is_pod(self):
         for _,e in self.element_types:
             if not e.is_pod:

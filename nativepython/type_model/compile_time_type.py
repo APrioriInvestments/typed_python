@@ -45,6 +45,16 @@ class CompileTimeType(Type):
             self
             )
 
+    def convert_attribute(self, context, instance, attr):
+        o = self.python_object_representation
+
+        if not hasattr(o, attr):
+            raise ConversionException("Can't get attribute %s from %s of type %s" % 
+                    (attr,o, type(o)))
+
+        return pythonObjectRepresentation(getattr(o, attr))
+
+
 def representation_for(obj):
     def decorator(override):
         FreePythonObjectReference.free_python_object_overrides[obj] = override
@@ -66,13 +76,6 @@ class FreePythonObjectReference(CompileTimeType):
     def python_object_representation(self):
         return self._original_obj
         
-    def convert_attribute(self, context, instance, attr):
-        if not hasattr(self._obj, attr):
-            raise ConversionException("Can't get attribute %s from %s of type %s" % 
-                    (attr,self._obj, type(self._obj)))
-
-        return pythonObjectRepresentation(getattr(self._obj, attr))
-
     def convert_call(self, context, instance, args):
         if isinstance(self._obj, types.FunctionType):
             return context.call_py_function(self._obj, args)
@@ -98,13 +101,13 @@ class FreePythonObjectReference(CompileTimeType):
             for a in args:
                 assert a.expr is not None
 
-            tmp_ptr = context.allocate_temporary(self._obj)
+            tmp_ref = context.allocate_temporary(self._obj)
 
             return TypedExpression(
-                self._obj.convert_initialize(context, tmp_ptr, args).expr + 
-                    context.activates_temporary(tmp_ptr) + 
-                    tmp_ptr.expr,
-                self._obj.reference
+                self._obj.convert_initialize(context, tmp_ref, args).expr + 
+                    context.activates_temporary(tmp_ref) + 
+                    tmp_ref.expr,
+                tmp_ref.expr_type
                 )
 
         def to_py(x):
@@ -159,3 +162,97 @@ def pythonObjectRepresentation(o):
         return o.as_typed_expression()
 
     return FreePythonObjectReference(o).as_typed_expression()
+
+class ExpressionFunction(CompileTimeType):
+    def __init__(self, f):
+        self.f = f
+
+    def convert_call(self, context, instance, args):
+        return self.f(context, args)
+
+    def __repr__(self):
+        return self.f.func_name
+
+    @property
+    def python_object_representation(self):
+        return self
+
+class TypeFunction(CompileTimeType):
+    def __init__(self, f):
+        self.f = f
+
+    def convert_call(self, context, instance, args):
+        def unwrap(x):
+            if not isinstance(x, TypedExpression):
+                raise ConversionException("Expected a TypedExpression, not %s" % x)
+            t = x.expr_type
+            if isinstance(t.nonref_type, FreePythonObjectReference):
+                return t.nonref_type.python_object_representation
+            else:
+                return t
+
+        def wrap(x):
+            return pythonObjectRepresentation(x)
+
+        unwrapped = [unwrap(x) for x in args]
+
+        res = self.f(*unwrapped)
+        
+        return wrap(res)
+
+    def __call__(self, *args):
+        return self.f(*args)
+
+    def __repr__(self):
+        return self.f.func_name
+
+    @property
+    def python_object_representation(self):
+        return self
+
+class ExternalFunction(CompileTimeType):
+    def __init__(self, name, output_type, input_types, implicit_type_casting,varargs):
+        self.name = name
+        self.output_type = output_type
+        self.input_types = input_types
+        self.implicit_type_casting = implicit_type_casting
+        self.varargs = varargs
+
+    def convert_call(self, context, instance, args):
+        if self.varargs:
+            assert len(args) >= len(self.input_types)
+        else:
+            assert len(args) == len(self.input_types)
+
+        args = [a.dereference() for a in args]
+
+        if not self.implicit_type_casting:
+            for i in xrange(len(input_types)):
+                assert args[i].expr_type == self.input_types[i]
+        else:
+            args = list(args)
+            for i in xrange(len(self.input_types)):
+                if args[i].expr_type != self.input_types[i]:
+                    args[i] = args[i].convert_to_type(self.input_types[i])
+
+        return TypedExpression(
+            native_ast.Expression.Call(
+                target=native_ast.CallTarget(
+                    name = self.name,
+                    arg_types = [i.lower() for i in self.input_types],
+                    output_type = self.output_type.lower(),
+                    external=True,
+                    varargs=self.varargs
+                    ),
+                args=[a.expr for a in args]
+                ),
+            self.output_type
+            )
+
+    def __repr__(self):
+        return self.name
+
+    @classmethod
+    def make(cls, name, output_type, input_types, implicit_type_casting=True,varargs=False):
+        return ExternalFunction(name, output_type, input_types, implicit_type_casting,varargs)
+

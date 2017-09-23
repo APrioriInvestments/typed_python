@@ -324,15 +324,14 @@ class PythonToNativeAstTests(unittest.TestCase):
             aRefToSelf = RefToSelf(0)
 
             util.assert_types_same(
-                util.typeof(aRefToSelf),
-                util.typeof(aRefToSelf.returns_ref_to_self())
+                util.typeof(aRefToSelf.returns_ref_to_self()),
+                util.typeof(aRefToSelf).nonref_type.reference
                 )
 
             util.assert_types_same(
-                util.typeof(RefToSelf(0)),
-                util.typeof(aRefToSelf.returns_copy_of_self())
+                util.typeof(aRefToSelf.returns_copy_of_self()),
+                util.typeof(aRefToSelf).nonref_type.reference_to_temporary
                 )
-
 
             return 0
 

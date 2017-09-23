@@ -53,3 +53,29 @@ class VectorTests(unittest.TestCase):
         self.assertTrue(vec[0] == 21)
         self.assertTrue(vec[1] == 23)
 
+    def test_vec_of_vec(self):
+        v = self.runtime.wrap(vector.Vector(util.Int64))
+
+        vec_type = v()._object_type
+
+        vec_of_vec = self.runtime.wrap(vector.Vector(vec_type))
+
+        instance = vec_of_vec()
+
+        instance.resize(10)
+
+        self.assertTrue(len(instance), 10)
+
+        instance[0].resize(10)
+
+        self.assertTrue(len(instance[0]), 10)
+
+        instance[0][1] = 20
+
+        self.assertEqual(instance[0][1], 20)
+
+        instance[1] = instance[0]
+
+        self.assertEqual(instance[1][1], 20)        
+
+

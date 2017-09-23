@@ -36,6 +36,10 @@ class Type(object):
         return False
 
     @property
+    def is_class(self):
+        return False
+
+    @property
     def is_create_ref(self):
         return False
 
@@ -53,6 +57,10 @@ class Type(object):
 
     @property
     def is_primitive_numeric(self):
+        return False
+
+    @property
+    def is_struct(self):
         return False
 
     @property

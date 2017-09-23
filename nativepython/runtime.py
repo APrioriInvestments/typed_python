@@ -18,6 +18,7 @@ import nativepython.native_ast as native_ast
 import nativepython.util as util
 import nativepython.llvm_compiler as llvm_compiler
 
+@util.typefun
 def is_simple_type(t):
     t = t.nonref_type
 
@@ -29,29 +30,65 @@ def is_simple_type(t):
         isinstance(t, type_model.CompileTimeType)
         )
 
-is_simple_type_tf = util.typefun(is_simple_type)
+class ReferenceHeldAsPointer:
+    def __init__(self, p):
+        self.p = p
+
+@util.typefun
+def isRefHeldAsPointer(t):
+    return t.nonref_type.is_class and t.nonref_type.cls is ReferenceHeldAsPointer
+
+def dereferenceRefHeldAsPointer(x):
+    if isRefHeldAsPointer(x):
+        return util.ref(x.p[0])
+    return util.ref(x)
 
 def wrapping_function_call(f):
-    def new_f(*args):
-        output_type = util.deref(util.typeof(f(*args)))
+    def new_f(*in_args):
+        args = util.map_struct(in_args, dereferenceRefHeldAsPointer)
 
-        if is_simple_type_tf(output_type):
+        output_type = util.typeof(f(*args)).nonref_type
+        output_type_raw = util.typeof(f(*args))
+
+        if is_simple_type(output_type):
             return f(*args)
+
+        if output_type_raw.is_ref:
+            if output_type_raw.is_ref_to_temp:
+                #this function creates a new object and returns it to us
+                raw_ptr = output_type.pointer(util.malloc(output_type.sizeof))
+
+                util.in_place_new(raw_ptr, f(*args))
+
+                return raw_ptr
+            else:
+                #this function is returning an internal reference
+                ref_as_ptr = ReferenceHeldAsPointer(util.addr(f(*args)))
+
+                reftype = util.typeof(ref_as_ptr).nonref_type
+
+                raw_ptr = reftype.pointer(util.malloc(reftype.sizeof))
+
+                util.in_place_new(raw_ptr, ref_as_ptr)
+
+                return raw_ptr
         else:
+            #this function creates a new object and returns it to us by value
             raw_ptr = output_type.pointer(util.malloc(output_type.sizeof))
 
             util.in_place_new(raw_ptr, f(*args))
 
             return raw_ptr
+
     new_f.func_name = "<wrapped f=%s>" % str(f)
     return new_f
 
 
 class WrappedFunction(object):
-    def __init__(self, runtime, f):
+    def __init__(self, runtime, f, wants_wrapping=True):
         self.runtime = runtime
         self.f = f
-        self.wrapping_func = wrapping_function_call(self.f)
+        self.wrapping_func = wrapping_function_call(self.f) if wants_wrapping else f
 
     def __call__(self, *args):
         def type_for_arg(a):
@@ -110,6 +147,9 @@ class WrappedObject(object):
     def __getitem__(self, a):
         return self._runtime._getitem_func(self, a)
 
+    def __setitem__(self, a, val):
+        return self._runtime._setitem_func(self, a, val)
+
     def __repr__(self):
         return "WrappedObject(t=%s,p=%s)" % (self._object_type, self._object_ptr)
 
@@ -132,10 +172,13 @@ class Runtime:
         self.functions_by_name = {}
 
         def call_func(f, *args):
-            return f(*args)
+            return util.ref_if_ref(f(*args))
 
         def getitem_func(f, a):
-            return f[a]
+            return util.ref_if_ref(f[a])
+
+        def setitem_func(f, a, b):
+            f[a] = b
 
         def len_func(f):
             return len(f)
@@ -147,15 +190,17 @@ class Runtime:
 
         self._call_func = WrappedFunction(self, call_func)
         self._getitem_func = WrappedFunction(self, getitem_func)
+        self._setitem_func = WrappedFunction(self, setitem_func)
         self._len_fun = WrappedFunction(self, len_func)
-        self._free_func = WrappedFunction(self, free_func)
+        self._free_func = WrappedFunction(self, free_func, wants_wrapping=False)
 
         self._pointer_attribute_funcs = {}
 
     def _pointer_attribute_func(self, attr):
         if attr not in self._pointer_attribute_funcs:
             getter = util.attribute_getter(attr)
-            self._pointer_attribute_funcs[attr] = WrappedFunction(self, lambda p: getter(p))
+            self._pointer_attribute_funcs[attr] = \
+                WrappedFunction(self, lambda p: util.ref_if_ref(getter(p)))
 
         return self._pointer_attribute_funcs[attr]
 

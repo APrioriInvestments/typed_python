@@ -35,6 +35,10 @@ class ClassType(Type):
     def is_pod(self):
         return False
 
+    @property
+    def is_class(self):
+        return True
+
     def lower(self):
         native_ast.Type.Struct([(n,t.lower()) for t in self.element_types])
 
@@ -125,9 +129,9 @@ class ClassType(Type):
                     dest_field = self.reference_to_field(instance_ref.expr, name)
                     source_field = other_instance.convert_attribute(context, name)
 
-                    body = body + dest_field.convert_initialize_copy(context, source_field)
+                    body = body + dest_field.convert_initialize_copy(context, source_field).expr
 
-                return TypedExpression.Void(body.expr)
+                return TypedExpression.Void(body)
 
             return context.call_expression_in_function(
                 (self, "initialize_copy"), 
@@ -289,6 +293,17 @@ class ClassType(Type):
                 )
 
         return super(ClassType, self).convert_getitem(context, instance, item)
+
+    def convert_setitem(self, context, instance, item, value):
+        if hasattr(self.cls, "__setitem__"):
+            getitem = self.cls.__setitem__.im_func
+            return context.call_py_function(
+                getitem, 
+                [instance, item, value],
+                name_override=self.cls.__name__+".__setitem__"
+                )
+
+        return super(ClassType, self).convert_setitem(context, instance, item, value)
 
     def __str__(self):
         return "Class(%s,%s)" % (self.cls, ",".join(["%s=%s" % t for t in self.element_types]))
