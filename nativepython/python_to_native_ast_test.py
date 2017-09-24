@@ -287,6 +287,13 @@ class PythonToNativeAstTests(unittest.TestCase):
                 .python_object_representation == type_model.Int64.reference
             )
 
+    def test_boolean_constant_exprs(self):
+        self.assertEqual(self.convert_expression(lambda: True).expr, native_ast.trueExpr)
+        self.assertEqual(self.convert_expression(lambda: False).expr, native_ast.falseExpr)
+        self.assertEqual(self.convert_expression(lambda: True and False).expr, native_ast.falseExpr)
+        self.assertEqual(self.convert_expression(lambda: True or False).expr, native_ast.trueExpr)
+        self.assertEqual(self.convert_expression(lambda: False or True).expr, native_ast.trueExpr)
+
     def test_typefuncs_3(self):
         def f():
             output_type = util.typeof(3)

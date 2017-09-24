@@ -55,8 +55,6 @@ Constant.ByteArray = {'val': bytes}
 Constant.NullPointer = {'value_type': Type}
 
 def const_truth_value(c):
-    if c.matches.Float:
-        return c.val != 0.0
     if c.matches.Int:
         return c.val != 0
     return False
@@ -287,6 +285,8 @@ Expression.ElementPtrIntegers = (lambda self, *offsets:
 
 
 nullExpr = Expression.Constant(Constant.Void())
+trueExpr = Expression.Constant(Constant.Int(bits=1,val=1,signed=False))
+falseExpr = Expression.Constant(Constant.Int(bits=1,val=0,signed=False))
 
 FunctionBody = Alternative("FunctionBody",
     Internal = {'body': Expression},

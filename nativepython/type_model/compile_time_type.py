@@ -134,6 +134,14 @@ def pythonObjectRepresentation(o):
     if isinstance(o,TypedExpression):
         return o
 
+    if isinstance(o, bool):
+        return TypedExpression(
+            native_ast.Expression.Constant(
+                native_ast.Constant.Int(val=1 if o else 0,bits=1,signed=False)
+                ), 
+            nativepython.type_model.Bool
+            )
+
     if isinstance(o, int):
         return TypedExpression(
             native_ast.Expression.Constant(

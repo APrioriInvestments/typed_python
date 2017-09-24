@@ -72,6 +72,32 @@ class PythonNativeRuntimeTests(unittest.TestCase):
                         
         self.runtime.wrap(f)()
 
+    def test_boolean_operations(self):
+        def test_expr(f):
+            args = [False for _ in xrange(f.func_code.co_argcount)]
+            done = [False]
+
+            def inc(ix):
+                if ix >= len(args):
+                    done[0] = True
+                    return
+
+                if args[ix]:
+                    args[ix] = False
+                    inc(ix+1)
+                else:
+                    args[ix] = True
+
+            while not done[0]:
+                self.assertEqual(f(*args), self.runtime.wrap(f)(*args))
+                inc(0)
+
+        test_expr(lambda x,y: x or y)
+        test_expr(lambda x,y: x and y)
+        test_expr(lambda x,y,z: x or y or z)
+        test_expr(lambda x,y,z: x and y and z)
+        test_expr(lambda x,y,z: x and y or z)
+
     def test_self_pointer(self):
         addr = util.addr
 

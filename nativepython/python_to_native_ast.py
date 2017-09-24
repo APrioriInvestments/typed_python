@@ -191,6 +191,48 @@ class ConversionContext(object):
         if ast.matches.Str:
             return pythonObjectRepresentation(ast.s)
 
+        if ast.matches.BoolOp:
+            op = ast.op
+            values = ast.values
+
+            expr_so_far = []
+
+            for i in xrange(len(values)):
+                expr_so_far.append(self.ensure_bool(self.convert_expression_ast(values[i])).expr)
+                if expr_so_far[-1].matches.Constant:
+                    if (expr_so_far[-1].val.val and op.matches.Or or 
+                            (not expr_so_far[-1].val.val) and op.matches.And):
+                        #this is a short-circuit
+                        if len(expr_so_far) == 1:
+                            return TypedExpression(expr_so_far[0], Bool)
+
+                        return TypedExpression(
+                            native_ast.Expression.Sequence(expr_so_far),
+                            Bool
+                            )
+                    else:
+                        expr_so_far.pop()
+
+            if not expr_so_far:
+                if op.matches.Or:
+                    #must have had all False constants
+                    return TypedExpression(native_ast.falseExpr, Bool)
+                else:
+                    #must have had all True constants
+                    return TypedExpression(native_ast.trueExpr, Bool)
+
+            while len(expr_so_far) > 1:
+                l,r = expr_so_far[-2], expr_so_far[-1]
+                expr_so_far.pop()
+                expr_so_far.pop()
+                if op.matches.And:
+                    new_expr = native_ast.Expression.Branch(cond=l, true=r, false=native_ast.falseExpr)
+                else:
+                    new_expr = native_ast.Expression.Branch(cond=l, true=native_ast.trueExpr, false=r)
+                expr_so_far.append(new_expr)
+
+            return TypedExpression(expr_so_far[0], Bool)
+
         if ast.matches.BinOp:
             l = self.convert_expression_ast(ast.left)
             r = self.convert_expression_ast(ast.right)
@@ -253,7 +295,7 @@ class ConversionContext(object):
                 )
 
         if ast.matches.IfExp:
-            test = self.convert_expression_ast(ast.test)
+            test = self.ensure_bool(self.convert_expression_ast(ast.test))
             body = self.convert_expression_ast(ast.body)
             orelse = self.convert_expression_ast(ast.orelse)
 
@@ -276,6 +318,20 @@ class ConversionContext(object):
                 )
 
         raise ConversionException("can't handle python expression type %s" % ast._which)
+
+    def ensure_bool(self, expr):
+        t = expr.expr_type.nonref_type
+
+        if t == Bool:
+            return expr.dereference()
+
+        if not (t.is_primitive_numeric or t.is_pointer):
+            if expr.expr.matches.Constant:
+                return TypedExpression(native_ast.falseExpr, Bool)
+            else:
+                return expr + TypedExpression(native_ast.falseExpr, Bool)
+
+        return expr.dereference()
 
     def convert_statement_ast_and_teardown_tmps(self, ast):
         if self._new_temporaries:
@@ -448,7 +504,7 @@ class ConversionContext(object):
                 )
 
         if ast.matches.If:
-            cond = self.convert_expression_ast(ast.test)
+            cond = self.ensure_bool(self.convert_expression_ast(ast.test))
             cond = self.consume_temporaries(cond)
 
             if cond.expr.matches.Constant:
@@ -474,7 +530,7 @@ class ConversionContext(object):
             return TypedExpression(native_ast.nullExpr, Void)
 
         if ast.matches.While:
-            cond = self.convert_expression_ast(ast.test)
+            cond = self.ensure_bool(self.convert_expression_ast(ast.test))
             cond = self.consume_temporaries(cond)
 
             true = self.convert_statement_list_ast(ast.body)
