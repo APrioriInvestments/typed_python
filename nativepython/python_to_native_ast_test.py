@@ -272,7 +272,25 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         functions = self.converter.extract_new_function_definitions()
 
-        return self.compiler.add_functions(functions)[f_target.name]
+        self.compiler.add_functions(functions)
+
+        return self.compiler.functions_by_name[f_target.name]
+
+    def assertLikePython(self, f, args):
+        def type_for(a):
+            if isinstance(a, bool):
+                return util.Bool
+            if isinstance(a, int):
+                return util.Int64
+            if isinstance(a, float):
+                return util.Float64
+            assert False, "can't handle %s" % a
+
+        types = [type_for(a) for a in args]
+
+        target = self.compile(f, types)
+
+        self.assertEqual(target(*args), f(*args))
 
     def test_typefuncs_1(self):
         self.assertTrue(self.convert_expression(lambda: 3).expr.matches.Constant)
@@ -373,6 +391,53 @@ class PythonToNativeAstTests(unittest.TestCase):
             return 0
             
         self.assertEqual(self.compile(test_expr, ())(), 0)
+
+    def test_power_binop(self):
+        def test_expr():
+            if 2.0 ** 3.0 is not 8.0:
+                return 1
+
+            if type_model.Float32(2.0) ** type_model.Float32(3.0) is not type_model.Float32(8.0):
+                return 2
+
+            if 2.0 ** 3 is not 8.0:
+                return 1
+
+            if type_model.Float32(2.0) ** 3 is not type_model.Float32(8.0):
+                return 2
+
+            if 2.0 ** type_model.Int8(3) is not 8.0:
+                return 1
+
+            if type_model.Float32(2.0) ** type_model.Int8(3) is not type_model.Float32(8.0):
+                return 2
+
+            return 0
+
+        self.assertEqual(self.compile(test_expr, ())(), 0)
+
+    def test_shift_operations(self):
+        for args in [(0,0),(1,1),(3,1),(1,3),(-2,3),(-2,1)]:
+            self.assertLikePython(lambda a,b: a<<b, args)
+            self.assertLikePython(lambda a,b: a>>b, args)
+
+    def test_bit_operations(self):
+        for args in [(0,0),(1,1),(3,1),(1,3),(-2,3),(-2,1)]:
+            self.assertLikePython(lambda a,b: a|b, args)
+            self.assertLikePython(lambda a,b: a&b, args)
+            self.assertLikePython(lambda a,b: a^b, args)
+
+    def test_div_rem_operations(self):
+        some_numbers = [0,1,2,4,8,0.0,1.0,2.0,4.0,8.0,3.1415]
+
+        div = lambda a,b: a/b
+        rem = lambda a,b: a%b
+
+        for arg1 in some_numbers:
+            for arg2 in some_numbers:
+                if arg2 != 0.0:
+                    self.assertLikePython(div, (arg1,arg2))
+                    self.assertLikePython(rem, (arg1,arg2))
 
     def test_boolean_constant_exprs(self):
         self.assertEqual(self.convert_expression(lambda: True).expr, native_ast.trueExpr)

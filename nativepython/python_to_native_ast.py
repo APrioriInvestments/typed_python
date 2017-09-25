@@ -958,7 +958,8 @@ class Converter(object):
                 arg_types=[x[1] for x in native_function_definition.args],
                 output_type=native_function_definition.output_type,
                 external=False,
-                varargs=False
+                varargs=False,
+                intrinsic=False
                 ),
             input_types,
             output_type
@@ -1044,7 +1045,8 @@ class Converter(object):
                     arg_types=[x[1] for x in definition.args],
                     output_type=definition.output_type,
                     external=False,
-                    varargs=False
+                    varargs=False,
+                    intrinsic=False
                     ),
                 input_types,
                 output_type

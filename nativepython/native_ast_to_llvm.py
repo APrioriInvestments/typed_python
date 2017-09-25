@@ -34,6 +34,9 @@ def type_to_llvm_type(t):
         
     if t.matches.Float and t.bits == 64:
         return llvmlite.ir.DoubleType()
+
+    if t.matches.Float and t.bits == 32:
+        return llvmlite.ir.FloatType()
     
     if t.matches.Int:
         return llvmlite.ir.IntType(t.bits)
@@ -576,22 +579,36 @@ def expression_to_llvm_ir(
                             native_ast.Type.Int(bits=1,signed=False)
                             )
 
-            for py_op, floatop, intop in [('Add','fadd','add'), ('Mul','fmul','mul'), 
-                                          ('Div','fdiv','div'), ('Sub','fsub','sub')]:
+            for py_op, floatop, intop_s, intop_u in [
+                        ('Add','fadd','add','add'), 
+                        ('Mul','fmul','mul','mul'), 
+                        ('Div','fdiv','sdiv', 'udiv'), 
+                        ('Mod','frem','srem', 'urem'), 
+                        ('Sub','fsub','sub','sub'),
+                        ('LShift',None,'shl','shl'),
+                        ('RShift',None,'ashr','lshr'),
+                        ('BitOr',None,'or_','or_'),
+                        ('BitXor',None,'xor','xor'),
+                        ('BitAnd',None,'and_','and_')
+                        ]:
                 if getattr(expr.op.matches, py_op):
                     assert l.native_type == r.native_type, \
                         "malformed types: expect l&r to be the same but got %s,%s,%s\n\nexpr=%s"\
                             % (py_op, l.native_type, r.native_type, expr)
-                    if l.native_type.matches.Float:
+                    if l.native_type.matches.Float and floatop is not None:
                         return TypedLLVMValue(
                             getattr(builder, floatop)(l.llvm_value, r.llvm_value), 
                             l.native_type
                             )
                     elif l.native_type.matches.Int:
-                        return TypedLLVMValue(
-                            getattr(builder, intop)(l.llvm_value, r.llvm_value), 
-                            l.native_type
-                            )
+                        llvm_op = intop_s if l.native_type.signed else intop_u
+
+                        if llvm_op is not None:
+                            return TypedLLVMValue(
+                                getattr(builder, llvm_op)(l.llvm_value, r.llvm_value), 
+                                l.native_type
+                                )
+
 
         if expr.matches.Call:
             target = expr.target
@@ -608,8 +625,13 @@ def expression_to_llvm_ir(
                         [type_to_llvm_type(x) for x in target.arg_types],
                         var_arg=target.varargs
                         )
-                    external_function_references[target.name] = \
-                        llvmlite.ir.Function(module, func_type, target.name)
+
+                    if target.intrinsic:
+                        external_function_references[target.name] = \
+                            module.declare_intrinsic(target.name, fnty=func_type)
+                    else:
+                        external_function_references[target.name] = \
+                            llvmlite.ir.Function(module, func_type, target.name)
 
                 func = external_function_references[target.name]
 

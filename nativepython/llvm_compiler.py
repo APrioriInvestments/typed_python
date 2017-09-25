@@ -41,13 +41,6 @@ def sizeof_native_type(native_type):
 
 
 def create_execution_engine():
-    """
-    Create an ExecutionEngine suitable for JIT code generation on
-    the host CPU.  The engine is reusable for an arbitrary number of
-    modules.
-    """
-    # Create a target machine representing the host
-
     pmb = llvm.create_pass_manager_builder()
     pmb.opt_level = 3
 
@@ -125,6 +118,7 @@ class Compiler:
 
         self.engine, self.module_pass_manager = create_execution_engine()
         self.converter = native_ast_to_llvm.Converter()
+        self.functions_by_name = {}
         self.verbose = False
         self.optimize = True
 
@@ -164,6 +158,8 @@ class Compiler:
 
             result[fname] = NativeFunctionPointer(fname, func_ptr, 
                                                   input_types, output_type)
+
+            self.functions_by_name[fname] = result[fname]
 
         return result
 

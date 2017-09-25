@@ -86,7 +86,9 @@ Constant.__str__ = const_str
 UnaryOp = Alternative("UnaryOp", Add={}, Negate={}, LogicalNot={}, BitwiseNot={})
 BinaryOp = Alternative("BinaryOp", 
                        Add={}, Sub={}, Mul={}, Div={}, Eq={}, 
-                       NotEq={}, Lt={}, LtE={}, Gt={}, GtE={}
+                       NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
+                       Mod={}, Pow={}, LShift={}, RShift={},
+                       BitOr={}, BitAnd={}, BitXor={}
                        )
 
 UnaryOp.__str__ = (lambda o:
@@ -105,6 +107,11 @@ BinaryOp.__str__ = (lambda o:
     "<=" if o.matches.LtE else 
     ">" if o.matches.Gt else 
     ">=" if o.matches.GtE else 
+    "<<" if o.matches.LShift else 
+    ">>" if o.matches.RShift else 
+    "|" if o.matches.BitOr else 
+    "&" if o.matches.BitAnd else 
+    "^" if o.matches.BitXor else
     None)
 
 CallTarget = Alternative(
@@ -113,7 +120,8 @@ CallTarget = Alternative(
                 'arg_types': List(Type), 
                 'output_type': Type, 
                 'external': bool, 
-                'varargs': bool
+                'varargs': bool,
+                'intrinsic': bool
                 }
             )
 

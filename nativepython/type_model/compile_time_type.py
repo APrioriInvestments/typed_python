@@ -219,12 +219,13 @@ class TypeFunction(CompileTimeType):
         return self
 
 class ExternalFunction(CompileTimeType):
-    def __init__(self, name, output_type, input_types, implicit_type_casting,varargs):
+    def __init__(self, name, output_type, input_types, implicit_type_casting,varargs,intrinsic):
         self.name = name
         self.output_type = output_type
         self.input_types = input_types
         self.implicit_type_casting = implicit_type_casting
         self.varargs = varargs
+        self.intrinsic = intrinsic
 
     def convert_call(self, context, instance, args):
         if self.varargs:
@@ -250,7 +251,8 @@ class ExternalFunction(CompileTimeType):
                     arg_types = [i.lower() for i in self.input_types],
                     output_type = self.output_type.lower(),
                     external=True,
-                    varargs=self.varargs
+                    varargs=self.varargs,
+                    intrinsic=self.intrinsic
                     ),
                 args=[a.expr for a in args]
                 ),
@@ -261,6 +263,6 @@ class ExternalFunction(CompileTimeType):
         return self.name
 
     @classmethod
-    def make(cls, name, output_type, input_types, implicit_type_casting=True,varargs=False):
-        return ExternalFunction(name, output_type, input_types, implicit_type_casting,varargs)
+    def make(cls, name, output_type, input_types, implicit_type_casting=True,varargs=False,intrinsic=False):
+        return ExternalFunction(name, output_type, input_types, implicit_type_casting,varargs,intrinsic)
 

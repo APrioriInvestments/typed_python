@@ -63,6 +63,22 @@ class PrimitiveNumericType(PrimitiveType):
     def is_primitive_numeric(self):
         return True
 
+    @property
+    def is_integer(self):
+        return self.t.matches.Int
+
+    @property
+    def is_bool(self):
+        return self.t.matches.Int and self.t.bits == 1
+
+    @property
+    def is_float(self):
+        return self.t.matches.Float
+
+    @property
+    def is_nonbool_integer(self):
+        return self.t.matches.Int and self.t.bits > 1
+
     def bigger_type(self, other):
         if self.t.matches.Float and other.t.matches.Int:
             return self
@@ -86,7 +102,7 @@ class PrimitiveNumericType(PrimitiveType):
         instance = instance_ref.dereference()
 
         if op.matches.UAdd or op.matches.USub:
-            if self.t.matches.Int and self.t.bits == 1:
+            if self.is_bool:
                 return self.convert_to_type(Int64).convert_unary_op(instance_ref, op)
 
             return TypedExpression(
@@ -98,7 +114,7 @@ class PrimitiveNumericType(PrimitiveType):
                 )
 
         if op.matches.Invert:
-            if self.t.matches.Int and self.t.bits == 1:
+            if self.is_bool:
                 return self.convert_to_type(Int64).convert_unary_op(instance_ref, op)
 
             return TypedExpression(
@@ -118,7 +134,7 @@ class PrimitiveNumericType(PrimitiveType):
                 Bool
                 )
 
-        return super(PrimitiveNumericType, self).convert_unary_op(instance, op)
+        return super(PrimitiveNumericType, self).convert_unary_op(instance_ref, op)
 
     def convert_bin_op(self, op, l, r):
         l = l.dereference()
@@ -150,6 +166,84 @@ class PrimitiveNumericType(PrimitiveType):
                     Bool
                     )
         
+        if op._alternative is python_ast.BinaryOp and (op.matches.LShift or op.matches.RShift):
+            if l.expr_type.is_nonbool_integer and r.expr_type.is_nonbool_integer:
+                return TypedExpression(
+                    native_ast.Expression.Binop(
+                        op=getattr(native_ast.BinaryOp,op._which)(),
+                        l=l.expr,
+                        r=r.expr
+                        ),
+                    l.expr_type
+                    )
+        
+        if op._alternative is python_ast.BinaryOp and (
+                    op.matches.BitOr or op.matches.BitAnd or op.matches.BitXor):
+            if l.expr_type.is_integer and r.expr_type.is_integer:
+                target_type = self.bigger_type(r.expr_type)
+
+                if r.expr_type != target_type:
+                    r = r.expr_type.convert_to_type(r, target_type)
+
+                if l.expr_type != target_type:
+                    l = l.expr_type.convert_to_type(l, target_type)
+
+                return TypedExpression(
+                    native_ast.Expression.Binop(
+                        op=getattr(native_ast.BinaryOp,op._which)(),
+                        l=l.expr,
+                        r=r.expr
+                        ),
+                    target_type
+                    )
+        
+        if op._alternative is python_ast.BinaryOp and op.matches.Pow and l.expr_type.is_float:
+            if r.expr_type.is_float:
+                target_type = self.bigger_type(r.expr_type)
+
+                if r.expr_type != target_type:
+                    r = r.expr_type.convert_to_type(r, target_type)
+
+                if l.expr_type != target_type:
+                    l = l.expr_type.convert_to_type(l, target_type)
+
+                bitcount = l.expr_type.t.bits
+
+                return TypedExpression(
+                    native_ast.Expression.Call(
+                        target=native_ast.CallTarget(
+                            name = "llvm.pow.f%s" % bitcount,
+                            arg_types = [l.expr_type.lower(), r.expr_type.lower()],
+                            output_type = l.expr_type.lower(),
+                            external=True,
+                            varargs=False,
+                            intrinsic=True
+                            ),
+                        args=[l.expr, r.expr]
+                        ),
+                    l.expr_type
+                    )
+            if r.expr_type.is_integer:
+                bitcount = l.expr_type.t.bits
+
+                if r.expr_type != Int32:
+                    r = r.expr_type.convert_to_type(r, Int32)
+
+                return TypedExpression(
+                    native_ast.Expression.Call(
+                        target=native_ast.CallTarget(
+                            name = "llvm.powi.f%s" % bitcount,
+                            arg_types = [l.expr_type.lower(), r.expr_type.lower()],
+                            output_type = l.expr_type.lower(),
+                            external=True,
+                            varargs=False,
+                            intrinsic=True
+                            ),
+                        args=[l.expr, r.expr]
+                        ),
+                    l.expr_type
+                    )
+
         target_type = self.bigger_type(r.expr_type)
 
         if r.expr_type != target_type:
@@ -159,7 +253,10 @@ class PrimitiveNumericType(PrimitiveType):
             l = l.expr_type.convert_to_type(l, target_type)
 
         if op._alternative is python_ast.BinaryOp:
-            for py_op, native_op in [('Add','Add'),('Sub','Sub'),('Mult','Mul'),('Div','Div')]:
+            for py_op, native_op in [('Add','Add'),('Sub','Sub'),
+                                     ('Mult','Mul'),('Div','Div'),
+                                     ('Mod','Mod')
+                                     ]:
                 if getattr(op.matches, py_op):
                     return TypedExpression(
                         native_ast.Expression.Binop(
@@ -205,6 +302,7 @@ class PrimitiveNumericType(PrimitiveType):
         raise ConversionException("can't convert %s to %s" % (self, other_type))
 
 Float64 = PrimitiveNumericType(native_ast.Type.Float(bits=64))
+Float32 = PrimitiveNumericType(native_ast.Type.Float(bits=32))
 Int64 = PrimitiveNumericType(native_ast.Type.Int(bits=64, signed=True))
 Int32 = PrimitiveNumericType(native_ast.Type.Int(bits=32, signed=True))
 Int8 = PrimitiveNumericType(native_ast.Type.Int(bits=8, signed=True))
