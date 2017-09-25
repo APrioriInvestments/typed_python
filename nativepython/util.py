@@ -162,8 +162,8 @@ def map_struct(context, args):
 
 @typefun
 def struct_size(t):
-    if t.is_struct:
-        return len(t.element_types)
+    if t.nonref_type.is_struct:
+        return len(t.nonref_type.element_types)
     else:
         return None
 
@@ -178,28 +178,50 @@ def len_override(x):
 @type_model.cls
 class xrange_override:
     def __types__(cls):
-        cls.top = int
+        cls.start = int
+        cls.stop = int
+        cls.step = int
 
-    def __init__(self, top):
-        self.top = top
+    def __init__(self, *args):
+        if struct_size(typeof(args)) is 0:
+            self.start = 0
+            self.stop = 0
+            self.step = 1
+        if struct_size(typeof(args)) is 1:
+            self.start = 0
+            self.stop = args[0]
+            self.step = 1
+        else:
+            self.start = args[0]
+            self.stop = args[1]
+
+            if struct_size(typeof(args)) is 3:
+                self.step = args[2]
+            else:
+                self.step = 1
 
     def __iter__(self):
-        return xrange_iterator(0, self.top)
+        return xrange_iterator(self.start, self.stop, self.step)
 
 @type_model.cls
 class xrange_iterator:
     def __types__(cls):
         cls.cur_value = int
-        cls.top = int
+        cls.stop = int
+        cls.step = int
 
-    def __init__(self, cur_value, top):
+    def __init__(self, cur_value, stop, step):
         self.cur_value = cur_value
-        self.top = top
+        self.stop = stop
+        self.step = step
 
     def has_next(self):
-        return self.cur_value < self.top
+        if self.step > 0:
+            return self.cur_value < self.stop
+        else:
+            return self.cur_value > self.stop
 
     def next(self):
         val = self.cur_value
-        self.cur_value += 1
+        self.cur_value += self.step
         return val

@@ -79,6 +79,17 @@ class PythonNativeRuntimeTests(unittest.TestCase):
                         
         self.runtime.wrap(f)()
 
+    def test_overloading_in_xrange(self):
+        def f(*args):
+            x = 0
+            for i in xrange(*args):
+                x = x + i
+            return x
+                        
+        self.assertEqual(self.runtime.wrap(f)(10), sum(xrange(10)))
+        self.assertEqual(self.runtime.wrap(f)(5, 10), sum(xrange(5, 10)))
+        self.assertEqual(self.runtime.wrap(f)(5, 10, 2), sum(xrange(5, 10, 2)))
+
     def test_boolean_operations(self):
         def test_expr(f):
             args = [False for _ in xrange(f.func_code.co_argcount)]

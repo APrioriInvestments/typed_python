@@ -52,9 +52,12 @@ class Struct(ClassType):
         return Struct(element_types=self.element_types + ((name,type),))
 
     def convert_getitem(self, context, instance, index):
-        assert index.expr.matches.Constant and index.expr.val.matches.Int, \
-            "can't index %s with %s" % (self,index)
+        if not (index.expr.matches.Constant and index.expr.val.matches.Int):
+            raise ConversionException("can't index %s with %s" % (self, index.expr))
+            
         i = index.expr.val.val
-        assert i >= 0 and i < len(self.element_types), "can't index %s with %s" % (self, index)
+        
+        if not (i >= 0 and i < len(self.element_types)):
+            raise ConversionException("can't index %s with %s" % (self, i))
 
         return self.convert_attribute(context, instance, self.element_types[i][0])

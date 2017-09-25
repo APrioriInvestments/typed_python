@@ -145,6 +145,12 @@ class PrimitiveNumericType(PrimitiveType):
                 if l.expr_type != r.expr_type:
                     return TypedExpression(native_ast.falseExpr, Bool)
 
+                if l.expr.matches.Constant and r.expr.matches.Constant:
+                    return TypedExpression(
+                        native_ast.trueExpr if l.expr.val == r.expr.val else native_ast.falseExpr,
+                        Bool
+                        )
+                
                 return TypedExpression(
                     native_ast.Expression.Binop(
                         op=native_ast.BinaryOp.Eq(),
@@ -153,6 +159,7 @@ class PrimitiveNumericType(PrimitiveType):
                         ),
                     Bool
                     )
+
             if op.matches.IsNot:
                 if l.expr_type != r.expr_type:
                     return TypedExpression(native_ast.trueExpr, Bool)
