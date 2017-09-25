@@ -1,3 +1,4 @@
+import nativepython
 import nativepython.type_model as type_model
 import nativepython.util as util
 
@@ -7,10 +8,14 @@ addr = util.addr
 def Vector(T):
     assert isinstance(T, type_model.Type)
 
+    @type_model.cls
     class Iterator:
+        def __types__(cls):
+            cls._vec_ptr = Vector.pointer
+            cls._i = int
+
         def __init__(self, vec_ptr):
             self._vec_ptr = vec_ptr
-            self._i = 0
 
         def has_next(self):
             return self._i < len(self._vec_ptr[0])
@@ -20,11 +25,12 @@ def Vector(T):
             self._i += 1
             return util.ref((self._vec_ptr[0])[old_i])
 
+    @type_model.cls
     class Vector:
-        def __init__(self):
-            self._ptr = T.pointer(0)
-            self._reserved = 0
-            self._size = 0
+        def __types__(cls):
+            cls._ptr = T.pointer
+            cls._reserved = int
+            cls._size = int
 
         def __destructor__(self):
             self._teardown()

@@ -175,14 +175,23 @@ def len_override(x):
         return x.__len__()
 
 @type_model.representation_for(xrange)
+@type_model.cls
 class xrange_override:
+    def __types__(cls):
+        cls.top = int
+
     def __init__(self, top):
         self.top = top
 
     def __iter__(self):
         return xrange_iterator(0, self.top)
 
+@type_model.cls
 class xrange_iterator:
+    def __types__(cls):
+        cls.cur_value = int
+        cls.top = int
+
     def __init__(self, cur_value, top):
         self.cur_value = cur_value
         self.top = top

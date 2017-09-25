@@ -103,7 +103,7 @@ class PrimitiveNumericType(PrimitiveType):
 
         if op.matches.UAdd or op.matches.USub:
             if self.is_bool:
-                return self.convert_to_type(Int64).convert_unary_op(instance_ref, op)
+                return self.convert_to_type(Int64, False).convert_unary_op(instance_ref, op)
 
             return TypedExpression(
                 native_ast.Expression.Unaryop(
@@ -115,7 +115,7 @@ class PrimitiveNumericType(PrimitiveType):
 
         if op.matches.Invert:
             if self.is_bool:
-                return self.convert_to_type(Int64).convert_unary_op(instance_ref, op)
+                return self.convert_to_type(Int64, False).convert_unary_op(instance_ref, op)
 
             return TypedExpression(
                 native_ast.Expression.Unaryop(
@@ -183,10 +183,10 @@ class PrimitiveNumericType(PrimitiveType):
                 target_type = self.bigger_type(r.expr_type)
 
                 if r.expr_type != target_type:
-                    r = r.expr_type.convert_to_type(r, target_type)
+                    r = r.expr_type.convert_to_type(r, target_type, False)
 
                 if l.expr_type != target_type:
-                    l = l.expr_type.convert_to_type(l, target_type)
+                    l = l.expr_type.convert_to_type(l, target_type, False)
 
                 return TypedExpression(
                     native_ast.Expression.Binop(
@@ -202,10 +202,10 @@ class PrimitiveNumericType(PrimitiveType):
                 target_type = self.bigger_type(r.expr_type)
 
                 if r.expr_type != target_type:
-                    r = r.expr_type.convert_to_type(r, target_type)
+                    r = r.expr_type.convert_to_type(r, target_type, False)
 
                 if l.expr_type != target_type:
-                    l = l.expr_type.convert_to_type(l, target_type)
+                    l = l.expr_type.convert_to_type(l, target_type, False)
 
                 bitcount = l.expr_type.t.bits
 
@@ -227,7 +227,7 @@ class PrimitiveNumericType(PrimitiveType):
                 bitcount = l.expr_type.t.bits
 
                 if r.expr_type != Int32:
-                    r = r.expr_type.convert_to_type(r, Int32)
+                    r = r.expr_type.convert_to_type(r, Int32, False)
 
                 return TypedExpression(
                     native_ast.Expression.Call(
@@ -247,10 +247,10 @@ class PrimitiveNumericType(PrimitiveType):
         target_type = self.bigger_type(r.expr_type)
 
         if r.expr_type != target_type:
-            r = r.expr_type.convert_to_type(r, target_type)
+            r = r.expr_type.convert_to_type(r, target_type, False)
 
         if l.expr_type != target_type:
-            l = l.expr_type.convert_to_type(l, target_type)
+            l = l.expr_type.convert_to_type(l, target_type, False)
 
         if op._alternative is python_ast.BinaryOp:
             for py_op, native_op in [('Add','Add'),('Sub','Sub'),
@@ -283,7 +283,29 @@ class PrimitiveNumericType(PrimitiveType):
             "can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type)
             )
 
-    def convert_to_type(self, e, other_type):
+    def convert_assign(self, context, instance_ref, arg):
+        if not self.is_pod:
+            raise ConversionException("instances of %s need an explicit assignment operator" % self)
+        
+        self.assert_is_instance_ref(instance_ref)
+
+        arg = arg.dereference()
+
+        if arg.expr_type != self:
+            arg = arg.convert_to_type(self, True)
+
+        if arg.expr_type != self:
+            raise ConversionException("can't assign %s to %s because type coercion failed" % 
+                    (arg.expr_type, self))
+
+        return TypedExpression.Void(
+            native_ast.Expression.Store(
+                ptr=instance_ref.expr,
+                val=arg.expr
+                )
+            )
+
+    def convert_to_type(self, e, other_type, implicitly):
         if other_type == self:
             return e
 
@@ -293,7 +315,7 @@ class PrimitiveNumericType(PrimitiveType):
                 other_type
                 )
 
-        if other_type.is_pointer and self.t.matches.Int:
+        if other_type.is_pointer and self.t.matches.Int and not implicitly:
             return TypedExpression(
                 native_ast.Expression.Cast(left=e.expr, to_type=other_type.lower()),
                 other_type

@@ -572,7 +572,7 @@ class ConversionContext(object):
             while_cond_expr = (
                 iter_expr.convert_attribute(self, "has_next")
                     .convert_call(self, [])
-                    .convert_to_type(Bool)
+                    .convert_to_type(Bool, False)
                 )
 
             while_cond_expr = self.consume_temporaries(while_cond_expr)

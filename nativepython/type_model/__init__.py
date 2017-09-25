@@ -16,6 +16,7 @@ from nativepython.type_model.type_base import Type
 from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.type_model.struct import Struct
 from nativepython.type_model.class_type import ClassType
+from nativepython.type_model.class_type import cls
 from nativepython.type_model.primitive_type import PrimitiveType
 from nativepython.type_model.primitive_type import PrimitiveNumericType
 from nativepython.type_model.primitive_type import Float64, Float32, Int64, Int32, Int8, UInt8, Bool, Void

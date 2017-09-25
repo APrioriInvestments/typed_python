@@ -18,12 +18,80 @@ from nativepython.type_model.type_base import Type
 from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.exceptions import ConversionException, UnassignableFieldException
 
+import nativepython
 import nativepython.native_ast as native_ast
 
+class ElementTypesUnresolved:
+    pass
+class ElementTypesBeingResolved:
+    pass
+
+#makes a class
+def cls(c):
+    if not hasattr(c, "__types__"):
+        raise ConversionException("Class missing a __types__ declaration")
+
+    return ClassType(c)
+
+class DirectSetter:
+    def __init__(self, t):
+        self.__dict__['t'] = t
+
+    def __setattr__(self, attr, val):
+        self.t.__dict__[attr] = val
+
 class ClassType(Type):
-    def __init__(self, cls, element_types):
-        self.cls = cls
-        self.element_types = tuple(element_types)
+    def __init__(self, cls, element_types = ElementTypesUnresolved):
+        if isinstance(element_types, list):
+            element_types = tuple(element_types)
+
+        Type.__init__(self)
+
+        DirectSetter(self).cls = cls
+        DirectSetter(self)._element_types = element_types
+        DirectSetter(self)._element_type_buildup = None
+        DirectSetter(self)._element_type_names = None
+
+    @property
+    def element_types(self):
+        if self._element_types is ElementTypesBeingResolved:
+            raise ConversionException("Cyclic dependency during class type resolution")
+
+        if self._element_types is ElementTypesUnresolved:
+            try:
+                DirectSetter(self)._element_types = ElementTypesBeingResolved
+                DirectSetter(self)._element_type_buildup = []
+                DirectSetter(self)._element_type_names = set()
+
+                typefun = getattr(self.cls,"__types__").im_func
+                typefun(self)
+                DirectSetter(self)._element_types = tuple(self._element_type_buildup)            
+            except Exception:
+                DirectSetter(self)._element_types = ElementTypesUnresolved
+                raise
+            finally:
+                DirectSetter(self)._element_type_buildup = None
+                DirectSetter(self)._element_type_names = None
+
+        return self._element_types
+
+    def __setattr__(self, attr, value):
+        if value is int:
+            value = nativepython.type_model.Int64
+        if value is float:
+            value = nativepython.type_model.Float64
+        if value is bool:
+            value = nativepython.type_model.Bool
+
+        if not isinstance(value, Type):
+            raise ConversionException("Can't assign %s as a type" % value)
+        if attr in self._element_type_names:
+            raise ConversionException("Can't reuse attribute name %s" % attr)
+        if (attr.startswith("__") and attr.endswith("__")):
+            raise ConversionException("%s is not a valid attribute name" % attr)
+
+        self._element_type_names.add(attr)
+        self._element_type_buildup.append((attr, value))
 
     @staticmethod
     def object_is_class(o):
@@ -48,50 +116,6 @@ class ClassType(Type):
                 [(name,t.null_value) for name,t in self.element_types]
                 )
 
-    @staticmethod
-    def convert_class_call(context, cls, args):
-        if not hasattr(cls, "__init__"):
-            cls_type = ClassType(cls, ())
-
-            tmp_ptr = context.allocate_temporary(cls_type)
-
-            return TypedExpression(
-                cls_type.convert_initialize(context, tmp_ptr, ()).expr + 
-                    context.activates_temporary(tmp_ptr) + 
-                    native_ast.Expression.Load(tmp_ptr.expr),
-                cls_type
-                )
-        else:
-            init_func = getattr(cls, "__init__").im_func
-            
-            cur_types = ()
-            while True:
-                try:
-                    cls_type = ClassType(cls, cur_types)
-                    call_target = context._converter.convert(init_func, [cls_type.reference] + \
-                        [a.expr_type for a in args], name_override=cls.__name__+".__init__")
-                    break
-                except UnassignableFieldException as e:
-                    if e.obj_type == cls_type:
-                        cur_types = cur_types + ((e.attr, e.target_type.nonref_type),)
-                    else:
-                        raise
-
-            tmp_ref = context.allocate_temporary(cls_type)
-
-            return TypedExpression(
-                cls_type.convert_initialize(context, tmp_ref, ()).expr + 
-                    context.activates_temporary(tmp_ref) + 
-                    context.generate_call_expr(
-                        target=call_target.native_call_target,
-                        args=[tmp_ref.expr] 
-                              + [a.expr for a in args]
-                        ) + 
-                    tmp_ref.expr,
-                tmp_ref.expr_type
-                )
-
-
     def convert_initialize_copy(self, context, instance_ref, other_instance):
         self.assert_is_instance_ref(instance_ref)
 
@@ -106,7 +130,7 @@ class ClassType(Type):
                     )
                     
                 return TypedExpression.Void(
-                    self.convert_initialize(context, instance_ref, ()).expr + 
+                    self.convert_initialize_blank(context, instance_ref).expr + 
                         context.generate_call_expr(
                             target=call_target.native_call_target,
                             args=[instance_ref.expr, other_instance.expr]
@@ -168,23 +192,62 @@ class ClassType(Type):
             make_body
             )
 
-    def convert_initialize(self, context, instance_ref, args):
+    def convert_initialize_blank(self, context, instance_ref):
         self.assert_is_instance_ref(instance_ref)
         
-        if len(args) != 0:
-            assert len(args) == len(self.element_types), (len(self.element_types), len(args))
-
-        def make_body(instance_ref, *args):
+        def make_body(instance_ref):
             body = native_ast.nullExpr
 
             for ix,(name,e) in enumerate(self.element_types):
                 dest_field = self.reference_to_field(instance_ref.expr, name)
 
                 dest_t = dest_field.expr_type.value_type
-                if args:
+                body = body + dest_t.convert_initialize(context, dest_field, ()).expr
+
+            return TypedExpression.Void(body)
+
+        return context.call_expression_in_function(
+            (self, "initialize_blank"), 
+            "%s.initialize_blank" % (self.cls.__name__), 
+            [instance_ref], 
+            make_body
+            )
+
+    def convert_initialize(self, context, instance_ref, args):
+        self.assert_is_instance_ref(instance_ref)
+        
+        def make_body(instance_ref, *args):
+            body = native_ast.nullExpr
+
+            call_default_initializer_with_args = True if len(args) else False
+
+            if hasattr(self.cls, "__init__"):
+                call_default_initializer_with_args = False
+
+            if call_default_initializer_with_args:
+                if len(args) != len(self.element_types):
+                    raise ConversionException("Can't initialize %s with arguments of type %s" % (
+                            self, [str(a.expr_type) for a in args]
+                            )
+                        )
+
+            for ix,(name,e) in enumerate(self.element_types):
+                dest_field = self.reference_to_field(instance_ref.expr, name)
+
+                dest_t = dest_field.expr_type.value_type
+                if call_default_initializer_with_args:
                     body = body + dest_t.convert_initialize_copy(context, dest_field, args[ix]).expr
                 else:
                     body = body + dest_t.convert_initialize(context, dest_field, ()).expr
+
+            if hasattr(self.cls, "__init__"):
+                init_func = self.cls.__init__.im_func
+                
+                body = body + context.call_py_function(
+                    init_func, 
+                    (instance_ref,) + tuple(args), 
+                    name_override=self.cls.__name__+"__init__"
+                    ).expr
 
             return TypedExpression.Void(body)
 
@@ -292,7 +355,7 @@ class ClassType(Type):
                 name_override=self.cls.__name__+".__getitem__"
                 )
 
-        return super(ClassType, self).convert_getitem(context, instance, item)
+        return DirectSetter(self).convert_getitem(context, instance, item)
 
     def convert_setitem(self, context, instance, item, value):
         if hasattr(self.cls, "__setitem__"):
@@ -303,10 +366,27 @@ class ClassType(Type):
                 name_override=self.cls.__name__+".__setitem__"
                 )
 
-        return super(ClassType, self).convert_setitem(context, instance, item, value)
+        return DirectSetter(self).convert_setitem(context, instance, item, value)
 
     def __str__(self):
         return "Class(%s,%s)" % (self.cls, ",".join(["%s=%s" % t for t in self.element_types]))
+
+    def __cmp__(self, other):
+        if not isinstance(other, type(self)):
+            return cmp(type(self), type(other))
+        for k in ['cls','element_types']:
+            c = cmp(getattr(self,k), getattr(other,k))
+            if c:
+                return c
+        return 0
+
+    def __hash__(self):
+        kvs = [(k,getattr(self,k)) for k in ['cls','element_types']]
+        try:
+            return hash(tuple(sorted(kvs)))
+        except:
+            print "failed on ", self, " with ", kvs
+            raise
 
 class PythonClassMemberFunc(Type):
     def __init__(self, python_class_type, attr):

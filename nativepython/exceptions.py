@@ -55,7 +55,8 @@ class ConversionException(Exception):
 
 class UnassignableFieldException(ConversionException):
     def __init__(self, obj_type, attr, target_type):
-        ConversionException.__init__(self, "missing attribute %s in type %s" % (attr,type))
+        ConversionException.__init__(self, "missing attribute %s in type %s" % (attr,obj_type))
+        
         self.obj_type = obj_type
         self.attr = attr
         self.target_type = target_type

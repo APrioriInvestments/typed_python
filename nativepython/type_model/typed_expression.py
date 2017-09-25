@@ -151,8 +151,8 @@ class TypedExpression(object):
     def convert_set_attribute(self, context, attr, val):
         return self.actor_type.convert_set_attribute(context, self, attr, val)
 
-    def convert_to_type(self, type):
-        return self.actor_type.convert_to_type(self, type)
+    def convert_to_type(self, type, implicitly):
+        return self.actor_type.convert_to_type(self, type, implicitly)
 
     def convert_setitem(self, context, index, value):
         return self.actor_type.convert_setitem(context, self, index, value)

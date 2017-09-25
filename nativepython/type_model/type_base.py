@@ -93,7 +93,7 @@ class Type(object):
         other_instance = other_instance.dereference()
 
         if other_instance.expr_type != self:
-            other_instance = other_instance.expr_type.convert_to_type(other_instance, self)
+            other_instance = other_instance.expr_type.convert_to_type(other_instance, self, False)
 
         return TypedExpression.Void(
             native_ast.Expression.Store(
@@ -151,7 +151,7 @@ class Type(object):
     def convert_bin_op(self, op, l, r):
         raise ConversionException("can't handle binary op %s between %s and %s" % (op, l.expr_type, r.expr_type))
 
-    def convert_to_type(self, instance, to_type):
+    def convert_to_type(self, instance, to_type, implicitly):
         raise ConversionException("can't convert %s to type %s" % (self, to_type))
 
     def convert_attribute(self, context, instance, attr):

@@ -14,6 +14,8 @@
 
 import nativepython.runtime as runtime
 import nativepython.util as util
+import nativepython.type_model as type_model
+
 import unittest
 import ast
 import time
@@ -21,7 +23,12 @@ import time
 def g(a):
     return a+2
 
+@type_model.cls
 class Simple:
+    def __types__(cls):
+        cls.x = int
+        cls.y = int
+
     def __init__(self, x, y):
         self.x = x
         self.y = y
@@ -101,7 +108,11 @@ class PythonNativeRuntimeTests(unittest.TestCase):
     def test_self_pointer(self):
         addr = util.addr
 
+        @type_model.cls
         class A:
+            def __types__(cls):
+                cls.ptr = int
+
             def __init__(self):
                 self.ptr = int(addr(self))
                 
@@ -189,7 +200,11 @@ class PythonNativeRuntimeTests(unittest.TestCase):
     def test_function_returning_ref(self):
         ref = util.ref
 
+        @type_model.cls
         class A:
+            def __types__(cls):
+                cls.x = float
+
             def __init__(self, x):
                 self.x = x
 
@@ -225,7 +240,11 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         ref = util.ref
         deref = util.deref
 
+        @type_model.cls
         class A:
+            def __types__(cls):
+                cls.x = float
+
             def __init__(self, x):
                 self.x = x
 

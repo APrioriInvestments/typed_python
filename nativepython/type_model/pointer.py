@@ -90,16 +90,16 @@ class Pointer(Type):
     def convert_setitem(self, context, instance, index, value):
         return self.convert_getitem(context, instance, index).convert_assign(context, value)
 
-    def convert_to_type(self, instance, to_type):
+    def convert_to_type(self, instance, to_type, implicitly):
         instance = instance.dereference()
 
-        if to_type.is_pointer:
+        if to_type.is_pointer and not implicitly:
             return TypedExpression(
                 native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
                 to_type
                 )
 
-        if to_type.is_primitive and to_type.t.matches.Int:
+        if to_type.is_primitive and to_type.t.matches.Int and not implicitly:
             return TypedExpression(
                 native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
                 to_type

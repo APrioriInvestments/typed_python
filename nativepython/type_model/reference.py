@@ -73,7 +73,7 @@ class Reference(Type):
     def convert_setitem(self, context, instance, index, value):
         raise ConversionException("References cannot be used directly")
 
-    def convert_to_type(self, instance, to_type):
+    def convert_to_type(self, instance, to_type, implicitly):
         raise ConversionException("References cannot be used directly")
 
     def convert_assign(self, context, instance_ref, other):

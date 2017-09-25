@@ -30,7 +30,12 @@ TEST_SEED = 1
 def g(a):
     return a+2
 
+@type_model.cls
 class Counter:
+    def __types__(cls):
+        cls.alive = int
+        cls.total = int
+
     def __init__(self):
         self.alive = 0
         self.total = 0
@@ -42,7 +47,12 @@ class Counter:
     def dec(self):
         self.alive -= 1
 
+@type_model.cls
 class A:
+    def __types__(cls):
+        cls.x = int
+        cls.c = Counter.pointer
+
     def __init__(self, c, x):
         self.x = x
         self.c = c
@@ -460,7 +470,11 @@ class PythonToNativeAstTests(unittest.TestCase):
         def g(x):
             return x + 1
 
+        @type_model.cls
         class RefToSelf:
+            def __types__(cls):
+                cls.x = int
+
             def __init__(self, x):
                 self.x = x
 
@@ -749,7 +763,12 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertTrue(f_comp(10.5) == 10 + 10.5 + 2.3)
 
     def test_classes(self):
+        @type_model.cls
         class A:
+            def __types__(cls):
+                cls.x = float
+                cls.y = int
+
             def __init__(self, x, y):
                 self.x = x
                 self.y = y
@@ -766,7 +785,11 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertTrue(f_comp(10.5) == 22)
 
     def test_constructors_and_destructors_1(self):
+        @type_model.cls
         class A:
+            def __types__(cls):
+                cls.x = float
+                
             def __init__(self, x):
                 self.x = x
 

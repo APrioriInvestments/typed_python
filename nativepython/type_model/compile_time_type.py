@@ -82,16 +82,11 @@ class FreePythonObjectReference(CompileTimeType):
 
         if self._obj is float:
             assert len(args) == 1
-            return args[0].convert_to_type(nativepython.type_model.Float64)
+            return args[0].convert_to_type(nativepython.type_model.Float64, False)
 
         if self._obj is int:
             assert len(args) == 1
-            return args[0].convert_to_type(nativepython.type_model.Int64)
-
-        ClassType = nativepython.type_model.ClassType
-
-        if ClassType.object_is_class(self._obj):
-            return ClassType.convert_class_call(context, self._obj, args)
+            return args[0].convert_to_type(nativepython.type_model.Int64, False)
 
         if isinstance(self._obj, Type):
             if self._obj.is_ref:
@@ -242,7 +237,7 @@ class ExternalFunction(CompileTimeType):
             args = list(args)
             for i in xrange(len(self.input_types)):
                 if args[i].expr_type != self.input_types[i]:
-                    args[i] = args[i].convert_to_type(self.input_types[i])
+                    args[i] = args[i].convert_to_type(self.input_types[i], False)
 
         return TypedExpression(
             native_ast.Expression.Call(
