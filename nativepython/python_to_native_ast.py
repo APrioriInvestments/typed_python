@@ -641,17 +641,20 @@ class ConversionContext(object):
                 break
 
         if exprs[-1].expr_type is not None:
-            exprs = exprs + [TypedExpression(native_ast.nullExpr, Void)]
-            ret_type = Void
+            assert exprs[-1].expr_type == Void
+            flows_off_end = True
         else:
-            ret_type = None
+            flows_off_end = False
 
-        if toplevel and ret_type is not None:
-            exprs = exprs + [TypedExpression(native_ast.Expression.Return(None), None)]
-            ret_type = None
-
-        if toplevel:
-            assert ret_type is None, "Not all control flow paths return a value"
+        if toplevel and flows_off_end:
+            if self._varname_to_type[FunctionOutput] in (Void, None):
+                exprs = exprs + [TypedExpression(native_ast.Expression.Return(None), None)]
+                flows_off_end = False
+            else:
+                raise ConversionException(
+                    "Not all control flow paths return a value and the function returns %s" % 
+                        self._varname_to_type[FunctionOutput]
+                    )
 
         teardowns = []
         for v in list(self._varname_to_type.keys()):
@@ -668,7 +671,8 @@ class ConversionContext(object):
                 expr=seq_expr,
                 teardowns=teardowns
                 )
-        return TypedExpression(seq_expr, ret_type)
+
+        return TypedExpression(seq_expr, Void if flows_off_end else None)
 
     def named_variable_teardown(self, v):
         return native_ast.Teardown.ByTag(

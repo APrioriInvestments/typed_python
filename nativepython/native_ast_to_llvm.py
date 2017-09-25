@@ -396,7 +396,7 @@ def expression_to_llvm_ir(
                 if cond_llvm.type.width != 1:
                     cond_llvm = builder.icmp_signed("!=", cond_llvm, zero_like)
             elif cond.native_type.matches.Float:
-                cond_llvm = builder.fcmp_signed("!=", cond_llvm, zero_like)
+                cond_llvm = builder.fcmp_unordered("!=", cond_llvm, zero_like)
             else:
                 return convert(expr.false)
             
@@ -517,16 +517,40 @@ def expression_to_llvm_ir(
             
         if expr.matches.Unaryop:
             operand = convert(expr.operand)
-            if expr.op.matches.Add:
-                return operand
-            if expr.op.matches.Negate:
-                if operand.native_type.matches.Int:
-                    return TypedLLVMValue(builder.neg(operand.llvm_value), operand.native_type)
-                if operand.native_type.matches.Float:
+            if operand.native_type == native_ast.Bool:
+                if expr.op.matches.LogicalNot:
                     return TypedLLVMValue(
-                        builder.fmul(operand.llvm_value, llvmlite.ir.DoubleType()(-1.0)), 
+                        builder.not_(operand.llvm_value),
                         operand.native_type
                         )
+            else:
+                if expr.op.matches.Add:
+                    return operand
+                if expr.op.matches.LogicalNot:
+                    zero_like = llvmlite.ir.Constant(operand.llvm_value.type, 0)
+
+                    if operand.native_type.matches.Int:
+                        return TypedLLVMValue(
+                            builder.icmp_signed("==", operand.llvm_value, zero_like),
+                            native_ast.Bool
+                            )
+                    if operand.native_type.matches.Float:
+                        return TypedLLVMValue(
+                            builder.fcmp_unordered("==", operand.llvm_value, zero_like),
+                            native_ast.Bool
+                            )
+
+                if expr.op.matches.BitwiseNot and operand.native_type.matches.Int:
+                    return TypedLLVMValue(builder.not_(operand.llvm_value), operand.native_type)
+                                        
+                if expr.op.matches.Negate:
+                    if operand.native_type.matches.Int:
+                        return TypedLLVMValue(builder.neg(operand.llvm_value), operand.native_type)
+                    if operand.native_type.matches.Float:
+                        return TypedLLVMValue(
+                            builder.fmul(operand.llvm_value, llvmlite.ir.DoubleType()(-1.0)), 
+                            operand.native_type
+                            )
 
             assert False, "can't apply unary operand %s to %s" % (expr.op, str(operand.native_type))
 

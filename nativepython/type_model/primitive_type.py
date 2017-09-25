@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import nativepython
+
 from nativepython.type_model.type_base import Type
 from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.exceptions import ConversionException
@@ -84,6 +86,9 @@ class PrimitiveNumericType(PrimitiveType):
         instance = instance_ref.dereference()
 
         if op.matches.UAdd or op.matches.USub:
+            if self.t.matches.Int and self.t.bits == 1:
+                return self.convert_to_type(Int64).convert_unary_op(instance_ref, op)
+
             return TypedExpression(
                 native_ast.Expression.Unaryop(
                     op=native_ast.UnaryOp.Add() if op.matches.UAdd else native_ast.UnaryOp.Negate(),
@@ -92,12 +97,59 @@ class PrimitiveNumericType(PrimitiveType):
                 self
                 )
 
+        if op.matches.Invert:
+            if self.t.matches.Int and self.t.bits == 1:
+                return self.convert_to_type(Int64).convert_unary_op(instance_ref, op)
+
+            return TypedExpression(
+                native_ast.Expression.Unaryop(
+                    op=native_ast.UnaryOp.BitwiseNot(),
+                    operand=instance.expr
+                    ),
+                self
+                )
+
+        if op.matches.Not:
+            return TypedExpression(
+                native_ast.Expression.Unaryop(
+                    op=native_ast.UnaryOp.LogicalNot(),
+                    operand=instance.expr
+                    ),
+                Bool
+                )
+
         return super(PrimitiveNumericType, self).convert_unary_op(instance, op)
 
     def convert_bin_op(self, op, l, r):
         l = l.dereference()
         r = r.dereference()
 
+        if op._alternative is python_ast.ComparisonOp:
+            if op.matches.Is:
+                if l.expr_type != r.expr_type:
+                    return TypedExpression(native_ast.falseExpr, Bool)
+
+                return TypedExpression(
+                    native_ast.Expression.Binop(
+                        op=native_ast.BinaryOp.Eq(),
+                        l=l.expr,
+                        r=r.expr
+                        ),
+                    Bool
+                    )
+            if op.matches.IsNot:
+                if l.expr_type != r.expr_type:
+                    return TypedExpression(native_ast.trueExpr, Bool)
+
+                return TypedExpression(
+                    native_ast.Expression.Binop(
+                        op=native_ast.BinaryOp.NotEq(),
+                        l=l.expr,
+                        r=r.expr
+                        ),
+                    Bool
+                    )
+        
         target_type = self.bigger_type(r.expr_type)
 
         if r.expr_type != target_type:
@@ -117,6 +169,7 @@ class PrimitiveNumericType(PrimitiveType):
                             ),
                         target_type
                         )
+
         if op._alternative is python_ast.ComparisonOp:
             for opname in ['Gt','GtE','Lt','LtE','Eq','NotEq']:
                 if getattr(op.matches, opname):

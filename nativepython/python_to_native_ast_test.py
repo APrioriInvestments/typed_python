@@ -267,8 +267,8 @@ class PythonToNativeAstTests(unittest.TestCase):
     def convert_expression(self, lambda_func):
         return self.converter.convert_lambda_as_expression(lambda_func)
 
-    def compile(self, f):
-        f_target = self.converter.convert(f, [util.Float64])
+    def compile(self, f, types = (util.Float64,)):
+        f_target = self.converter.convert(f, types)
 
         functions = self.converter.extract_new_function_definitions()
 
@@ -286,6 +286,93 @@ class PythonToNativeAstTests(unittest.TestCase):
             self.convert_expression(lambda: util.typeof(3+3).reference).expr_type
                 .python_object_representation == type_model.Int64.reference
             )
+
+    def test_compiling_without_return_fails(self):
+        def f(x):
+            if x > 0.0:
+                return 1.0
+            
+        with self.assertRaises(python_to_native_ast.ConversionException):
+            self.compile(f)
+
+    def test_compiling_with_mixed_return_fails(self):
+        def f(x):
+            if x > 0.0:
+                return 1.0
+            else:
+                return 1
+            
+        with self.assertRaises(python_to_native_ast.ConversionException):
+            self.compile(f)
+
+    def test_compiling_with_empty_return_and_implicit_return_works(self):
+        def f(x):
+            if x > 0.0:
+                return
+            
+        self.compile(f)
+
+    def test_unary_operations(self):
+        def test_expr():
+            float_one = 1.0
+            float_zero = 0.0
+
+            if (not float_one) is not False:
+                return 1
+            if (not float_zero) is not True:
+                return 1
+            if (-float_one) is not -1.0:
+                return 2
+            if (-float_zero) is not 0.0:
+                return 3
+            if (+float_one) is not 1.0:
+                return 4
+            if (+float_zero) is not 0.0:
+                return 5
+            
+            int_one = 1
+            int_zero = 0
+
+            if (not int_one) is not False:
+                return 6
+            if (not int_zero) is not True:
+                return 6
+            if (-int_one) is not -1:
+                return 7
+            if (-int_zero) is not 0:
+                return 8
+            if (+int_one) is not 1:
+                return 9
+            if (+int_zero) is not 0:
+                return 10
+            if (~int_zero) is not -1:
+                return 11
+            if (~int_one) is not -2:
+                return 12
+            
+            bool_one = 1
+            bool_zero = 0
+
+            if (not bool_one) is not False:
+                return 13
+            if (not bool_zero) is not True:
+                return 13
+            if (-bool_one) is not -1:
+                return 14
+            if (-bool_zero) is not 0:
+                return 15
+            if (+bool_one) is not 1:
+                return 16
+            if (+bool_zero) is not 0:
+                return 17
+            if (~bool_zero) is not -1:
+                return 18
+            if (~bool_one) is not -2:
+                return 19
+
+            return 0
+            
+        self.assertEqual(self.compile(test_expr, ())(), 0)
 
     def test_boolean_constant_exprs(self):
         self.assertEqual(self.convert_expression(lambda: True).expr, native_ast.trueExpr)

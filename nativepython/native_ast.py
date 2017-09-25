@@ -83,7 +83,7 @@ def const_str(c):
 
 Constant.__str__ = const_str
 
-UnaryOp = Alternative("UnaryOp", Add={}, Negate={})
+UnaryOp = Alternative("UnaryOp", Add={}, Negate={}, LogicalNot={}, BitwiseNot={})
 BinaryOp = Alternative("BinaryOp", 
                        Add={}, Sub={}, Mul={}, Div={}, Eq={}, 
                        NotEq={}, Lt={}, LtE={}, Gt={}, GtE={}
@@ -91,7 +91,9 @@ BinaryOp = Alternative("BinaryOp",
 
 UnaryOp.__str__ = (lambda o:
     "+" if o.matches.Add else
-    "-" if o.matches.Negate else None)
+    "-" if o.matches.Negate else 
+    "!" if o.matches.LogicalNot else 
+    "~" if o.matches.BitwiseNot else None)
 BinaryOp.__str__ = (lambda o:
     "+" if o.matches.Add else
     "-" if o.matches.Sub else 
@@ -295,3 +297,6 @@ FunctionBody = Alternative("FunctionBody",
 
 Function = Alternative("Function")
 Function.Definition = {'args': List((str, Type)), 'body': FunctionBody, 'output_type': Type}
+
+Bool = Type.Int(bits=1, signed=False)
+
