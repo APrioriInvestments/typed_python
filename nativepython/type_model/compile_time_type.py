@@ -188,11 +188,14 @@ class TypeFunction(CompileTimeType):
         def unwrap(x):
             if not isinstance(x, TypedExpression):
                 raise ConversionException("Expected a TypedExpression, not %s" % x)
+
             t = x.expr_type
-            if isinstance(t.nonref_type, FreePythonObjectReference):
+            if isinstance(t.nonref_type, CompileTimeType):
                 return t.nonref_type.python_object_representation
-            else:
-                return t
+            
+            raise ConversionException(
+                "Can't call a TypeFunction with non compile-time argument %s" % t
+                )
 
         def wrap(x):
             return pythonObjectRepresentation(x)

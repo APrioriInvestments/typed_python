@@ -50,7 +50,7 @@ def isRefHeldAsPointer(t):
     return t.nonref_type.is_class and issubclass(t.nonref_type.cls, ReferenceHeldAsPointerBase)
 
 def dereferenceRefHeldAsPointer(x):
-    if isRefHeldAsPointer(x):
+    if isRefHeldAsPointer(util.typeof(x)):
         return util.ref(x.p[0])
     return util.ref(x)
 
