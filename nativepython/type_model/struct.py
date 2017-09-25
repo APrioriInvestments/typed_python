@@ -19,12 +19,12 @@ from nativepython.exceptions import ConversionException
 
 import nativepython.native_ast as native_ast
 
-class TheNullClass:
+class Struct_:
     pass
 
 class Struct(ClassType):
     def __init__(self, element_types=()):
-        ClassType.__init__(self, TheNullClass, element_types)
+        ClassType.__init__(self, Struct_, element_types)
 
     def __str__(self):
         return "Struct(%s)" % (",".join(["%s=%s" % t for t in self.element_types]))
@@ -37,13 +37,6 @@ class Struct(ClassType):
     def is_struct(self):
         return True
 
-    @property
-    def is_pod(self):
-        for _,e in self.element_types:
-            if not e.is_pod:
-                return False
-        return True
-
     def with_field(self, name, type):
         if isinstance(name, TypedExpression):
             assert name.expr.matches.Constant and name.expr.val.matches.ByteArray, name.expr
@@ -54,7 +47,7 @@ class Struct(ClassType):
     def convert_getitem(self, context, instance, index):
         if not (index.expr.matches.Constant and index.expr.val.matches.Int):
             raise ConversionException("can't index %s with %s" % (self, index.expr))
-            
+
         i = index.expr.val.val
         
         if not (i >= 0 and i < len(self.element_types)):

@@ -74,4 +74,3 @@ class VectorTests(unittest.TestCase):
 
         self.assertEqual(instance[1][1], 20)        
 
-

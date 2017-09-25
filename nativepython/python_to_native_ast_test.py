@@ -25,6 +25,8 @@ import ast
 import time
 import numpy
 
+ConversionException = python_to_native_ast.ConversionException
+
 TEST_SEED = 1
 
 def g(a):
@@ -320,7 +322,7 @@ class PythonToNativeAstTests(unittest.TestCase):
             if x > 0.0:
                 return 1.0
             
-        with self.assertRaises(python_to_native_ast.ConversionException):
+        with self.assertRaises(ConversionException):
             self.compile(f)
 
     def test_compiling_with_mixed_return_fails(self):
@@ -330,7 +332,7 @@ class PythonToNativeAstTests(unittest.TestCase):
             else:
                 return 1
             
-        with self.assertRaises(python_to_native_ast.ConversionException):
+        with self.assertRaises(ConversionException):
             self.compile(f)
 
     def test_compiling_with_empty_return_and_implicit_return_works(self):
@@ -510,7 +512,7 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         self.convert_expression(lambda: all_pass())
 
-        with self.assertRaises(python_to_native_ast.ConversionException):
+        with self.assertRaises(ConversionException):
             self.convert_expression(
                 lambda: util.assert_types_same(util.typeof(10), type_model.Int64.reference)
                 )
@@ -553,7 +555,7 @@ class PythonToNativeAstTests(unittest.TestCase):
             else:
                 return b
 
-        with self.assertRaises(python_to_native_ast.ConversionException):
+        with self.assertRaises(ConversionException):
             self.compile(f)
 
     def test_simple_4(self):
@@ -784,12 +786,40 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         self.assertTrue(f_comp(10.5) == 22)
 
+    def test_class_methods_cant_be_special(self):
+        try:
+            @type_model.cls
+            class A:
+                def __types__(cls):
+                    pass
+
+                def __int__(self):
+                    pass
+
+        except ConversionException as e:
+            self.assertTrue('__init__' in e.message and '__int__' in e.message)
+
+    def test_no_access_to_special_methods(self):
+        with self.assertRaises(ConversionException):
+            @type_model.cls
+            class A:
+                def __types__(cls):
+                    cls.x = int
+
+                def __init__(self):
+                    self.x = 10
+
+                def f(self):
+                    self.__init__()
+
+            self.compile(lambda x: A(x))
+
     def test_constructors_and_destructors_1(self):
         @type_model.cls
         class A:
             def __types__(cls):
                 cls.x = float
-                
+
             def __init__(self, x):
                 self.x = x
 

@@ -40,10 +40,60 @@ class DirectSetter:
     def __setattr__(self, attr, val):
         self.t.__dict__[attr] = val
 
+def distance(s1, s2):
+    if len(s1) < len(s2):
+        return distance(s2, s1)
+
+    if len(s2) == 0:
+        return len(s1)
+
+    prev = range(len(s2) + 1)
+
+    for i, c1 in enumerate(s1):
+        cur = [i + 1]
+        for j, c2 in enumerate(s2):
+            cur.append(min(prev[j+1]+1, cur[j]+1, prev[j] + (1 if c1 != c2 else 0)))
+        prev = cur
+    
+    return prev[-1]
+
+def closest_special_member_name(name):
+    return sorted((distance(name, x), x) for x in valid_special_member_names)[0][1]
+
+valid_special_member_names = [
+    '__assign__',
+    '__destructor__',
+    '__copy_constructor__',
+    '__init__',
+    '__iter__',
+    '__len__',
+    '__getitem__',
+    '__setitem__',
+    '__types__'
+    ]
+
+special_member_names_accessible_directly = [
+    '__iter__',
+    '__len__'
+    ]
+
+def is_special_name(name):
+    return name.startswith("__") and name.endswith("__") and len(name) > 4
+
 class ClassType(Type):
     def __init__(self, cls, element_types = ElementTypesUnresolved):
         if isinstance(element_types, list):
             element_types = tuple(element_types)
+
+        for method_name in dir(cls):
+            method = getattr(cls, method_name)
+            if isinstance(method, types.UnboundMethodType):
+                if is_special_name(method.__name__) and \
+                        method.__name__ not in valid_special_member_names:
+                    raise ConversionException("Invalid member name %s. Did you mean %s?" % 
+                            (method.__name__,
+                                closest_special_member_name(method.__name__))
+                            )
 
         Type.__init__(self)
 
@@ -87,7 +137,7 @@ class ClassType(Type):
             raise ConversionException("Can't assign %s as a type" % value)
         if attr in self._element_type_names:
             raise ConversionException("Can't reuse attribute name %s" % attr)
-        if (attr.startswith("__") and attr.endswith("__")):
+        if is_special_name(attr):
             raise ConversionException("%s is not a valid attribute name" % attr)
 
         self._element_type_names.add(attr)
@@ -101,7 +151,18 @@ class ClassType(Type):
 
     @property
     def is_pod(self):
-        return False
+        if (hasattr(self.cls, "__assign__") 
+                or hasattr(self.cls, "__destructor__")
+                or hasattr(self.cls, "__init__") 
+                or hasattr(self.cls, "__copy_constructor__")
+                ):
+            return False
+
+        for _,e in self.element_types:
+            if not e.is_pod:
+                return False
+
+        return True
 
     @property
     def is_class(self):
@@ -118,6 +179,9 @@ class ClassType(Type):
 
     def convert_initialize_copy(self, context, instance_ref, other_instance):
         self.assert_is_instance_ref(instance_ref)
+
+        if not self.is_pod:
+            self.assert_is_instance_ref(other_instance)
 
         if hasattr(self.cls, "__copy_constructor__"):
             def make_body(instance_ref, other_instance):
@@ -143,9 +207,6 @@ class ClassType(Type):
                 make_body
                 )
         else:
-            if not self.is_pod:
-                self.assert_is_instance_ref(other_instance)
-
             def make_body(instance_ref, other_instance):
                 body = native_ast.nullExpr
 
@@ -293,6 +354,9 @@ class ClassType(Type):
         return native_ast.Type.Struct(tuple([(a[0], a[1].lower()) for a in self.element_types]))
 
     def convert_attribute(self, context, instance_or_ref, attr):
+        if is_special_name(attr) and attr not in special_member_names_accessible_directly:
+            raise ConversionException("Illegal to access attributes with names like __X__")
+
         if self.is_pod and instance_or_ref.expr_type == self:
             instance = instance_or_ref
 
