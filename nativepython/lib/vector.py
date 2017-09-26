@@ -15,7 +15,7 @@ def Vector(T):
             cls._i = int
 
         def __init__(self, vec_ptr):
-            self._vec_ptr = vec_ptr
+            self._vec_ptr.__init__(vec_ptr)
 
         def has_next(self):
             return self._i < len(self._vec_ptr[0])

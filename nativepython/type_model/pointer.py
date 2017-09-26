@@ -40,10 +40,10 @@ class Pointer(Type):
     def null_value(self):
         return native_ast.Constant.NullPointer(self.value_type.lower())
 
-    def convert_attribute(self, context, instance, attr):
+    def convert_attribute(self, context, instance, attr, allow_double_refs=False):
         instance = instance.dereference()
         ref = instance.reference_from_pointer()
-        return ref.convert_attribute(context, attr)
+        return ref.convert_attribute(context, attr, allow_double_refs)
 
     def convert_set_attribute(self, context, instance, attr, val):
         raise ConversionException("no attribute %s in Pointer" % attr)

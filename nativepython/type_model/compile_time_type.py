@@ -15,6 +15,7 @@
 import types
 import nativepython
 import nativepython.native_ast as native_ast
+import nativepython.python_ast as python_ast
 
 from nativepython.type_model.type_base import Type
 from nativepython.type_model.typed_expression import TypedExpression
@@ -33,6 +34,25 @@ class CompileTimeType(Type):
     def lower(self):
         return native_ast.Type.Struct(())
 
+    def convert_bin_op(self, op, lref, rref):
+        l = lref.dereference()
+        r = rref.dereference()
+
+        if op._alternative is python_ast.ComparisonOp:
+            if (op.matches.Is or op.matches.IsNot) and isinstance(r.expr_type, CompileTimeType):
+                res = l.expr_type.python_object_representation is \
+                            r.expr_type.python_object_representation
+
+                if op.matches.IsNot:
+                    res = not res
+
+                return TypedExpression(
+                    native_ast.trueExpr if res else native_ast.falseExpr,
+                    nativepython.type_model.Bool
+                    )
+
+        return super(Pointer, self).convert_bin_op(op,lref,rref)
+    
     @property
     def python_object_representation(self):
         raise ConversionException("Subclasses must implement")
@@ -45,7 +65,7 @@ class CompileTimeType(Type):
             self
             )
 
-    def convert_attribute(self, context, instance, attr):
+    def convert_attribute(self, context, instance, attr, allow_double_refs=False):
         o = self.python_object_representation
 
         if not hasattr(o, attr):
@@ -75,7 +95,7 @@ class FreePythonObjectReference(CompileTimeType):
     @property
     def python_object_representation(self):
         return self._original_obj
-        
+
     def convert_call(self, context, instance, args):
         if isinstance(self._obj, types.FunctionType):
             return context.call_py_function(self._obj, args)

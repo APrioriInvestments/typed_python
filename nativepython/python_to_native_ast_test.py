@@ -915,6 +915,115 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         self.assertEqual(f_comp(10), 0)
 
+    def test_constructors_cant_initialize_twice(self):
+        @type_model.cls
+        class InitializesTwice:
+            def __types__(cls):
+                cls.x = int
+
+            def __init__(self):
+                self.x.__init__(10)
+                self.x.__init__(10)
+
+        def f(a):
+            InitializesTwice()
+
+        with self.assertRaises(ConversionException):
+            self.compile(f)
+
+
+    def test_constructors_and_destructors_6(self):
+        @type_model.cls
+        class IsInitialized:
+            def __types__(cls):
+                cls.value = int
+                cls.how = int
+
+            def __init__(self, *args):
+                self.value = 1234
+                    
+                if util.struct_size(util.typeof(args)) is 0:
+                    self.how = 0
+                else:
+                    self.how = 1
+
+        @type_model.cls
+        class InitializesOne:
+            def __types__(cls):
+                cls.x = IsInitialized
+                cls.y = IsInitialized
+
+            def __init__(self):
+                self.x.__init__(10)
+
+        @type_model.cls
+        class InitializesInIfs:
+            def __types__(cls):
+                cls.x = IsInitialized
+                cls.y = IsInitialized
+
+            def __init__(self, z):
+                self.x.__init__(10)
+
+                if util.typeof(z).nonref_type is type_model.Int64:
+                    self.y.__init__(10)
+
+        def check():
+            return (
+                    InitializesOne().x.value == 1234
+                and InitializesOne().y.value == 1234
+                and InitializesOne().x.how == 1
+                and InitializesOne().y.how == 0
+                and InitializesInIfs(0).y.value == 1234
+                and InitializesInIfs(0).y.how == 1
+                and InitializesInIfs(0.0).y.value == 1234
+                and InitializesInIfs(0.0).y.how == 0
+                )
+        
+        self.assertEqual(self.compile(check,types=())(), True)
+
+    def test_constructors_and_destructors_references_1(self):
+        @type_model.cls
+        class HoldsAReference:
+            def __types__(cls):
+                cls.value_ref = type_model.Int64.reference
+
+            def __init__(self, a):
+                self.value_ref.__init__(a)
+
+        def check():
+            an_int = 10
+            holder = HoldsAReference(an_int)
+            holder.value_ref += 1
+
+            return an_int
+        
+        self.assertEqual(self.compile(check,types=())(), 11)
+
+    def test_cant_null_initilize_a_reference(self):
+        @type_model.cls
+        class HoldsAReference:
+            def __types__(cls):
+                cls.value_ref = type_model.Int64.reference
+
+            def __init__(self):
+                pass
+
+        @util.typefun
+        def pr(t):
+            print t
+
+        def check():
+            an_int = 10
+            holder = HoldsAReference()
+            holder.value_ref += 1
+
+            return an_int
+        
+        try:
+            self.compile(check,types=())
+        except ConversionException as e:
+            self.assertTrue("can't null-initialize" in e.message)
         
     def test_constructors_and_destructors_fuzz(self):
         #we want to generate some random functions. Signatures always take a 'c', and can take

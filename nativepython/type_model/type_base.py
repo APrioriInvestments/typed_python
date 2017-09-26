@@ -154,7 +154,7 @@ class Type(object):
     def convert_to_type(self, instance, to_type, implicitly):
         raise ConversionException("can't convert %s to type %s" % (self, to_type))
 
-    def convert_attribute(self, context, instance, attr):
+    def convert_attribute(self, context, instance, attr, allow_double_refs=False):
         raise ConversionException("%s has no attribute %s" % (self, attr))
 
     def convert_set_attribute(self, context, instance, attr, value):

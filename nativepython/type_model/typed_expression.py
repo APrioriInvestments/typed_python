@@ -139,11 +139,14 @@ class TypedExpression(object):
     def convert_call(self, context, args):
         return self.actor_type.convert_call(context, self, args)
 
-    def convert_attribute(self, context, attr):
-        return self.actor_type.convert_attribute(context, self, attr)
+    def convert_attribute(self, context, attr, allow_double_refs=False):
+        return self.actor_type.convert_attribute(context, self, attr, allow_double_refs)
 
     def convert_initialize_copy(self, context, other):
         return self.actor_type.convert_initialize_copy(context, self, other)
+
+    def convert_initialize(self, context, args):
+        return self.actor_type.convert_initialize(context, self, args)
 
     def convert_assign(self, context, other):
         return self.actor_type.convert_assign(context, self, other)

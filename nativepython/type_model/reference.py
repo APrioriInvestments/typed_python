@@ -58,7 +58,7 @@ class Reference(Type):
     def pointer(self):
         return nativepython.type_model.Pointer(self)
 
-    def convert_attribute(self, context, instance, attr):
+    def convert_attribute(self, context, instance, attr, allow_double_refs=False):
         raise ConversionException("References cannot be used directly")
 
     def convert_set_attribute(self, context, instance, attr, val):
@@ -78,6 +78,16 @@ class Reference(Type):
 
     def convert_assign(self, context, instance_ref, other):
         raise ConversionException("References cannot be used directly")
+
+    def convert_initialize(self, context, instance_ref, args):
+        self.assert_is_instance_ref(instance_ref)
+
+        assert len(args) <= 1
+
+        if len(args) == 1:
+            return self.convert_initialize_copy(context, instance_ref, args[0])
+        else:
+            raise ConversionException("can't null-initialize %s" % self)
 
     def convert_initialize_copy(self, context, instance_ref, other_instance):
         other_instance = other_instance.drop_create_reference()

@@ -13,10 +13,7 @@
 #   limitations under the License.
 
 from nativepython.algebraic import Alternative, List, Nullable
-
-def indent(text, amount=4, ch=' '):
-    padding = amount * ch
-    return ''.join(padding+line for line in text.splitlines(True))
+from nativepython.python.string_util import indent
 
 Type = Alternative("Type")
 Type.Void = {}

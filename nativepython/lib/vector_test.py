@@ -28,7 +28,7 @@ class VectorTests(unittest.TestCase):
     def setUpClass(cls):
         cls.runtime = runtime.Runtime.singleton()
 
-    def test_instantiation(self):
+    def test_vector_creation(self):
         v = vector.Vector(util.Int64)
 
         vec_type = self.runtime.wrap(v)

@@ -21,8 +21,49 @@ from nativepython.type_model import *
 class FunctionOutput:
     pass
 
+class InitFields:
+    def __init__(self, first_var_name, fields_and_types):
+        self.first_var_name = first_var_name
+        self.uninitialized_fields = set(x[0] for x in fields_and_types)
+        self.field_types = dict(fields_and_types)
+        self.field_order = [x[0] for x in fields_and_types]
+        self.initialization_expressions = {}
+
+    def mark_field_initialized(self, field, expr):
+        self.initialization_expressions[field] = expr
+        self.uninitialized_fields.discard(field)
+
+    def finalize(self, context):
+        for f in self.uninitialized_fields:
+            self.initialization_expressions[f] = (
+                context.named_var_expr(self.first_var_name)
+                    .drop_double_references()
+                    .convert_attribute(context, f, allow_double_refs=True)
+                    .convert_initialize(context, ())
+                )
+
+        self.uninitialized_fields = set()
+
+    def init_expr(self, context):
+        self.finalize(context)
+
+        if not self.field_order:
+            return TypedExpression(native_ast.nullExpr, Void)
+
+        expr = self.initialization_expressions[self.field_order[0]]
+
+        for field in self.field_order[1:]:
+            expr = expr + self.initialization_expressions[field]
+
+        return expr
+
+    def any_remaining(self):
+        return bool(self.uninitialized_fields)
+
+
+
 class ConversionContext(object):
-    def __init__(self, converter, varname_to_type, free_variable_lookup):
+    def __init__(self, converter, varname_to_type, free_variable_lookup, init_fields):
         self._converter = converter
         self._varname_to_type = varname_to_type
         self._new_variables = set()
@@ -30,6 +71,7 @@ class ConversionContext(object):
         self._temporaries = {}
         self._new_temporaries = set()
         self._temp_let_var = 0
+        self._init_fields = init_fields
 
     def let_varname(self):
         self._temp_let_var += 1
@@ -385,8 +427,66 @@ class ConversionContext(object):
 
             raise
 
+    def check_statement_is_field_initializer(self, ast):
+        if not ast.matches.Expr:
+            return None
+
+        ast = ast.value
+
+        if not (ast.matches.Call and
+                ast.func.matches.Attribute and
+                ast.func.attr == "__init__" and
+                ast.func.value.matches.Attribute and
+                ast.func.value.value.matches.Name and
+                ast.func.value.value.id == self._init_fields.first_var_name
+                ):
+            return None
+
+        return (ast.func.value.attr, ast.args)
+
     def convert_statement_ast_(self, ast):
+        field_and_args = self.check_statement_is_field_initializer(ast)
+        if field_and_args is not None:
+            field, args = field_and_args
+
+            if self._init_fields is None:
+                raise ConversionException("Invalid use of __init__ outside of constructor")
+
+            if not self._init_fields.any_remaining():
+                raise ConversionException("All members are initialized.")
+
+            if field not in self._init_fields.field_types:
+                raise ConversionException(
+                    "Member %s is not a valid member to initialize. Did you mean %s?" % (
+                        field,
+                        string_util.closest(field, self._init_fields.field_order)
+                        )
+                    )
+
+            if field not in self._init_fields.uninitialized_fields:
+                raise ConversionException("Member %s is already initialized" % field)
+
+            field_type = self._init_fields.field_types[field]
+
+            args = [self.convert_expression_ast(a) for a in args]
+
+            expr = (
+                self.named_var_expr(self._init_fields.first_var_name)
+                    .drop_double_references()
+                    .convert_attribute(self, field, allow_double_refs=True)
+                    .convert_initialize(self, args)
+                )
+
+            expr = self.consume_temporaries(expr)
+
+            self._init_fields.mark_field_initialized(field, expr)
+
+            return TypedExpression.Void(native_ast.nullExpr)
+
         if ast.matches.Assign or ast.matches.AugAssign:
+            if self._init_fields is not None:
+                self._init_fields.finalize(self)
+
             if ast.matches.Assign:
                 assert len(ast.targets) == 1
                 op = None
@@ -448,8 +548,11 @@ class ConversionContext(object):
                     val_to_store = slicing.convert_attribute(self, attr).convert_bin_op(op, val_to_store)
 
                 return slicing.convert_set_attribute(self, attr, val_to_store)
-        
+
         if ast.matches.Return:
+            if self._init_fields is not None:
+                self._init_fields.finalize(self)
+            
             if ast.value.matches.Null:
                 e = TypedExpression(native_ast.nullExpr, Void)
             else:
@@ -513,9 +616,12 @@ class ConversionContext(object):
                 
                 return cond + branch
 
+            if self._init_fields is not None:
+                self._init_fields.finalize(self)
+
             true = self.convert_statement_list_ast(ast.body)
             false = self.convert_statement_list_ast(ast.orelse)
-
+            
             if true.expr_type is None and false.expr_type is None:
                 ret_type = None
             else:
@@ -530,6 +636,9 @@ class ConversionContext(object):
             return TypedExpression(native_ast.nullExpr, Void)
 
         if ast.matches.While:
+            if self._init_fields is not None:
+                self._init_fields.finalize(self)
+
             cond = self.ensure_bool(self.convert_expression_ast(ast.test))
             cond = self.consume_temporaries(cond)
 
@@ -547,6 +656,9 @@ class ConversionContext(object):
                 )
 
         if ast.matches.For:
+            if self._init_fields is not None:
+                self._init_fields.finalize(self)
+
             if not ast.target.matches.Name:
                 raise ConversionException("For loops can only have simple targets for now")
 
@@ -623,7 +735,6 @@ class ConversionContext(object):
                 )
 
             return res
-
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 
@@ -859,7 +970,15 @@ class Converter(object):
             suffix = 1 if not suffix else suffix+1
         return getname()
 
-    def convert_function_ast(self, ast_arg, statements, input_types, local_variables, free_variable_lookup):
+    def convert_function_ast(
+                self, 
+                ast_arg, 
+                statements, 
+                input_types, 
+                local_variables, 
+                free_variable_lookup,
+                members_of_arg0_to_initialize
+                ):
         if ast_arg.vararg.matches.Value:
             star_args_name = ast_arg.vararg.val
         else:
@@ -868,12 +987,12 @@ class Converter(object):
         if star_args_name is None:
             if len(input_types) != len(ast_arg.args):
                 raise ConversionException(
-                    "Exected %s arguments but got %s" % (len(ast_arg.args), len(input_types))
+                    "Expected %s arguments but got %s" % (len(ast_arg.args), len(input_types))
                     )
         else:
             if len(input_types) < len(ast_arg.args):
                 raise ConversionException(
-                    "Exected at least %s arguments but got %s" % 
+                    "Expected at least %s arguments but got %s" % 
                         (len(ast_arg.args), len(input_types))
                     )
 
@@ -905,9 +1024,20 @@ class Converter(object):
 
         varname_to_type[FunctionOutput] = None
 
-        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
+        if members_of_arg0_to_initialize:
+            init_fields = InitFields(
+                local_variables[0],
+                members_of_arg0_to_initialize
+                )
+        else:
+            init_fields = None
+
+        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup, init_fields)
 
         res = subconverter.convert_statement_list_ast(statements, toplevel=True)
+
+        if init_fields:
+            res = init_fields.init_expr(subconverter) + res
 
         if star_args_name is not None:
             res = subconverter.construct_starargs_around(res, star_args_name)
@@ -937,7 +1067,8 @@ class Converter(object):
                 )],
             input_types,
             local_variables,
-            free_variable_lookup
+            free_variable_lookup,
+            ()
             )
 
 
@@ -975,7 +1106,7 @@ class Converter(object):
 
         varname_to_type = {}
 
-        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
+        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup, None)
 
         return subconverter.convert_expression_ast(ast.body)
 
@@ -996,8 +1127,11 @@ class Converter(object):
                 freevars[f.func_code.co_freevars[i]] = f.func_closure[i].cell_contents
 
         return pyast, freevars
+    
+    def convert_initializer_function(self, f, input_types, name_override, fields_and_types):
+        return self.convert(f, input_types, name_override, fields_and_types)
 
-    def convert(self, f, input_types, name_override=None):
+    def convert(self, f, input_types, name_override=None, fields_and_types_for_initializing=None):
         for i in input_types:
             if not i.is_valid_as_variable():
                 raise ConversionException("Invalid argument types for %s: %s" % (f, input_types))
@@ -1020,10 +1154,13 @@ class Converter(object):
                         pyast.body, 
                         input_types, 
                         f.func_code.co_varnames, 
-                        freevars
+                        freevars,
+                        fields_and_types_for_initializing
                         )
             else:
                 assert pyast.matches.Lambda
+                if fields_and_types_for_initializing:
+                    raise ConversionException("initializers can't be lambdas")
                 definition,output_type = self.convert_lambda_ast(pyast, input_types, f.func_code.co_varnames, freevars)
 
             assert definition is not None

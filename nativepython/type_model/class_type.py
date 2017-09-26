@@ -19,6 +19,7 @@ from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.exceptions import ConversionException, UnassignableFieldException
 
 import nativepython
+import nativepython.python.string_util as string_util
 import nativepython.native_ast as native_ast
 
 class ElementTypesUnresolved:
@@ -40,25 +41,8 @@ class DirectSetter:
     def __setattr__(self, attr, val):
         self.t.__dict__[attr] = val
 
-def distance(s1, s2):
-    if len(s1) < len(s2):
-        return distance(s2, s1)
-
-    if len(s2) == 0:
-        return len(s1)
-
-    prev = range(len(s2) + 1)
-
-    for i, c1 in enumerate(s1):
-        cur = [i + 1]
-        for j, c2 in enumerate(s2):
-            cur.append(min(prev[j+1]+1, cur[j]+1, prev[j] + (1 if c1 != c2 else 0)))
-        prev = cur
-    
-    return prev[-1]
-
 def closest_special_member_name(name):
-    return sorted((distance(name, x), x) for x in valid_special_member_names)[0][1]
+    return string_util.closest_in(name, valid_special_member_names)
 
 valid_special_member_names = [
     '__assign__',
@@ -187,18 +171,18 @@ class ClassType(Type):
             def make_body(instance_ref, other_instance):
                 init_func = self.cls.__copy_constructor__.im_func
 
-                call_target = context._converter.convert(
+                call_target = context._converter.convert_initializer_function(
                     init_func, 
                     [instance_ref.expr_type, other_instance.expr_type],
-                    name_override=self.cls.__name__+".__copy_constructor__"
+                    self.cls.__name__+".__copy_constructor__",
+                    self.element_types
                     )
                     
                 return TypedExpression.Void(
-                    self.convert_initialize_blank(context, instance_ref).expr + 
-                        context.generate_call_expr(
-                            target=call_target.native_call_target,
-                            args=[instance_ref.expr, other_instance.expr]
-                            )
+                    context.generate_call_expr(
+                        target=call_target.native_call_target,
+                        args=[instance_ref.expr, other_instance.expr]
+                        )
                     )
 
             return context.call_expression_in_function(
@@ -238,7 +222,8 @@ class ClassType(Type):
                     [instance_ref],
                     name_override=self.cls.__name__+".__destructor__").expr
 
-            for ix,(name,e) in enumerate(self.element_types):
+            #destroy things in reverse order
+            for ix,(name,e) in enumerate(reversed(self.element_types)):
                 dest_field = self.reference_to_field(instance_ref.expr, name)
 
                 dest_t = dest_field.expr_type.value_type
@@ -253,65 +238,52 @@ class ClassType(Type):
             make_body
             )
 
-    def convert_initialize_blank(self, context, instance_ref):
-        self.assert_is_instance_ref(instance_ref)
-        
-        def make_body(instance_ref):
-            body = native_ast.nullExpr
-
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.reference_to_field(instance_ref.expr, name)
-
-                dest_t = dest_field.expr_type.value_type
-                body = body + dest_t.convert_initialize(context, dest_field, ()).expr
-
-            return TypedExpression.Void(body)
-
-        return context.call_expression_in_function(
-            (self, "initialize_blank"), 
-            "%s.initialize_blank" % (self.cls.__name__), 
-            [instance_ref], 
-            make_body
-            )
-
     def convert_initialize(self, context, instance_ref, args):
         self.assert_is_instance_ref(instance_ref)
         
         def make_body(instance_ref, *args):
             body = native_ast.nullExpr
 
-            call_default_initializer_with_args = True if len(args) else False
-
-            if hasattr(self.cls, "__init__"):
-                call_default_initializer_with_args = False
-
-            if call_default_initializer_with_args:
-                if len(args) != len(self.element_types):
+            if not hasattr(self.cls, "__init__"):
+                if len(args) != len(self.element_types) and len(args) != 0:
                     raise ConversionException("Can't initialize %s with arguments of type %s" % (
                             self, [str(a.expr_type) for a in args]
                             )
                         )
 
-            for ix,(name,e) in enumerate(self.element_types):
-                dest_field = self.reference_to_field(instance_ref.expr, name)
+                for ix,(name,e) in enumerate(self.element_types):
+                    dest_field = self.reference_to_field(instance_ref.expr, name)
 
-                dest_t = dest_field.expr_type.value_type
-                if call_default_initializer_with_args:
-                    body = body + dest_t.convert_initialize_copy(context, dest_field, args[ix]).expr
-                else:
-                    body = body + dest_t.convert_initialize(context, dest_field, ()).expr
+                    dest_t = dest_field.expr_type.value_type
+                    if len(args):
+                        body = body + dest_t.convert_initialize_copy(context, dest_field, args[ix]).expr
+                    else:
+                        body = body + dest_t.convert_initialize(context, dest_field, ()).expr
 
-            if hasattr(self.cls, "__init__"):
+                return TypedExpression.Void(body)
+            else:
                 init_func = self.cls.__init__.im_func
                 
-                body = body + context.call_py_function(
+                call_target = context._converter.convert_initializer_function(
                     init_func, 
-                    (instance_ref,) + tuple(args), 
-                    name_override=self.cls.__name__+"__init__"
-                    ).expr
+                    [instance_ref.expr_type] + [a.expr_type for a in args],
+                    self.cls.__name__+".__init__",
+                    self.element_types
+                    )
 
-            return TypedExpression.Void(body)
+                return TypedExpression.Void(
+                    context.generate_call_expr(
+                        target=call_target.native_call_target,
+                        args=[instance_ref.expr] + [a.expr for a in args]
+                        )
+                    )
 
+
+            return context.call_expression_in_function(
+                (self, "initialize_copy"), "%s.initialize_copy" % (self.cls.__name__), 
+                [instance_ref, other_instance], 
+                make_body
+                )
         return context.call_expression_in_function(
             (self, "initialize"), 
             "%s.initialize" % (self.cls.__name__), 
@@ -353,7 +325,7 @@ class ClassType(Type):
     def lower(self):
         return native_ast.Type.Struct(tuple([(a[0], a[1].lower()) for a in self.element_types]))
 
-    def convert_attribute(self, context, instance_or_ref, attr):
+    def convert_attribute(self, context, instance_or_ref, attr, allow_double_refs=False):
         if is_special_name(attr) and attr not in special_member_names_accessible_directly:
             raise ConversionException("Illegal to access attributes with names like __X__")
 
@@ -368,18 +340,18 @@ class ClassType(Type):
                             attr=attr
                             ),
                         self.element_types[i][1]
-                        )
+                        ).drop_double_references()
         else:
             instance_ref = instance_or_ref
 
             self.assert_is_instance_ref(instance_ref)
 
-            for i in xrange(len(self.element_types)):
-                if self.element_types[i][0] == attr:
-                    return TypedExpression(
-                        instance_ref.expr.ElementPtrIntegers(0,i),
-                        self.element_types[i][1].reference
-                        ).drop_double_references()
+            field = self.reference_to_field(instance_ref.expr, attr)
+            if field is not None:
+                if allow_double_refs:
+                    return field
+                else:
+                    return field.drop_double_references()
 
             func = None
             try:
@@ -390,7 +362,7 @@ class ClassType(Type):
             if func is not None:
                 return TypedExpression(instance_ref.expr, PythonClassMemberFunc(self, attr))
 
-        return super(ClassType,self).convert_attribute(context, instance_ref, attr)
+        return super(ClassType,self).convert_attribute(context, instance_ref, attr, allow_double_refs)
 
     def reference_to_field(self, native_instance_ptr, attribute_name):
         for i in xrange(len(self.element_types)):
@@ -403,7 +375,7 @@ class ClassType(Type):
     def convert_set_attribute(self, context, instance_ref, attr, val):
         self.assert_is_instance_ref(instance_ref)
 
-        field_ref = self.reference_to_field(instance_ref.expr, attr)
+        field_ref = self.reference_to_field(instance_ref.expr, attr).drop_double_references()
 
         if field_ref is None:
             raise UnassignableFieldException(self, attr, val.expr_type)
