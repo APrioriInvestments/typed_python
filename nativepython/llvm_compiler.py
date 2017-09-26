@@ -97,10 +97,12 @@ class NativeFunctionPointer:
             argtypes = [native_to_ctype(x) for x in 
                                 [self.output_type] + self.input_types]
 
+            argtypes = argtypes[:1] + [x for x in argtypes[1:] if x is not None]
+
             self._ctypes_cache = ctypes.CFUNCTYPE(*argtypes)(self.fp)
         
         try:
-            return self._ctypes_cache(*args)
+            return self._ctypes_cache(*[a for a in args if a is not None])
         except:
             print "can't call ", self, " with ", args
             raise

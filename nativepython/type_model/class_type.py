@@ -240,7 +240,7 @@ class ClassType(Type):
 
     def convert_initialize(self, context, instance_ref, args):
         self.assert_is_instance_ref(instance_ref)
-        
+
         def make_body(instance_ref, *args):
             body = native_ast.nullExpr
 
@@ -278,12 +278,6 @@ class ClassType(Type):
                         )
                     )
 
-
-            return context.call_expression_in_function(
-                (self, "initialize_copy"), "%s.initialize_copy" % (self.cls.__name__), 
-                [instance_ref, other_instance], 
-                make_body
-                )
         return context.call_expression_in_function(
             (self, "initialize"), 
             "%s.initialize" % (self.cls.__name__), 

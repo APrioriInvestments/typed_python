@@ -109,15 +109,18 @@ class WrappedFunction(object):
                 return type_model.Bool
             if isinstance(a, int):
                 return type_model.Int64
-            if isinstance(a, WrappedObject):
-                return a._object_type.reference
+            if isinstance(a, RuntimeObject):
+                if a._object_ptr is None:
+                    return a._object_type
+                else:
+                    return a._object_type.reference
 
             return type_model.FreePythonObjectReference(a)
 
         def arg_for_arg(a):
             if isinstance(a, (float,int, bool)):
                 return a
-            if isinstance(a, WrappedObject):
+            if isinstance(a, RuntimeObject):
                 return a._object_ptr
             return None
 
@@ -138,9 +141,9 @@ class WrappedFunction(object):
         if res is None:
             return res
 
-        return WrappedObject(self.runtime, res, output_type.value_type)
+        return RuntimeObject(self.runtime, res, output_type.value_type)
 
-class WrappedObject(object):
+class RuntimeObject(object):
     def __init__(self, runtime, object_ptr, object_type):
         self._runtime = runtime
         self._object_ptr = object_ptr
@@ -162,11 +165,11 @@ class WrappedObject(object):
         return self._runtime._setitem_func(self, a, val)
 
     def __repr__(self):
-        return "WrappedObject(t=%s,p=%s)" % (self._object_type, self._object_ptr)
+        return "RuntimeObject(t=%s,p=%s)" % (self._object_type, self._object_ptr)
 
     def __del__(self):
-        self._runtime._free_func(self)
-
+        if self._object_ptr is not None:
+            self._runtime._free_func(self)
 
 _singleton = [None]
 
@@ -199,6 +202,7 @@ class Runtime:
             util.in_place_destroy(f_ptr)
             util.free(f_ptr)
 
+        self._return = WrappedFunction(self, lambda x:x)
         self._call_func = WrappedFunction(self, call_func)
         self._getitem_func = WrappedFunction(self, getitem_func)
         self._setitem_func = WrappedFunction(self, setitem_func)
@@ -216,7 +220,11 @@ class Runtime:
         return self._pointer_attribute_funcs[attr]
 
     def wrap(self, f):
-        return WrappedFunction(self, f)
+        if isinstance(f, (int,float,bool,RuntimeObject)):
+            return f
+        
+        return RuntimeObject(self, None, type_model.FreePythonObjectReference(f))
+
 
     def convert(self, f, argtypes):
         f_target = self.converter.convert(f, argtypes)

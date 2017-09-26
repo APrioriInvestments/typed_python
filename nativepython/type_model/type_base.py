@@ -90,6 +90,9 @@ class Type(object):
         if not self.is_pod:
             raise ConversionException("can't initialize %s - need a real implementation" % self)
 
+        if self.sizeof == 0:
+            return TypedExpression.Void(native_ast.nullExpr)
+
         other_instance = other_instance.dereference()
 
         if other_instance.expr_type != self:
@@ -120,6 +123,10 @@ class Type(object):
         else:
             if not self.is_pod:
                 raise ConversionException("can't initialize %s - need a real implementation" % self)
+            
+            if self.sizeof == 0:
+                return TypedExpression.Void(native_ast.nullExpr)
+        
             return TypedExpression.Void(
                 native_ast.Expression.Store(
                     ptr=instance_ref.expr,
