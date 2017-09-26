@@ -347,6 +347,14 @@ class ClassType(Type):
                 else:
                     return field.drop_double_references()
 
+            if hasattr(self.cls, attr) and isinstance(getattr(self.cls, attr), property):
+                return context.call_py_function(
+                    getattr(self.cls, attr).fget, 
+                    [instance_ref],
+                    name_override=self.cls.__name__+".%s.getter" % attr
+                    )
+
+
             func = None
             try:
                 func = getattr(self.cls, attr).im_func
@@ -368,6 +376,13 @@ class ClassType(Type):
 
     def convert_set_attribute(self, context, instance_ref, attr, val):
         self.assert_is_instance_ref(instance_ref)
+
+        if hasattr(self.cls, attr) and isinstance(getattr(self.cls, attr), property):
+            return context.call_py_function(
+                getattr(self.cls, attr).fset, 
+                [instance_ref, val],
+                name_override=self.cls.__name__+".%s.setter" % attr
+                )
 
         field_ref = self.reference_to_field(instance_ref.expr, attr).drop_double_references()
 

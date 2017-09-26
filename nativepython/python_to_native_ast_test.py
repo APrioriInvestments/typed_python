@@ -1009,10 +1009,6 @@ class PythonToNativeAstTests(unittest.TestCase):
             def __init__(self):
                 pass
 
-        @util.typefun
-        def pr(t):
-            print t
-
         def check():
             an_int = 10
             holder = HoldsAReference()
@@ -1024,6 +1020,33 @@ class PythonToNativeAstTests(unittest.TestCase):
             self.compile(check,types=())
         except ConversionException as e:
             self.assertTrue("can't null-initialize" in e.message)
+        
+    def test_class_properties(self):
+        @type_model.cls
+        class HasAProperty:
+            def __types__(cls):
+                cls.x = int
+
+            def y_get(self):
+                return self.x + 10
+
+            def y_set(self, val):
+                self.x = val - 10
+
+            y = property(y_get, y_set)
+
+        def check_1():
+            holder = HasAProperty()
+            holder.x = 10
+            return holder.y
+        
+        def check_2():
+            holder = HasAProperty()
+            holder.y = 20
+            return holder.x
+        
+        self.assertEqual(self.compile(check_1,types=())(), 20)
+        self.assertEqual(self.compile(check_2,types=())(), 10)
         
     def test_constructors_and_destructors_fuzz(self):
         #we want to generate some random functions. Signatures always take a 'c', and can take
