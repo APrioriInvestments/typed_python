@@ -15,18 +15,21 @@
 import nativepython.native_ast as native_ast
 import llvmlite.ir
 
-exception_type_llvm = llvmlite.ir.LiteralStructType(
-        [llvmlite.ir.PointerType(llvmlite.ir.IntType(8)),
-         llvmlite.ir.IntType(32)]
-        )
+llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
+llvm_i8 = llvmlite.ir.IntType(8)
+llvm_i32 = llvmlite.ir.IntType(32)
+llvm_i64 = llvmlite.ir.IntType(64)
+llvm_i1 = llvmlite.ir.IntType(1)
+llvm_void = llvmlite.ir.VoidType()
+
+exception_type_llvm = llvmlite.ir.LiteralStructType([llvm_i8ptr, llvm_i32])
 
 #just hardcoded for now. We check this in the compiler to ensure it's consistent.
 pointer_size = 8
 
-def llvm_int(i):
-    return llvmlite.ir.Constant(llvmlite.ir.IntType(32), i)
+def llvm_bool(i):
+    return llvmlite.ir.Constant(llvm_i1, i)
 
-llvm_i8ptr = llvmlite.ir.IntType(8).as_pointer()
 
 def type_to_llvm_type(t):
     if t.matches.Void:
@@ -92,7 +95,7 @@ def constant_to_typed_llvm_value(module, builder, c):
     if c.matches.ByteArray:
         byte_array = c.val
 
-        t = llvmlite.ir.ArrayType(llvmlite.ir.IntType(8), len(byte_array) + 1)
+        t = llvmlite.ir.ArrayType(llvm_i8, len(byte_array) + 1)
 
         llvm_c = llvmlite.ir.Constant(t, bytearray(byte_array + bytes("\x00")))
 
@@ -104,7 +107,7 @@ def constant_to_typed_llvm_value(module, builder, c):
         nt = native_ast.Type.Pointer(native_ast.Type.Int(bits=8,signed=False))
 
         return TypedLLVMValue(
-            builder.bitcast(value, llvmlite.ir.PointerType(llvmlite.ir.IntType(8))), 
+            builder.bitcast(value, llvm_i8ptr), 
             nt
             )
 
@@ -161,11 +164,11 @@ class TeardownOnScopeExit:
             return False
 
         with self.builder.goto_block(self._block):
-            is_return = self.builder.phi(llvmlite.ir.IntType(1), name='is_return_flow_%s' % self.height)
+            is_return = self.builder.phi(llvm_i1, name='is_return_flow_%s' % self.height)
 
             for b,val in self.incoming_is_return.iteritems():
                 if isinstance(val, bool):
-                    val = llvmlite.ir.Constant(llvmlite.ir.IntType(1), val)
+                    val = llvm_bool(val)
                 is_return.add_incoming(val, b)
 
             return is_return
@@ -207,11 +210,11 @@ class TeardownOnScopeExit:
                 return None
             if all(k is True for k in incoming.values()):
                 return True
-            phinode = self.builder.phi(llvmlite.ir.IntType(1), name='is_initialized.' + t)
+            phinode = self.builder.phi(llvm_i1, name='is_initialized.' + t)
 
             for b in incoming:
                 if isinstance(incoming[b], bool):
-                    val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),incoming[b])
+                    val = llvm_bool(incoming[b])
                 else:
                     val = incoming[b]
                 phinode.add_incoming(val, b)
@@ -414,7 +417,7 @@ class FunctionConverter:
         exception_ptr = self.builder.bitcast(
             self.builder.call(
                 self.external_function_references["__cxa_allocate_exception"],
-                [llvmlite.ir.Constant(llvmlite.ir.IntType(64),pointer_size)],
+                [llvmlite.ir.Constant(llvm_i64,pointer_size)],
                 name="alloc_e"
                 ),
             llvm_i8ptr.as_pointer()
@@ -617,7 +620,7 @@ class FunctionConverter:
             zero_like = llvmlite.ir.Constant(cond_llvm.type, 0)
 
             if cond.native_type.matches.Pointer:
-                cond_llvm = self.builder.ptrtoint(cond_llvm, llvmlite.ir.IntType(64))
+                cond_llvm = self.builder.ptrtoint(cond_llvm, llvm_i64)
                 cond_llvm = self.builder.icmp_signed("!=", cond_llvm, zero_like)
             elif cond.native_type.matches.Int:
                 if cond_llvm.type.width != 1:
@@ -667,11 +670,11 @@ class FunctionConverter:
                     final_tags[tag] = True
                 else:
                     #it's not certain
-                    tag_llvm_value = self.builder.phi(llvmlite.ir.IntType(1), 'is_initialized.' + tag)
+                    tag_llvm_value = self.builder.phi(llvm_i1, 'is_initialized.' + tag)
                     if isinstance(true_val, bool):
-                        true_val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),true_val)
+                        true_val = llvm_bool(true_val)
                     if isinstance(false_val, bool):
-                        false_val = llvmlite.ir.Constant(llvmlite.ir.IntType(1),false_val)
+                        false_val = llvm_bool(false_val)
 
                     tag_llvm_value.add_incoming(true_val, true_block)
                     tag_llvm_value.add_incoming(false_val, false_block)
@@ -795,12 +798,12 @@ class FunctionConverter:
                     if l.native_type.matches.Float:
                         return TypedLLVMValue(
                             self.builder.fcmp_ordered(rep, l.llvm_value, r.llvm_value), 
-                            native_ast.Type.Int(bits=1,signed=False)
+                            native_ast.Bool
                             )
                     elif l.native_type.matches.Int:
                         return TypedLLVMValue(
                             self.builder.icmp_signed(rep, l.llvm_value, r.llvm_value), 
-                            native_ast.Type.Int(bits=1,signed=False)
+                            native_ast.Bool
                             )
 
             for py_op, floatop, intop_s, intop_u in [
@@ -1004,56 +1007,22 @@ class FunctionConverter:
         assert False, "can't handle %s" % repr(expr)
 
 def populate_needed_externals(external_function_references, module):
-    external_function_references["__cxa_allocate_exception"] = \
-        llvmlite.ir.Function(
-            module, 
-            llvmlite.ir.FunctionType(
-                llvm_i8ptr,
-                [llvmlite.ir.IntType(64)],
-                var_arg=False
-                ), 
-            "__cxa_allocate_exception"
-            )
-    external_function_references["__cxa_throw"] = \
-        llvmlite.ir.Function(
-            module, 
-            llvmlite.ir.FunctionType(
-                llvmlite.ir.VoidType(),
-                [llvm_i8ptr] * 3,
-                var_arg=False
-                ), 
-            "__cxa_throw"
-            )
-    external_function_references["__cxa_end_catch"] = \
-        llvmlite.ir.Function(
-            module, 
-            llvmlite.ir.FunctionType(
-                llvm_i8ptr,
-                [llvm_i8ptr],
-                var_arg=False
-                ), 
-            "__cxa_end_catch"
-            )
-    external_function_references["__cxa_begin_catch"] = \
-        llvmlite.ir.Function(
-            module, 
-            llvmlite.ir.FunctionType(
-                llvm_i8ptr,
-                [llvm_i8ptr],
-                var_arg=False
-                ), 
-            "__cxa_begin_catch"
-            )
-    external_function_references["__gxx_personality_v0"] = \
-        llvmlite.ir.Function(
-            module, 
-            llvmlite.ir.FunctionType(
-                llvmlite.ir.IntType(32),
-                [],
-                var_arg=True
-                ), 
-            "__gxx_personality_v0"
-            )
+    def define(fname, output, inputs, vararg=False):
+        external_function_references[fname] = \
+            llvmlite.ir.Function(
+                module, 
+                llvmlite.ir.FunctionType(
+                    output,
+                    inputs,
+                    var_arg=vararg
+                    ), 
+                fname
+                )
+    define("__cxa_allocate_exception", llvm_i8ptr, [llvm_i64])
+    define("__cxa_throw", llvm_void, [llvm_i8ptr,llvm_i8ptr,llvm_i8ptr])
+    define("__cxa_end_catch", llvm_i8ptr, [llvm_i8ptr])
+    define("__cxa_begin_catch", llvm_i8ptr, [llvm_i8ptr])
+    define("__gxx_personality_v0", llvm_i32, [], vararg=True)
 
 
 class Converter(object):

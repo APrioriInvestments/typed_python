@@ -60,8 +60,6 @@ class InitFields:
     def any_remaining(self):
         return bool(self.uninitialized_fields)
 
-
-
 class ConversionContext(object):
     def __init__(self, converter, varname_to_type, free_variable_lookup, init_fields):
         self._converter = converter
@@ -117,7 +115,7 @@ class ConversionContext(object):
             self._varname_and_type_to_slot_name[slot_type,name] = name_to_use
 
         name_to_use = self._varname_and_type_to_slot_name[slot_type,name]
-        
+
         return TypedExpression(
             native_ast.Expression.StackSlot(
                 name=name_to_use,
