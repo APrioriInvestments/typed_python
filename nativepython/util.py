@@ -18,12 +18,14 @@ import nativepython.type_model as type_model
 
 from nativepython.exceptions import ConversionException
 
+TypedExpression = type_model.TypedExpression
 Float64 = type_model.Float64
 Int64 = type_model.Int64
 Int32 = type_model.Int32
 Bool = type_model.Bool
 Void = type_model.Void
 UInt8 = type_model.UInt8
+Int8 = type_model.Int8
 Struct = type_model.Struct
 
 def typefun(f):
@@ -128,6 +130,17 @@ malloc = type_model.ExternalFunction.make("malloc", UInt8.pointer, [Int64])
 realloc = type_model.ExternalFunction.make("realloc", UInt8.pointer, [Int64])
 free = type_model.ExternalFunction.make("free", Void, [UInt8.pointer])
 printf = type_model.ExternalFunction.make("printf", Int64, [UInt8.pointer], varargs=True)
+
+@exprfun
+def throw(context, args):
+    if len(args) != 1:
+        raise ConversionException("throw takes one argument")
+    arg = args[0].dereference()
+
+    if not arg.expr_type.is_pointer:
+        raise ConversionException("throw can only take a pointer")
+
+    return TypedExpression(native_ast.Expression.Throw(arg.expr), None)
 
 @exprfun
 def map_struct(context, args):

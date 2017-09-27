@@ -44,6 +44,10 @@ class Type(object):
         return False
 
     @property
+    def is_compile_time(self):
+        return False
+
+    @property
     def is_ref_to_temp(self):
         return False
 

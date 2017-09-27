@@ -118,14 +118,14 @@ CallTarget = Alternative(
                 'output_type': Type, 
                 'external': bool, 
                 'varargs': bool,
-                'intrinsic': bool
+                'intrinsic': bool,
+                'can_throw': bool
                 }
             )
 
 #loads and stores - no assignments
 Expression = Alternative("Expression")
 Teardown = Alternative("Teardown")
-
 
 Teardown.ByTag = {'tag': str, 'expr': Expression}
 Teardown.Always = {'expr': Expression}
@@ -148,6 +148,14 @@ Expression.Branch = {'cond': Expression,
                      'true': Expression, 
                      'false': Expression
                      }
+
+Expression.Throw = {'expr': Expression } #throw a pointer.
+
+Expression.TryCatch = {'expr': Expression,
+                       'varname': str, #varname is bound to a int8*
+                       'handler': Expression
+                       }
+
 Expression.While = {'cond': Expression, 
                     'while_true': Expression, 
                     'orelse': Expression
@@ -181,6 +189,10 @@ def teardown_str(self):
     if self.matches.ByTag:
         return "if slot_initialized(name=%s):\n" % self.tag + indent(str(self.expr))
 Teardown.__str__ = teardown_str
+
+def catch_handler_str(self):
+    if self.matches.Any:
+        return "catch Exception:\n" + indent(str(self.expr)).rstrip() + "\n"
 
 def expr_str(self):
     if self.matches.Comment:
@@ -261,6 +273,13 @@ def expr_str(self):
     if self.matches.Finally:
         return "try:\n" + indent(str(self.expr)) + "\nfinally:\n"\
         + indent("\n".join(str(x) for x in self.teardowns))
+    if self.matches.TryCatch:
+        return (
+              "try:\n" + indent(str(self.expr)) + "\n"
+            + "catch %s:\n" % self.varname + indent(str(self.handler)).rstrip()
+            )
+    if self.matches.Throw:
+        return "throw (%s)" % str(self.expr)
     if self.matches.ActivatesTeardown:
         return "mark slot %s initialized" % self.name
     if self.matches.StackSlot:
@@ -295,6 +314,11 @@ nullExpr = Expression.Constant(Constant.Void())
 trueExpr = Expression.Constant(Constant.Int(bits=1,val=1,signed=False))
 falseExpr = Expression.Constant(Constant.Int(bits=1,val=0,signed=False))
 
+def const_int_expr(i):
+    return Expression.Constant(
+        Constant.Int(bits=64,val=i,signed=True)
+        )
+
 FunctionBody = Alternative("FunctionBody",
     Internal = {'body': Expression},
     External = {'name': str}
@@ -304,4 +328,5 @@ Function = Alternative("Function")
 Function.Definition = {'args': List((str, Type)), 'body': FunctionBody, 'output_type': Type}
 
 Bool = Type.Int(bits=1, signed=False)
+Int8Ptr = Type.Pointer(Type.Int(bits=8, signed=True))
 

@@ -28,6 +28,10 @@ class CompileTimeType(Type):
         return True
     
     @property
+    def is_compile_time(self):
+        return True
+
+    @property
     def null_value(self):
         return native_ast.Constant.Struct(())
 
@@ -261,7 +265,7 @@ class ExternalFunction(CompileTimeType):
             for i in xrange(len(self.input_types)):
                 if args[i].expr_type != self.input_types[i]:
                     args[i] = args[i].convert_to_type(self.input_types[i], False)
-
+        
         return TypedExpression(
             native_ast.Expression.Call(
                 target=native_ast.CallTarget(
@@ -270,7 +274,8 @@ class ExternalFunction(CompileTimeType):
                     output_type = self.output_type.lower(),
                     external=True,
                     varargs=self.varargs,
-                    intrinsic=self.intrinsic
+                    intrinsic=self.intrinsic,
+                    can_throw=False
                     ),
                 args=[a.expr for a in args]
                 ),

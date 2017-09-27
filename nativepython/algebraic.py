@@ -195,7 +195,7 @@ def makeAlternativeOption(alternative, which, typedict):
 
             for f in fields:
                 if f not in typedict:
-                    raise TypeError("constructing with unused argument %s" % f)
+                    raise TypeError("constructing with unused argument %s: %s vs %s" % (f, fields.keys(), typedict.keys()))
 
             for k in typedict:
                 if k not in fields:

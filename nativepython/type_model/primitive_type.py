@@ -224,7 +224,8 @@ class PrimitiveNumericType(PrimitiveType):
                             output_type = l.expr_type.lower(),
                             external=True,
                             varargs=False,
-                            intrinsic=True
+                            intrinsic=True,
+                            can_throw=False
                             ),
                         args=[l.expr, r.expr]
                         ),
@@ -244,7 +245,8 @@ class PrimitiveNumericType(PrimitiveType):
                             output_type = l.expr_type.lower(),
                             external=True,
                             varargs=False,
-                            intrinsic=True
+                            intrinsic=True,
+                            can_throw=False
                             ),
                         args=[l.expr, r.expr]
                         ),

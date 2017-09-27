@@ -90,6 +90,43 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.runtime.wrap(f)(5, 10), sum(xrange(5, 10)))
         self.assertEqual(self.runtime.wrap(f)(5, 10, 2), sum(xrange(5, 10, 2)))
 
+    def test_exceptions_basic(self):
+        @type_model.cls
+        class OnExit:
+            def __types__(cls):
+                pass
+
+            def __destructor__(self):
+                util.printf("in destroy\n")
+
+        def thrower():
+            try:
+                try:
+                    ptr = type_model.Int8.pointer(0xdeadbeef)
+                    util.printf("pointer is 0x%x\n", ptr)
+                    util.throw(ptr)
+                except Exception as x:
+                    util.printf("pointer is 0x%x\n", x)
+                    util.throw(x)
+            except Exception as x2:
+                util.printf("pointer 2 is 0x%x\n", x2)
+                util.throw(x2)
+
+        def f():
+            res = 0
+            
+            try:
+                x = OnExit()
+                x2 = OnExit()
+                thrower()
+            except Exception as x3:
+                if int(x3) == 0xdeadbeef:
+                    res = 1
+
+            return res
+                        
+        self.assertEqual(self.runtime.wrap(f)(), 1)
+
     def test_boolean_operations(self):
         def test_expr(f):
             args = [False for _ in xrange(f.func_code.co_argcount)]

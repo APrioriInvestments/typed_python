@@ -302,6 +302,10 @@ ExceptionHandler.Item = {
     "name": Nullable(Expr),
     "body": List(Statement)
     }
+ExceptionHandler.add_common_field("line_number", int)
+ExceptionHandler.add_common_field("col_offset", int)
+ExceptionHandler.add_common_field("filename", str)
+
 
 Arguments.Item = {
     "args": List(Expr),
@@ -439,7 +443,7 @@ converters = {
     ast.NotIn: ComparisonOp.NotIn,
     ast.comprehension: Comprehension,
     ast.excepthandler: lambda x:x,
-    ast.ExceptHandler: ExceptionHandler,
+    ast.ExceptHandler: ExceptionHandler.Item,
     ast.arguments: Arguments,
     ast.keyword: Keyword,
     ast.alias: Alias
@@ -465,8 +469,12 @@ def convertPyAstToAlgebraic(tree,fname):
         except Exception as e:
             import traceback
             raise UserWarning(
-                "Failed to construct %s with arguments %s within %s:\n\n%s"
-                % (type(tree), args, converter, traceback.format_exc())
+                "Failed to construct %s with arguments\n%s\nwithin %s:\n\n%s"
+                % (type(tree), 
+                   "\n".join(["\t%s:%s" % (k,repr(v)[:50]) for k,v in args.iteritems()]), 
+                   converter, 
+                   traceback.format_exc()
+                   )
                 )
 
     if isinstance(tree, list):

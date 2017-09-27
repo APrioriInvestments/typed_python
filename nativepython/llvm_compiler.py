@@ -17,6 +17,11 @@ import llvmlite.ir
 import native_ast_to_llvm as native_ast_to_llvm
 import ctypes
 
+#we have to be able to get libstdc++ runtime functions.
+#this shouldn't be a problem because llvm-3.8 depends on it,
+#so if we can load llvm, we can load this.
+ctypes.CDLL("libstdc++.so.6",mode=ctypes.RTLD_GLOBAL)
+
 llvm.initialize()
 llvm.initialize_native_target()
 llvm.initialize_native_asmprinter()  # yes, even this one
@@ -29,6 +34,8 @@ pointer_size = (
     llvmlite.ir.PointerType(llvmlite.ir.DoubleType())
         .get_abi_size(target_machine.target_data)
     )
+
+assert pointer_size == native_ast_to_llvm.pointer_size
 
 def sizeof_native_type(native_type):
     if native_type.matches.Void:
@@ -136,8 +143,12 @@ class Compiler:
 
         module = self.converter.add_functions(functions)
 
-        mod = llvm.parse_assembly(module)
-        mod.verify()
+        try:
+            mod = llvm.parse_assembly(module)
+            mod.verify()
+        except:
+            print "failing: ", module
+            raise
 
         # Now add the module and make sure it is ready for execution
         self.engine.add_module(mod)

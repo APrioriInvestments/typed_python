@@ -66,6 +66,8 @@ class ConversionContext(object):
     def __init__(self, converter, varname_to_type, free_variable_lookup, init_fields):
         self._converter = converter
         self._varname_to_type = varname_to_type
+        self._varname_and_type_to_slot_name = {}
+        self._varname_uses = {}
         self._new_variables = set()
         self._free_variable_lookup = free_variable_lookup
         self._temporaries = {}
@@ -102,9 +104,23 @@ class ConversionContext(object):
 
         slot_type = self._varname_to_type[name]
 
+        if name not in self._varname_uses:
+            self._varname_uses[name] = 0
+
+        if (slot_type, name) not in self._varname_and_type_to_slot_name:
+            self._varname_uses[name] += 1
+            if self._varname_uses[name] > 1:
+                name_to_use = name + ".%s" % self._varname_uses[name]
+            else:
+                name_to_use = name
+
+            self._varname_and_type_to_slot_name[slot_type,name] = name_to_use
+
+        name_to_use = self._varname_and_type_to_slot_name[slot_type,name]
+        
         return TypedExpression(
             native_ast.Expression.StackSlot(
-                name=name,
+                name=name_to_use,
                 type=slot_type.lower()
                 ),
             slot_type.reference
@@ -655,6 +671,59 @@ class ConversionContext(object):
                 ret_type
                 )
 
+        if ast.matches.TryExcept:
+            if len(ast.orelse):
+                raise ConversionException("We dont handle try-except-else")
+
+            body = self.convert_statement_list_ast(ast.body)
+            handlers = []
+
+            #if 'orelse' is not None, then 
+            any_handlers_exit = False
+
+            for h in ast.handlers:
+                if h.type.matches.Value:
+                    typexpr = self.convert_expression_ast(h.type.val)
+
+                    if not (    typexpr.expr_type.is_compile_time
+                            and typexpr.expr_type.python_object_representation is Exception
+                            ):
+                        raise ConversionException("can't handle types in exceptions yet")
+
+                name = None
+                if not h.name.matches.Null:
+                    name = h.name.val.id
+
+                if name is not None:
+                    if self._varname_to_type.get(name, None) is not None:
+                        raise ConversionException("Variable %s is already defined" % name)
+                    
+                    self._varname_to_type[name] = Int8.pointer
+
+                handler_expr = self.convert_statement_list_ast(h.body)
+
+                if name is not None:
+                    handler_expr = TypedExpression.Void(
+                        native_ast.Expression.Store(
+                            val=native_ast.Expression.Variable(".unnamed.exception.var"),
+                            ptr=self.named_var_expr(name).expr
+                            )
+                        ) + handler_expr
+
+                    del self._varname_to_type[name]
+
+                if handler_expr.expr_type is not None:
+                    any_handlers_exit = True
+
+            return TypedExpression(
+                native_ast.Expression.TryCatch(
+                    expr=body.expr,
+                    varname=".unnamed.exception.var",
+                    handler=handler_expr.expr
+                    ),
+                Void if any_handlers_exit or body.expr_type is not None else None
+                )
+
         if ast.matches.For:
             if self._init_fields is not None:
                 self._init_fields.finalize(self)
@@ -735,6 +804,8 @@ class ConversionContext(object):
                 )
 
             return res
+
+
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 
@@ -1090,7 +1161,8 @@ class Converter(object):
                 output_type=native_function_definition.output_type,
                 external=False,
                 varargs=False,
-                intrinsic=False
+                intrinsic=False,
+                can_throw=True
                 ),
             input_types,
             output_type
@@ -1183,7 +1255,8 @@ class Converter(object):
                     output_type=definition.output_type,
                     external=False,
                     varargs=False,
-                    intrinsic=False
+                    intrinsic=False,
+                    can_throw=True
                     ),
                 input_types,
                 output_type
