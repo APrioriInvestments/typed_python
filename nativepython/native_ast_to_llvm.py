@@ -1024,7 +1024,6 @@ def populate_needed_externals(external_function_references, module):
     define("__cxa_begin_catch", llvm_i8ptr, [llvm_i8ptr])
     define("__gxx_personality_v0", llvm_i32, [], vararg=True)
 
-
 class Converter(object):
     def __init__(self):
         object.__init__(self)

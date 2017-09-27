@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.python_to_native_ast as python_to_native_ast
 import nativepython.native_ast as native_ast
 import nativepython.type_model as type_model
 
@@ -132,17 +131,6 @@ free = type_model.ExternalFunction.make("free", Void, [UInt8.pointer])
 printf = type_model.ExternalFunction.make("printf", Int64, [UInt8.pointer], varargs=True)
 
 @exprfun
-def throw(context, args):
-    if len(args) != 1:
-        raise ConversionException("throw takes one argument")
-    arg = args[0].dereference()
-
-    if not arg.expr_type.is_pointer:
-        raise ConversionException("throw can only take a pointer")
-
-    return TypedExpression(native_ast.Expression.Throw(arg.expr), None)
-
-@exprfun
 def map_struct(context, args):
     if len(args) != 2:
         raise ConversionException("map_struct takes two arguments")
@@ -238,3 +226,17 @@ class xrange_iterator:
         val = self.cur_value
         self.cur_value += self.step
         return val
+
+@exprfun
+def throw_pointer(context, args):
+    if len(args) != 1:
+        raise ConversionException("throw takes one argument")
+    arg = args[0].dereference()
+
+    if not arg.expr_type.is_pointer:
+        raise ConversionException("throw can only take a pointer")
+
+    return TypedExpression(native_ast.Expression.Throw(arg.expr), None)
+
+def throw(value):
+    throw_pointer(value)

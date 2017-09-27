@@ -14,6 +14,7 @@
 
 import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
+import nativepython.util as util
 import nativepython.native_ast as native_ast
 import nativepython.exceptions as exceptions
 from nativepython.type_model import *
@@ -803,7 +804,16 @@ class ConversionContext(object):
 
             return res
 
+        if ast.matches.Raise:
+            if ast.type.matches.Value and ast.inst.matches.Null and ast.tback.matches.Null:
+                expr = self.convert_expression_ast(ast.type.val)
 
+                return self.call_py_function(
+                    util.throw, 
+                    [expr]
+                    )
+            else:
+                raise ConversionException("We can only handle simple 'raise' statements")
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 

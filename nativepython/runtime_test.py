@@ -104,13 +104,13 @@ class PythonNativeRuntimeTests(unittest.TestCase):
                 try:
                     ptr = type_model.Int8.pointer(0xdeadbeef)
                     util.printf("pointer is 0x%x\n", ptr)
-                    util.throw(ptr)
+                    raise ptr
                 except Exception as x:
                     util.printf("pointer is 0x%x\n", x)
-                    util.throw(x)
+                    raise x
             except Exception as x2:
                 util.printf("pointer 2 is 0x%x\n", x2)
-                util.throw(x2)
+                raise x2
 
         def f():
             res = 0
