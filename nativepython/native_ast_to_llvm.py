@@ -43,6 +43,15 @@ def type_to_llvm_type(t):
         if t.value_type.matches.Void:
             return llvmlite.ir.PointerType(llvmlite.ir.LiteralStructType(()))
 
+        if t.value_type.matches.Function:
+            return llvmlite.ir.PointerType(
+                llvmlite.ir.FunctionType(
+                    type_to_llvm_type(t.value_type.output),
+                    [type_to_llvm_type(x) for x in t.value_type.args],
+                    var_arg=t.value_type.varargs
+                    )
+                )
+
         return llvmlite.ir.PointerType(type_to_llvm_type(t.value_type))
         
     if t.matches.Float and t.bits == 64:
@@ -427,6 +436,45 @@ class FunctionConverter:
             exception_ptr
             )
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
+
+    def namedCallTargetToLLVM(self, target):
+        if target.external:
+            if target.name not in self.external_function_references:
+                func_type = llvmlite.ir.FunctionType(
+                    type_to_llvm_type(target.output_type),
+                    [type_to_llvm_type(x) for x in target.arg_types],
+                    var_arg=target.varargs
+                    )
+
+                if target.intrinsic:
+                    self.external_function_references[target.name] = \
+                        self.module.declare_intrinsic(target.name, fnty=func_type)
+                else:
+                    self.external_function_references[target.name] = \
+                        llvmlite.ir.Function(self.module, func_type, target.name)
+
+            func = self.external_function_references[target.name]
+        else:
+            func = self.converter._functions_by_name[target.name]
+            if func.module is not self.module:
+                if target.name not in self.external_function_references:
+                    self.external_function_references[target.name] = \
+                        llvmlite.ir.Function(self.module, func.function_type, func.name)
+
+                func = self.external_function_references[target.name]
+
+        return TypedLLVMValue(
+            func,
+            native_ast.Type.Pointer(
+                native_ast.Type.Function(
+                    args=target.arg_types,
+                    output=target.output_type,
+                    varargs=target.varargs,
+                    can_throw=target.can_throw
+                    )
+                )
+            )
+
 
     def generate_throw_expression(self, llvm_pointer_val):
         exception_ptr = self.generate_exception_and_store_value(llvm_pointer_val)
@@ -838,45 +886,31 @@ class FunctionConverter:
 
 
         if expr.matches.Call:
-            target = expr.target
+            target_or_ptr = expr.target
             args = [self.convert(a) for a in expr.args]
 
             for i in xrange(len(args)):
                 if args[i] is None:
                     return
 
-            if target.external:
-                if target.name not in self.external_function_references:
-                    func_type = llvmlite.ir.FunctionType(
-                        type_to_llvm_type(target.output_type),
-                        [type_to_llvm_type(x) for x in target.arg_types],
-                        var_arg=target.varargs
-                        )
+            if target_or_ptr.matches.Named:
+                target = target_or_ptr.target
 
-                    if target.intrinsic:
-                        self.external_function_references[target.name] = \
-                            self.module.declare_intrinsic(target.name, fnty=func_type)
-                    else:
-                        self.external_function_references[target.name] = \
-                            llvmlite.ir.Function(self.module, func_type, target.name)
-
-                func = self.external_function_references[target.name]
+                func = self.namedCallTargetToLLVM(target)
             else:
-                func = self.converter._functions_by_name[target.name]
-                if func.module is not self.module:
-                    if target.name not in self.external_function_references:
-                        self.external_function_references[target.name] = \
-                            llvmlite.ir.Function(self.module, func.function_type, func.name)
+                target = self.convert(target_or_ptr.expr)
 
-                    func = self.external_function_references[target.name]
+                assert target.native_type.matches.Pointer
+                assert target.native_type.value_type.matches.Function
 
+                func = target
             try: 
-                if target.can_throw:
+                if func.native_type.value_type.can_throw:
                     normal_target = self.builder.append_basic_block()
                     exception_target = self.builder.append_basic_block()
 
                     llvm_call_result = self.builder.invoke(
-                        func, 
+                        func.llvm_value, 
                         [a.llvm_value for a in args], 
                         normal_target,
                         exception_target
@@ -886,17 +920,19 @@ class FunctionConverter:
 
                     self.builder.position_at_start(normal_target)
                 else:
-                    llvm_call_result = self.builder.call(func, [a.llvm_value for a in args])
+                    llvm_call_result = self.builder.call(func.llvm_value, [a.llvm_value for a in args])
             except:
                 print "failing while calling ", target.name
                 for a in args:
                     print "\t", a.llvm_value, a.native_type
                 raise
 
-            if target.output_type.matches.Void:
+            output_type = func.native_type.value_type.output
+
+            if output_type.matches.Void:
                 llvm_call_result = None
 
-            return TypedLLVMValue(llvm_call_result, target.output_type)
+            return TypedLLVMValue(llvm_call_result, output_type)
 
 
         if expr.matches.Sequence:
@@ -978,6 +1014,9 @@ class FunctionConverter:
             self.builder.position_at_start(target_resume_block)
 
             return TypedLLVMValue(None, native_ast.Type.Void())
+
+        if expr.matches.FunctionPointer:
+            return self.namedCallTargetToLLVM(expr.target)
 
         if expr.matches.Finally:
             self.teardown_handler = TeardownOnScopeExit(

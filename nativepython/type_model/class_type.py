@@ -152,9 +152,6 @@ class ClassType(Type):
     def is_class(self):
         return True
 
-    def lower(self):
-        native_ast.Type.Struct([(n,t.lower()) for t in self.element_types])
-
     @property
     def null_value(self):
         return native_ast.Constant.Struct(
@@ -171,7 +168,7 @@ class ClassType(Type):
             def make_body(instance_ref, other_instance):
                 init_func = self.cls.__copy_constructor__.im_func
 
-                call_target = context._converter.convert_initializer_function(
+                call_target = context.converter.convert_initializer_function(
                     init_func, 
                     [instance_ref.expr_type, other_instance.expr_type],
                     self.cls.__name__+".__copy_constructor__",
@@ -180,7 +177,7 @@ class ClassType(Type):
                     
                 return TypedExpression.Void(
                     context.generate_call_expr(
-                        target=call_target.native_call_target,
+                        target=call_target.named_call_target,
                         args=[instance_ref.expr, other_instance.expr]
                         )
                     )
@@ -264,7 +261,7 @@ class ClassType(Type):
             else:
                 init_func = self.cls.__init__.im_func
                 
-                call_target = context._converter.convert_initializer_function(
+                call_target = context.converter.convert_initializer_function(
                     init_func, 
                     [instance_ref.expr_type] + [a.expr_type for a in args],
                     self.cls.__name__+".__init__",
@@ -273,7 +270,7 @@ class ClassType(Type):
 
                 return TypedExpression.Void(
                     context.generate_call_expr(
-                        target=call_target.native_call_target,
+                        target=call_target.named_call_target,
                         args=[instance_ref.expr] + [a.expr for a in args]
                         )
                     )

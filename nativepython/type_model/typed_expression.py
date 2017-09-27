@@ -39,11 +39,8 @@ class TypedExpression(object):
         self.expr = expr
         self.expr_type = expr_type
 
-    @property
-    def address_of(self):
-        if self.expr_type.is_ref:
-            return TypedExpression(self.expr, self.expr_type.unwrap_reference().pointer)
-        raise ConversionException("Can't take address of something of type %s" % self.expr_type)
+    def convert_take_address(self, context):
+        return self.expr_type.convert_take_address(self, context)
 
     @staticmethod
     def Void(expr):

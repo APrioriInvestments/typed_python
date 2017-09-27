@@ -90,6 +90,45 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         self.assertEqual(self.runtime.wrap(f)(5, 10), sum(xrange(5, 10)))
         self.assertEqual(self.runtime.wrap(f)(5, 10, 2), sum(xrange(5, 10, 2)))
 
+    def test_function_pointer_to_external(self):
+        def f():
+            ptr = util.addr(util.malloc)(10)
+            util.free(ptr)
+
+        self.runtime.wrap(f)()
+
+    def test_function_pointer_to_internal(self):
+        def g(x):
+            return x + 2
+        def g2(x):
+            return x - 1
+
+        def f():
+            v1 = util.addr(util.typed_function(g, int))(10)
+            v2 = util.addr(util.typed_function(g, float))(10.5)
+            return (v1,v2)
+
+        def f2(ct):
+            p1 = util.addr(util.typed_function(g2, int))
+            p2 = util.addr(util.typed_function(g, int))
+
+            val = 1
+
+            for i in xrange(ct):
+                val = p1(val)
+                t = p1
+                p1 = p2
+                p2 = t
+
+            return val
+
+
+
+        res = self.runtime.wrap(f)()
+        self.assertEqual((res.f0, res.f1), (12, 12.5))
+        self.assertEqual(self.runtime.wrap(f2)(1000), 501)
+
+
     def test_exceptions_basic(self):
         @type_model.cls
         class OnExit:

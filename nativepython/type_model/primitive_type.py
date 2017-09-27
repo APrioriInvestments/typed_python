@@ -218,7 +218,7 @@ class PrimitiveNumericType(PrimitiveType):
 
                 return TypedExpression(
                     native_ast.Expression.Call(
-                        target=native_ast.CallTarget(
+                        target=native_ast.CallTarget.Named(native_ast.NamedCallTarget(
                             name = "llvm.pow.f%s" % bitcount,
                             arg_types = [l.expr_type.lower(), r.expr_type.lower()],
                             output_type = l.expr_type.lower(),
@@ -226,7 +226,7 @@ class PrimitiveNumericType(PrimitiveType):
                             varargs=False,
                             intrinsic=True,
                             can_throw=False
-                            ),
+                            )),
                         args=[l.expr, r.expr]
                         ),
                     l.expr_type
@@ -239,7 +239,7 @@ class PrimitiveNumericType(PrimitiveType):
 
                 return TypedExpression(
                     native_ast.Expression.Call(
-                        target=native_ast.CallTarget(
+                        target=native_ast.CallTarget.Named(native_ast.NamedCallTarget(
                             name = "llvm.powi.f%s" % bitcount,
                             arg_types = [l.expr_type.lower(), r.expr_type.lower()],
                             output_type = l.expr_type.lower(),
@@ -247,7 +247,7 @@ class PrimitiveNumericType(PrimitiveType):
                             varargs=False,
                             intrinsic=True,
                             can_throw=False
-                            ),
+                            )),
                         args=[l.expr, r.expr]
                         ),
                     l.expr_type

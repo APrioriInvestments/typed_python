@@ -63,7 +63,7 @@ class InitFields:
 
 class ConversionContext(object):
     def __init__(self, converter, varname_to_type, free_variable_lookup, init_fields):
-        self._converter = converter
+        self.converter = converter
         self._varname_to_type = varname_to_type
         self._varname_and_type_to_slot_name = {}
         self._varname_uses = {}
@@ -125,6 +125,58 @@ class ConversionContext(object):
             slot_type.reference
             )
 
+    def call_typed_function(self, native_call_target, output_type, input_types, varargs, args):
+        def make_arg_compatible(i, arg):
+            if i >= len(input_types):
+                if not varargs:
+                    raise ConversionException("Calling with too many arguments and func is not varargs")
+                #never pass references - always unpack
+                return args[i].unwrap_reference(completely=True)
+
+            to_type = input_types[i]
+
+            if arg.expr_type.nonref_type != to_type.nonref_type:
+                arg = arg.convert_to_type(to_type.nonref_type, implicitly=True)
+
+            if not to_type.is_ref and arg.expr_type.is_ref:
+                arg=arg.dereference()
+        
+            if arg.expr_type != to_type:
+                raise ConversionException(
+                    "Can't convert arg #%s from %s to %s" % (
+                        i+1, 
+                        args[i].expr_type, 
+                        to_type
+                        )
+                    )
+
+            return arg
+
+        new_args = []
+        for i in xrange(len(args)):
+            new_args.append(make_arg_compatible(i, args[i]))
+
+        if output_type.is_pod:
+            return TypedExpression(
+                native_ast.Expression.Call(
+                    target=native_call_target,
+                    args=[a.expr for a in new_args]
+                    ),
+                output_type
+                )
+        else:
+            slot_ref = self.allocate_temporary(output_type)
+
+            return TypedExpression(
+                native_ast.Expression.Call(
+                    target=native_ast.CallTarget.Pointer(instance.expr),
+                    args=[slot_ref.expr] + [a.expr for a in new_args]
+                    )
+                    + self.activates_temporary(slot_ref)
+                    + slot_ref.expr,
+                slot_ref.expr_type
+                )
+
     def call_py_function(self, f, args, name_override=None):
         #force arguments to a type appropriate for argpassing
         #e.g. drop out "CreateReference" and other syntactic sugar
@@ -132,20 +184,20 @@ class ConversionContext(object):
         native_args = [a.expr for a in args]
 
         call_target = \
-            self._converter.convert(
+            self.converter.convert(
                 f, 
                 [a.expr_type for a in args], 
                 name_override=name_override
                 )
 
         if not call_target.output_type.is_pod:
-            assert len(call_target.native_call_target.arg_types) == len(args) + 1
+            assert len(call_target.named_call_target.arg_types) == len(args) + 1
 
             slot = self.allocate_temporary(call_target.output_type)
 
             return TypedExpression(
                 self.generate_call_expr(
-                    target=call_target.native_call_target,
+                    target=call_target.named_call_target,
                     args=[slot.expr] + native_args
                     ) 
                     + self.activates_temporary(slot)
@@ -154,11 +206,11 @@ class ConversionContext(object):
                 slot.expr_type
                 )
         else:
-            assert len(call_target.native_call_target.arg_types) == len(args)
+            assert len(call_target.named_call_target.arg_types) == len(args)
 
             return TypedExpression(
                 self.generate_call_expr(
-                    target=call_target.native_call_target,
+                    target=call_target.named_call_target,
                     args=native_args
                     ),
                 call_target.output_type
@@ -187,7 +239,10 @@ class ConversionContext(object):
             else:
                 actual_args.append(a)
 
-        e = native_ast.Expression.Call(target=target, args=actual_args)
+        e = native_ast.Expression.Call(
+            target=native_ast.CallTarget.Named(target),
+            args=actual_args
+            )
 
         for k,v in reversed(lets):
             e = native_ast.Expression.Let(
@@ -902,7 +957,7 @@ class ConversionContext(object):
         if expr.expr_type != Void:
             expr = native_ast.Expression.Return(expr)
 
-        call_target = self._converter.define(
+        call_target = self.converter.define(
             (identity, tuple(typelist)),
             name,
             typelist,
@@ -917,7 +972,7 @@ class ConversionContext(object):
 
         return TypedExpression(
             self.generate_call_expr(
-                target=call_target.native_call_target,
+                target=call_target.named_call_target,
                 args=[a.expr for a in args]
                 ),
             expr.expr_type
@@ -1001,15 +1056,15 @@ class ConversionContext(object):
 
 
 class TypedCallTarget(object):
-    def __init__(self, native_call_target, input_types, output_type):
+    def __init__(self, named_call_target, input_types, output_type):
         object.__init__(self)
-        self.native_call_target = native_call_target
+        self.named_call_target = named_call_target
         self.input_types = input_types
         self.output_type = output_type
 
     @property
     def name(self):
-        return self.native_call_target.name
+        return self.named_call_target.name
 
     def __str__(self):
         return "TypedCallTarget(name=%s,inputs=%s,outputs=%s)" % (
@@ -1163,7 +1218,7 @@ class Converter(object):
         self._names_for_identifier[identifier] = new_name
 
         self._targets[new_name] = TypedCallTarget(
-            native_ast.CallTarget(
+            native_ast.NamedCallTarget(
                 name=new_name, 
                 arg_types=[x[1] for x in native_function_definition.args],
                 output_type=native_function_definition.output_type,
@@ -1257,7 +1312,7 @@ class Converter(object):
                     )
 
             self._targets[new_name] = TypedCallTarget(
-                native_ast.CallTarget(
+                native_ast.NamedCallTarget(
                     name=new_name, 
                     arg_types=[x[1] for x in definition.args],
                     output_type=definition.output_type,

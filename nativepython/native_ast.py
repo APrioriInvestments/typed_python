@@ -20,6 +20,7 @@ Type.Void = {}
 Type.Float = {'bits': int}
 Type.Int = {'bits': int, 'signed': bool}
 Type.Struct = {'element_types': List((str, Type))}
+Type.Function = {'output': Type, 'args': List(Type), 'varargs': bool, 'can_throw': bool}
 Type.Pointer = {'value_type': Type}
 
 def type_attr_ix(t,attr):
@@ -30,6 +31,12 @@ def type_attr_ix(t,attr):
 Type.attr_ix = type_attr_ix
 
 def type_str(c):
+    if c.matches.Function:
+        return "func((%s)->%s%s)" % (
+            ",".join([str(x) for x in (c.args + ["..."] if c.varargs else [])]), 
+            str(c.output),
+            ",nothrow" if not c.can_throw else ""
+            )
     if c.matches.Float:
         return "float" + str(c.bits)
     if c.matches.Int:
@@ -111,21 +118,23 @@ BinaryOp.__str__ = (lambda o:
     "^" if o.matches.BitXor else
     None)
 
-CallTarget = Alternative(
-        "CallTarget", 
-        Item = {'name': str, 
+#loads and stores - no assignments
+Expression = Alternative("Expression")
+Teardown = Alternative("Teardown")
+CallTarget = Alternative("CallTarget")
+
+NamedCallTarget = Alternative("NamedCallTarget", Item ={
+                'name': str, 
                 'arg_types': List(Type), 
                 'output_type': Type, 
                 'external': bool, 
                 'varargs': bool,
                 'intrinsic': bool,
                 'can_throw': bool
-                }
-            )
+                })
+CallTarget.Named = {'target': NamedCallTarget}
 
-#loads and stores - no assignments
-Expression = Alternative("Expression")
-Teardown = Alternative("Teardown")
+CallTarget.Pointer = {'expr': Expression}
 
 Teardown.ByTag = {'tag': str, 'expr': Expression}
 Teardown.Always = {'expr': Expression}
@@ -143,6 +152,7 @@ Expression.Attribute = {'left': Expression, 'attr': str}
 Expression.StructElementByIndex = {'left': Expression, 'index': int}
 Expression.ElementPtr = {'left': Expression, 'offsets': List(Expression)}
 Expression.Call = {'target': CallTarget, 'args': List(Expression)}
+Expression.FunctionPointer = {'target': NamedCallTarget}
 Expression.MakeStruct = {'args': List((str,Expression))}
 Expression.Branch = {'cond': Expression, 
                      'true': Expression, 
@@ -278,6 +288,15 @@ def expr_str(self):
               "try:\n" + indent(str(self.expr)) + "\n"
             + "catch %s:\n" % self.varname + indent(str(self.handler)).rstrip()
             )
+    if self.matches.FunctionPointer:
+        return "&func(name=%s,(%s)->%s%s%s)" % (
+            self.name,
+            ",".join([str(x) for x in (self.args + ["..."] if c.varargs else [])]), 
+            str(self.output),
+            ",nothrow" if not self.can_throw else "",
+            ",intrinsic" if self.intrinsic else ""
+            )
+        return "&func(%s)" % str(self.expr)
     if self.matches.Throw:
         return "throw (%s)" % str(self.expr)
     if self.matches.ActivatesTeardown:
@@ -311,6 +330,7 @@ Expression.ElementPtrIntegers = (lambda self, *offsets:
 
 
 nullExpr = Expression.Constant(Constant.Void())
+emptyStructExpr = Expression.Constant(Constant.Struct([]))
 trueExpr = Expression.Constant(Constant.Int(bits=1,val=1,signed=False))
 falseExpr = Expression.Constant(Constant.Int(bits=1,val=0,signed=False))
 
@@ -327,6 +347,7 @@ FunctionBody = Alternative("FunctionBody",
 Function = Alternative("Function")
 Function.Definition = {'args': List((str, Type)), 'body': FunctionBody, 'output_type': Type}
 
+Void = Type.Void()
 Bool = Type.Int(bits=1, signed=False)
 Int8Ptr = Type.Pointer(Type.Int(bits=8, signed=True))
 

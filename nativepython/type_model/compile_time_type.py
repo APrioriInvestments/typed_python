@@ -249,6 +249,18 @@ class ExternalFunction(CompileTimeType):
         self.varargs = varargs
         self.intrinsic = intrinsic
 
+    def convert_take_address_override(self, instance_ref, context):
+        if not self.intrinsic:
+            return TypedExpression(
+                native_ast.Expression.FunctionPointer(self.get_named_call_target()),
+                nativepython.type_model.FunctionPointer(
+                    output_type = self.output_type,
+                    input_types = self.input_types,
+                    varargs = self.varargs,
+                    can_throw = False
+                    )
+                )
+
     def convert_call(self, context, instance, args):
         if self.varargs:
             assert len(args) >= len(self.input_types)
@@ -264,22 +276,25 @@ class ExternalFunction(CompileTimeType):
             args = list(args)
             for i in xrange(len(self.input_types)):
                 if args[i].expr_type != self.input_types[i]:
-                    args[i] = args[i].convert_to_type(self.input_types[i], False)
+                    args[i] = args[i].convert_to_type(self.input_types[i], implicitly=False)
         
         return TypedExpression(
             native_ast.Expression.Call(
-                target=native_ast.CallTarget(
-                    name = self.name,
-                    arg_types = [i.lower() for i in self.input_types],
-                    output_type = self.output_type.lower(),
-                    external=True,
-                    varargs=self.varargs,
-                    intrinsic=self.intrinsic,
-                    can_throw=False
-                    ),
+                target=native_ast.CallTarget.Named(self.get_named_call_target()),
                 args=[a.expr for a in args]
                 ),
             self.output_type
+            )
+
+    def get_named_call_target(self):
+        return native_ast.NamedCallTarget(
+            name = self.name,
+            arg_types = [i.lower() for i in self.input_types],
+            output_type = self.output_type.lower(),
+            external=True,
+            varargs=self.varargs,
+            intrinsic=self.intrinsic,
+            can_throw=False
             )
 
     def __repr__(self):

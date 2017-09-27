@@ -58,6 +58,14 @@ class Reference(Type):
     def pointer(self):
         return nativepython.type_model.Pointer(self)
 
+    def convert_take_address(self, instance_ref, context):
+        res = self.value_type.convert_take_address_override(instance_ref, context)
+
+        if res is not None:
+            return res
+
+        return TypedExpression(instance_ref.expr, self.unwrap_reference().pointer)
+
     def convert_attribute(self, context, instance, attr, allow_double_refs=False):
         raise ConversionException("References cannot be used directly")
 

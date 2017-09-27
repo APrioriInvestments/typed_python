@@ -40,6 +40,10 @@ class Type(object):
         return False
 
     @property
+    def is_function_pointer(self):
+        return False
+
+    @property
     def is_create_ref(self):
         return False
 
@@ -68,6 +72,10 @@ class Type(object):
         return False
 
     @property
+    def is_function(self):
+        return False
+
+    @property
     def is_pod(self):
         raise ConversionException("can't directly references instances of %s" % self)
 
@@ -89,6 +97,17 @@ class Type(object):
 
     def lower(self):
         raise ConversionException("Can't directly reference instances of %s" % self)
+
+    def convert_take_address(self, instance_ref, context):
+        res = self.convert_take_address_override(instance_ref, context)
+
+        if res is not None:
+            return res
+        
+        raise ConversionException("Can't take address of something of type %s" % self)
+    
+    def convert_take_address_override(self, instance_ref, context):
+        return None
 
     def convert_initialize_copy(self, context, instance_ref, other_instance):
         if not self.is_pod:

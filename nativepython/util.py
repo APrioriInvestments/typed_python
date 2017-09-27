@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import types
+
 import nativepython.native_ast as native_ast
 import nativepython.type_model as type_model
 
@@ -43,7 +45,7 @@ def addr(context, args):
     if len(args) != 1:
         raise ConversionException("addr takes 1 argument")
 
-    return args[0].address_of
+    return args[0].convert_take_address(context)
 
 @exprfun
 def ref(context, args):
@@ -240,3 +242,50 @@ def throw_pointer(context, args):
 
 def throw(value):
     throw_pointer(value)
+
+@exprfun
+def typed_function(context, args):
+    actual_types = []
+
+    if len(args) < 1:
+        raise ConversionException("Expected an argument")
+
+    for a in args:
+        t = a.expr_type
+        if not t.nonref_type.is_compile_time:
+            raise ConversionException("'typed_function' only takes types as arguments")
+        actual_types.append(t.nonref_type.python_object_representation)
+
+    if not isinstance(actual_types[0], types.FunctionType):
+        raise ConversionException("First argument should be a function")
+
+    def map_internal(t):
+        if t is int:
+            return type_model.Int64
+        if t is float:
+            return type_model.Float64
+        if t is bool:
+            return type_model.Bool
+        if t is None:
+            return type_model.Void
+
+        return t
+
+    actual_types = [map_internal(a) for a in actual_types]
+
+    target = context.converter.convert(actual_types[0], actual_types[1:])
+
+    func_type = type_model.FunctionType(
+            actual_types[0],
+            target.output_type,
+            actual_types[1:],
+            target.named_call_target
+            )
+
+    return TypedExpression(
+        native_ast.Expression.Constant(func_type.null_value),
+        func_type
+        )
+
+
+        
