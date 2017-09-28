@@ -64,15 +64,11 @@ def createException(e):
 
     return exception_ptr
 
-def exception_matches(T, exception_pointer_int8):
-    exception_ptr = InFlightException.pointer(exception_pointer_int8)
-
+def exception_matches(T, exception_ptr):
     return exception_ptr[0].typeid == util.typeid(T)
 
-def bind_exception_into(exception_pointer_int8, target):
+def bind_exception_into(exception_ptr, target):
     T = util.typeof(target).nonref_type
-
-    exception_ptr = InFlightException.pointer(exception_pointer_int8)
 
     source_ptr = T.pointer(exception_ptr[0].data_ptr)
 
@@ -80,9 +76,7 @@ def bind_exception_into(exception_pointer_int8, target):
 
     exception_ptr[0].teardown()
 
-def exception_teardown(exception_pointer_int8):
-    exception_ptr = InFlightException.pointer(exception_pointer_int8)
-
+def exception_teardown(exception_ptr):
     exception_ptr[0].teardown()
 
 @util.exprfun

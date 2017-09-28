@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import nativepython
 import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
 import nativepython.util as util
@@ -62,8 +63,128 @@ class InitFields:
     def any_remaining(self):
         return bool(self.uninitialized_fields)
 
+class ExceptionHandlingHelper:
+    def __init__(self, conversion_context):
+        self.context = conversion_context
+
+        import nativepython.lib.exception
+        self.InFlightException = nativepython.lib.exception.InFlightException
+
+    def exception_pointer(self):
+        return TypedExpression(
+            native_ast.Expression.Cast(
+                left=native_ast.Expression.Variable(".unnamed.exception.var"),
+                to_type=self.InFlightException.pointer.lower()
+                ),
+            self.InFlightException.pointer
+            )
+
+    def convert_tryexcept(self, ast):
+        if len(ast.orelse):
+            raise ConversionException("We dont handle try-except-else")
+
+        body = self.context.convert_statement_list_ast(ast.body)
+        handlers = []
+
+        #if 'orelse' is not None, then 
+        any_handlers_exit = False
+
+        handlers_and_conds = []
+
+        for h in ast.handlers:
+            if not h.type.matches.Value:
+                raise ConversionException("Can't handle typeless exception handlers yet")
+
+            typexpr = self.context.consume_temporaries(self.context.convert_expression_ast(h.type.val))
+
+            if not (typexpr.expr_type.is_compile_time
+                    and isinstance(typexpr.expr_type.python_object_representation, Type)
+                    ):
+                raise ConversionException("expected a type, not %s" % typexpr.expr_type)
+
+            handler_type = typexpr.expr_type.python_object_representation
+
+            name = None
+            if h.name.matches.Null:
+                raise ConversionException("can't handle nameless exception handlers yet")
+
+            name = h.name.val.id
+
+            handler_cond, handler_expr = \
+                self.generate_exception_handler_expr(handler_type, name, h.body)
+
+            handlers_and_conds.append((handler_cond, handler_expr))
+
+        expr = self.context.consume_temporaries(self.generate_exception_teardown_handler())
+
+        for cond, handler in reversed(handlers_and_conds):
+            expr = TypedExpression(
+                native_ast.Expression.Branch(
+                    cond=cond.expr,
+                    true=handler.expr,
+                    false=expr.expr
+                    ),
+                Void if (handler.expr_type is not None or expr.expr_type is not None) else 
+                    None
+                )
+
+        return TypedExpression(
+            native_ast.Expression.TryCatch(
+                expr=body.expr,
+                varname=".unnamed.exception.var",
+                handler=expr.expr
+                ),
+            Void if any_handlers_exit or body.expr_type is not None else None
+            )
+
+    def generate_exception_teardown_handler(self):
+        import nativepython.lib.exception
+
+        return TypedExpression(
+            native_ast.Expression.Throw(
+                native_ast.Expression.Variable(".unnamed.exception.var")
+                ),
+            None
+            )
+
+    def generate_exception_handler_expr(self, val_type, binding_name, body):
+        """Generate an expression that tests the current exception against 
+            'val_type', and if so, binds it into 'binding_name' and evaluates 'body'
+        """
+        if self.context._varname_to_type.get(binding_name, None) is not None:
+            raise ConversionException("Variable %s is already defined" % binding_name)
+        
+        self.context._varname_to_type[binding_name] = val_type
+
+        cond_expr = self.context.consume_temporaries(
+            self.context.call_py_function(
+                nativepython.lib.exception.exception_matches,
+                [pythonObjectRepresentation(val_type), 
+                 self.exception_pointer()
+                 ]
+                )
+            )
+
+        bind_expr = self.context.consume_temporaries(
+            self.context.call_py_function(
+                nativepython.lib.exception.bind_exception_into,
+                [self.exception_pointer(),
+                 self.context.named_var_expr(binding_name)
+                 ]
+                )
+            )
+
+        handler_expr = (
+            self.context.convert_statement_list_ast(body) 
+                + self.context.named_var_expr(binding_name).convert_destroy(self)
+            )
+
+        return (cond_expr, self.context.consume_temporaries(bind_expr + handler_expr))
+
+
 class ConversionContext(object):
     def __init__(self, converter, varname_to_type, free_variable_lookup, init_fields):
+        self.exception_helper = ExceptionHandlingHelper(self)
         self.converter = converter
         self._varname_to_type = varname_to_type
         self._varname_and_type_to_slot_name = {}
@@ -265,50 +386,6 @@ class ConversionContext(object):
             raise
 
 
-    def generate_exception_teardown_handler(self):
-        import nativepython.lib.exception
-
-        return TypedExpression(
-            native_ast.Expression.Throw(
-                native_ast.Expression.Variable(".unnamed.exception.var")
-                ),
-            None
-            )
-
-    def generate_exception_handler_expr(self, val_type, binding_name, body):
-        """Generate an expression that tests the current exception against 
-            'val_type', and if so, binds it into 'binding_name' and evaluates 'body'
-        """
-        if self._varname_to_type.get(binding_name, None) is not None:
-            raise ConversionException("Variable %s is already defined" % binding_name)
-        
-        import nativepython.lib.exception
-        self._varname_to_type[binding_name] = val_type
-
-        cond_expr = self.consume_temporaries(
-            self.call_py_function(
-                nativepython.lib.exception.exception_matches,
-                [pythonObjectRepresentation(val_type), 
-                 TypedExpression(native_ast.Expression.Variable(".unnamed.exception.var"), Int8.pointer)
-                 ]
-                )
-            )
-
-        bind_expr = self.consume_temporaries(
-            self.call_py_function(
-                nativepython.lib.exception.bind_exception_into,
-                [TypedExpression(native_ast.Expression.Variable(".unnamed.exception.var"), Int8.pointer),
-                 self.named_var_expr(binding_name)
-                 ]
-                )
-            )
-
-        handler_expr = (
-            self.convert_statement_list_ast(body) 
-                + self.named_var_expr(binding_name).convert_destroy(self)
-            )
-
-        return (cond_expr, self.consume_temporaries(bind_expr + handler_expr))
 
 
     def convert_expression_ast_(self, ast):
@@ -776,62 +853,7 @@ class ConversionContext(object):
                 )
 
         if ast.matches.TryExcept:
-            if len(ast.orelse):
-                raise ConversionException("We dont handle try-except-else")
-
-            body = self.convert_statement_list_ast(ast.body)
-            handlers = []
-
-            #if 'orelse' is not None, then 
-            any_handlers_exit = False
-
-            handlers_and_conds = []
-
-            for h in ast.handlers:
-                if not h.type.matches.Value:
-                    raise ConversionException("Can't handle typeless exception handlers yet")
-
-                typexpr = self.consume_temporaries(self.convert_expression_ast(h.type.val))
-
-                if not (typexpr.expr_type.is_compile_time
-                        and isinstance(typexpr.expr_type.python_object_representation, Type)
-                        ):
-                    raise ConversionException("expected a type, not %s" % typexpr.expr_type)
-
-                handler_type = typexpr.expr_type.python_object_representation
-
-                name = None
-                if h.name.matches.Null:
-                    raise ConversionException("can't handle nameless exception handlers yet")
-
-                name = h.name.val.id
-
-                handler_cond, handler_expr = \
-                    self.generate_exception_handler_expr(handler_type, name, h.body)
-
-                handlers_and_conds.append((handler_cond, handler_expr))
-
-            expr = self.consume_temporaries(self.generate_exception_teardown_handler())
-
-            for cond, handler in reversed(handlers_and_conds):
-                expr = TypedExpression(
-                    native_ast.Expression.Branch(
-                        cond=cond.expr,
-                        true=handler.expr,
-                        false=expr.expr
-                        ),
-                    Void if (handler.expr_type is not None or expr.expr_type is not None) else 
-                        None
-                    )
-
-            return TypedExpression(
-                native_ast.Expression.TryCatch(
-                    expr=body.expr,
-                    varname=".unnamed.exception.var",
-                    handler=expr.expr
-                    ),
-                Void if any_handlers_exit or body.expr_type is not None else None
-                )
+            return self.exception_helper.convert_tryexcept(ast)
 
         if ast.matches.For:
             if self._init_fields is not None:
