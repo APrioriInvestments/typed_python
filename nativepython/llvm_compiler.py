@@ -16,11 +16,15 @@ import llvmlite.binding as llvm
 import llvmlite.ir
 import native_ast_to_llvm as native_ast_to_llvm
 import ctypes
+import sys
 
 #we have to be able to get libstdc++ runtime functions.
 #this shouldn't be a problem because llvm-3.8 depends on it,
 #so if we can load llvm, we can load this.
-ctypes.CDLL("libstdc++.so.6",mode=ctypes.RTLD_GLOBAL)
+if sys.platform == "darwin":
+    ctypes.CDLL("libstdc++.dylib",mode=ctypes.RTLD_GLOBAL)
+else:
+    ctypes.CDLL("libstdc++.so.6",mode=ctypes.RTLD_GLOBAL)
 
 llvm.initialize()
 llvm.initialize_native_target()
