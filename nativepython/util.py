@@ -230,20 +230,6 @@ class xrange_iterator:
         return val
 
 @exprfun
-def throw_pointer(context, args):
-    if len(args) != 1:
-        raise ConversionException("throw takes one argument")
-    arg = args[0].dereference()
-
-    if not arg.expr_type.is_pointer:
-        raise ConversionException("throw can only take a pointer")
-
-    return TypedExpression(native_ast.Expression.Throw(arg.expr), None)
-
-def throw(value):
-    throw_pointer(value)
-
-@exprfun
 def typed_function(context, args):
     actual_types = []
 
@@ -287,5 +273,43 @@ def typed_function(context, args):
         func_type
         )
 
+@exprfun
+def typeid(context, args):
+    """Returns a unique Int64 identifying the type (stripped of refs) in question"""
+    if len(args) != 1:
+        raise ConversionError("typeid takes 1 argument")
+    if not args[0].expr_type.nonref_type.is_compile_time:
+        raise ConversionError("first arg to typeid must be a type, not %s" % args[0].expr_type)
+    t = args[0].expr_type.nonref_type.python_object_representation
+    if not isinstance(t, type_model.Type):
+        raise ConversionError("first arg to typeid must be a type, not %s" % args[0].expr_type)
 
+    res = context.converter.get_typeid(t)
+
+    return TypedExpression(
+        native_ast.const_int_expr(res),
+        Int64
+        )
+
+def destroyfun(ref):
+    in_place_destroy(addr(ref))
+
+@exprfun
+def destructor(context, args):
+    T = args[0].expr_type.nonref_type.python_object_representation
+    assert isinstance(T, type_model.Type)
+
+    target = context.converter.convert(destroyfun, [T])
+
+    func_type = type_model.FunctionType(
+            destroyfun,
+            type_model.Void,
+            [T],
+            target.named_call_target
+            )
+
+    return TypedExpression(
+        native_ast.Expression.Constant(func_type.null_value),
+        func_type
+        )
         

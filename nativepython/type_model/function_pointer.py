@@ -23,9 +23,9 @@ import nativepython.python.string_util as string_util
 import nativepython.native_ast as native_ast
 
 class FunctionPointer(Type):
-    def __init__(self, output_type, input_types, varargs, can_throw):
+    def __init__(self, output_type, input_types, varargs=False, can_throw=True):
         self.output_type = output_type
-        self.input_types = input_types
+        self.input_types = tuple(input_types)
         self.varargs = varargs
         self.can_throw = can_throw
 

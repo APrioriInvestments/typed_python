@@ -145,6 +145,9 @@ class TypedExpression(object):
     def convert_initialize(self, context, args):
         return self.actor_type.convert_initialize(context, self, args)
 
+    def convert_destroy(self, context):
+        return self.actor_type.convert_destroy(context, self)
+
     def convert_assign(self, context, other):
         return self.actor_type.convert_assign(context, self, other)
 

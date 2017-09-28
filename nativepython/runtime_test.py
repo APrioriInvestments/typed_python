@@ -142,14 +142,14 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             try:
                 try:
                     ptr = type_model.Int8.pointer(0xdeadbeef)
-                    util.printf("pointer is 0x%x\n", ptr)
+                    util.printf("before raise pointer is 0x%x\n", ptr)
                     raise ptr
-                except Exception as x:
-                    util.printf("pointer is 0x%x\n", x)
+                except type_model.Int8.pointer as x:
+                    util.printf("first catch: pointer is 0x%x\n", x)
                     raise x
-            except Exception as x2:
-                util.printf("pointer 2 is 0x%x\n", x2)
-                raise x2
+            except type_model.Int8 as x2:
+                #this shouldn't happen
+                return
 
         def f():
             res = 0
@@ -158,7 +158,7 @@ class PythonNativeRuntimeTests(unittest.TestCase):
                 x = OnExit()
                 x2 = OnExit()
                 thrower()
-            except Exception as x3:
+            except type_model.Int8.pointer as x3:
                 if int(x3) == 0xdeadbeef:
                     res = 1
 

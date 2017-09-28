@@ -204,6 +204,9 @@ class ExpressionFunction(CompileTimeType):
     def python_object_representation(self):
         return self
 
+    def __call__(self, *args):
+        return self.f(*args)
+
 class TypeFunction(CompileTimeType):
     def __init__(self, f):
         self.f = f

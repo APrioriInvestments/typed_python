@@ -33,7 +33,7 @@ Type.attr_ix = type_attr_ix
 def type_str(c):
     if c.matches.Function:
         return "func((%s)->%s%s)" % (
-            ",".join([str(x) for x in (c.args + ["..."] if c.varargs else [])]), 
+            ",".join([str(x) for x in (c.args + tuple(["..."] if c.varargs else []))]), 
             str(c.output),
             ",nothrow" if not c.can_throw else ""
             )
@@ -236,9 +236,14 @@ def expr_str(self):
     if self.matches.StructElementByIndex:
         return "(" + str(self.left) + ")[%s]" % self.index
     if self.matches.Call:
-        return "call(" + str(self.target.name) + "->"\
-            + str(self.target.output_type) + ")"\
-            + "(" + ",".join(str(r) for r in self.args) + ")"
+        if self.target.matches.Named:
+            return "call(" + str(self.target.target.name) + "->"\
+                + str(self.target.target.output_type) + ")"\
+                + "(" + ",".join(str(r) for r in self.args) + ")"
+        else:
+            return "call(" + str(self.target.expr) + ")"\
+                + "(" + ",".join(str(r) for r in self.args) + ")"
+
 
     if self.matches.Branch:
         t = str(self.true)
@@ -290,11 +295,11 @@ def expr_str(self):
             )
     if self.matches.FunctionPointer:
         return "&func(name=%s,(%s)->%s%s%s)" % (
-            self.name,
-            ",".join([str(x) for x in (self.args + ["..."] if c.varargs else [])]), 
-            str(self.output),
-            ",nothrow" if not self.can_throw else "",
-            ",intrinsic" if self.intrinsic else ""
+            self.target.name,
+            ",".join([str(x) for x in (self.target.arg_types + tuple(["..."] if self.target.varargs else []))]), 
+            str(self.target.output_type),
+            ",nothrow" if not self.target.can_throw else "",
+            ",intrinsic" if self.target.intrinsic else ""
             )
         return "&func(%s)" % str(self.expr)
     if self.matches.Throw:
