@@ -31,7 +31,7 @@ import nose.plugins.xunit
 import argparse
 import nativepython
 import nativepython.runtime as runtime
-import nativepython.test_config as test_config
+import nativepython_tests.test_config as test_config
 import traceback
 
 class DirectoryScope(object):
@@ -72,7 +72,7 @@ def fileNameToModuleName(fileName, rootDir, rootModule):
     tr = (
         fileName
             .replace('.py', '')
-            .replace(rootDir, rootModule)
+            .replace(rootDir, '')
             .replace(os.sep, '.')
             )
     if tr.startswith('.'):
@@ -256,13 +256,16 @@ def findTestFiles(rootDir, testRegex):
     return testFiles
 
 def runPythonUnitTests(args, filter_actions):
-    """run python unittests in all *_test.py files in the project.
+    """run python unittests in all files in the 'tests' directory in the project.
 
     Args contains arguments from a UnitTestArgumentParser.
 
     Returns True if any failed.
     """
-    root_dir = os.path.split(nativepython.__file__)[0]
+    root_dir = os.path.join(
+        os.path.split(os.path.split(nativepython.__file__)[0])[0],
+        "nativepython_tests"
+        )
 
     return runPythonUnitTests_(
         args, filter_actions, testGroupName = "python",
@@ -456,7 +459,7 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
     if not args.list:
         print "Executing %s unit tests." % testGroupName
 
-    root_dir = os.path.split(nativepython.__file__)[0]
+    root_dir = os.path.split(os.path.split(nativepython.__file__)[0])[0]
 
     testCasesToRun = []
 
@@ -465,7 +468,7 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
     config = nose.config.Config(plugins=plugins)
     config.configure(testArgs)
     
-    testCases = loadTestCases(config, testFiles, root_dir, 'nativepython')
+    testCases = loadTestCases(config, testFiles, root_dir, 'nativepython_tests')
     if filterActions:
         testCases = applyFilterActions(filterActions, testCases)
 

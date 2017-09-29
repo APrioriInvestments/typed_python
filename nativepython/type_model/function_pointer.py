@@ -15,6 +15,7 @@
 import types
 
 from nativepython.type_model.type_base import Type
+from nativepython.type_model.pointer import Pointer
 from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.exceptions import ConversionException
 
@@ -73,10 +74,28 @@ class FunctionPointer(Type):
 
     def __str__(self):
         return "FuncPtr((%s)->%s%s)" % (
-            ",".join([str(x) for x in (c.input__types + ["..."] if self.varargs else [])]), 
+            ",".join([str(x) for x in (self.input_types + tuple(["..."] if self.varargs else []))]), 
             str(self.output_type),
             ",nothrow" if not self.can_throw else ""
             )
+        
+    def convert_to_type(self, instance, to_type, implicitly):
+        instance = instance.dereference()
+
+        if (to_type.is_pointer or to_type.is_function_pointer) and not implicitly:
+            return TypedExpression(
+                native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
+                to_type
+                )
+
+        if to_type.is_primitive and to_type.t.matches.Int and not implicitly:
+            return TypedExpression(
+                native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
+                to_type
+                )
+
+        raise ConversionException("can't convert %s to type %s" % (self, to_type))
+
 
     def convert_call(self, context, instance, args):
         instance = instance.dereference()

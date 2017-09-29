@@ -46,7 +46,9 @@ class Pointer(Type):
         return ref.convert_attribute(context, attr, allow_double_refs)
 
     def convert_set_attribute(self, context, instance, attr, val):
-        raise ConversionException("no attribute %s in Pointer" % attr)
+        instance = instance.dereference()
+        ref = instance.reference_from_pointer()
+        return ref.convert_set_attribute(context, attr, val)
 
     def convert_bin_op(self, op, lref, rref):
         l = lref.dereference()
@@ -56,7 +58,7 @@ class Pointer(Type):
             if op.matches.Add or op.matches.Sub:
                 if r.expr_type.is_primitive_numeric and r.expr_type.t.matches.Int:
                     if op.matches.Sub:
-                        r = r.convert_unary_op(python_ast.PythonASTUnaryOp.USub())
+                        r = r.convert_unary_op(python_ast.UnaryOp.USub())
 
                     return TypedExpression(
                         native_ast.Expression.ElementPtr(
@@ -93,7 +95,7 @@ class Pointer(Type):
     def convert_to_type(self, instance, to_type, implicitly):
         instance = instance.dereference()
 
-        if to_type.is_pointer and not implicitly:
+        if (to_type.is_pointer or to_type.is_function_pointer) and not implicitly:
             return TypedExpression(
                 native_ast.Expression.Cast(left=instance.expr, to_type=to_type.lower()), 
                 to_type

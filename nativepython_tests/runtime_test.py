@@ -128,44 +128,6 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         self.assertEqual((res.f0, res.f1), (12, 12.5))
         self.assertEqual(self.runtime.wrap(f2)(1000), 501)
 
-
-    def test_exceptions_basic(self):
-        @type_model.cls
-        class OnExit:
-            def __types__(cls):
-                pass
-
-            def __destructor__(self):
-                util.printf("in destroy\n")
-
-        def thrower():
-            try:
-                try:
-                    ptr = type_model.Int8.pointer(0xdeadbeef)
-                    util.printf("before raise pointer is 0x%x\n", ptr)
-                    raise ptr
-                except type_model.Int8.pointer as x:
-                    util.printf("first catch: pointer is 0x%x\n", x)
-                    raise x
-            except type_model.Int8 as x2:
-                #this shouldn't happen
-                return
-
-        def f():
-            res = 0
-            
-            try:
-                x = OnExit()
-                x2 = OnExit()
-                thrower()
-            except type_model.Int8.pointer as x3:
-                if int(x3) == 0xdeadbeef:
-                    res = 1
-
-            return res
-                        
-        self.assertEqual(self.runtime.wrap(f)(), 1)
-
     def test_boolean_operations(self):
         def test_expr(f):
             args = [False for _ in xrange(f.func_code.co_argcount)]

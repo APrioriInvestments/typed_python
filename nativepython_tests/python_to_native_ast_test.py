@@ -19,7 +19,7 @@ import nativepython.native_ast as native_ast
 import nativepython.util as util
 import nativepython.python.inspect_override as inspect_override
 import nativepython.llvm_compiler as llvm_compiler
-import nativepython.test_config as test_config
+import nativepython_tests.test_config as test_config
 import unittest
 import ast
 import time

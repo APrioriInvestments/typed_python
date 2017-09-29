@@ -277,12 +277,12 @@ def typed_function(context, args):
 def typeid(context, args):
     """Returns a unique Int64 identifying the type (stripped of refs) in question"""
     if len(args) != 1:
-        raise ConversionError("typeid takes 1 argument")
+        raise ConversionException("typeid takes 1 argument")
     if not args[0].expr_type.nonref_type.is_compile_time:
-        raise ConversionError("first arg to typeid must be a type, not %s" % args[0].expr_type)
+        raise ConversionException("first arg to typeid must be a type, not %s" % args[0].expr_type)
     t = args[0].expr_type.nonref_type.python_object_representation
     if not isinstance(t, type_model.Type):
-        raise ConversionError("first arg to typeid must be a type, not %s" % args[0].expr_type)
+        raise ConversionException("first arg to typeid must be a type, not %s" % args[0].expr_type)
 
     res = context.converter.get_typeid(t)
 

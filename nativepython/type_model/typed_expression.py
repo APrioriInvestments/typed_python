@@ -43,7 +43,9 @@ class TypedExpression(object):
         return self.expr_type.convert_take_address(self, context)
 
     @staticmethod
-    def Void(expr):
+    def Void(expr=None):
+        if expr is None:
+            expr = native_ast.nullExpr
         assert not isinstance(expr, TypedExpression)
         return TypedExpression(
             expr,
