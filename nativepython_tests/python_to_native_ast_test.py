@@ -457,6 +457,7 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertEqual(self.convert_expression(lambda: True and False).expr, native_ast.falseExpr)
         self.assertEqual(self.convert_expression(lambda: True or False).expr, native_ast.trueExpr)
         self.assertEqual(self.convert_expression(lambda: False or True).expr, native_ast.trueExpr)
+        self.assertEqual(self.convert_expression(lambda: not (False or True)).expr, native_ast.falseExpr)
 
     def test_typefuncs_3(self):
         def f():

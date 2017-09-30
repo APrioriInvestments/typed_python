@@ -86,9 +86,6 @@ class ExceptionHandlingHelper:
         body = self.context.convert_statement_list_ast(ast.body)
         handlers = []
 
-        #if 'orelse' is not None, then 
-        any_handlers_exit = False
-
         handlers_and_conds = []
 
         for h in ast.handlers:
@@ -136,7 +133,7 @@ class ExceptionHandlingHelper:
                 varname=".unnamed.exception.var",
                 handler=expr.expr
                 ),
-            Void if any_handlers_exit or body.expr_type is not None else None
+            Void if body.expr_type is not None else None
             )
 
     def generate_exception_rethrow(self):
@@ -788,8 +785,8 @@ class ConversionContext(object):
             if self._varname_to_type[FunctionOutput] is not None:
                 if self._varname_to_type[FunctionOutput] != e.expr_type.variable_storage_type:
                     raise ConversionException(
-                        "Function returning multiple types (%s and %s)" % (
-                                e.expr_type, 
+                        "Function returning multiple types:\n\t%s\n\t%s" % (
+                                e.expr_type.variable_storage_type, 
                                 self._varname_to_type[FunctionOutput]
                                 )
                         )
@@ -991,6 +988,9 @@ class ConversionContext(object):
         orig_vars_in_scope = set(self._varname_to_type)
 
         if not statements:
+            if toplevel:
+                return TypedExpression(native_ast.Expression.Return(None), None)
+
             return TypedExpression(native_ast.nullExpr, Void)
 
         exprs = []
@@ -1008,6 +1008,9 @@ class ConversionContext(object):
 
         if toplevel and flows_off_end:
             if self._varname_to_type[FunctionOutput] in (Void, None):
+                if self._varname_to_type[FunctionOutput] is None:
+                    self._varname_to_type[FunctionOutput] = Void
+
                 exprs = exprs + [TypedExpression(native_ast.Expression.Return(None), None)]
                 flows_off_end = False
             else:

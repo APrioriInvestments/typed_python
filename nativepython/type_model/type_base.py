@@ -114,7 +114,7 @@ class Type(object):
             raise ConversionException("can't initialize %s - need a real implementation" % self)
 
         if self.sizeof == 0:
-            return TypedExpression.Void(native_ast.nullExpr)
+            return other_instance + TypedExpression.Void(native_ast.nullExpr)
 
         other_instance = other_instance.dereference()
 

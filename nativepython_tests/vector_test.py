@@ -60,11 +60,11 @@ class VectorTests(unittest.TestCase):
 
         instance.resize(10)
 
-        self.assertTrue(len(instance), 10)
+        self.assertEqual(len(instance), 10)
 
         instance[0].resize(10)
 
-        self.assertTrue(len(instance[0]), 10)
+        self.assertEqual(len(instance[0]), 10)
 
         instance[0][1] = 20
 

@@ -17,6 +17,9 @@ import nativepython.type_model as type_model
 import nativepython.native_ast as native_ast
 import nativepython.util as util
 import nativepython.llvm_compiler as llvm_compiler
+import nativepython
+
+Int8 = type_model.Int8
 
 @util.typefun
 def is_simple_type(t):
@@ -54,6 +57,58 @@ def dereferenceRefHeldAsPointer(x):
         return util.ref(x.p[0])
     return util.ref(x)
 
+@util.typefun
+def ResultOrException(T):
+    @type_model.cls
+    class ResultOrException:
+        def __types__(cls):
+            cls.p = T.pointer
+            cls.e = nativepython.lib.exception.InFlightException.pointer
+
+        def __init__(self, p, e):
+            self.p = T.pointer(p)
+            self.e = nativepython.lib.exception.InFlightException.pointer(e)
+
+    return ResultOrException
+
+def roe_teardown(roe, T):
+    roe_p = ResultOrException(T).pointer(roe)
+
+    if roe_p.p:
+        util.in_place_destroy(roe_p.p)
+        util.free(roe_p.p)
+    else:
+        nativepython.lib.exception.exception_teardown(roe_p.e)
+    util.free(roe)
+
+def roe_extract_ptr(roe):
+    roe_p = ResultOrException(Int8).pointer(roe)
+
+    p = roe_p.p
+    util.free(roe_p)
+    return p
+
+def roe_get_exception(roe):
+    roe_p = ResultOrException(Int8).pointer(roe)
+
+    e = roe_p.e
+    util.free(roe_p)
+    return e
+
+def roe_is_exception(roe):
+    roe_p = ResultOrException(Int8).pointer(roe)
+    return int(roe_p.e) != 0
+
+def roe_get_as(roe, T):
+    roe_p = ResultOrException(T).pointer(roe)
+    return roe_p.p[0]
+
+def to_ptr(i):
+    T = util.typeof(i).nonref_type
+    res = T.pointer(util.malloc(T.sizeof))
+    util.in_place_new(res, i)
+    return res
+
 def wrapping_function_call(f):
     def new_f(*in_args):
         args = util.map_struct(in_args, dereferenceRefHeldAsPointer)
@@ -61,10 +116,7 @@ def wrapping_function_call(f):
         output_type = util.typeof(f(*args)).nonref_type
         output_type_raw = util.typeof(f(*args))
 
-        if is_simple_type(output_type):
-            return f(*args)
-
-        if output_type_raw.is_ref:
+        if output_type_raw.is_ref and not is_simple_type(output_type):
             if output_type_raw.is_ref_to_temp:
                 #this function creates a new object and returns it to us
                 raw_ptr = output_type.pointer(util.malloc(output_type.sizeof))
@@ -74,7 +126,7 @@ def wrapping_function_call(f):
                 return raw_ptr
             else:
                 #this function is returning an internal reference
-                ref_as_ptr = ReferenceHeldAsPointer(output_type)(util.addr(f(*args)))
+                ref_as_ptr =  ReferenceHeldAsPointer(output_type)(util.addr(f(*args)))
 
                 reftype = util.typeof(ref_as_ptr).nonref_type
 
@@ -84,22 +136,73 @@ def wrapping_function_call(f):
 
                 return raw_ptr
         else:
+            sz = output_type.sizeof
+            if sz == 0:
+                sz = 1
+
             #this function creates a new object and returns it to us by value
-            raw_ptr = output_type.pointer(util.malloc(output_type.sizeof))
+            raw_ptr = output_type.pointer(util.malloc(sz))
 
             util.in_place_new(raw_ptr, f(*args))
 
             return raw_ptr
 
-    new_f.func_name = "<wrapped f=%s>" % str(f)
-    return new_f
+    def exception_catcher(*args):
+        out_t = util.typeof(new_f(*args)).nonref_type.value_type
+
+        roe = ResultOrException(out_t)(0,0)
+
+        try:
+            roe.p = new_f(*args)
+        except nativepython.lib.exception.InFlightException.pointer as e_ptr:
+            roe.e = e_ptr
+
+        return to_ptr(roe)
+
+    exception_catcher.func_name = "<wrappedouter f=%s>" % str(f)
+    new_f.func_name = "<wrappedinner f=%s>" % str(f)
+    return exception_catcher
 
 
-class WrappedFunction(object):
+class SimpleFunction(object):
     def __init__(self, runtime, f, wants_wrapping=True):
         self.runtime = runtime
         self.f = f
-        self.wrapping_func = wrapping_function_call(self.f) if wants_wrapping else f
+
+    def __call__(self, *args):
+        def type_for_arg(a):
+            if isinstance(a, float):
+                return type_model.Float64
+            if isinstance(a, bool):
+                return type_model.Bool
+            if isinstance(a, int):
+                return type_model.Int64
+            if isinstance(a, RuntimeObject):
+                if a._object_ptr is None:
+                    return a._object_type
+                else:
+                    return a._object_type.reference
+
+            return type_model.FreePythonObjectReference(a)
+
+        def arg_for_arg(a):
+            if isinstance(a, (float,int, bool)):
+                return a
+            if isinstance(a, RuntimeObject):
+                return a._object_ptr
+            return None
+
+        f_target = self.runtime.convert(self.f, [type_for_arg(a) for a in args])
+
+        f_callable = self.runtime.native_ptr_for_typed_target(f_target)
+
+        return f_callable(*[arg_for_arg(a) for a in args])
+
+class WrappedFunction(object):
+    def __init__(self, runtime, f):
+        self.runtime = runtime
+        self.f = f
+        self.wrapping_func = wrapping_function_call(self.f)
 
     def __call__(self, *args):
         def type_for_arg(a):
@@ -130,18 +233,31 @@ class WrappedFunction(object):
 
         output_type = f_target.output_type
 
-        if is_simple_type(output_type):
-            simple_result = f_callable(*[arg_for_arg(a) for a in args])
-            if isinstance(output_type, python_to_native_ast.CompileTimeType):
-                return output_type.python_object_representation
+        output_type_normal = output_type.value_type.element_types[0][1].value_type
+
+        roe = f_callable(*[arg_for_arg(a) for a in args])
+
+        if self.runtime._roe_is_exception(roe):
+            raise RuntimeException(self.runtime._roe_get_exception(roe))
+
+        if is_simple_type(output_type_normal):
+            simple_result = self.runtime._roe_get_as(roe, output_type_normal)
+            self.runtime._roe_teardown(roe, output_type_normal)
+
+            if isinstance(output_type_normal, python_to_native_ast.CompileTimeType):
+                return output_type_normal.python_object_representation
+            
             return simple_result
 
-        res = f_callable(*[arg_for_arg(a) for a in args])
+        res = self.runtime._roe_extract_ptr(roe)
 
-        if res is None:
-            return res
+        return RuntimeObject(self.runtime, res, output_type_normal)
 
-        return RuntimeObject(self.runtime, res, output_type.value_type)
+class RuntimeException(Exception):
+    def __init__(self, in_flight_exception):
+        Exception.__init__(self)
+
+        self.in_flight_exception = in_flight_exception
 
 class RuntimeObject(object):
     def __init__(self, runtime, object_ptr, object_type):
@@ -207,7 +323,13 @@ class Runtime:
         self._getitem_func = WrappedFunction(self, getitem_func)
         self._setitem_func = WrappedFunction(self, setitem_func)
         self._len_fun = WrappedFunction(self, len_func)
-        self._free_func = WrappedFunction(self, free_func, wants_wrapping=False)
+
+        self._free_func = SimpleFunction(self, free_func)
+        self._roe_is_exception = SimpleFunction(self, roe_is_exception)
+        self._roe_get_as = SimpleFunction(self, roe_get_as)
+        self._roe_teardown = SimpleFunction(self, roe_teardown)
+        self._roe_extract_ptr = SimpleFunction(self, roe_extract_ptr)
+        self._roe_get_exception = SimpleFunction(self, roe_get_exception)
 
         self._pointer_attribute_funcs = {}
 

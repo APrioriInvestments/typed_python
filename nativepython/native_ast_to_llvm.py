@@ -972,7 +972,6 @@ class FunctionConverter:
             return
 
         if expr.matches.TryCatch:
-            #self.convert each handler
             self.teardown_handler = TeardownOnScopeExit(
                 self,
                 self.teardown_handler
@@ -1013,7 +1012,7 @@ class FunctionConverter:
 
             self.builder.position_at_start(target_resume_block)
 
-            return TypedLLVMValue(None, native_ast.Type.Void())
+            return result
 
         if expr.matches.FunctionPointer:
             return self.namedCallTargetToLLVM(expr.target)
@@ -1139,7 +1138,11 @@ class Converter(object):
 
                 if res is not None:
                     assert res.llvm_value is None
+                    assert definition.output_type == native_ast.Void 
                     builder.ret_void()
+                else:
+                    if not builder.block.is_terminated:
+                        builder.unreachable()
 
             except Exception as e:
                 print "function failing = " + name

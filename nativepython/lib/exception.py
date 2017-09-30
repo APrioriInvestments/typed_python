@@ -65,10 +65,20 @@ def createException(e):
     return exception_ptr
 
 def exception_matches(T, exception_ptr):
+    if T == InFlightException.pointer:
+        return True
+
     return exception_ptr[0].typeid == util.typeid(T)
 
 def bind_exception_into(exception_ptr, target):
     T = util.typeof(target).nonref_type
+
+    #this is a special bailout if we want to catch the exception
+    #object itself, rather than object held by the exception.
+    if T == InFlightException.pointer:
+        target = exception_ptr
+        return
+
 
     source_ptr = T.pointer(exception_ptr[0].data_ptr)
 

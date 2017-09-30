@@ -41,7 +41,7 @@ class PythonNativeRuntimeTests(unittest.TestCase):
     def runtime(self):
         return runtime.Runtime.singleton()
     
-    def test_conversion(self):
+    def test_runtime_basic(self):
         def f(a):
             return g(a)+g(1)
 

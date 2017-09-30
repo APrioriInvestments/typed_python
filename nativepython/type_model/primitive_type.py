@@ -126,6 +126,11 @@ class PrimitiveNumericType(PrimitiveType):
                 )
 
         if op.matches.Not:
+            if self.is_bool and instance_ref.expr.matches.Constant:
+                return TypedExpression(
+                    native_ast.trueExpr if not instance_ref.expr.val.val else native_ast.falseExpr,
+                    Bool
+                    )
             return TypedExpression(
                 native_ast.Expression.Unaryop(
                     op=native_ast.UnaryOp.LogicalNot(),

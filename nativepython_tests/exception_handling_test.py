@@ -39,6 +39,13 @@ class ExceptionHandlingTests(unittest.TestCase):
     def runtime(self):
         return runtime.Runtime.singleton()
 
+    def test_raises(self):
+        def f():
+            raise 10
+                        
+        with self.assertRaises(runtime.RuntimeException):
+            self.runtime.wrap(f)()
+
     def test_exceptions_basic(self):
         def thrower():
             try:

@@ -55,7 +55,19 @@ class CompileTimeType(Type):
                     nativepython.type_model.Bool
                     )
 
-        return super(Pointer, self).convert_bin_op(op,lref,rref)
+            if (op.matches.Eq or op.matches.NotEq) and isinstance(r.expr_type, CompileTimeType):
+                res = l.expr_type.python_object_representation == \
+                            r.expr_type.python_object_representation
+
+                if op.matches.NotEq:
+                    res = not res
+
+                return TypedExpression(
+                    native_ast.trueExpr if res else native_ast.falseExpr,
+                    nativepython.type_model.Bool
+                    )
+
+        return super(Type, self).convert_bin_op(op,lref,rref)
     
     @property
     def python_object_representation(self):
@@ -210,6 +222,7 @@ class ExpressionFunction(CompileTimeType):
 class TypeFunction(CompileTimeType):
     def __init__(self, f):
         self.f = f
+        self.memo = {}
 
     def convert_call(self, context, instance, args):
         def unwrap(x):
@@ -227,14 +240,24 @@ class TypeFunction(CompileTimeType):
         def wrap(x):
             return pythonObjectRepresentation(x)
 
-        unwrapped = [unwrap(x) for x in args]
+        unwrapped = tuple(unwrap(x) for x in args)
 
-        res = self.f(*unwrapped)
+        if unwrapped in self.memo:
+            res = self.memo[unwrapped]
+        else:
+            res = self.memo[unwrapped] = self.f(*unwrapped)
         
         return wrap(res)
 
     def __call__(self, *args):
-        return self.f(*args)
+        args = tuple(args)
+
+        if args in self.memo:
+            return self.memo[args]
+        else:
+            self.memo[args] = self.f(*args)
+
+        return self.memo[args]
 
     def __repr__(self):
         return self.f.func_name
