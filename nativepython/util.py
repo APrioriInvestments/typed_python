@@ -151,7 +151,7 @@ def map_struct(context, args):
 
     new_struct_type = Struct(
         [(struct_type.element_types[i][0], exprs[i].expr_type)
-            for i in xrange(len(exprs))]
+            for i in range(len(exprs))]
         )
 
     tmp_ref = context.allocate_temporary(new_struct_type)
@@ -177,7 +177,7 @@ def len_override(x):
     else:
         return x.__len__()
 
-@type_model.representation_for(xrange)
+@type_model.representation_for(range)
 @type_model.cls
 class xrange_override:
     def __types__(cls):

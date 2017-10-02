@@ -81,7 +81,9 @@ class ExceptionHandlingHelper:
 
     def convert_tryexcept(self, ast):
         if len(ast.orelse):
-            raise ConversionException("We dont handle try-except-else")
+            raise ConversionException("We dont handle try-except-else yet")
+        if len(ast.finalbody):
+            raise ConversionException("We dont handle try-except-finally yet")
 
         body = self.context.convert_statement_list_ast(ast.body)
         handlers = []
@@ -108,7 +110,8 @@ class ExceptionHandlingHelper:
 
                 name = None
                 if not h.name.matches.Null:
-                    name = h.name.val.id
+                    name = h.name.val
+                    assert isinstance(name, str)
 
                 handlers_and_conds.append(
                     self.generate_exception_handler_expr(handler_type, name, h.body)
@@ -302,7 +305,7 @@ class ConversionContext(object):
             return arg
 
         new_args = []
-        for i in xrange(len(args)):
+        for i in range(len(args)):
             new_args.append(make_arg_compatible(i, args[i]))
 
         if output_type.is_pod:
@@ -437,6 +440,20 @@ class ConversionContext(object):
                     )
 
         if ast.matches.Num:
+            if ast.n.matches.None_:
+                return TypedExpression(
+                    native_ast.Expression.Constant(
+                        native_ast.Constant.Void()
+                        ), 
+                    Void
+                    )
+            if ast.n.matches.Boolean:
+                return TypedExpression(
+                    native_ast.Expression.Constant(
+                        native_ast.Constant.Int(val=ast.n.value,bits=1,signed=False)
+                        ), 
+                    Bool
+                    )
             if ast.n.matches.Int:
                 return TypedExpression(
                     native_ast.Expression.Constant(
@@ -461,7 +478,7 @@ class ConversionContext(object):
 
             expr_so_far = []
 
-            for i in xrange(len(values)):
+            for i in range(len(values)):
                 expr_so_far.append(self.ensure_bool(self.convert_expression_ast(values[i])).expr)
                 if expr_so_far[-1].matches.Constant:
                     if (expr_so_far[-1].val.val and op.matches.Or or 
@@ -518,12 +535,20 @@ class ConversionContext(object):
 
         if ast.matches.Call:
             l = self.convert_expression_ast(ast.func)
-            args = [self.convert_expression_ast(a) for a in ast.args]
+
+            ast_args = ast.args
+            stararg = None
+
+            if ast_args and ast_args[-1].matches.Starred:
+                stararg = ast_args[-1].value
+                ast_args = ast_args[:-1]
+
+            args = [self.convert_expression_ast(a) for a in ast_args]
 
             init = native_ast.nullExpr
 
-            if not ast.starargs.matches.Null:
-                starargs = self.convert_expression_ast(ast.starargs.val)
+            if stararg is not None:
+                starargs = self.convert_expression_ast(stararg)
 
                 #starargs is now a reference to a tuple
                 #now we want to take each element and turn into a reference.
@@ -879,7 +904,7 @@ class ConversionContext(object):
                 ret_type
                 )
 
-        if ast.matches.TryExcept:
+        if ast.matches.Try:
             return self.exception_helper.convert_tryexcept(ast)
 
         if ast.matches.For:
@@ -964,14 +989,14 @@ class ConversionContext(object):
             return res
 
         if ast.matches.Raise:
-            if ast.type.matches.Null and ast.inst.matches.Null and ast.tback.matches.Null:
+            if ast.exc.matches.Null:
                 #this is a naked raise
                 raise ConversionException(
-                    "Can't have a raise statement with no exception"
+                    "We don't handle re-raise yet"
                     )
                 
-            if ast.type.matches.Value and ast.inst.matches.Null and ast.tback.matches.Null:
-                expr = self.convert_expression_ast(ast.type.val)
+            if ast.exc.matches.Value and ast.cause.matches.Null:
+                expr = self.convert_expression_ast(ast.exc.val)
 
                 import nativepython.lib.exception
 
@@ -1059,7 +1084,7 @@ class ConversionContext(object):
         typelist = []
         exprlist = []
 
-        for i in xrange(len(args)):
+        for i in range(len(args)):
             varlist.append(native_ast.Expression.Variable(".var.%s" % i))
 
             if args[i].expr_type.is_pod:
@@ -1082,7 +1107,7 @@ class ConversionContext(object):
             expr.expr_type,
             native_ast.Function(
                 args=[(varlist[i].name, typelist[i].lower_as_function_arg()) 
-                            for i in xrange(len(varlist))],
+                            for i in range(len(varlist))],
                 body=native_ast.FunctionBody.Internal(expr.expr),
                 output_type=expr.expr_type.lower()
                 )
@@ -1169,7 +1194,7 @@ class ConversionContext(object):
                         native_ast.Expression.Variable(".star_args.%s" % i),
                         args_type.element_types[i][1]
                         ) 
-                    for i in xrange(len(args_type.element_types))]
+                    for i in range(len(args_type.element_types))]
             ).with_comment("initialize *args slot") + res
 
 
@@ -1218,7 +1243,7 @@ class Converter(object):
             res[u] = self._definitions[u]
 
             if self.verbose:
-                print self._targets[u]
+                print(self._targets[u])
         
         self._unconverted = set()
 
@@ -1241,7 +1266,7 @@ class Converter(object):
                 members_of_arg0_to_initialize
                 ):
         if ast_arg.vararg.matches.Value:
-            star_args_name = ast_arg.vararg.val
+            star_args_name = ast_arg.vararg.val.arg
         else:
             star_args_name = None
 
@@ -1260,9 +1285,9 @@ class Converter(object):
         varname_to_type = {}
 
         args = []
-        for i in xrange(len(ast_arg.args)):
-            varname_to_type[ast_arg.args[i].id] = input_types[i]
-            args.append((ast_arg.args[i].id, input_types[i].lower_as_function_arg()))
+        for i in range(len(ast_arg.args)):
+            varname_to_type[ast_arg.args[i].arg] = input_types[i]
+            args.append((ast_arg.args[i].arg, input_types[i].lower_as_function_arg()))
 
         argnames = [a[0] for a in args]
 
@@ -1270,7 +1295,7 @@ class Converter(object):
             star_args_count = len(input_types) - len(ast_arg.args)
 
             starargs_elts = []
-            for i in xrange(len(ast_arg.args), len(input_types)):
+            for i in range(len(ast_arg.args), len(input_types)):
                 args.append(
                     ('.star_args.%s' % (i - len(ast_arg.args)), 
                         input_types[i].lower_as_function_arg())
@@ -1278,7 +1303,7 @@ class Converter(object):
 
             starargs_type = Struct(
                 [('f_%s' % i, input_types[i+len(ast_arg.args)])
-                    for i in xrange(star_args_count)]
+                    for i in range(star_args_count)]
                 )
 
             varname_to_type[star_args_name] = starargs_type
@@ -1382,11 +1407,11 @@ class Converter(object):
 
         pyast = python_ast.convertPyAstToAlgebraic(pyast, fname)
 
-        freevars = dict(f.func_globals)
+        freevars = dict(f.__globals__)
 
-        if f.func_closure:
-            for i in xrange(len(f.func_closure)):
-                freevars[f.func_code.co_freevars[i]] = f.func_closure[i].cell_contents
+        if f.__closure__:
+            for i in range(len(f.__closure__)):
+                freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
 
         return pyast, freevars
     
@@ -1415,7 +1440,7 @@ class Converter(object):
                         pyast.args, 
                         pyast.body, 
                         input_types, 
-                        f.func_code.co_varnames, 
+                        f.__code__.co_varnames, 
                         freevars,
                         fields_and_types_for_initializing
                         )
@@ -1423,11 +1448,11 @@ class Converter(object):
                 assert pyast.matches.Lambda
                 if fields_and_types_for_initializing:
                     raise ConversionException("initializers can't be lambdas")
-                definition,output_type = self.convert_lambda_ast(pyast, input_types, f.func_code.co_varnames, freevars)
+                definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars)
 
             assert definition is not None
 
-            new_name = self.new_name(name_override or f.func_name)
+            new_name = self.new_name(name_override or f.__name__)
 
             self._names_for_identifier[identifier] = new_name
 

@@ -61,6 +61,9 @@ special_member_names_accessible_directly = [
     '__len__'
     ]
 
+def class_has_function(cls, name):
+    return hasattr(cls, name) and isinstance(getattr(cls, name), types.FunctionType)
+
 def is_special_name(name):
     return name.startswith("__") and name.endswith("__") and len(name) > 4
 
@@ -71,7 +74,7 @@ class ClassType(Type):
 
         for method_name in dir(cls):
             method = getattr(cls, method_name)
-            if isinstance(method, types.UnboundMethodType):
+            if isinstance(method, types.FunctionType):
                 if is_special_name(method.__name__) and \
                         method.__name__ not in valid_special_member_names:
                     raise ConversionException("Invalid member name %s. Did you mean %s?" % 
@@ -97,7 +100,7 @@ class ClassType(Type):
                 DirectSetter(self)._element_type_buildup = []
                 DirectSetter(self)._element_type_names = set()
 
-                typefun = getattr(self.cls,"__types__").im_func
+                typefun = getattr(self.cls,"__types__")
                 typefun(self)
                 DirectSetter(self)._element_types = tuple(self._element_type_buildup)            
             except Exception:
@@ -135,10 +138,10 @@ class ClassType(Type):
 
     @property
     def is_pod(self):
-        if (hasattr(self.cls, "__assign__") 
-                or hasattr(self.cls, "__destructor__")
-                or hasattr(self.cls, "__init__") 
-                or hasattr(self.cls, "__copy_constructor__")
+        if (class_has_function(self.cls, "__assign__") 
+                or class_has_function(self.cls, "__destructor__")
+                or class_has_function(self.cls, "__init__") 
+                or class_has_function(self.cls, "__copy_constructor__")
                 ):
             return False
 
@@ -164,9 +167,9 @@ class ClassType(Type):
         if not self.is_pod:
             self.assert_is_instance_ref(other_instance)
 
-        if hasattr(self.cls, "__copy_constructor__"):
+        if class_has_function(self.cls, "__copy_constructor__"):
             def make_body(instance_ref, other_instance):
-                init_func = self.cls.__copy_constructor__.im_func
+                init_func = self.cls.__copy_constructor__
 
                 call_target = context.converter.convert_initializer_function(
                     init_func, 
@@ -212,8 +215,8 @@ class ClassType(Type):
         def make_body(instance_ref):
             expr = native_ast.nullExpr
 
-            if hasattr(self.cls, "__destructor__"):
-                destructor_func = self.cls.__destructor__.im_func
+            if class_has_function(self.cls, "__destructor__"):
+                destructor_func = self.cls.__destructor__
                 expr = context.call_py_function(
                     destructor_func, 
                     [instance_ref],
@@ -241,7 +244,7 @@ class ClassType(Type):
         def make_body(instance_ref, *args):
             body = native_ast.nullExpr
 
-            if not hasattr(self.cls, "__init__"):
+            if not class_has_function(self.cls, "__init__"):
                 if len(args) != len(self.element_types) and len(args) != 0:
                     raise ConversionException("Can't initialize %s with arguments of type %s" % (
                             self, [str(a.expr_type) for a in args]
@@ -259,7 +262,7 @@ class ClassType(Type):
 
                 return TypedExpression.Void(body)
             else:
-                init_func = self.cls.__init__.im_func
+                init_func = self.cls.__init__
                 
                 call_target = context.converter.convert_initializer_function(
                     init_func, 
@@ -289,8 +292,8 @@ class ClassType(Type):
         def make_body(instance_ref, arg):
             expr = native_ast.nullExpr
 
-            if hasattr(self.cls, "__assign__"):
-                assign_func = self.cls.__assign__.im_func
+            if class_has_function(self.cls, "__assign__"):
+                assign_func = self.cls.__assign__
                 return context.call_py_function(
                     assign_func, 
                     [instance_ref, arg],
@@ -323,7 +326,7 @@ class ClassType(Type):
         if self.is_pod and instance_or_ref.expr_type == self:
             instance = instance_or_ref
 
-            for i in xrange(len(self.element_types)):
+            for i in range(len(self.element_types)):
                 if self.element_types[i][0] == attr:
                     return TypedExpression(
                         native_ast.Expression.Attribute(
@@ -354,7 +357,7 @@ class ClassType(Type):
 
             func = None
             try:
-                func = getattr(self.cls, attr).im_func
+                func = getattr(self.cls, attr)
             except AttributeError:
                 pass
 
@@ -364,7 +367,7 @@ class ClassType(Type):
         return super(ClassType,self).convert_attribute(context, instance_ref, attr, allow_double_refs)
 
     def reference_to_field(self, native_instance_ptr, attribute_name):
-        for i in xrange(len(self.element_types)):
+        for i in range(len(self.element_types)):
             if self.element_types[i][0] == attribute_name:
                 return TypedExpression(
                     native_instance_ptr.ElementPtrIntegers(0, i),
@@ -389,8 +392,8 @@ class ClassType(Type):
         return field_ref.convert_assign(context, val)
 
     def convert_getitem(self, context, instance, item):
-        if hasattr(self.cls, "__getitem__"):
-            getitem = self.cls.__getitem__.im_func
+        if class_has_function(self.cls, "__getitem__"):
+            getitem = self.cls.__getitem__
             return context.call_py_function(
                 getitem, 
                 [instance, item],
@@ -400,8 +403,8 @@ class ClassType(Type):
         return DirectSetter(self).convert_getitem(context, instance, item)
 
     def convert_setitem(self, context, instance, item, value):
-        if hasattr(self.cls, "__setitem__"):
-            getitem = self.cls.__setitem__.im_func
+        if class_has_function(self.cls, "__setitem__"):
+            getitem = self.cls.__setitem__
             return context.call_py_function(
                 getitem, 
                 [instance, item, value],
@@ -413,22 +416,8 @@ class ClassType(Type):
     def __str__(self):
         return "Class(%s,%s)" % (self.cls, ",".join(["%s=%s" % t for t in self.element_types]))
 
-    def __cmp__(self, other):
-        if not isinstance(other, type(self)):
-            return cmp(type(self), type(other))
-        for k in ['cls','element_types']:
-            c = cmp(getattr(self,k), getattr(other,k))
-            if c:
-                return c
-        return 0
-
-    def __hash__(self):
-        kvs = [(k,getattr(self,k)) for k in ['cls','element_types']]
-        try:
-            return hash(tuple(sorted(kvs)))
-        except:
-            print "failed on ", self, " with ", kvs
-            raise
+    def fieldsToCheck(self):
+        return ('cls', 'element_types')
 
 class PythonClassMemberFunc(Type):
     def __init__(self, python_class_type, attr):
@@ -445,7 +434,7 @@ class PythonClassMemberFunc(Type):
     def convert_call(self, context, instance, args):
         instance = instance.dereference()
 
-        func = getattr(self.python_class_type.cls, self.attr).im_func
+        func = getattr(self.python_class_type.cls, self.attr)
         
         obj_ref = TypedExpression(instance.expr, self.python_class_type.reference)
 

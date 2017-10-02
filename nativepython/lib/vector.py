@@ -48,7 +48,7 @@ def Vector(T):
                 self._reserved = other._reserved
                 self._size = other._size
 
-                for i in xrange(self._size):
+                for i in range(self._size):
                     util.in_place_new(self._ptr + i, other._ptr[i])
             else:
                 self._ptr = T.pointer(0)
@@ -57,7 +57,7 @@ def Vector(T):
             
         def _teardown(self):
             if self._ptr:
-                for i in xrange(self._size):
+                for i in range(self._size):
                     util.in_place_destroy(self._ptr + i)
 
                 util.free(self._ptr)
@@ -88,7 +88,7 @@ def Vector(T):
 
             new_ptr = T.pointer(util.malloc(T.sizeof * count))
                 
-            for i in xrange(self._size):
+            for i in range(self._size):
                 util.in_place_new(new_ptr + i, self._ptr[i])
                 util.in_place_destroy(self._ptr + i)
 

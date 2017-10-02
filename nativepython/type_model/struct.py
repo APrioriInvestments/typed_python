@@ -40,8 +40,8 @@ class Struct(ClassType):
     def with_field(self, name, type):
         if isinstance(name, TypedExpression):
             assert name.expr.matches.Constant and name.expr.val.matches.ByteArray, name.expr
-            name = name.expr.val.val
-
+            name = str(name.expr.val.val, 'utf8')
+            
         return Struct(element_types=self.element_types + ((name,type),))
 
     def convert_getitem(self, context, instance, index):

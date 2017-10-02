@@ -36,7 +36,7 @@ def CachedByArgs(f):
     """Function decorator that adds a simple memo to 'f' on its arguments"""
     cache = {}
     def inner(*args, **kwargs):
-        keys = sorted(kwargs.iterkeys())
+        keys = sorted(kwargs)
         all_args = args + tuple((k, kwargs[k]) for k in keys)
         if (all_args) not in cache:
             cache[all_args] = f(*args, **kwargs)
@@ -81,7 +81,7 @@ def getSourceLines(pyObject):
     try:
         tr = inspect.getsourcelines(pyObject)
     except (TypeError, IOError) as e:
-        raise CantGetSourceTextError(e.message), None, sys.exc_info()[2]
+        raise CantGetSourceTextError(str(e))
     return tr
 
 @CachedByArgs

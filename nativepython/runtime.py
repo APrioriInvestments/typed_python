@@ -159,8 +159,8 @@ def wrapping_function_call(f):
 
         return to_ptr(roe)
 
-    exception_catcher.func_name = "<wrappedouter f=%s>" % str(f)
-    new_f.func_name = "<wrappedinner f=%s>" % str(f)
+    exception_catcher.__name__ = "<wrappedouter f=%s>" % str(f)
+    new_f.__name__ = "<wrappedinner f=%s>" % str(f)
     return exception_catcher
 
 
@@ -353,7 +353,7 @@ class Runtime:
 
         functions = self.converter.extract_new_function_definitions()
 
-        for k,v in self.compiler.add_functions(functions).iteritems():
+        for k,v in self.compiler.add_functions(functions).items():
             self.functions_by_name[k] = v
 
         return f_target

@@ -24,6 +24,7 @@ from nativepython.algebraic import Alternative, AlternativeInstance, List, Nulla
 Module = Alternative("Module")
 Statement = Alternative("Statement")
 Expr = Alternative("Expr")
+Arg = Alternative("Arg")
 NumericConstant = Alternative("NumericConstant")
 ExprContext = Alternative("ExprContext")
 Slice = Alternative("Slice")
@@ -46,7 +47,8 @@ Statement.FunctionDef = {
    "name": str,
    "args": Arguments,
    "body": List(Statement),
-   "decorator_list": List(Expr)
+   "decorator_list": List(Expr),
+   "returns": Nullable(Expr)
 	}
 
 Statement.ClassDef = {
@@ -97,17 +99,13 @@ Statement.With = {
    }
 
 Statement.Raise = {
-   "type": Nullable(Expr),
-   "inst": Nullable(Expr),
-   "tback": Nullable(Expr)
+   "exc": Nullable(Expr),
+   "cause": Nullable(Expr)
    }
-Statement.TryExcept = {
+Statement.Try = {
    "body": List(Statement),
    "handlers": List(ExceptionHandler),
-   "orelse": List(Statement)
-   }
-Statement.TryFinally = {
-   "body": List(Statement),
+   "orelse": List(Statement),
    "finalbody": List(Statement)
    }
 Statement.Assert = {
@@ -121,11 +119,6 @@ Statement.ImportFrom = {
    "module": List(str),
    "names": List(Alias),
    "level": Nullable(int)
-   }
-Statement.Exec = {
-   "body": Expr,
-   "globals": Nullable(Expr),
-   "locals": Nullable(Expr)
    }
 Statement.Global = {
    "names": List(str)
@@ -195,11 +188,6 @@ Expr.Call = {
    "func": Expr,
    "args": List(Expr),
    "keywords": List(Keyword),
-   "starargs": Nullable(Expr),
-   "kwargs": Nullable(Expr)
-   }
-Expr.Repr = {
-   "value": Expr
    }
 Expr.Num = {"n": NumericConstant}
 Expr.Str = {"s": str}
@@ -225,6 +213,10 @@ Expr.Tuple = {
    "elts": List(Expr),
    "ctx": ExprContext
    }
+Expr.Starred = {
+   "value": Expr,
+   "ctx": ExprContext
+   }
 
 Expr.add_common_field("line_number", int)
 Expr.add_common_field("col_offset", int)
@@ -236,7 +228,7 @@ Statement.add_common_field("filename", str)
 NumericConstant.Int = {"value": int}
 NumericConstant.Long = {"value": str}
 NumericConstant.Boolean = {"value": bool}
-NumericConstant.__setattr__("None", {})
+NumericConstant.None_ = {}
 NumericConstant.Float = {"value": float}
 NumericConstant.Unknown = {}
 
@@ -299,7 +291,7 @@ Comprehension.Item = {
 
 ExceptionHandler.Item = {
     "type": Nullable(Expr),
-    "name": Nullable(Expr),
+    "name": Nullable(str),
     "body": List(Statement)
     }
 ExceptionHandler.add_common_field("line_number", int)
@@ -308,11 +300,21 @@ ExceptionHandler.add_common_field("filename", str)
 
 
 Arguments.Item = {
-    "args": List(Expr),
-    "vararg": Nullable(str),
-    "kwarg": Nullable(str),
-    "defaults": List(Expr)
+    "args": List(Arg),
+    "vararg": Nullable(Arg),
+    "kwonlyargs": List(Arg),
+    "kw_defaults": List(Expr),
+    "kwarg": Nullable(Arg),
+    "defaults": List(Expr),
     }
+
+Arg.Item ={
+  'arg': str,
+  'annotation': Nullable(Expr),
+  }
+Arg.add_common_field("line_number", int)
+Arg.add_common_field("col_offset", int)
+Arg.add_common_field("filename", str)
 
 Keyword.Item = {
     "arg": str,
@@ -327,8 +329,7 @@ Alias = {
 numericConverters = {
     int: NumericConstant.Int,
     bool: NumericConstant.Boolean,
-    long: lambda x: NumericConstant.Long(str(x)),
-    type(None): lambda x: NumericConstant.None(),
+    type(None): lambda x: NumericConstant.None_(),
     float: NumericConstant.Float
     }
 
@@ -344,7 +345,6 @@ def createPythonAstConstant(n, **kwds):
         )
 
 def createPythonAstString(s, **kwds):
-    #WARNING: this code deliberately discards unicode information
     try:
         return Expr.Str(s=str(s), **kwds)
     except:
@@ -352,6 +352,9 @@ def createPythonAstString(s, **kwds):
             n=NumericConstant.Unknown(), 
             **kwds
             )
+
+def makeNameConstant(value, **kwds):
+  return Expr.Num(n=numericConverters[type(value)](value), **kwds)
 
 converters = {
     ast.Module: Module.Module,
@@ -364,18 +367,15 @@ converters = {
     ast.Delete: Statement.Delete,
     ast.Assign: Statement.Assign,
     ast.AugAssign: Statement.AugAssign,
-    ast.Print: Statement.Print,
     ast.For: Statement.For,
     ast.While: Statement.While,
     ast.If: Statement.If,
     ast.With: Statement.With,
     ast.Raise: Statement.Raise,
-    ast.TryExcept: Statement.TryExcept,
-    ast.TryFinally: Statement.TryFinally,
+    ast.Try: Statement.Try,
     ast.Assert: Statement.Assert,
     ast.Import: Statement.Import,
     ast.ImportFrom: Statement.ImportFrom,
-    ast.Exec: Statement.Exec,
     ast.Global: Statement.Global,
     ast.Expr: Statement.Expr,
     ast.Pass: Statement.Pass,
@@ -395,14 +395,15 @@ converters = {
     ast.Yield: Expr.Yield,
     ast.Compare: Expr.Compare,
     ast.Call: Expr.Call,
-    ast.Repr: Expr.Repr,
     ast.Num: createPythonAstConstant,
     ast.Str: createPythonAstString,
     ast.Attribute: Expr.Attribute,
     ast.Subscript: Expr.Subscript,
     ast.Name: Expr.Name,
+    ast.NameConstant: makeNameConstant,
     ast.List: Expr.List,
     ast.Tuple: Expr.Tuple,
+    ast.Starred: Expr.Starred,
     ast.Load: ExprContext.Load,
     ast.Store: ExprContext.Store,
     ast.Del: ExprContext.Del,
@@ -445,6 +446,7 @@ converters = {
     ast.excepthandler: lambda x:x,
     ast.ExceptHandler: ExceptionHandler.Item,
     ast.arguments: Arguments,
+    ast.arg: Arg,
     ast.keyword: Keyword,
     ast.alias: Alias
     }
@@ -469,10 +471,9 @@ def convertPyAstToAlgebraic(tree,fname):
         except Exception as e:
             import traceback
             raise UserWarning(
-                "Failed to construct %s with arguments\n%s\nwithin %s:\n\n%s"
-                % (type(tree), 
-                   "\n".join(["\t%s:%s" % (k,repr(v)[:50]) for k,v in args.iteritems()]), 
-                   converter, 
+                "Failed to construct %s from %s with arguments\n%s\n\n%s"
+                % (converter, type(tree), 
+                   "\n".join(["\t%s:%s" % (k,repr(v)[:50]) for k,v in args.items()]), 
                    traceback.format_exc()
                    )
                 )

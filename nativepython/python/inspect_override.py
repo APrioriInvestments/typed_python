@@ -17,7 +17,6 @@ import inspect
 import linecache
 import os
 import re
-import string
 import sys
 
 from inspect import *
@@ -75,7 +74,7 @@ def _try_getfile_class(pyObject):
         func = elt0
     else:
         # must be a method
-        func = elt0.im_func
+        func = elt0
 
     return inspect.getfile(func)
         
@@ -88,10 +87,10 @@ def getsourcefile(pyObject):
     if filename == "<stdin>":
         return filename
 
-    if string.lower(filename[-4:]) in ('.pyc', '.pyo'):
+    if filename[-4:].lower() in ('.pyc', '.pyo'):
         filename = filename[:-4] + '.py'
     for suffix, mode, _ in imp.get_suffixes():
-        if 'b' in mode and string.lower(filename[-len(suffix):]) == suffix:
+        if 'b' in mode and filename[-len(suffix):].lower() == suffix:
             # Looks like a binary file.  We want to only return a text file.
             return None
 
@@ -158,9 +157,14 @@ def findsource(pyObject):
             return lines, lnum
 
     if ismethod(pyObject):
-        pyObject = pyObject.im_func
+        pyObject = pyObject
     if isfunction(pyObject):
-        pyObject = pyObject.func_code
+        try:
+            pyObject = pyObject.__code__
+        except:
+            print(pyObject)
+            print(dir(pyObject))
+            raise
     if istraceback(pyObject):
         pyObject = pyObject.tb_frame
     if isframe(pyObject):
@@ -196,5 +200,5 @@ def getsource(pyObject):
     or code object.  The source code is returned as a single string.  An
     IOError is raised if the source code cannot be retrieved."""
     lines, _ = getsourcelines(pyObject)
-    return string.join(lines, '')
+    return ''.join(lines)
 

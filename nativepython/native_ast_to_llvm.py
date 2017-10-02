@@ -96,7 +96,7 @@ def constant_to_typed_llvm_value(module, builder, c):
         llvm_c = llvmlite.ir.Constant(t, [t.llvm_value for t in vals])
 
         nt = native_ast.Type.Struct(
-            [(c.elements[i][0],vals[i].native_type) for i in xrange(len(vals))]
+            [(c.elements[i][0],vals[i].native_type) for i in range(len(vals))]
             )
 
         return TypedLLVMValue(llvm_c, nt)
@@ -106,7 +106,7 @@ def constant_to_typed_llvm_value(module, builder, c):
 
         t = llvmlite.ir.ArrayType(llvm_i8, len(byte_array) + 1)
 
-        llvm_c = llvmlite.ir.Constant(t, bytearray(byte_array + bytes("\x00")))
+        llvm_c = llvmlite.ir.Constant(t, bytearray(byte_array + b"\x00"))
 
         value = llvmlite.ir.GlobalVariable(module, t, "string_constant_%s" % strings_ever[0])
         strings_ever[0] += 1
@@ -175,7 +175,7 @@ class TeardownOnScopeExit:
         with self.builder.goto_block(self._block):
             is_return = self.builder.phi(llvm_i1, name='is_return_flow_%s' % self.height)
 
-            for b,val in self.incoming_is_return.iteritems():
+            for b,val in self.incoming_is_return.items():
                 if isinstance(val, bool):
                     val = llvm_bool(val)
                 is_return.add_incoming(val, b)
@@ -541,7 +541,7 @@ class FunctionConverter:
 
             value = llvmlite.ir.Constant(llvmlite.ir.LiteralStructType(types), None)
 
-            for i in xrange(len(exprs)):
+            for i in range(len(exprs)):
                 value = self.builder.insert_value(value, exprs[i], i)
 
             return TypedLLVMValue(value, native_ast.Type.Struct(names_and_types))
@@ -550,7 +550,7 @@ class FunctionConverter:
             val = self.convert(expr.left)
             if val.native_type.matches.Struct:
                 attr = expr.attr
-                for i in xrange(len(val.native_type.element_types)):
+                for i in range(len(val.native_type.element_types)):
                     if val.native_type.element_types[i][0] == attr:
                         return TypedLLVMValue(
                             self.builder.extract_value(val.llvm_value, i), 
@@ -710,7 +710,7 @@ class FunctionConverter:
 
             #we need to merge tags
             final_tags = {}
-            for tag in set(true_tags.keys() + false_tags.keys()):
+            for tag in set(list(true_tags.keys()) + list(false_tags.keys())):
                 true_val = true_tags.get(tag, False)
                 false_val = false_tags.get(tag, False)
 
@@ -889,7 +889,7 @@ class FunctionConverter:
             target_or_ptr = expr.target
             args = [self.convert(a) for a in expr.args]
 
-            for i in xrange(len(args)):
+            for i in range(len(args)):
                 if args[i] is None:
                     return
 
@@ -922,9 +922,9 @@ class FunctionConverter:
                 else:
                     llvm_call_result = self.builder.call(func.llvm_value, [a.llvm_value for a in args])
             except:
-                print "failing while calling ", target.name
+                print("failing while calling ", target.name)
                 for a in args:
-                    print "\t", a.llvm_value, a.native_type
+                    print("\t", a.llvm_value, a.native_type)
                 raise
 
             output_type = func.native_type.value_type.output
@@ -1082,7 +1082,7 @@ class Converter(object):
         external_function_references = {}
         populate_needed_externals(external_function_references, module)
 
-        for name, function in names_to_definitions.iteritems():
+        for name, function in names_to_definitions.items():
             func_type = llvmlite.ir.FunctionType(
                 type_to_llvm_type(function.output_type),
                 [type_to_llvm_type(x[1]) for x in function.args]
@@ -1096,15 +1096,16 @@ class Converter(object):
                 definition = names_to_definitions[name]
                 func = self._functions_by_name[name]
 
-                print
-                print "*************"
-                print "def %s(%s): #->%s" % (name, 
+                print()
+                print("*************")
+                print("def %s(%s): #->%s" % (name, 
                             ",".join(["%s=%s" % (k,str(t)) for k,t in definition.args]),
                             str(definition.output_type)
                             )
-                print native_ast.indent(str(definition.body.body))
-                print "*************"
-                print
+                    )
+                print(native_ast.indent(str(definition.body.body)))
+                print("*************")
+                print()
 
         for name in sorted(names_to_definitions):
             definition = names_to_definitions[name]
@@ -1112,7 +1113,7 @@ class Converter(object):
             func.attributes.personality = external_function_references["__gxx_personality_v0"]
 
             arg_assignments = {}
-            for i in xrange(len(func.args)):
+            for i in range(len(func.args)):
                 arg_assignments[definition.args[i][0]] = \
                         TypedLLVMValue(func.args[i], definition.args[i][1])
 
@@ -1145,7 +1146,7 @@ class Converter(object):
                         builder.unreachable()
 
             except Exception as e:
-                print "function failing = " + name
+                print("function failing = " + name)
                 raise
 
 

@@ -184,7 +184,7 @@ def pythonObjectRepresentation(o):
     if isinstance(o, str):
         return TypedExpression(
             native_ast.Expression.Constant(
-                native_ast.Constant.ByteArray(bytes(o))
+                native_ast.Constant.ByteArray(bytes(o,'utf8'))
                 ), 
             nativepython.type_model.UInt8.pointer
             )
@@ -210,7 +210,7 @@ class ExpressionFunction(CompileTimeType):
         return self.f(context, args)
 
     def __repr__(self):
-        return self.f.func_name
+        return self.f.__name__
 
     @property
     def python_object_representation(self):
@@ -260,7 +260,7 @@ class TypeFunction(CompileTimeType):
         return self.memo[args]
 
     def __repr__(self):
-        return self.f.func_name
+        return self.f.__name__
 
     @property
     def python_object_representation(self):
@@ -296,11 +296,11 @@ class ExternalFunction(CompileTimeType):
         args = [a.dereference() for a in args]
 
         if not self.implicit_type_casting:
-            for i in xrange(len(input_types)):
+            for i in range(len(input_types)):
                 assert args[i].expr_type == self.input_types[i]
         else:
             args = list(args)
-            for i in xrange(len(self.input_types)):
+            for i in range(len(self.input_types)):
                 if args[i].expr_type != self.input_types[i]:
                     args[i] = args[i].convert_to_type(self.input_types[i], implicitly=False)
         

@@ -86,7 +86,8 @@ def generate_functions(seed, count, add_printfs=False):
         if isinstance(array, int):
             array = range(array)
 
-        array = sorted(list(array))
+        if isinstance(array, (set,dict)):
+            array = sorted(list(array))
 
         return array[numpy.random.choice(range(len(array)))]
 
@@ -96,7 +97,7 @@ def generate_functions(seed, count, add_printfs=False):
         return low + int(x * (high-low))
 
     def random_function(out_t, signature, function_signatures):
-        variable_types = {"arg%s" % i:signature[i] for i in xrange(len(signature))}
+        variable_types = {"arg%s" % i:signature[i] for i in range(len(signature))}
 
         def random_expression_of_type(target_t, allow_refs, depth=0):
             tries = 0
@@ -149,7 +150,7 @@ def generate_functions(seed, count, add_printfs=False):
 
             if x < .2 and function_signatures and depth < 3:
                 #function call
-                fname, (signature, out_t) = choice(list(function_signatures.iteritems()))
+                fname, (signature, out_t) = choice(list(function_signatures.items()))
 
                 args = [random_expression_of_type(t, allow_refs, depth+1)[0] for t in signature]
 
@@ -157,7 +158,7 @@ def generate_functions(seed, count, add_printfs=False):
 
             if x < .6 and variable_types:
                 #pick a variable
-                varname, t = choice(sorted(list(variable_types.iteritems())))
+                varname, t = choice(sorted(list(variable_types.items())))
                 return varname, t, True
 
             #random integer
@@ -186,11 +187,11 @@ def generate_functions(seed, count, add_printfs=False):
                 #if block
                 true_statements = "\n".join(
                     random_statement(False) for _ in 
-                        xrange(choice_sq(1,3))
+                        range(choice_sq(1,3))
                     )
                 false_statements = "\n".join(
                     random_statement(False) for _ in 
-                        xrange(choice_sq(1,3))
+                        range(choice_sq(1,3))
                     )
                 cond = random_expression_of_type(int, True)[0]
 
@@ -209,7 +210,7 @@ def generate_functions(seed, count, add_printfs=False):
 
             if x < .6 and variable_types:
                 #assignment
-                varname, t = choice(sorted(list(variable_types.iteritems())))
+                varname, t = choice(sorted(list(variable_types.items())))
 
                 expr = random_expression_of_type(t, True)[0]
 
@@ -225,7 +226,7 @@ def generate_functions(seed, count, add_printfs=False):
         body_text = "\n".join(body)
 
         fname = "f%s" % len(function_signatures)
-        argtuple = ",".join(["c"]+["arg%s" % i for i in xrange(len(signature))])
+        argtuple = ",".join(["c"]+["arg%s" % i for i in range(len(signature))])
         def type_name(t):
             if t is int:
                 return "int"
@@ -245,7 +246,7 @@ def generate_functions(seed, count, add_printfs=False):
     while len(fdefs) < count:
         out_t = choice([int, A, (A,A)])
         signature = [choice([int, A, (A,A)]) for _ in 
-                            xrange(choice(3))]
+                            range(choice(3))]
 
         fname, body = random_function(out_t, signature, signatures)
 
@@ -255,7 +256,7 @@ def generate_functions(seed, count, add_printfs=False):
 
     all_defs = "\n".join(fdefs)
     all_defs = all_defs.split("\n")
-    for i in xrange(len(all_defs)):
+    for i in range(len(all_defs)):
         all_defs[i] = all_defs[i].replace("__line__", str(i+1))
     all_defs = "\n".join(all_defs)
 
@@ -265,7 +266,7 @@ def generate_functions(seed, count, add_printfs=False):
     locals_and_globals = {'A': A,'util': util}
 
     code = compile(all_defs, "<<<FAKE>>>", 'exec')
-    exec code in locals_and_globals
+    exec(code, locals_and_globals)
 
     return {fname: locals_and_globals[fname] for fname in signatures}, all_defs, signatures
 
@@ -302,7 +303,7 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         target = self.compile(f, types)
 
-        self.assertEqual(target(*args), f(*args))
+        self.assertEqual(target(*args), f(*args), (f,args))
 
     def test_typefuncs_1(self):
         self.assertTrue(self.convert_expression(lambda: 3).expr.matches.Constant)
@@ -442,7 +443,7 @@ class PythonToNativeAstTests(unittest.TestCase):
     def test_div_rem_operations(self):
         some_numbers = [0,1,2,4,8,0.0,1.0,2.0,4.0,8.0,3.1415]
 
-        div = lambda a,b: a/b
+        div = lambda a,b: int(a/b)
         rem = lambda a,b: a%b
 
         for arg1 in some_numbers:
@@ -1056,10 +1057,10 @@ class PythonToNativeAstTests(unittest.TestCase):
 
         deep = test_config.tests_are_deep
 
-        for i in xrange(2 if not deep else 20):
+        for i in range(2 if not deep else 20):
             functions, text, signatures = generate_functions(TEST_SEED + i, 4 if not deep else 16)
 
-            for fname,signature in signatures.iteritems():
+            for fname,signature in signatures.items():
                 if len(signature[0]) in (0,1):
                     def make_f_empty(f):
                         def caller(a):

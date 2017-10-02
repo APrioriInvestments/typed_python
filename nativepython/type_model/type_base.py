@@ -223,18 +223,20 @@ class Type(object):
     def create_reference(self):
         return nativepython.type_model.CreateReference(self)
 
-    def __cmp__(self, other):
+    def fieldsToCheck(self):
+        return sorted(self.__dict__)
+
+    def __eq__(self, other):
         if not isinstance(other, type(self)):
-            return cmp(type(self), type(other))
-        for k in sorted(self.__dict__):
-            c = cmp(getattr(self,k), getattr(other,k))
-            if c:
-                return c
-        return 0
+            return False
+        for k in sorted(self.fieldsToCheck()):
+            if getattr(self,k) != getattr(other,k):
+                return False
+        return True
 
     def __hash__(self):
         try:
-            return hash(tuple(sorted(self.__dict__.iteritems())))
+            return hash(tuple([getattr(self, x) for x in self.fieldsToCheck()]))
         except:
-            print "failed on ", self, " with ", self.__dict__
+            print("failed on ", self, " with ", self.__dict__)
             raise

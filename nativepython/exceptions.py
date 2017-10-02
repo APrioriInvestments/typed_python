@@ -19,12 +19,12 @@ class ConversionScopeInfo(object):
         self.filename = filename
         self.line = line
         self.col = col
-        self.types = {k:v for k,v in types.iteritems() if isinstance(k,str) and v is not None}
+        self.types = {k:v for k,v in types.items() if isinstance(k,str) and v is not None}
 
-    def __cmp__(self, other):
-        return cmp(
-            (self.filename,self.line,self.col,tuple(sorted(self.types.iteritems()))),
-            (other.filename,other.line,other.col,tuple(sorted(other.types.iteritems())))
+    def __eq__(self, other):
+        return (
+                (self.filename,self.line,self.col,tuple(sorted(self.types.items())))
+            ==  (other.filename,other.line,other.col,tuple(sorted(other.types.items())))
             )
 
     @staticmethod
@@ -38,12 +38,13 @@ class ConversionScopeInfo(object):
 
     def __str__(self):
         return "   File \"%s\", line %d\n%s" % (self.filename, self.line, 
-            "".join(["\t\t%s=%s\n" % (k,v) for k,v in self.types.iteritems()])
+            "".join(["\t\t%s=%s\n" % (k,v) for k,v in self.types.items()])
             )
 
 class ConversionException(Exception):
     def __init__(self, msg):
-        Exception.__init__(self, msg)
+        Exception.__init__(self)
+        self.message = msg
         self.conversion_scope_infos=[]
 
     def add_scope(self, new_scope):
@@ -51,7 +52,12 @@ class ConversionException(Exception):
             self.conversion_scope_infos = [new_scope] + self.conversion_scope_infos
 
     def __str__(self):
-        return self.message + "\n\n" + "".join(str(x) for x in self.conversion_scope_infos)
+        try:
+            return self.message + "\n\n" + "".join(str(x) for x in self.conversion_scope_infos)
+        except:
+            import traceback
+            traceback.print_exc()
+            raise
 
 class UnassignableFieldException(ConversionException):
     def __init__(self, obj_type, attr, target_type):

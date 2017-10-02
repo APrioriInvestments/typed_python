@@ -17,7 +17,7 @@ Basic infrastructure for typed union datastructures in python
 """
 
 def valid_type(t):
-    if isinstance(t, Alternative) or t in [str, int, bool, float]:
+    if isinstance(t, Alternative) or t in [str, int, bool, float, bytes]:
         return True
 
     if isinstance(t, tuple) and t:
@@ -44,7 +44,7 @@ def coerce_instance(instance, to_type):
         if not isinstance(instance, tuple) or len(instance) != len(to_type):
             return None
         res = []
-        for i in xrange(len(instance)):
+        for i in range(len(instance)):
             coerced = coerce_instance(instance[i], to_type[i])
             if coerced is None:
                 return None
@@ -59,7 +59,7 @@ def coerce_instance(instance, to_type):
         res = []
         while True:
             try:
-                val = coerce_instance(i.next(), to_type.subtype)
+                val = coerce_instance(i.__next__(), to_type.subtype)
                 if val is None:
                     return None
                 res.append(val)
@@ -87,7 +87,7 @@ class Alternative(object):
         self._instantiated = False
         self._methods = {}
         
-        for k, v in kwds.iteritems():
+        for k, v in kwds.items():
             self.__setattr__(k,v)
 
     def add_common_field(self, k, v):
@@ -95,7 +95,7 @@ class Alternative(object):
             self._types[tname][k] = v
 
     def define(self, **kwds):
-        for k,v in kwds.iteritems():
+        for k,v in kwds.items():
             self.__setattr__(k,v)
 
     def __setattr__(self, alt_name, defs):
@@ -110,7 +110,7 @@ class Alternative(object):
         if isinstance(defs, dict):
             assert valid_fieldname(alt_name), "invalid alternative name: " + alt_name
         
-            for fname, ftype in defs.iteritems():
+            for fname, ftype in defs.items():
                 assert valid_fieldname(fname), "%s is not a valid field name" % fname
                 assert valid_type(ftype), "%s is not a valid type" % ftype
 
@@ -143,7 +143,7 @@ class Alternative(object):
 
             if len(args) == 1:
                 assert(len(kwds) == 0)
-                for typename,typedict in self._types.iteritems():
+                for typename,typedict in self._types.items():
                     if len(typedict) == 1:
                         if possibility is not None:
                             raise TypeError("coersion to %s with one unnamed argument is ambiguous" % self._name)
@@ -152,7 +152,7 @@ class Alternative(object):
                 assert(len(args) == 0)
 
                 #multiple options, so it's a little ambiguous
-                for typename,typedict in self._types.iteritems():
+                for typename,typedict in self._types.items():
                     if sorted(typedict) == sorted(kwds):
                         if possibility is not None:
                             raise TypeError("coersion to %s with one unnamed argument is ambiguous" % self._name)
@@ -212,7 +212,7 @@ def makeAlternativeOption(alternative, which, typedict):
 
         def __hash__(self):
             if self._hash is None:
-                self._hash = hash(tuple(sorted(self._fields.iteritems())))
+                self._hash = hash(tuple(sorted(self._fields.items())))
             return self._hash
 
         @property
@@ -243,16 +243,15 @@ def makeAlternativeOption(alternative, which, typedict):
                 return self._alternative._methods['__repr__'](self)
             return "%s.%s(%s)" % (self._alternative._name, self._which, ",".join(["%s=%s" % (k,repr(self._fields[k])) for k in sorted(self._fields)]))
 
-        def __cmp__(self, other):
+        def __eq__(self, other):
             if not isinstance(other, AlternativeOption):
-                return cmp(type(self), type(other))
+                return False
             if self._which != other._which:
-                return cmp(self._which, other._which)
+                return False
             for f in sorted(self._fields):
-                c = cmp(getattr(self,f), getattr(other,f))
-                if c != 0:
-                    return c
-            return 0
+                if getattr(self,f) != getattr(other,f):
+                    return False
+            return True
 
     AlternativeOption.__name__ = alternative._name + "." + which
 

@@ -14,7 +14,7 @@
 
 import llvmlite.binding as llvm
 import llvmlite.ir
-import native_ast_to_llvm as native_ast_to_llvm
+import nativepython.native_ast_to_llvm as native_ast_to_llvm
 import ctypes
 import sys
 
@@ -115,7 +115,7 @@ class NativeFunctionPointer:
         try:
             return self._ctypes_cache(*[a for a in args if a is not None])
         except:
-            print "can't call ", self, " with ", args
+            print("can't call ", self, " with ", args)
             raise
 
     def __repr__(self):
@@ -151,7 +151,7 @@ class Compiler:
             mod = llvm.parse_assembly(module)
             mod.verify()
         except:
-            print "failing: ", module
+            print("failing: ", module)
             raise
 
         # Now add the module and make sure it is ready for execution
@@ -161,7 +161,7 @@ class Compiler:
             self.module_pass_manager.run(mod)
 
         if self.verbose:
-            print mod
+            print(mod)
 
         self.engine.finalize_object()
 

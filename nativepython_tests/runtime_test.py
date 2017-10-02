@@ -56,7 +56,7 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             count = len(self.runtime.functions_by_name)
 
             #access the property several more times
-            for i in xrange(10):
+            for i in range(10):
                 res.x
         
             #and verify we're not compiling new code every time
@@ -75,20 +75,20 @@ class PythonNativeRuntimeTests(unittest.TestCase):
 
     def test_printf(self):
         def f():
-            util.printf("hello\n")
+            util.printf("")
                         
         self.runtime.wrap(f)()
 
     def test_overloading_in_xrange(self):
         def f(*args):
             x = 0
-            for i in xrange(*args):
+            for i in range(*args):
                 x = x + i
             return x
                         
-        self.assertEqual(self.runtime.wrap(f)(10), sum(xrange(10)))
-        self.assertEqual(self.runtime.wrap(f)(5, 10), sum(xrange(5, 10)))
-        self.assertEqual(self.runtime.wrap(f)(5, 10, 2), sum(xrange(5, 10, 2)))
+        self.assertEqual(self.runtime.wrap(f)(10), sum(range(10)))
+        self.assertEqual(self.runtime.wrap(f)(5, 10), sum(range(5, 10)))
+        self.assertEqual(self.runtime.wrap(f)(5, 10, 2), sum(range(5, 10, 2)))
 
     def test_function_pointer_to_external(self):
         def f():
@@ -114,7 +114,7 @@ class PythonNativeRuntimeTests(unittest.TestCase):
 
             val = 1
 
-            for i in xrange(ct):
+            for i in range(ct):
                 val = p1(val)
                 t = p1
                 p1 = p2
@@ -130,7 +130,7 @@ class PythonNativeRuntimeTests(unittest.TestCase):
 
     def test_boolean_operations(self):
         def test_expr(f):
-            args = [False for _ in xrange(f.func_code.co_argcount)]
+            args = [False for _ in range(f.__code__.co_argcount)]
             done = [False]
 
             def inc(ix):

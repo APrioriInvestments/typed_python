@@ -89,12 +89,18 @@ class AlgebraicTests(unittest.TestCase):
 
         self.assertTrue(X(Sub.I()).val.matches.Value)
 
+    def test_equality(self):
+        for i in range(10):
+            self.assertEqual(hash(expr.Constant(i)), hash(expr.Constant(i)))
+            self.assertEqual(expr.Constant(i), expr.Constant(i))
+            self.assertNotEqual(expr.Constant(i), expr.Constant(i+1))
+
     def test_algebraics_in_dicts(self):
         d = {}
-        for i in xrange(10):
+        for i in range(10):
             d[expr.Constant(i)] = i
             d[expr.Add(l=expr.Constant(i),r=expr.Constant(i+1))] = 2*i+1
             
-        for i in xrange(10):
+        for i in range(10):
             self.assertEqual(d[expr.Constant(i)], i)
             self.assertEqual(d[expr.Add(l=expr.Constant(i),r=expr.Constant(i+1))], 2*i+1)

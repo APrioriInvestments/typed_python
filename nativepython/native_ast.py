@@ -24,7 +24,7 @@ Type.Function = {'output': Type, 'args': List(Type), 'varargs': bool, 'can_throw
 Type.Pointer = {'value_type': Type}
 
 def type_attr_ix(t,attr):
-    for i in xrange(len(t.element_types)):
+    for i in range(len(t.element_types)):
         if t.element_types[i][0] == attr:
             return i
     return None

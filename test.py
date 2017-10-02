@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 
 #   Copyright 2017 Braxton Mckee
 #
@@ -198,7 +198,7 @@ def applyFilterActions(filterActions, tests):
 
 def printTests(testCases):
     for test in testCases:
-        print test.id()
+        print(test.id())
 
 def runPyTestSuite(config, testFiles, testCasesToRun, testArgs):
     testProgram = nose.core.TestProgram(
@@ -274,9 +274,9 @@ def runPythonUnitTests(args, filter_actions):
 
 def logAsInfo(*args):
     if len(args) == 1:
-        print time.asctime(), " | ", args
+        print(time.asctime(), " | ", args)
     else:
-        print time.asctime(), " | ", args[0] % args[1:]
+        print(time.asctime(), " | ", args[0] % args[1:])
 
 def setLoggingLevel(level):
     logging.getLogger().setLevel(level)
@@ -409,8 +409,8 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         ev = self.addCaptureToErr(ev, tb)
 
         #print statements here show up in the logfile
-        print "Test ", test, ' failed: '
-        print ev
+        print("Test ", test, ' failed: ')
+        print(ev)
 
         self.failureReason = ev
 
@@ -423,7 +423,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         return self.formatError(test, err)
 
     def addCaptureToErr(self, ev, tb):
-        return ''.join([unicode(str(ev) + "\n")] + traceback.format_tb(tb) + ['\n>> output captured in %s <<' % self.fname])
+        return ''.join([str(ev) + "\n"] + traceback.format_tb(tb) + ['\n>> output captured in %s <<' % self.fname])
 
     def end(self):
         pass
@@ -457,7 +457,7 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
     testArgs.append('--verbosity=0')
 
     if not args.list:
-        print "Executing %s unit tests." % testGroupName
+        print("Executing %s unit tests." % testGroupName)
 
     root_dir = os.path.split(os.path.split(nativepython.__file__)[0])[0]
 
@@ -476,7 +476,7 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
 
     if args.list:
         for test in testCasesToRun:
-            print test.id()
+            print(test.id())
 
         os._exit(0)
 
@@ -484,16 +484,16 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
 
 def executeTests(args, filter_actions):
     if not args.list:
-        print "Running python unit tests."
-        print "nose version: ", nose.__version__
-        print time.ctime(time.time())
+        print("Running python unit tests.")
+        print("nose version: ", nose.__version__)
+        print(time.ctime(time.time()))
 
     if runPythonUnitTests(args, filter_actions):
         anyFailed = True
     else:
         anyFailed = False
 
-    print "\n\n\n"
+    print("\n\n\n")
 
     if anyFailed:
         return 1
