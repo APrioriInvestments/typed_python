@@ -379,11 +379,20 @@ class ConversionContext(object):
                 return True
             if expr.matches.Variable:
                 return True
+            if expr.matches.ElementPtr:
+                return is_simple(expr.left) and all(is_simple(x) for x in expr.offsets)
             if expr.matches.Load:
                 return is_simple(expr.ptr)
+            if expr.matches.Sequence and len(expr.vals) == 1:
+                return is_simple(expr.vals[0])
             return False
 
         for a in args:
+            while a.matches.Sequence:
+                for sub_expr in a.vals[:-1]:
+                    lets.append((None, sub_expr))
+                a = a.vals[-1]
+
             if not is_simple(a):
                 name = self.let_varname()
                 lets.append((name, a))
@@ -397,11 +406,14 @@ class ConversionContext(object):
             )
 
         for k,v in reversed(lets):
-            e = native_ast.Expression.Let(
-                var=k,
-                val=v,
-                within=e
-                )
+            if k is not None:
+                e = native_ast.Expression.Let(
+                    var=k,
+                    val=v,
+                    within=e
+                    )
+            else:
+                e = v + e
         
         return e
 
