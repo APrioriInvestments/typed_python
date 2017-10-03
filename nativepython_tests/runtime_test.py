@@ -328,6 +328,16 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             def f(self):
                 return 0
 
+            def f(self, x: int):
+                return -1
+
+            def f(self, x: float):
+                return -2
+
+            def f(self, 
+                    x: (lambda: A)):
+                return -3
+
             def f(self, x):
                 return 1
 
@@ -339,10 +349,14 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             an_a = A(x)
             if an_a.f() != 0:
                 return 1
-            if an_a.f(1) != 1:
-                return 1
+            if an_a.f(1) != -1:
+                return 2
+            if an_a.f(1.5) != -2:
+                return 3
             if an_a.f(1,2) != 2:
-                return 1
+                return 4
+            if an_a.f(an_a) != -3:
+                return 5
             return 0
 
         self.assertEqual(self.runtime.wrap(f)(0), 0)

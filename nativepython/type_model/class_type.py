@@ -402,6 +402,37 @@ class Override:
             )
 
     def matches(self, f, args):
+        if not self.matches_argcount(f, args):
+            return False
+        for varname, ann in f.__annotations__.items():
+            if varname != 'return':
+                slot_ix = f.__code__.co_varnames.index(varname)
+                if slot_ix > 0:
+                    slot_ix -= 1
+                    if slot_ix < f.__code__.co_argcount and slot_ix >= 0:
+                        if not self.argtype_matches_annotation(args[slot_ix], ann):
+                            return False
+
+        return True
+
+    def argtype_matches_annotation(self, t, annotation):
+        if isinstance(annotation, types.FunctionType):
+            annotation = annotation()
+
+        if annotation is int:
+            annotation = nativepython.type_model.Int64
+        if annotation is float:
+            annotation = nativepython.type_model.Float64
+        if annotation is bool:
+            annotation = nativepython.type_model.Bool
+
+        if annotation is nativepython.util.ref:
+            return t.expr_type.is_reference
+
+        return annotation == t.expr_type.nonref_type
+
+
+    def matches_argcount(self, f, args):
         f_argcount = f.__code__.co_argcount
         f_has_starargs = bool(f.__code__.co_flags & 0x04)
 
