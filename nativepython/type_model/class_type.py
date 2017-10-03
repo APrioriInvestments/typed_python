@@ -27,19 +27,12 @@ class ElementTypesUnresolved:
 class ElementTypesBeingResolved:
     pass
 
-#makes a class
-def cls(c):
-    if not hasattr(c, "__types__"):
-        raise ConversionException("Class missing a __types__ declaration")
-
-    return ClassType(c)
-
-class DirectSetter:
+class TypeAdder:
     def __init__(self, t):
         self.__dict__['t'] = t
 
     def __setattr__(self, attr, val):
-        self.t.__dict__[attr] = val
+        self.t._add_element_type(attr,val)
 
 def closest_special_member_name(name):
     return string_util.closest_in(name, valid_special_member_names)
@@ -67,69 +60,7 @@ def class_has_function(cls, name):
 def is_special_name(name):
     return name.startswith("__") and name.endswith("__") and len(name) > 4
 
-class ClassType(Type):
-    def __init__(self, cls, element_types = ElementTypesUnresolved):
-        if isinstance(element_types, list):
-            element_types = tuple(element_types)
-
-        for method_name in dir(cls):
-            method = getattr(cls, method_name)
-            if isinstance(method, types.FunctionType):
-                if is_special_name(method.__name__) and \
-                        method.__name__ not in valid_special_member_names:
-                    raise ConversionException("Invalid member name %s. Did you mean %s?" % 
-                            (method.__name__,
-                                closest_special_member_name(method.__name__))
-                            )
-
-        Type.__init__(self)
-
-        DirectSetter(self).cls = cls
-        DirectSetter(self)._element_types = element_types
-        DirectSetter(self)._element_type_buildup = None
-        DirectSetter(self)._element_type_names = None
-
-    @property
-    def element_types(self):
-        if self._element_types is ElementTypesBeingResolved:
-            raise ConversionException("Cyclic dependency during class type resolution")
-
-        if self._element_types is ElementTypesUnresolved:
-            try:
-                DirectSetter(self)._element_types = ElementTypesBeingResolved
-                DirectSetter(self)._element_type_buildup = []
-                DirectSetter(self)._element_type_names = set()
-
-                typefun = getattr(self.cls,"__types__")
-                typefun(self)
-                DirectSetter(self)._element_types = tuple(self._element_type_buildup)            
-            except Exception:
-                DirectSetter(self)._element_types = ElementTypesUnresolved
-                raise
-            finally:
-                DirectSetter(self)._element_type_buildup = None
-                DirectSetter(self)._element_type_names = None
-
-        return self._element_types
-
-    def __setattr__(self, attr, value):
-        if value is int:
-            value = nativepython.type_model.Int64
-        if value is float:
-            value = nativepython.type_model.Float64
-        if value is bool:
-            value = nativepython.type_model.Bool
-
-        if not isinstance(value, Type):
-            raise ConversionException("Can't assign %s as a type" % value)
-        if attr in self._element_type_names:
-            raise ConversionException("Can't reuse attribute name %s" % attr)
-        if is_special_name(attr):
-            raise ConversionException("%s is not a valid attribute name" % attr)
-
-        self._element_type_names.add(attr)
-        self._element_type_buildup.append((attr, value))
-
+class ClassType(Type):   
     @staticmethod
     def object_is_class(o):
         return (isinstance(o, type) 
@@ -400,7 +331,7 @@ class ClassType(Type):
                 name_override=self.cls.__name__+".__getitem__"
                 )
 
-        return DirectSetter(self).convert_getitem(context, instance, item)
+        return self.convert_getitem(context, instance, item)
 
     def convert_setitem(self, context, instance, item, value):
         if class_has_function(self.cls, "__setitem__"):
@@ -411,10 +342,11 @@ class ClassType(Type):
                 name_override=self.cls.__name__+".__setitem__"
                 )
 
-        return DirectSetter(self).convert_setitem(context, instance, item, value)
+        return self.convert_setitem(context, instance, item, value)
 
     def __str__(self):
-        return "Class(%s,%s)" % (self.cls, ",".join(["%s=%s" % t for t in self.element_types]))
+        return "Class(%s@%s,%s)" % (self.cls.__name__, id(self.cls), 
+                ",".join(["%s=%s" % t for t in self.element_types]))
 
     def fieldsToCheck(self):
         return ('cls', 'element_types')
@@ -435,6 +367,9 @@ class PythonClassMemberFunc(Type):
         instance = instance.dereference()
 
         func = getattr(self.python_class_type.cls, self.attr)
+
+        if isinstance(func, Override):
+            func = func.first_matching(args)
         
         obj_ref = TypedExpression(instance.expr, self.python_class_type.reference)
 
@@ -450,3 +385,123 @@ class PythonClassMemberFunc(Type):
             self.attr, 
             ",".join(["%s=%s" % t for t in self.python_class_type.element_types])
             )
+
+class Override:
+    def __init__(self, name, o):
+        self.name = name
+        self.overrides = [o]
+
+    def first_matching(self, args):
+        for o in self.overrides:
+            if self.matches(o, args):
+                return o
+        raise ConversionException(
+            "Can't call function %s with arguments %s" % (
+                self.name, [str(x.expr_type) for x in args]
+                )
+            )
+
+    def matches(self, f, args):
+        f_argcount = f.__code__.co_argcount
+        f_has_starargs = bool(f.__code__.co_flags & 0x04)
+
+        argcount = len(args)+1
+
+        if not f_has_starargs:
+            return f_argcount == argcount
+        else:
+            return argcount >= f_argcount
+
+class OverrideDict:
+    def __init__(self):
+        self.elts = {}
+
+    def __setitem__(self, k, v):
+        if k in self.elts:
+            if not isinstance(self.elts[k], Override):
+                self.elts[k] = Override(k, self.elts[k])
+            
+            self.elts[k].overrides.append(v)
+        else:
+            self.elts[k] = v
+
+    def __getitem__(self, k):
+        return self.elts[k]
+
+    def __in__(self, k):
+        return k in self.elts
+
+class ClassTypeMeta(ClassType, type):
+    def __prepare__(name, bases, **kwds):
+        return OverrideDict()
+
+    def __new__(cls, name, bases, attrs):
+        new_a = {}
+        new_a['_element_types'] = ElementTypesUnresolved
+        new_a['_element_type_buildup'] = None
+        new_a['_element_type_names'] = None
+        new_a['types'] = None
+        new_a['cls'] = type.__new__(type, name, (), attrs.elts)
+
+        return super().__new__(cls, name, bases, new_a)
+
+    def __init__(self, *args, **kwds):
+        ClassType.__init__(self)
+
+        self.types = TypeAdder(self)
+
+        cls = self.cls
+        for method_name in dir(cls):
+            method = getattr(cls, method_name)
+            if isinstance(method, types.FunctionType):
+                if is_special_name(method.__name__) and \
+                        method.__name__ not in valid_special_member_names:
+                    raise ConversionException("Invalid member name %s. Did you mean %s?" % 
+                            (method.__name__,
+                                closest_special_member_name(method.__name__))
+                            )
+
+    @property
+    def element_types(self):
+        if self._element_types is ElementTypesBeingResolved:
+            raise ConversionException("Cyclic dependency during class type resolution")
+
+        if self._element_types is ElementTypesUnresolved:
+            try:
+                self._element_types = ElementTypesBeingResolved
+                self._element_type_buildup = []
+                self._element_type_names = set()
+
+                typefun = getattr(self.cls,"__types__")
+                typefun(self)
+
+                self._element_types = tuple(self._element_type_buildup)            
+            except Exception:
+                self._element_types = ElementTypesUnresolved
+                raise
+            finally:
+                self._element_type_buildup = None
+                self._element_type_names = None
+
+        return self._element_types
+
+    def _add_element_type(self, attr, value):
+        if value is int:
+            value = nativepython.type_model.Int64
+        if value is float:
+            value = nativepython.type_model.Float64
+        if value is bool:
+            value = nativepython.type_model.Bool
+
+        if not isinstance(value, Type):
+            raise ConversionException("Can't assign %s as a type" % value)
+        if attr in self._element_type_names:
+            raise ConversionException("Can't reuse attribute name %s" % attr)
+        if is_special_name(attr):
+            raise ConversionException("%s is not a valid attribute name" % attr)
+
+        self._element_type_names.add(attr)
+        self._element_type_buildup.append((attr, value))
+
+class cls(metaclass = ClassTypeMeta):
+    pass

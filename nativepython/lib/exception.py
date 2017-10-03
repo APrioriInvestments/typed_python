@@ -27,12 +27,11 @@ VoidPtrFunc = type_model.FunctionPointer(
     output_type=Void
     )
 
-@type_model.cls
-class InFlightException:
+class InFlightException(type_model.cls):
     def __types__(cls):
-        cls.data_ptr = Int8.pointer
-        cls.destructor = VoidPtrFunc
-        cls.typeid = Int64
+        cls.types.data_ptr = Int8.pointer
+        cls.types.destructor = VoidPtrFunc
+        cls.types.typeid = Int64
 
     def __init__(self, data_ptr, destructor, typeid):
         self.data_ptr.__init__(data_ptr)

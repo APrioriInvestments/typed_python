@@ -24,7 +24,9 @@ class Struct_:
 
 class Struct(ClassType):
     def __init__(self, element_types=()):
-        ClassType.__init__(self, Struct_, element_types)
+        ClassType.__init__(self)
+        self.element_types = tuple(element_types)
+        self.cls = Struct_
 
     def __str__(self):
         return "Struct(%s)" % (",".join(["%s=%s" % t for t in self.element_types]))

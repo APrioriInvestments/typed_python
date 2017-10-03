@@ -23,11 +23,10 @@ import time
 def g(a):
     return a+2
 
-@type_model.cls
-class Simple:
+class Simple(type_model.cls):
     def __types__(cls):
-        cls.x = int
-        cls.y = int
+        cls.types.x = int
+        cls.types.y = int
 
     def __init__(self, x, y):
         self.x = x
@@ -157,10 +156,9 @@ class PythonNativeRuntimeTests(unittest.TestCase):
     def test_self_pointer(self):
         addr = util.addr
 
-        @type_model.cls
-        class A:
+        class A(type_model.cls):
             def __types__(cls):
-                cls.ptr = int
+                cls.types.ptr = int
 
             def __init__(self):
                 self.ptr = int(addr(self))
@@ -249,10 +247,9 @@ class PythonNativeRuntimeTests(unittest.TestCase):
     def test_function_returning_ref(self):
         ref = util.ref
 
-        @type_model.cls
-        class A:
+        class A(type_model.cls):
             def __types__(cls):
-                cls.x = float
+                cls.types.x = float
 
             def __init__(self, x):
                 self.x = x
@@ -289,10 +286,9 @@ class PythonNativeRuntimeTests(unittest.TestCase):
         ref = util.ref
         deref = util.deref
 
-        @type_model.cls
-        class A:
+        class A(type_model.cls):
             def __types__(cls):
-                cls.x = float
+                cls.types.x = float
 
             def __init__(self, x):
                 self.x = x
@@ -320,3 +316,33 @@ class PythonNativeRuntimeTests(unittest.TestCase):
             return an_a.x
 
         self.assertEqual(self.runtime.wrap(f)(0), 5)
+
+    def test_overrides(self):
+        class A(type_model.cls):
+            def __types__(cls):
+                cls.types.x = float
+
+            def __init__(self, x):
+                self.x = x
+
+            def f(self):
+                return 0
+
+            def f(self, x):
+                return 1
+
+            def f(self, *args):
+                return len(args)
+
+
+        def f(x):
+            an_a = A(x)
+            if an_a.f() != 0:
+                return 1
+            if an_a.f(1) != 1:
+                return 1
+            if an_a.f(1,2) != 2:
+                return 1
+            return 0
+
+        self.assertEqual(self.runtime.wrap(f)(0), 0)

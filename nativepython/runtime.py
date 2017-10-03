@@ -38,10 +38,9 @@ class ReferenceHeldAsPointerBase:
 
 @util.typefun
 def ReferenceHeldAsPointer(T):
-    @type_model.cls
-    class ReferenceHeldAsPointer(ReferenceHeldAsPointerBase):
+    class ReferenceHeldAsPointer(type_model.cls, ReferenceHeldAsPointerBase):
         def __types__(cls):
-            cls.p = T.pointer
+            cls.types.p = T.pointer
 
         def __init__(self, p):
             self.p = p
@@ -50,7 +49,7 @@ def ReferenceHeldAsPointer(T):
 
 @util.typefun
 def isRefHeldAsPointer(t):
-    return t.nonref_type.is_class and issubclass(t.nonref_type.cls, ReferenceHeldAsPointerBase)
+    return t.nonref_type.is_class and issubclass(t.nonref_type, ReferenceHeldAsPointerBase)
 
 def dereferenceRefHeldAsPointer(x):
     if isRefHeldAsPointer(util.typeof(x)):
@@ -59,11 +58,10 @@ def dereferenceRefHeldAsPointer(x):
 
 @util.typefun
 def ResultOrException(T):
-    @type_model.cls
-    class ResultOrException:
+    class ResultOrException(type_model.cls):
         def __types__(cls):
-            cls.p = T.pointer
-            cls.e = nativepython.lib.exception.InFlightException.pointer
+            cls.types.p = T.pointer
+            cls.types.e = nativepython.lib.exception.InFlightException.pointer
 
         def __init__(self, p, e):
             self.p = T.pointer(p)

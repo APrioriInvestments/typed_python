@@ -20,18 +20,16 @@ import unittest
 import ast
 import time
 
-@type_model.cls
-class Counter:
+class Counter(type_model.cls):
     def __types__(cls):
-        cls.count = int
+        cls.types.count = int
 
     def __init__(self):
         self.count = 0
 
-@type_model.cls
-class CounterInc:
+class CounterInc(type_model.cls):
     def __types__(cls):
-        cls.target = Counter.pointer
+        cls.types.target = Counter.pointer
 
     def __init__(self, target):
         self.target = target

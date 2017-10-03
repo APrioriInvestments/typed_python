@@ -8,11 +8,10 @@ addr = util.addr
 def Vector(T):
     assert isinstance(T, type_model.Type)
 
-    @type_model.cls
-    class Iterator:
+    class Iterator(type_model.cls):
         def __types__(cls):
-            cls._vec_ptr = Vector.pointer
-            cls._i = int
+            cls.types._vec_ptr = Vector.pointer
+            cls.types._i = int
 
         def __init__(self, vec_ptr):
             self._vec_ptr.__init__(vec_ptr)
@@ -25,12 +24,11 @@ def Vector(T):
             self._i += 1
             return util.ref((self._vec_ptr[0])[old_i])
 
-    @type_model.cls
-    class Vector:
+    class Vector(type_model.cls):
         def __types__(cls):
-            cls._ptr = T.pointer
-            cls._reserved = int
-            cls._size = int
+            cls.types._ptr = T.pointer
+            cls.types._reserved = int
+            cls.types._size = int
 
         def __destructor__(self):
             self._teardown()

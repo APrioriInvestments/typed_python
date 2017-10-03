@@ -24,11 +24,10 @@ Int8 = type_model.Int8
 Counter = counter.Counter
 CounterInc = counter.CounterInc
 
-@type_model.cls
-class FancyException:
+class FancyException(type_model.cls):
     def __types__(cls):
-        cls.holder = CounterInc
-        cls.x = int
+        cls.types.holder = CounterInc
+        cls.types.x = int
 
     def __init__(self, counter, x):
         self.holder = CounterInc(util.addr(counter))

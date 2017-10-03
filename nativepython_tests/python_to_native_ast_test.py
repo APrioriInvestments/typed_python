@@ -32,11 +32,10 @@ TEST_SEED = 1
 def g(a):
     return a+2
 
-@type_model.cls
-class Counter:
+class Counter(type_model.cls):
     def __types__(cls):
-        cls.alive = int
-        cls.total = int
+        cls.types.alive = int
+        cls.types.total = int
 
     def __init__(self):
         self.alive = 0
@@ -49,11 +48,10 @@ class Counter:
     def dec(self):
         self.alive -= 1
 
-@type_model.cls
-class A:
+class A(type_model.cls):
     def __types__(cls):
-        cls.x = int
-        cls.c = Counter.pointer
+        cls.types.x = int
+        cls.types.c = Counter.pointer
 
     def __init__(self, c, x):
         self.x = x
@@ -474,10 +472,9 @@ class PythonToNativeAstTests(unittest.TestCase):
         def g(x):
             return x + 1
 
-        @type_model.cls
-        class RefToSelf:
+        class RefToSelf(type_model.cls):
             def __types__(cls):
-                cls.x = int
+                cls.types.x = int
 
             def __init__(self, x):
                 self.x = x
@@ -767,11 +764,10 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertTrue(f_comp(10.5) == 10 + 10.5 + 2.3)
 
     def test_classes(self):
-        @type_model.cls
-        class A:
+        class A(type_model.cls):
             def __types__(cls):
-                cls.x = float
-                cls.y = int
+                cls.types.x = float
+                cls.types.y = int
 
             def __init__(self, x, y):
                 self.x = x
@@ -790,8 +786,7 @@ class PythonToNativeAstTests(unittest.TestCase):
 
     def test_class_methods_cant_be_special(self):
         try:
-            @type_model.cls
-            class A:
+            class A(type_model.cls):
                 def __types__(cls):
                     pass
 
@@ -803,10 +798,9 @@ class PythonToNativeAstTests(unittest.TestCase):
 
     def test_no_access_to_special_methods(self):
         with self.assertRaises(ConversionException):
-            @type_model.cls
-            class A:
+            class A(type_model.cls):
                 def __types__(cls):
-                    cls.x = int
+                    cls.types.x = int
 
                 def __init__(self):
                     self.x = 10
@@ -817,10 +811,9 @@ class PythonToNativeAstTests(unittest.TestCase):
             self.compile(lambda x: A(x))
 
     def test_constructors_and_destructors_1(self):
-        @type_model.cls
-        class A:
+        class A(type_model.cls):
             def __types__(cls):
-                cls.x = float
+                cls.types.x = float
 
             def __init__(self, x):
                 self.x = x
@@ -918,10 +911,9 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertEqual(f_comp(10), 0)
 
     def test_constructors_cant_initialize_twice(self):
-        @type_model.cls
-        class InitializesTwice:
+        class InitializesTwice(type_model.cls):
             def __types__(cls):
-                cls.x = int
+                cls.types.x = int
 
             def __init__(self):
                 self.x.__init__(10)
@@ -935,11 +927,10 @@ class PythonToNativeAstTests(unittest.TestCase):
 
 
     def test_constructors_and_destructors_6(self):
-        @type_model.cls
-        class IsInitialized:
+        class IsInitialized(type_model.cls):
             def __types__(cls):
-                cls.value = int
-                cls.how = int
+                cls.types.value = int
+                cls.types.how = int
 
             def __init__(self, *args):
                 self.value = 1234
@@ -949,20 +940,18 @@ class PythonToNativeAstTests(unittest.TestCase):
                 else:
                     self.how = 1
 
-        @type_model.cls
-        class InitializesOne:
+        class InitializesOne(type_model.cls):
             def __types__(cls):
-                cls.x = IsInitialized
-                cls.y = IsInitialized
+                cls.types.x = IsInitialized
+                cls.types.y = IsInitialized
 
             def __init__(self):
                 self.x.__init__(10)
 
-        @type_model.cls
-        class InitializesInIfs:
+        class InitializesInIfs(type_model.cls):
             def __types__(cls):
-                cls.x = IsInitialized
-                cls.y = IsInitialized
+                cls.types.x = IsInitialized
+                cls.types.y = IsInitialized
 
             def __init__(self, z):
                 self.x.__init__(10)
@@ -985,10 +974,9 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertEqual(self.compile(check,types=())(), True)
 
     def test_constructors_and_destructors_references_1(self):
-        @type_model.cls
-        class HoldsAReference:
+        class HoldsAReference(type_model.cls):
             def __types__(cls):
-                cls.value_ref = type_model.Int64.reference
+                cls.types.value_ref = type_model.Int64.reference
 
             def __init__(self, a):
                 self.value_ref.__init__(a)
@@ -1003,10 +991,9 @@ class PythonToNativeAstTests(unittest.TestCase):
         self.assertEqual(self.compile(check,types=())(), 11)
 
     def test_cant_null_initilize_a_reference(self):
-        @type_model.cls
-        class HoldsAReference:
+        class HoldsAReference(type_model.cls):
             def __types__(cls):
-                cls.value_ref = type_model.Int64.reference
+                cls.types.value_ref = type_model.Int64.reference
 
             def __init__(self):
                 pass
@@ -1024,10 +1011,9 @@ class PythonToNativeAstTests(unittest.TestCase):
             self.assertTrue("can't null-initialize" in e.message)
         
     def test_class_properties(self):
-        @type_model.cls
-        class HasAProperty:
+        class HasAProperty(type_model.cls):
             def __types__(cls):
-                cls.x = int
+                cls.types.x = int
 
             def y_get(self):
                 return self.x + 10

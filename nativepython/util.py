@@ -172,18 +172,17 @@ def struct_size(t):
 
 @type_model.representation_for(len)
 def len_override(x):
-    if typeof(x).is_struct:
+    if typeof(x).nonref_type.is_struct:
         return struct_size(typeof(x))
     else:
         return x.__len__()
 
 @type_model.representation_for(range)
-@type_model.cls
-class xrange_override:
+class xrange_override(type_model.cls):
     def __types__(cls):
-        cls.start = int
-        cls.stop = int
-        cls.step = int
+        cls.types.start = int
+        cls.types.stop = int
+        cls.types.step = int
 
     def __init__(self, *args):
         if struct_size(typeof(args)) is 0:
@@ -206,12 +205,11 @@ class xrange_override:
     def __iter__(self):
         return xrange_iterator(self.start, self.stop, self.step)
 
-@type_model.cls
-class xrange_iterator:
+class xrange_iterator(type_model.cls):
     def __types__(cls):
-        cls.cur_value = int
-        cls.stop = int
-        cls.step = int
+        cls.types.cur_value = int
+        cls.types.stop = int
+        cls.types.step = int
 
     def __init__(self, cur_value, stop, step):
         self.cur_value = cur_value

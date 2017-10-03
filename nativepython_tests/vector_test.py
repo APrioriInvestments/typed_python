@@ -56,6 +56,8 @@ class VectorTests(unittest.TestCase):
     def test_vec_of_vec(self):
         v = vector.Vector(vector.Vector(util.Int64))
 
+        v2 = vector.Vector(vector.Vector(util.Int64))
+
         instance = self.runtime.wrap(v)()
 
         instance.resize(10)
