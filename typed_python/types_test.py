@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.hash import sha_hash
-from typed_python.types import TypeFunction, ListOf, OneOf
+from typed_python.types import TypeFunction, ListOf, OneOf, Dict, ConstDict, TypedFunction, Class
 
 import unittest
 
@@ -29,8 +29,8 @@ class TypesTests(unittest.TestCase):
         self.assertTrue(isinstance(int_list_1, ListOf))
         self.assertFalse(isinstance(int_list_1, OneOf))
 
-        self.assertTrue(int_list_1.T is int)
-        self.assertTrue(str_list.T is str)
+        self.assertTrue(int_list_1.ElementType is int)
+        self.assertTrue(str_list.ElementType is str)
 
     def test_list_type(self):
         int_list = ListOf(int)()
@@ -58,6 +58,148 @@ class TypesTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             l[0] = 1.1
+
+    def test_dict_type(self):
+        l = Dict(int, int)()
         
+        l[10] = 20
+        l[20] = 30
+
+        self.assertEqual(len(l), 2)
+        self.assertEqual(l[10], 20)
+        self.assertEqual(l[20], 30)
+
+        with self.assertRaises(TypeError):
+            l[0] = 1.1
+
+        with self.assertRaises(TypeError):
+            l[1.1] = 0
+
+        with self.assertRaises(TypeError):
+            del l[1.1]
+
+        
+        self.assertTrue(10 in l)
+        
+        del l[10]
+
+        self.assertTrue(10 not in l)
+        self.assertTrue(20 in l)
+        self.assertTrue(30 not in l)
+
+    def test_const_dicts(self):
+        l = ConstDict(int, int)({10:10, 20:20})
+        l2 = ConstDict(int, int)({10:100, 30:300})
+
+        l3 = l + l2
+
+        self.assertTrue(10 in l)
+        self.assertTrue(10 in l2)
+        self.assertTrue(10 in l3)
+
+        
+    def test_types_with_none(self):
+        l = ListOf(OneOf(int, None, "hi"))()
+
+        l.append(10)
+        l.append(None)
+        l.append("hi")
+
+        self.assertEqual(len(l), 3)
+        self.assertEqual(l[0], 10)
+        self.assertEqual(l[1], None)
+        self.assertEqual(l[2], "hi")
+
+        l[0] = None
+
+        with self.assertRaises(TypeError):
+            l[0] = "hi2"
+        
+        with self.assertRaises(TypeError):
+            l[0] = 1.1
+
+    def test_compound_list_types(self):
+        l = ListOf(OneOf(ListOf(int), ListOf(float)))()
+
+        l.append(ListOf(int)())
+        l.append(ListOf(float)())
+
+        with self.assertRaises(TypeError):
+            l.append(ListOf(None))
+        
+    def test_function_types(self):
+        @TypedFunction
+        def f(x: int):
+            return x + 1
+
+        self.assertEqual(f(20),21)
+
+        with self.assertRaises(TypeError):
+            f("hi")
+
+    def test_function_types_bad_return_val(self):
+        @TypedFunction
+        def good(x: int) -> int:
+            return x + 1
+
+        @TypedFunction
+        def bad(x: int) -> str:
+            return x + 1
+
+        self.assertEqual(good(20),21)
+        
+        with self.assertRaises(TypeError):
+            bad(20)
+
+    def test_function_overload_dispatch(self):
+        @TypedFunction
+        def f_first(x: int) -> int:
+            return x + 1
+
+        @f_first.overload
+        def f(x: float) -> str:
+            return str(x)
+
+        self.assertEqual(f(20),21)
+        self.assertEqual(f(20.1),"20.1")
+        
+        with self.assertRaises(TypeError):
+            f("hi")
+        
+    def test_typed_classes(self):
+        class MyTypedClass(Class):
+            x = int
+
+            def __init__(self):
+                self.x = 0
+
+            def __init__(self, y: int):
+                self.x = y
+
+            def f(self, z: int) -> int:
+                return self.x + z
+
+            def f(self, z: int, z2: int) -> int:
+                return self.x + z + z2
+
+            def f(self, z: int, z2: int, z3: int) -> str:
+                return self.x + z + z2 + z3
+
+        c = MyTypedClass()
+        self.assertEqual(c.x, 0)
+
+        c = MyTypedClass(1)
+        self.assertEqual(c.x, 1)
+
+        self.assertEqual(c.f(10), 11)
+        self.assertEqual(c.f(10, 20), 31)
+
+        with self.assertRaises(TypeError):
+            c.f(10,20,30)
+
+        c.x = c.x + 1
+        self.assertEqual(c.x, 2)
 
 
+        with self.assertRaises(TypeError):
+            c.x = "hi"
