@@ -15,7 +15,7 @@
 from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
                                 ConstDict, TypedFunction, Class, PackedArray, \
-                                Pointer, Internal
+                                Pointer, Internal, init, UndefinedBehaviorException
 
 import unittest
 
@@ -24,6 +24,8 @@ class BasicTypedClass(Class):
     x = int
 
     def __init__(self):
+        #variables are already initialized - we can assign to them directly
+        #this only works if everything is default constructible.
         self.x = 0
 
     def __init__(self, y: int):
@@ -193,6 +195,9 @@ class TypesTests(unittest.TestCase):
         c = BasicTypedClass(1)
         self.assertEqual(c.x, 1)
 
+        print("BasicTypedClass.f is ", BasicTypedClass.f)
+        print("got ", c.f)
+
         self.assertEqual(c.f(10), 11)
         self.assertEqual(c.f(10, 20), 31)
 
@@ -235,7 +240,7 @@ class TypesTests(unittest.TestCase):
         #this is always OK
         i.ptr(0) + 2
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(UndefinedBehaviorException):
             (i.ptr(0) + 2).set(50)
 
 
@@ -268,12 +273,12 @@ class TypesTests(unittest.TestCase):
 
         i.resize(2)
         
-        with self.assertRaises(Exception):
+        with self.assertRaises(UndefinedBehaviorException):
             five_ptr.get()
 
         i.resize(10)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(UndefinedBehaviorException):
             five_val.x
         
     def test_internal_vs_noninternal_members(self):
@@ -307,9 +312,6 @@ class TypesTests(unittest.TestCase):
 
         self.assertTrue(n.b is b)
         self.assertFalse(i.b is b)
-        
-
-
 
     def test_packed_arrays_of_classes_with_classes(self):
         class NestedClass(Class):
@@ -324,3 +326,33 @@ class TypesTests(unittest.TestCase):
         self.assertIsInstance(i[0], NestedClass)
         self.assertIsInstance(i[0].btc, BasicTypedClass)
 
+    def test_class_constructors_and_destructors(self):
+        l = []
+
+        class TestClass(Class):
+            x = int
+
+            def __init__(self):
+                self.x = 10
+
+            def __constructor__(self, arg: int):
+                init(self).x(arg)
+
+            #this one throws
+            def __constructor__(self, arg: int, arg2: int):
+                self.x = arg
+
+            def __destructor__(self):
+                l.append(self)
+
+        self.assertEqual(TestClass().x, 10)
+        self.assertEqual(TestClass(20).x, 20)
+
+        with self.assertRaises(UndefinedBehaviorException):
+            TestClass(20,30)
+
+        a = PackedArray(TestClass)()
+        a.resize(1)
+        a.resize(0)
+
+        self.assertEqual(len(l), 1)

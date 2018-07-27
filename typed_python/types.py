@@ -49,6 +49,10 @@ def toTuple(t):
         return t
     return tuple(toTuple(x) for x in t)
 
+class UndefinedBehaviorException(Exception):
+    """For errors so bad that compiled code would be expected to abort!"""
+    pass
+
 def MakeMetaclassFunction(name, **keywords):
     def TypeFunction(func):
         """Decorator that makes regular functions into memoized TypeFunctions."""
@@ -120,15 +124,26 @@ def TryTypeConvert(type_filter, value, allow_construct_new=False):
 
 @Memoized
 def OneOf(*args):
+    assert args, "Need at least one option for OneOf to make sense"
+
     assert IsTypeFilterTuple(args)
+
+    args = set(args)
+
+    if len(args) == 1:
+        #if we only have one item, then we're not OneOf - we're just that!
+        return args[0]
 
     class OneOf:
         __typed_python_type_filter__ = True
 
         options = args
         
+        def __new__(cls):
+            raise TypeError("OneOf is a TypeFilter, not an actual Type, so you can't instantiate it.")
+
         def __init__(self, *args, **kwargs):
-            raise Exception("OneOf is a TypeFilter, not an actual Type, so you can't instantiate it.")
+            raise TypeError("OneOf is a TypeFilter, not an actual Type, so you can't instantiate it.")
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
@@ -146,7 +161,7 @@ class Any:
     __typed_python_type_filter__ = True
 
     def __init__(self, *args, **kwargs):
-        raise Exception("Any is a TypeFilter, not an actual Type, so you can't instantiate it.")
+        raise TypeError("Any is a TypeFilter, not an actual Type, so you can't instantiate it.")
 
     @staticmethod
     def __typed_python_try_convert_instance__(value, allow_construct_new):
@@ -475,7 +490,7 @@ def OverloadedFunction(term_types):
 
     return OverloadedFunction_
 
-def TypedFunction(f):
+def TypedFunction(f, wrapper=None):
     if isinstance(f, types.FunctionType):
         spec = inspect.getfullargspec(f)
         if spec.varargs or spec.varkw or spec.defaults or spec.kwonlyargs or spec.kwonlydefaults:
@@ -489,7 +504,7 @@ def TypedFunction(f):
 
         return_type = annotationToTypeFilter(spec.annotations.get('return'))
 
-        return Function(return_type, arg_types)(f)
+        return Function(return_type, arg_types)(f if not wrapper else wrapper(f))
 
     raise Exception("Don't know how to type %s" % f)
 
@@ -505,14 +520,28 @@ class ClassMetaNamespace:
         if k not in self.ns:
             self.order.append(k)
 
-        if isinstance(v, types.FunctionType) and (k[:2] != "__" or k == "__init__"):
+        special = ("__init__", "__constructor__", "__assign__", "__copy_constructor__", "__destructor__")
+
+        def initToConstructor(initFun):
+            def __constructor__(self, *args, **kwargs):
+                type(self).__typed_python_class_pre_init__(self)
+                initFun(self, *args, **kwargs)
+            return __constructor__
+
+        if isinstance(v, types.FunctionType) and (k[:2] != "__" or k in special):
+            if k == '__init__':
+                k = '__constructor__'
+                v = TypedFunction(v, initToConstructor)
+            else:
+                v = TypedFunction(v)
+
             if k in self.ns:
                 if isinstance(self.ns[k], (OverloadedFunction, Function)):
-                    self.ns[k] = self.ns[k].addTerm(TypedFunction(v))
+                    self.ns[k] = self.ns[k].addTerm(v)
                 else:
-                    self.ns[k] = TypedFunction(v)
+                    self.ns[k] = v
             else:
-                self.ns[k] = TypedFunction(v)
+                self.ns[k] = v
         else:
             assert k not in self.ns, "Cannot define a class member twice unless its a function overload."
             self.ns[k] = v
@@ -541,13 +570,68 @@ class ClassMeta(type):
             if isinstance(res[k], (OverloadedFunction, Function)):
                 res[k] = wrapFunction(k, res[k])
             elif IsTypeFilter(res[k]) and k[:2] != "__":
-                members[k] = res[k]
                 if isinstance(res[k], Internal):
                     internal_members[k] = res[k].ElementType
                     members[k] = res[k].ElementType
+                else:
+                    members[k] = res[k]
+
+        #pop out the user's definitions of their functions. We don't want them in the
+        #actual class.
+        constructor_fun = res.pop('__constructor__', None)
+        copy_constructor_fun = res.pop('__copy_constructor__', None)
+        assign_fun = res.pop('__assign__', None)
+        destroy_fun = res.pop('__destructor__', None)
 
         res['__typed_python_class_members__'] = members
         res['__typed_python_class_internal_members__'] = internal_members
+
+        def __pre_init__(self):
+            for m,t in members.items():
+                if self.__dict__[m] is not Uninitialized:
+                    raise UndefinedBehaviorException("Variable %s is already initialized" % m)
+
+                self.__dict__[m] = _construct(t, self.__typed_python_class_context__[0], self.__typed_python_class_context__[1] + (m,))
+
+        def __destructor__(self):
+            try:
+                destroy_fun(self)
+            except:
+                #throwing exceptions in destructors is bad
+                self.__typed_python_class_context__ = None
+
+                try:
+                    for k,v in internal_members.items():
+                        object.__getattribute__(self, k).__destructor__()
+                    return
+                except:
+                    #throwing doubly is an abort situation!
+                    raise UndefinedBehaviorException("Exception thrown in destructor exception handling routine. This would crash in c++.")
+
+            self.__typed_python_class_context__ = None
+
+            for k,v in internal_members.items():
+                object.__getattribute__(self, k).__destructor__()
+
+        def __constructor__(self):
+            __pre_init__(self)
+
+        def __copy_constructor__(self, other):
+            for m,t in members.items():
+                if self.__dict__[m] is not Uninitialized:
+                    raise UndefinedBehaviorException("Variable %s is already initialized" % m)
+
+                self.__dict__[m] = _copy_construct(t, getattr(other, m), self.__typed_python_class_context__[0], self.__typed_python_class_context__[1] + (m,))
+
+        def __assign__(self, other):
+            for m,t in members.items():
+                _assign(self.__dict__, m, getattr(other, m))
+
+        res['__typed_python_class_pre_init__'] = __pre_init__
+        res['__destructor__'] = __destructor__
+        res['__constructor__'] = constructor_fun or __constructor__
+        res['__copy_constructor__'] = copy_constructor_fun or __copy_constructor__
+        res['__assign__'] = assign_fun or __assign__
 
         return type.__new__(cls, name, bases, res, **kwds)
 
@@ -565,21 +649,39 @@ def Internal(t):
 
     return Internal
 
-def _construct(eltType, context_owner, context_path):
-    if isinstance(eltType, ClassMeta):
-        res = eltType()
-        res.__context__ = (context_owner, context_path)
-        res.__constructor__()
-        return res
-    return eltType()
+def _construct(cls, context_owner, context_path, *args, **kwargs):
+    if isinstance(cls, ClassMeta):
+        res = object.__new__(cls)
+        res.__typed_python_class_context__ = (context_owner, context_path)
 
-def _copy_construct(eltType, otherVal, context_owner, context_path):
-    if isinstance(eltType, ClassMeta):
-        res = eltType()
-        res.__context__ = (context_owner, context_path)
-        res.__copy_constructor__(otherVal)
+        for m in cls.__typed_python_class_members__:
+            res.__dict__[m] = Uninitialized
+        
+        res.__constructor__(*args, **kwargs)
+        
         return res
-    return eltType()
+
+    if not args and not kwargs:
+        return cls()
+
+    if len(args) == 1 and not kwargs:
+        return TypeConvert(cls, args[0])
+
+    raise TypeError("Can't construct a %s with args %s/%s" % (cls, args, kwargs))
+
+def _copy_construct(cls, otherVal, context_owner, context_path):
+    if isinstance(cls, ClassMeta):
+        res = object.__new__(cls)
+        res.__typed_python_class_context__ = (context_owner, context_path)
+
+        for m in cls.__typed_python_class_members__:
+            res.__dict__[m] = Uninitialized
+        
+        res.__copy_constructor__(otherVal)
+
+        return res
+
+    return cls()
 
 def _assign(container, key, val):
     elt = container[key]
@@ -589,6 +691,28 @@ def _assign(container, key, val):
     else:
         container[key] = val
 
+class init:
+    def __init__(self, inst):
+        self.__inst = inst
+
+    def __getattr__(self, memberName):
+        t = type(self.__inst).__typed_python_class_members__.get(memberName,None)
+        if not t:
+            raise TypeError("Can't initialize non-member " + memberName)
+
+        def call(*args, **kwargs):
+            assert self.__inst.__dict__.get(memberName) is Uninitialized
+            self.__inst.__dict__[memberName] = _construct(
+                t, 
+                self.__inst.__typed_python_class_context__[0], 
+                self.__inst.__typed_python_class_context__[1] + (memberName,),
+                *args,
+                **kwargs
+                )
+
+        return call
+
+
 class Class(object, metaclass=ClassMeta):
     """Base class for all strongly-typed classes."""
     __typed_python_type__ = True
@@ -596,42 +720,23 @@ class Class(object, metaclass=ClassMeta):
     def __new__(cls, *args, **kwargs):
         res = object.__new__(cls)
 
-        res.__context__ = (res, ())
+        res.__typed_python_class_context__ = (res, ())
         for m in cls.__typed_python_class_members__:
             res.__dict__[m] = Uninitialized
+        
+        res.__constructor__(*args, **kwargs)
 
         return res
-
-    def __init__(self):
-        print(self.__dict__)
-        self.__constructor__()
-
-    def __destructor__(self):
-        self.__context__ = None
-
-        for k,v in type(self).__typed_python_class_internal_members__.items():
-            object.__getattribute__(self, k).__destructor__()
-
-    def __constructor__(self):
-        for m,t in type(self).__typed_python_class_members__.items():
-            if self.__dict__[m] is Uninitialized:
-                self.__dict__[m] = _construct(t, self.__context__[0], self.__context__[1] + (m,))
-
-    def __copy_constructor__(self, other):
-        for m,t in type(self).__typed_python_class_members__.items():
-            if self.__dict__[m] is Uninitialized:
-                self.__dict__[m] = _copy_construct(t, getattr(other, m), self.__context__[0], self.__context__[1] + (m,))
-
-    def __assign__(self, other):
-        for m,t in type(self).__typed_python_class_members__.items():
-            _assign(self.__dict__, m, getattr(other, m))
 
     def __setattr__(self, k, v):
         if k[:2] == '__':
             return object.__setattr__(self, k, v)
 
-        if self.__context__ is None:
-            raise Exception("Instance was deleted already!")
+        if self.__typed_python_class_context__ is None:
+            raise UndefinedBehaviorException("Instance was deleted already!")
+
+        if self.__dict__.get(k) is Uninitialized:
+            raise UndefinedBehaviorException("Can't assign to an uninitialized value")
 
         int_type = type(self).__typed_python_class_internal_members__.get(k, None)
         if int_type is not None:
@@ -646,13 +751,12 @@ class Class(object, metaclass=ClassMeta):
 
         raise AttributeError(k)
 
-
     def __getattribute__(self, attr):
         if attr[:2] == "__":
             return object.__getattribute__(self, attr)
 
-        if object.__getattribute__(self, '__context__') is None:
-            raise Exception("Instance was deleted already!")
+        if object.__getattribute__(self, '__typed_python_class_context__') is None:
+            raise UndefinedBehaviorException("Instance was deleted already!")
 
         return object.__getattribute__(self, attr)
 
@@ -673,10 +777,14 @@ def PackedArray(t):
         def __init__(self, iterable = ()):
             self.__contents__ = [_copy_construct(t, val, self, (ix,)) for ix,val in enumerate(iterable)]
 
-        def __getitem__(self, x):
-            return self.__contents__[x]
+        def __getitem__(self, ix):
+            if ix < 0 or ix >= len(self.__contents__):
+                raise IndexError()
+            return self.__contents__[ix]
 
         def __setitem__(self, ix, x):
+            if ix < 0 or ix >= len(self.__contents__):
+                raise IndexError()
             _assign(self.__contents__, ix, TypeConvert(t, x))
 
         def append(self, x):
@@ -735,7 +843,7 @@ def Pointer(t):
     class Pointer:
         ElementType = t
 
-        def __init__(self, value, container, offset, internal_guard = None):
+        def __init__(self, value=None, container=None, offset=None, internal_guard = None):
             """Initialize a Pointer. Either value or (container, offset) must be populated.
 
             if value is populated, then it's a class instance.
@@ -743,7 +851,15 @@ def Pointer(t):
             if container is not populated, but offset is something other than zero, then this
                 is illegal pointer arithmetic!
             """
+            if value is None and container is None and offset is None:
+                #this constructs the null pointer
+                self.__value__ = None
+                self.__container__ = None
+                self.__offset__ = None
+                return
+
             assert internal_guard is _PrivateGuard, "only internal code should call this."
+
 
             self.__value__ = value
             self.__container__ = container
@@ -759,20 +875,26 @@ def Pointer(t):
 
         def get(self):
             if self.__offset__ is not None and self.__container__ is None:
-                raise Exception("Invalid Pointer Dereference")
+                raise UndefinedBehaviorException("Invalid Pointer Dereference")
 
             if self.__value__ is not None:
                 return self.__value__
             else:
                 if self.__offset__ < 0 or self.__offset__ >= len(self.__container__):
-                    raise Exception("Invalid Pointer Dereference")
+                    raise UndefinedBehaviorException("Invalid Pointer Dereference")
 
                 return self.__container__[self.__offset__]
 
         def set(self, arg):
+            if self.__offset__ is not None and self.__container__ is None:
+                raise UndefinedBehaviorException("Invalid Pointer Dereference")
+
             if self.__value__ is not None:
                 self.__value__.__assign__(arg)
             else:
+                if self.__offset__ < 0 or self.__offset__ >= len(self.__container__):
+                    raise UndefinedBehaviorException("Invalid Pointer Dereference")
+
                 if isinstance(t, ClassMeta):
                     self.__container__[self.__offset__].__assign__(arg)
                 else:
