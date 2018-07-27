@@ -13,9 +13,28 @@
 #   limitations under the License.
 
 from typed_python.hash import sha_hash
-from typed_python.types import TypeFunction, ListOf, OneOf, Dict, ConstDict, TypedFunction, Class
+from typed_python.types import TypeFunction, ListOf, OneOf, Dict, ConstDict, TypedFunction, Class, PackedArray
 
 import unittest
+
+
+class BasicTypedClass(Class):
+    x = int
+
+    def __init__(self):
+        self.x = 0
+
+    def __init__(self, y: int):
+        self.x = y
+
+    def f(self, z: int) -> int:
+        return self.x + z
+
+    def f(self, z: int, z2: int) -> int:
+        return self.x + z + z2
+
+    def f(self, z: int, z2: int, z3: int) -> str:
+        return self.x + z + z2 + z3
 
 class TypesTests(unittest.TestCase):
     def test_type_function_memoization(self):
@@ -27,8 +46,7 @@ class TypesTests(unittest.TestCase):
         self.assertTrue(int_list_1 is not str_list)
 
         self.assertTrue(isinstance(int_list_1, ListOf))
-        self.assertFalse(isinstance(int_list_1, OneOf))
-
+        
         self.assertTrue(int_list_1.ElementType is int)
         self.assertTrue(str_list.ElementType is str)
 
@@ -167,28 +185,10 @@ class TypesTests(unittest.TestCase):
             f("hi")
         
     def test_typed_classes(self):
-        class MyTypedClass(Class):
-            x = int
-
-            def __init__(self):
-                self.x = 0
-
-            def __init__(self, y: int):
-                self.x = y
-
-            def f(self, z: int) -> int:
-                return self.x + z
-
-            def f(self, z: int, z2: int) -> int:
-                return self.x + z + z2
-
-            def f(self, z: int, z2: int, z3: int) -> str:
-                return self.x + z + z2 + z3
-
-        c = MyTypedClass()
+        c = BasicTypedClass()
         self.assertEqual(c.x, 0)
 
-        c = MyTypedClass(1)
+        c = BasicTypedClass(1)
         self.assertEqual(c.x, 1)
 
         self.assertEqual(c.f(10), 11)
@@ -203,3 +203,14 @@ class TypesTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             c.x = "hi"
+
+    def test_packed_arrays(self):
+        i = PackedArray(int)()
+
+        i.append(10)
+        self.assertEqual(i[0], 10)
+        self.assertEqual(len(i), 1)
+
+        i.resize(0)
+
+        self.assertEqual(len(i), 0)

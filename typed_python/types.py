@@ -32,10 +32,7 @@ def IsTypeFilter(t):
     if IsType(t):
         return True
 
-    if isinstance(t, OneOf):
-        return True
-
-    return False
+    return hasattr(t, "__typed_python_type_filter__")
 
 def IsTypeFilterTuple(t):
     return isinstance(t, tuple) and all(IsTypeFilter(e) for e in t)
@@ -52,32 +49,42 @@ def toTuple(t):
         return t
     return tuple(toTuple(x) for x in t)
 
-def TypeFunction(func):
-    """Decorator that makes regular functions into memoized TypeFunctions."""
-    lookup = {}
+def MakeMetaclassFunction(name, **keywords):
+    def TypeFunction(func):
+        """Decorator that makes regular functions into memoized TypeFunctions."""
+        lookup = {}
 
-    class MetaMetaClass(type):
-        def __instancecheck__(self, instance):
-            if not hasattr(instance, '__typed_python_metaclass__'):
-                return False
+        class MetaMetaClass(type):
+            def __instancecheck__(self, instance):
+                if not hasattr(instance, '__typed_python_metaclass__'):
+                    return False
 
-            return instance.__typed_python_metaclass__ is MetaClass
+                return instance.__typed_python_metaclass__ is MetaClass
 
-    class MetaClass(metaclass=MetaMetaClass):
-        def __new__(self, *args, **kwargs):
-            args = toTuple(args)
-            kwargs = toTuple(sorted(kwargs.items()))
+        class MetaClass(metaclass=MetaMetaClass):
+            def __new__(self, *args, **kwargs):
+                args = toTuple(args)
+                kwargs = toTuple(sorted(kwargs.items()))
 
-            lookup_key = (TypeFunction, func.__name__, args, kwargs)
+                lookup_key = (args, kwargs)
 
-            if lookup_key not in lookup:
-                lookup[lookup_key] = func(*args, **dict(kwargs))
-                lookup[lookup_key].__typed_python_type__ = True
-                lookup[lookup_key].__typed_python_metaclass__ = MetaClass
+                if lookup_key not in lookup:
+                    lookup[lookup_key] = func(*args, **dict(kwargs))
+                    lookup[lookup_key].__typed_python_type__ = True
+                    lookup[lookup_key].__typed_python_metaclass__ = MetaClass
 
-            return lookup[lookup_key]
+                return lookup[lookup_key]
 
-    return MetaClass #return actual_func
+        MetaClass.__name__ = func.__name__
+
+        return MetaClass #return actual_func
+    
+    TypeFunction.__name__ = name
+
+    return TypeFunction
+
+TypeFunction = MakeMetaclassFunction("TypeFunction", __typed_python_type__ = True)
+Memoized = MakeMetaclassFunction("Memoized")
 
 def TypeConvert(type_filter, value, allow_construct_new=False):
     """Return a converted value, or throw an exception"""
@@ -109,11 +116,13 @@ def TryTypeConvert(type_filter, value, allow_construct_new=False):
 
     return type_filter.__typed_python_try_convert_instance__(value, allow_construct_new)
 
-@TypeFunction
+@Memoized
 def OneOf(*args):
     assert IsTypeFilterTuple(args)
 
     class OneOf:
+        __typed_python_type_filter__ = True
+
         options = args
         
         def __init__(self, *args, **kwargs):
@@ -132,7 +141,7 @@ def OneOf(*args):
     return OneOf
 
 class Any:
-    __typed_python_type__ = True
+    __typed_python_type_filter__ = True
 
     def __init__(self, *args, **kwargs):
         raise Exception("Any is a TypeFilter, not an actual Type, so you can't instantiate it.")
@@ -517,17 +526,169 @@ class ClassMeta(type):
 
     def __new__(cls, name, bases, namespace, **kwds):
         res = dict(namespace.ns)
+
+        members = {}
+
         for k in res:
             if isinstance(res[k], (OverloadedFunction, Function)):
                 res[k] = wrapFunction(k, res[k])
+            elif IsTypeFilter(res[k]):
+                members[k] = res[k]
+
+        res['__typed_python_class_members__'] = members
 
         return type.__new__(cls, name, bases, res, **kwds)
 
 class Class(object, metaclass=ClassMeta):
+    """Base class for all strongly-typed classes."""
     __typed_python_type__ = True
 
+    def __new__(cls, *args, **kwargs):
+        res = object.__new__(cls)
+        res.__deleted__ = False
+        return res
+
+    def __trigger_deletion__(self):
+        self.__deleted__ = True
+
+        for k,v in __typed_python_class_members__.iteritems():
+            if isinstance(v, Internal):
+                object.__getattribute__(self, k).__trigger_deletion__()
+
     def __setattr__(self, k, v):
+        if k[:2] == '__':
+            return object.__setattr__(self, k, v)
+
+        if self.__deleted__:
+            raise Exception("Instance was deleted already!")
+
         t = type(self).__dict__.get(k, None)
+
         if IsTypeFilter(t):
             v = TypeConvert(t, v)
+
         return object.__setattr__(self, k, v)
+
+    def __getattribute__(self, attr):
+        if attr[:2] == "__":
+            return object.__getattribute__(self, attr)
+
+        if object.__getattribute__(self, '__deleted__'):
+            raise Exception("Instance was deleted already!")
+
+        t = type(self).__dict__.get(attr, None)
+
+        if isinstance(t, Internal):
+            return InternalReference(t.ElementType)(self.__dict__.get(attr), self, (attr,))
+
+        return object.__getattribute__(self, attr)
+
+@TypeFunction
+def PackedArray(t):
+    assert IsTypeFilter(t)
+    
+    class PackedArray:
+        ElementType = t
+
+        def __init__(self, iterable = ()):
+            self.__contents__ = [TypeConvert(t, x) for x in iterable]
+
+        def __getitem__(self, x):
+            return self.__contents__[x]
+
+        def __setitem__(self, ix, x):
+            self.__contents__[ix] = TypeConvert(t, x)
+
+        def append(self, x):
+            self.__contents__.append(TypeConvert(t, x))
+
+        def resize(self, ix):
+            #resize the array.
+            if ix > len(self.__contents__):
+                raise Exception("don't have a model of default-construction yet")
+            else:
+                if isinstance(t, ClassMeta):
+                    for x in self.__contents__[ix:]:
+                        x.__deleted__ = True
+
+                    #todo call destructor here
+                self.__contents__ = self.__contents__[:ix]
+
+        def ptr(self, ix):
+            assert ix >= 0 and ix < self.__contents__
+            return Pointer(self.__contents__[ix], self, (ix,))
+
+        def __len__(self):
+            return len(self.__contents__)
+
+        @staticmethod
+        def __typed_python_try_convert_instance__(value, allow_construct_new):
+            if not isinstance(value, PackedArray):
+                return None
+            return (value,)
+
+    PackedArray.__name__ == "PackedArray(%s)" % str(t)
+
+    return PackedArray
+
+@Memoized
+def Internal(t):
+    assert isinstance(t, ClassMeta)
+
+    class Internal:
+        ElementType = t
+        
+    Internal.__name__ = "Internal(%s)" % repr(t)
+
+    return Internal
+
+class _PrivateGuard:
+    """Class used as a token to provide access to Pointer construction.
+
+    Intended to prevent users from accidentally constructing Pointer
+    objects directly.
+    """
+    pass
+
+def ptr(x):
+    return Pointer(type(x))(x, (), _PrivateGuard)
+
+@TypeFunction
+def Pointer(t):
+    assert IsTypeFilter(t)
+
+    class Pointer:
+        ElementType = t
+
+        def __init__(self, value, guard, chain, internal_guard = None):
+            assert internal_guard is _PrivateGuard, "only internal code should call this."
+
+            self.__value__ = value
+            self.__guard__ = guard
+            self.__chain__ = chain
+
+        def get(self):
+            v = self.__value__
+            for c in self.__chain__:
+                v = v.__dict__[c]
+            return v
+
+        def set(self, arg):
+            arg = TypeConvert(t, arg)
+
+            v = self.__value__
+            
+            for c in self.__chain__[:-1]:
+                v = v.__dict__[c]
+
+            v.__dict__[self.__chain__[-1]] = arg
+
+        @staticmethod
+        def __typed_python_try_convert_instance__(value, allow_construct_new):
+            if not isinstance(value, Pointer):
+                return None
+            return (value,)
+
+    Pointer.__name__ == "Pointer" + repr(args)
+
+    return Pointer
