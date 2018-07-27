@@ -94,8 +94,10 @@ def TypeConvert(type_filter, value, allow_construct_new=False):
         raise TypeError("Can't convert %s to %s" % (value, type_filter))
 
     res = type_filter.__typed_python_try_convert_instance__(value, allow_construct_new)
+
     if res:
         return res[0]
+    
     raise TypeError("Can't convert %s to %s" % (value, type_filter))
 
 def TryTypeConvert(type_filter, value, allow_construct_new=False):
@@ -494,11 +496,15 @@ def TypedFunction(f):
 class ClassMetaNamespace:
     def __init__(self):
         self.ns = {}
+        self.order = []
 
     def __getitem__(self, k):
         return self.ns[k]
 
     def __setitem__(self, k, v):
+        if k not in self.ns:
+            self.order.append(k)
+
         if isinstance(v, types.FunctionType) and (k[:2] != "__" or k == "__init__"):
             if k in self.ns:
                 if isinstance(self.ns[k], (OverloadedFunction, Function)):
@@ -508,6 +514,7 @@ class ClassMetaNamespace:
             else:
                 self.ns[k] = TypedFunction(v)
         else:
+            assert k not in self.ns, "Cannot define a class member twice unless its a function overload."
             self.ns[k] = v
 
     def __contains__(self, k):
@@ -528,16 +535,58 @@ class ClassMeta(type):
         res = dict(namespace.ns)
 
         members = {}
+        internal_members = {}
 
         for k in res:
             if isinstance(res[k], (OverloadedFunction, Function)):
                 res[k] = wrapFunction(k, res[k])
-            elif IsTypeFilter(res[k]):
+            elif IsTypeFilter(res[k]) and k[:2] != "__":
                 members[k] = res[k]
+                if isinstance(res[k], Internal):
+                    internal_members[k] = res[k]
 
         res['__typed_python_class_members__'] = members
+        res['__typed_python_class_internal_members__'] = internal_members
 
         return type.__new__(cls, name, bases, res, **kwds)
+
+class Uninitialized:
+    pass
+
+@Memoized
+def Internal(t):
+    assert isinstance(t, ClassMeta)
+
+    class Internal:
+        ElementType = t
+        
+    Internal.__name__ = "Internal(%s)" % repr(t)
+
+    return Internal
+
+def _construct(eltType, context_owner, context_path):
+    if isinstance(eltType, ClassMeta):
+        res = eltType()
+        res.__context__ = (context_owner, context_path)
+        res.__constructor__()
+        return res
+    return eltType()
+
+def _copy_construct(eltType, otherVal, context_owner, context_path):
+    if isinstance(eltType, ClassMeta):
+        res = eltType()
+        res.__context__ = (context_owner, context_path)
+        res.__copy_constructor__(otherVal)
+        return res
+    return eltType()
+
+def _assign(container, key, val):
+    elt = container[key]
+
+    if isinstance(elt, Class):
+        elt.__assign__(val)
+    else:
+        container[key] = val
 
 class Class(object, metaclass=ClassMeta):
     """Base class for all strongly-typed classes."""
@@ -545,21 +594,38 @@ class Class(object, metaclass=ClassMeta):
 
     def __new__(cls, *args, **kwargs):
         res = object.__new__(cls)
-        res.__deleted__ = False
+
+        res.__context__ = (res, ())
+        for m in cls.__typed_python_class_members__:
+            res.__dict__[m] = Uninitialized
+
         return res
 
-    def __trigger_deletion__(self):
-        self.__deleted__ = True
+    def __destructor__(self):
+        self.__context__ = None
 
-        for k,v in __typed_python_class_members__.iteritems():
-            if isinstance(v, Internal):
-                object.__getattribute__(self, k).__trigger_deletion__()
+        for k,v in type(self).__typed_python_class_internal_members__.iteritems():
+            object.__getattribute__(self, k).__destructor__()
+
+    def __constructor__(self):
+        for m,t in type(self).__typed_python_class_members__.items():
+            if self.__dict__[m] is Uninitialized:
+                self.__dict__[m] = _construct(t, self.__context__[0], self.__context__[1] + (m,))
+
+    def __copy_constructor__(self, other):
+        for m,t in type(self).__typed_python_class_members__.items():
+            if self.__dict__[m] is Uninitialized:
+                self.__dict__[m] = _copy_construct(t, getattr(other, m), self.__context__[0], self.__context__[1] + (m,))
+
+    def __assign__(self, other):
+        for m,t in type(self).__typed_python_class_members__.items():
+            _assign(self.__dict__, m, getattr(other, m))
 
     def __setattr__(self, k, v):
         if k[:2] == '__':
             return object.__setattr__(self, k, v)
 
-        if self.__deleted__:
+        if self.__context__ is None:
             raise Exception("Instance was deleted already!")
 
         t = type(self).__dict__.get(k, None)
@@ -573,7 +639,7 @@ class Class(object, metaclass=ClassMeta):
         if attr[:2] == "__":
             return object.__getattribute__(self, attr)
 
-        if object.__getattribute__(self, '__deleted__'):
+        if object.__getattribute__(self, '__context__') is None:
             raise Exception("Instance was deleted already!")
 
         t = type(self).__dict__.get(attr, None)
@@ -583,6 +649,13 @@ class Class(object, metaclass=ClassMeta):
 
         return object.__getattribute__(self, attr)
 
+    @classmethod
+    def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
+        if not isinstance(value, cls):
+            return None
+        return (value,)
+
+
 @TypeFunction
 def PackedArray(t):
     assert IsTypeFilter(t)
@@ -591,13 +664,13 @@ def PackedArray(t):
         ElementType = t
 
         def __init__(self, iterable = ()):
-            self.__contents__ = [TypeConvert(t, x) for x in iterable]
+            self.__contents__ = [_copy_construct(t, val, self, (ix,)) for ix,val in enumerate(iterable)]
 
         def __getitem__(self, x):
             return self.__contents__[x]
 
         def __setitem__(self, ix, x):
-            self.__contents__[ix] = TypeConvert(t, x)
+            _assign(self.__contents__, ix, TypeConvert(t, x))
 
         def append(self, x):
             self.__contents__.append(TypeConvert(t, x))
@@ -605,18 +678,18 @@ def PackedArray(t):
         def resize(self, ix):
             #resize the array.
             if ix > len(self.__contents__):
-                raise Exception("don't have a model of default-construction yet")
+                while len(self.__contents__) < ix:
+                    self.__contents__.append(_construct(t, self, (ix,)))
             else:
                 if isinstance(t, ClassMeta):
                     for x in self.__contents__[ix:]:
-                        x.__deleted__ = True
+                        x.__destructor__()
 
-                    #todo call destructor here
                 self.__contents__ = self.__contents__[:ix]
 
         def ptr(self, ix):
-            assert ix >= 0 and ix < self.__contents__
-            return Pointer(self.__contents__[ix], self, (ix,))
+            assert ix >= 0 and ix < len(self.__contents__)
+            return Pointer(t)(None, self, ix, _PrivateGuard)
 
         def __len__(self):
             return len(self.__contents__)
@@ -631,17 +704,6 @@ def PackedArray(t):
 
     return PackedArray
 
-@Memoized
-def Internal(t):
-    assert isinstance(t, ClassMeta)
-
-    class Internal:
-        ElementType = t
-        
-    Internal.__name__ = "Internal(%s)" % repr(t)
-
-    return Internal
-
 class _PrivateGuard:
     """Class used as a token to provide access to Pointer construction.
 
@@ -651,7 +713,9 @@ class _PrivateGuard:
     pass
 
 def ptr(x):
-    return Pointer(type(x))(x, (), _PrivateGuard)
+    assert isinstance(x, Class)
+
+    return Pointer(type(x))(x, _PrivateGuard)
 
 @TypeFunction
 def Pointer(t):
@@ -660,28 +724,49 @@ def Pointer(t):
     class Pointer:
         ElementType = t
 
-        def __init__(self, value, guard, chain, internal_guard = None):
+        def __init__(self, value, container, offset, internal_guard = None):
+            """Initialize a Pointer. Either value or (container, offset) must be populated.
+
+            if value is populated, then it's a class instance.
+            if container is populated, then this is a member of a container.
+            if container is not populated, but offset is something other than zero, then this
+                is illegal pointer arithmetic!
+            """
             assert internal_guard is _PrivateGuard, "only internal code should call this."
 
             self.__value__ = value
-            self.__guard__ = guard
-            self.__chain__ = chain
+            self.__container__ = container
+            self.__offset__ = offset
+
+        def __add__(self, offset):
+            new_offset = (self.__offset__ or 0) + offset
+            
+            if new_offset == 0 and self.__container__ is None:
+                new_offset = 0
+
+            return Pointer(self.__value__, self.__container__, new_offset, _PrivateGuard)
 
         def get(self):
-            v = self.__value__
-            for c in self.__chain__:
-                v = v.__dict__[c]
-            return v
+            if self.__offset__ is not None and self.__container__ is None:
+                raise Exception("Invalid Pointer Dereference")
+
+            if self.__value__ is not None:
+                return self.__value__
+            else:
+                if self.__offset__ < 0 or self.__offset__ >= len(self.__container__):
+                    raise Exception("Invalid Pointer Dereference")
+
+                return self.__container__[self.__offset__]
 
         def set(self, arg):
-            arg = TypeConvert(t, arg)
-
-            v = self.__value__
-            
-            for c in self.__chain__[:-1]:
-                v = v.__dict__[c]
-
-            v.__dict__[self.__chain__[-1]] = arg
+            if self.__value__ is not None:
+                self.__value__.__assign__(arg)
+            else:
+                if isinstance(t, ClassMeta):
+                    self.__container__[self.__offset__].__assign__(arg)
+                else:
+                    #this is a container of non-classes, so we can just plug the value in
+                    self.__container__[self.__offset__] = TypeConvert(t, arg)
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
@@ -689,6 +774,9 @@ def Pointer(t):
                 return None
             return (value,)
 
-    Pointer.__name__ == "Pointer" + repr(args)
+    Pointer.__name__ == "Pointer" + repr(t)
 
     return Pointer
+
+
+

@@ -13,7 +13,9 @@
 #   limitations under the License.
 
 from typed_python.hash import sha_hash
-from typed_python.types import TypeFunction, ListOf, OneOf, Dict, ConstDict, TypedFunction, Class, PackedArray
+from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
+                                ConstDict, TypedFunction, Class, PackedArray, \
+                                Pointer
 
 import unittest
 
@@ -204,13 +206,60 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             c.x = "hi"
 
-    def test_packed_arrays(self):
+    def test_packed_arrays_of_integers(self):
         i = PackedArray(int)()
 
         i.append(10)
         self.assertEqual(i[0], 10)
         self.assertEqual(len(i), 1)
 
+        i.append(20)
+
+        self.assertIsInstance(i.ptr(0), Pointer)
+        self.assertIsInstance(i.ptr(0), Pointer(int))
+
+        i.ptr(0).set(30)
+
+        self.assertEqual(i[0], 30)
+        self.assertEqual(i[1], 20)
+
+        i.ptr(1).set(40)
+        self.assertEqual(i[1], 40)
+
+        (i.ptr(0) + 1).set(50)
+        self.assertEqual(i[1], 50)
+
+        with self.assertRaises(Exception):
+            i.ptr(2)
+
+        #this is always OK
+        i.ptr(0) + 2
+
+        with self.assertRaises(Exception):
+            (i.ptr(0) + 2).set(50)
+
+
         i.resize(0)
 
         self.assertEqual(len(i), 0)
+
+    def test_packed_arrays_of_classes(self):
+        i = PackedArray(BasicTypedClass)()
+
+        i.resize(10)
+
+        self.assertEqual(len(i), 10)
+        self.assertIsInstance(i[0], BasicTypedClass)
+
+        for ix in range(10):
+            i[ix].x = ix
+
+        i[0] = i[5]
+
+        self.assertEqual(i[0].x, 5)
+
+        i[0].x = 10
+        self.assertEqual(i[0].x, 10)
+        self.assertEqual(i[5].x, 5)
+
+        
