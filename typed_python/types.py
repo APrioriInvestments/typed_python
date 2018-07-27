@@ -681,7 +681,7 @@ def _copy_construct(cls, otherVal, context_owner, context_path):
 
         return res
 
-    return cls()
+    return TypeConvert(cls, otherVal)
 
 def _assign(container, key, val):
     elt = container[key]
@@ -911,5 +911,55 @@ def Pointer(t):
 
     return Pointer
 
+class StackGetter:
+    def __init__(self, stack):
+        self.stack = stack
 
+    def __getitem__(self, ix):
+        if self.stack._destroyed:
+            raise UndefinedBehaviorException("Access already destroyed stack variable.")
+        return self.stack._variables[ix]
+
+    def __setitem__(self, ix, v):
+        if self.stack._destroyed:
+            raise UndefinedBehaviorException("Access already destroyed stack variable.")
+        self.stack._variables[ix] = v
+
+    def __len__(self):
+        return len(self.stack._variables)
+
+class Stack:
+    def __init__(self):
+        self._variables = []
+        self._active = False
+        self._destroyed = False
+        self._getter = StackGetter(self)
+
+    def __enter__(self):
+        self._active = True
+        return self
+
+    def __exit__(self, *args):
+        self._destroyed = True
+
+        for v in reversed(self._variables):
+            if isinstance(v, Class):
+                v.__destructor__()
+
+    def __call__(self, t):
+        assert IsTypeFilter(t)
+
+        assert self._active
+        assert not self._destroyed
+
+        intended_count = len(self._variables)
+
+        def init(*args, **kwargs):
+            assert len(self._variables) == intended_count
+
+            self._variables.append(_construct(t, self._getter, (len(self._variables),), *args, **kwargs))
+
+            return Pointer(t)(None, self._getter, intended_count, _PrivateGuard)
+
+        return init
 

@@ -15,10 +15,10 @@
 from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
                                 ConstDict, TypedFunction, Class, PackedArray, \
-                                Pointer, Internal, init, UndefinedBehaviorException
+                                Pointer, Internal, init, UndefinedBehaviorException, Stack
 
 import unittest
-
+import time
 
 class BasicTypedClass(Class):
     x = int
@@ -195,9 +195,6 @@ class TypesTests(unittest.TestCase):
         c = BasicTypedClass(1)
         self.assertEqual(c.x, 1)
 
-        print("BasicTypedClass.f is ", BasicTypedClass.f)
-        print("got ", c.f)
-
         self.assertEqual(c.f(10), 11)
         self.assertEqual(c.f(10, 20), 31)
 
@@ -356,3 +353,36 @@ class TypesTests(unittest.TestCase):
         a.resize(0)
 
         self.assertEqual(len(l), 1)
+
+    def test_stacks(self):
+        with Stack() as s:
+            x = s(int)()
+            y = s(int)(3)
+
+            self.assertEqual(y.get(), 3)
+
+            x.set(y.get()+1)
+
+            self.assertEqual(x.get(), 4)
+
+            with self.assertRaises(TypeError):
+                x.set("hi")
+
+        with self.assertRaises(UndefinedBehaviorException):
+            x.get()
+
+    def test_stack_perf(self):
+        t0 = time.time()
+
+        count = 0
+        while time.time() - t0 < 1.0:
+            for i in range(1000):
+                with Stack() as s:
+                    x = s(int)()
+                    x.set(2)
+            count += 1000
+
+        print("Total count in 1 second:", count)
+
+        self.assertTrue(count > 10000)
+
