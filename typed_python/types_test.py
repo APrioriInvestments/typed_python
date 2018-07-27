@@ -15,7 +15,7 @@
 from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
                                 ConstDict, TypedFunction, Class, PackedArray, \
-                                Pointer
+                                Pointer, Internal
 
 import unittest
 
@@ -262,4 +262,65 @@ class TypesTests(unittest.TestCase):
         self.assertEqual(i[0].x, 10)
         self.assertEqual(i[5].x, 5)
 
+        five_ptr = i.ptr(5)
+        self.assertEqual(five_ptr.get().x, 5)
+        five_val = five_ptr.get()
+
+        i.resize(2)
         
+        with self.assertRaises(Exception):
+            five_ptr.get()
+
+        i.resize(10)
+
+        with self.assertRaises(Exception):
+            five_val.x
+        
+    def test_internal_vs_noninternal_members(self):
+        class HoldingInternal(Class):
+            b = Internal(BasicTypedClass)
+
+        class HoldingNoniternal(Class):
+            b = BasicTypedClass
+
+        i = HoldingInternal()
+        n = HoldingNoniternal()
+
+        self.assertIsInstance(i.b, BasicTypedClass)
+        self.assertIsInstance(n.b, BasicTypedClass)
+
+        b = BasicTypedClass()
+        b.x = 2
+
+        i.b.x = 10
+        self.assertEqual(i.b.x, 10)
+        i.b = b
+        self.assertEqual(i.b.x, 2)
+        i.b.x = 10
+        self.assertEqual(i.b.x, 10)
+        self.assertEqual(b.x, 2)
+
+        n.b = b
+        n.b.x = 30
+        self.assertEqual(n.b.x, 30)
+        self.assertEqual(b.x, 30)
+
+        self.assertTrue(n.b is b)
+        self.assertFalse(i.b is b)
+        
+
+
+
+    def test_packed_arrays_of_classes_with_classes(self):
+        class NestedClass(Class):
+            btc = Internal(BasicTypedClass)
+
+        i = PackedArray(NestedClass)()
+
+        i.resize(10)
+
+        self.assertEqual(len(i), 10)
+        
+        self.assertIsInstance(i[0], NestedClass)
+        self.assertIsInstance(i[0].btc, BasicTypedClass)
+

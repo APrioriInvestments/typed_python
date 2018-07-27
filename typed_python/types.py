@@ -543,7 +543,8 @@ class ClassMeta(type):
             elif IsTypeFilter(res[k]) and k[:2] != "__":
                 members[k] = res[k]
                 if isinstance(res[k], Internal):
-                    internal_members[k] = res[k]
+                    internal_members[k] = res[k].ElementType
+                    members[k] = res[k].ElementType
 
         res['__typed_python_class_members__'] = members
         res['__typed_python_class_internal_members__'] = internal_members
@@ -601,10 +602,14 @@ class Class(object, metaclass=ClassMeta):
 
         return res
 
+    def __init__(self):
+        print(self.__dict__)
+        self.__constructor__()
+
     def __destructor__(self):
         self.__context__ = None
 
-        for k,v in type(self).__typed_python_class_internal_members__.iteritems():
+        for k,v in type(self).__typed_python_class_internal_members__.items():
             object.__getattribute__(self, k).__destructor__()
 
     def __constructor__(self):
@@ -628,12 +633,19 @@ class Class(object, metaclass=ClassMeta):
         if self.__context__ is None:
             raise Exception("Instance was deleted already!")
 
-        t = type(self).__dict__.get(k, None)
+        int_type = type(self).__typed_python_class_internal_members__.get(k, None)
+        if int_type is not None:
+            self.__dict__[k].__assign__(TypeConvert(int_type,v))
+            return
 
-        if IsTypeFilter(t):
+        t = type(self).__typed_python_class_members__.get(k, None)
+
+        if t is not None:
             v = TypeConvert(t, v)
+            return object.__setattr__(self, k, v)
 
-        return object.__setattr__(self, k, v)
+        raise AttributeError(k)
+
 
     def __getattribute__(self, attr):
         if attr[:2] == "__":
@@ -641,11 +653,6 @@ class Class(object, metaclass=ClassMeta):
 
         if object.__getattribute__(self, '__context__') is None:
             raise Exception("Instance was deleted already!")
-
-        t = type(self).__dict__.get(attr, None)
-
-        if isinstance(t, Internal):
-            return InternalReference(t.ElementType)(self.__dict__.get(attr), self, (attr,))
 
         return object.__getattribute__(self, attr)
 
@@ -675,11 +682,15 @@ def PackedArray(t):
         def append(self, x):
             self.__contents__.append(TypeConvert(t, x))
 
-        def resize(self, ix):
+        def resize(self, ix, argument=None):
             #resize the array.
             if ix > len(self.__contents__):
-                while len(self.__contents__) < ix:
-                    self.__contents__.append(_construct(t, self, (ix,)))
+                if argument is None:
+                    while len(self.__contents__) < ix:
+                        self.__contents__.append(_construct(t, self, (ix,)))
+                else:
+                    while len(self.__contents__) < ix:
+                        self.__contents__.append(_copy_construct(t, argument, self, (ix,)))
             else:
                 if isinstance(t, ClassMeta):
                     for x in self.__contents__[ix:]:
