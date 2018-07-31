@@ -92,6 +92,12 @@ Memoized = MakeMetaclassFunction("Memoized")
 
 def TypeConvert(type_filter, value, allow_construct_new=False):
     """Return a converted value, or throw an exception"""
+    if isinstance(type_filter, valid_primitive_types):
+        if isinstance(value, type(type_filter)) and value == type_filter:
+            return (value,)
+
+        raise TypeError("Can't convert %s to %s" % (value, type_filter))
+
     if type_filter in valid_primitive_types:
         if isinstance(value, type_filter):
             return value
@@ -114,6 +120,7 @@ def TryTypeConvert(type_filter, value, allow_construct_new=False):
     if type_filter in valid_primitive_types:
         if isinstance(value, type_filter):
             return (value,)
+
         if allow_construct_new:
             if isinstance(value, (float, int)) and type_filter in (float, int, bool):
                 return type_filter(value)
@@ -315,6 +322,17 @@ def TupleOf(t):
         def __len__(self):
             return len(self.__contents__)
 
+        def __add__(self, other):
+            res = TupleOf(())
+            res.__contents__ = self.__contents__ + tuple(TypeConvert(t, x) for x in other)
+            return res
+
+        def __sha_hash__(self):
+            res = sha_hash(len(self.__contents__))
+            for i in self.__contents__:
+                res += sha_hash(i)
+            return res
+
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
             if isinstance(value, TupleOf):
@@ -329,7 +347,7 @@ def TupleOf(t):
                 members = []
 
                 for val in res:
-                    converted = TryTypeConvert(t, val)
+                    converted = TryTypeConvert(t, val, allow_construct_new)
                     if converted is None:
                         return None
                     members.append(converted[0])
@@ -428,7 +446,7 @@ def Tuple(*args):
         def __init__(self, iterable):
             assert len(iterable) == len(args)
 
-            self.__contents__ = tuple(TypeConvert(iterable[i], args[i]) for i in xrange(len(args)))
+            self.__contents__ = tuple(TypeConvert(args[i], iterable[i]) for i in range(len(args)))
 
         def __getitem__(self, x):
             return self.__contents__[x]
@@ -436,11 +454,27 @@ def Tuple(*args):
         def __len__(self):
             return len(self.__contents__)
 
+        def __sha_hash__(self):
+            res = sha_hash(len(self.__contents__))
+            for i in self.__contents__:
+                res += sha_hash(i)
+            return res
+
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
-            if not isinstance(value, Tuple):
-                return None
-            return (value,)
+            if isinstance(value, Tuple):
+                return (value,)
+
+            if allow_construct_new:
+                if len(value) == len(args):
+                    new_elts = []
+                    for i in range(len(args)):
+                        converted = TryTypeConvert(args[i], value[i], allow_construct_new=True)
+                        if converted is None:
+                            return None
+                        new_elts.append(converted[0])
+                    return (Tuple(new_elts),)
+            return None
 
     Tuple.__name__ == "Tuple" + repr(args)
 

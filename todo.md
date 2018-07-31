@@ -14,3 +14,8 @@
                 head = int
                 tail = OneOf(List | None)
           because 'List' isn't defined yet
+    * support for `*args` and `**kwargs` in typed python typefunctions
+    	* we can't have annotations on them
+    	* but we can still support calling with them
+    	* compiler support is totally broken for these right now
+    * get rid of legacy 'typefun' in old compiler model. really this belongs in typedpython only

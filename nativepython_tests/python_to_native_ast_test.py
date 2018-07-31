@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python.types import Class
+
 import nativepython.type_model as type_model
 import nativepython.runtime as runtime
 import nativepython.python_to_native_ast as python_to_native_ast
@@ -32,23 +34,7 @@ TEST_SEED = 1
 def g(a):
     return a+2
 
-class Counter(type_model.cls):
-    def __types__(cls):
-        cls.types.alive = int
-        cls.types.total = int
-
-    def __init__(self):
-        self.alive = 0
-        self.total = 0
-
-    def inc(self):
-        self.alive += 1
-        self.total += 1
-
-    def dec(self):
-        self.alive -= 1
-
-class A(type_model.cls):
+class A(Class):
     def __types__(cls):
         cls.types.x = int
         cls.types.c = Counter.pointer
@@ -472,9 +458,8 @@ class PythonToNativeAstTests(unittest.TestCase):
         def g(x):
             return x + 1
 
-        class RefToSelf(type_model.cls):
-            def __types__(cls):
-                cls.types.x = int
+        class RefToSelf(Class):
+            x = int
 
             def __init__(self, x):
                 self.x = x

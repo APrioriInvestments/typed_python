@@ -12,27 +12,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.runtime as runtime
-import nativepython.util as util
-import nativepython.type_model as type_model
+from typed_python.types import Class, OneOf
 
-import unittest
-import ast
-import time
-
-class Counter(type_model.cls):
-    def __types__(cls):
-        cls.types.count = int
+class Counter(Class):
+    count = int
 
     def __init__(self):
         self.count = 0
 
-class CounterInc(type_model.cls):
-    def __types__(cls):
-        cls.types.target = Counter.pointer
+class CounterInc(Class):
+    target = OneOf(None, Counter)
 
     def __init__(self, target):
         self.target = target
+
         if self.target:
             self.target.count += 1
 
@@ -44,7 +37,9 @@ class CounterInc(type_model.cls):
     def __assign__(self, other):
         if self.target:
             self.target.count -= 1
+
         self.target = other.target
+        
         if self.target:
             self.target.count += 1
 

@@ -40,7 +40,7 @@ class Encoder(object):
                 return value
             return { 'type': str(type(value)), 'value': self.to_json(type(value), value) }
 
-        if hasattr(object_type, '__typed_python_alternative__'):
+        if isinstance(object_type, Alternative):
             if not value._fields:
                 return value._which
             else:
@@ -89,7 +89,7 @@ class Encoder(object):
             if algebraic_type in (bool, int, str, float):
                 return value
 
-            if hasattr(algebraic_type, '__typed_python_alternative__'):
+            if isinstance(algebraic_type, Alternative):
                 if isinstance(value, str):
                     return getattr(algebraic_type, value)()
 

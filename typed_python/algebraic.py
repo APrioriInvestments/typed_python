@@ -20,74 +20,84 @@ import types
 def valid_fieldname(name):
     return name and name[0] != "_" and name != 'matches' and name != "define"
 
-def Alternative(name, **kwds):
-    class Alternative(object):
-        __typed_python_alternative__ = True
-        __typed_python_type__ = True
-        _frozen = False
-        _subtypes = {}
-        _common_fields = {}
-        
-        
-        @classmethod
-        def add_common_fields(cls, fields):
-            assert not cls._frozen, "can't modify an Alternative once it has been frozen"
+class AlternativeMetaclass(type):
+    def __instancecheck__(self, instance):
+        return hasattr(instance, '__typed_python_alternative__')
+
+class Alternative(metaclass=AlternativeMetaclass):
+    def __new__(cls, name, **kwds):
+        class AlternativeCls(object):
+            __typed_python_alternative__ = True
+            __typed_python_type__ = True
+            _frozen = False
+            _subtypes = {}
+            _common_fields = {}
             
-            for k,v in fields.items():
-                cls.add_common_field(k,v)
+            def __init__(self, *args, **kwargs):
+                raise Exception("%s expected you to initialize one of its alternatives" % repr(AlternativeCls))
 
-        @classmethod
-        def add_common_field(cls, k, v):
-            assert not cls._frozen, "can't modify an Alternative once it has been frozen"
-
-            cls._common_fields[k] = v
-
-        @classmethod
-        def define(cls, **kwds):
-            for k,v in kwds.items():
-                cls._define(k,v)
-
-        @classmethod
-        def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
-            if isinstance(value, cls):
-                return (value,)
-            return None
-            
-        @classmethod
-        def _define(cls, alt_name, defs):
-            assert not cls._frozen, "can't modify an Alternative once it has been frozen"
-
-            assert alt_name not in cls._subtypes, "already have a definition for " + alt_name
-
-            if isinstance(defs, dict):
-                assert valid_fieldname(alt_name), "invalid alternative name: " + alt_name
-            
-                for fname, ftype in defs.items():
-                    assert valid_fieldname(fname), "%s is not a valid field name" % fname
+            @classmethod
+            def add_common_fields(cls, fields):
+                assert not cls._frozen, "can't modify an Alternative once it has been frozen"
                 
-                for d in defs.values():
-                    assert IsTypeFilter(d)
+                for k,v in fields.items():
+                    cls.add_common_field(k,v)
 
-                defs = dict(defs)
+            @classmethod
+            def add_common_field(cls, k, v):
+                assert not cls._frozen, "can't modify an Alternative once it has been frozen"
 
-                alt = makeAlternativeOption(cls, alt_name, defs)
+                cls._common_fields[k] = v
 
-                cls._subtypes[alt_name] = alt
+            @classmethod
+            def define(cls, **kwds):
+                for k,v in kwds.items():
+                    cls._define(k,v)
 
-                setattr(cls,alt_name, alt)
-            else:
-                setattr(cls,alt_name, defs)
+            @classmethod
+            def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
+                if isinstance(value, cls):
+                    return (value,)
+                return None
+                
+            @classmethod
+            def _define(cls, alt_name, defs):
+                assert not cls._frozen, "can't modify an Alternative once it has been frozen"
 
-        @classmethod
-        def _freeze(cls):
-            cls._frozen = True
+                assert alt_name not in cls._subtypes, "already have a definition for " + alt_name
 
-        def __repr__(self):
-            return "%s.%s(%s)" % (self._alternative.__qualname__, self._which, ",".join(["%s=%s" % (k,repr(self._fields[k])) for k in sorted(self._fields)]))
+                if isinstance(defs, dict):
+                    assert valid_fieldname(alt_name), "invalid alternative name: " + alt_name
+                
+                    for fname, ftype in defs.items():
+                        assert valid_fieldname(fname), "%s is not a valid field name" % fname
+                    
+                    for d in defs.values():
+                        assert IsTypeFilter(d)
 
-    Alternative.define(**kwds)
-    Alternative.__qualname__ = name
-    return Alternative
+                    defs = dict(defs)
+
+                    alt = makeAlternativeOption(cls, alt_name, defs)
+
+                    cls._subtypes[alt_name] = alt
+
+                    setattr(cls,alt_name, alt)
+                else:
+                    setattr(cls,alt_name, defs)
+
+            @classmethod
+            def _freeze(cls):
+                cls._frozen = True
+
+            def __repr__(self):
+                return "%s.%s(%s)" % (self._alternative.__qualname__, self._which, ",".join(["%s=%s" % (k,repr(self._fields[k])) for k in sorted(self._fields)]))
+
+            def __str__(self):
+                return repr(self)
+
+        AlternativeCls.define(**kwds)
+        AlternativeCls.__qualname__ = name
+        return AlternativeCls
 
 def makeAlternativeOption(Alternative, which, inTypedict):
     class AlternativeOption(Alternative):
@@ -163,9 +173,6 @@ def makeAlternativeOption(Alternative, which, inTypedict):
             if attr[:1] != "_":
                 raise Exception("Field %s is read-only" % attr)
             self.__dict__[attr] = val
-
-        def __str__(self):
-            return repr(self)
 
         def __ne__(self, other):
             return not self.__eq__(other)

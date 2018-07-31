@@ -639,9 +639,9 @@ class FunctionConverter:
                     return TypedLLVMValue(self.builder.uitofp(l.llvm_value, target_type), expr.to_type)
 
         if expr.matches.Return:
-            if not expr.arg.matches.Null:
+            if expr.arg is not None:
                 #write the value into the return slot
-                l = self.convert(expr.arg.val)
+                l = self.convert(expr.arg)
 
                 if l is None:
                     return

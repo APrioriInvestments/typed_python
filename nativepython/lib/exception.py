@@ -15,6 +15,7 @@
 import nativepython.native_ast as native_ast
 import nativepython.util as util
 import nativepython.type_model as type_model
+from typed_python.types import Class
 
 from nativepython.exceptions import ConversionException
 
@@ -27,7 +28,7 @@ VoidPtrFunc = type_model.FunctionPointer(
     output_type=Void
     )
 
-class InFlightException(type_model.cls):
+class InFlightException(Class):
     def __types__(cls):
         cls.types.data_ptr = Int8.pointer
         cls.types.destructor = VoidPtrFunc

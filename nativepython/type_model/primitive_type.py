@@ -51,7 +51,7 @@ class PrimitiveType(Type):
         return self.t
 
     def __repr__(self):
-        return str(self.t)
+        return "primitive(" + str(self.t) + ")"
 
 class PrimitiveNumericType(PrimitiveType):
     def __init__(self, t):

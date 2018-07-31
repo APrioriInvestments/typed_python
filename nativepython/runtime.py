@@ -33,29 +33,6 @@ def is_simple_type(t):
         isinstance(t, type_model.CompileTimeType)
         )
 
-class ReferenceHeldAsPointerBase:
-    pass
-
-@util.typefun
-def ReferenceHeldAsPointer(T):
-    class ReferenceHeldAsPointer(type_model.cls, ReferenceHeldAsPointerBase):
-        def __types__(cls):
-            cls.types.p = T.pointer
-
-        def __init__(self, p):
-            self.p = p
-
-    return ReferenceHeldAsPointer
-
-@util.typefun
-def isRefHeldAsPointer(t):
-    return t.nonref_type.is_class and issubclass(t.nonref_type, ReferenceHeldAsPointerBase)
-
-def dereferenceRefHeldAsPointer(x):
-    if isRefHeldAsPointer(util.typeof(x)):
-        return util.ref(x.p[0])
-    return util.ref(x)
-
 @util.typefun
 def ResultOrException(T):
     class ResultOrException(type_model.cls):

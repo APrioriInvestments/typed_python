@@ -16,6 +16,7 @@ import types
 
 import nativepython.native_ast as native_ast
 import nativepython.type_model as type_model
+from typed_python.types import Class
 
 from nativepython.exceptions import ConversionException
 
@@ -27,7 +28,6 @@ Bool = type_model.Bool
 Void = type_model.Void
 UInt8 = type_model.UInt8
 Int8 = type_model.Int8
-Struct = type_model.Struct
 
 def typefun(f):
     return type_model.TypeFunction(f)
@@ -132,100 +132,58 @@ realloc = type_model.ExternalFunction.make("realloc", UInt8.pointer, [Int64])
 free = type_model.ExternalFunction.make("free", Void, [UInt8.pointer])
 printf = type_model.ExternalFunction.make("printf", Int64, [UInt8.pointer], varargs=True)
 
-@exprfun
-def map_struct(context, args):
-    if len(args) != 2:
-        raise ConversionException("map_struct takes two arguments")
-    if not args[0].expr_type.nonref_type.is_struct:
-        raise ConversionException("first argument of map_struct must be of type Struct")
-
-    struct_type = args[0].expr_type.nonref_type
-
-    exprs = []
-
-    for fieldname,_ in struct_type.element_types:
-        exprs.append(
-            args[1].convert_call(context, [args[0].convert_attribute(context, fieldname)])
-                .as_call_arg(context)
-            )
-
-    new_struct_type = Struct(
-        [(struct_type.element_types[i][0], exprs[i].expr_type)
-            for i in range(len(exprs))]
-        )
-
-    tmp_ref = context.allocate_temporary(new_struct_type)
-
-    return type_model.TypedExpression(
-        new_struct_type.convert_initialize(context, tmp_ref, exprs).expr + 
-            context.activates_temporary(tmp_ref) + 
-            tmp_ref.expr,
-        tmp_ref.expr_type
-        )
-
-@typefun
-def struct_size(t):
-    if t.nonref_type.is_struct:
-        return len(t.nonref_type.element_types)
-    else:
-        return None
-
 @type_model.representation_for(len)
 def len_override(x):
-    if typeof(x).nonref_type.is_struct:
-        return struct_size(typeof(x))
-    else:
-        return x.__len__()
+    return x.__len__()
 
-@type_model.representation_for(range)
-class xrange_override(type_model.cls):
-    def __types__(cls):
-        cls.types.start = int
-        cls.types.stop = int
-        cls.types.step = int
+if False:
+    @type_model.representation_for(range)
+    class xrange_override(Class):
+        start = int
+        stop = int
+        step = int
 
-    def __init__(self, *args):
-        if struct_size(typeof(args)) is 0:
-            self.start = 0
-            self.stop = 0
-            self.step = 1
-        if struct_size(typeof(args)) is 1:
-            self.start = 0
-            self.stop = args[0]
-            self.step = 1
-        else:
-            self.start = args[0]
-            self.stop = args[1]
-
-            if struct_size(typeof(args)) is 3:
-                self.step = args[2]
-            else:
+        def __init__(self, *args):
+            if struct_size(typeof(args)) is 0:
+                self.start = 0
+                self.stop = 0
                 self.step = 1
+            if struct_size(typeof(args)) is 1:
+                self.start = 0
+                self.stop = args[0]
+                self.step = 1
+            else:
+                self.start = args[0]
+                self.stop = args[1]
 
-    def __iter__(self):
-        return xrange_iterator(self.start, self.stop, self.step)
+                if struct_size(typeof(args)) is 3:
+                    self.step = args[2]
+                else:
+                    self.step = 1
 
-class xrange_iterator(type_model.cls):
-    def __types__(cls):
-        cls.types.cur_value = int
-        cls.types.stop = int
-        cls.types.step = int
+        def __iter__(self):
+            return xrange_iterator(self.start, self.stop, self.step)
 
-    def __init__(self, cur_value, stop, step):
-        self.cur_value = cur_value
-        self.stop = stop
-        self.step = step
+    class xrange_iterator(Class):
+        cur_value = int
+        stop = int
+        step = int
 
-    def has_next(self):
-        if self.step > 0:
-            return self.cur_value < self.stop
-        else:
-            return self.cur_value > self.stop
+        def __init__(self, cur_value, stop, step):
+            self.cur_value = cur_value
+            self.stop = stop
+            self.step = step
 
-    def next(self):
-        val = self.cur_value
-        self.cur_value += self.step
-        return val
+        def has_next(self):
+            if self.step > 0:
+                return self.cur_value < self.stop
+            else:
+                return self.cur_value > self.stop
+
+        def next(self):
+            val = self.cur_value
+            self.cur_value += self.step
+            return val
 
 @exprfun
 def typed_function(context, args):

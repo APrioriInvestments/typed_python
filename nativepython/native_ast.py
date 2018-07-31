@@ -12,22 +12,27 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from nativepython.algebraic import Alternative, List, Nullable
+from typed_python.algebraic import Alternative
+from typed_python.types import Tuple, TupleOf, OneOf
+
 from nativepython.python.string_util import indent
 
-Type = Alternative("Type")
-Type.Void = {}
-Type.Float = {'bits': int}
-Type.Int = {'bits': int, 'signed': bool}
-Type.Struct = {'element_types': List((str, Type))}
-Type.Function = {'output': Type, 'args': List(Type), 'varargs': bool, 'can_throw': bool}
-Type.Pointer = {'value_type': Type}
+Type = Alternative("native_ast.Type")
+Type.define(
+    Void={},
+    Float={'bits': int},
+    Int={'bits': int, 'signed': bool},
+    Struct={'element_types': TupleOf(Tuple(str, Type))},
+    Function={'output': Type, 'args': TupleOf(Type), 'varargs': bool, 'can_throw': bool},
+    Pointer={'value_type': Type}
+    )
 
 def type_attr_ix(t,attr):
     for i in range(len(t.element_types)):
         if t.element_types[i][0] == attr:
             return i
     return None
+
 Type.attr_ix = type_attr_ix
 
 def type_str(c):
@@ -51,12 +56,14 @@ def type_str(c):
 Type.__str__ = type_str
 
 Constant = Alternative("Constant")
-Constant.Void = {}
-Constant.Float = {'val': float, 'bits': int}
-Constant.Int = {'val': int, 'bits': int, 'signed': bool}
-Constant.Struct = {'elements': List((str, Constant))}
-Constant.ByteArray = {'val': bytes}
-Constant.NullPointer = {'value_type': Type}
+Constant.define(
+    Void={},
+    Float={'val': float, 'bits': int},
+    Int={'val': int, 'bits': int, 'signed': bool},
+    Struct={'elements': TupleOf(Tuple(str, Constant))},
+    ByteArray={'val': bytes},
+    NullPointer={'value_type': Type},
+    )
 
 def const_truth_value(c):
     if c.matches.Int:
@@ -125,61 +132,66 @@ CallTarget = Alternative("CallTarget")
 
 NamedCallTarget = Alternative("NamedCallTarget", Item ={
                 'name': str, 
-                'arg_types': List(Type), 
+                'arg_types': TupleOf(Type), 
                 'output_type': Type, 
                 'external': bool, 
                 'varargs': bool,
                 'intrinsic': bool,
                 'can_throw': bool
                 })
-CallTarget.Named = {'target': NamedCallTarget}
+CallTarget.define(
+    Named = {'target': NamedCallTarget},
+    Pointer = {'expr': Expression},
+    )
 
-CallTarget.Pointer = {'expr': Expression}
+Teardown.define(
+    ByTag = {'tag': str, 'expr': Expression},
+    Always = {'expr': Expression}
+    )
 
-Teardown.ByTag = {'tag': str, 'expr': Expression}
-Teardown.Always = {'expr': Expression}
+Expression.define(
+    Constant = {'val': Constant},
+    Comment = {'comment': str, 'expr': Expression},
+    Load = {'ptr': Expression},
+    Store = {'ptr': Expression, 'val': Expression},
+    Alloca = {'type': Type},
+    Cast = {'left': Expression, 'to_type': Type},
+    Binop = {'op': BinaryOp, 'l': Expression, 'r': Expression},
+    Unaryop = {'op': UnaryOp, 'operand': Expression},
+    Variable = {'name': str},
+    Attribute = {'left': Expression, 'attr': str},
+    StructElementByIndex = {'left': Expression, 'index': int},
+    ElementPtr = {'left': Expression, 'offsets': TupleOf(Expression)},
+    Call = {'target': CallTarget, 'args': TupleOf(Expression)},
+    FunctionPointer = {'target': NamedCallTarget},
+    MakeStruct = {'args': TupleOf(Tuple(str,Expression))},
+    Branch = {'cond': Expression, 
+                         'true': Expression, 
+                         'false': Expression
+                         },
 
-Expression.Constant = {'val': Constant}
-Expression.Comment = {'comment': str, 'expr': Expression}
-Expression.Load = {'ptr': Expression}
-Expression.Store = {'ptr': Expression, 'val': Expression}
-Expression.Alloca = {'type': Type}
-Expression.Cast = {'left': Expression, 'to_type': Type}
-Expression.Binop = {'op': BinaryOp, 'l': Expression, 'r': Expression}
-Expression.Unaryop = {'op': UnaryOp, 'operand': Expression}
-Expression.Variable = {'name': str}
-Expression.Attribute = {'left': Expression, 'attr': str}
-Expression.StructElementByIndex = {'left': Expression, 'index': int}
-Expression.ElementPtr = {'left': Expression, 'offsets': List(Expression)}
-Expression.Call = {'target': CallTarget, 'args': List(Expression)}
-Expression.FunctionPointer = {'target': NamedCallTarget}
-Expression.MakeStruct = {'args': List((str,Expression))}
-Expression.Branch = {'cond': Expression, 
-                     'true': Expression, 
-                     'false': Expression
-                     }
+    Throw = {'expr': Expression }, #throw a pointer.
 
-Expression.Throw = {'expr': Expression } #throw a pointer.
+    TryCatch = {'expr': Expression,
+                           'varname': str, #varname is bound to a int8*
+                           'handler': Expression
+                           },
 
-Expression.TryCatch = {'expr': Expression,
-                       'varname': str, #varname is bound to a int8*
-                       'handler': Expression
-                       }
+    While = {'cond': Expression, 
+                        'while_true': Expression, 
+                        'orelse': Expression
+                        },
+    Return = {'arg': OneOf(Expression, None)},
+    Let = {'var': str, 'val': Expression, 'within': Expression},
 
-Expression.While = {'cond': Expression, 
-                    'while_true': Expression, 
-                    'orelse': Expression
-                    }
-Expression.Return = {'arg': Nullable(Expression)}
-Expression.Let = {'var': str, 'val': Expression, 'within': Expression}
+    #evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
+    #clause
+    Finally = {'expr': Expression, 'teardowns': TupleOf(Teardown)},
+    Sequence = {'vals': TupleOf(Expression)},
 
-#evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
-#clause
-Expression.Finally = {'expr': Expression, 'teardowns': List(Teardown)}
-Expression.Sequence = {'vals': List(Expression)}
-
-Expression.ActivatesTeardown = {'name': str}
-Expression.StackSlot = {'name': str, 'type': Type}
+    ActivatesTeardown = {'name': str},
+    StackSlot = {'name': str, 'type': Type}
+    )
 
 def expr_add(self, other):
     if self.matches.Constant:
@@ -262,7 +274,7 @@ def expr_str(self):
         return "while " + str(self.cond) + ":\n"\
                + indent(t).rstrip() + "\nelse:\n" + indent(f).rstrip()
     if self.matches.Return:
-        s = (str(self.arg.val) if self.arg.matches.Value else "")
+        s = (str(self.arg) if self.arg is not None else "")
         if "\n" in s:
             return "return (" + s + ")"
         return "return " + s
@@ -321,18 +333,19 @@ Expression.load = expr_load
 Expression.__add__ = expr_add
 Expression.__str__ = expr_str
 Expression.with_comment = expr_with_comment
-Expression.ElementPtrIntegers = (lambda self, *offsets: 
-    Expression.ElementPtr(
-    left=self,
-    offsets=tuple(
-        Expression.Constant(
-                Constant.Int(bits=32,signed=True,val=index)
+Expression.define(
+    ElementPtrIntegers = (lambda self, *offsets: 
+        Expression.ElementPtr(
+        left=self,
+        offsets=tuple(
+            Expression.Constant(
+                    Constant.Int(bits=32,signed=True,val=index)
+                    )
+                for index in offsets
                 )
-            for index in offsets
             )
         )
     )
-
 
 nullExpr = Expression.Constant(Constant.Void())
 emptyStructExpr = Expression.Constant(Constant.Struct([]))
@@ -350,7 +363,9 @@ FunctionBody = Alternative("FunctionBody",
     )
 
 Function = Alternative("Function")
-Function.Definition = {'args': List((str, Type)), 'body': FunctionBody, 'output_type': Type}
+Function.define(
+    Definition = {'args': TupleOf(Tuple(str, Type)), 'body': FunctionBody, 'output_type': Type}
+    )
 
 Void = Type.Void()
 Bool = Type.Int(bits=1, signed=False)

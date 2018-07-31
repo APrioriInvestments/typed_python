@@ -17,6 +17,9 @@ import nativepython
 import nativepython.native_ast as native_ast
 import nativepython.python_ast as python_ast
 
+from typed_python.types import Class
+
+from nativepython.type_model.class_type import ClassType
 from nativepython.type_model.type_base import Type
 from nativepython.type_model.typed_expression import TypedExpression
 from nativepython.exceptions import ConversionException, UnassignableFieldException
@@ -124,7 +127,21 @@ class FreePythonObjectReference(CompileTimeType):
             assert len(args) == 1
             return args[0].convert_to_type(nativepython.type_model.Int64, False)
 
+        if issubclass(self._obj, Class):
+            typed_type = ClassType(self._obj)
+
+            tmp_ref = context.allocate_temporary(typed_type)
+
+            return TypedExpression(
+                self._obj.convert_initialize(context, tmp_ref, args).expr + 
+                    context.activates_temporary(tmp_ref) + 
+                    tmp_ref.expr,
+                tmp_ref.expr_type
+                )
+
         if isinstance(self._obj, Type):
+            assert False, "this shouldn't happen because we should always be dealing in typed-python types at the FPOR level"
+
             if self._obj.is_ref:
                 raise ConversionException("Can't instantiate %s" % self._obj)
 
@@ -197,7 +214,7 @@ def pythonObjectRepresentation(o):
             nativepython.type_model.Float64
             )
 
-    if isinstance(o,CompileTimeType):
+    if isinstance(o, CompileTimeType):
         return o.as_typed_expression()
 
     return FreePythonObjectReference(o).as_typed_expression()
@@ -313,7 +330,7 @@ class ExternalFunction(CompileTimeType):
             )
 
     def get_named_call_target(self):
-        return native_ast.NamedCallTarget(
+        return native_ast.NamedCallTarget.Item(
             name = self.name,
             arg_types = [i.lower() for i in self.input_types],
             output_type = self.output_type.lower(),

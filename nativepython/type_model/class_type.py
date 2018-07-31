@@ -22,33 +22,6 @@ import nativepython
 import nativepython.python.string_util as string_util
 import nativepython.native_ast as native_ast
 
-class ElementTypesUnresolved:
-    pass
-class ElementTypesBeingResolved:
-    pass
-
-class TypeAdder:
-    def __init__(self, t):
-        self.__dict__['t'] = t
-
-    def __setattr__(self, attr, val):
-        self.t._add_element_type(attr,val)
-
-def closest_special_member_name(name):
-    return string_util.closest_in(name, valid_special_member_names)
-
-valid_special_member_names = [
-    '__assign__',
-    '__destructor__',
-    '__copy_constructor__',
-    '__init__',
-    '__iter__',
-    '__len__',
-    '__getitem__',
-    '__setitem__',
-    '__types__'
-    ]
-
 special_member_names_accessible_directly = [
     '__iter__',
     '__len__'
@@ -61,12 +34,9 @@ def is_special_name(name):
     return name.startswith("__") and name.endswith("__") and len(name) > 4
 
 class ClassType(Type):   
-    @staticmethod
-    def object_is_class(o):
-        return (isinstance(o, type) 
-                and o.__module__ != '__builtin__' 
-                and not issubclass(o, Type) or isinstance(o, types.ClassType))
-
+    def __init__(self, cls):
+        self.cls = cls
+    
     @property
     def is_pod(self):
         if (class_has_function(self.cls, "__assign__") 
@@ -385,154 +355,3 @@ class PythonClassMemberFunc(Type):
             self.attr, 
             ",".join(["%s=%s" % t for t in self.python_class_type.element_types])
             )
-
-class Override:
-    def __init__(self, name, o):
-        self.name = name
-        self.overrides = [o]
-
-    def first_matching(self, args):
-        for o in self.overrides:
-            if self.matches(o, args):
-                return o
-        raise ConversionException(
-            "Can't call function %s with arguments %s" % (
-                self.name, [str(x.expr_type) for x in args]
-                )
-            )
-
-    def matches(self, f, args):
-        if not self.matches_argcount(f, args):
-            return False
-        for varname, ann in f.__annotations__.items():
-            if varname != 'return':
-                slot_ix = f.__code__.co_varnames.index(varname)
-                if slot_ix > 0:
-                    slot_ix -= 1
-                    if slot_ix < f.__code__.co_argcount and slot_ix >= 0:
-                        if not self.argtype_matches_annotation(args[slot_ix], ann):
-                            return False
-
-        return True
-
-    def argtype_matches_annotation(self, t, annotation):
-        if isinstance(annotation, types.FunctionType):
-            annotation = annotation()
-
-        if annotation is int:
-            annotation = nativepython.type_model.Int64
-        if annotation is float:
-            annotation = nativepython.type_model.Float64
-        if annotation is bool:
-            annotation = nativepython.type_model.Bool
-
-        if annotation is nativepython.util.ref:
-            return t.expr_type.is_reference
-
-        return annotation == t.expr_type.nonref_type
-
-
-    def matches_argcount(self, f, args):
-        f_argcount = f.__code__.co_argcount
-        f_has_starargs = bool(f.__code__.co_flags & 0x04)
-
-        argcount = len(args)+1
-
-        if not f_has_starargs:
-            return f_argcount == argcount
-        else:
-            return argcount >= f_argcount
-
-class OverrideDict:
-    def __init__(self):
-        self.elts = {}
-
-    def __setitem__(self, k, v):
-        if k in self.elts:
-            if not isinstance(self.elts[k], Override):
-                self.elts[k] = Override(k, self.elts[k])
-            
-            self.elts[k].overrides.append(v)
-        else:
-            self.elts[k] = v
-
-    def __getitem__(self, k):
-        return self.elts[k]
-
-    def __in__(self, k):
-        return k in self.elts
-
-class ClassTypeMeta(ClassType, type):
-    def __prepare__(name, bases, **kwds):
-        return OverrideDict()
-
-    def __new__(cls, name, bases, attrs):
-        new_a = {}
-        new_a['_element_types'] = ElementTypesUnresolved
-        new_a['_element_type_buildup'] = None
-        new_a['_element_type_names'] = None
-        new_a['types'] = None
-        new_a['cls'] = type.__new__(type, name, (), attrs.elts)
-
-        return super().__new__(cls, name, bases, new_a)
-
-    def __init__(self, *args, **kwds):
-        ClassType.__init__(self)
-
-        self.types = TypeAdder(self)
-
-        cls = self.cls
-        for method_name in dir(cls):
-            method = getattr(cls, method_name)
-            if isinstance(method, types.FunctionType):
-                if is_special_name(method.__name__) and \
-                        method.__name__ not in valid_special_member_names:
-                    raise ConversionException("Invalid member name %s. Did you mean %s?" % 
-                            (method.__name__,
-                                closest_special_member_name(method.__name__))
-                            )
-
-    @property
-    def element_types(self):
-        if self._element_types is ElementTypesBeingResolved:
-            raise ConversionException("Cyclic dependency during class type resolution")
-
-        if self._element_types is ElementTypesUnresolved:
-            try:
-                self._element_types = ElementTypesBeingResolved
-                self._element_type_buildup = []
-                self._element_type_names = set()
-
-                typefun = getattr(self.cls,"__types__")
-                typefun(self)
-
-                self._element_types = tuple(self._element_type_buildup)            
-            except Exception:
-                self._element_types = ElementTypesUnresolved
-                raise
-            finally:
-                self._element_type_buildup = None
-                self._element_type_names = None
-
-        return self._element_types
-
-    def _add_element_type(self, attr, value):
-        if value is int:
-            value = nativepython.type_model.Int64
-        if value is float:
-            value = nativepython.type_model.Float64
-        if value is bool:
-            value = nativepython.type_model.Bool
-
-        if not isinstance(value, Type):
-            raise ConversionException("Can't assign %s as a type" % value)
-        if attr in self._element_type_names:
-            raise ConversionException("Can't reuse attribute name %s" % attr)
-        if is_special_name(attr):
-            raise ConversionException("%s is not a valid attribute name" % attr)
-
-        self._element_type_names.add(attr)
-        self._element_type_buildup.append((attr, value))
-
-class cls(metaclass = ClassTypeMeta):
-    pass

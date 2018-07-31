@@ -77,7 +77,7 @@ class Type(object):
 
     @property
     def is_pod(self):
-        raise ConversionException("can't directly references instances of %s" % self)
+        raise ConversionException("can't directly reference instances of %s" % self)
 
     def assert_is_instance_ref(self, instance_ref):
         if not instance_ref.expr_type.is_ref or instance_ref.expr_type.value_type != self:

@@ -41,14 +41,10 @@ class Pointer(Type):
         return native_ast.Constant.NullPointer(self.value_type.lower())
 
     def convert_attribute(self, context, instance, attr, allow_double_refs=False):
-        instance = instance.dereference()
-        ref = instance.reference_from_pointer()
-        return ref.convert_attribute(context, attr, allow_double_refs)
+        assert False
 
     def convert_set_attribute(self, context, instance, attr, val):
-        instance = instance.dereference()
-        ref = instance.reference_from_pointer()
-        return ref.convert_set_attribute(context, attr, val)
+        assert False
 
     def convert_bin_op(self, op, lref, rref):
         l = lref.dereference()

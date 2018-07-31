@@ -21,8 +21,31 @@ import nativepython.exceptions as exceptions
 
 from nativepython.type_model import *
 
+from typed_python.types import Class
+
 class FunctionOutput:
     pass
+
+def typedPythonTypeToTypeWrapper(t):
+    if isinstance(t, Type):
+        return t
+
+    if isinstance(t, Class):
+        return ClassType(t)
+
+    if t in (int,float,bool,type(None),bytes,str):
+        if t is int:
+            return Int64
+        if t is float:
+            return Float64
+        if t is bool:
+            return Bool
+        if t is type(None):
+            return Void
+    
+    assert False, "Can't handle %s yet" % t
+
+
 
 class InitFields:
     def __init__(self, first_var_name, fields_and_types):
@@ -91,8 +114,8 @@ class ExceptionHandlingHelper:
         handlers_and_conds = []
 
         for h in ast.handlers:
-            if not h.type.matches.Value:
-                if not h.name.matches.Null:
+            if h.type is None:
+                if h.name is not None:
                     raise ConversionException("Can't handle a typeless exception handler with a named variable")
 
                 handlers_and_conds.append(
@@ -109,7 +132,7 @@ class ExceptionHandlingHelper:
                 handler_type = typexpr.expr_type.python_object_representation
 
                 name = None
-                if not h.name.matches.Null:
+                if h.name is not None:
                     name = h.name.val
                     assert isinstance(name, str)
 
@@ -768,7 +791,9 @@ class ConversionContext(object):
                     self._new_variables.add(varname)
 
                     new_variable_type = val_to_store.expr_type.variable_storage_type
+
                     assert new_variable_type.is_valid_as_variable()
+                    
                     self._varname_to_type[varname] = new_variable_type
 
                     slot_ref = self.named_var_expr(varname)
@@ -814,10 +839,10 @@ class ConversionContext(object):
             if self._init_fields is not None:
                 self._init_fields.finalize(self)
             
-            if ast.value.matches.Null:
+            if ast.value is None:
                 e = TypedExpression(native_ast.nullExpr, Void)
             else:
-                e = self.convert_expression_ast(ast.value.val)
+                e = self.convert_expression_ast(ast.value)
 
             if self._varname_to_type[FunctionOutput] is not None:
                 if self._varname_to_type[FunctionOutput] != e.expr_type.variable_storage_type:
@@ -1001,13 +1026,13 @@ class ConversionContext(object):
             return res
 
         if ast.matches.Raise:
-            if ast.exc.matches.Null:
+            if ast.exc is None:
                 #this is a naked raise
                 raise ConversionException(
                     "We don't handle re-raise yet"
                     )
                 
-            if ast.exc.matches.Value and ast.cause.matches.Null:
+            if ast.exc is not None and ast.cause is None:
                 expr = self.convert_expression_ast(ast.exc.val)
 
                 import nativepython.lib.exception
@@ -1117,7 +1142,7 @@ class ConversionContext(object):
             name,
             typelist,
             expr.expr_type,
-            native_ast.Function(
+            native_ast.Function.Definition(
                 args=[(varlist[i].name, typelist[i].lower_as_function_arg()) 
                             for i in range(len(varlist))],
                 body=native_ast.FunctionBody.Internal(expr.expr),
@@ -1277,7 +1302,7 @@ class Converter(object):
                 free_variable_lookup,
                 members_of_arg0_to_initialize
                 ):
-        if ast_arg.vararg.matches.Value:
+        if ast_arg.vararg is not None:
             star_args_name = ast_arg.vararg.val.arg
         else:
             star_args_name = None
@@ -1345,7 +1370,7 @@ class Converter(object):
         return_type = subconverter._varname_to_type[FunctionOutput] or Void
 
         return (
-            native_ast.Function(
+            native_ast.Function.Definition(
                 args=args, 
                 body=native_ast.FunctionBody.Internal(res.expr),
                 output_type=return_type.lower()
@@ -1431,11 +1456,7 @@ class Converter(object):
         return self.convert(f, input_types, name_override, fields_and_types)
 
     def convert(self, f, input_types, name_override=None, fields_and_types_for_initializing=None):
-        for i in input_types:
-            if not i.is_valid_as_variable():
-                raise ConversionException("Invalid argument types for %s: %s" % (f, input_types))
-
-        input_types = tuple(input_types)
+        input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
         identifier = ("pyfunction", f, input_types)
 
@@ -1469,14 +1490,14 @@ class Converter(object):
             self._names_for_identifier[identifier] = new_name
 
             if not output_type.is_pod:
-                definition = native_ast.Function(
+                definition = native_ast.Function.Definition(
                     args=(('.return', output_type.pointer.lower()),) + definition.args,
                     body=definition.body,
                     output_type=native_ast.Type.Void()
                     )
 
             self._targets[new_name] = TypedCallTarget(
-                native_ast.NamedCallTarget(
+                native_ast.NamedCallTarget.Item(
                     name=new_name, 
                     arg_types=[x[1] for x in definition.args],
                     output_type=definition.output_type,

@@ -19,7 +19,8 @@ Python ast directly.
 """
 
 import ast
-from nativepython.algebraic import Alternative, AlternativeInstance, List, Nullable
+from typed_python.algebraic import Alternative
+from typed_python.types import TupleOf, Tuple, OneOf
 
 Module = Alternative("Module")
 Statement = Alternative("Statement")
@@ -38,185 +39,191 @@ Arguments = Alternative("Arguments")
 Keyword = Alternative("Keyword")
 Alias = Alternative("Alias")
 
-Module.Module = {"body": List(Statement)}
-Module.Expression = {'body': Expr}
-Module.Interactive = {'body': List(Statement)}
-Module.Suite = {"body": List(Statement)}
+Module.define(
+  Module = {"body": TupleOf(Statement)},
+  Expression = {'body': Expr},
+  Interactive = {'body': TupleOf(Statement)},
+  Suite = {"body": TupleOf(Statement)}
+  )
 
-Statement.FunctionDef = {
-   "name": str,
-   "args": Arguments,
-   "body": List(Statement),
-   "decorator_list": List(Expr),
-   "returns": Nullable(Expr)
-	}
+Statement.define(
+  FunctionDef = {
+     "name": str,
+     "args": Arguments,
+     "body": TupleOf(Statement),
+     "decorator_list": TupleOf(Expr),
+     "returns": OneOf(Expr, None)
+  	},
 
-Statement.ClassDef = {
-   "name": str,
-   "bases": List(Expr),
-   "body": List(Statement),
-   "decorator_list": List(Expr)
-   }
+  ClassDef = {
+     "name": str,
+     "bases": TupleOf(Expr),
+     "body": TupleOf(Statement),
+     "decorator_list": TupleOf(Expr)
+     },
 
-Statement.Return = { "value": Nullable(Expr) }
-Statement.Delete = {
-   "value": List(Expr)
-   }
-Statement.Assign = {
-   "targets": List(Expr),
-   "value": Expr
-   }
-Statement.AugAssign = {
-   "target": Expr,
-   "op": BinaryOp,
-   "value": Expr
-   }
-Statement.Print = {
-   "expr": Nullable(Expr),
-   "values": List(Expr),
-   "nl": int
-   }
-Statement.For = {
-   "target": Expr,
-   "iter": Expr,
-   "body": List(Statement),
-   "orelse": List(Statement)
-   }
-Statement.While = {
-   "test": Expr,
-   "body": List(Statement),
-   "orelse": List(Statement)
-   }
-Statement.If = {
-   "test": Expr,
-   "body": List(Statement),
-   "orelse": List(Statement)
-   }
-Statement.With = {
-   "context_expr": Expr,
-   "optional_vars": Nullable(Expr),
-   "body": List(Statement)
-   }
+  Return = { "value": OneOf(Expr, None) },
+  Delete = {
+     "value": TupleOf(Expr)
+     },
+  Assign = {
+     "targets": TupleOf(Expr),
+     "value": Expr
+     },
+  AugAssign = {
+     "target": Expr,
+     "op": BinaryOp,
+     "value": Expr
+     },
+  Print = {
+     "expr": OneOf(Expr, None),
+     "values": TupleOf(Expr),
+     "nl": int
+     },
+  For = {
+     "target": Expr,
+     "iter": Expr,
+     "body": TupleOf(Statement),
+     "orelse": TupleOf(Statement)
+     },
+  While = {
+     "test": Expr,
+     "body": TupleOf(Statement),
+     "orelse": TupleOf(Statement)
+     },
+  If = {
+     "test": Expr,
+     "body": TupleOf(Statement),
+     "orelse": TupleOf(Statement)
+     },
+  With = {
+     "context_expr": Expr,
+     "optional_vars": OneOf(Expr, None),
+     "body": TupleOf(Statement)
+     },
 
-Statement.Raise = {
-   "exc": Nullable(Expr),
-   "cause": Nullable(Expr)
-   }
-Statement.Try = {
-   "body": List(Statement),
-   "handlers": List(ExceptionHandler),
-   "orelse": List(Statement),
-   "finalbody": List(Statement)
-   }
-Statement.Assert = {
-   "test": Expr,
-   "msg": Nullable(Expr)
-   }
-Statement.Import = {
-   "names": List(Alias)
-   }
-Statement.ImportFrom = {
-   "module": List(str),
-   "names": List(Alias),
-   "level": Nullable(int)
-   }
-Statement.Global = {
-   "names": List(str)
-   }
-Statement.Expr = {
-   "value": Expr
-   }
-Statement.Pass = {}
-Statement.Break  = {}
-Statement.Continue = {}
+  Raise = {
+     "exc": OneOf(Expr, None),
+     "cause": OneOf(Expr, None)
+     },
+  Try = {
+     "body": TupleOf(Statement),
+     "handlers": TupleOf(ExceptionHandler),
+     "orelse": TupleOf(Statement),
+     "finalbody": TupleOf(Statement)
+     },
+  Assert = {
+     "test": Expr,
+     "msg": OneOf(Expr, None)
+     },
+  Import = {
+     "names": TupleOf(Alias)
+     },
+  ImportFrom = {
+     "module": TupleOf(str),
+     "names": TupleOf(Alias),
+     "level": OneOf(int, None)
+     },
+  Global = {
+     "names": TupleOf(str)
+     },
+  Expr = {
+     "value": Expr
+     },
+  Pass = {},
+  Break  = {},
+  Continue = {}
+  )
 
-Expr.BoolOp = {
+Expr.define(
+  BoolOp = {
    "op": BooleanOp,
-   "values": List(Expr)
-   }
-Expr.BinOp = {
-   "left": Expr,
-   "op": BinaryOp,
-   "right": Expr
-   }
-Expr.UnaryOp = {
-   "op": UnaryOp,
-   "operand": Expr
-   }
-Expr.Lambda = {
-   "args": Arguments,
-   "body": Expr
-   }
-Expr.IfExp = {
-   "test": Expr,
-   "body": Expr,
-   "orelse": Expr
-   }
-Expr.Dict = {
-   "keys": List(Expr),
-   "values": List(Expr)
-   }
-Expr.Set = {
-   "elts": List(Expr)
-   }
-Expr.ListComp = {
-   "elt": Expr,
-   "generators": List(Comprehension)
-   }
-Expr.SetComp = {
-   "elt": Expr,
-   "generators": List(Comprehension)
-   }
-Expr.DictComp = {
-   "key": Expr,
-   "value": Expr,
-   "generators": List(Comprehension)
-   }
-Expr.GeneratorExp = {
-   "elt": Expr,
-   "generators": List(Comprehension)
-   }
-Expr.Yield = {
-   "value": Nullable(Expr)
-   }
-Expr.Compare = {
-   "left": Expr,
-   "ops": List(ComparisonOp),
-   "comparators": List(Expr)
-   }
-Expr.Call = {
-   "func": Expr,
-   "args": List(Expr),
-   "keywords": List(Keyword),
-   }
-Expr.Num = {"n": NumericConstant}
-Expr.Str = {"s": str}
-Expr.Attribute = {
-   "value": Expr,
-   "attr": str,
-   "ctx": ExprContext
-   }
-Expr.Subscript = {
-   "value": Expr,
-   "slice": Slice,
-   "ctx": ExprContext
-   }
-Expr.Name = {
-   "id": str,
-   "ctx": ExprContext
-   }
-Expr.List = {
-   "elts": List(Expr),
-   "ctx": ExprContext
-   }
-Expr.Tuple = {
-   "elts": List(Expr),
-   "ctx": ExprContext
-   }
-Expr.Starred = {
-   "value": Expr,
-   "ctx": ExprContext
-   }
+   "values": TupleOf(Expr)
+   },
+  BinOp = {
+     "left": Expr,
+     "op": BinaryOp,
+     "right": Expr
+     },
+  UnaryOp = {
+     "op": UnaryOp,
+     "operand": Expr
+     },
+  Lambda = {
+     "args": Arguments,
+     "body": Expr
+     },
+  IfExp = {
+     "test": Expr,
+     "body": Expr,
+     "orelse": Expr
+     },
+  Dict = {
+     "keys": TupleOf(Expr),
+     "values": TupleOf(Expr)
+     },
+  Set = {
+     "elts": TupleOf(Expr)
+     },
+  ListComp = {
+     "elt": Expr,
+     "generators": TupleOf(Comprehension)
+     },
+  SetComp = {
+     "elt": Expr,
+     "generators": TupleOf(Comprehension)
+     },
+  DictComp = {
+     "key": Expr,
+     "value": Expr,
+     "generators": TupleOf(Comprehension)
+     },
+  GeneratorExp = {
+     "elt": Expr,
+     "generators": TupleOf(Comprehension)
+     },
+  Yield = {
+     "value": OneOf(Expr, None)
+     },
+  Compare = {
+     "left": Expr,
+     "ops": TupleOf(ComparisonOp),
+     "comparators": TupleOf(Expr)
+     },
+  Call = {
+     "func": Expr,
+     "args": TupleOf(Expr),
+     "keywords": TupleOf(Keyword),
+     },
+  Num = {"n": NumericConstant},
+  Str = {"s": str},
+  Attribute = {
+     "value": Expr,
+     "attr": str,
+     "ctx": ExprContext
+     },
+  Subscript = {
+     "value": Expr,
+     "slice": Slice,
+     "ctx": ExprContext
+     },
+  Name = {
+     "id": str,
+     "ctx": ExprContext
+     },
+  List = {
+     "elts": TupleOf(Expr),
+     "ctx": ExprContext
+     },
+  Tuple = {
+     "elts": TupleOf(Expr),
+     "ctx": ExprContext
+     },
+  Starred = {
+     "value": Expr,
+     "ctx": ExprContext
+     }
+  )
 
 Expr.add_common_field("line_number", int)
 Expr.add_common_field("col_offset", int)
@@ -225,106 +232,127 @@ Statement.add_common_field("line_number", int)
 Statement.add_common_field("col_offset", int)
 Statement.add_common_field("filename", str)
 
-NumericConstant.Int = {"value": int}
-NumericConstant.Long = {"value": str}
-NumericConstant.Boolean = {"value": bool}
-NumericConstant.None_ = {}
-NumericConstant.Float = {"value": float}
-NumericConstant.Unknown = {}
+NumericConstant.define(
+  Int = {"value": int},
+  Long = {"value": str},
+  Boolean = {"value": bool},
+  None_ = {},
+  Float = {"value": float},
+  Unknown = {}
+  )
 
-ExprContext.Load = {}
-ExprContext.Store = {}
-ExprContext.Del = {}
-ExprContext.AugLoad = {}
-ExprContext.AugStore = {}
-ExprContext.Param = {}
+ExprContext.define(
+  Load = {},
+  Store = {},
+  Del = {},
+  AugLoad = {},
+  AugStore = {},
+  Param = {}
+  )
 
-Slice.Ellipsis = {}
-Slice.Slice = {
-       "lower": Nullable(Expr),
-       "upper": Nullable(Expr),
-       "step": Nullable(Expr)
-       }
-Slice.ExtSlice = {"dims": List(Slice)}
+Slice.define(
+  Ellipsis = {},
+  Slice = {
+       "lower": OneOf(Expr, None),
+       "upper": OneOf(Expr, None),
+       "step": OneOf(Expr, None)
+       },
+  ExtSlice = {"dims": TupleOf(Slice)},
+  Index = {"value": Expr}
+  )
 
-Slice.Index = {"value": Expr}
+BooleanOp.define(
+  And = {},
+  Or = {}
+  )
 
-BooleanOp.And = {}
-BooleanOp.Or = {}
+BinaryOp.define(
+  Add = {},
+  Sub = {},
+  Mult = {},
+  Div = {},
+  Mod = {},
+  Pow = {},
+  LShift = {},
+  RShift = {},
+  BitOr = {},
+  BitXor = {},
+  BitAnd = {},
+  FloorDiv = {}
+  )
 
-BinaryOp.Add = {}
-BinaryOp.Sub = {}
-BinaryOp.Mult = {}
-BinaryOp.Div = {}
-BinaryOp.Mod = {}
-BinaryOp.Pow = {}
-BinaryOp.LShift = {}
-BinaryOp.RShift = {}
-BinaryOp.BitOr = {}
-BinaryOp.BitXor = {}
-BinaryOp.BitAnd = {}
-BinaryOp.FloorDiv = {}
+UnaryOp.define(
+  Invert = {},
+  Not = {},
+  UAdd = {},
+  USub = {}
+  )
 
-UnaryOp.Invert = {}
-UnaryOp.Not = {}
-UnaryOp.UAdd = {}
-UnaryOp.USub = {}
+ComparisonOp.define(
+  Eq = {},
+  NotEq = {},
+  Lt = {},
+  LtE = {},
+  Gt = {},
+  GtE = {},
+  Is = {},
+  IsNot = {},
+  In = {},
+  NotIn = {}
+  )
 
-
-ComparisonOp.Eq = {}
-ComparisonOp.NotEq = {}
-ComparisonOp.Lt = {}
-ComparisonOp.LtE = {}
-ComparisonOp.Gt = {}
-ComparisonOp.GtE = {}
-ComparisonOp.Is = {}
-ComparisonOp.IsNot = {}
-ComparisonOp.In = {}
-ComparisonOp.NotIn = {}
-
-Comprehension.Item = {
+Comprehension.define(
+  Item = {
     "target": Expr,
     "iter": Expr,
-    "conditions": List(Expr)
+    "conditions": TupleOf(Expr)
     }
+  )
 
-
-ExceptionHandler.Item = {
-    "type": Nullable(Expr),
-    "name": Nullable(str),
-    "body": List(Statement)
+ExceptionHandler.define(
+  Item = {
+    "type": OneOf(Expr, None),
+    "name": OneOf(str, None),
+    "body": TupleOf(Statement)
     }
+  )
 ExceptionHandler.add_common_field("line_number", int)
 ExceptionHandler.add_common_field("col_offset", int)
 ExceptionHandler.add_common_field("filename", str)
 
 
-Arguments.Item = {
-    "args": List(Arg),
-    "vararg": Nullable(Arg),
-    "kwonlyargs": List(Arg),
-    "kw_defaults": List(Expr),
-    "kwarg": Nullable(Arg),
-    "defaults": List(Expr),
+Arguments.define(
+  Item = {
+    "args": TupleOf(Arg),
+    "vararg": OneOf(Arg, None),
+    "kwonlyargs": TupleOf(Arg),
+    "kw_defaults": TupleOf(Expr),
+    "kwarg": OneOf(Arg, None),
+    "defaults": TupleOf(Expr),
     }
+  )
 
-Arg.Item ={
+Arg.define(
+  Item ={
   'arg': str,
-  'annotation': Nullable(Expr),
-  }
+  'annotation': OneOf(Expr, None),
+  })
 Arg.add_common_field("line_number", int)
 Arg.add_common_field("col_offset", int)
 Arg.add_common_field("filename", str)
 
-Keyword.Item = {
+Keyword.define(
+  Item = {
     "arg": str,
     "value": Expr
     }
+  )
 
-Alias = {
+Alias.define(Item = {
     "name": str,
-    "asname": Nullable(str)
+    "asname": OneOf(str, None)
     }
+    )
 
 numericConverters = {
     int: NumericConstant.Int,
@@ -445,10 +473,10 @@ converters = {
     ast.comprehension: Comprehension,
     ast.excepthandler: lambda x:x,
     ast.ExceptHandler: ExceptionHandler.Item,
-    ast.arguments: Arguments,
-    ast.arg: Arg,
+    ast.arguments: Arguments.Item,
+    ast.arg: Arg.Item,
     ast.keyword: Keyword,
-    ast.alias: Alias
+    ast.alias: Alias.Item
     }
 
 def convertPyAstToAlgebraic(tree,fname):
