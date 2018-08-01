@@ -22,6 +22,7 @@ def valid_fieldname(name):
 
 def Alternative(name, **kwds):
     class Alternative(object):
+        __typed_python_alternative__ = True
         __typed_python_type__ = True
         _frozen = False
         _subtypes = {}
@@ -82,10 +83,10 @@ def Alternative(name, **kwds):
             cls._frozen = True
 
         def __repr__(self):
-            return "%s.%s(%s)" % (self._alternative.__name__, self._which, ",".join(["%s=%s" % (k,repr(self._fields[k])) for k in sorted(self._fields)]))
+            return "%s.%s(%s)" % (self._alternative.__qualname__, self._which, ",".join(["%s=%s" % (k,repr(self._fields[k])) for k in sorted(self._fields)]))
 
     Alternative.define(**kwds)
-    Alternative.__name__ = name
+    Alternative.__qualname__ = name
     return Alternative
 
 def makeAlternativeOption(Alternative, which, inTypedict):
@@ -111,7 +112,7 @@ def makeAlternativeOption(Alternative, which, inTypedict):
                     assert not fields and len(args) == 1, "can't infer a name for more than one argument"
                     fields = {list(typedict.keys())[0]: args[0]}
                 else:
-                    raise TypeError("constructing %s with an extra unnamed argument" % (alternative.__name__ + "." + which))
+                    raise TypeError("constructing %s with an extra unnamed argument" % (alternative.__qualname__ + "." + which))
 
             for f in fields:
                 if f not in typedict:
@@ -140,7 +141,7 @@ def makeAlternativeOption(Alternative, which, inTypedict):
 
         def __sha_hash__(self):
             if self._sha_hash_cache is None:
-                base_hash = sha_hash(Alternative.__name__)
+                base_hash = sha_hash(Alternative.__qualname__)
                 
                 for fieldname in sorted(self._fields):
                     val = self._fields[fieldname]
@@ -188,7 +189,7 @@ def makeAlternativeOption(Alternative, which, inTypedict):
             
             return True
 
-    AlternativeOption.__name__ = Alternative.__name__ + "." + which
+    AlternativeOption.__qualname__ = Alternative.__qualname__ + "." + which
 
     return AlternativeOption
 

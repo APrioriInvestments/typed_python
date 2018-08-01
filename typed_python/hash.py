@@ -44,7 +44,7 @@ class Hash:
 
     @property
     def hexdigest(self):
-        return self.digest.encode("hex")
+        return self.digest.hex()
 
     def __str__(self):
         return "0x" + self.hexdigest

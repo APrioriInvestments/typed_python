@@ -374,6 +374,51 @@ def Kwargs(**kwargs):
     return Kwargs
 
 @TypeFunction
+def NamedTuple(*namesAndTypes):
+    for n in namesAndTypes:
+        assert isinstance(n, tuple)
+        assert len(n) == 2
+        assert IsTypeFilter(n[1])
+        assert isinstance(n[0], str)
+
+    names = [n[0] for n in namesAndTypes]
+
+    assert len(set(names)) == len(names), "names need to be unique"
+
+    types = [n[1] for n in namesAndTypes]
+
+    nameLookup = { names[i]:i for i in range(len(names)) }
+
+    class NamedTuple:
+        ElementTypes = types
+        ElementNames = names
+        NameLookup = nameLookup
+
+        def __init__(self, iterable):
+            assert len(iterable) == len(namesAndTypes)
+
+            self.__contents__ = {k: TypeConvert(names[i], iterable[i]) for i in range(namesAndTypes)}
+
+        def __getitem__(self, x):
+            return self.__contents__[nameLookup[x]]
+
+        def __getattr__(self, x):
+            return self.__contents__[x]
+
+        def __len__(self):
+            return len(self.__contents__)
+
+        @staticmethod
+        def __typed_python_try_convert_instance__(value, allow_construct_new):
+            if not isinstance(value, NamedTuple):
+                return None
+            return (value,)
+
+    NamedTuple.__name__ == "NamedTuple(" + ",".join("%s=%s" % (k,v) for k,v in sorted(namesAndTypes.items())) + ")"
+
+    return NamedTuple
+
+@TypeFunction
 def Tuple(*args):
     assert IsTypeFilterTuple(args)
     
