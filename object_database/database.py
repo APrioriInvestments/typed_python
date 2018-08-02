@@ -226,6 +226,8 @@ class DatabaseView(object):
         self._db = db
         self._transaction_num = transaction_id
         self._writes = {}
+        self._set_adds = {}
+        self._set_removes = {}
         self._t0 = None
         self._stack = None
         self._readWatcher = None
@@ -274,16 +276,7 @@ class DatabaseView(object):
                 if val is not None:
                     ik = index_key(cls.__qualname__, index_name, val)
 
-                    if ik in self._writes:
-                        self._writes[ik] = self._writes[ik] + (identity,)
-                    else:
-                        existing = self._get_dbkey(ik)
-                        if existing is None:
-                            existing = ()
-                        else:
-                            existing = tuple(existing)
-
-                        self._writes[ik] = existing + (identity,)
+                    self._add_to_index(ik, identity)
 
         return o        
 
@@ -364,13 +357,29 @@ class DatabaseView(object):
                     if cur_index_val is not None:
                         old_index_name = index_key(obj_typename, index_name, cur_index_val)
                         cur_index_list = tuple(self._get_dbkey(old_index_name) or ())
-                        self._writes[old_index_name] = tuple([x for x in cur_index_list if x != identity])
+                        self._remove_from_index(old_index_name, identity)
 
                     if new_index_val is not None:
                         new_index_name = index_key(obj_typename, index_name, new_index_val)
-                        new_index_list = tuple(self._get_dbkey(new_index_name) or ())
-                        self._writes[new_index_name] = new_index_list + (identity,)
+                        self._add_to_index(new_index_name, identity)
 
+    def _add_to_index(self, index_key, identity):
+        if index_key not in self._set_adds:
+            self._set_adds[index_key] = set()
+            self._set_removes[index_key] = set()
+            
+        self._set_adds[index_key].add(identity)
+        self._set_removes[index_key].discard(identity)
+
+    def _remove_from_index(self, index_key, identity):
+        if index_key not in self._set_adds:
+            self._set_adds[index_key] = set()
+            self._set_removes[index_key] = set()
+            
+        self._set_adds[index_key].discard(identity)
+        self._set_removes[index_key].add(identity)
+
+    
     def indexLookup(self, type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
@@ -383,13 +392,9 @@ class DatabaseView(object):
 
         keyname = index_key(type.__qualname__, tname, value)
 
-        if keyname in self._writes:
-            identities = self._writes[keyname]
-        else:
-            identities = self._db._get_versioned_object_data(keyname, self._transaction_num)[0]
-            
-        if not identities:
-            return ()
+        identities = set(self._db._get_versioned_set_data(keyname, self._transaction_num))
+        identities = identities.union(self._set_adds.get(keyname, set()))
+        identities = identities.difference(self._set_removes.get(keyname, set()))
         
         return tuple([type(str(x)) for x in identities])
 
@@ -403,17 +408,19 @@ class DatabaseView(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
-        keyname = index_key(type.__qualname__, tname, value)
+        keyname = index_key(type.__name__, tname, value)
 
-        if keyname in self._writes:
-            identities = self._writes[keyname]
-        else:
-            identities = self._db._get_versioned_object_data(keyname, self._transaction_num)[0]
-            
-        if not identities:
-            return None
-        
-        return type(str(identities[0]))
+        added = self._set_adds.get(keyname, set())
+        removed = self._set_removes.get(keyname, set())
+
+        if added:
+            return type(str(list(added)[0]))
+
+        for val in self._db._get_versioned_set_data(keyname, self._transaction_num):
+            if val not in removed:
+                return type(str(val))
+
+        return None
 
     def commit(self):
         if not self._writeable:
@@ -429,7 +436,7 @@ class DatabaseView(object):
             writes = {key: encode(v) for key, v in self._writes.items()}
             tid = self._transaction_num
             
-            self._db._set_versioned_object_data(writes, tid)
+            self._db._set_versioned_object_data(writes, self._set_adds, self._set_removes, tid)
 
     def nocommit(self):
         class Scope:
@@ -719,6 +726,23 @@ class Database:
                         parsed_val
                         )
 
+    def _get_versioned_set_data(self, key, transaction_id):
+        with self._lock:
+            assert transaction_id >= self._min_transaction_num
+
+            if key not in self._key_version_numbers:
+                if key in self._tail_values:
+                    return self._tail_values[key][0]
+
+                return self._kvstore.setMembers(key)
+
+            #get the largest version number less than or equal to transaction_id
+            version = self._best_version_for(transaction_id, self._key_version_numbers[key])
+
+            if version is not None:
+                return self._key_and_version_to_object[key, version][0]
+            else:
+                return self._tail_values[key][0]
 
     def _get_versioned_object_data(self, key, transaction_id):
         with self._lock:
@@ -748,12 +772,17 @@ class Database:
 
         return None
 
-    def _set_versioned_object_data(self, key_value, transaction_id):
+    def _set_versioned_object_data(self, key_value, set_adds, set_removes, transaction_id):
         """Commit a transaction. 
 
         key_value: a map
             db_key -> (json_representation, database_representation)
         that we want to commit. We cache the normal_representation for later.
+
+        set_adds: a map:
+            db_key -> set of identities added to an index
+        set_removes: a map:
+            db_key -> set of identities removed fromf an index
         """
         with self._lock:
             if transaction_id != self._cur_transaction_num:
@@ -769,14 +798,31 @@ class Database:
                 if key not in self._key_version_numbers:
                     self._tail_values[key] = (self._kvstore.get(key), self._current_database_object_cache.get(key))
 
+            for key in set(list(set_adds) + list(set_removes)):
+                #if this object is not versioned already, we need to keep the old value around
+                if key not in self._key_version_numbers:
+                    self._current_database_object_cache[key] = (set(self._kvstore.setMembers(key)), None)
+                    self._tail_values[key] = (self._current_database_object_cache[key], self._current_database_object_cache[key])
+
             #set the json representation in the database
-            self._kvstore.setSeveral({k: v[0] for k,v in key_value.items()})
+            self._kvstore.setSeveral({k: v[0] for k,v in key_value.items()}, set_adds, set_removes)
+
             for k,v in key_value.items():
                 if v[1] is None:
                     if k in self._current_database_object_cache:
                         del self._current_database_object_cache[k]
                 else:
                     self._current_database_object_cache[k] = v[1]
+
+            for key, ids_added in set_adds.items():
+                if key not in self._current_database_object_cache:
+                    self._current_database_object_cache[key] = (set(), None)
+                self._current_database_object_cache[key][0].update(ids_added)
+
+            for key, ids_removed in set_removes.items():
+                if key not in self._current_database_object_cache:
+                    self._current_database_object_cache[key] = (set(), None)
+                self._current_database_object_cache[key][0].difference_update(ids_removed)
 
             #record what objects we touched
             self._version_number_objects[transaction_id] = list(key_value.keys())
@@ -795,6 +841,13 @@ class Database:
                         self._invalidateCachedCalc(cacheKey)
 
                     del self._keyToCacheKeyDepending[key]
+
+            for key in set(list(set_adds) + list(set_removes)):
+                if key not in self._key_version_numbers:
+                    self._key_version_numbers[key] = []
+                self._key_version_numbers[key].append(transaction_id)
+
+                self._key_and_version_to_object[key,transaction_id] = self._current_database_object_cache[key]
 
     def _invalidateCachedCalc(self, cacheKey):
         if cacheKey not in self._calcCacheValues:

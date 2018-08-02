@@ -350,6 +350,38 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Counter,k=20), ())
             self.assertEqual(v.indexLookup(db.Counter,k=30), ())
 
+    def test_indices_multiple_values(self):
+        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+
+        db = Database(mem_store)
+        initialize_types(db)
+        db.addIndex(db.Counter, 'k')
+
+        with db.transaction() as v:
+            k1 = db.Counter.New(k=20)
+            k2 = db.Counter.New(k=20)
+
+            self.assertEqual(len(db.Counter.lookupAll(k=20)), 2)
+
+            k1.k = 30
+
+            self.assertEqual(len(db.Counter.lookupAll(k=20)), 1)
+
+            k1.k = 20
+
+            self.assertEqual(len(db.Counter.lookupAll(k=20)), 2)
+
+        with db.transaction() as v:
+            self.assertEqual(len(db.Counter.lookupAll(k=20)), 2)
+
+            k1.k = 30
+
+            self.assertEqual(len(db.Counter.lookupAll(k=20)), 1)
+
+            k1.k = 20
+
+            self.assertEqual(len(db.Counter.lookupAll(k=20)), 2)
+
     def test_indices_of_algebraics(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()
 
