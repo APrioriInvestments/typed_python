@@ -24,23 +24,24 @@ expr.__str__ = lambda self: (
     )
 
 def initialize_types(db):
-    db.Root.define(
+    @db.define
+    class Root:
         obj=db.Object
-        )
 
-    db.Object.define(
-        k=expr,
+    @db.define
+    class Object:
+        k=expr
         other=db.Object
-        )
 
-    class CounterMethods:
+    @db.define
+    class Counter:
+        k = int
+
         def f(self):
             return self.k + 1
+        
         def __str__(self):
             return "Counter(k=%s)" % self.k
-
-    db.Counter.define(k=int).methods_from(CounterMethods)
-
 
 class ObjectDatabaseTests(unittest.TestCase):
     def test_methods(self):

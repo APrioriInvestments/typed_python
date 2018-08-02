@@ -22,6 +22,7 @@ import logging
 import uuid
 import traceback
 import time
+import types
 
 _encoder = algebraic_to_json.Encoder()
 _encoder.allowExtraFields = True
@@ -161,7 +162,7 @@ class DatabaseObject(object):
     @classmethod
     def methods_from(cls, other):
         for method_name, method in other.__dict__.items():
-            if not method_name.startswith("__") or method_name in ["__str__", "__repr__"]:
+            if (not method_name.startswith("__") or method_name in ["__str__", "__repr__"]) and isinstance(method, types.FunctionType):
                 setattr(cls, method_name, method)
 
     @classmethod
@@ -564,6 +565,20 @@ class Database:
             return
         
         self._types[typename] = val
+
+    def define(self, cls):
+        t = getattr(self, cls.__name__)
+        
+        types = {}
+        
+        for name, val in cls.__dict__.items():
+            if name[:2] != '__' and isinstance(val, type):
+                types[name] = val
+
+        t.define(**types)
+        t.methods_from(cls)
+
+        return t
 
     def __getattr__(self, typename):
         if typename[:1] == "_":
