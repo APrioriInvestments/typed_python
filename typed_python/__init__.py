@@ -19,4 +19,4 @@ from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, TupleOf, \
                 ConstDict, TypedFunction, Class, PackedArray, \
                 Pointer, Internal, init, UndefinedBehaviorException, Stack, NamedTuple, \
-                TypeConvert, TryTypeConvert 
+                TypeConvert, TryTypeConvert , Tuple

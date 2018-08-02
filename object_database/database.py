@@ -96,15 +96,15 @@ class DatabaseObject(object):
 
     @classmethod
     def lookupOne(cls, **kwargs):
-        return cls._database.current_transaction().indexLookupOne(cls, **kwargs)
+        return cls._database.current_transaction().indexLookupOne(cls, **kwargs or {' exists': True})
 
     @classmethod
     def lookupAll(cls, **kwargs):
-        return cls._database.current_transaction().indexLookup(cls, **kwargs)
+        return cls._database.current_transaction().indexLookup(cls, **kwargs or {' exists': True})
 
     @classmethod
     def lookupAny(cls, **kwargs):
-        return cls._database.current_transaction().indexLookupAny(cls, **kwargs)
+        return cls._database.current_transaction().indexLookupAny(cls, **kwargs or {' exists': True})
 
     def exists(self):
         if not hasattr(_cur_view, "view"):
@@ -253,6 +253,10 @@ class DatabaseView(object):
         writes = {}
 
         kwds = dict(kwds)
+        
+        if not hasattr(cls, '__types__') or cls.__types__ is None:
+            raise Exception("Please initialize the type object for %s" % str(cls.__qualname__))
+
         for tname, t in cls.__types__.items():
             if tname not in kwds:
                 kwds[tname] = default_initialize(t)
@@ -400,7 +404,7 @@ class DatabaseView(object):
 
     def indexLookupAny(self, type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
-        tname, value = kwargs.items()[0]
+        tname, value = list(kwargs.items())[0]
 
         if type.__qualname__ not in self._db._indices or tname not in self._db._indices[type.__qualname__]:
             raise Exception("No index enabled for %s.%s" % (type.__qualname__, tname))
@@ -408,7 +412,7 @@ class DatabaseView(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
-        keyname = index_key(type.__name__, tname, value)
+        keyname = index_key(type.__qualname__, tname, value)
 
         added = self._set_adds.get(keyname, set())
         removed = self._set_removes.get(keyname, set())
@@ -588,6 +592,8 @@ class Database:
         return t
 
     def __getattr__(self, typename):
+        assert '.' not in typename
+
         if typename[:1] == "_":
             return self.__dict__[typename]
 
@@ -599,6 +605,7 @@ class Database:
             cls.__qualname__ = typename
 
             self._types[typename] = cls
+            self._indices[cls.__qualname__] = {' exists': lambda e: True}
 
         return self._types[typename]
 

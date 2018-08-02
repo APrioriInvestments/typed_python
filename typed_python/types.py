@@ -19,6 +19,8 @@ import nativepython.python.inspect_override as inspect
 
 from typed_python.hash import sha_hash
 
+_null_hash = sha_hash(None)
+
 def IsType(t):
     if t in valid_primitive_types:
         return True
@@ -123,7 +125,7 @@ def TryTypeConvert(type_filter, value, allow_construct_new=False):
 
         if allow_construct_new:
             if isinstance(value, (float, int)) and type_filter in (float, int, bool):
-                return type_filter(value)
+                return (type_filter(value),)
 
         return None
 
@@ -233,6 +235,12 @@ def Dict(K,V):
         def __iter__(self):
             return self.__contents__.__iter__()
 
+        def __repr__(self):
+            return repr(self.__contents__)
+
+        def __str__(self):
+            return str(self.__contents__)
+
         def pop(self, k):
             return self.__contents__.pop(TypeConvert(K,k))
 
@@ -259,12 +267,34 @@ def ConstDict(K,V):
         ValueType=V
 
         def __init__(self, iterable = ()):
+            self._sha_hash_cache = None
+
             if isinstance(iterable, ConstDict):
                 self.__contents__ = dict(iterable.__contents__)
             elif isinstance(iterable, dict):
                 self.__contents__ = {TypeConvert(K, k): TypeConvert(V,v) for k,v in iterable.items()}
             else:
                 self.__contents__ = {TypeConvert(K, k): TypeConvert(V,v) for k,v in iterable}
+        
+        def __sha_hash__(self):
+            if self._sha_hash_cache is None:
+                base_hash = _null_hash
+
+                for k,v in sorted(self.__contents__.items()):
+                    base_hash = base_hash + sha_hash(k) + sha_hash(v)
+
+                self._sha_hash_cache = base_hash
+
+            return self._sha_hash_cache
+
+        def __eq__(self, other):
+            if not isinstance(other, ConstDict):
+                return False
+
+            return self.__contents__ == other.__contents__
+
+        def __hash__(self):
+            return hash(self.__sha_hash__())
 
         def __getitem__(self, k):
             return self.__contents__[TypeConvert(K,k)]
@@ -280,8 +310,23 @@ def ConstDict(K,V):
 
             return res
 
+        def __repr__(self):
+            return repr(self.__contents__)
+
+        def __str__(self):
+            return str(self.__contents__)
+
         def __contains__(self, k):
             return TypeConvert(K, k) in self.__contents__
+
+        def items(self):
+            return self.__contents__.items()
+
+        def keys(self):
+            return self.__contents__.keys()
+
+        def values(self):
+            return self.__contents__.values()
 
         def __sub__(self, other):
             res = ConstDict(self)
@@ -298,9 +343,29 @@ def ConstDict(K,V):
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
-            if not isinstance(value, ConstDict):
-                return None
-            return (value,)
+            if isinstance(value, ConstDict):
+                return (value,)
+
+            if allow_construct_new:
+                try:
+                    res = list(value.items())
+                except:
+                    return None
+
+                members = []
+
+                for k,v in res:
+                    converted_k = TryTypeConvert(K, k, allow_construct_new)
+                    converted_v = TryTypeConvert(V, v, allow_construct_new)
+
+                    if converted_k is None or converted_v is None:
+                        return None
+
+                    members.append((converted_k[0], converted_v[0]))
+
+                return (ConstDict(members),)
+
+            return None
 
     ConstDict.__name__ == "ConstDict(%s->%s)" % (K.__name__, V.__name__)
 
@@ -314,7 +379,19 @@ def TupleOf(t):
         ElementType = t
 
         def __init__(self, iterable = ()):
+            self._sha_hash_cache = None
             self.__contents__ = tuple(TypeConvert(t, x) for x in iterable)
+        
+        def __sha_hash__(self):
+            if self._sha_hash_cache is None:
+                base_hash = _null_hash
+
+                for k in self.__contents__:
+                    base_hash = base_hash + sha_hash(k)
+
+                self._sha_hash_cache = base_hash
+
+            return self._sha_hash_cache
 
         def __getitem__(self, x):
             return self.__contents__[x]
@@ -322,10 +399,24 @@ def TupleOf(t):
         def __len__(self):
             return len(self.__contents__)
 
+        def __repr__(self):
+            return repr(self.__contents__)
+
+        def __str__(self):
+            return str(self.__contents__)
+
         def __add__(self, other):
             res = TupleOf(())
             res.__contents__ = self.__contents__ + tuple(TypeConvert(t, x) for x in other)
             return res
+
+        def __eq__(self, other):
+            if not isinstance(other, TupleOf):
+                return False
+            return self.__contents__ == other.__contents__
+
+        def __hash__(self):
+            return hash(self.__contents__)
 
         def __sha_hash__(self):
             res = sha_hash(len(self.__contents__))
@@ -445,8 +536,27 @@ def Tuple(*args):
 
         def __init__(self, iterable):
             assert len(iterable) == len(args)
-
+            self._sha_hash_cache = None
             self.__contents__ = tuple(TypeConvert(args[i], iterable[i]) for i in range(len(args)))
+
+        def __sha_hash__(self):
+            if self._sha_hash_cache is None:
+                base_hash = _null_hash
+
+                for k in self.__contents__:
+                    base_hash = base_hash + sha_hash(k)
+
+                self._sha_hash_cache = base_hash
+
+            return self._sha_hash_cache
+
+        def __eq__(self, other):
+            if not isinstance(other, Tuple):
+                return False
+            return self.__contents__ == other.__contents__
+
+        def __hash__(self):
+            return hash(self.__contents__)
 
         def __getitem__(self, x):
             return self.__contents__[x]
@@ -460,12 +570,23 @@ def Tuple(*args):
                 res += sha_hash(i)
             return res
 
+        def __repr__(self):
+            return repr(self.__contents__)
+
+        def __str__(self):
+            return str(self.__contents__)
+
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
             if isinstance(value, Tuple):
                 return (value,)
 
             if allow_construct_new:
+                try:
+                    value = tuple(value)
+                except:
+                    return None
+
                 if len(value) == len(args):
                     new_elts = []
                     for i in range(len(args)):

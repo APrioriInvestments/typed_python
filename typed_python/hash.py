@@ -78,4 +78,7 @@ def sha_hash(val):
         return Hash.from_string(val)
     if isinstance(val, bytes):
         return Hash.from_string(str(val))
+    if val is None:
+        return Hash.from_string("")
+
     return val.__sha_hash__()

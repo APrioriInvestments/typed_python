@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, ConstDict, OneOf
+from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple
 
 import logging
 import json
@@ -38,6 +38,7 @@ class Encoder(object):
         if isinstance(object_type, OneOf):
             if value is None or isinstance(value, (int,float,str,bool)):
                 return value
+            
             return { 'type': str(type(value)), 'value': self.to_json(type(value), value) }
 
         if isinstance(object_type, Alternative):
@@ -57,18 +58,21 @@ class Encoder(object):
                     'fields': fields
                     }
 
+        elif isinstance(value, Tuple):
+            return tuple(self.to_json(value.ElementTypes[i], x) for i,x in enumerate(value))
+
         elif isinstance(value, TupleOf):
             return tuple(self.to_json(value.ElementType, x) for x in value)
 
         elif isinstance(value, ConstDict):
-            return tuple((self.to_json(value.KeyType, k), self.to_json(value.ValueType, value[k])))
+            return tuple((self.to_json(value.KeyType, k), self.to_json(value.ValueType, value[k])) for k,v in value.items())
 
         elif isinstance(value, (int,float,bool,str)) or value is None:
             return value
         elif hasattr(type(value), "to_json"):
             return type(value).to_json(value)
         else:
-            assert False, "Can't convert %s to %s" % (value,object_type)
+            assert False, "Can't convert %s of type %s to JSON" % (value,object_type)
 
     def from_json(self, value, algebraic_type):
         if algebraic_type in self.overrides:
@@ -76,7 +80,10 @@ class Encoder(object):
         
         try:
             if isinstance(algebraic_type, OneOf):
-                which_type
+                if isinstance(value, dict):
+                    which_type = [o for o in algebraic_type.options if str(o) == value['type']]
+                    return self.from_json(value['value'], which_type)
+                return value
 
             if isinstance(algebraic_type, ConstDict):
                 return algebraic_type(
