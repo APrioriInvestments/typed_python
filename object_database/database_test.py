@@ -1,6 +1,6 @@
 from typed_python import Alternative, TupleOf
 
-from object_database.database import Database, RevisionConflictException
+from object_database.database import Database, RevisionConflictException, Indexed
 
 import object_database.InMemoryJsonStore as InMemoryJsonStore
 
@@ -30,12 +30,12 @@ def initialize_types(db):
 
     @db.define
     class Object:
-        k=expr
+        k=Indexed(expr)
         other=db.Object
 
     @db.define
     class Counter:
-        k = int
+        k = Indexed(int)
 
         def f(self):
             return self.k + 1
@@ -265,7 +265,7 @@ class ObjectDatabaseTests(unittest.TestCase):
 
                 counters = new_counters
 
-        self.assertTrue(len(mem_store.values) < 50)
+        self.assertTrue(mem_store.storedStringCount() < 50)
         self.assertTrue(total_writes > 500)
 
     def test_flush_db_works(self):
@@ -286,13 +286,13 @@ class ObjectDatabaseTests(unittest.TestCase):
             c.delete()
 
         #database doesn't have this
-        self.assertFalse(mem_store.values)
+        self.assertFalse(mem_store.storedStringCount())
 
         #but the view does!
         with view:
             self.assertTrue(c.exists())
 
-        self.assertFalse(mem_store.values)
+        self.assertFalse(mem_store.storedStringCount())
 
     def test_read_write_conflict(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()
@@ -323,8 +323,7 @@ class ObjectDatabaseTests(unittest.TestCase):
 
         db = Database(mem_store)
         initialize_types(db)
-        db.addIndex(db.Counter, 'k')
-
+        
         with db.view() as v:
             self.assertEqual(v.indexLookup(db.Counter,k=20), ())
             self.assertEqual(v.indexLookup(db.Counter,k=30), ())
@@ -355,8 +354,7 @@ class ObjectDatabaseTests(unittest.TestCase):
 
         db = Database(mem_store)
         initialize_types(db)
-        db.addIndex(db.Counter, 'k')
-
+        
         with db.transaction() as v:
             k1 = db.Counter.New(k=20)
             k2 = db.Counter.New(k=20)
@@ -387,8 +385,7 @@ class ObjectDatabaseTests(unittest.TestCase):
 
         db = Database(mem_store)
         initialize_types(db)
-        db.addIndex(db.Object, 'k')
-
+        
         with db.transaction():
             o1 = db.Object.New(k=expr.Constant(value=123))
 
@@ -399,10 +396,15 @@ class ObjectDatabaseTests(unittest.TestCase):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()
 
         db = Database(mem_store)
-        db.Object.define(k=int)
-        db.addIndex(db.Object, 'k')
-        db.addIndex(db.Object, 'k2', lambda o: o.k * 2)
         
+        @db.define
+        class Object:
+            k=Indexed(int)
+
+            @Indexed
+            def k2(self) -> int:
+                return self.k * 2
+
         with db.transaction():
             o1 = db.Object.New(k=10)
 
@@ -410,6 +412,7 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Object,k=10), (o1,))
             self.assertEqual(v.indexLookup(db.Object,k2=20), (o1,))
             self.assertEqual(v.indexLookup(db.Object,k=20), ())
+            self.assertEqual(o1.k2(), o1.k * 2)
 
     def test_index_functions_None_semantics(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()

@@ -18,7 +18,7 @@ class InMemoryJsonStore(object):
                 return None
             val = self.values.get(key)
 
-            assert isinstance(val, str)
+            assert isinstance(val, str), key
 
             return json.loads(val)
 
@@ -43,6 +43,9 @@ class InMemoryJsonStore(object):
             assert isinstance(s,set)
             for value in values:
                 s.discard(json.dumps(value))
+
+    def storedStringCount(self):
+        return len([x for x in self.values.values() if isinstance(x,str)])
 
     def setMembers(self, key):
         with self.lock:

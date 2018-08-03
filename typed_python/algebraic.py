@@ -122,7 +122,9 @@ def makeAlternativeOption(Alternative, which, inTypedict):
                     assert not fields and len(args) == 1, "can't infer a name for more than one argument"
                     fields = {list(typedict.keys())[0]: args[0]}
                 else:
-                    raise TypeError("constructing %s with an extra unnamed argument" % (alternative.__qualname__ + "." + which))
+                    raise TypeError("constructing %s with an unnamed argument, but the choice of type is ambiguous" % (
+                        Alternative.__qualname__ + "." + which
+                        ))
 
             for f in fields:
                 if f not in typedict:

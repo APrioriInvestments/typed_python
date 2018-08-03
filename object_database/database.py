@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert
-
+import inspect
 import object_database.algebraic_to_json as algebraic_to_json
 from typed_python.hash import sha_hash
 
@@ -22,7 +22,7 @@ import logging
 import uuid
 import traceback
 import time
-import types
+from types import FunctionType
 
 _encoder = algebraic_to_json.Encoder()
 _encoder.allowExtraFields = True
@@ -34,6 +34,11 @@ class RevisionConflictException(Exception):
 
 #singleton object that clients should never see
 _creating_the_null_object = []
+
+class Indexed:
+    def __init__(self, obj):
+        assert isinstance(obj, (type, FunctionType))
+        self.obj = obj
 
 class DatabaseObject(object):
     __algebraic__ = True
@@ -158,12 +163,6 @@ class DatabaseObject(object):
             raise Exception("Null object is not writeable")
 
         _cur_view.view._delete(self, type(self).__qualname__, self._identity, self.__types__.keys())
-
-    @classmethod
-    def methods_from(cls, other):
-        for method_name, method in other.__dict__.items():
-            if (not method_name.startswith("__") or method_name in ["__str__", "__repr__"]) and isinstance(method, types.FunctionType):
-                setattr(cls, method_name, method)
 
     @classmethod
     def define(cls, **types):
@@ -360,7 +359,6 @@ class DatabaseView(object):
                 if cur_index_val != new_index_val:
                     if cur_index_val is not None:
                         old_index_name = index_key(obj_typename, index_name, cur_index_val)
-                        cur_index_list = tuple(self._get_dbkey(old_index_name) or ())
                         self._remove_from_index(old_index_name, identity)
 
                     if new_index_val is not None:
@@ -394,6 +392,10 @@ class DatabaseView(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
+        indexType = self._db._indexTypes[type.__qualname__][tname]
+        if indexType is not None:
+            value = TypeConvert(indexType, value, allow_construct_new=True)
+
         keyname = index_key(type.__qualname__, tname, value)
 
         identities = set(self._db._get_versioned_set_data(keyname, self._transaction_num))
@@ -411,6 +413,10 @@ class DatabaseView(object):
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
+
+        indexType = self._db._indexTypes[type.__qualname__][tname]
+        if indexType is not None:
+            value = TypeConvert(indexType, value, allow_construct_new=True)
 
         keyname = index_key(type.__qualname__, tname, value)
 
@@ -498,6 +504,7 @@ class Database:
         self._types = {}
         #typename -> indexname -> fun(object->value)
         self._indices = {}
+        self._indexTypes = {}
 
         #for each version number in _version_numbers, how many views referring to it
         self._version_number_counts = {}
@@ -561,14 +568,20 @@ class Database:
     def addCalculationCache(self, name, function=None):
         self._calcCacheFunctions[name] = function or name
 
-    def addIndex(self, type, prop, fun = None):
+    def addIndex(self, type, prop, fun = None, index_type = None):
         if type.__qualname__ not in self._indices:
             self._indices[type.__qualname__] = {}
+            self._indexTypes[type.__qualname__] = {}
 
         if fun is None:
             fun = lambda o: getattr(o, prop)
+            index_type = type.__types__[prop]
+        else:
+            spec = inspect.getfullargspec(fun)
+            index_type = spec.annotations.get('return', None)
 
         self._indices[type.__qualname__][prop] = fun
+        self._indexTypes[type.__qualname__][prop] = index_type
 
     def __setattr__(self, typename, val):
         if typename[:1] == "_":
@@ -585,9 +598,22 @@ class Database:
         for name, val in cls.__dict__.items():
             if name[:2] != '__' and isinstance(val, type):
                 types[name] = val
+            elif name[:2] != '__' and isinstance(val, Indexed):
+                if isinstance(val.obj, type):
+                    types[name] = val.obj
 
         t.define(**types)
-        t.methods_from(cls)
+
+        for name, val in cls.__dict__.items():
+            if name[:2] != '__' and isinstance(val, Indexed):
+                if isinstance(val.obj, FunctionType):
+                    self.addIndex(t, name, val.obj)
+                    setattr(t, name, val.obj)
+                else:
+                    self.addIndex(t, name)
+            elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
+                if isinstance(val, FunctionType):
+                    setattr(t, name, val)
 
         return t
 
@@ -606,6 +632,7 @@ class Database:
 
             self._types[typename] = cls
             self._indices[cls.__qualname__] = {' exists': lambda e: True}
+            self._indexTypes[cls.__qualname__] = {' exists': bool}
 
         return self._types[typename]
 
