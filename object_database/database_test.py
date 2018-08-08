@@ -1,6 +1,6 @@
 from typed_python import Alternative, TupleOf
 
-from object_database.database import Database, RevisionConflictException, Indexed
+from object_database.database import Database, RevisionConflictException, Indexed, Index
 
 import object_database.InMemoryJsonStore as InMemoryJsonStore
 
@@ -36,6 +36,7 @@ def initialize_types(db):
     @db.define
     class Counter:
         k = Indexed(int)
+        x = int
 
         def f(self):
             return self.k + 1
@@ -265,7 +266,7 @@ class ObjectDatabaseTests(unittest.TestCase):
 
                 counters = new_counters
 
-        self.assertTrue(mem_store.storedStringCount() < 50)
+        self.assertLess(mem_store.storedStringCount(), 100)
         self.assertTrue(total_writes > 500)
 
     def test_flush_db_works(self):
@@ -380,6 +381,44 @@ class ObjectDatabaseTests(unittest.TestCase):
 
             self.assertEqual(len(db.Counter.lookupAll(k=20)), 2)
 
+    def test_indices_across_invocations(self):
+        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+
+        db = Database(mem_store)
+        initialize_types(db)
+        
+        with db.transaction():
+            o = db.Counter.New(k=1)
+            o.x = 10
+
+        db = Database(mem_store)
+        initialize_types(db)
+    
+        with db.transaction() as v:
+            o = db.Counter.lookupOne(k=1)
+            self.assertEqual(o.x, 10)
+            o.k = 2
+            o.x = 11
+
+        db = Database(mem_store)
+        initialize_types(db)
+    
+        with db.transaction() as v:
+            o = db.Counter.lookupOne(k=2)
+            o.k = 3
+            self.assertEqual(o.x, 11)
+            
+        db = Database(mem_store)
+        initialize_types(db)
+    
+        with db.transaction() as v:
+            self.assertFalse(db.Counter.lookupAny(k=2))
+            
+            o = db.Counter.lookupOne(k=3)
+            o.k = 3
+            self.assertEqual(o.x, 11)
+            
+
     def test_indices_of_algebraics(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()
 
@@ -405,6 +444,8 @@ class ObjectDatabaseTests(unittest.TestCase):
             def k2(self) -> int:
                 return self.k * 2
 
+            pair_index = Index('k', 'k')
+
         with db.transaction():
             o1 = db.Object.New(k=10)
 
@@ -413,6 +454,12 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Object,k2=20), (o1,))
             self.assertEqual(v.indexLookup(db.Object,k=20), ())
             self.assertEqual(o1.k2(), o1.k * 2)
+
+            self.assertEqual(v.indexLookup(db.Object,pair_index=(10,10)), (o1,))
+            self.assertEqual(v.indexLookup(db.Object,pair_index=(10,11)), ())
+
+            with self.assertRaises(Exception):
+                self.assertEqual(v.indexLookup(db.Object,pair_index=(10,"hi")), (o1,))
 
     def test_index_functions_None_semantics(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()

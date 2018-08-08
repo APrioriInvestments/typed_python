@@ -15,7 +15,7 @@
 from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
                                 ConstDict, TypedFunction, Class, PackedArray, \
-                                Pointer, Internal, init, UndefinedBehaviorException, Stack
+                                Pointer, Internal, init, UndefinedBehaviorException, Stack, TupleOf
 
 import unittest
 import time
@@ -53,6 +53,9 @@ class TypesTests(unittest.TestCase):
         
         self.assertTrue(int_list_1.ElementType is int)
         self.assertTrue(str_list.ElementType is str)
+
+    def test_tuple_of_type(self):
+        TupleOf(str)(("a", "b"))
 
     def test_list_type(self):
         int_list = ListOf(int)()

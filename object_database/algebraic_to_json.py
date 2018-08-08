@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple
+from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple
 
 import logging
 import json
@@ -58,19 +58,27 @@ class Encoder(object):
                     'fields': fields
                     }
 
-        elif isinstance(value, Tuple):
-            return tuple(self.to_json(value.ElementTypes[i], x) for i,x in enumerate(value))
+        elif isinstance(object_type, Tuple):
+            return tuple(self.to_json(object_type.ElementTypes[i], x) for i,x in enumerate(value))
 
-        elif isinstance(value, TupleOf):
-            return tuple(self.to_json(value.ElementType, x) for x in value)
+        elif isinstance(object_type, TupleOf):
+            return tuple(self.to_json(object_type.ElementType, x) for x in value)
 
-        elif isinstance(value, ConstDict):
-            return tuple((self.to_json(value.KeyType, k), self.to_json(value.ValueType, value[k])) for k,v in value.items())
+        elif isinstance(object_type, ConstDict):
+            return tuple((self.to_json(object_type.KeyType, k), 
+                          self.to_json(object_type.ValueType, value[k])) for k,v in value.items())
 
+        elif isinstance(object_type, Kwargs):
+            return {k: self.to_json(object_type.ElementTypes[k], getitem(value, k)) for k in object_type.ElementNames}
+
+        elif isinstance(object_type, NamedTuple):
+            return {k: self.to_json(t, getattr(value, k)) for k,t in object_type.ElementNamesAndTypes}
+        elif isinstance(value, bytes):
+            return str(value, 'ascii')
         elif isinstance(value, (int,float,bool,str)) or value is None:
             return value
-        elif hasattr(type(value), "to_json"):
-            return type(value).to_json(value)
+        elif hasattr(object_type, "to_json"):
+            return object_type.to_json(value)
         else:
             assert False, "Can't convert %s of type %s to JSON" % (value,object_type)
 
@@ -93,8 +101,21 @@ class Encoder(object):
             if isinstance(algebraic_type, TupleOf):
                 return algebraic_type(self.from_json(v, algebraic_type.ElementType) for v in value)
 
+            if algebraic_type is bytes:
+                return bytes(value, 'ascii')
+
             if algebraic_type in (bool, int, str, float):
                 return value
+
+            if isinstance(algebraic_type, Kwargs):
+                return algebraic_type(
+                    {k: self.from_json(algebraic_type.ElementTypes[k], value[k]) for k in algebraic_type.ElementNames}
+                    )
+
+            if isinstance(algebraic_type, NamedTuple):
+                return algebraic_type(
+                    **{k: self.from_json(algebraic_type.ElementTypes[k], value[k]) for k in algebraic_type.ElementNames}
+                    )
 
             if isinstance(algebraic_type, Alternative):
                 if isinstance(value, str):

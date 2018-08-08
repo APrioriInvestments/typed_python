@@ -39,6 +39,14 @@ def IsTypeFilter(t):
 def IsTypeFilterTuple(t):
     return isinstance(t, tuple) and all(IsTypeFilter(e) for e in t)
 
+def TypeToString(t):
+    if isinstance(t, (int, str, float, type(None), bool, bytes)):
+        return repr(t)
+    if hasattr(t,'__qualname__'):
+        return t.__qualname__
+
+    return str(t)
+
 def IsTypeFilterDict(t):
     return (
         isinstance(t, dict) 
@@ -60,6 +68,9 @@ def MakeMetaclassFunction(name, **keywords):
         """Decorator that makes regular functions into memoized TypeFunctions."""
         lookup = {}
 
+        def preprocessHook(args, kwargs):
+            return (args,kwargs)
+
         class MetaMetaClass(type):
             def __instancecheck__(self, instance):
                 if not hasattr(instance, '__typed_python_metaclass__'):
@@ -72,6 +83,8 @@ def MakeMetaclassFunction(name, **keywords):
                 args = toTuple(args)
                 kwargs = toTuple(sorted(kwargs.items()))
 
+                args,kwargs = MetaClass.preprocessHook(args,kwargs)
+
                 lookup_key = (args, kwargs)
 
                 if lookup_key not in lookup:
@@ -82,6 +95,7 @@ def MakeMetaclassFunction(name, **keywords):
                 return lookup[lookup_key]
 
         MetaClass.__name__ = func.__name__
+        MetaClass.preprocessHook = preprocessHook
 
         return MetaClass #return actual_func
     
@@ -98,19 +112,19 @@ def TypeConvert(type_filter, value, allow_construct_new=False):
         if isinstance(value, type(type_filter)) and value == type_filter:
             return (value,)
 
-        raise TypeError("Can't convert %s to %s" % (value, type_filter))
+        raise TypeError("Can't convert %s to %s" % (value, str(type_filter)))
 
     if type_filter in valid_primitive_types:
         if isinstance(value, type_filter):
             return value
-        raise TypeError("Can't convert %s to %s" % (value, type_filter))
+        raise TypeError("Can't convert %s to %s" % (value, str(type_filter)))
 
     res = type_filter.__typed_python_try_convert_instance__(value, allow_construct_new)
 
     if res:
         return res[0]
     
-    raise TypeError("Can't convert %s to %s" % (value, type_filter))
+    raise TypeError("Can't convert %s to %s" % (value, str(type_filter)))
 
 def TryTypeConvert(type_filter, value, allow_construct_new=False):
     if isinstance(type_filter, valid_primitive_types):
@@ -162,7 +176,7 @@ def OneOf(*args):
                     return res
             return None
 
-    OneOf.__name__ = "OneOf" + repr(args)
+    OneOf.__qualname__ = "OneOf(" + ",".join(TypeToString(x) for x in sorted(args, key=str)) + ")"
 
     return OneOf
 
@@ -204,7 +218,7 @@ def ListOf(t):
                 return None
             return (value,)
 
-    ListOf.__name__ == "ListOf(%s)" % str(t)
+    ListOf.__qualname__ = "ListOf(%s)" % str(t)
 
     return ListOf
 
@@ -253,7 +267,7 @@ def Dict(K,V):
                 return None
             return (value,)
 
-    Dict.__name__ == "Dict(%s->%s)" % (K.__name__, V.__name__)
+    Dict.__qualname__ = "Dict(%s->%s)" % (K.__name__, V.__name__)
 
     return Dict
 
@@ -289,7 +303,12 @@ def ConstDict(K,V):
 
         def __eq__(self, other):
             if not isinstance(other, ConstDict):
-                return False
+                x = TryTypeConvert(ConstDict, other, allow_construct_new=True)
+
+                if x is None:
+                    return NotImplemented
+
+                return self == x[0]
 
             return self.__contents__ == other.__contents__
 
@@ -367,7 +386,7 @@ def ConstDict(K,V):
 
             return None
 
-    ConstDict.__name__ == "ConstDict(%s->%s)" % (K.__name__, V.__name__)
+    ConstDict.__qualname__ = "ConstDict(%s->%s)" % (TypeToString(K), TypeToString(V))
 
     return ConstDict
 
@@ -412,7 +431,11 @@ def TupleOf(t):
 
         def __eq__(self, other):
             if not isinstance(other, TupleOf):
-                return False
+                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self == x[0]
+
             return self.__contents__ == other.__contents__
 
         def __hash__(self):
@@ -429,7 +452,7 @@ def TupleOf(t):
             if isinstance(value, TupleOf):
                 return (value,)
 
-            if allow_construct_new:
+            if allow_construct_new or isinstance(value, tuple):
                 try:
                     res = list(value)
                 except:
@@ -447,7 +470,7 @@ def TupleOf(t):
 
             return None
 
-    TupleOf.__name__ == "TupleOf(%s)" % t.__name__
+    TupleOf.__qualname__ = "TupleOf(%s)" % str(t)
 
     return TupleOf
 
@@ -455,22 +478,31 @@ def TupleOf(t):
 def Kwargs(**kwargs):
     assert IsTypeFilterDict(kwargs)
     
-    kwargs_sorted = sorted(kwargs.items())
+    kwargs_sorted = sorted(kwargs)
 
     class Kwargs:
         ElementTypes = kwargs
-        ElementTypesSorted = kwargs_sorted
+        ElementNames = kwargs_sorted
 
-        def __init__(self, iterable):
+        def __init__(self, iterable=None, **starargs):
+            if iterable is None and starargs:
+                iterable = starargs
+
             assert len(iterable) == len(kwargs)
 
             self.__contents__ = {k: TypeConvert(kwargs[k], iterable[k]) for k in kwargs_sorted}
 
-        def __getattr__(self, x):
+        def __getitem__(self, x):
             return self.__contents__[x]
 
         def __len__(self):
             return len(self.__contents__)
+
+        def __iter__(self):
+            return iter(self.__contents__)
+
+        def items(self):
+            return self.__contents__.items()
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
@@ -478,16 +510,16 @@ def Kwargs(**kwargs):
                 return None
             return (value,)
 
-    Kwargs.__name__ == "Kwargs(" + ",".join("%s=%s" % (k,v) for k,v in sorted(args.items())) + ")"
+    Kwargs.__qualname__ = "Kwargs(" + ",".join("%s=%s" % (k,v) for k,v in sorted(kwargs.items())) + ")"
 
     return Kwargs
 
 @TypeFunction
-def NamedTuple(*namesAndTypes):
+def NamedTuple(*namesAndTypes, **kwargs):
     for n in namesAndTypes:
         assert isinstance(n, tuple)
         assert len(n) == 2
-        assert IsTypeFilter(n[1])
+        assert IsTypeFilter(n[1]), n[1]
         assert isinstance(n[0], str)
 
     names = [n[0] for n in namesAndTypes]
@@ -498,38 +530,119 @@ def NamedTuple(*namesAndTypes):
 
     nameLookup = { names[i]:i for i in range(len(names)) }
 
-    class NamedTuple:
+    class NamedTuple_:
         ElementTypes = types
         ElementNames = names
+        ElementNamesAndTypes = namesAndTypes
         NameLookup = nameLookup
 
-        def __init__(self, iterable):
-            assert len(iterable) == len(namesAndTypes)
+        def __init__(self, iterable=None, **kwargs):
+            self._sha_hash_cache = None
 
-            self.__contents__ = {k: TypeConvert(names[i], iterable[i]) for i in range(namesAndTypes)}
+            if iterable is not None:
+                assert len(iterable) == len(namesAndTypes)
+
+                self.__contents__ = tuple(TypeConvert(types[i], iterable[i]) for i in range(len(namesAndTypes)))
+            else:
+                assert len(kwargs) == len(namesAndTypes)
+                self.__contents__ = tuple(TypeConvert(types[i], kwargs[names[i]]) for i in range(len(namesAndTypes)))
 
         def __getitem__(self, x):
-            return self.__contents__[nameLookup[x]]
+            return self.__contents__[x]
 
         def __getattr__(self, x):
-            return self.__contents__[x]
+            if x not in nameLookup:
+                raise AttributeError(x)
+            return self.__contents__[nameLookup[x]]
 
         def __len__(self):
             return len(self.__contents__)
 
+        def __add__(self, other):
+            out_type = NamedTuple(NamedTuple_.ElementNamesAndTypes + type(other).ElementNamesAndTypes)
+            return out_type(self.__contents__ + other.__contents__)
+
+        def __str__(self):
+            return repr(self)
+
+        def __sha_hash__(self):
+            if self._sha_hash_cache is None:
+                base_hash = _null_hash
+
+                for k in self.__contents__:
+                    base_hash = base_hash + sha_hash(k)
+
+                self._sha_hash_cache = base_hash
+
+            return self._sha_hash_cache
+
+        def __repr__(self):
+            return "(%s)" % (",".join("%s=%s" % (NamedTuple_.ElementNames[i], self.__contents__[i]) 
+                        for i in range(len(self.__contents__))))
+
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
-            if not isinstance(value, NamedTuple):
-                return None
-            return (value,)
+            if isinstance(value, NamedTuple_):
+                return (value,)
 
-    NamedTuple.__name__ == "NamedTuple(" + ",".join("%s=%s" % (k,v) for k,v in sorted(namesAndTypes.items())) + ")"
+            if allow_construct_new:
+                if isinstance(value, dict):
+                    if len(value) != len(types):
+                        return None
 
-    return NamedTuple
+                    members = []
+
+                    for ix in range(len(types)):
+                        if names[ix] not in value:
+                            return None
+
+                        converted = TryTypeConvert(types[ix], value[names[ix]], allow_construct_new)
+                        if converted is None:
+                            return None
+
+                        members.append(converted[0])
+
+                    return (NamedTuple_(members),)
+                else:
+                    try:
+                        res = list(value.items())
+                    except:
+                        return None
+
+                    if len(res) != len(types):
+                        return None
+
+                    members = []
+
+                    for ix in range(len(types)):
+                        converted = TryTypeConvert(types[ix], res[ix], allow_construct_new)
+                        if converted is None:
+                            return None
+                        members.append(converted[0])
+
+                    return (NamedTuple_(members),)
+
+            return None
+
+    NamedTuple_.__qualname__ = "NamedTuple(" + ",".join("%s=%s" % (k,TypeToString(v)) for k,v in sorted(namesAndTypes)) + ")"
+
+    return NamedTuple_
+
+def _named_tuple_preprocess_hook(args, kwargs):
+    """Allow NamedTuple to accept kwargs, which we'll sort (since we need a canonical ordering)"""
+    return args + kwargs, ()
+
+NamedTuple.preprocessHook = _named_tuple_preprocess_hook
+def _named_tuple_new(**kwargs):
+    T = NamedTuple(**{k: type(v) for k,v in kwargs.items()})
+    
+    return T(**kwargs)
+
+NamedTuple.New = staticmethod(_named_tuple_new)
 
 @TypeFunction
 def Tuple(*args):
-    assert IsTypeFilterTuple(args)
+    assert IsTypeFilterTuple(args), args
     
     class Tuple:
         ElementTypes = args
@@ -552,7 +665,11 @@ def Tuple(*args):
 
         def __eq__(self, other):
             if not isinstance(other, Tuple):
-                return False
+                x = TryTypeConvert(Tuple, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self == x[0]
+
             return self.__contents__ == other.__contents__
 
         def __hash__(self):
@@ -581,7 +698,7 @@ def Tuple(*args):
             if isinstance(value, Tuple):
                 return (value,)
 
-            if allow_construct_new:
+            if allow_construct_new or isinstance(value, tuple):
                 try:
                     value = tuple(value)
                 except:
@@ -597,7 +714,7 @@ def Tuple(*args):
                     return (Tuple(new_elts),)
             return None
 
-    Tuple.__name__ == "Tuple" + repr(args)
+    Tuple.__qualname__ = "Tuple(" + ",".join(TypeToString(x) for x in args) + ")"
 
     return Tuple
 
@@ -1019,7 +1136,7 @@ def PackedArray(t):
                 return None
             return (value,)
 
-    PackedArray.__name__ == "PackedArray(%s)" % str(t)
+    PackedArray.__qualname__ = "PackedArray(%s)" % str(t)
 
     return PackedArray
 
@@ -1107,7 +1224,7 @@ def Pointer(t):
                 return None
             return (value,)
 
-    Pointer.__name__ == "Pointer" + repr(t)
+    Pointer.__qualname__ = "Pointer" + repr(t)
 
     return Pointer
 

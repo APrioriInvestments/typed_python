@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert
+from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs
 import inspect
 import object_database.algebraic_to_json as algebraic_to_json
 from typed_python.hash import sha_hash
@@ -40,8 +40,18 @@ class Indexed:
         assert isinstance(obj, (type, FunctionType))
         self.obj = obj
 
+class Index:
+    def __init__(self, *names):
+        self.names = names
+
+    def __call__(self, instance):
+        return tuple(getattr(instance,x) for x in self.names)
+
+def isValidIdentity(val):
+    return isinstance(val, str) and '"' not in val
+
 class DatabaseObject(object):
-    __algebraic__ = True
+    __typed_python_type__ = True
     __types__ = None
     _database = None
     Null = None
@@ -71,6 +81,9 @@ class DatabaseObject(object):
     def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
         if isinstance(value, cls):
             return (value,)
+        if value is None:
+            return (cls.Null,)
+
         return None
 
     def __init__(self, identity):
@@ -82,6 +95,7 @@ class DatabaseObject(object):
             identity = "NULL"
         else:
             assert isinstance(identity, str), type(identity)
+            assert '"' not in identity
 
         self.__dict__['_identity'] = identity
 
@@ -131,7 +145,7 @@ class DatabaseObject(object):
             raise Exception("Null object of type %s has no fields" % type(self).__qualname__)
 
         if name not in self.__types__:
-            raise AttributeError("Object of type %s has no field %s" % (type(self).__qualname__, name))
+            raise AttributeError("Object of type %s has no field '%s'" % (type(self).__qualname__, name))
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
@@ -206,11 +220,21 @@ def default_initialize(t):
         return t()
     if t is type(None):
         return None
+    if isinstance(t, Kwargs):
+        return Kwargs(**{k:default_initialize(t) for k,t in t.ElementTypes.items()})
     if isinstance(t, (TupleOf, ConstDict)):
         return t()
     if isinstance(t, OneOf):
         if None in t.options:
             return None
+        for o in t.options:
+            if isinstance(o, (str,bool,bytes,int,float)):
+                return o
+        for o in sorted(t.options, key=str):
+            if hasattr(o, '__default_initializer__'):
+                return o.__default_initializer__()
+
+        raise Exception("can't default initialize OneOf(%s)" % t.options)
 
     if hasattr(t, '__default_initializer__'):
         return t.__default_initializer__()
@@ -366,6 +390,8 @@ class DatabaseView(object):
                         self._add_to_index(new_index_name, identity)
 
     def _add_to_index(self, index_key, identity):
+        assert isinstance(identity, str)
+
         if index_key not in self._set_adds:
             self._set_adds[index_key] = set()
             self._set_removes[index_key] = set()
@@ -374,6 +400,8 @@ class DatabaseView(object):
         self._set_removes[index_key].discard(identity)
 
     def _remove_from_index(self, index_key, identity):
+        assert isinstance(identity, str)
+
         if index_key not in self._set_adds:
             self._set_adds[index_key] = set()
             self._set_removes[index_key] = set()
@@ -401,8 +429,12 @@ class DatabaseView(object):
         identities = set(self._db._get_versioned_set_data(keyname, self._transaction_num))
         identities = identities.union(self._set_adds.get(keyname, set()))
         identities = identities.difference(self._set_removes.get(keyname, set()))
-        
-        return tuple([type(str(x)) for x in identities])
+
+        for i in identities:
+            assert isinstance(i, str)
+            assert '"' not in i
+
+        return tuple([type(x) for x in identities])
 
     def indexLookupAny(self, type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
@@ -415,6 +447,7 @@ class DatabaseView(object):
             raise Exception("Please access indices from within a view.")
 
         indexType = self._db._indexTypes[type.__qualname__][tname]
+
         if indexType is not None:
             value = TypeConvert(indexType, value, allow_construct_new=True)
 
@@ -424,11 +457,13 @@ class DatabaseView(object):
         removed = self._set_removes.get(keyname, set())
 
         if added:
-            return type(str(list(added)[0]))
+            return type(list(added)[0])
 
         for val in self._db._get_versioned_set_data(keyname, self._transaction_num):
+            assert isinstance(val, str)
+
             if val not in removed:
-                return type(str(val))
+                return type(val)
 
         return None
 
@@ -605,6 +640,9 @@ class Database:
         t.define(**types)
 
         for name, val in cls.__dict__.items():
+            if isinstance(val, Index):
+                self.addIndex(t, name, val, Tuple(*tuple(types[k] for k in val.names)))
+
             if name[:2] != '__' and isinstance(val, Indexed):
                 if isinstance(val.obj, FunctionType):
                     self.addIndex(t, name, val.obj)
@@ -766,16 +804,29 @@ class Database:
 
             if key not in self._key_version_numbers:
                 if key in self._tail_values:
+                    for val in self._tail_values[key][0]:
+                        assert isValidIdentity(val), val
                     return self._tail_values[key][0]
 
-                return self._kvstore.setMembers(key)
+                res = self._kvstore.setMembers(key)
+
+                for val in res:
+                    assert isValidIdentity(val), val
+
+                return res
 
             #get the largest version number less than or equal to transaction_id
             version = self._best_version_for(transaction_id, self._key_version_numbers[key])
 
             if version is not None:
+                for val in self._key_and_version_to_object[key, version][0]:
+                    assert isValidIdentity(val), val
+
                 return self._key_and_version_to_object[key, version][0]
             else:
+                for val in self._tail_values[key][0]:
+                    assert isValidIdentity(val), val
+
                 return self._tail_values[key][0]
 
     def _get_versioned_object_data(self, key, transaction_id):
@@ -818,6 +869,16 @@ class Database:
         set_removes: a map:
             db_key -> set of identities removed fromf an index
         """
+        for s in set_adds.values():
+            for val in s:
+                assert isinstance(val, str)
+                assert '"' not in val
+
+        for s in set_removes.values():
+            for val in s:
+                assert isinstance(val, str)
+                assert '"' not in val
+        
         with self._lock:
             if transaction_id != self._cur_transaction_num:
                 raise RevisionConflictException()

@@ -54,7 +54,8 @@ class InMemoryJsonStore(object):
                 return []
 
             assert isinstance(s,set)
-            return sorted(s)
+
+            return sorted([json.loads(x) for x in s])
 
     def listKeys(self, prefix, suffix):
         with self.lock:
