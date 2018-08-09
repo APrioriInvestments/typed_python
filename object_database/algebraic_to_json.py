@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple
+from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple, TryTypeConvert
 
 import logging
 import json
@@ -38,8 +38,12 @@ class Encoder(object):
         if isinstance(object_type, OneOf):
             if value is None or isinstance(value, (int,float,str,bool)):
                 return value
-            
-            return { 'type': str(type(value)), 'value': self.to_json(type(value), value) }
+
+            for t in object_type.options:
+                if TryTypeConvert(t, value):
+                    return { 'type': str(t), 'value': self.to_json(t, value) }
+
+            assert False
 
         if isinstance(object_type, Alternative):
             if not value._fields:
@@ -90,13 +94,18 @@ class Encoder(object):
             if isinstance(algebraic_type, OneOf):
                 if isinstance(value, dict):
                     which_type = [o for o in algebraic_type.options if str(o) == value['type']]
-                    return self.from_json(value['value'], which_type)
+                    if not which_type:
+                        raise Exception("Can't find %s in %s", value['type'], algebraic_type.options)
+                    return self.from_json(value['value'], which_type[0])
                 return value
 
             if isinstance(algebraic_type, ConstDict):
                 return algebraic_type(
                     {self.from_json(k, algebraic_type.KeyType):self.from_json(v, algebraic_type.ValueType) for k,v in value}
                     )
+
+            if isinstance(algebraic_type, Tuple):
+                return algebraic_type(tuple(self.from_json(value[ix], t) for ix,t in enumerate(algebraic_type.ElementTypes)))
 
             if isinstance(algebraic_type, TupleOf):
                 return algebraic_type(self.from_json(v, algebraic_type.ElementType) for v in value)
@@ -109,12 +118,13 @@ class Encoder(object):
 
             if isinstance(algebraic_type, Kwargs):
                 return algebraic_type(
-                    {k: self.from_json(algebraic_type.ElementTypes[k], value[k]) for k in algebraic_type.ElementNames}
+                    {k: self.from_json(value[k], algebraic_type.ElementTypes[k]) for k in algebraic_type.ElementNames}
                     )
 
             if isinstance(algebraic_type, NamedTuple):
                 return algebraic_type(
-                    **{k: self.from_json(algebraic_type.ElementTypes[k], value[k]) for k in algebraic_type.ElementNames}
+                    **{k: self.from_json(value[k], t) 
+                        for k,t in algebraic_type.ElementNamesAndTypes}
                     )
 
             if isinstance(algebraic_type, Alternative):

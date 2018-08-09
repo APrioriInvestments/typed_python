@@ -113,6 +113,9 @@ class DatabaseObject(object):
 
         return _cur_view.view._new(cls, kwds)
 
+    def __repr__(self):
+        return type(self).__qualname__ + "(" + self._identity[:8] + ")"
+
     @classmethod
     def lookupOne(cls, **kwargs):
         return cls._database.current_transaction().indexLookupOne(cls, **kwargs or {' exists': True})
