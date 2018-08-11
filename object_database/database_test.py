@@ -1,7 +1,7 @@
 from typed_python import Alternative, TupleOf, OneOf
 
 from object_database.database import Database, RevisionConflictException, Indexed, Index
-
+import object_database.database
 import object_database.InMemoryJsonStore as InMemoryJsonStore
 
 import unittest
@@ -44,12 +44,9 @@ def initialize_types(db):
         def __str__(self):
             return "Counter(k=%s)" % self.k
 
-class ObjectDatabaseTests(unittest.TestCase):
+class ObjectDatabaseTests:
     def test_methods(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             counter = db.Counter.New()
@@ -58,10 +55,7 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(str(counter), "Counter(k=2)")
 
     def test_basic(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             root = db.Root.New()
@@ -70,18 +64,14 @@ class ObjectDatabaseTests(unittest.TestCase):
 
             root.obj = db.Object.New(k=expr.Constant(value=23))
 
-        db2 = Database(mem_store)
-        initialize_types(db2)
+        db2 = self.createNewDb(withTypes=True)
 
         with db2.view():
             root = db2.Root(root._identity)
             self.assertEqual(root.obj.k.value, 23)
 
     def test_throughput(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             root = db.Root.New()
@@ -93,14 +83,10 @@ class ObjectDatabaseTests(unittest.TestCase):
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
         
         with db.view():
-            self.assertTrue(root.obj.k.value > 1000, root.obj.k.value)
-            print("Did ", root.obj.k.value)
-
+            self.assertTrue(root.obj.k.value > 500, root.obj.k.value)
+                
     def test_exists(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             root = db.Root.New()
@@ -115,18 +101,13 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertTrue(not root.exists())
             root_id = root._identity
 
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.view():
             self.assertTrue(not db.Root(root_id).exists())
 
-
     def test_read_performance(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         objects = {}
         with db.transaction():
@@ -142,9 +123,7 @@ class ObjectDatabaseTests(unittest.TestCase):
 
                 objects[i] = root
 
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         objects = {k: db.Root(v._identity) for k,v in objects.items()}
 
@@ -160,10 +139,7 @@ class ObjectDatabaseTests(unittest.TestCase):
         
 
     def test_transactions(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             root = db.Root.New()
@@ -186,11 +162,7 @@ class ObjectDatabaseTests(unittest.TestCase):
         self.assertEqual(vals, [None, 1,2,3])
 
     def test_conflicts(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
-
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             root = db.Root.New()
@@ -211,10 +183,7 @@ class ObjectDatabaseTests(unittest.TestCase):
                     root.obj.k = expr.Constant(value=root.obj.k.value + 1)
     
     def test_object_versions_robust(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         counters = []
         counter_vals_by_tn = {}
@@ -227,7 +196,7 @@ class ObjectDatabaseTests(unittest.TestCase):
         counter_vals_by_tn[db._cur_transaction_num] = {}
 
         #seed the initial state
-        with db.transaction():
+        with db.transaction() as t:
             for i in range(20):
                 counter = db.Counter.New(_identity="C_%s" % i)
                 counter.k = int(random.random() * 100)
@@ -238,10 +207,6 @@ class ObjectDatabaseTests(unittest.TestCase):
         total_writes = 0
 
         for passIx in range(1000):
-            #keyname = "Counter-val:C_19:k"
-            #print "C19: ", db._tail_values.get(keyname), [(tid, db._key_and_version_to_object.get((keyname, tid)))
-            #    for tid in sorted(db._key_version_numbers.get(keyname,()))], mem_store.get(keyname)
-            
             with db.transaction():
                 for subix in range(int(random.random() * 5 + 1)):
                     counter = counters[int(random.random() * len(counters))]
@@ -263,7 +228,6 @@ class ObjectDatabaseTests(unittest.TestCase):
                 tid = all_tids[int(random.random() * len(all_tids))]
 
                 with views_by_tn[tid]:
-                    #print "checking consistency of ", tid
                     for c in counters:
                         if not c.exists():
                             assert c not in counter_vals_by_tn[tid]
@@ -280,33 +244,29 @@ class ObjectDatabaseTests(unittest.TestCase):
                             max_counter_vals[c] = c.k
 
                 #reset the database
-                db = Database(mem_store)
-                initialize_types(db)
+                db = self.createNewDb(withTypes=True)
 
                 new_counters = [db.Counter(c._identity) for x in counters]
 
-                views_by_tn = {0: db.view()}
-                counter_vals_by_tn = {0: 
+                views_by_tn = {db._cur_transaction_num: db.view()}
+                counter_vals_by_tn = {db._cur_transaction_num: 
                     {new_counters[ix]: max_counter_vals[counters[ix]] for ix in 
                         range(len(counters)) if counters[ix] in max_counter_vals}
                     }
 
                 counters = new_counters
 
-        self.assertLess(mem_store.storedStringCount(), 100)
+        self.assertLess(self.mem_store.storedStringCount(), 100)
         self.assertTrue(total_writes > 500)
 
     def test_flush_db_works(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
-        initialize_types(db)
+        db = self.createNewDb(withTypes=True)
 
         with db.transaction():
             c = db.Counter.New()
             c.k = 1
 
-        self.assertTrue(mem_store.values)
+        self.assertTrue(self.mem_store.values)
 
         view = db.view()
 
@@ -314,50 +274,50 @@ class ObjectDatabaseTests(unittest.TestCase):
             c.delete()
 
         #database doesn't have this
-        self.assertFalse(mem_store.storedStringCount())
+        self.assertFalse(self.mem_store.storedStringCount())
 
         #but the view does!
         with view:
             self.assertTrue(c.exists())
 
-        self.assertFalse(mem_store.storedStringCount())
+        self.assertFalse(self.mem_store.storedStringCount())
 
     def test_read_write_conflict(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=False)
 
-        db = Database(mem_store)
-        initialize_types(db)
+        @db.define
+        class Counter:
+            k = int
 
         with db.transaction():
             o1 = db.Counter.New()
             o2 = db.Counter.New()
 
         for consistency in [True, False]:
-            t1 = db.transaction().consistency(writes=True)
-            t2 = db.transaction().consistency(writes=True)
+            if consistency:
+                t1 = db.transaction().consistency(reads=True)
+                t2 = db.transaction().consistency(reads=True)
+            else:
+                t1 = db.transaction().consistency(none=True)
+                t2 = db.transaction().consistency(none=True)
 
-        with t1.nocommit():
-            o1.k = o2.k + 1
-        
-        with t2.nocommit():
-            o2.k = o1.k + 1
+            with t1.nocommit():
+                o1.k = o2.k + 1
+            
+            with t2.nocommit():
+                o2.k = o1.k + 1
 
-        t1.commit()
+            t1.commit()
 
-        if consistency:
-            with self.assertRaises(RevisionConflictException):
+            if consistency:
+                with self.assertRaises(RevisionConflictException):
+                    t2.commit()
+            else:
                 t2.commit()
-        else:
-            t2.commit()
-
-
-        
+            
     def test_indices(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=True)
 
-        db = Database(mem_store)
-        initialize_types(db)
-        
         with db.view() as v:
             self.assertEqual(v.indexLookup(db.Counter,k=20), ())
             self.assertEqual(v.indexLookup(db.Counter,k=30), ())
@@ -384,11 +344,8 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Counter,k=30), ())
 
     def test_indices_multiple_values(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=True)
 
-        db = Database(mem_store)
-        initialize_types(db)
-        
         with db.transaction() as v:
             k1 = db.Counter.New(k=20)
             k2 = db.Counter.New(k=20)
@@ -415,35 +372,29 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(len(db.Counter.lookupAll(k=20)), 2)
 
     def test_indices_across_invocations(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=True)
 
-        db = Database(mem_store)
-        initialize_types(db)
-        
         with db.transaction():
             o = db.Counter.New(k=1)
             o.x = 10
 
-        db = Database(mem_store)
-        initialize_types(db)
-    
+        db = self.createNewDb(withTypes=True)
+
         with db.transaction() as v:
             o = db.Counter.lookupOne(k=1)
             self.assertEqual(o.x, 10)
             o.k = 2
             o.x = 11
 
-        db = Database(mem_store)
-        initialize_types(db)
-    
+        db = self.createNewDb(withTypes=True)
+
         with db.transaction() as v:
             o = db.Counter.lookupOne(k=2)
             o.k = 3
             self.assertEqual(o.x, 11)
             
-        db = Database(mem_store)
-        initialize_types(db)
-    
+        db = self.createNewDb(withTypes=True)
+
         with db.transaction() as v:
             self.assertFalse(db.Counter.lookupAny(k=2))
             
@@ -451,13 +402,43 @@ class ObjectDatabaseTests(unittest.TestCase):
             o.k = 3
             self.assertEqual(o.x, 11)
             
+    def test_index_consistency(self):
+        db = self.createNewDb(withTypes=False)
+
+        @db.define
+        class Object:
+            x = int
+            y = int
+
+            @Indexed
+            def pair(self):
+                return (self.x, self.y)
+
+        with db.transaction():
+            o = db.Object.New(x=0,y=0)
+
+        t1 = db.transaction()
+        t2 = db.transaction()
+
+        with t1.nocommit():
+            o.x = 1
+
+        with t2.nocommit():
+            o.y = 1
+
+        t1.commit()
+
+        with self.assertRaises(RevisionConflictException):
+            t2.commit()
+
+        with self.assertRaises(Exception):
+            with db.transaction().consistency(writes=True):
+                o.y = 2
+
 
     def test_indices_of_algebraics(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=True)
 
-        db = Database(mem_store)
-        initialize_types(db)
-        
         with db.transaction():
             o1 = db.Object.New(k=expr.Constant(value=123))
 
@@ -465,10 +446,8 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Object,k=expr.Constant(value=123)), (o1,))
 
     def test_index_functions(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=False)
 
-        db = Database(mem_store)
-        
         @db.define
         class Object:
             k=Indexed(int)
@@ -495,9 +474,7 @@ class ObjectDatabaseTests(unittest.TestCase):
                 self.assertEqual(v.indexLookup(db.Object,pair_index=(10,"hi")), (o1,))
 
     def test_index_functions_None_semantics(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
+        db = self.createNewDb(withTypes=False)
 
         @db.define
         class Object:
@@ -521,9 +498,7 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Object,index=True), ())
 
     def test_indices_update_during_transactions(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
-
-        db = Database(mem_store)
+        db = self.createNewDb(withTypes=False)
 
         @db.define
         class Object:
@@ -546,10 +521,8 @@ class ObjectDatabaseTests(unittest.TestCase):
             self.assertEqual(v.indexLookup(db.Object,k=20), ())
 
     def test_index_transaction_conflicts(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=False)
 
-        db = Database(mem_store)
-        
         @db.define
         class Object:
             k=Indexed(int)
@@ -576,9 +549,8 @@ class ObjectDatabaseTests(unittest.TestCase):
             t1.commit()
 
     def test_default_constructor_for_list(self):
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        db = self.createNewDb(withTypes=False)
 
-        db = Database(mem_store)
         @db.define
         class Object:
             x = TupleOf(int)
@@ -586,3 +558,42 @@ class ObjectDatabaseTests(unittest.TestCase):
         with db.transaction():
             n = db.Object.New()
             self.assertEqual(len(n.x), 0)
+
+class ObjectDatabaseInMemTests(unittest.TestCase, ObjectDatabaseTests):
+    def setUp(self):
+        self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
+
+    def createNewDb(self, withTypes=False):
+        db = Database(self.mem_store)
+        if withTypes:
+            initialize_types(db)
+        return db
+
+class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
+    def setUp(self):
+        self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        self.core_db = Database(self.mem_store)
+        self.channels = []
+
+    def createNewDb(self, withTypes=False):
+        channel = object_database.database.InMemoryChannel()
+
+        self.core_db.addConnection(channel)
+
+        db = object_database.database.DatabaseConnection(channel)
+
+        channel.start()
+
+        self.channels.append(channel)
+
+        db.initialized.wait()
+
+        if withTypes:
+            initialize_types(db)
+
+        return db
+
+    def tearDown(self):
+        for c in self.channels:
+            c.stop()
+

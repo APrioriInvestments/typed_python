@@ -1,5 +1,5 @@
 import redis
-import json
+import ujson as json
 import time
 import threading
 import logging
@@ -77,7 +77,7 @@ class RedisJsonStore(object):
                         logging.info("Redis is still loading. Waiting...")
                         time.sleep(1.0)
 
-                for ix in xrange(len(needed_keys)):
+                for ix in range(len(needed_keys)):
                     if vals[ix] is not None:
                         self.cache[needed_keys[ix]] = vals[ix]
 

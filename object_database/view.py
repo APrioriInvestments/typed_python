@@ -86,9 +86,9 @@ class View(object):
         self._t0 = None
         self._stack = None
         self._readWatcher = None
-        self._insistReadsConsistent = False
-        self._insistIndexReadsConsistent = False
+        self._insistReadsConsistent = True
         self._insistWritesConsistent = True
+        self._insistIndexReadsConsistent = False
 
     def _new(self, cls, kwds):
         if not self._writeable:
@@ -230,8 +230,10 @@ class View(object):
             self._set_adds[index_key] = set()
             self._set_removes[index_key] = set()
             
-        self._set_adds[index_key].add(identity)
-        self._set_removes[index_key].discard(identity)
+        if identity in self._set_removes[index_key]:
+            self._set_removes[index_key].discard(identity)
+        else:
+            self._set_adds[index_key].add(identity)
 
     def _remove_from_index(self, index_key, identity):
         assert isinstance(identity, str)
@@ -239,11 +241,12 @@ class View(object):
         if index_key not in self._set_adds:
             self._set_adds[index_key] = set()
             self._set_removes[index_key] = set()
-            
-        self._set_adds[index_key].discard(identity)
-        self._set_removes[index_key].add(identity)
+        
+        if identity in self._set_adds[index_key]:
+            self._set_adds[index_key].discard(identity)
+        else:
+            self._set_removes[index_key].add(identity)
 
-    
     def indexLookup(self, type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
@@ -313,12 +316,17 @@ class View(object):
 
             writes = {key: encode(v) for key, v in self._writes.items()}
             tid = self._transaction_num
-            
+
+            if (self._set_adds or self._set_removes) and not self._insistReadsConsistent:
+                raise Exception("You can't update an indexed value without read and write consistency.")
+
             self._db._set_versioned_object_data(
                 writes, 
-                self._set_adds, 
-                self._set_removes, 
-                self._reads if self._insistReadsConsistent else set(writes) if self._insistWritesConsistent else set(),
+                {k:v for k,v in self._set_adds.items() if v}, 
+                {k:v for k,v in self._set_removes.items() if v}, 
+                self._reads.union(set(writes)) if self._insistReadsConsistent 
+                    else set(writes) if self._insistWritesConsistent 
+                    else set(),
                 self._indexReads if self._insistIndexReadsConsistent else set(),
                 tid
                 )

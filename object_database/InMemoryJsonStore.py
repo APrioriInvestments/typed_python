@@ -1,5 +1,5 @@
 import threading
-import json
+import ujson as json
 
 class InMemoryJsonStore(object):
     """Implements a string-to-json store in memory.
@@ -40,9 +40,11 @@ class InMemoryJsonStore(object):
     def setRemove(self, key, values):
         with self.lock:
             s = self.values.get(key,None)
-            assert isinstance(s,set)
+            assert isinstance(s,set), (key,s)
             for value in values:
-                s.discard(json.dumps(value))
+                jv = json.dumps(value)
+                assert jv in s, (jv, s)
+                s.remove(json.dumps(value))
 
     def storedStringCount(self):
         return len([x for x in self.values.values() if isinstance(x,str)])

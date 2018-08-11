@@ -1,6 +1,6 @@
 import asyncio
 import struct
-import json
+import ujson as json
 import logging
 import traceback
 

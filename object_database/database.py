@@ -16,10 +16,13 @@ from object_database.object import DatabaseObject, Index, Indexed
 from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
 
 import inspect
+import ujson as json
 from typed_python.hash import sha_hash
-from typed_python import Tuple
+from typed_python import *
+
 from types import FunctionType
 
+import queue
 import threading
 import logging
 import uuid
@@ -49,6 +52,17 @@ class VersionedBase:
         top = self.version_numbers[-1]
         assert transaction_id > version_read
         return version_read >= top
+
+    def hasVersionInfoNewerThan(self, tid):
+        if not self.version_numbers:
+            return False
+        return tid < self.version_numbers[-1]
+
+    def newestValue(self):
+        if self.version_numbers:
+            return self.valueForVersion(self.version_numbers[-1])
+        else:
+            return self.valueForVersion(None)
 
 class VersionedValue(VersionedBase):
     def __init__(self, tailValue):
@@ -108,7 +122,7 @@ class VersionedSet(VersionedBase):
         self.adds.pop(0)
         self.removes.pop(0)
 
-    def versionFor(self, version):
+    def valueForVersion(self, version):
         ix = self._best_version_offset_for(version)
         if ix is None:
             ix = 0
@@ -143,10 +157,8 @@ class SetWithEdits:
             if a not in removed:
                 return a
 
-
-class Database:
-    def __init__(self, kvstore):
-        self._kvstore = kvstore
+class DatabaseCore:
+    def __init__(self):
         self._lock = threading.Lock()
 
         #transaction of what's in the KV store
@@ -175,8 +187,9 @@ class Database:
         #for each key, a VersionedValue or VersionedSet
         self._versioned_objects = {}
 
+        self.initialized = threading.Event()
+    
     def clearCache(self):
-        self._kvstore.clearCache()
         with self._lock:
             self._versioned_objects = {k:v for k,v in self._versioned_objects.items() if not v.isEmpty()}
 
@@ -214,7 +227,7 @@ class Database:
         self._types[typename] = val
 
     def define(self, cls):
-        assert cls.__name__[:1] != "_", "Illegal to use _ for first character in databse classnames."
+        assert cls.__name__[:1] != "_", "Illegal to use _ for first character in database classnames."
 
         t = getattr(self, cls.__name__)
         
@@ -347,6 +360,122 @@ class Database:
             for key in keys_touched:
                 self._versioned_objects[key].cleanup(lowest)
                 
+
+class ConnectedChannel:
+    def __init__(self, initial_tid, channel):
+        self.channel = channel
+        self.initial_tid = initial_tid
+
+    def sendInitialKeyVersion(self, key, value):
+        if isinstance(value, SetWithEdits):
+            value = list(value.toSet())
+            is_set = True
+        else:
+            value = value.jsonRep
+            is_set = False
+
+        self.channel.write(
+            ServerToClient.KeyInfo(
+                key=key,
+                data=json.dumps(value),
+                is_set=is_set,
+                transaction_id=self.initial_tid
+                )
+            )
+
+    def sendTransaction(self, key_value, setAdds, setRemoves, tid):
+        self.channel.write(
+            ServerToClient.Transaction(
+                writes={k:json.dumps(v.jsonRep) for k,v in key_value.items()},
+                set_adds=setAdds,
+                set_removes=setRemoves,
+                transaction_id=tid
+                )
+            )
+
+    def sendInitializationMessage(self):
+        self.channel.write(
+            ServerToClient.Initialize(transaction_num=self.initial_tid)
+            )
+
+    def sendTransactionSuccess(self, guid, success):
+        self.channel.write(
+            ServerToClient.TransactionResult(transaction_guid=guid,success=success)
+            )
+
+class Database(DatabaseCore):
+    def __init__(self, kvstore):
+        DatabaseCore.__init__(self)
+        self._kvstore = kvstore
+        self._clientChannels = []
+        self.initialized.set()
+        
+    def addConnection(self, channel):
+        with self._lock:
+            connectedChannel = ConnectedChannel(self._cur_transaction_num, channel)
+
+            self._clientChannels.append(connectedChannel)
+
+            channel.setClientToServerHandler(
+                lambda msg: self._onClientToServerMessage(connectedChannel, msg)
+                )
+
+            connectedChannel.sendInitializationMessage()
+
+
+    def _onClientToServerMessage(self, connectedChannel, msg):
+        assert isinstance(msg, ClientToServer)
+        if msg.matches.SendSets:
+            with self._lock:
+                for key in msg.keys:
+                    if key not in self._versioned_objects:
+                        members = self._kvstore.setMembers(key)
+                        self._versioned_objects[key] = VersionedSet(members)
+
+                    connectedChannel.sendInitialKeyVersion(
+                        key, 
+                        self._versioned_objects[key].valueForVersion(
+                            connectedChannel.initial_tid
+                            )
+                        )
+        elif msg.matches.SendValues:
+            with self._lock:
+                for key in msg.keys:
+                    if key not in self._version_numbers:
+                        self._versioned_objects[key] = VersionedValue(
+                            JsonWithPyRep(
+                                self._kvstore.get(key),
+                                None
+                                )
+                            )
+
+                    connectedChannel.sendInitialKeyVersion(
+                        key, 
+                        self._versioned_objects[key].valueForVersion(
+                            connectedChannel.initial_tid
+                            )
+                        )
+        elif msg.matches.NewTransaction:
+            try:
+                self._set_versioned_object_data(
+                    {k: JsonWithPyRep(json.loads(v),None) for k,v in msg.writes.items()},
+                    {k: set(a) for k,a in msg.set_adds.items() if a},
+                    {k: set(a) for k,a in msg.set_removes.items() if a},
+                    msg.key_versions,
+                    msg.index_versions,
+                    msg.as_of_version
+                    )
+                isOK = True
+            except RevisionConflictException:
+                isOK = False
+            except:
+                traceback.print_exc()
+                logging.error("Unknown error: %s", traceback.format_exc())
+                isOK = False
+
+            connectedChannel.sendTransactionSuccess(msg.transaction_guid, isOK)
+
+
     def _get_versioned_set_data(self, key, transaction_id):
         with self._lock:
             assert transaction_id >= self._min_transaction_num
@@ -357,7 +486,7 @@ class Database:
                 self._versioned_objects[key] = VersionedSet(members)
 
             #get the largest version number less than or equal to transaction_id
-            return self._versioned_objects[key].versionFor(transaction_id)
+            return self._versioned_objects[key].valueForVersion(transaction_id)
 
     def _get_versioned_object_data(self, key, transaction_id):
         with self._lock:
@@ -392,6 +521,10 @@ class Database:
         set_removes: a map:
             db_key -> set of identities removed from an index
         """
+
+        set_adds = {k:v for k,v in set_adds.items() if v}
+        set_removes = {k:v for k,v in set_removes.items() if v}
+
         with self._lock:
             assert as_of_version >= self._min_transaction_num
 
@@ -399,7 +532,11 @@ class Database:
             transaction_id = self._cur_transaction_num
             assert transaction_id > as_of_version
 
+            keysWritingTo = []
+
             for key in key_value:
+                keysWritingTo.append(key)
+
                 if key not in self._versioned_objects:
                     self._versioned_objects[key] = (
                             VersionedValue(
@@ -412,15 +549,28 @@ class Database:
             
             for subset in [set_adds, set_removes]:
                 for k in subset:
-                    if k not in self._versioned_objects:
-                        self._versioned_objects[k] = VersionedSet(
-                            self._kvstore.setMembers(k)
-                            )
+                    if subset[k]:
+                        keysWritingTo.append(k)
+                    
+                        if k not in self._versioned_objects:
+                            self._versioned_objects[k] = VersionedSet(
+                                self._kvstore.setMembers(k)
+                                )
 
             for subset in [keys_to_check_versions, indices_to_check_versions]:
                 for key in subset:
                     if not self._versioned_objects[key].validVersionIncoming(as_of_version, transaction_id):
                         raise RevisionConflictException()
+
+            for key in keysWritingTo:
+                obj = self._versioned_objects[key]
+
+                for client in self._clientChannels:
+                    #see if this value has not changed since this client connected. If so, we need
+                    #to send the value we currently have, because otherwise we cannot recreate it
+                    #if it asks for it later.
+                    if not obj.hasVersionInfoNewerThan(client.initial_tid):
+                        client.sendInitialKeyVersion(key, obj.newestValue())
 
             #set the json representation in the database
             self._kvstore.setSeveral({k: v.jsonRep for k,v in key_value.items()}, set_adds, set_removes)
@@ -438,4 +588,222 @@ class Database:
             #record what objects we touched
             self._version_number_objects[transaction_id] = list(key_value.keys())
             self._version_numbers.append(transaction_id)
+
+            for client in self._clientChannels:
+                client.sendTransaction(
+                    key_value,
+                    set_adds,
+                    set_removes,
+                    transaction_id
+                    )
+
+
+ClientToServer = Alternative(
+    "ClientToServer",
+    NewTransaction = {
+        "writes": ConstDict(str, str),
+        "set_adds": ConstDict(str, TupleOf(str)),
+        "set_removes": ConstDict(str, TupleOf(str)),
+        "key_versions": TupleOf(str),
+        "index_versions": TupleOf(str),
+        "as_of_version": int,
+        "transaction_guid": str
+        },
+    SendValues = {
+        "keys": TupleOf(str)
+        },
+    SendSets = {
+        "keys": TupleOf(str)
+        }
+    )
+
+ServerToClient = Alternative(
+    "ServerToClient",
+    Initialize = {'transaction_num': int},
+    TransactionResult = {'transaction_guid': str, 'success': bool},
+    KeyInfo = {'key': str, 'data': str, 'is_set': bool, 'transaction_id': int},
+    Transaction = {
+        "writes": ConstDict(str, str),
+        "set_adds": ConstDict(str, TupleOf(str)),
+        "set_removes": ConstDict(str, TupleOf(str)),
+        "transaction_id": int
+        }
+    )
+
+class InMemoryChannel:
+    def __init__(self):
+        self._clientCallback = None
+        self._serverCallback = None
+        self._clientToServerMsgQueue = queue.Queue()
+        self._serverToClientMsgQueue = queue.Queue()
+        self._shouldStop = True
+
+        self._pumpThreadServer = threading.Thread(target=self.pumpMessagesFromServer)
+        self._pumpThreadServer.daemon = True
+        
+        self._pumpThreadClient = threading.Thread(target=self.pumpMessagesFromClient)
+        self._pumpThreadClient.daemon = True
+        
+    def pumpMessagesFromServer(self):
+        while not self._shouldStop:
+            try:
+                e = self._serverToClientMsgQueue.get(timeout=0.01)
+            except queue.Empty:
+                e = None
+
+            if e:
+                try:
+                    self._clientCallback(e)
+                except:
+                    traceback.print_exc()
+                    logging.error("Pump thread failed: %s", traceback.format_exc())
+                    return
+        
+    def pumpMessagesFromClient(self):
+        while not self._shouldStop:
+            try:
+                e = self._clientToServerMsgQueue.get(timeout=0.01)
+            except queue.Empty:
+                e = None
+
+            if e:
+                try:
+                    self._serverCallback(e)
+                except:
+                    traceback.print_exc()
+                    logging.error("Pump thread failed: %s", traceback.format_exc())
+                    return
+
+    def start(self):
+        assert self._shouldStop
+        self._shouldStop = False
+        self._pumpThreadServer.start()
+        self._pumpThreadClient.start()
+
+    def stop(self):
+        self._shouldStop = True
+        self._pumpThreadServer.join()
+        self._pumpThreadClient.join()
+
+    def write(self, msg):
+        if isinstance(msg, ClientToServer):
+            self._clientToServerMsgQueue.put(msg)
+        elif isinstance(msg, ServerToClient):
+            self._serverToClientMsgQueue.put(msg)
+        else:
+            assert False
+
+    def setServerToClientHandler(self, callback):
+        self._clientCallback = callback
+
+    def setClientToServerHandler(self, callback):
+        self._serverCallback = callback
+
+
+class DatabaseConnection(DatabaseCore):
+    def __init__(self, channel):
+        DatabaseCore.__init__(self)
+        self._channel = channel
+        self._channel.setServerToClientHandler(self._onMessage)
+        self._write_queues = {}
+        self._read_events = {}
+
+    def _onMessage(self, msg):
+        with self._lock:
+            if msg.matches.Initialize:
+                self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
+                self.initialized.set()
+            elif msg.matches.TransactionResult:
+                self._write_queues.pop(msg.transaction_guid).put(msg.success)
+            elif msg.matches.KeyInfo:
+                key = msg.key
+                if key not in self._versioned_objects:
+                    if msg.is_set:                    
+                        self._versioned_objects[key] = VersionedSet(set(json.loads(msg.data)))
+                    else:
+                        self._versioned_objects[key] = VersionedValue(JsonWithPyRep(json.loads(msg.data), None))
+
+                if key in self._read_events:
+                    self._read_events.pop(key).set()
+
+            elif msg.matches.Transaction:
+                for k,val_serialized in msg.writes.items():
+                    json_val = json.loads(val_serialized)
+
+                    self._versioned_objects[k].setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, None))
+
+                for k,a in msg.set_adds.items():
+                    self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(a), set())
+
+                for k,r in msg.set_removes.items():
+                    self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(), set(r))
+
+                self._cur_transaction_num = msg.transaction_id
+        
+    def _get_versioned_set_data(self, key, transaction_id):
+        assert transaction_id >= self._min_transaction_num
+
+        with self._lock:
+            if key in self._versioned_objects:
+                return self._versioned_objects[key].valueForVersion(transaction_id)
+            
+            self._channel.write(ClientToServer.SendSets(keys=(key,)))
+
+            if key not in self._read_events:
+                self._read_events[key] = threading.Event()
+
+            e = self._read_events[key]
+
+        e.wait()
+
+        with self._lock:
+            return self._versioned_objects[key].valueForVersion(transaction_id)
+
+    def _get_versioned_object_data(self, key, transaction_id):
+        assert transaction_id >= self._min_transaction_num
+
+        with self._lock:
+            if key in self._versioned_objects:
+                return self._versioned_objects[key].valueForVersion(transaction_id)
+
+            self._channel.write(ClientToServer.SendValues(keys=(key,)))
+
+            if key not in self._read_events:
+                self._read_events[key] = threading.Event()
+
+            e = self._read_events[key]
+
+        e.wait()
+
+        with self._lock:
+            return self._versioned_objects[key].valueForVersion(transaction_id)
+
+    def _set_versioned_object_data(self, 
+                key_value, 
+                set_adds, 
+                set_removes, 
+                keys_to_check_versions, 
+                indices_to_check_versions, 
+                as_of_version
+                ):
+        transaction_guid = str(uuid.uuid4()).replace("-","")
+
+        writeQueue = queue.Queue()
+
+        self._write_queues[transaction_guid] = writeQueue
+
+        self._channel.write(
+            ClientToServer.NewTransaction(
+                writes={k:json.dumps(v.jsonRep) for k,v in key_value.items()},
+                set_adds=set_adds,
+                set_removes=set_removes,
+                key_versions=keys_to_check_versions,
+                index_versions=indices_to_check_versions,
+                as_of_version=as_of_version,
+                transaction_guid=transaction_guid
+                )
+            )
+
+        if not writeQueue.get():
+            raise RevisionConflictException()
 
