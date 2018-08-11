@@ -20,15 +20,12 @@ from typed_python.hash import sha_hash
 
 from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs
 
-_creating_the_null_object = []
-
 from types import FunctionType
 
 class DatabaseObject(object):
     __typed_python_type__ = True
     __types__ = None
     _database = None
-    Null = None
 
     def __ne__(self, other):
         return not (self==other)
@@ -42,12 +39,6 @@ class DatabaseObject(object):
             return False
         return self._identity == other._identity
 
-    def __bool__(self):
-        return self is not type(self).Null
-
-    def __nonzero__(self):
-        return self is not type(self).Null
-
     def __hash__(self):
         return hash(self._identity)
 
@@ -55,27 +46,16 @@ class DatabaseObject(object):
     def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
         if isinstance(value, cls):
             return (value,)
-        if value is None:
-            return (cls.Null,)
-
+        
         return None
 
     def __init__(self, identity):
         object.__init__(self)
 
-        if identity is _creating_the_null_object:
-            if type(self).Null is None:
-                type(self).Null = self
-            identity = "NULL"
-        else:
-            assert isinstance(identity, str), type(identity)
-            assert '"' not in identity
+        assert isinstance(identity, str), type(identity)
+        assert '"' not in identity
 
         self.__dict__['_identity'] = identity
-
-    @classmethod
-    def __default_initializer__(cls):
-        return cls.Null
 
     @classmethod
     def New(cls, **kwds):
@@ -118,9 +98,6 @@ class DatabaseObject(object):
         return self.get_field(name)
 
     def get_field(self, name):
-        if self.__dict__["_identity"] == "NULL":
-            raise Exception("Null object of type %s has no fields" % type(self).__qualname__)
-
         if name not in self.__types__:
             raise AttributeError("Object of type %s has no field '%s'" % (type(self).__qualname__, name))
 
@@ -133,9 +110,6 @@ class DatabaseObject(object):
         return _cur_view.view._get(type(self).__qualname__, self._identity, name, self.__types__[name])
 
     def __setattr__(self, name, val):
-        if self.__dict__["_identity"] == "NULL":
-            raise Exception("Null object is not writeable")
-
         if name not in self.__types__:
             raise AttributeError("Database object of type %s has no attribute %s" % (type(self).__qualname__, name))
 
@@ -150,19 +124,15 @@ class DatabaseObject(object):
         _cur_view.view._set(self, type(self).__qualname__, self._identity, name, self.__types__[name], coerced_val)
 
     def delete(self):
-        if self.__dict__["_identity"] is None:
-            raise Exception("Null object is not writeable")
-
         _cur_view.view._delete(self, type(self).__qualname__, self._identity, self.__types__.keys())
 
     @classmethod
-    def define(cls, **types):
-        assert not cls.Null, "already defined"
+    def _define(cls, **types):
+        assert cls.__types__ is None, "already defined"
         assert isinstance(types, dict)
-        
-        cls.__types__ = types
-        cls.Null = cls(_creating_the_null_object)
 
+        cls.__types__ = types
+        
         return cls
 
     @classmethod
@@ -171,9 +141,6 @@ class DatabaseObject(object):
 
     @classmethod
     def from_json(cls, obj):
-        if obj == "NULL":
-            return cls.Null
-
         assert isinstance(obj, str), obj
 
         return cls(obj)

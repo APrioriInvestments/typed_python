@@ -142,7 +142,7 @@ class Database:
                 if isinstance(val.obj, type):
                     types[name] = val.obj
 
-        t.define(**types)
+        t._define(**types)
 
         for name, val in cls.__dict__.items():
             if isinstance(val, Index):
@@ -538,12 +538,4 @@ class Database:
 
             for c in readCaches:
                 self._calcCacheToCalcCacheDepending[c].add(cacheKey)
-
-
-    def _get(self, obj_typename, identity, field_name, type):
-        raise Exception("Please open a transaction or a view")
-
-    def _set(self, obj, obj_typename, identity, field_name, type, val):
-        raise Exception("Please open a transaction")
-
 

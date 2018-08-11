@@ -153,10 +153,6 @@ def OneOf(*args):
 
     args = set(args)
 
-    if len(args) == 1:
-        #if we only have one item, then we're not OneOf - we're just that!
-        return args[0]
-
     class OneOf:
         __typed_python_type_filter__ = True
 
