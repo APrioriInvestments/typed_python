@@ -94,6 +94,33 @@ class ObjectDatabaseTests(unittest.TestCase):
         
         with db.view():
             self.assertTrue(root.obj.k.value > 1000, root.obj.k.value)
+            print("Did ", root.obj.k.value)
+
+    def test_exists(self):
+        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+
+        db = Database(mem_store)
+        initialize_types(db)
+
+        with db.transaction():
+            root = db.Root.New()
+
+            self.assertTrue(root.exists())
+
+            root.delete()
+
+            self.assertTrue(not root.exists())
+
+        with db.view():
+            self.assertTrue(not root.exists())
+            root_id = root._identity
+
+        db = Database(mem_store)
+        initialize_types(db)
+
+        with db.view():
+            self.assertTrue(not db.Root(root_id).exists())
+
 
     def test_read_performance(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()
@@ -305,8 +332,9 @@ class ObjectDatabaseTests(unittest.TestCase):
             o1 = db.Counter.New()
             o2 = db.Counter.New()
 
-        t1 = db.transaction()
-        t2 = db.transaction()
+        for consistency in [True, False]:
+            t1 = db.transaction().consistency(writes=True)
+            t2 = db.transaction().consistency(writes=True)
 
         with t1.nocommit():
             o1.k = o2.k + 1
@@ -316,8 +344,13 @@ class ObjectDatabaseTests(unittest.TestCase):
 
         t1.commit()
 
-        with self.assertRaises(RevisionConflictException):
+        if consistency:
+            with self.assertRaises(RevisionConflictException):
+                t2.commit()
+        else:
             t2.commit()
+
+
         
     def test_indices(self):
         mem_store = InMemoryJsonStore.InMemoryJsonStore()
@@ -528,8 +561,8 @@ class ObjectDatabaseTests(unittest.TestCase):
             o2 = db.Object.New(k=20)
             o3 = db.Object.New(k=30)
 
-        t1 = db.transaction()
-        t2 = db.transaction()
+        t1 = db.transaction().consistency(full=True)
+        t2 = db.transaction().consistency(full=True)
 
         with t1.nocommit():
             o2.k=len(t1.indexLookup(db.Object,k=10))

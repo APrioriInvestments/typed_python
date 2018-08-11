@@ -23,6 +23,12 @@ import time
 import traceback
 import uuid
 
+class JsonWithPyRep:
+    """A value stored as Json with a python representation."""
+    def __init__(self, jsonRep, pyRep):
+        self.jsonRep = jsonRep
+        self.pyRep = pyRep
+
 def data_key(obj_typename, identity, field_name):
     return obj_typename + "-val:" + identity + ":" + field_name
 
@@ -73,16 +79,16 @@ class View(object):
         self._db = db
         self._transaction_num = transaction_id
         self._writes = {}
+        self._reads = set()
+        self._indexReads = set()
         self._set_adds = {}
         self._set_removes = {}
         self._t0 = None
         self._stack = None
         self._readWatcher = None
-
-    def _get_dbkey(self, key):
-        if key in self._writes:
-            return self._writes[key]
-        return self._db._get_versioned_object_data(key, self._transaction_num)[0]
+        self._insistReadsConsistent = False
+        self._insistIndexReadsConsistent = False
+        self._insistWritesConsistent = True
 
     def _new(self, cls, kwds):
         if not self._writeable:
@@ -134,27 +140,26 @@ class View(object):
     def _get(self, obj_typename, identity, field_name, type):
         key = data_key(obj_typename, identity, field_name)
 
+        self._reads.add(key)
+
         if self._readWatcher:
             self._readWatcher("key", key)
 
         if key in self._writes:
-            return self._writes[key][1]
+            res = self._writes[key][1]
+            if isinstance(res, tuple):
+                return res[1]
+            return res
 
-        db_val, parsed_val = self._db._get_versioned_object_data(key, self._transaction_num)
+        dbValWithPyrep = self._db._get_versioned_object_data(key, self._transaction_num)
 
-        db_val = self._get_dbkey(key)
+        if dbValWithPyrep.jsonRep is None:
+            return None
 
-        if db_val is None:
-            return db_val
+        if dbValWithPyrep.pyRep is None:
+            dbValWithPyrep.pyRep = _encoder.from_json(dbValWithPyrep.jsonRep, type)
 
-        if parsed_val is not None:
-            return parsed_val
-
-        parsed_val = _encoder.from_json(db_val, type)
-
-        self._db._update_versioned_object_data_cache(key, self._transaction_num, parsed_val)
-
-        return parsed_val
+        return dbValWithPyrep.pyRep
 
     def _exists(self, obj, obj_typename, identity):
         key = data_key(obj_typename, identity, ".exists")
@@ -162,7 +167,12 @@ class View(object):
         if self._readWatcher:
             self._readWatcher("key", key)
 
-        return self._get_dbkey(key) is not None
+        if key in self._writes:
+            return self._writes[key] is not None
+        
+        val = self._db._get_versioned_object_data(key, self._transaction_num)
+
+        return val.jsonRep is not None
 
     def _delete(self, obj, obj_typename, identity, field_names):
         existing_index_vals = self._compute_index_vals(obj, obj_typename)
@@ -250,13 +260,11 @@ class View(object):
 
         keyname = index_key(type.__qualname__, tname, value)
 
-        identities = set(self._db._get_versioned_set_data(keyname, self._transaction_num))
+        self._indexReads.add(keyname)
+
+        identities = self._db._get_versioned_set_data(keyname, self._transaction_num).toSet()
         identities = identities.union(self._set_adds.get(keyname, set()))
         identities = identities.difference(self._set_removes.get(keyname, set()))
-
-        for i in identities:
-            assert isinstance(i, str)
-            assert '"' not in i
 
         return tuple([type(x) for x in identities])
 
@@ -283,11 +291,12 @@ class View(object):
         if added:
             return type(list(added)[0])
 
-        for val in self._db._get_versioned_set_data(keyname, self._transaction_num):
-            assert isinstance(val, str)
+        self._indexReads.add(keyname)
 
-            if val not in removed:
-                return type(val)
+        res = self._db._get_versioned_set_data(keyname, self._transaction_num).pickAny()
+
+        if res:
+            return type(res)
 
         return None
 
@@ -298,14 +307,21 @@ class View(object):
         if self._writes:
             def encode(val):
                 if isinstance(val, tuple) and len(val) == 2 and isinstance(val[0], type):
-                    return (_encoder.to_json(val[0], val[1]), val[1])
+                    return JsonWithPyRep(_encoder.to_json(val[0], val[1]), val[1])
                 else:
-                    return (val,val)
+                    return JsonWithPyRep(val, val)
 
             writes = {key: encode(v) for key, v in self._writes.items()}
             tid = self._transaction_num
             
-            self._db._set_versioned_object_data(writes, self._set_adds, self._set_removes, tid)
+            self._db._set_versioned_object_data(
+                writes, 
+                self._set_adds, 
+                self._set_removes, 
+                self._reads if self._insistReadsConsistent else set(writes) if self._insistWritesConsistent else set(),
+                self._indexReads if self._insistIndexReadsConsistent else set(),
+                tid
+                )
 
     def nocommit(self):
         class Scope:
@@ -344,3 +360,28 @@ class View(object):
 
 class Transaction(View):
     _writeable = True
+
+    def consistency(self, writes=False, reads=False, full=False, none=False):
+        """Set the consistency model for the Transaction.
+        
+        if 'none', then the transaction always succeeds
+        if 'writes', then we insist that any key you write to has not been updated, but
+            allow read keys to have been updated.
+        if 'reads', then we insist that any key you read or write is not updated, but allow
+            index updates
+        if 'full' is True, then we insist that any index you read from is not updated.
+            (this is very stringent)
+
+        This function modifies the view, and the semantics are only in place at
+        commit time.
+        """
+        assert sum(int(i) for i in (reads,writes,full,none)) == 1, "Please set exactly one option"
+
+        self._insistReadsConsistent = bool(reads or full)
+        self._insistWritesConsistent = bool(writes or reads or full)
+        self._insistIndexReadsConsistent = bool(full)
+
+        return self
+
+
+

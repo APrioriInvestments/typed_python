@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from object_database.object import DatabaseObject, Index, Indexed
-from object_database.view import View, Transaction, _cur_view
+from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
 
 import inspect
 from typed_python.hash import sha_hash
@@ -28,6 +28,121 @@ import time
 
 class RevisionConflictException(Exception):
     pass
+
+class VersionedBase:
+    def _best_version_offset_for(self, version):
+        i = len(self.version_numbers) - 1
+
+        while i >= 0:
+            if self.version_numbers[i] <= version:
+                return i
+            i -= 1
+
+        return None
+
+    def isEmpty(self):
+        return not self.version_numbers
+
+    def validVersionIncoming(self, version_read, transaction_id):
+        if not self.version_numbers:
+            return True
+        top = self.version_numbers[-1]
+        assert transaction_id > version_read
+        return version_read >= top
+
+class VersionedValue(VersionedBase):
+    def __init__(self, tailValue):
+        self.version_numbers = []
+        self.values = []
+
+        #the value for the lowest possible revision
+        self.tailValue = tailValue
+
+    def setVersionedValue(self, version_number, val):
+        assert isinstance(val, JsonWithPyRep), val
+
+        self.version_numbers.append(version_number)
+        self.values.append(val)
+
+    def valueForVersion(self, version):
+        i = self._best_version_offset_for(version)
+
+        if i is None:
+            return self.tailValue
+        return self.values[i]
+
+    def cleanup(self, version_number):
+        assert self.version_numbers[0] == version_number
+
+        self.tailValue = self.values[0]
+        self.version_numbers.pop(0)
+        self.values.pop(0)
+
+class VersionedSet(VersionedBase):
+    #values in sets are always strings
+    def __init__(self, tailValue):
+        self.version_numbers = []
+        self.adds = []
+        self.removes = []
+
+        self.tailValue = tailValue
+
+    def setVersionedAddsAndRemoves(self, version, adds, removes):
+        assert not adds or not removes
+        assert adds or removes
+        assert isinstance(adds, set)
+        assert isinstance(removes, set)
+
+        self.adds.append(adds)
+        self.removes.append(removes)
+        self.version_numbers.append(version)
+
+    def cleanup(self, version_number):
+        assert self.version_numbers[0] == version_numbers
+
+        self.tailValue.update(self.adds[0])
+        self.tailValue.difference_update(self.removes[0])
+
+        self.version_numbers.pop(0)
+        self.values.pop(0)
+        self.adds.pop(0)
+        self.removes.pop(0)
+
+    def versionFor(self, version):
+        ix = self._best_version_offset_for(version)
+        if ix is None:
+            ix = 0
+        else:
+            ix += 1
+
+        return SetWithEdits(self.tailValue, self.adds[:ix], self.removes[:ix])
+
+class SetWithEdits:
+    def __init__(self, s, adds, removes):
+        self.s = s
+        self.adds = adds
+        self.removes = removes
+
+    def toSet(self):
+        res = set(self.s)
+        for i in range(len(self.adds)):
+            res.update(self.adds[i])
+            res.difference_update(self.removes[i])
+        return res
+
+    def pickAny(self):
+        removed = set()
+
+        for i in reversed(range(len(self.adds))):
+            for a in self.adds[i]:
+                if a not in removed:
+                    return a
+            removed.update(self.removes[i])
+
+        for a in self.s:
+            if a not in removed:
+                return a
+
 
 class Database:
     def __init__(self, kvstore):
@@ -57,42 +172,13 @@ class Database:
         #for each version number, a set of keys that were set
         self._version_number_objects = {}
 
-        #for each key, a sorted list of version numbers outstanding and the relevant objects
-        self._key_version_numbers = {}
-
-        #for each (key, version), the object, as (json, actual_object)
-        self._key_and_version_to_object = {}
-
-        #for each key with versions, the value replaced by the oldest key. (json, actual_object)
-        self._tail_values = {}
-
-        #our parsed representation of each thing in the database
-        self._current_database_object_cache = {}
-
-        #cache-name to cache function
-        self._calcCacheFunctions = {}
-
-        #cache-key (cachename, (arg1,arg2,...)) -> cache value
-        self._calcCacheValues = {}
-
-        #cache-key -> tid before which this cache calc is definitely invalid.
-        self._calcCacheMinTransactionId = {}
-
-        #cache-key to keys that it depends on
-        self._calcCacheKeysNeeded = {}
-
-        #cache-key to other calcs that it depends on
-        self._calcCacheToCalcCacheNeeded = {}
-
-        #key -> set(cache_keys)
-        self._keyToCacheKeyDepending = {}
-
-        #cache_key -> set(cache_key), cache-keys depending on this one
-        self._calcCacheToCalcCacheDepending = {}
+        #for each key, a VersionedValue or VersionedSet
+        self._versioned_objects = {}
 
     def clearCache(self):
         self._kvstore.clearCache()
-        self._current_database_object_cache = {}
+        with self._lock:
+            self._versioned_objects = {k:v for k,v in self._versioned_objects.items() if not v.isEmpty()}
 
     def __str__(self):
         return "Database(%s)" % id(self)
@@ -104,9 +190,6 @@ class Database:
         if not hasattr(_cur_view, "view"):
             return None
         return _cur_view.view
-
-    def addCalculationCache(self, name, function=None):
-        self._calcCacheFunctions[name] = function or name
 
     def addIndex(self, type, prop, fun = None, index_type = None):
         if type.__qualname__ not in self._indices:
@@ -131,6 +214,8 @@ class Database:
         self._types[typename] = val
 
     def define(self, cls):
+        assert cls.__name__[:1] != "_", "Illegal to use _ for first character in databse classnames."
+
         t = getattr(self, cls.__name__)
         
         types = {}
@@ -219,7 +304,6 @@ class Database:
                 else:
                     self._min_reffed_version_number = min(self._version_number_counts)
 
-
     def transaction(self):
         """Only one transaction may be committed on the current transaction number."""
         with self._lock:
@@ -258,100 +342,45 @@ class Database:
             keys_touched = self._version_number_objects[lowest]
             del self._version_number_objects[lowest]
 
-            if not self._version_numbers:
-                #views have caught up with the current transaction
-                self._min_transaction_num = self._cur_transaction_num
-                self._key_version_numbers = {}
-                self._key_and_version_numbers = {}
-                self._tail_values = {}
-            else:
-                self._min_transaction_num = lowest
+            self._min_transaction_num = lowest
 
-                for key in keys_touched:
-                    assert self._key_version_numbers[key][0] == lowest
-                    if len(self._key_version_numbers[key]) == 1:
-                        #this key is now current in the database
-                        del self._key_version_numbers[key]
-                        del self._key_and_version_to_object[key, lowest]
-
-                        #it's OK to keep the key around if it's not None
-                        del self._tail_values[key]
-                    else:
-                        self._key_version_numbers[key].pop(0)
-                        self._tail_values[key] = self._key_and_version_to_object[key, lowest]
-                        del self._key_and_version_to_object[key, lowest]
-
-    def _update_versioned_object_data_cache(self, key, transaction_id, parsed_val):
-        with self._lock:
-            if key not in self._key_version_numbers:
-                if key in self._tail_values:
-                    self._tail_values[key] = (self._tail_values[key][0], parsed_val)
-                else:
-                    self._current_database_object_cache[key] = parsed_val
-            else:
-                #get the largest version number less than or equal to transaction_id
-                version = self._best_version_for(transaction_id, self._key_version_numbers[key])
-
-                if version is not None:
-                    self._key_and_version_to_object[key, version] = (
-                        self._key_and_version_to_object[key, version][0],
-                        parsed_val
-                        )
-                else:
-                    self._tail_values[key] = (
-                        self._tail_values[key][0],
-                        parsed_val
-                        )
-
+            for key in keys_touched:
+                self._versioned_objects[key].cleanup(lowest)
+                
     def _get_versioned_set_data(self, key, transaction_id):
         with self._lock:
             assert transaction_id >= self._min_transaction_num
 
-            if key not in self._key_version_numbers:
-                if key in self._tail_values:
-                    return self._tail_values[key][0]
+            if key not in self._versioned_objects:
+                members = self._kvstore.setMembers(key)
 
-                res = self._kvstore.setMembers(key)
-
-                return res
+                self._versioned_objects[key] = VersionedSet(members)
 
             #get the largest version number less than or equal to transaction_id
-            version = self._best_version_for(transaction_id, self._key_version_numbers[key])
-
-            if version is not None:
-                return self._key_and_version_to_object[key, version][0]
-            else:
-                return self._tail_values[key][0]
+            return self._versioned_objects[key].versionFor(transaction_id)
 
     def _get_versioned_object_data(self, key, transaction_id):
         with self._lock:
             assert transaction_id >= self._min_transaction_num
 
-            if key not in self._key_version_numbers:
-                if key in self._tail_values:
-                    return self._tail_values[key]
+            if key not in self._versioned_objects:
+                self._versioned_objects[key] = VersionedValue(
+                    JsonWithPyRep(
+                        self._kvstore.get(key),
+                        None
+                        )
+                    )
 
-                return (self._kvstore.get(key), self._current_database_object_cache.get(key))
+            return self._versioned_objects[key].valueForVersion(transaction_id)
 
-            #get the largest version number less than or equal to transaction_id
-            version = self._best_version_for(transaction_id, self._key_version_numbers[key])
-
-            if version is not None:
-                return self._key_and_version_to_object[key, version]
-            else:
-                return self._tail_values[key]
-
-    def _best_version_for(self, transactionId, transactions):
-        i = len(transactions) - 1
-
-        while i >= 0:
-            if transactions[i] <= transactionId:
-                return transactions[i]
-            i -= 1
-
-        return None
-
-    def _set_versioned_object_data(self, key_value, set_adds, set_removes, transaction_id):
+    def _set_versioned_object_data(self, 
+                key_value, 
+                set_adds, 
+                set_removes, 
+                keys_to_check_versions, 
+                indices_to_check_versions, 
+                as_of_version
+                ):
         """Commit a transaction. 
 
         key_value: a map
@@ -361,181 +390,52 @@ class Database:
         set_adds: a map:
             db_key -> set of identities added to an index
         set_removes: a map:
-            db_key -> set of identities removed fromf an index
+            db_key -> set of identities removed from an index
         """
-        for s in set_adds.values():
-            for val in s:
-                assert isinstance(val, str)
-                assert '"' not in val
-
-        for s in set_removes.values():
-            for val in s:
-                assert isinstance(val, str)
-                assert '"' not in val
-        
         with self._lock:
-            if transaction_id != self._cur_transaction_num:
-                raise RevisionConflictException()
+            assert as_of_version >= self._min_transaction_num
 
             self._cur_transaction_num += 1
+            transaction_id = self._cur_transaction_num
+            assert transaction_id > as_of_version
 
-            #we were viewing objects at the old transaction layer. now we write a new one.
-            transaction_id += 1
-            
             for key in key_value:
-                #if this object is not versioned already, we need to keep the old value around
-                if key not in self._key_version_numbers:
-                    self._tail_values[key] = (self._kvstore.get(key), self._current_database_object_cache.get(key))
+                if key not in self._versioned_objects:
+                    self._versioned_objects[key] = (
+                            VersionedValue(
+                                JsonWithPyRep(
+                                self._kvstore.get(key),
+                                None
+                                )
+                            )
+                        )
+            
+            for subset in [set_adds, set_removes]:
+                for k in subset:
+                    if k not in self._versioned_objects:
+                        self._versioned_objects[k] = VersionedSet(
+                            self._kvstore.setMembers(k)
+                            )
 
-            for key in set(list(set_adds) + list(set_removes)):
-                #if this object is not versioned already, we need to keep the old value around
-                if key not in self._key_version_numbers:
-                    self._current_database_object_cache[key] = (set(self._kvstore.setMembers(key)), None)
-                    self._tail_values[key] = (self._current_database_object_cache[key], self._current_database_object_cache[key])
+            for subset in [keys_to_check_versions, indices_to_check_versions]:
+                for key in subset:
+                    if not self._versioned_objects[key].validVersionIncoming(as_of_version, transaction_id):
+                        raise RevisionConflictException()
 
             #set the json representation in the database
-            self._kvstore.setSeveral({k: v[0] for k,v in key_value.items()}, set_adds, set_removes)
+            self._kvstore.setSeveral({k: v.jsonRep for k,v in key_value.items()}, set_adds, set_removes)
 
             for k,v in key_value.items():
-                if v[1] is None:
-                    if k in self._current_database_object_cache:
-                        del self._current_database_object_cache[k]
-                else:
-                    self._current_database_object_cache[k] = v[1]
+                self._versioned_objects[k].setVersionedValue(transaction_id, v)
 
-            for key, ids_added in set_adds.items():
-                if key not in self._current_database_object_cache:
-                    self._current_database_object_cache[key] = (set(), None)
-                self._current_database_object_cache[key][0].update(ids_added)
-
-            for key, ids_removed in set_removes.items():
-                if key not in self._current_database_object_cache:
-                    self._current_database_object_cache[key] = (set(), None)
-                self._current_database_object_cache[key][0].difference_update(ids_removed)
+            for k,a in set_adds.items():
+                if a:
+                    self._versioned_objects[k].setVersionedAddsAndRemoves(transaction_id, a, set())
+            for k,r in set_removes.items():
+                if r:
+                    self._versioned_objects[k].setVersionedAddsAndRemoves(transaction_id, set(), r)
 
             #record what objects we touched
             self._version_number_objects[transaction_id] = list(key_value.keys())
             self._version_numbers.append(transaction_id)
-
-            for key, value in key_value.items():
-                if key not in self._key_version_numbers:
-                    self._key_version_numbers[key] = []
-                self._key_version_numbers[key].append(transaction_id)
-
-                self._key_and_version_to_object[key,transaction_id] = value
-
-                #invalidate the calculation cache
-                if key in self._keyToCacheKeyDepending:
-                    for cacheKey in list(self._keyToCacheKeyDepending[key]):
-                        self._invalidateCachedCalc(cacheKey)
-
-                    del self._keyToCacheKeyDepending[key]
-
-            for key in set(list(set_adds) + list(set_removes)):
-                if key not in self._key_version_numbers:
-                    self._key_version_numbers[key] = []
-                self._key_version_numbers[key].append(transaction_id)
-
-                self._key_and_version_to_object[key,transaction_id] = self._current_database_object_cache[key]
-
-    def _invalidateCachedCalc(self, cacheKey):
-        if cacheKey not in self._calcCacheValues:
-            return
-
-        del self._calcCacheValues[cacheKey]
-        del self._calcCacheToCalcCacheNeeded[cacheKey]
-        del self._calcCacheMinTransactionId[cacheKey]
-        keysToCheck = self._calcCacheKeysNeeded[cacheKey]
-        del self._calcCacheKeysNeeded[cacheKey]
-
-        calcsToCheck = self._calcCacheToCalcCacheDepending[cacheKey]
-        del self._calcCacheToCalcCacheDepending[cacheKey]
-
-        for k in keysToCheck:
-            self._keyToCacheKeyDepending[k].discard(cacheKey)
-
-        for k in calcsToCheck:
-            self._invalidateCachedCalc(k)
-
-    def lookupCachedCalculation(self, name, args):
-        if not hasattr(_cur_view, "view"):
-            raise Exception("Please access properties from within a view or transaction.")
-        
-        view = _cur_view.view
-        
-        #don't cache values from writeable views - too hard to keep track of 
-        #whether we invalidated things mid-transaction.
-        if view._writeable:
-            return self._calcCacheFunctions[name](*args)
-
-        if view._db is not self:
-            raise Exception("Please use a view if you want to use caches")
-
-        origReadWatcher = view._readWatcher
-        if origReadWatcher:
-            origReadWatcher("cache", (name, args))
-
-        cacheKey = (name,args)
-        with self._lock:
-            if cacheKey in self._calcCacheMinTransactionId:
-                minTID = self._calcCacheMinTransactionId.get(cacheKey)
-                if minTID is None or minTID <= view._transaction_num:
-                    #this is a cache hit!
-                    return self._calcCacheValues[cacheKey]
-
-        readKeys = set()
-        readCaches = set()
-
-        def readWatcher(readKind, readKey):
-            if readKind == 'cache':
-                readCaches.add(readKey)
-            elif readKind == "key":
-                readKeys.add(readKey)
-            else:
-                assert False 
-        
-        try:
-            view._readWatcher = readWatcher
-
-            cachedValue = self._calcCacheFunctions[name](*args)
-        finally:
-            view._readWatcher = origReadWatcher
-
-        self._writeCachedValue((name, args), view._transaction_num, readKeys, readCaches, cachedValue)
-
-        return cachedValue
-
-    def _writeCachedValue(self, cacheKey, asOfTransId, readKeys, readCaches, cachedValue):
-        with self._lock:
-            minValidTID = None
-            for key in readKeys:
-                if key not in self._key_version_numbers:
-                    #do nothing - there is only one version of this object around!
-                    pass
-                else:
-                    tid = self._key_version_numbers[key][-1]
-                    minValidTID = max(minValidTID, tid)
-            for key in readCaches:
-                if key not in self._calcCacheMinTransactionId:
-                    #we read from a now-invalidated cache!
-                    return
-                else:
-                    minValidTID = max(minValidTID, self._calcCacheMinTransactionId[key])
-
-            if minValidTID > asOfTransId:
-                return
-
-            self._calcCacheMinTransactionId[cacheKey] = minValidTID
-            self._calcCacheValues[cacheKey] = cachedValue
-            self._calcCacheKeysNeeded[cacheKey] = readKeys
-            for k in readKeys:
-                if k not in self._keyToCacheKeyDepending:
-                    self._keyToCacheKeyDepending[k] = set()
-                self._keyToCacheKeyDepending[k].add(cacheKey)
-
-            self._calcCacheToCalcCacheNeeded[cacheKey] = readCaches
-            self._calcCacheToCalcCacheDepending[cacheKey] = set()
-
-            for c in readCaches:
-                self._calcCacheToCalcCacheDepending[c].add(cacheKey)
 

@@ -53,8 +53,7 @@ class DatabaseObject(object):
         object.__init__(self)
 
         assert isinstance(identity, str), type(identity)
-        assert '"' not in identity
-
+        
         self.__dict__['_identity'] = identity
 
     @classmethod
