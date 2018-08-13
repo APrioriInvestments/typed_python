@@ -96,7 +96,20 @@ class RedisJsonStore(object):
         with self.lock:
             if key in self.cache:
                 assert isinstance(self.cache[key], set), "item is a string, not a set"
-                return sorted(self.cache[key])
+                return self.cache[key]
+
+            success = False
+            while not success:
+                try:
+                    vals = self.redis.smembers(key)
+                    success = True
+                except redis.exceptions.BusyLoadingError:
+                    logging.info("Redis is still loading. Waiting...")
+                    time.sleep(1.0)
+
+            self.cache[key] = set([json.loads(k) for k in vals])
+            return self.cache[key]
+
 
     def setAdd(self, key, values):
         self.setSeveral({}, {key: values}, {})
