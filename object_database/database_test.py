@@ -602,7 +602,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
         self.core_db = Database(self.mem_store)
-        self.databaseServer = object_database.database.DatabaseServer(self.core_db, port=8888)
+        self.databaseServer = object_database.database.DatabaseServer(self.core_db, host="localhost", port=8888)
         self.databaseServer.start()
         self.channels = []
 

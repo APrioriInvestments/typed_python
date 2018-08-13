@@ -945,15 +945,16 @@ def connect(host, port):
     return DatabaseConnection(proto)
 
 class DatabaseServer:
-    def __init__(self, db, port):
+    def __init__(self, db, host, port):
         self.db = db
+        self.host = host
         self.port = port
         self.server = None
 
     def start(self):
         self.server = _eventLoop.create_server(
             lambda: ServerToClientProtocol(self), 
-            '127.0.0.1', 
+            self.host, 
             self.port
             )
         

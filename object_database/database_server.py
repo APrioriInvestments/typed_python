@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import argparse
 import sys
 import time
@@ -9,7 +11,8 @@ import object_database.RedisJsonStore as RedisJsonStore
 def main(argv):
     parser = argparse.ArgumentParser("Run an object_database server")
 
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("host")
+    parser.add_argument("port", type=int)
     parser.add_argument("--redis_port", type=int, default=None)
     parser.add_argument("--inmem", default=False, action='store_true')
 
@@ -21,7 +24,7 @@ def main(argv):
         mem_store = RedisJsonStore.RedisJsonStore(port=parsedArgs.redis_port)
 
     db = database.Database(mem_store)
-    databaseServer = database.DatabaseServer(db, parsedArgs.port)
+    databaseServer = database.DatabaseServer(db, parsedArgs.host, parsedArgs.port)
 
     databaseServer.start()
 
