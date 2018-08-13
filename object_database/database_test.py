@@ -72,7 +72,7 @@ class ObjectDatabaseTests:
 
     def test_throughput(self):
         db = self.createNewDb(withTypes=True)
-
+        
         with db.transaction():
             root = db.Root.New()
             root.obj = db.Object.New(k=expr.Constant(value=0))
@@ -596,4 +596,29 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def tearDown(self):
         for c in self.channels:
             c.stop()
+
+
+class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
+    def setUp(self):
+        self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        self.core_db = Database(self.mem_store)
+        self.databaseServer = object_database.database.DatabaseServer(self.core_db, port=8888)
+        self.databaseServer.start()
+        self.channels = []
+
+    def createNewDb(self, withTypes=False):
+        db = object_database.database.connect("localhost", 8888)
+
+        self.channels.append(db)
+        
+        db.initialized.wait()
+
+        if withTypes:
+            initialize_types(db)
+
+        return db
+
+    def tearDown(self):
+        self.databaseServer.stop()
+
 

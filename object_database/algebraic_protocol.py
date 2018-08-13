@@ -3,6 +3,7 @@ import struct
 import ujson as json
 import logging
 import traceback
+import socket
 
 from object_database.algebraic_to_json import Encoder
 
@@ -37,6 +38,7 @@ class AlgebraicProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
+        self.transport._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
         self.onConnected()
 
     def data_received(self, data):

@@ -14,7 +14,8 @@
 
 from object_database.object import DatabaseObject, Index, Indexed
 from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
-
+from object_database.algebraic_protocol import AlgebraicProtocol
+import asyncio
 import inspect
 import ujson as json
 from typed_python.hash import sha_hash
@@ -28,6 +29,9 @@ import logging
 import uuid
 import traceback
 import time
+
+class DisconnectedException(Exception):
+    pass
 
 class RevisionConflictException(Exception):
     pass
@@ -188,6 +192,7 @@ class DatabaseCore:
         self._versioned_objects = {}
 
         self.initialized = threading.Event()
+        self.disconnected = threading.Event()
     
     def clearCache(self):
         with self._lock:
@@ -279,6 +284,9 @@ class DatabaseCore:
 
     def view(self, transaction_id=None):
         with self._lock:
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
             if transaction_id is None:
                 transaction_id = self._cur_transaction_num
 
@@ -320,6 +328,9 @@ class DatabaseCore:
     def transaction(self):
         """Only one transaction may be committed on the current transaction number."""
         with self._lock:
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
             view = Transaction(self, self._cur_transaction_num)
 
             transaction_id = self._cur_transaction_num
@@ -409,7 +420,11 @@ class Database(DatabaseCore):
         self._kvstore = kvstore
         self._clientChannels = []
         self.initialized.set()
-        
+    
+    def dropConnection(self, channel):
+        with self._lock:
+            self._clientChannels = [x for x in self._clientChannels if x.channel is not channel]
+
     def addConnection(self, channel):
         with self._lock:
             connectedChannel = ConnectedChannel(self._cur_transaction_num, channel)
@@ -465,6 +480,7 @@ class Database(DatabaseCore):
                     msg.index_versions,
                     msg.as_of_version
                     )
+                self._cleanup()
                 isOK = True
             except RevisionConflictException:
                 isOK = False
@@ -622,6 +638,7 @@ ServerToClient = Alternative(
     Initialize = {'transaction_num': int},
     TransactionResult = {'transaction_guid': str, 'success': bool},
     KeyInfo = {'key': str, 'data': str, 'is_set': bool, 'transaction_id': int},
+    Disconnected = {},
     Transaction = {
         "writes": ConstDict(str, str),
         "set_adds": ConstDict(str, TupleOf(str)),
@@ -710,7 +727,17 @@ class DatabaseConnection(DatabaseCore):
 
     def _onMessage(self, msg):
         with self._lock:
-            if msg.matches.Initialize:
+            if msg.matches.Disconnected:
+                self.disconnected.set()
+            
+                for q in self._write_queues.values():
+                    q.put(False)
+                for i in self._read_events.values():
+                    i.set()
+                self._write_queues = {}
+                self._read_events = {}
+
+            elif msg.matches.Initialize:
                 self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
                 self.initialized.set()
             elif msg.matches.TransactionResult:
@@ -747,6 +774,9 @@ class DatabaseConnection(DatabaseCore):
             if key in self._versioned_objects:
                 return self._versioned_objects[key].valueForVersion(transaction_id)
             
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
             self._channel.write(ClientToServer.SendSets(keys=(key,)))
 
             if key not in self._read_events:
@@ -755,6 +785,9 @@ class DatabaseConnection(DatabaseCore):
             e = self._read_events[key]
 
         e.wait()
+
+        if self.disconnected.is_set():
+            raise DisconnectedException()
 
         with self._lock:
             return self._versioned_objects[key].valueForVersion(transaction_id)
@@ -766,6 +799,9 @@ class DatabaseConnection(DatabaseCore):
             if key in self._versioned_objects:
                 return self._versioned_objects[key].valueForVersion(transaction_id)
 
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
             self._channel.write(ClientToServer.SendValues(keys=(key,)))
 
             if key not in self._read_events:
@@ -774,6 +810,9 @@ class DatabaseConnection(DatabaseCore):
             e = self._read_events[key]
 
         e.wait()
+
+        if self.disconnected.is_set():
+            raise DisconnectedException()
 
         with self._lock:
             return self._versioned_objects[key].valueForVersion(transaction_id)
@@ -805,5 +844,120 @@ class DatabaseConnection(DatabaseCore):
             )
 
         if not writeQueue.get():
+            if self.disconnected.is_set():
+                raise DisconnectedException()
             raise RevisionConflictException()
+
+
+class ServerToClientProtocol(AlgebraicProtocol):
+    def __init__(self, dbserver):
+        AlgebraicProtocol.__init__(self, ClientToServer, ServerToClient)
+        self.dbserver = dbserver
+
+    def setClientToServerHandler(self, handler):
+        self.handler = handler
+
+    def messageReceived(self, msg):
+        self.handler(msg)
+
+    def onConnected(self):
+        self.dbserver.db.addConnection(self)
+
+    def write(self, msg):
+        self.sendMessage(msg)
+
+    def connection_lost(self, e):
+        self.dbserver.db.dropConnection(self)
+
+class ClientToServerProtocol(AlgebraicProtocol):
+    def __init__(self):
+        AlgebraicProtocol.__init__(self, ServerToClient, ClientToServer)
+        self.lock = threading.Lock()
+        self.handler = None
+        self.msgs = []
+        
+    def setServerToClientHandler(self, handler):
+        with self.lock:
+            self.handler = handler
+            for m in self.msgs:
+                _eventLoop.loop.call_soon_threadsafe(self.handler, m)
+            self.msgs = None
+
+    def messageReceived(self, msg):
+        with self.lock:
+            if not self.handler:
+                self.msgs.append(msg)
+            else:
+                _eventLoop.loop.call_soon_threadsafe(self.handler, msg)
+        
+    def onConnected(self):
+        pass
+
+    def connection_lost(self, e):
+        self.messageReceived(ServerToClient.Disconnected())
+
+    def write(self, msg):
+        _eventLoop.loop.call_soon_threadsafe(self.sendMessage, msg)
+
+class EventLoopInThread:
+    def __init__(self):
+        self.loop = asyncio.new_event_loop()
+        self.thread = threading.Thread(target=self.runEventLoop)
+        self.thread.daemon = True
+        self.started = False
+
+    def runEventLoop(self):
+        asyncio.set_event_loop(self.loop)
+        self.loop.run_forever()
+
+    def start(self):
+        if not self.started:
+            self.started = True
+            self.thread.start()
+
+    def create_connection(self, callback, host, port):
+        self.start()
+
+        async def doit():
+            return await self.loop.create_connection(callback, host, port)
+
+        return asyncio.run_coroutine_threadsafe(doit(), self.loop).result(10)
+
+    def create_server(self, callback, host, port):
+        self.start()
+
+        async def doit():
+            return await self.loop.create_server(callback, host, port)
+
+        res = asyncio.run_coroutine_threadsafe(doit(), self.loop)
+
+        return res.result(10)
+
+_eventLoop = EventLoopInThread()
+
+def connect(host, port):
+    _, proto = _eventLoop.create_connection(
+        lambda: ClientToServerProtocol(),
+        host,
+        port
+        )
+
+    return DatabaseConnection(proto)
+
+class DatabaseServer:
+    def __init__(self, db, port):
+        self.db = db
+        self.port = port
+        self.server = None
+
+    def start(self):
+        self.server = _eventLoop.create_server(
+            lambda: ServerToClientProtocol(self), 
+            '127.0.0.1', 
+            self.port
+            )
+        
+    def stop(self):
+        if self.server:
+            self.server.close()
 
