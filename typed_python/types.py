@@ -107,24 +107,10 @@ TypeFunction = MakeMetaclassFunction("TypeFunction", __typed_python_type__ = Tru
 Memoized = MakeMetaclassFunction("Memoized")
 
 def TypeConvert(type_filter, value, allow_construct_new=False):
-    """Return a converted value, or throw an exception"""
-    if isinstance(type_filter, valid_primitive_types):
-        if isinstance(value, type(type_filter)) and value == type_filter:
-            return (value,)
-
+    res = TryTypeConvert(type_filter, value, allow_construct_new)
+    if res is None:
         raise TypeError("Can't convert %s to %s" % (value, str(type_filter)))
-
-    if type_filter in valid_primitive_types:
-        if isinstance(value, type_filter):
-            return value
-        raise TypeError("Can't convert %s to %s" % (value, str(type_filter)))
-
-    res = type_filter.__typed_python_try_convert_instance__(value, allow_construct_new)
-
-    if res:
-        return res[0]
-    
-    raise TypeError("Can't convert %s to %s" % (value, str(type_filter)))
+    return res[0]
 
 def TryTypeConvert(type_filter, value, allow_construct_new=False):
     if isinstance(type_filter, valid_primitive_types):
