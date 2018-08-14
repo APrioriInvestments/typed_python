@@ -78,7 +78,7 @@ class Encoder(object):
         elif isinstance(object_type, NamedTuple):
             return {k: self.to_json(t, getattr(value, k)) for k,t in object_type.ElementNamesAndTypes}
         elif isinstance(value, bytes):
-            return str(value, 'ascii')
+            return str(value, 'raw_unicode_escape')
         elif isinstance(value, (int,float,bool,str)) or value is None:
             return value
         elif hasattr(object_type, "to_json"):
@@ -111,7 +111,7 @@ class Encoder(object):
                 return algebraic_type(self.from_json(v, algebraic_type.ElementType) for v in value)
 
             if algebraic_type is bytes:
-                return bytes(value, 'ascii')
+                return bytes(value, 'raw_unicode_escape')
 
             if algebraic_type in (bool, int, str, float):
                 return value
@@ -131,6 +131,7 @@ class Encoder(object):
                 if isinstance(value, str):
                     return getattr(algebraic_type, value)()
 
+                assert 'type' in value, value
                 alt_type = getattr(algebraic_type, value['type'])
 
                 fields = {}
