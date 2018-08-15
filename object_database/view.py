@@ -99,7 +99,10 @@ class View(object):
             kwds = dict(kwds)
             del kwds["_identity"]
         else:
-            identity = sha_hash(str(uuid.uuid4())).hexdigest
+            if self._db.stableIdentities is not None:
+                identity = str(self._db.getStableIdentity())
+            else:
+                identity = sha_hash(str(uuid.uuid4())).hexdigest
 
         o = cls(identity)
 
@@ -258,6 +261,7 @@ class View(object):
             raise Exception("Please access indices from within a view.")
 
         indexType = self._db._indexTypes[type.__qualname__][tname]
+
         if indexType is not None:
             value = TypeConvert(indexType, value, allow_construct_new=True)
 
@@ -358,12 +362,12 @@ class View(object):
 
         self._db._releaseView(self)
 
-    def indexLookupOne(self, type, **kwargs):
-        res = self.indexLookup(type, **kwargs)
+    def indexLookupOne(self, lookup_type, **kwargs):
+        res = self.indexLookup(lookup_type, **kwargs)
         if not res:
-            raise Exception("No instances of %s found with %s" % (type, kwargs))
+            raise Exception("No instances of %s found with %s" % (lookup_type, kwargs))
         if len(res) != 1:
-            raise Exception("Multiple instances of %s found with %s" % (type, kwargs))
+            raise Exception("Multiple instances of %s found with %s" % (lookup_type, kwargs))
         return res[0]
 
 class Transaction(View):

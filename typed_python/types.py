@@ -274,7 +274,7 @@ def ConstDict(K,V):
         
         def __sha_hash__(self):
             if self._sha_hash_cache is None:
-                base_hash = _null_hash
+                base_hash = sha_hash(len(self.__contents__))
 
                 for k,v in sorted(self.__contents__.items()):
                     base_hash = base_hash + sha_hash(k) + sha_hash(v)
@@ -299,6 +299,9 @@ def ConstDict(K,V):
 
         def __getitem__(self, k):
             return self.__contents__[TypeConvert(K,k)]
+
+        def get(self, k, other=None):
+            return self.__contents__.get(TypeConvert(K, k), other)
 
         def __len__(self):
             return len(self.__contents__)
@@ -347,7 +350,7 @@ def ConstDict(K,V):
             if isinstance(value, ConstDict):
                 return (value,)
 
-            if allow_construct_new:
+            if allow_construct_new or isinstance(value, dict):
                 try:
                     res = list(value.items())
                 except:
@@ -385,8 +388,8 @@ def TupleOf(t):
         
         def __sha_hash__(self):
             if self._sha_hash_cache is None:
-                base_hash = _null_hash
-
+                base_hash = sha_hash(len(self.__contents__))
+            
                 for k in self.__contents__:
                     base_hash = base_hash + sha_hash(k)
 
@@ -406,6 +409,9 @@ def TupleOf(t):
         def __str__(self):
             return str(self.__contents__)
 
+        def index(self, other):
+            return self.__contents__.index(TypeConvert(t,other))
+
         def __add__(self, other):
             res = TupleOf(())
             res.__contents__ = self.__contents__ + tuple(TypeConvert(t, x) for x in other)
@@ -422,12 +428,6 @@ def TupleOf(t):
 
         def __hash__(self):
             return hash(self.__contents__)
-
-        def __sha_hash__(self):
-            res = sha_hash(len(self.__contents__))
-            for i in self.__contents__:
-                res += sha_hash(i)
-            return res
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
@@ -549,7 +549,7 @@ def NamedTuple(*namesAndTypes, **kwargs):
 
         def __sha_hash__(self):
             if self._sha_hash_cache is None:
-                base_hash = _null_hash
+                base_hash = sha_hash(len(self.__contents__))
 
                 for k in self.__contents__:
                     base_hash = base_hash + sha_hash(k)
@@ -636,7 +636,7 @@ def Tuple(*args):
 
         def __sha_hash__(self):
             if self._sha_hash_cache is None:
-                base_hash = _null_hash
+                base_hash = sha_hash(len(self.__contents__))
 
                 for k in self.__contents__:
                     base_hash = base_hash + sha_hash(k)
@@ -662,12 +662,6 @@ def Tuple(*args):
 
         def __len__(self):
             return len(self.__contents__)
-
-        def __sha_hash__(self):
-            res = sha_hash(len(self.__contents__))
-            for i in self.__contents__:
-                res += sha_hash(i)
-            return res
 
         def __repr__(self):
             return repr(self.__contents__)

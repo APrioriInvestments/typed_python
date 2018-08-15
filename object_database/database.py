@@ -193,6 +193,15 @@ class DatabaseCore:
 
         self.initialized = threading.Event()
         self.disconnected = threading.Event()
+
+        self.stableIdentities = False
+        self._identityIx = 0
+
+    def getStableIdentity(self):
+        with self._lock:
+            self._identityIx = self._identityIx + 1
+            return "ID_" + str(self._identityIx)
+
     
     def clearCache(self):
         with self._lock:
@@ -218,8 +227,9 @@ class DatabaseCore:
             fun = lambda o: getattr(o, prop)
             index_type = type.__types__[prop]
         else:
-            spec = inspect.getfullargspec(fun)
-            index_type = spec.annotations.get('return', None)
+            if index_type is None:
+                spec = inspect.getfullargspec(fun)
+                index_type = spec.annotations.get('return', None)
 
         self._indices[type.__qualname__][prop] = fun
         self._indexTypes[type.__qualname__][prop] = index_type

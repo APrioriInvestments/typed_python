@@ -15,7 +15,7 @@
 from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
                                 ConstDict, TypedFunction, Class, PackedArray, \
-                                Pointer, Internal, init, UndefinedBehaviorException, Stack, TupleOf
+                                Pointer, Internal, init, UndefinedBehaviorException, Stack, TupleOf, TypeConvert
 
 import unittest
 import time
@@ -389,3 +389,6 @@ class TypesTests(unittest.TestCase):
 
         self.assertTrue(count > 10000)
 
+    def test_const_dict_convert_empty(self):
+        TypeConvert(ConstDict(int,int), {1:2}, True)
+        TypeConvert(ConstDict(int,int), {}, True)
