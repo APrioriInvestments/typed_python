@@ -17,7 +17,7 @@ from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
 from object_database.algebraic_protocol import AlgebraicProtocol
 import asyncio
 import inspect
-import ujson as json
+import json
 from typed_python.hash import sha_hash
 from typed_python import *
 

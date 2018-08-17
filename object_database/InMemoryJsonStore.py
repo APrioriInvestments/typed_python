@@ -1,5 +1,5 @@
 import threading
-import ujson as json
+import json
 
 class InMemoryJsonStore(object):
     """Implements a string-to-json store in memory.

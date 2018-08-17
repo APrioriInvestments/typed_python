@@ -1,5 +1,5 @@
 import redis
-import ujson as json
+import json
 import time
 import threading
 import logging

@@ -15,7 +15,7 @@
 from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple, TryTypeConvert
 
 import logging
-import ujson as json
+import json
 
 class Encoder(object):
     """An algebraic <---> json encoder.
