@@ -1,4 +1,19 @@
 #!/usr/bin/env python3
+
+#   Copyright 2018 Braxton Mckee
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
 import threading
 import argparse
 import sys
@@ -10,46 +25,34 @@ def main(argv):
 
     parser.add_argument("host")
     parser.add_argument("port")
-    parser.add_argument("--threads", default=1, type=int)
+    parser.add_argument("seconds", type=float)
 
     parsedArgs = parser.parse_args(argv[1:])
 
     db = database.connect(parsedArgs.host, parsedArgs.port)
 
-    @db.define
+    schema = database.Schema()
+
+    @schema.define
     class Counter:
         k = int
 
-    def worker():
+    with db.transaction():
+        c = Counter()
+
+    t0 = time.time()
+    
+    with db.transaction():
+        c.k = 0
+
+    while time.time() - t0 < parsedArgs.seconds:
         with db.transaction():
-            c = Counter.New()
+            c.k = c.k + 1
 
-        while True:
-            t0 = time.time()
-            
-            with db.transaction():
-                c.k = 0
+    with db.view():
+        print(c.k, " transactions per second")
 
-            while time.time() - t0 < 1.0:
-                with db.transaction():
-                    c.k = c.k + 1
-
-            with db.view():
-                print(c.k, " transactions per second")
-
-    threads = [threading.Thread(target=worker) for _ in range(parsedArgs.threads)]
-    for t in threads:
-        t.daemon = True
-        t.start()
-
-    while True:
-        time.sleep(0.01)
+    return 0
 
 if __name__ == '__main__':
-    try:
-    	main(sys.argv)
-    except KeyboardInterrupt:
-        pass
-    except:
-    	import traceback
-    	traceback.print_exc()
+    sys.exit(main(sys.argv))

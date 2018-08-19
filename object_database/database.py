@@ -161,6 +161,89 @@ class SetWithEdits:
             if a not in removed:
                 return a
 
+class Schema:
+    """A collection of types that can be used to access data in a database."""
+    def __init__(self):
+        self._types = {}
+        #typename -> indexname -> fun(object->value)
+        self._indices = {}
+        self._indexTypes = {}
+
+    def __setattr__(self, typename, val):
+        if typename[:1] == "_":
+            self.__dict__[typename] = val
+            return
+        
+        self._types[typename] = val
+
+    def __getattr__(self, typename):
+        assert '.' not in typename
+
+        if typename[:1] == "_":
+            return self.__dict__[typename]
+
+        if typename not in self._types:
+            class cls(DatabaseObject):
+                pass
+
+            cls.__qualname__ = typename
+            cls.__schema__ = self
+
+            self._types[typename] = cls
+            self._indices[cls.__qualname__] = {' exists': lambda e: True}
+            self._indexTypes[cls.__qualname__] = {' exists': bool}
+
+        return self._types[typename]
+
+    def _addIndex(self, type, prop, fun = None, index_type = None):
+        if type.__qualname__ not in self._indices:
+            self._indices[type.__qualname__] = {}
+            self._indexTypes[type.__qualname__] = {}
+
+        if fun is None:
+            fun = lambda o: getattr(o, prop)
+            index_type = type.__types__[prop]
+        else:
+            if index_type is None:
+                spec = inspect.getfullargspec(fun)
+                index_type = spec.annotations.get('return', None)
+
+        self._indices[type.__qualname__][prop] = fun
+        self._indexTypes[type.__qualname__][prop] = index_type
+
+    def define(self, cls):
+        assert cls.__name__[:1] != "_", "Illegal to use _ for first character in database classnames."
+
+        t = getattr(self, cls.__name__)
+        
+        types = {}
+        
+        for name, val in cls.__dict__.items():
+            if name[:2] != '__' and isinstance(val, type):
+                types[name] = val
+            elif name[:2] != '__' and isinstance(val, Indexed):
+                if isinstance(val.obj, type):
+                    types[name] = val.obj
+
+        t._define(**types)
+
+        for name, val in cls.__dict__.items():
+            if isinstance(val, Index):
+                self._addIndex(t, name, val, Tuple(*tuple(types[k] for k in val.names)))
+
+            if name[:2] != '__' and isinstance(val, Indexed):
+                if isinstance(val.obj, FunctionType):
+                    self._addIndex(t, name, val.obj)
+                    setattr(t, name, val.obj)
+                else:
+                    self._addIndex(t, name)
+            elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
+                if isinstance(val, FunctionType):
+                    setattr(t, name, val)
+
+        return t
+
+
 class DatabaseCore:
     def __init__(self):
         self._lock = threading.Lock()
@@ -171,11 +254,6 @@ class DatabaseCore:
         #minimum transaction we can support. This is the implicit transaction
         #for all the 'tail values'
         self._min_transaction_num = 0
-
-        self._types = {}
-        #typename -> indexname -> fun(object->value)
-        self._indices = {}
-        self._indexTypes = {}
 
         #for each version number in _version_numbers, how many views referring to it
         self._version_number_counts = {}
@@ -201,7 +279,6 @@ class DatabaseCore:
         with self._lock:
             self._identityIx = self._identityIx + 1
             return "ID_" + str(self._identityIx)
-
     
     def clearCache(self):
         with self._lock:
@@ -217,80 +294,6 @@ class DatabaseCore:
         if not hasattr(_cur_view, "view"):
             return None
         return _cur_view.view
-
-    def addIndex(self, type, prop, fun = None, index_type = None):
-        if type.__qualname__ not in self._indices:
-            self._indices[type.__qualname__] = {}
-            self._indexTypes[type.__qualname__] = {}
-
-        if fun is None:
-            fun = lambda o: getattr(o, prop)
-            index_type = type.__types__[prop]
-        else:
-            if index_type is None:
-                spec = inspect.getfullargspec(fun)
-                index_type = spec.annotations.get('return', None)
-
-        self._indices[type.__qualname__][prop] = fun
-        self._indexTypes[type.__qualname__][prop] = index_type
-
-    def __setattr__(self, typename, val):
-        if typename[:1] == "_":
-            self.__dict__[typename] = val
-            return
-        
-        self._types[typename] = val
-
-    def define(self, cls):
-        assert cls.__name__[:1] != "_", "Illegal to use _ for first character in database classnames."
-
-        t = getattr(self, cls.__name__)
-        
-        types = {}
-        
-        for name, val in cls.__dict__.items():
-            if name[:2] != '__' and isinstance(val, type):
-                types[name] = val
-            elif name[:2] != '__' and isinstance(val, Indexed):
-                if isinstance(val.obj, type):
-                    types[name] = val.obj
-
-        t._define(**types)
-
-        for name, val in cls.__dict__.items():
-            if isinstance(val, Index):
-                self.addIndex(t, name, val, Tuple(*tuple(types[k] for k in val.names)))
-
-            if name[:2] != '__' and isinstance(val, Indexed):
-                if isinstance(val.obj, FunctionType):
-                    self.addIndex(t, name, val.obj)
-                    setattr(t, name, val.obj)
-                else:
-                    self.addIndex(t, name)
-            elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
-                if isinstance(val, FunctionType):
-                    setattr(t, name, val)
-
-        return t
-
-    def __getattr__(self, typename):
-        assert '.' not in typename
-
-        if typename[:1] == "_":
-            return self.__dict__[typename]
-
-        if typename not in self._types:
-            class cls(DatabaseObject):
-                pass
-
-            cls._database = self
-            cls.__qualname__ = typename
-
-            self._types[typename] = cls
-            self._indices[cls.__qualname__] = {' exists': lambda e: True}
-            self._indexTypes[cls.__qualname__] = {' exists': bool}
-
-        return self._types[typename]
 
     def view(self, transaction_id=None):
         with self._lock:

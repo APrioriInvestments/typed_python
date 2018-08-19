@@ -12,8 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-#singleton object that clients should never see
-
 from object_database.view import _cur_view
 
 from typed_python.hash import sha_hash
@@ -25,15 +23,13 @@ from types import FunctionType
 class DatabaseObject(object):
     __typed_python_type__ = True
     __types__ = None
-    _database = None
-
+    __schema__ = None
+    
     def __ne__(self, other):
         return not (self==other)
         
     def __eq__(self, other):
         if not isinstance(other, DatabaseObject):
-            return False
-        if not self._database is other._database:
             return False
         if not type(self) is type(other):
             return False
@@ -49,20 +45,17 @@ class DatabaseObject(object):
         
         return None
 
-    def __init__(self, identity):
-        object.__init__(self)
-
-        assert isinstance(identity, str), type(identity)
-        
-        self.__dict__['_identity'] = identity
-
     @classmethod
-    def New(cls, **kwds):
+    def fromIdentity(cls, identity):
+        assert isinstance(identity, str), type(identity)
+
+        o = object.__new__(cls)
+        o.__dict__['_identity'] = identity
+        return o
+
+    def __new__(cls, **kwds):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please create new objects from within a transaction.")
-
-        if _cur_view.view._db is not cls._database:
-            raise Exception("Please create new objects from within a transaction created on the same database as the object.")
 
         return _cur_view.view._new(cls, kwds)
 
@@ -71,22 +64,28 @@ class DatabaseObject(object):
 
     @classmethod
     def lookupOne(cls, **kwargs):
-        return cls._database.current_transaction().indexLookupOne(cls, **kwargs or {' exists': True})
+        if not hasattr(_cur_view, "view"):
+            raise Exception("Please lookup in indices from within a transaction.")
+
+        return _cur_view.view.indexLookupOne(cls, **kwargs or {' exists': True})
 
     @classmethod
     def lookupAll(cls, **kwargs):
-        return cls._database.current_transaction().indexLookup(cls, **kwargs or {' exists': True})
+        if not hasattr(_cur_view, "view"):
+            raise Exception("Please lookup in indices from within a transaction.")
+
+        return _cur_view.view.indexLookup(cls, **kwargs or {' exists': True})
 
     @classmethod
     def lookupAny(cls, **kwargs):
-        return cls._database.current_transaction().indexLookupAny(cls, **kwargs or {' exists': True})
+        if not hasattr(_cur_view, "view"):
+            raise Exception("Please lookup in indices from within a transaction.")
+
+        return _cur_view.view.indexLookupAny(cls, **kwargs or {' exists': True})
 
     def exists(self):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
-
-        if _cur_view.view._db is not type(self)._database:
-            raise Exception("Please access properties from within a view or transaction created on the same database as the object.")
 
         return _cur_view.view._exists(self, type(self).__qualname__, self._identity)
 
@@ -103,10 +102,7 @@ class DatabaseObject(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
 
-        if _cur_view.view._db is not type(self)._database:
-            raise Exception("Please access properties from within a view or transaction created on the same database as the object.")
-        
-        return _cur_view.view._get(type(self).__qualname__, self._identity, name, self.__types__[name])
+        return _cur_view.view._get(self, type(self).__qualname__, self._identity, name, self.__types__[name])
 
     def __setattr__(self, name, val):
         if name not in self.__types__:
@@ -114,9 +110,6 @@ class DatabaseObject(object):
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
-
-        if _cur_view.view._db is not type(self)._database:
-            raise Exception("Please access properties from within a view or transaction created on the same database as the object.")
 
         coerced_val = TypeConvert(self.__types__[name], val, allow_construct_new=True)
 
@@ -142,7 +135,7 @@ class DatabaseObject(object):
     def from_json(cls, obj):
         assert isinstance(obj, str), obj
 
-        return cls(obj)
+        return cls.fromIdentity(obj)
 
     def __sha_hash__(self):
         return sha_hash(self._identity) + sha_hash(type(self).__qualname__)

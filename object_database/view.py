@@ -104,7 +104,7 @@ class View(object):
             else:
                 identity = sha_hash(str(uuid.uuid4())).hexdigest
 
-        o = cls(identity)
+        o = cls.fromIdentity(identity)
 
         writes = {}
 
@@ -129,8 +129,8 @@ class View(object):
 
         self._writes.update(writes)
 
-        if cls.__qualname__ in self._db._indices:
-            for index_name, index_fun in self._db._indices[cls.__qualname__].items():
+        if cls.__qualname__ in cls.__schema__._indices:
+            for index_name, index_fun in cls.__schema__._indices[cls.__qualname__].items():
                 val = index_fun(o)
 
                 if val is not None:
@@ -140,7 +140,7 @@ class View(object):
 
         return o        
 
-    def _get(self, obj_typename, identity, field_name, type):
+    def _get(self, obj, obj_typename, identity, field_name, type):
         key = data_key(obj_typename, identity, field_name)
 
         self._reads.add(key)
@@ -205,15 +205,15 @@ class View(object):
     def _compute_index_vals(self, obj, obj_typename):
         existing_index_vals = {}
 
-        if obj_typename in self._db._indices:
-            for index_name, index_fun in self._db._indices[obj_typename].items():
+        if obj_typename in obj.__schema__._indices:
+            for index_name, index_fun in obj.__schema__._indices[obj_typename].items():
                 existing_index_vals[index_name] = index_fun(obj)
 
         return existing_index_vals
 
     def _update_indices(self, obj, obj_typename, identity, existing_index_vals, new_index_vals):
-        if obj_typename in self._db._indices:
-            for index_name, index_fun in self._db._indices[obj_typename].items():
+        if obj_typename in obj.__schema__._indices:
+            for index_name, index_fun in obj.__schema__._indices[obj_typename].items():
                 new_index_val = new_index_vals.get(index_name, None)
                 cur_index_val = existing_index_vals.get(index_name, None)
 
@@ -254,13 +254,13 @@ class View(object):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
 
-        if type.__qualname__ not in self._db._indices or tname not in self._db._indices[type.__qualname__]:
+        if type.__qualname__ not in type.__schema__._indices or tname not in type.__schema__._indices[type.__qualname__]:
             raise Exception("No index enabled for %s.%s" % (type.__qualname__, tname))
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
-        indexType = self._db._indexTypes[type.__qualname__][tname]
+        indexType = type.__schema__._indexTypes[type.__qualname__][tname]
 
         if indexType is not None:
             value = TypeConvert(indexType, value, allow_construct_new=True)
@@ -273,19 +273,19 @@ class View(object):
         identities = identities.union(self._set_adds.get(keyname, set()))
         identities = identities.difference(self._set_removes.get(keyname, set()))
 
-        return tuple([type(x) for x in identities])
+        return tuple([type.fromIdentity(x) for x in identities])
 
     def indexLookupAny(self, type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
 
-        if type.__qualname__ not in self._db._indices or tname not in self._db._indices[type.__qualname__]:
+        if type.__qualname__ not in type.__schema__._indices or tname not in type.__schema__._indices[type.__qualname__]:
             raise Exception("No index enabled for %s.%s" % (type.__qualname__, tname))
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
-        indexType = self._db._indexTypes[type.__qualname__][tname]
+        indexType = type.__schema__._indexTypes[type.__qualname__][tname]
 
         if indexType is not None:
             value = TypeConvert(indexType, value, allow_construct_new=True)
@@ -296,14 +296,14 @@ class View(object):
         removed = self._set_removes.get(keyname, set())
 
         if added:
-            return type(list(added)[0])
+            return type.fromIdentity(list(added)[0])
 
         self._indexReads.add(keyname)
 
         res = self._db._get_versioned_set_data(keyname, self._transaction_num).pickAny()
 
         if res:
-            return type(res)
+            return type.fromIdentity(res)
 
         return None
 
