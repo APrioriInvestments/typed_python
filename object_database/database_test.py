@@ -17,7 +17,7 @@ from typed_python import Alternative, TupleOf, OneOf
 from object_database.database import Database, RevisionConflictException, Indexed, Index, Schema
 import object_database.database
 import object_database.InMemoryJsonStore as InMemoryJsonStore
-
+import queue
 import unittest
 import random
 import time
@@ -105,10 +105,41 @@ class ObjectDatabaseTests:
         while time.time() < t0 + 1.0:
             with db.transaction() as t:
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
-        
+
         with db.view():
             self.assertTrue(root.obj.k.value > 500, root.obj.k.value)
                 
+    def test_delayed_transactions(self):
+        db = self.createNewDb()
+
+        confirmed = queue.Queue()
+
+        with db.transaction():
+            root = Root()
+            root.obj = Object(k=expr.Constant(value=0))
+
+        t0 = time.time()
+
+        for i in range(1000):
+            with db.transaction().onConfirmed(confirmed.put) as t:
+                root.obj.k = expr.Constant(value=root.obj.k.value + 1)
+
+        if self.TEST_TRANSACTIONS_ARE_SYNCHRONOUS:
+            self.assertTrue(confirmed.qsize() == 1000)
+        else:
+            self.assertTrue(confirmed.qsize() < 1000)
+
+        good = 0
+        for i in range(1000):
+            if confirmed.get().matches.Success:
+                good += 1
+
+        if self.TEST_TRANSACTIONS_ARE_SYNCHRONOUS:
+            self.assertEqual(good, 1000)
+        else:
+            self.assertGreater(good, 0)
+            self.assertLess(good, 1000)
+
     def test_exists(self):
         db = self.createNewDb()
 
@@ -590,6 +621,8 @@ class ObjectDatabaseTests:
             self.assertEqual(len(n.x), 0)
 
 class ObjectDatabaseInMemTests(unittest.TestCase, ObjectDatabaseTests):
+    TEST_TRANSACTIONS_ARE_SYNCHRONOUS = True
+
     def setUp(self):
         self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
 
@@ -598,6 +631,8 @@ class ObjectDatabaseInMemTests(unittest.TestCase, ObjectDatabaseTests):
         return db
 
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
+    TEST_TRANSACTIONS_ARE_SYNCHRONOUS = False
+    
     def setUp(self):
         self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
         self.core_db = Database(self.mem_store)
@@ -624,6 +659,8 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
 
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
+    TEST_TRANSACTIONS_ARE_SYNCHRONOUS = False
+
     def setUp(self):
         self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
         self.core_db = Database(self.mem_store)

@@ -19,9 +19,16 @@ from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tu
 import object_database.algebraic_to_json as algebraic_to_json
 
 import threading
+import queue
 import time
 import traceback
 import uuid
+
+class DisconnectedException(Exception):
+    pass
+
+class RevisionConflictException(Exception):
+    pass
 
 class JsonWithPyRep:
     """A value stored as Json with a python representation."""
@@ -89,6 +96,7 @@ class View(object):
         self._insistReadsConsistent = True
         self._insistWritesConsistent = True
         self._insistIndexReadsConsistent = False
+        self._confirmCommitCallback = None
 
     def _new(self, cls, kwds):
         if not self._writeable:
@@ -324,6 +332,15 @@ class View(object):
             if (self._set_adds or self._set_removes) and not self._insistReadsConsistent:
                 raise Exception("You can't update an indexed value without read and write consistency.")
 
+            
+
+            if self._confirmCommitCallback is None:
+                result_queue = queue.Queue()
+
+                confirmCallback = result_queue.put
+            else:
+                confirmCallback = self._confirmCommitCallback
+
             self._db._set_versioned_object_data(
                 writes, 
                 {k:v for k,v in self._set_adds.items() if v}, 
@@ -332,8 +349,22 @@ class View(object):
                     else set(writes) if self._insistWritesConsistent 
                     else set(),
                 self._indexReads if self._insistIndexReadsConsistent else set(),
-                tid
+                tid,
+                confirmCallback
                 )
+
+            if not self._confirmCommitCallback:
+                #this is the synchronous case - we want to wait for the confirm
+                res = result_queue.get()
+                if res.matches.Success:
+                    return
+                if res.matches.Disconnected:
+                    raise DisconnectedException()
+                if res.matches.RevisionConflict:
+                    raise RevisionConflictException()
+
+                assert False, "unknown transaction result: " + str(res)
+
 
     def nocommit(self):
         class Scope:
@@ -343,6 +374,7 @@ class View(object):
 
             def __exit__(self, *args):
                 del _cur_view.view
+
         return Scope()
 
     def __enter__(self):
@@ -395,5 +427,20 @@ class Transaction(View):
 
         return self
 
+    def onConfirmed(self, callback):
+        """Set a callback function to be called on the main event thread with a boolean indicating
+        whether the transaction was accepted."""
+        self._confirmCommitCallback = callback
+        
+        return self
+
+    def noconfirm(self):
+        """Indicate that the transaction should return immediately without a round-trip to
+        confirm that it was successful."""
+        def ignoreConfirmResult(result):
+            pass
+        self._confirmCommitCallback = ignoreConfirmResult
+
+        return self
 
 

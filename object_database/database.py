@@ -30,11 +30,14 @@ import uuid
 import traceback
 import time
 
-class DisconnectedException(Exception):
-    pass
+from object_database.view import RevisionConflictException, DisconnectedException
 
-class RevisionConflictException(Exception):
-    pass
+TransactionResult = Alternative(
+    "TransactionResult", 
+    Success = {},
+    RevisionConflict = {},
+    Disconnected = {}
+    )
 
 class VersionedBase:
     def _best_version_offset_for(self, version):
@@ -485,24 +488,28 @@ class Database(DatabaseCore):
                         )
         elif msg.matches.NewTransaction:
             try:
+                isOK = [None]
+
+                def onCommit(successful):
+                    isOK[0] = successful.matches.Success
+
                 self._set_versioned_object_data(
                     {k: JsonWithPyRep(json.loads(v),None) for k,v in msg.writes.items()},
                     {k: set(a) for k,a in msg.set_adds.items() if a},
                     {k: set(a) for k,a in msg.set_removes.items() if a},
                     msg.key_versions,
                     msg.index_versions,
-                    msg.as_of_version
+                    msg.as_of_version,
+                    onCommit
                     )
+
                 self._cleanup()
-                isOK = True
-            except RevisionConflictException:
-                isOK = False
             except:
                 traceback.print_exc()
                 logging.error("Unknown error: %s", traceback.format_exc())
-                isOK = False
+                isOK[0] = False
 
-            connectedChannel.sendTransactionSuccess(msg.transaction_guid, isOK)
+            connectedChannel.sendTransactionSuccess(msg.transaction_guid, isOK[0])
 
 
     def _get_versioned_set_data(self, key, transaction_id):
@@ -537,7 +544,8 @@ class Database(DatabaseCore):
                 set_removes, 
                 keys_to_check_versions, 
                 indices_to_check_versions, 
-                as_of_version
+                as_of_version,
+                confirmCallback
                 ):
         """Commit a transaction. 
 
@@ -589,7 +597,8 @@ class Database(DatabaseCore):
             for subset in [keys_to_check_versions, indices_to_check_versions]:
                 for key in subset:
                     if not self._versioned_objects[key].validVersionIncoming(as_of_version, transaction_id):
-                        raise RevisionConflictException()
+                        confirmCallback(TransactionResult.RevisionConflict())
+                        return
 
             for key in keysWritingTo:
                 obj = self._versioned_objects[key]
@@ -626,6 +635,7 @@ class Database(DatabaseCore):
                     transaction_id
                     )
 
+            confirmCallback(TransactionResult.Success())
 
 ClientToServer = Alternative(
     "ClientToServer",
@@ -735,7 +745,7 @@ class DatabaseConnection(DatabaseCore):
         DatabaseCore.__init__(self)
         self._channel = channel
         self._channel.setServerToClientHandler(self._onMessage)
-        self._write_queues = {}
+        self._transaction_callbacks = {}
         self._read_events = {}
 
     def _onMessage(self, msg):
@@ -743,18 +753,34 @@ class DatabaseConnection(DatabaseCore):
             if msg.matches.Disconnected:
                 self.disconnected.set()
             
-                for q in self._write_queues.values():
-                    q.put(False)
+                for q in self._transaction_callbacks.values():
+                    try:
+                        q(TransactionResult.Disconnected())
+                    except:
+                        logging.error(
+                            "Transaction commit callback threw an exception:\n%s", 
+                            traceback.format_exc()
+                            )
+
                 for i in self._read_events.values():
                     i.set()
-                self._write_queues = {}
+                self._transaction_callbacks = {}
                 self._read_events = {}
 
             elif msg.matches.Initialize:
                 self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
                 self.initialized.set()
             elif msg.matches.TransactionResult:
-                self._write_queues.pop(msg.transaction_guid).put(msg.success)
+                try:
+                    self._transaction_callbacks.pop(msg.transaction_guid)(
+                        TransactionResult.Success() if msg.success 
+                            else TransactionResult.RevisionConflict()
+                        )
+                except:
+                    logging.error(
+                        "Transaction commit callback threw an exception:\n%s", 
+                        traceback.format_exc()
+                        )
             elif msg.matches.KeyInfo:
                 key = msg.key
                 if key not in self._versioned_objects:
@@ -836,13 +862,14 @@ class DatabaseConnection(DatabaseCore):
                 set_removes, 
                 keys_to_check_versions, 
                 indices_to_check_versions, 
-                as_of_version
+                as_of_version,
+                confirmCallback
                 ):
+        assert confirmCallback is not None
+        
         transaction_guid = str(uuid.uuid4()).replace("-","")
 
-        writeQueue = queue.Queue()
-
-        self._write_queues[transaction_guid] = writeQueue
+        self._transaction_callbacks[transaction_guid] = confirmCallback
 
         self._channel.write(
             ClientToServer.NewTransaction(
@@ -855,11 +882,6 @@ class DatabaseConnection(DatabaseCore):
                 transaction_guid=transaction_guid
                 )
             )
-
-        if not writeQueue.get():
-            if self.disconnected.is_set():
-                raise DisconnectedException()
-            raise RevisionConflictException()
 
 
 class ServerToClientProtocol(AlgebraicProtocol):
