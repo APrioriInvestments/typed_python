@@ -14,4 +14,5 @@
 
 from object_database.database import connect
 from object_database.database import Schema
+from object_database.database import Indexed, Index
 
