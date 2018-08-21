@@ -308,7 +308,7 @@ class View(object):
 
         self._indexReads.add(keyname)
 
-        res = self._db._get_versioned_set_data(keyname, self._transaction_num).pickAny()
+        res = self._db._get_versioned_set_data(keyname, self._transaction_num).pickAny(removed)
 
         if res:
             return db_type.fromIdentity(res)

@@ -39,6 +39,23 @@ TransactionResult = Alternative(
     Disconnected = {}
     )
 
+def revisionConflictRetry(f):
+    MAX_TRIES = 100
+
+    def inner(*args, **kwargs):
+        tries = 0
+        while tries < MAX_TRIES:
+            try:
+                return f(*args, **kwargs)
+            except RevisionConflictException:
+                logging.info("Handled a RevisionConflictException")
+                tries += 1
+
+        raise RevisionConflictException()
+
+    inner.__name__ = f.__name__
+    return inner
+
 class VersionedBase:
     def _best_version_offset_for(self, version):
         i = len(self.version_numbers) - 1
@@ -151,17 +168,17 @@ class SetWithEdits:
             res.difference_update(self.removes[i])
         return res
 
-    def pickAny(self):
+    def pickAny(self, toAvoid):
         removed = set()
 
         for i in reversed(range(len(self.adds))):
             for a in self.adds[i]:
-                if a not in removed:
+                if a not in removed and a not in toAvoid:
                     return a
             removed.update(self.removes[i])
 
         for a in self.s:
-            if a not in removed:
+            if a not in removed and a not in toAvoid:
                 return a
 
 class Schema:
@@ -301,6 +318,8 @@ class DatabaseCore:
 
         self.initialized = threading.Event()
         self.disconnected = threading.Event()
+
+        self.connectionObject = None
 
         self.stableIdentities = False
         self._identityIx = 0
@@ -458,12 +477,23 @@ class ConnectedChannel:
             ServerToClient.TransactionResult(transaction_guid=guid,success=success)
             )
 
+
+
 class Database(DatabaseCore):
     def __init__(self, kvstore):
         DatabaseCore.__init__(self)
         self._kvstore = kvstore
         self._clientChannels = []
         self.initialized.set()
+
+
+    def clone(self):
+        assert self.initialized.isSet()
+
+        with self.transaction():
+            conn = Connection()
+
+        return DatabaseWrapper(self, conn)
     
     def dropConnection(self, channel):
         with self._lock:
@@ -734,6 +764,13 @@ class InMemoryChannel:
         self._pumpThreadClient = threading.Thread(target=self.pumpMessagesFromClient)
         self._pumpThreadClient.daemon = True
         
+    def clone(self):
+        res = InMemoryChannel()
+        res.setServerToClientHandler(self._clientCallback)
+        res.setClientToServerHandler(self._serverCallback)
+        res.start()
+        return res
+
     def pumpMessagesFromServer(self):
         while not self._shouldStop:
             try:
@@ -789,15 +826,80 @@ class InMemoryChannel:
     def setClientToServerHandler(self, callback):
         self._serverCallback = callback
 
+class DatabaseWrapper:
+    def __init__(self, inner_db, connectionObject):
+        self._db = inner_db
+        self.connectionObject = connectionObject
+        self.initialized = inner_db.initialized
+
+        self.disconnected = threading.Event()
+
+    def clone(self):
+        assert self.initialized.isSet()
+
+        with self.transaction():
+            conn = Connection()
+
+        return DatabaseWrapper(self, conn)
+    
+    def view(self):
+        return self._db.view()
+
+    def transaction(self):
+        return self._db.transaction()
+
+    def _get_versioned_set_data(self, key, transaction_id):
+        if self.disconnected.is_set():
+            raise DisconnectedException()
+        return self._db._get_versioned_set_data(key,transaction_id)
+
+    def _get_versioned_object_data(self, key, transaction_id):
+        if self.disconnected.is_set():
+            raise DisconnectedException()
+        return self._db._get_versioned_object_data(key,transaction_id)
+
+    def disconnect(self):
+        with self.transaction():
+            self.connectionObject.delete()
+        self.disconnected.set()
+
+    def _set_versioned_object_data(self, 
+                key_value, 
+                set_adds, 
+                set_removes, 
+                keys_to_check_versions, 
+                indices_to_check_versions, 
+                as_of_version,
+                confirmCallback
+                ):
+
+        if self.disconnected.is_set():
+            raise DisconnectedException()
+
+        return self._db._set_versioned_object_data(
+                key_value, 
+                set_adds, 
+                set_removes, 
+                keys_to_check_versions, 
+                indices_to_check_versions, 
+                as_of_version,
+                confirmCallback
+                )
+
+
 
 class DatabaseConnection(DatabaseCore):
     def __init__(self, channel):
         DatabaseCore.__init__(self)
-        self.connectionObject = None
         self._channel = channel
         self._channel.setServerToClientHandler(self._onMessage)
         self._transaction_callbacks = {}
         self._read_events = {}
+
+    def clone(self):
+        assert self.initialized.isSet()
+
+        return DatabaseCore(self._channel.clone())
 
     def _onMessage(self, msg):
         with self._lock:
@@ -958,12 +1060,21 @@ class ServerToClientProtocol(AlgebraicProtocol):
         self.dbserver.db.dropConnection(self)
 
 class ClientToServerProtocol(AlgebraicProtocol):
-    def __init__(self):
+    def __init__(self, host, port):
         AlgebraicProtocol.__init__(self, ServerToClient, ClientToServer)
         self.lock = threading.Lock()
+        self.host = host
+        self.port = port
         self.handler = None
         self.msgs = []
-        
+    
+    def clone(self):
+        return eventLoop.create_connection(
+            lambda: ClientToServerProtocol(self.host, self.port),
+            self.host,
+            self.port
+            )
+
     def setServerToClientHandler(self, handler):
         with self.lock:
             self.handler = handler
@@ -1025,7 +1136,7 @@ _eventLoop = EventLoopInThread()
 
 def connect(host, port):
     _, proto = _eventLoop.create_connection(
-        lambda: ClientToServerProtocol(),
+        lambda: ClientToServerProtocol(host, port),
         host,
         port
         )
