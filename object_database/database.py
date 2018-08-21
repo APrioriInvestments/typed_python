@@ -166,17 +166,33 @@ class SetWithEdits:
 
 class Schema:
     """A collection of types that can be used to access data in a database."""
-    def __init__(self):
+    def __init__(self, name="default"):
+        self._name = name
         self._types = {}
-        #typename -> indexname -> fun(object->value)
+        #class -> indexname -> fun(object->value)
         self._indices = {}
         self._indexTypes = {}
+        self._frozen = False
+
+    @property
+    def name(self):
+        return self._name
+
+    def freeze(self):
+        if not self._frozen:
+            for tname, t in self._types.items():
+                if issubclass(t, DatabaseObject) and t.__types__ is None:
+                    raise Exception("Database subtype %s is not defined." % tname)
+
+            self._frozen = True
 
     def __setattr__(self, typename, val):
         if typename[:1] == "_":
             self.__dict__[typename] = val
             return
         
+        assert not self._frozen, "Schema is already frozen."
+
         self._types[typename] = val
 
     def __getattr__(self, typename):
@@ -186,6 +202,9 @@ class Schema:
             return self.__dict__[typename]
 
         if typename not in self._types:
+            if self._frozen:
+                raise AttributeError(typename)
+
             class cls(DatabaseObject):
                 pass
 
@@ -193,15 +212,17 @@ class Schema:
             cls.__schema__ = self
 
             self._types[typename] = cls
-            self._indices[cls.__qualname__] = {' exists': lambda e: True}
-            self._indexTypes[cls.__qualname__] = {' exists': bool}
+            self._indices[cls] = {' exists': lambda e: True}
+            self._indexTypes[cls] = {' exists': bool}
 
         return self._types[typename]
 
     def _addIndex(self, type, prop, fun = None, index_type = None):
-        if type.__qualname__ not in self._indices:
-            self._indices[type.__qualname__] = {}
-            self._indexTypes[type.__qualname__] = {}
+        assert issubclass(type, DatabaseObject)
+
+        if type not in self._indices:
+            self._indices[type] = {}
+            self._indexTypes[type] = {}
 
         if fun is None:
             fun = lambda o: getattr(o, prop)
@@ -211,11 +232,12 @@ class Schema:
                 spec = inspect.getfullargspec(fun)
                 index_type = spec.annotations.get('return', None)
 
-        self._indices[type.__qualname__][prop] = fun
-        self._indexTypes[type.__qualname__][prop] = index_type
+        self._indices[type][prop] = fun
+        self._indexTypes[type][prop] = index_type
 
     def define(self, cls):
         assert cls.__name__[:1] != "_", "Illegal to use _ for first character in database classnames."
+        assert not self._frozen, "Schema is already frozen"
 
         t = getattr(self, cls.__name__)
         
@@ -246,6 +268,11 @@ class Schema:
 
         return t
 
+core_schema = Schema("core")
+
+@core_schema.define
+class Connection:
+    pass
 
 class DatabaseCore:
     def __init__(self):
@@ -389,9 +416,10 @@ class DatabaseCore:
                 
 
 class ConnectedChannel:
-    def __init__(self, initial_tid, channel):
+    def __init__(self, initial_tid, channel, connectionObject):
         self.channel = channel
         self.initial_tid = initial_tid
+        self.connectionObject = connectionObject
 
     def sendInitialKeyVersion(self, key, value):
         if isinstance(value, SetWithEdits):
@@ -422,7 +450,7 @@ class ConnectedChannel:
 
     def sendInitializationMessage(self):
         self.channel.write(
-            ServerToClient.Initialize(transaction_num=self.initial_tid)
+            ServerToClient.Initialize(transaction_num=self.initial_tid, connIdentity=self.connectionObject._identity)
             )
 
     def sendTransactionSuccess(self, guid, success):
@@ -441,17 +469,39 @@ class Database(DatabaseCore):
         with self._lock:
             self._clientChannels = [x for x in self._clientChannels if x.channel is not channel]
 
-    def addConnection(self, channel):
-        with self._lock:
-            connectedChannel = ConnectedChannel(self._cur_transaction_num, channel)
-
-            self._clientChannels.append(connectedChannel)
-
-            channel.setClientToServerHandler(
-                lambda msg: self._onClientToServerMessage(connectedChannel, msg)
+        try:
+            with self.transaction():
+                channel.connectionObject.delete()
+        except:
+            logging.error('Error deleting connection objects for channel %s:\n%s', 
+                channel.connectionObject._identity, 
+                traceback.format_exc()
                 )
 
-            connectedChannel.sendInitializationMessage()
+    def addConnection(self, channel):
+        with self.transaction():
+            connectionObject = core_schema.Connection()
+
+        try:
+            with self._lock:
+                connectedChannel = ConnectedChannel(self._cur_transaction_num, channel, connectionObject)
+
+                self._clientChannels.append(connectedChannel)
+
+                channel.setClientToServerHandler(
+                    lambda msg: self._onClientToServerMessage(connectedChannel, msg)
+                    )
+
+                connectedChannel.sendInitializationMessage()
+        except:
+            try:
+                with self.transaction():
+                    connectionObject.delete()
+            except:
+                logging.error(
+                    "Failed to delete a Connection object during connection creation:\n%s", 
+                    traceback.format_exc()
+                    )
 
 
     def _onClientToServerMessage(self, connectedChannel, msg):
@@ -658,7 +708,7 @@ ClientToServer = Alternative(
 
 ServerToClient = Alternative(
     "ServerToClient",
-    Initialize = {'transaction_num': int},
+    Initialize = {'transaction_num': int, 'connIdentity': str},
     TransactionResult = {'transaction_guid': str, 'success': bool},
     KeyInfo = {'key': str, 'data': str, 'is_set': bool, 'transaction_id': int},
     Disconnected = {},
@@ -743,6 +793,7 @@ class InMemoryChannel:
 class DatabaseConnection(DatabaseCore):
     def __init__(self, channel):
         DatabaseCore.__init__(self)
+        self.connectionObject = None
         self._channel = channel
         self._channel.setServerToClientHandler(self._onMessage)
         self._transaction_callbacks = {}
@@ -752,6 +803,7 @@ class DatabaseConnection(DatabaseCore):
         with self._lock:
             if msg.matches.Disconnected:
                 self.disconnected.set()
+                self.connectionObject = None
             
                 for q in self._transaction_callbacks.values():
                     try:
@@ -769,6 +821,7 @@ class DatabaseConnection(DatabaseCore):
 
             elif msg.matches.Initialize:
                 self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
+                self.connectionObject = core_schema.Connection.fromIdentity(msg.connIdentity)
                 self.initialized.set()
             elif msg.matches.TransactionResult:
                 try:

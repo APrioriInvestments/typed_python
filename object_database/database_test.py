@@ -307,31 +307,37 @@ class ObjectDatabaseTests:
 
                 counters = new_counters
 
-        self.assertLess(self.mem_store.storedStringCount(), 100)
+        #we may have one or two for connection objects.
+        self.assertLess(self.mem_store.storedStringCount(), 102)
         self.assertTrue(total_writes > 500)
 
     def test_flush_db_works(self):
         db = self.createNewDb()
 
+        counters = []
         with db.transaction():
-            c = Counter()
-            c.k = 1
+            for _ in range(10):
+                counters.append(Counter(k=1))
 
         self.assertTrue(self.mem_store.values)
 
         view = db.view()
 
         with db.transaction():
-            c.delete()
+            for c in counters:
+                c.delete()
 
         #database doesn't have this
-        self.assertFalse(self.mem_store.storedStringCount())
+        t0 = time.time()
+        while time.time() - t0 < 1.0 and self.mem_store.storedStringCount() >= 2:
+            time.sleep(.01)
+
+        self.assertLess(self.mem_store.storedStringCount(), 2)
 
         #but the view does!
         with view:
-            self.assertTrue(c.exists())
-
-        self.assertFalse(self.mem_store.storedStringCount())
+            for c in counters:
+                self.assertTrue(c.exists())
 
     def test_read_write_conflict(self):
         db = self.createNewDb()
@@ -500,10 +506,42 @@ class ObjectDatabaseTests:
         with db.view() as v:
             self.assertEqual(Object.lookupAll(k=expr.Constant(value=123)), (o1,))
 
+    def test_frozen_schema(self):
+        schema = Schema()
+
+        @schema.define
+        class Object:
+            x = int
+            y = int
+
+        Object.fromIdentity("hi")
+
+        with self.assertRaises(AttributeError):
+            schema.SomeOtherObject
+
+    def test_freezing_schema_with_undefined_fails(self):
+        schema = Schema()
+
+        @schema.define
+        class Object:
+            x = schema.Object2
+            y = int
+
+        with self.assertRaises(Exception):
+            schema.freeze()
+
+        @schema.define
+        class Object2:
+            x = int
+
+        schema.freeze()
+        
+        
     def test_index_functions(self):
         db = self.createNewDb()
 
         schema = Schema()
+
         @schema.define
         class Object:
             k=Indexed(int)

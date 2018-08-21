@@ -36,16 +36,16 @@ class JsonWithPyRep:
         self.jsonRep = jsonRep
         self.pyRep = pyRep
 
-def data_key(obj_typename, identity, field_name):
-    return obj_typename + "-val:" + identity + ":" + field_name
+def data_key(obj_type, identity, field_name):
+    return obj_type.__schema__.name + "-" + obj_type.__qualname__ + "-val:" + identity + ":" + field_name
 
-def index_key(obj_typename, field_name, value):
+def index_key(obj_type, field_name, value):
     if isinstance(value, int):
         value_hash = "int_" + str(value)
     else:
         value_hash = sha_hash(value).hexdigest
 
-    return obj_typename + "-ix:" + field_name + ":" + value_hash
+    return obj_type.__schema__.name + "-" + obj_type.__qualname__ + "-ix:" + field_name + ":" + value_hash
 
 def default_initialize(t):
     if t in (str,bool,bytes,int,float):
@@ -131,25 +131,25 @@ class View(object):
 
             coerced_val = TypeConvert(cls.__types__[kwd], val, allow_construct_new=True)
 
-            writes[data_key(cls.__qualname__, identity, kwd)] = (cls.__types__[kwd], coerced_val)
+            writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
 
-        writes[data_key(cls.__qualname__, identity, ".exists")] = True
+        writes[data_key(cls, identity, ".exists")] = True
 
         self._writes.update(writes)
 
-        if cls.__qualname__ in cls.__schema__._indices:
-            for index_name, index_fun in cls.__schema__._indices[cls.__qualname__].items():
+        if cls in cls.__schema__._indices:
+            for index_name, index_fun in cls.__schema__._indices[cls].items():
                 val = index_fun(o)
 
                 if val is not None:
-                    ik = index_key(cls.__qualname__, index_name, val)
+                    ik = index_key(cls, index_name, val)
 
                     self._add_to_index(ik, identity)
 
         return o        
 
-    def _get(self, obj, obj_typename, identity, field_name, type):
-        key = data_key(obj_typename, identity, field_name)
+    def _get(self, obj, identity, field_name, field_type):
+        key = data_key(type(obj), identity, field_name)
 
         self._reads.add(key)
 
@@ -168,12 +168,12 @@ class View(object):
             return None
 
         if dbValWithPyrep.pyRep is None:
-            dbValWithPyrep.pyRep = _encoder.from_json(dbValWithPyrep.jsonRep, type)
+            dbValWithPyrep.pyRep = _encoder.from_json(dbValWithPyrep.jsonRep, field_type)
 
         return dbValWithPyrep.pyRep
 
-    def _exists(self, obj, obj_typename, identity):
-        key = data_key(obj_typename, identity, ".exists")
+    def _exists(self, obj, identity):
+        key = data_key(type(obj), identity, ".exists")
 
         if self._readWatcher:
             self._readWatcher("key", key)
@@ -185,53 +185,53 @@ class View(object):
 
         return val.jsonRep is not None
 
-    def _delete(self, obj, obj_typename, identity, field_names):
-        existing_index_vals = self._compute_index_vals(obj, obj_typename)
+    def _delete(self, obj, identity, field_names):
+        existing_index_vals = self._compute_index_vals(obj)
 
         for name in field_names:
-            key = data_key(obj_typename, identity, name)
+            key = data_key(type(obj), identity, name)
             self._writes[key] = None
 
-        self._writes[data_key(obj_typename, identity, ".exists")] = None
+        self._writes[data_key(type(obj), identity, ".exists")] = None
 
-        self._update_indices(obj, obj_typename, identity, existing_index_vals, {})
+        self._update_indices(obj, identity, existing_index_vals, {})
 
-    def _set(self, obj, obj_typename, identity, field_name, type, val):
+    def _set(self, obj, identity, field_name, field_type, val):
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
 
-        key = data_key(obj_typename, identity, field_name)
+        key = data_key(type(obj), identity, field_name)
 
-        existing_index_vals = self._compute_index_vals(obj, obj_typename)
+        existing_index_vals = self._compute_index_vals(obj)
 
-        self._writes[key] = (type, val)
+        self._writes[key] = (field_type, val)
         
-        new_index_vals = self._compute_index_vals(obj, obj_typename)
+        new_index_vals = self._compute_index_vals(obj)
 
-        self._update_indices(obj, obj_typename, identity, existing_index_vals, new_index_vals)
+        self._update_indices(obj, identity, existing_index_vals, new_index_vals)
 
-    def _compute_index_vals(self, obj, obj_typename):
+    def _compute_index_vals(self, obj):
         existing_index_vals = {}
 
-        if obj_typename in obj.__schema__._indices:
-            for index_name, index_fun in obj.__schema__._indices[obj_typename].items():
+        if type(obj) in obj.__schema__._indices:
+            for index_name, index_fun in obj.__schema__._indices[type(obj)].items():
                 existing_index_vals[index_name] = index_fun(obj)
 
         return existing_index_vals
 
-    def _update_indices(self, obj, obj_typename, identity, existing_index_vals, new_index_vals):
-        if obj_typename in obj.__schema__._indices:
-            for index_name, index_fun in obj.__schema__._indices[obj_typename].items():
+    def _update_indices(self, obj, identity, existing_index_vals, new_index_vals):
+        if type(obj) in obj.__schema__._indices:
+            for index_name, index_fun in obj.__schema__._indices[type(obj)].items():
                 new_index_val = new_index_vals.get(index_name, None)
                 cur_index_val = existing_index_vals.get(index_name, None)
 
                 if cur_index_val != new_index_val:
                     if cur_index_val is not None:
-                        old_index_name = index_key(obj_typename, index_name, cur_index_val)
+                        old_index_name = index_key(type(obj), index_name, cur_index_val)
                         self._remove_from_index(old_index_name, identity)
 
                     if new_index_val is not None:
-                        new_index_name = index_key(obj_typename, index_name, new_index_val)
+                        new_index_name = index_key(type(obj), index_name, new_index_val)
                         self._add_to_index(new_index_name, identity)
 
     def _add_to_index(self, index_key, identity):
@@ -258,22 +258,22 @@ class View(object):
         else:
             self._set_removes[index_key].add(identity)
 
-    def indexLookup(self, type, **kwargs):
+    def indexLookup(self, db_type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
 
-        if type.__qualname__ not in type.__schema__._indices or tname not in type.__schema__._indices[type.__qualname__]:
-            raise Exception("No index enabled for %s.%s" % (type.__qualname__, tname))
+        if db_type not in db_type.__schema__._indices or tname not in db_type.__schema__._indices[db_type]:
+            raise Exception("No index enabled for %s.%s.%s" % (db_type.__schema__.name, db_type.__qualname__, tname))
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
-        indexType = type.__schema__._indexTypes[type.__qualname__][tname]
+        indexType = db_type.__schema__._indexTypes[db_type][tname]
 
         if indexType is not None:
             value = TypeConvert(indexType, value, allow_construct_new=True)
 
-        keyname = index_key(type.__qualname__, tname, value)
+        keyname = index_key(db_type, tname, value)
 
         self._indexReads.add(keyname)
 
@@ -281,37 +281,37 @@ class View(object):
         identities = identities.union(self._set_adds.get(keyname, set()))
         identities = identities.difference(self._set_removes.get(keyname, set()))
 
-        return tuple([type.fromIdentity(x) for x in identities])
+        return tuple([db_type.fromIdentity(x) for x in identities])
 
-    def indexLookupAny(self, type, **kwargs):
+    def indexLookupAny(self, db_type, **kwargs):
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
 
-        if type.__qualname__ not in type.__schema__._indices or tname not in type.__schema__._indices[type.__qualname__]:
-            raise Exception("No index enabled for %s.%s" % (type.__qualname__, tname))
+        if db_type not in db_type.__schema__._indices or tname not in db_type.__schema__._indices[db_type]:
+            raise Exception("No index enabled for %s.%s.%s" % (db_type.__schema__.name, db_type.__qualname__, tname))
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access indices from within a view.")
 
-        indexType = type.__schema__._indexTypes[type.__qualname__][tname]
+        indexType = db_type.__schema__._indexTypes[db_type][tname]
 
         if indexType is not None:
             value = TypeConvert(indexType, value, allow_construct_new=True)
 
-        keyname = index_key(type.__qualname__, tname, value)
+        keyname = index_key(db_type, tname, value)
 
         added = self._set_adds.get(keyname, set())
         removed = self._set_removes.get(keyname, set())
 
         if added:
-            return type.fromIdentity(list(added)[0])
+            return db_type.fromIdentity(list(added)[0])
 
         self._indexReads.add(keyname)
 
         res = self._db._get_versioned_set_data(keyname, self._transaction_num).pickAny()
 
         if res:
-            return type.fromIdentity(res)
+            return db_type.fromIdentity(res)
 
         return None
 

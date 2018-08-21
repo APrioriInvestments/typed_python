@@ -48,6 +48,7 @@ class DatabaseObject(object):
     @classmethod
     def fromIdentity(cls, identity):
         assert isinstance(identity, str), type(identity)
+        cls.__schema__.freeze()
 
         o = object.__new__(cls)
         o.__dict__['_identity'] = identity
@@ -87,7 +88,7 @@ class DatabaseObject(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
 
-        return _cur_view.view._exists(self, type(self).__qualname__, self._identity)
+        return _cur_view.view._exists(self, self._identity)
 
     def __getattr__(self, name):
         if name[:1] == "_":
@@ -102,7 +103,7 @@ class DatabaseObject(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
 
-        return _cur_view.view._get(self, type(self).__qualname__, self._identity, name, self.__types__[name])
+        return _cur_view.view._get(self, self._identity, name, self.__types__[name])
 
     def __setattr__(self, name, val):
         if name not in self.__types__:
@@ -113,10 +114,10 @@ class DatabaseObject(object):
 
         coerced_val = TypeConvert(self.__types__[name], val, allow_construct_new=True)
 
-        _cur_view.view._set(self, type(self).__qualname__, self._identity, name, self.__types__[name], coerced_val)
+        _cur_view.view._set(self, self._identity, name, self.__types__[name], coerced_val)
 
     def delete(self):
-        _cur_view.view._delete(self, type(self).__qualname__, self._identity, self.__types__.keys())
+        _cur_view.view._delete(self, self._identity, self.__types__.keys())
 
     @classmethod
     def _define(cls, **types):
