@@ -14,11 +14,12 @@
 
 from typed_python import Alternative, TupleOf, OneOf
 
-from object_database.database import Database, RevisionConflictException, Indexed, Index, Schema
+from object_database.database import Database, RevisionConflictException, Indexed, Index, Schema, TransactionListener
 import object_database.database
 import object_database.InMemoryJsonStore as InMemoryJsonStore
 import queue
 import unittest
+import threading
 import random
 import time
 
@@ -79,6 +80,23 @@ class ObjectDatabaseTests:
             root.obj = Object(k=expr.Constant(value=23))
             self.assertEqual(root2.obj.k.value, 23)
 
+    def test_transaction_handlers(self):
+        db = self.createNewDb()
+        db.addSchema(schema)
+
+        didOne = threading.Event()
+
+        def handler(changed):
+            didOne.set()
+
+        with TransactionListener(db, handler):
+            with db.transaction():
+                root = Root()
+
+            didOne.wait()
+
+        assert didOne.isSet()
+        
     def test_basic(self):
         db = self.createNewDb()
 

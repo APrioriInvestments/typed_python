@@ -92,6 +92,7 @@ class View(object):
         self._set_removes = {}
         self._t0 = None
         self._stack = None
+        self._schemas = set()
         self._readWatcher = None
         self._insistReadsConsistent = True
         self._insistWritesConsistent = True
@@ -101,6 +102,8 @@ class View(object):
     def _new(self, cls, kwds):
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
+
+        self._schemas.add(cls.__schema__)
 
         if "_identity" in kwds:
             identity = kwds["_identity"]
@@ -163,6 +166,13 @@ class View(object):
             return res
 
         dbValWithPyrep = self._db._get_versioned_object_data(key, self._transaction_num)
+
+        return self.unwrapJsonWithPyRep(dbValWithPyrep, field_type)
+
+    @staticmethod
+    def unwrapJsonWithPyRep(dbValWithPyrep, field_type):
+        if dbValWithPyrep is None:
+            return None
 
         if dbValWithPyrep.jsonRep is None:
             return None
@@ -431,7 +441,7 @@ class Transaction(View):
         """Set a callback function to be called on the main event thread with a boolean indicating
         whether the transaction was accepted."""
         self._confirmCommitCallback = callback
-        
+
         return self
 
     def noconfirm(self):

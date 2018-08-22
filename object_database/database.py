@@ -181,6 +181,69 @@ class SetWithEdits:
             if a not in removed and a not in toAvoid:
                 return a
 
+class TransactionListener:
+    def __init__(self, db, handler):
+        self._thread = threading.Thread(target=self._doWork)
+        self._thread.daemon = True
+        self._shouldStop = False
+        self._db = db
+        self._db._onTransaction.append(self._onTransaction)
+        self._queue = queue.Queue()
+
+        self.handler = handler
+
+    def start(self):
+        self._thread.start()
+        
+    def stop(self):
+        self._shouldStop = True
+        self._thread.join()
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()
+
+    def flush(self):
+        while self._queue.qsize():
+            time.sleep(0.001)
+
+    def _doWork(self):
+        while not self._shouldStop:
+            try:
+                todo = self._queue.get(timeout=0.1)
+            except queue.Empty:
+                todo = None
+
+            if todo:
+                try:
+                    self.handler(todo)
+                except:
+                    logging.error("Callback threw exception:\n%s", traceback.format_exc())
+
+
+    def _onTransaction(self, key_value, priors, set_adds, set_removes, tid):
+        changed = {}
+
+        for k in key_value:
+            o, fieldname = self._db._data_key_to_object(k)
+
+            if o:
+                if o not in changed:
+                    changed[o] = []
+
+                if fieldname != ".exists":
+                    changed[o].append((
+                        fieldname,
+                        View.unwrapJsonWithPyRep(key_value[k], o.__types__[fieldname]),
+                        View.unwrapJsonWithPyRep(priors[k], o.__types__[fieldname])
+                        ))
+
+        self._queue.put(changed)
+
+
 class Schema:
     """A collection of types that can be used to access data in a database."""
     def __init__(self, name="default"):
@@ -291,6 +354,7 @@ core_schema = Schema("core")
 class Connection:
     pass
 
+
 class DatabaseCore:
     def __init__(self):
         self._lock = threading.Lock()
@@ -323,6 +387,36 @@ class DatabaseCore:
 
         self.stableIdentities = False
         self._identityIx = 0
+
+        #transaction handlers. These must be nonblocking since we call them under lock
+        self._onTransaction = []
+
+        self._schemas = {}
+
+    def addSchema(self, schema):
+        schema.freeze()
+
+        if schema.name in self._schemas:
+            assert schema is self._schemas.get(schema.name), "Schema %s already defined" % schema.name
+            return
+
+        self._schemas[schema.name] = schema
+
+    def _data_key_to_object(self, key):
+        typename,identity,fieldname = key.split(":")
+
+        schemaname, typename, suffix = typename.split("-")
+        
+        schema = self._schemas.get(schemaname)
+        if not schema:
+            return None,None
+
+        cls = schema._types.get(typename)
+        
+        if cls:
+            return cls.fromIdentity(identity), fieldname
+
+        return None,None
 
     def getStableIdentity(self):
         with self._lock:
@@ -484,6 +578,7 @@ class Database(DatabaseCore):
         DatabaseCore.__init__(self)
         self._kvstore = kvstore
         self._clientChannels = []
+        self._transactionWriteLock = threading.Lock()
         self.initialized.set()
 
 
@@ -693,8 +788,12 @@ class Database(DatabaseCore):
             #set the json representation in the database
             self._kvstore.setSeveral({k: v.jsonRep for k,v in key_value.items()}, set_adds, set_removes)
 
+            priors = {}
+
             for k,v in key_value.items():
-                self._versioned_objects[k].setVersionedValue(transaction_id, v)
+                versioned = self._versioned_objects[k]
+                priors[k] = versioned.newestValue()
+                versioned.setVersionedValue(transaction_id, v)
 
             for k,a in set_adds.items():
                 if a:
@@ -716,6 +815,21 @@ class Database(DatabaseCore):
                     )
 
             confirmCallback(TransactionResult.Success())
+
+            self._transactionWriteLock.acquire()
+
+        try:
+            for handler in self._onTransaction:
+                try:
+                    handler(key_value, priors, set_adds, set_removes, transaction_id)
+                except:
+                    logging.error(
+                        "_onTransaction callback %s threw an exception:\n%s", 
+                        handler, 
+                        traceback.format_exc()
+                        )
+        finally:
+            self._transactionWriteLock.release()
 
 ClientToServer = Alternative(
     "ClientToServer",
@@ -948,10 +1062,18 @@ class DatabaseConnection(DatabaseCore):
                     self._read_events.pop(key).set()
 
             elif msg.matches.Transaction:
+                key_value = {}
+                priors = {}
                 for k,val_serialized in msg.writes.items():
                     json_val = json.loads(val_serialized)
 
-                    self._versioned_objects[k].setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, None))
+                    key_value[k] = json_val
+
+                    versioned = self._versioned_objects[k]
+
+                    priors[k] = versioned.newestValue()
+
+                    versioned.setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, None))
 
                 for k,a in msg.set_adds.items():
                     self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(a), set())
@@ -960,6 +1082,17 @@ class DatabaseConnection(DatabaseCore):
                     self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(), set(r))
 
                 self._cur_transaction_num = msg.transaction_id
+
+                for handler in self._onTransaction:
+                    try:
+                        handler(key_value, priors, msg.set_adds, msg.set_removes, msg.transaction_id)
+                    except:
+                        logging.error(
+                            "_onTransaction callback %s threw an exception:\n%s", 
+                            handler, 
+                            traceback.format_exc()
+                            )
+            
         
     def _get_versioned_set_data(self, key, transaction_id):
         assert transaction_id >= self._min_transaction_num
