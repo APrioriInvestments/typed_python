@@ -143,7 +143,7 @@ class RedisStringStore(object):
         if port is not None:
             kwds['port'] = port
 
-        self.redis = redis.StrictRedis(db=db, **kwds)
+        self.redis = redis.StrictRedis(db=db, decode_responses=True, **kwds)
         self.cache = {}
 
     def get(self, key):
@@ -267,7 +267,7 @@ class RedisStringStore(object):
             for key, to_remove in (setRemoves or {}).items():
                 if key not in self.cache:
                     self.cache[key] = set()
-                for val in to_add:
+                for val in to_remove:
                     self.cache[key].discard(val)
 
     def set(self, key, value):

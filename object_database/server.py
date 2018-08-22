@@ -18,12 +18,15 @@ from object_database.core_schema import core_schema
 from object_database.view import View, Transaction, _cur_view, data_key, index_key
 from object_database.algebraic_protocol import AlgebraicProtocol
 from typed_python.hash import sha_hash
+from typed_python import *
 
 import uuid
 import logging
 import threading
 import traceback
 import json
+
+tupleOfString = TupleOf(str)
 
 class ConnectedChannel:
     def __init__(self, initial_tid, channel, connectionObject):
@@ -32,7 +35,7 @@ class ConnectedChannel:
         self.connectionObject = connectionObject
 
     def sendKeyVersion(self, key, value, tid):
-        toSend = value if not isinstance(value, set) else TupleOf(str)(value)
+        toSend = value if not isinstance(value, set) else tupleOfString(value)
 
         self.channel.write(
             ServerToClient.KeyInfo(
