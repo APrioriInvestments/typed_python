@@ -18,7 +18,7 @@ import argparse
 import sys
 import time
 import typed_python
-import object_database.database as database
+import object_database.tcp_server as tcp_server
 import object_database.InMemoryJsonStore as InMemoryJsonStore
 import object_database.RedisJsonStore as RedisJsonStore
 
@@ -37,8 +37,7 @@ def main(argv):
     else:
         mem_store = RedisJsonStore.RedisJsonStore(port=parsedArgs.redis_port)
 
-    db = database.Database(mem_store)
-    databaseServer = database.DatabaseServer(db, parsedArgs.host, parsedArgs.port)
+    databaseServer = tcp_server.TcpServer(mem_store, parsedArgs.host, parsedArgs.port)
 
     databaseServer.start()
 

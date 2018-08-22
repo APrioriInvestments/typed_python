@@ -25,7 +25,7 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
         try:
             server = subprocess.Popen([
                 sys.executable, 
-                os.path.join(own_dir, "database_server.py"), 
+                os.path.join(own_dir, "frontends", "database_server.py"), 
                 "localhost", "8888",
                 "--inmem"], 
                 stdout=subprocess.DEVNULL,
@@ -36,7 +36,7 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
 
             client = subprocess.run([
                 sys.executable, 
-                os.path.join(own_dir, "database_throughput_test.py"), 
+                os.path.join(own_dir, "frontends", "database_throughput_test.py"), 
                 "localhost", "8888", "1"
                 ],
                 stdout=subprocess.DEVNULL,

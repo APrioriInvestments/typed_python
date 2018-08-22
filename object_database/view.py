@@ -30,6 +30,23 @@ class DisconnectedException(Exception):
 class RevisionConflictException(Exception):
     pass
 
+def revisionConflictRetry(f):
+    MAX_TRIES = 100
+
+    def inner(*args, **kwargs):
+        tries = 0
+        while tries < MAX_TRIES:
+            try:
+                return f(*args, **kwargs)
+            except RevisionConflictException:
+                logging.info("Handled a RevisionConflictException")
+                tries += 1
+
+        raise RevisionConflictException()
+
+    inner.__name__ = f.__name__
+    return inner
+
 class JsonWithPyRep:
     """A value stored as Json with a python representation."""
     def __init__(self, jsonRep, pyRep):
@@ -110,10 +127,7 @@ class View(object):
             kwds = dict(kwds)
             del kwds["_identity"]
         else:
-            if self._db.stableIdentities is not None:
-                identity = str(self._db.getStableIdentity())
-            else:
-                identity = sha_hash(str(uuid.uuid4())).hexdigest
+            identity = sha_hash(str(uuid.uuid4())).hexdigest
 
         o = cls.fromIdentity(identity)
 

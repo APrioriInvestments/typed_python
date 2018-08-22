@@ -18,7 +18,7 @@ import threading
 import argparse
 import sys
 import time
-import object_database.database as database
+from object_database import connect, Schema
 
 def main(argv):
     parser = argparse.ArgumentParser("Run a database throughput test")
@@ -29,9 +29,9 @@ def main(argv):
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    db = database.connect(parsedArgs.host, parsedArgs.port)
+    db = connect(parsedArgs.host, parsedArgs.port)
 
-    schema = database.Schema()
+    schema = Schema("database_throughput_test")
 
     @schema.define
     class Counter:
