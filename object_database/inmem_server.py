@@ -1,5 +1,7 @@
 from object_database.server import Server
+from object_database.database_connection import DatabaseConnection
 from object_database.messages import ClientToServer, ServerToClient
+from object_database.persistence import InMemoryStringStore
 import json
 import queue
 import logging
@@ -20,13 +22,6 @@ class InMemoryChannel:
         self._pumpThreadClient = threading.Thread(target=self.pumpMessagesFromClient)
         self._pumpThreadClient.daemon = True
         
-    def clone(self):
-        res = InMemoryChannel()
-        res.setServerToClientHandler(self._clientCallback)
-        res.setClientToServerHandler(self._serverCallback)
-        res.start()
-        return res
-
     def pumpMessagesFromServer(self):
         while not self._shouldStop:
             try:
@@ -87,8 +82,8 @@ class InMemoryChannel:
         self._pumpThreadClient.start()
 
 class InMemServer(Server):
-    def __init__(self, kvstore):
-        Server.__init__(self, kvstore)
+    def __init__(self, kvstore=None):
+        Server.__init__(self, kvstore or InMemoryStringStore())
         self.channels = []
 
     def getChannel(self):
@@ -100,6 +95,15 @@ class InMemServer(Server):
 
         return channel
 
+    def connect(self):
+        return DatabaseConnection(self.getChannel())
+
     def teardown(self):
         for c in self.channels:
             c.stop()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, val, tb):
+        self.teardown()

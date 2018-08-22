@@ -16,3 +16,4 @@ from object_database.tcp_server import connect
 from object_database.schema import Schema, Indexed, Index
 from object_database.core_schema import core_schema
 from object_database.view import revisionConflictRetry, RevisionConflictException
+from object_database.inmem_server import InMemServer

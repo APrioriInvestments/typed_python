@@ -264,11 +264,6 @@ class DatabaseConnection:
 
         self._channel.setServerToClientHandler(self._onMessage)
 
-    def clone(self):
-        assert self.initialized.isSet()
-
-        return DatabaseConnection(self._channel.clone())
-
     def addSchema(self, schema):
         schema.freeze()
 

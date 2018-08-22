@@ -39,13 +39,6 @@ class ClientToServerProtocol(AlgebraicProtocol):
         self.handler = None
         self.msgs = []
     
-    def clone(self):
-        return eventLoop.create_connection(
-            lambda: ClientToServerProtocol(self.host, self.port),
-            self.host,
-            self.port
-            )
-
     def setServerToClientHandler(self, handler):
         with self.lock:
             self.handler = handler

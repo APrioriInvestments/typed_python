@@ -17,7 +17,7 @@ from typed_python.hash import sha_hash
 from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs
 
 import object_database.algebraic_to_json as algebraic_to_json
-
+import logging
 import threading
 import queue
 import time
