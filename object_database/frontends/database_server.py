@@ -19,8 +19,7 @@ import sys
 import time
 import typed_python
 import object_database.tcp_server as tcp_server
-import object_database.InMemoryJsonStore as InMemoryJsonStore
-import object_database.RedisJsonStore as RedisJsonStore
+from object_database.persistence import InMemoryStringStore, RedisStringStore
 
 def main(argv):
     parser = argparse.ArgumentParser("Run an object_database server")
@@ -33,9 +32,9 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     if parsedArgs.inmem:
-        mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        mem_store = InMemoryStringStore()
     else:
-        mem_store = RedisJsonStore.RedisJsonStore(port=parsedArgs.redis_port)
+        mem_store = RedisStringStore(port=parsedArgs.redis_port)
 
     databaseServer = tcp_server.TcpServer(mem_store, parsedArgs.host, parsedArgs.port)
 

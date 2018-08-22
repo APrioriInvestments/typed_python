@@ -434,6 +434,9 @@ def TupleOf(t):
             if isinstance(value, TupleOf):
                 return (value,)
 
+            if not isinstance(value, (tuple, list, set, TupleOf, Tuple)):
+                return None
+
             if allow_construct_new or isinstance(value, tuple):
                 try:
                     res = list(value)
@@ -673,6 +676,9 @@ def Tuple(*args):
         def __typed_python_try_convert_instance__(value, allow_construct_new):
             if isinstance(value, Tuple):
                 return (value,)
+
+            if not isinstance(value, (tuple, list, set, TupleOf, Tuple)):
+                return None
 
             if allow_construct_new or isinstance(value, tuple):
                 try:

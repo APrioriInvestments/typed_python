@@ -1,3 +1,17 @@
+#   Copyright 2018 Braxton Mckee
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
 import redis
 import json
 import time
@@ -5,11 +19,110 @@ import threading
 import logging
 import os
 
+class InMemoryStringStore(object):
+    """Implements a string-to-string store in memory.
 
-class RedisJsonStore(object):
-    """Implements a string-to-json store using Redis.
+    Keys must be strings. Values are also strings or sets of strings.
 
-    Keys must be strings. Values may be anything that's json-compatible.
+    This class is thread-safe.
+    """
+    def __init__(self, db=0):
+        self.values = {}
+        self.lock = threading.RLock()
+
+    def get(self, key):
+        with self.lock:
+            if key not in self.values:
+                return None
+            val = self.values.get(key)
+
+            assert isinstance(val, str), key
+
+            return val
+
+    def set(self, key, value):
+        with self.lock:
+            if value is None:
+                if key in self.values:
+                    del self.values[key]
+            else:
+                self.values[key] = value
+
+    def setAdd(self, key, values):
+        with self.lock:
+            if key not in self.values:
+                self.values[key] = set()
+            for value in values:
+                self.values[key].add(value)
+
+    def setRemove(self, key, values):
+        with self.lock:
+            s = self.values.get(key,None)
+            assert isinstance(s,set), (key,s)
+            for value in values:
+                assert value in s, (jv, s)
+                s.remove(value)
+
+    def storedStringCount(self):
+        return len([x for x in self.values.values() if isinstance(x,str)])
+
+    def setMembers(self, key):
+        with self.lock:
+            s = self.values.get(key, None)
+            if s is None:
+                return []
+
+            assert isinstance(s,set)
+
+            return sorted([x for x in s])
+
+    def listKeys(self, prefix, suffix):
+        with self.lock:
+            res = []
+            for k in self.keys:
+                if k.startswith(prefix) and k.endswith(suffix) and len(k) >= len(prefix) + len(suffix):
+                    res.append(k)
+            return sorted(res)
+
+    def getSeveral(self, keys):
+        with self.lock:
+            return [self.get(k) for k in keys]
+
+    def setSeveral(self, kvs, adds=None, removes=None):
+        with self.lock:
+            for k in (adds or []):
+                assert not isinstance(self.values.get(k, None), str), k + " is already a string"
+            for k in (removes or []):
+                assert not isinstance(self.values.get(k, None), str), k + " is already a string"
+
+            for k,v in kvs.items():
+                self.set(k,v)
+
+            if adds:
+                for k,to_add in adds.items():
+                    self.setAdd(k, to_add)
+
+            if removes:
+                for k,to_remove in removes.items():
+                    self.setRemove(k, to_remove)
+
+    def exists(self, key):
+        with self.lock:
+            return key in self.values
+
+    def delete(self, key):
+        with self.lock:
+            if key in self.values:
+                del self.values[key]
+
+    def clearCache(self):
+        pass
+
+
+class RedisStringStore(object):
+    """Implements a string-to-store store using Redis.
+
+    Keys must be strings. Values are strings, or None.
 
     You may store values using the "set" and "get" methods. 
 
@@ -17,7 +130,7 @@ class RedisJsonStore(object):
 
     You may not use a value-style method on a set-style key or vice versa.
 
-    Setting a key to "none" deletes it, and non-existent keys are implicity 'None'
+    Setting a key to None deletes it, and non-existent keys are implicity 'None'
 
     You may delete any kind of value.
 
@@ -55,7 +168,7 @@ class RedisJsonStore(object):
             if result is None:
                 return result
 
-            result = json.loads(result)
+            result = result
 
             self.cache[key] = result
 
@@ -107,7 +220,7 @@ class RedisJsonStore(object):
                     logging.info("Redis is still loading. Waiting...")
                     time.sleep(1.0)
 
-            self.cache[key] = set([json.loads(k) for k in vals])
+            self.cache[key] = set([k for k in vals])
             return self.cache[key]
 
 
@@ -125,15 +238,15 @@ class RedisJsonStore(object):
                 if value is None:
                     pipe.delete(key)
                 else:
-                    pipe.set(key, json.dumps(value))
+                    pipe.set(key, value)
 
             for key, to_add in (setAdds or {}).items():
                 for to_add_val in to_add:
-                    pipe.sadd(key, json.dumps(to_add_val))
+                    pipe.sadd(key, to_add_val)
 
             for key, to_remove in (setRemoves or {}).items():
                 for to_remove_val in to_remove:
-                    pipe.srem(key, json.dumps(to_remove_val))
+                    pipe.srem(key, to_remove_val)
 
             pipe.execute()
 
@@ -165,7 +278,7 @@ class RedisJsonStore(object):
                     del self.cache[key]
             else:
                 self.cache[key] = value
-                self.redis.set(key, json.dumps(value))
+                self.redis.set(key, value)
 
     def exists(self, key):
         with self.lock:

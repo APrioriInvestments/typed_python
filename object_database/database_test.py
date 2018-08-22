@@ -19,7 +19,7 @@ from object_database.view import RevisionConflictException
 from object_database.database_connection import TransactionListener, DatabaseConnection
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
-import object_database.InMemoryJsonStore as InMemoryJsonStore
+from object_database.persistence import InMemoryStringStore
 import queue
 import unittest
 import threading
@@ -129,6 +129,7 @@ class ObjectDatabaseTests:
 
         with db.view():
             self.assertTrue(root.obj.k.value > 500, root.obj.k.value)
+            print(root.obj.k.value, "transactions per second")
                 
     def test_delayed_transactions(self):
         db = self.createNewDb()
@@ -675,7 +676,7 @@ class ObjectDatabaseTests:
 
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
-        self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        self.mem_store = InMemoryStringStore()
         self.server = InMemServer(self.mem_store)
 
     def createNewDb(self):
@@ -689,7 +690,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
-        self.mem_store = InMemoryJsonStore.InMemoryJsonStore()
+        self.mem_store = InMemoryStringStore()
         self.databaseServer = TcpServer(self.mem_store, host="localhost", port=8888)
         self.databaseServer.start()
 

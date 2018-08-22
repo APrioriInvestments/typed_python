@@ -15,140 +15,15 @@
 from object_database.messages import ClientToServer, ServerToClient
 from object_database.schema import Schema
 from object_database.core_schema import core_schema
-from object_database.view import View, JsonWithPyRep, Transaction, _cur_view, data_key, index_key
+from object_database.view import View, Transaction, _cur_view, data_key, index_key
 from object_database.algebraic_protocol import AlgebraicProtocol
 from typed_python.hash import sha_hash
 
-import json
 import uuid
 import logging
 import threading
 import traceback
-
-class VersionedBase:
-    def _best_version_offset_for(self, version):
-        i = len(self.version_numbers) - 1
-
-        while i >= 0:
-            if self.version_numbers[i] <= version:
-                return i
-            i -= 1
-
-        return None
-
-    def isEmpty(self):
-        return not self.version_numbers
-
-    def validVersionIncoming(self, version_read, transaction_id):
-        if not self.version_numbers:
-            return True
-        top = self.version_numbers[-1]
-        assert transaction_id > version_read
-        return version_read >= top
-
-    def hasVersionInfoNewerThan(self, tid):
-        if not self.version_numbers:
-            return False
-        return tid < self.version_numbers[-1]
-
-    def newestValue(self):
-        if self.version_numbers:
-            return self.valueForVersion(self.version_numbers[-1])
-        else:
-            return self.valueForVersion(None)
-
-class VersionedValue(VersionedBase):
-    def __init__(self, tailValue):
-        self.version_numbers = []
-        self.values = []
-
-        #the value for the lowest possible revision
-        self.tailValue = tailValue
-
-    def setVersionedValue(self, version_number, val):
-        assert isinstance(val, JsonWithPyRep), val
-
-        self.version_numbers.append(version_number)
-        self.values.append(val)
-
-    def valueForVersion(self, version):
-        i = self._best_version_offset_for(version)
-
-        if i is None:
-            return self.tailValue
-        return self.values[i]
-
-    def cleanup(self, version_number):
-        assert self.version_numbers[0] == version_number
-
-        self.tailValue = self.values[0]
-        self.version_numbers.pop(0)
-        self.values.pop(0)
-
-class VersionedSet(VersionedBase):
-    #values in sets are always strings
-    def __init__(self, tailValue):
-        self.version_numbers = []
-        self.adds = []
-        self.removes = []
-
-        self.tailValue = tailValue
-
-    def setVersionedAddsAndRemoves(self, version, adds, removes):
-        assert not adds or not removes
-        assert adds or removes
-        assert isinstance(adds, set)
-        assert isinstance(removes, set)
-
-        self.adds.append(adds)
-        self.removes.append(removes)
-        self.version_numbers.append(version)
-
-    def cleanup(self, version_number):
-        assert self.version_numbers[0] == version_numbers
-
-        self.tailValue.update(self.adds[0])
-        self.tailValue.difference_update(self.removes[0])
-
-        self.version_numbers.pop(0)
-        self.values.pop(0)
-        self.adds.pop(0)
-        self.removes.pop(0)
-
-    def valueForVersion(self, version):
-        ix = self._best_version_offset_for(version)
-        if ix is None:
-            ix = 0
-        else:
-            ix += 1
-
-        return SetWithEdits(self.tailValue, self.adds[:ix], self.removes[:ix])
-
-class SetWithEdits:
-    def __init__(self, s, adds, removes):
-        self.s = s
-        self.adds = adds
-        self.removes = removes
-
-    def toSet(self):
-        res = set(self.s)
-        for i in range(len(self.adds)):
-            res.update(self.adds[i])
-            res.difference_update(self.removes[i])
-        return res
-
-    def pickAny(self, toAvoid):
-        removed = set()
-
-        for i in reversed(range(len(self.adds))):
-            for a in self.adds[i]:
-                if a not in removed and a not in toAvoid:
-                    return a
-            removed.update(self.removes[i])
-
-        for a in self.s:
-            if a not in removed and a not in toAvoid:
-                return a
+import json
 
 class ConnectedChannel:
     def __init__(self, initial_tid, channel, connectionObject):
@@ -156,27 +31,21 @@ class ConnectedChannel:
         self.initial_tid = initial_tid
         self.connectionObject = connectionObject
 
-    def sendInitialKeyVersion(self, key, value):
-        if isinstance(value, SetWithEdits):
-            value = list(value.toSet())
-            is_set = True
-        else:
-            value = value.jsonRep
-            is_set = False
+    def sendKeyVersion(self, key, value, tid):
+        toSend = value if not isinstance(value, set) else TupleOf(str)(value)
 
         self.channel.write(
             ServerToClient.KeyInfo(
                 key=key,
-                data=json.dumps(value),
-                is_set=is_set,
-                transaction_id=self.initial_tid
+                data=toSend,
+                transaction_id=tid
                 )
             )
 
     def sendTransaction(self, key_value, setAdds, setRemoves, tid):
         self.channel.write(
             ServerToClient.Transaction(
-                writes={k:json.dumps(v.jsonRep) for k,v in key_value.items()},
+                writes={k:v for k,v in key_value.items()},
                 set_adds=setAdds,
                 set_removes=setRemoves,
                 transaction_id=tid
@@ -197,31 +66,14 @@ class ConnectedChannel:
 class Server:
     def __init__(self, kvstore):
         self._lock = threading.Lock()
-
         self._kvstore = kvstore
         self._clientChannels = {}
-        self._transactionWriteLock = threading.Lock()
-
-        #transaction of what's in the KV store
+        
+        #id of the next transaction
         self._cur_transaction_num = 0
 
-        #minimum transaction we can support. This is the implicit transaction
-        #for all the 'tail values'
-        self._min_transaction_num = 0
-
-        #for each version number in _version_numbers, how many views referring to it
-        self._version_number_counts = {}
-        self._min_reffed_version_number = None
-
-        #list of outstanding version numbers in increasing order where we have writes
-        #_min_transaction_num is the minimum of these and the current transaction
-        self._version_numbers = []
-
-        #for each version number, a set of keys that were set
-        self._version_number_objects = {}
-
-        #for each key, a VersionedValue or VersionedSet
-        self._versioned_objects = {}
+        #for each key, the last version number we committed if it wasn't a write.
+        self._version_numbers = {}
         
     def dropConnection(self, channel):
         with self._lock:
@@ -235,11 +87,11 @@ class Server:
 
     def _createConnectionEntry(self):
         identity = sha_hash(str(uuid.uuid4())).hexdigest
-        exists_key = data_key(core_schema.Connection, identity, ".exists")
-        exists_index = index_key(core_schema.Connection, ".exists", True)
+        exists_key = data_key(core_schema.Connection, identity, " exists")
+        exists_index = index_key(core_schema.Connection, " exists", True)
 
         self._handleNewTransaction(
-            {exists_key: JsonWithPyRep(True, True)},
+            {exists_key: "true"},
             {exists_index: set([identity])},
             {},
             [],
@@ -252,11 +104,11 @@ class Server:
     def _dropConnectionEntry(self, entry):
         identity = entry._identity
 
-        exists_key = data_key(core_schema.Connection, identity, ".exists")
-        exists_index = index_key(core_schema.Connection, ".exists", True)
+        exists_key = data_key(core_schema.Connection, identity, " exists")
+        exists_index = index_key(core_schema.Connection, " exists", True)
 
         self._handleNewTransaction(
-            {exists_key: JsonWithPyRep(None, None)},
+            {exists_key: None},
             {},
             {exists_index: set([identity])},
             [],
@@ -289,38 +141,25 @@ class Server:
         if msg.matches.SendSets:
             with self._lock:
                 for key in msg.keys:
-                    if key not in self._versioned_objects:
-                        members = self._kvstore.setMembers(key)
-                        self._versioned_objects[key] = VersionedSet(members)
-
-                    connectedChannel.sendInitialKeyVersion(
-                        key, 
-                        self._versioned_objects[key].valueForVersion(
-                            connectedChannel.initial_tid
-                            )
+                    connectedChannel.sendKeyVersion(
+                        key,
+                        self._kvstore.setMembers(key),
+                        self._version_numbers.get(key, connectedChannel.initial_tid)
                         )
+
         elif msg.matches.SendValues:
             with self._lock:
                 for key in msg.keys:
-                    if key not in self._version_numbers:
-                        self._versioned_objects[key] = VersionedValue(
-                            JsonWithPyRep(
-                                self._kvstore.get(key),
-                                None
-                                )
-                            )
-
-                    connectedChannel.sendInitialKeyVersion(
+                    connectedChannel.sendKeyVersion(
                         key, 
-                        self._versioned_objects[key].valueForVersion(
-                            connectedChannel.initial_tid
-                            )
+                        self._kvstore.get(key),
+                        self._version_numbers.get(key, connectedChannel.initial_tid)
                         )
         elif msg.matches.NewTransaction:
             try:
                 with self._lock:
                     isOK = self._handleNewTransaction(
-                        {k: JsonWithPyRep(json.loads(v),None) for k,v in msg.writes.items()},
+                        {k: v for k,v in msg.writes.items()},
                         {k: set(a) for k,a in msg.set_adds.items() if a},
                         {k: set(a) for k,a in msg.set_removes.items() if a},
                         msg.key_versions,
@@ -357,72 +196,49 @@ class Server:
         set_adds = {k:v for k,v in set_adds.items() if v}
         set_removes = {k:v for k,v in set_removes.items() if v}
 
-        assert as_of_version >= self._min_transaction_num
-
         self._cur_transaction_num += 1
         transaction_id = self._cur_transaction_num
         assert transaction_id > as_of_version
 
         keysWritingTo = []
+        setsWritingTo = []
 
         for key in key_value:
             keysWritingTo.append(key)
 
-            if key not in self._versioned_objects:
-                self._versioned_objects[key] = (
-                        VersionedValue(
-                            JsonWithPyRep(
-                            self._kvstore.get(key),
-                            None
-                            )
-                        )
-                    )
-        
         for subset in [set_adds, set_removes]:
             for k in subset:
                 if subset[k]:
-                    keysWritingTo.append(k)
-                
-                    if k not in self._versioned_objects:
-                        self._versioned_objects[k] = VersionedSet(
-                            self._kvstore.setMembers(k)
-                            )
+                    setsWritingTo.append(k)
 
         for subset in [keys_to_check_versions, indices_to_check_versions]:
             for key in subset:
-                if not self._versioned_objects[key].validVersionIncoming(as_of_version, transaction_id):
+                last_tid = self._version_numbers.get(key, -1)
+                if as_of_version < last_tid:
                     return False
 
+        #broadcast any values that have not changed since the client subscribed.
+        #we'll replace this with a proper subscription mechanism at some point.
         for key in keysWritingTo:
-            obj = self._versioned_objects[key]
-
             for client in self._clientChannels.values():
-                #see if this value has not changed since this client connected. If so, we need
-                #to send the value we currently have, because otherwise we cannot recreate it
-                #if it asks for it later.
-                if not obj.hasVersionInfoNewerThan(client.initial_tid):
-                    client.sendInitialKeyVersion(key, obj.newestValue())
+                last_tid = self._version_numbers.get(key, client.initial_tid)
+
+                if last_tid <= client.initial_tid:
+                    client.sendKeyVersion(key, self._kvstore.get(key), last_tid)
+
+            self._version_numbers[key] = transaction_id
+
+        for key in setsWritingTo:
+            for client in self._clientChannels.values():
+                last_tid = self._version_numbers.get(key, client.initial_tid)
+
+                if last_tid <= client.initial_tid:
+                    client.sendKeyVersion(key, self._kvstore.setMembers(key), last_tid)
+
+            self._version_numbers[key] = transaction_id
 
         #set the json representation in the database
-        self._kvstore.setSeveral({k: v.jsonRep for k,v in key_value.items()}, set_adds, set_removes)
-
-        priors = {}
-
-        for k,v in key_value.items():
-            versioned = self._versioned_objects[k]
-            priors[k] = versioned.newestValue()
-            versioned.setVersionedValue(transaction_id, v)
-
-        for k,a in set_adds.items():
-            if a:
-                self._versioned_objects[k].setVersionedAddsAndRemoves(transaction_id, a, set())
-        for k,r in set_removes.items():
-            if r:
-                self._versioned_objects[k].setVersionedAddsAndRemoves(transaction_id, set(), r)
-
-        #record what objects we touched
-        self._version_number_objects[transaction_id] = list(key_value.keys())
-        self._version_numbers.append(transaction_id)
+        self._kvstore.setSeveral({k: v for k,v in key_value.items()}, set_adds, set_removes)
 
         for client in self._clientChannels.values():
             client.sendTransaction(

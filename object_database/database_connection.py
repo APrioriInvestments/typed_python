@@ -214,7 +214,7 @@ class TransactionListener:
                 if o not in changed:
                     changed[o] = []
 
-                if fieldname != ".exists":
+                if fieldname != " exists":
                     changed[o].append((
                         fieldname,
                         View.unwrapJsonWithPyRep(key_value[k], o.__types__[fieldname]),
@@ -436,10 +436,14 @@ class DatabaseConnection:
             elif msg.matches.KeyInfo:
                 key = msg.key
                 if key not in self._versioned_objects:
-                    if msg.is_set:                    
-                        self._versioned_objects[key] = VersionedSet(set(json.loads(msg.data)))
+                    if isinstance(msg.data, TupleOf):
+                        self._versioned_objects[key] = VersionedSet(set(msg.data))
                     else:
-                        self._versioned_objects[key] = VersionedValue(JsonWithPyRep(json.loads(msg.data), None))
+                        self._versioned_objects[key] = VersionedValue(
+                            JsonWithPyRep(
+                                json.loads(msg.data) if msg.data is not None else msg.data,
+                                None
+                                ))
 
                 if key in self._read_events:
                     self._read_events.pop(key).set()
@@ -448,7 +452,7 @@ class DatabaseConnection:
                 key_value = {}
                 priors = {}
                 for k,val_serialized in msg.writes.items():
-                    json_val = json.loads(val_serialized)
+                    json_val = json.loads(val_serialized) if val_serialized is not None else None
 
                     key_value[k] = json_val
 
@@ -546,7 +550,7 @@ class DatabaseConnection:
 
         self._channel.write(
             ClientToServer.NewTransaction(
-                writes={k:json.dumps(v.jsonRep) for k,v in key_value.items()},
+                writes={k:json.dumps(v.jsonRep) if v.jsonRep is not None else None for k,v in key_value.items()},
                 set_adds=set_adds,
                 set_removes=set_removes,
                 key_versions=keys_to_check_versions,

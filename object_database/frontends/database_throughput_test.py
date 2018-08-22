@@ -26,6 +26,7 @@ def main(argv):
     parser.add_argument("host")
     parser.add_argument("port")
     parser.add_argument("seconds", type=float)
+    parser.add_argument("--threads", dest='threads', type=int, default=1)
 
     parsedArgs = parser.parse_args(argv[1:])
 
@@ -37,20 +38,28 @@ def main(argv):
     class Counter:
         k = int
 
-    with db.transaction():
-        c = Counter()
-
     t0 = time.time()
-    
-    with db.transaction():
-        c.k = 0
 
-    while time.time() - t0 < parsedArgs.seconds:
+    transactionCount = []
+
+    def doWork():
         with db.transaction():
-            c.k = c.k + 1
+            c = Counter()
 
-    with db.view():
-        print(c.k, " transactions per second")
+        while time.time() - t0 < parsedArgs.seconds:
+            with db.transaction():
+                c.k = c.k + 1
+
+        with db.view():
+            transactionCount.append(c.k)
+
+    threads = [threading.Thread(target=doWork) for _ in range(parsedArgs.threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    
+    print(sum(transactionCount) / parsedArgs.seconds, " transactions per second")
 
     return 0
 

@@ -150,7 +150,7 @@ class View(object):
 
             writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
 
-        writes[data_key(cls, identity, ".exists")] = True
+        writes[data_key(cls, identity, " exists")] = True
 
         self._writes.update(writes)
 
@@ -197,7 +197,7 @@ class View(object):
         return dbValWithPyrep.pyRep
 
     def _exists(self, obj, identity):
-        key = data_key(type(obj), identity, ".exists")
+        key = data_key(type(obj), identity, " exists")
 
         if self._readWatcher:
             self._readWatcher("key", key)
@@ -216,7 +216,7 @@ class View(object):
             key = data_key(type(obj), identity, name)
             self._writes[key] = None
 
-        self._writes[data_key(type(obj), identity, ".exists")] = None
+        self._writes[data_key(type(obj), identity, " exists")] = None
 
         self._update_indices(obj, identity, existing_index_vals, {})
 

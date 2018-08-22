@@ -65,8 +65,8 @@ class Schema:
             cls.__schema__ = self
 
             self._types[typename] = cls
-            self._indices[cls] = {' exists': lambda e: True}
-            self._indexTypes[cls] = {' exists': bool}
+            self._indices[cls] = {" exists": lambda e: True}
+            self._indexTypes[cls] = {" exists": bool}
 
         return self._types[typename]
 

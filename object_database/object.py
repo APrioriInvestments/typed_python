@@ -68,21 +68,21 @@ class DatabaseObject(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please lookup in indices from within a transaction.")
 
-        return _cur_view.view.indexLookupOne(cls, **kwargs or {' exists': True})
+        return _cur_view.view.indexLookupOne(cls, **kwargs or {" exists": True})
 
     @classmethod
     def lookupAll(cls, **kwargs):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please lookup in indices from within a transaction.")
 
-        return _cur_view.view.indexLookup(cls, **kwargs or {' exists': True})
+        return _cur_view.view.indexLookup(cls, **kwargs or {" exists": True})
 
     @classmethod
     def lookupAny(cls, **kwargs):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please lookup in indices from within a transaction.")
 
-        return _cur_view.view.indexLookupAny(cls, **kwargs or {' exists': True})
+        return _cur_view.view.indexLookupAny(cls, **kwargs or {" exists": True})
 
     def exists(self):
         if not hasattr(_cur_view, "view"):
