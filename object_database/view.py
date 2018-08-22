@@ -403,15 +403,14 @@ class View(object):
 
     def __enter__(self):
         self._t0 = time.time()
-        self._stack = traceback.format_stack()
-
+        
         assert not hasattr(_cur_view, 'view')
         _cur_view.view = self
         return self
 
     def __exit__(self, type, val, tb):
         if time.time() - self._t0 > 30.0:
-            logging.warn("long db transaction: %s elapsed.\n%s", time.time() - self._t0, "".join(self._stack))
+            logging.warn("long db transaction: %s elapsed.\n%s", time.time() - self._t0, "".join(traceback.format_stack()))
         del _cur_view.view
         if type is None and self._writes:
             self.commit()
