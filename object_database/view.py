@@ -450,6 +450,9 @@ class Transaction(View):
 
         return self
 
+    def hasFullConsistency(self):
+        return self._insistIndexReadsConsistent
+
     def onConfirmed(self, callback):
         """Set a callback function to be called on the main event thread with a boolean indicating
         whether the transaction was accepted."""

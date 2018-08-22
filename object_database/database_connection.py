@@ -264,6 +264,20 @@ class DatabaseConnection:
 
         self._channel.setServerToClientHandler(self._onMessage)
 
+    def waitForCondition(self, cond, timeout):
+        #eventally we will replace this with something that watches the calculation
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            with self.view():
+                try:
+                    if cond():
+                        return True
+                except:
+                    pass
+
+                time.sleep(timeout / 20)
+        return False
+
     def addSchema(self, schema):
         schema.freeze()
 
