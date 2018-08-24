@@ -78,6 +78,7 @@ class Encoder(object):
         elif isinstance(object_type, NamedTuple):
             return {k: self.to_json(t, getattr(value, k)) for k,t in object_type.ElementNamesAndTypes}
         elif isinstance(value, bytes):
+            value = value.replace(b'\\', b'\\\\')
             return str(value, 'raw_unicode_escape')
         elif isinstance(value, (int,float,bool,str)) or value is None:
             return value
@@ -111,7 +112,7 @@ class Encoder(object):
                 return algebraic_type(self.from_json(v, algebraic_type.ElementType) for v in value)
 
             if algebraic_type is bytes:
-                return bytes(value, 'raw_unicode_escape')
+                return bytes(value, 'raw_unicode_escape').replace(b'\\\\', b'\\')
 
             if algebraic_type in (bool, int, str, float):
                 return value

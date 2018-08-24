@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, OneOf
+from typed_python import Alternative, TupleOf, OneOf, sha_hash
 from object_database.algebraic_to_json import Encoder
 
 import unittest
@@ -34,7 +34,7 @@ expr.define(
 
 c10 = expr.Constant(value=10)
 c20 = expr.Constant(value=20)
-withbytes = expr.ConstantBytes(value=b"asdf\x80")
+withbytes = expr.ConstantBytes(value=sha_hash("something").digest)
 withstr = expr.ConstantStr(value="asdf")
 
 a = expr.Add(l=c10,r=c20)
@@ -50,3 +50,11 @@ class AlgebraicToJsonTests(unittest.TestCase):
                 item, 
                 e.from_json(e.to_json(expr, item), expr)
                 )
+
+    def test_convert_sha_hash_bytes(self):
+        e = Encoder()
+        def checkRoundtrip(b):
+            self.assertEqual(e.from_json(e.to_json(bytes, b), bytes), b)
+
+        for i in range(1000):
+            checkRoundtrip(sha_hash("this is some sha hash" + str(i)).digest)
