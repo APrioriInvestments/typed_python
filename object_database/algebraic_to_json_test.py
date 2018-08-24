@@ -14,7 +14,6 @@
 
 from typed_python import Alternative, TupleOf, OneOf, sha_hash
 from object_database.algebraic_to_json import Encoder
-
 import unittest
 
 opcode = Alternative("Opcode", Add={}, Sub={})
@@ -58,3 +57,4 @@ class AlgebraicToJsonTests(unittest.TestCase):
 
         for i in range(1000):
             checkRoundtrip(sha_hash("this is some sha hash" + str(i)).digest)
+

@@ -273,7 +273,7 @@ class DatabaseConnection:
                     if cond():
                         return True
                 except:
-                    pass
+                    logging.error("Condition callback threw an exception:\n%s", traceback.format_exc())
 
                 time.sleep(timeout / 20)
         return False

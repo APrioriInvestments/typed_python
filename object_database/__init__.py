@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.tcp_server import connect
+from object_database.tcp_server import connect, TcpServer
 from object_database.schema import Schema, Indexed, Index
 from object_database.core_schema import core_schema
 from object_database.view import revisionConflictRetry, RevisionConflictException

@@ -2,6 +2,7 @@ from object_database.database_connection import DatabaseConnection
 from object_database.server import Server
 from object_database.messages import ClientToServer, ServerToClient
 from object_database.algebraic_protocol import AlgebraicProtocol
+from object_database.persistence import InMemoryStringStore
 
 import asyncio
 import json
@@ -108,8 +109,8 @@ def connect(host, port):
     return DatabaseConnection(proto)
 
 class TcpServer(Server):
-    def __init__(self, mem_store, host, port):
-        Server.__init__(self, mem_store)
+    def __init__(self, host, port, mem_store = None):
+        Server.__init__(self, mem_store or InMemoryStringStore())
 
         self.mem_store = mem_store
         self.host = host
@@ -127,3 +128,12 @@ class TcpServer(Server):
         if self.socket_server:
             self.socket_server.close()
 
+    def connect(self):
+        return connect(self.host, self.port)
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, t,v,traceback):
+        self.stop()

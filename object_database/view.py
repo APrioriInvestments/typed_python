@@ -39,7 +39,7 @@ def revisionConflictRetry(f):
             try:
                 return f(*args, **kwargs)
             except RevisionConflictException:
-                logging.info("Handled a RevisionConflictException")
+                logging.info("Handled a RevisionConflictException in %s. Retrying." % f.__name__)
                 tries += 1
 
         raise RevisionConflictException()
@@ -115,6 +115,9 @@ class View(object):
         self._insistWritesConsistent = True
         self._insistIndexReadsConsistent = False
         self._confirmCommitCallback = None
+
+    def transaction_id(self):
+        return self._transaction_num
 
     def _new(self, cls, kwds):
         if not self._writeable:

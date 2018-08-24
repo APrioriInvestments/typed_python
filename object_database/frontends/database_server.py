@@ -36,7 +36,7 @@ def main(argv):
     else:
         mem_store = RedisStringStore(port=parsedArgs.redis_port)
 
-    databaseServer = tcp_server.TcpServer(mem_store, parsedArgs.host, parsedArgs.port)
+    databaseServer = tcp_server.TcpServer(parsedArgs.host, parsedArgs.port, mem_store)
 
     databaseServer.start()
 
