@@ -22,6 +22,8 @@ import time
 import signal
 import logging
 import traceback
+import psutil
+import multiprocessing
 import logging.config
 
 def configureLogging(preamble=""):
@@ -44,7 +46,11 @@ def main(argv):
     
     #if populated, run a db_server as well
     parser.add_argument("--redis_port", type=int, default=None, required=False)
-    
+
+    parser.add_argument("--max_gb_ram", type=float, default=None, required=False)
+    parser.add_argument("--max_cores", type=int, default=None, required=False)
+
+    parser.add_argument('--logdir', default=None, required=False)
     configureLogging()
 
     parsedArgs = parser.parse_args(argv[1:])
@@ -87,7 +93,15 @@ def main(argv):
         logging.info("Successfully connected to object database at %s:%s", parsedArgs.db_hostname, object_database_port)
 
         #start the process manager
-        serviceManager = SubprocessServiceManager(parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port)
+        serviceManager = SubprocessServiceManager(
+            parsedArgs.own_hostname, 
+            parsedArgs.db_hostname, 
+            parsedArgs.port, 
+            isMaster=parsedArgs.run_db,
+            maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
+            maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),
+            logfileDirectory=parsedArgs.logdir
+            )
         
         serviceManager.start()
 

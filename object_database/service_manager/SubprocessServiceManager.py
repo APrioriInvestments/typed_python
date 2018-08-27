@@ -25,7 +25,7 @@ import os
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, logfileDirectory=None):
+    def __init__(self, own_hostname, host, port, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None):
         self.own_hostname = own_hostname
         self.host = host
         self.port = port
@@ -38,11 +38,14 @@ class SubprocessServiceManager(ServiceManager):
         def dbConnectionFactory():
             return connect(host, port)
 
-        ServiceManager.__init__(self, dbConnectionFactory)
+        ServiceManager.__init__(self, dbConnectionFactory, isMaster, own_hostname, maxGbRam=maxGbRam, maxCores=maxCores)
 
         self.serviceProcesses = {}
 
     def _startServiceWorker(self, service, instanceIdentity):
+        if instanceIdentity in self.serviceProcesses:
+            return
+
         logfileName = service.name + "_" + instanceIdentity + ".log.txt"
 
         if self.logfileDirectory is not None:
@@ -58,7 +61,7 @@ class SubprocessServiceManager(ServiceManager):
             stderr=subprocess.STDOUT
             )
 
-        self.serviceProcesses[service] = self.serviceProcesses.get(service, ()) + (process,)
+        self.serviceProcesses[instanceIdentity] = self.serviceProcesses.get(service, ()) + (process,)
 
         if output_file:
             output_file.close()
@@ -80,7 +83,7 @@ class SubprocessServiceManager(ServiceManager):
     def stop(self, timeout=10.0):
         self.stopAllServices(timeout)
 
-        for service, workers in self.serviceProcesses.items():
+        for instanceIdentity, workers in self.serviceProcesses.items():
             for worker in workers:
                 worker.terminate()
 

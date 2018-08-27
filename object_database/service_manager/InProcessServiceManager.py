@@ -17,24 +17,27 @@ from object_database.service_manager.ServiceWorker import ServiceWorker
 
 class InProcessServiceManager(ServiceManager):
     def __init__(self, dbConnectionFactory):
-        ServiceManager.__init__(self, dbConnectionFactory)
+        ServiceManager.__init__(self, dbConnectionFactory, isMaster=True, ownHostname="localhost")
 
         self.serviceWorkers = {}
 
     def _startServiceWorker(self, service, instanceIdentity):
+        if instanceIdentity in self.serviceWorkers:
+            return
+
         worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity)
 
-        self.serviceWorkers[service] = self.serviceWorkers.get(service, ()) + (worker,)
+        self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)
 
         worker.start()
 
     def stop(self):
         self.stopAllServices(10.0)
 
-        for service, workers in self.serviceWorkers.items():
+        for instanceId, workers in self.serviceWorkers.items():
             for worker in workers:
                 worker.stop()
 
-        self.serviceThreads = {}
+        self.serviceWorkers = {}
 
         ServiceManager.stop(self)

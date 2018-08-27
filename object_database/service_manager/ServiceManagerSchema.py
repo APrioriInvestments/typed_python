@@ -90,6 +90,17 @@ class Codebase:
             sys.path.pop(0)
 
 @service_schema.define
+class ServiceHost:
+    connection = Indexed(core_schema.Connection)
+    isMaster = bool
+    hostname = str
+    maxGbRam = float
+    maxCores = int
+
+    gbRamUsed = float
+    coresUsed = float
+
+@service_schema.define
 class Service:
     name = Indexed(str)
     codebase = OneOf(service_schema.Codebase, None)
@@ -97,20 +108,30 @@ class Service:
     service_module_name = str
     service_class_name = str
 
-    min_ram_gb_required = int
-    min_cores_required = int
+    gbRamUsed = int
+    coresUsed = int
+    placement = OneOf("Master", "Worker", "Any")
 
     #how many do we want?
     target_count = int
-    actual_count = int
+
+    #how many would we like but we can't boot?
+    unbootable_count = int
 
 @service_schema.define
 class ServiceInstance:
+    host = Indexed(ServiceHost)
     service = Indexed(service_schema.Service)
-    connection = Indexed(OneOf(None, core_schema.Connection))
     codebase = OneOf(service_schema.Codebase, None)
+    connection = Indexed(OneOf(None, core_schema.Connection))
 
     shouldShutdown = bool
+
+    def markFailedToStart(self, reason):
+        self.boot_timestamp = time.time()
+        self.end_timestamp = self.boot_timestamp
+        self.failureReason = reason
+        self.state = "Failed"
 
     def isNotRunning(self):
         return self.state in ("Stopped", "Failed") or (self.connection and not self.connection.exists())
@@ -124,6 +145,7 @@ class ServiceInstance:
             )
 
     state = Indexed(OneOf("Booting", "Initializing", "Running", "Stopped", "Failed"))
+
     boot_timestamp = OneOf(None, float)
     start_timestamp = OneOf(None, float)
     end_timestamp = OneOf(None, float)

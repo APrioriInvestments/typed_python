@@ -23,8 +23,13 @@ import threading
 import time
 
 class ServiceManager(object):
-    def __init__(self, dbConnectionFactory):
+    def __init__(self, dbConnectionFactory, isMaster, ownHostname, maxGbRam=4, maxCores=4):
         object.__init__(self)
+        self.ownHostname = ownHostname
+        self.isMaster = isMaster
+        self.maxGbRam = maxGbRam
+        self.maxCores = maxCores
+        self.serviceHostObject = None
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
 
@@ -42,11 +47,11 @@ class ServiceManager(object):
         self.thread.join()
 
     @staticmethod
-    def createService(serviceClass, serviceName, targetCount=0):
+    def createService(serviceClass, serviceName, targetCount=0, placement="Any"):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
-            service = service_schema.Service(name=serviceName)
+            service = service_schema.Service(name=serviceName, placement=placement)
             service.service_module_name = serviceClass.__module__
             service.service_class_name = serviceClass.__qualname__
             service.target_count = targetCount
@@ -56,13 +61,13 @@ class ServiceManager(object):
         return service
 
     @staticmethod
-    def createServiceWithCodebase(codebase, className, serviceName, targetCount=0):
+    def createServiceWithCodebase(codebase, className, serviceName, targetCount=0, placement="Any"):
         assert len(className.split(".")) > 1, "className should be a fully-qualified module.classname"
 
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
-            service = service_schema.Service(name=serviceName)
+            service = service_schema.Service(name=serviceName, placement="Any")
 
         service.codebase = codebase
         service.service_module_name = ".".join(className.split(".")[:-1])
@@ -104,21 +109,27 @@ class ServiceManager(object):
         self.db.waitForCondition(allStopped, timeout)
 
     def doWork(self):
-        #reset the state
         with self.db.transaction():
-            for s in service_schema.Service.lookupAll():
-                s.actual_count = 0
-            for sInst in service_schema.ServiceInstance.lookupAll():
-                sInst.delete()
+            self.serviceHostObject = service_schema.ServiceHost(
+                connection=self.db.connectionObject,
+                isMaster=self.isMaster,
+                maxGbRam=self.maxGbRam,
+                maxCores=self.maxCores
+                )
+            self.serviceHostObject.hostname = self.ownHostname
 
         while not self.shouldStop.is_set():
-            didOne = False
-
+            #redeploy our own services
             self.redeployServicesIfNecessary()
 
-            instances = self.createInstanceRecords()
-            
-            bad_instances = []
+            #if we're the master, do some allocation
+            if self.isMaster:
+                self.collectDeadHosts()
+                self.createInstanceRecords()
+
+            instances = self.instanceRecordsToBoot()
+                
+            bad_instances = {}
 
             for i in instances:
                 try:
@@ -126,20 +137,35 @@ class ServiceManager(object):
                         self._startServiceWorker(i.service, i._identity)
                 except:
                     logging.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
-                    bad_instances.append(i)
+                    bad_instances[i] = traceback.format_exc()
 
             if bad_instances:
                 with self.db.transaction():
                     for i in bad_instances:
-                        i.delete()
+                        i.markFailedToStart(bad_instances[i])
 
-            if not instances:
-                time.sleep(self.SLEEP_INTERVAL)
+            time.sleep(self.SLEEP_INTERVAL)
+
+    
+    @revisionConflictRetry
+    def collectDeadHosts(self):
+        #reset the state
+        with self.db.transaction():
+            for serviceHost in service_schema.ServiceHost.lookupAll():
+                instances = service_schema.ServiceInstance.lookupAll(host=serviceHost)
+
+                if not serviceHost.connection.exists():
+                    for sInst in instances:
+                        sInst.delete()
+                    serviceHost.delete()
+                else:
+                    serviceHost.gbRamUsed = sum([i.service.gbRamUsed for i in instances if i.isActive()])
+                    serviceHost.coresUsed = sum([i.service.coresUsed for i in instances if i.isActive()])
 
     def redeployServicesIfNecessary(self):
         needRedeploy = []
         with self.db.view():
-            for i in service_schema.ServiceInstance.lookupAll():
+            for i in service_schema.ServiceInstance.lookupAll(host=self.serviceHostObject):
                 if i.service.codebase != i.codebase and i.connection is not None and not i.shouldShutdown:
                     needRedeploy.append(i)
 
@@ -162,40 +188,61 @@ class ServiceManager(object):
 
     @revisionConflictRetry
     def createInstanceRecords(self):
-        res = []
-        with self.db.transaction():
+        actual_by_service = {}
+
+        with self.db.view():
             for service in service_schema.Service.lookupAll():
-                service.actual_count = len([
+                actual_by_service[service] = [
                     x for x in service_schema.ServiceInstance.lookupAll(service=service)
                         if x.isActive()
-                    ])
+                    ]
 
-                if service.target_count != service.actual_count:
-                    res += self._updateService(service)
+        for service, actual_records in actual_by_service.items():
+            with self.db.transaction():
+                if service.target_count != len(actual_records):
+                    self._updateService(service, actual_records)
 
-        return res
+    def _pickHost(self, service):
+        for h in service_schema.ServiceHost.lookupAll():
+            if h.connection.exists():
+                if h.isMaster:
+                    canPlace = service.placement in ("Master", "Any")
+                else:
+                    canPlace = service.placement in ("Worker", "Any")
 
-    def _updateService(self, service):
-        updates = []
+                if canPlace and h.gbRamUsed + service.gbRamUsed <= h.maxGbRam and h.coresUsed + service.coresUsed <= h.maxCores:
+                    return h
 
-        while service.target_count > service.actual_count:
+    def _updateService(self, service, actual_records):
+        service.unbootable_count = 0
+
+        while service.target_count > len(actual_records):
+            host = self._pickHost(service)
+            
+            if not host:
+                service.unbootable_count = service.target_count - len(actual_records)
+                return
+
             instance = service_schema.ServiceInstance(
                 service=service, 
+                host=self._pickHost(service.gbRamUsed, service.coresUsed),
                 state="Booting",
                 start_timestamp=time.time()
                 )
 
-            updates.append(instance)
+            actual_records.append(instance)
 
-            service.actual_count += 1
+        while service.target_count < len(actual_records):
+            sInst = actual_records.pop()
+            sInst.shouldShutdown = True
 
-        while service.target_count < service.actual_count:
-            for sInst in service_schema.ServiceInstance.lookupAll(service=service):
-                if service.target_count < service.actual_count and sInst.isActive():
-                    sInst.shouldShutdown = True
-                    service.actual_count = service.actual_count - 1
-
-        return updates
+    def instanceRecordsToBoot(self):
+        res = []
+        with self.db.view():
+            for i in service_schema.ServiceInstance.lookupAll(host=self.serviceHostObject):
+                if i.state == "Booting":
+                    res.append(i)
+        return res
 
     def _startServiceWorker(self, service, instanceIdentity):
         raise NotImplementedError()
