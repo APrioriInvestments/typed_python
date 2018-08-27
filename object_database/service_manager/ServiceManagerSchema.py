@@ -12,22 +12,82 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import logging
+import os
+import sys
+import importlib
+
 from object_database import Schema, Indexed, Index, core_schema
 from typed_python import *
 
 service_schema = Schema("core.service")
-
-service_schema.DockerImage = NamedTuple(source=str, dockerfile_contents=OneOf(None, str))
 
 @service_schema.define
 class Codebase:
     hash = Indexed(str)
 
     #filename (at root of project import) to contents
-    modules = ConstDict(str, str) 
+    files = ConstDict(str, str) 
 
-    #the dockerfile we'd like to run in
-    image = service_schema.DockerImage
+    @staticmethod
+    def create(root_paths, extensions=('.py',), maxTotalBytes = 1024 * 1024):
+        files = {}
+        total_bytes = 0
+
+        def walk(path, so_far):
+            for name in os.path.listdir(path):
+                fullpath = os.path.join(path, name)
+                if os.path.isdir(fullpath):
+                    walk(fullpath, os.path.join(so_far, name) if so_far else name)
+                else:
+                    if os.path.splitext(name)[1] in extensions:
+                        with open(fullpath, "r") as f:
+                            contents = f.read()
+
+                        total_bytes += len(contents)
+                        
+                        assert total_bytes < maxTotalBytes, "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
+
+                        files[so_far] = contents
+
+        for path in root_paths:
+            walk(path, '')
+
+        return Codebase.createFromFiles(files)
+
+    @staticmethod
+    def createFromFiles(files):
+        assert files
+
+        hashval = sha_hash(files).hexdigest
+
+        c = Codebase.lookupAny(hash=hashval)
+        if c:
+            return c
+
+        return Codebase(hash=hashval, files=files)
+
+    def instantiate(self, disk_path, service_module):
+        """Instantiate a codebase on disk and load it."""
+        logging.info(disk_path)
+
+        for fpath, fcontents in self.files.items():
+            path, name = os.path.split(fpath)
+
+            fullpath = os.path.join(disk_path, path)
+
+            if not os.path.exists(fullpath):
+                os.makedirs(fullpath)
+            
+            with open(os.path.join(fullpath, name), "w") as f:
+                f.write(fcontents)
+
+        sys.path = [disk_path] + sys.path
+
+        try:
+            return importlib.import_module(service_module)
+        finally:
+            sys.path.pop(0)
 
 @service_schema.define
 class Service:
@@ -48,6 +108,7 @@ class Service:
 class ServiceInstance:
     service = Indexed(service_schema.Service)
     connection = Indexed(OneOf(None, core_schema.Connection))
+    codebase = OneOf(service_schema.Codebase, None)
 
     shouldShutdown = bool
 

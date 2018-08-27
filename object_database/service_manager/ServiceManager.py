@@ -56,6 +56,23 @@ class ServiceManager(object):
         return service
 
     @staticmethod
+    def createServiceWithCodebase(codebase, className, serviceName, targetCount=0):
+        assert len(className.split(".")) > 1, "className should be a fully-qualified module.classname"
+
+        service = service_schema.Service.lookupAny(name=serviceName)
+
+        if not service:
+            service = service_schema.Service(name=serviceName)
+
+        service.codebase = codebase
+        service.service_module_name = ".".join(className.split(".")[:-1])
+        service.service_class_name = className.split(".")[-1]
+        
+        service.target_count = targetCount
+
+        return service
+
+    @staticmethod
     def startService(serviceName, targetCount = 1):
         service = service_schema.Service.lookupOne(name=serviceName)
         service.target_count = targetCount
@@ -97,6 +114,8 @@ class ServiceManager(object):
         while not self.shouldStop.is_set():
             didOne = False
 
+            self.redeployServicesIfNecessary()
+
             instances = self.createInstanceRecords()
             
             bad_instances = []
@@ -116,6 +135,30 @@ class ServiceManager(object):
 
             if not instances:
                 time.sleep(self.SLEEP_INTERVAL)
+
+    def redeployServicesIfNecessary(self):
+        needRedeploy = []
+        with self.db.view():
+            for i in service_schema.ServiceInstance.lookupAll():
+                if i.service.codebase != i.codebase and i.connection is not None and not i.shouldShutdown:
+                    needRedeploy.append(i)
+
+            if needRedeploy:
+                logging.info(
+                    "The following services need to be stopped because their codebases are out of date:\n%s",
+                    "\n".join(["  " + i.service.name + "." + i._identity + ". " 
+                            + str(i.service.codebase) + " != " + str(i.codebase) for i in needRedeploy])
+                    )
+
+        if needRedeploy:
+            self.stopServices(needRedeploy)
+
+    @revisionConflictRetry
+    def stopServices(self, needRedeploy):
+        with self.db.transaction():
+            for i in needRedeploy:
+                if i.exists():
+                    i.shouldShutdown = True
 
     @revisionConflictRetry
     def createInstanceRecords(self):

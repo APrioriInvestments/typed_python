@@ -18,9 +18,9 @@ import unittest
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect
+from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema
 from typed_python import *
-
+import textwrap
 import time
 import numpy
 import logging
@@ -38,6 +38,7 @@ class TestServiceLastTimestamp:
     lastPing = float
     triggerHardKill = bool
     triggerSoftKill = bool
+    version = int
 
     @staticmethod
     def aliveServices(window = None):
@@ -57,6 +58,7 @@ class TestService(ServiceBase):
     def initialize(self):
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+            self.version = 0
 
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
@@ -70,6 +72,46 @@ class TestService(ServiceBase):
                     os._exit(1)
 
                 self.conn.lastPing = time.time()
+
+def getTestServiceModule(version):
+    return {
+        'test_service/__init__.py': '',
+        'test_service/service.py': textwrap.dedent("""
+            from object_database import Schema, ServiceBase, Indexed, core_schema
+            import os
+            import time
+            import logging
+
+            schema = Schema("core.ServiceManagerTest")
+
+            @schema.define
+            class TestServiceLastTimestamp:
+                connection = Indexed(core_schema.Connection)
+                lastPing = float
+                triggerHardKill = bool
+                triggerSoftKill = bool
+                version = int
+
+            class Service(ServiceBase):
+                def initialize(self):
+                    with self.db.transaction():
+                        self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+                        self.conn.version = {version}
+
+                def doWork(self, shouldStop):
+                    while not shouldStop.is_set():
+                        time.sleep(0.01)
+
+                        with self.db.transaction():
+                            if self.conn.triggerSoftKill:
+                                return
+
+                            if self.conn.triggerHardKill:
+                                os._exit(1)
+
+                            self.conn.lastPing = time.time()
+            """.format(version=version))
+    }
 
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
@@ -138,3 +180,39 @@ class ServiceManagerTest(unittest.TestCase):
         self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
 
         self.waitForCount(1)
+
+    def test_update_module_code(self):
+        with self.database.transaction():
+            ServiceManager.createServiceWithCodebase(
+                service_schema.Codebase.createFromFiles(getTestServiceModule(1)),
+                "test_service.service.Service",
+                "TestService",
+                1
+                )
+
+        self.waitForCount(1)
+
+        with self.database.transaction():
+            s = TestServiceLastTimestamp.aliveServices()[0]
+            self.assertEqual(s.version, 1)
+
+        with self.database.transaction():
+            ServiceManager.createServiceWithCodebase(
+                service_schema.Codebase.createFromFiles(getTestServiceModule(2)),
+                "test_service.service.Service",
+                "TestService",
+                1
+                )
+
+        self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
+
+        self.waitForCount(1)
+
+        with self.database.transaction():
+            s = TestServiceLastTimestamp.aliveServices()[0]
+            self.assertEqual(s.version, 2)
+
+
+
+
+
