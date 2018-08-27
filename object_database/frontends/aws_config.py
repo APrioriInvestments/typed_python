@@ -24,36 +24,9 @@ import logging
 import traceback
 import logging.config
 
-def formatTable(rows):
-    cols = [[r[i] for r in rows] for i in range(len(rows[0]))]
-    colWidth = [max([len(c) for c in col]) for col in cols]
-
-    formattedRows = [
-        "  ".join(row[col] + " " * (colWidth[col] - len(row[col])) for col in range(len(cols)))
-            for row in rows
-        ]
-    formattedRows = formattedRows[:1] + [
-        "  ".join("-" * colWidth[col] for col in range(len(cols)))
-        ] + formattedRows[1:]
-
-    return "\n".join(formattedRows)
-
-def configureLogging(preamble=""):
-    logging.basicConfig(format='[%(asctime)s] %(levelname)6s %(filename)30s:%(lineno)4s' 
-        + ("|" + preamble if preamble else '') 
-        + '| %(message)s', level=logging.ERROR
-        )
-
-def secondsToHumanReadable(seconds):
-    if seconds < 120:
-        return "%.2f seconds" % (seconds)
-    if seconds < 120 * 60:
-        return "%.2f minutes" % (seconds / 60)
-    if seconds < 120 * 60 * 24:
-        return "%.2f hours" % (seconds / 60 / 60)
-    return "%.2f days" % (seconds / 60 / 60 / 24)
-
 from object_database import connect, InMemServer
+from object_database.util import configureLogging, formatTable, secondsToHumanReadable
+from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.aws.AwsWorkerBootService import AwsWorkerBootService, AwsApi
 
 def main(argv):
@@ -75,9 +48,11 @@ def main(argv):
     parser.add_argument('--max_to_boot', required=False, type=int)
 
     parser.add_argument('--configure', required=False, action='store_true')
+    parser.add_argument('--install', required=False, action='store_true')
     parser.add_argument('--list', required=False, action='store_true')
     parser.add_argument('--boot', required=False)
     parser.add_argument('--kill', required=False)
+    parser.add_argument('--killall', required=False, action='store_true')
 
     configureLogging()
 
@@ -115,6 +90,10 @@ def main(argv):
                 max_to_boot=parsedArgs.max_to_boot
                 )
 
+    if parsedArgs.install:
+        with db.transaction():
+            ServiceManager.createService(AwsWorkerBootService, "AwsWorkerBootService", placement="Master")
+
     if parsedArgs.list:
         with db.view():
             api = AwsApi()
@@ -136,6 +115,12 @@ def main(argv):
         with db.view():
             api = AwsApi()
             api.terminateInstanceById(parsedArgs.kill)
+
+    if parsedArgs.killall:
+        with db.view():
+            api = AwsApi()
+            for i in api.allRunningInstances():
+                api.terminateInstanceById(i)
 
     return 0
 

@@ -47,16 +47,13 @@ class ServiceManager(object):
         self.thread.join()
 
     @staticmethod
-    def createService(serviceClass, serviceName, targetCount=0, placement="Any"):
+    def createService(serviceClass, serviceName, placement="Any"):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
             service = service_schema.Service(name=serviceName, placement=placement)
             service.service_module_name = serviceClass.__module__
             service.service_class_name = serviceClass.__qualname__
-            service.target_count = targetCount
-
-        service.target_count = targetCount
 
         return service
 
@@ -73,7 +70,8 @@ class ServiceManager(object):
         service.service_module_name = ".".join(className.split(".")[:-1])
         service.service_class_name = className.split(".")[-1]
         
-        service.target_count = targetCount
+        if targetCount is not None:
+            service.target_count = targetCount
 
         return service
 
@@ -225,7 +223,7 @@ class ServiceManager(object):
 
             instance = service_schema.ServiceInstance(
                 service=service, 
-                host=self._pickHost(service.gbRamUsed, service.coresUsed),
+                host=host,
                 state="Booting",
                 start_timestamp=time.time()
                 )
