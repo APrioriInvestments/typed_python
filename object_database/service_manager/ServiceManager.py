@@ -47,7 +47,7 @@ class ServiceManager(object):
         self.thread.join()
 
     @staticmethod
-    def createService(serviceClass, serviceName, placement="Any"):
+    def createService(serviceClass, serviceName, target_count=None, placement="Any"):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
@@ -55,6 +55,9 @@ class ServiceManager(object):
             service.service_module_name = serviceClass.__module__
             service.service_class_name = serviceClass.__qualname__
 
+        if target_count is not None:
+            service.target_count = target_count
+        
         return service
 
     @staticmethod
@@ -115,6 +118,8 @@ class ServiceManager(object):
                 maxCores=self.maxCores
                 )
             self.serviceHostObject.hostname = self.ownHostname
+
+        logging.info("ServiceManager starting work loop.")
 
         while not self.shouldStop.is_set():
             #redeploy our own services

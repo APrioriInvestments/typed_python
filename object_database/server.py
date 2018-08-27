@@ -70,6 +70,9 @@ class Server:
     def __init__(self, kvstore):
         self._lock = threading.Lock()
         self._kvstore = kvstore
+
+        self._removeOldDeadConnections()
+
         self._clientChannels = {}
         
         #id of the next transaction
@@ -77,7 +80,18 @@ class Server:
 
         #for each key, the last version number we committed if it wasn't a write.
         self._version_numbers = {}
-        
+
+    def _removeOldDeadConnections(self):        
+        connection_index = index_key(core_schema.Connection, " exists", True)
+        oldIds = self._kvstore.setMembers(index_key(core_schema.Connection, " exists", True))
+
+        if oldIds:
+            self._kvstore.setSeveral(
+                {data_key(core_schema.Connection, identity, " exists"):None for identity in oldIds},
+                {},
+                {connection_index: set(oldIds)}
+                )
+
     def dropConnection(self, channel):
         with self._lock:
             if channel not in self._clientChannels:

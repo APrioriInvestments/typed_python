@@ -135,13 +135,13 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_starting_services(self):        
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", target_count=1)
 
         numpy.random.seed(42)
 
@@ -155,7 +155,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_service_restarts_after_soft_kill(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
@@ -169,7 +169,7 @@ class ServiceManagerTest(unittest.TestCase):
     
     def test_service_restarts_after_killing(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
