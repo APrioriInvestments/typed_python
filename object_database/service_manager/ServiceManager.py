@@ -41,7 +41,8 @@ class ServiceManager(object):
         self.shouldStop.set()
         self.thread.join()
 
-    def createService(self, serviceClass, serviceName, targetCount=0):
+    @staticmethod
+    def createService(serviceClass, serviceName, targetCount=0):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
@@ -54,12 +55,13 @@ class ServiceManager(object):
 
         return service
 
-    def startService(self, serviceName, targetCount = 1):
-        with self.db.transaction():
-            service = service_schema.Service.lookupOne(name=serviceName)
-            service.target_count = targetCount
+    @staticmethod
+    def startService(serviceName, targetCount = 1):
+        service = service_schema.Service.lookupOne(name=serviceName)
+        service.target_count = targetCount
 
-    def waitRunning(self, serviceName, timeout=5.0):
+    @staticmethod
+    def waitRunning(db, serviceName, timeout=5.0):
         def isRunning():
             service = service_schema.Service.lookupAny(name=serviceName)
             if not service:

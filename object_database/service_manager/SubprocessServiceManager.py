@@ -25,7 +25,8 @@ import os
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, host, port, logfileDirectory=None):
+    def __init__(self, own_hostname, host, port, logfileDirectory=None):
+        self.own_hostname = own_hostname
         self.host = host
         self.port = port
         self.logfileDirectory = logfileDirectory
@@ -50,7 +51,7 @@ class SubprocessServiceManager(ServiceManager):
             output_file = None
         
         process = subprocess.Popen(
-            [sys.executable, os.path.join(ownDir, 'service_entrypoint.py'),
+            [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
              self.host, str(self.port), instanceIdentity],
             stdin=subprocess.DEVNULL,
             stdout=output_file,

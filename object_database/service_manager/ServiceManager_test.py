@@ -15,16 +15,20 @@
 
 import unittest
 
-from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
+from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer
+from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect
 from typed_python import *
 
 import time
 import numpy
 import logging
+import subprocess
 import os
+import sys
+
+ownDir = os.path.dirname(os.path.abspath(__file__))
 
 schema = Schema("core.ServiceManagerTest")
 
@@ -69,16 +73,15 @@ class TestService(ServiceBase):
 
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
-        self.dbServer = TcpServer("localhost", 8020)
-        self.dbServer.start()
-        self.database = self.dbServer.connect()
-
-        self.serviceManager = SubprocessServiceManager("localhost", 8020)
-        self.serviceManager.start()
+        self.server = subprocess.Popen(
+            [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
+                'localhost', 'localhost', "8020", "--run_db"]
+            )
+        self.database = connect("localhost", 8020, retry=True)
 
     def tearDown(self):
-        self.serviceManager.stop()
-        self.dbServer.stop()
+        self.server.terminate()
+        self.server.wait()
 
     def waitForCount(self, count):
         self.assertTrue(
@@ -90,28 +93,27 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_starting_services(self):        
         with self.database.transaction():
-            self.serviceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", 1)
 
         self.waitForCount(1)
 
     def test_racheting_service_count_up_and_down(self):
-        self.serviceManager.SLEEP_INTERVAL = 0.01
-
         with self.database.transaction():
-            self.serviceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", 1)
 
         numpy.random.seed(42)
 
         for count in numpy.random.choice(15,size=20):
             logging.info("Setting count for TestService to %s and waiting for it to be alive.", count)
 
-            self.serviceManager.startService("TestService", int(count))
+            with self.database.transaction():
+                ServiceManager.startService("TestService", int(count))
 
             self.waitForCount(count)
 
     def test_service_restarts_after_soft_kill(self):
         with self.database.transaction():
-            self.serviceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", 1)
 
         self.waitForCount(1)
 
@@ -125,7 +127,7 @@ class ServiceManagerTest(unittest.TestCase):
     
     def test_service_restarts_after_killing(self):
         with self.database.transaction():
-            self.serviceManager.createService(TestService, "TestService", 1)
+            ServiceManager.createService(TestService, "TestService", 1)
 
         self.waitForCount(1)
 
