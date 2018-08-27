@@ -197,11 +197,16 @@ class AwsWorkerBootService(ServiceBase):
         s = State.lookupAny(instance_type=instance_type)
         if not s:
             s = State(instance_type=instance_type)
-        s.booted = target
+        s.desired = target
 
     @staticmethod
     def bootOneDirectly(instance_type):
         AwsApi().bootWorker(instance_type)
+
+    @staticmethod
+    def shutdownAll():
+        for s in State.lookupAll():
+            s.desired = 0
 
     @staticmethod
     def shutOneDown(instance_type):
@@ -280,7 +285,7 @@ class AwsWorkerBootService(ServiceBase):
         instanceTypes = {}
         instancesByType = {}
 
-        for machineId, instance in actuallyUsed:
+        for machineId, instance in actuallyUsed.items():
             instanceTypes[instance["InstanceType"]] = instanceTypes.get(instance["InstanceType"],0)+1
             instancesByType[instance["InstanceType"]] = instancesByType.get(instance["InstanceType"],())+(instance,)
 
@@ -293,7 +298,7 @@ class AwsWorkerBootService(ServiceBase):
                 if state.instance_type not in instanceTypes:
                     state.booted = 0
 
-            for instType, count in instanceTypes.keys():
+            for instType, count in instanceTypes.items():
                 state = State.lookupAny(instance_type=instType)
                 if not state:
                     state = State(instance_type=instType)
@@ -307,8 +312,8 @@ class AwsWorkerBootService(ServiceBase):
                         state.desired
                         )
 
-                    instanceId = instancesByType[state.instance_type].pop()
-                    self.api.terminateInstanceById(instanceId)
+                    instance = instancesByType[state.instance_type].pop()
+                    self.api.terminateInstanceById(instance["InstanceId"])
                     state.booted -= 1
 
                 while state.booted < state.desired:
@@ -322,7 +327,7 @@ class AwsWorkerBootService(ServiceBase):
 
                     self.api.bootWorker(state.instance_type)
 
-            time.sleep(self.SLEEP_INTERVAL)
+        time.sleep(self.SLEEP_INTERVAL)
         
 
                         

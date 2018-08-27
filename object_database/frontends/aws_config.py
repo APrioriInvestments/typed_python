@@ -32,48 +32,46 @@ from object_database.service_manager.aws.AwsWorkerBootService import AwsWorkerBo
 def main(argv):
     parser = argparse.ArgumentParser("Control the AWS service")
 
-    parser.add_argument("--inmem", default=False, action='store_true')
     parser.add_argument("--hostname", default=os.getenv("ODB_HOST", "localhost"), required=False)
     parser.add_argument("--port", type=int, default=int(os.getenv("ODB_PORT", 8000)), required=False)
 
-    parser.add_argument('--region', required=False)
-    parser.add_argument('--vpc_id', required=False)
-    parser.add_argument('--subnet', required=False)
-    parser.add_argument('--security_group', required=False)
-    parser.add_argument('--keypair', required=False)
-    parser.add_argument('--worker_name', required=False)
-    parser.add_argument('--worker_iam_role_name', required=False)
-    parser.add_argument('--linux_ami', required=False)
-    parser.add_argument('--defaultStorageSize', required=False, type=int)
-    parser.add_argument('--max_to_boot', required=False, type=int)
+    subparsers = parser.add_subparsers()
 
-    parser.add_argument('--configure', required=False, action='store_true')
-    parser.add_argument('--install', required=False, action='store_true')
-    parser.add_argument('--list', required=False, action='store_true')
-    parser.add_argument('--boot', required=False)
-    parser.add_argument('--kill', required=False)
-    parser.add_argument('--killall', required=False, action='store_true')
+    config_parser = subparsers.add_parser('config', help='configure the service')
+    config_parser.set_defaults(command='config')
+
+    config_parser.add_argument('--region', required=False)
+    config_parser.add_argument('--vpc_id', required=False)
+    config_parser.add_argument('--subnet', required=False)
+    config_parser.add_argument('--security_group', required=False)
+    config_parser.add_argument('--keypair', required=False)
+    config_parser.add_argument('--worker_name', required=False)
+    config_parser.add_argument('--worker_iam_role_name', required=False)
+    config_parser.add_argument('--linux_ami', required=False)
+    config_parser.add_argument('--defaultStorageSize', required=False, type=int)
+    config_parser.add_argument('--max_to_boot', required=False, type=int)
+
+    install_parser = subparsers.add_parser('install', help='install the service')
+    install_parser.set_defaults(command='install')
+
+    list_parser = subparsers.add_parser('list', help='list machines')
+    list_parser.set_defaults(command='list')
+    
+    boot_parser = subparsers.add_parser('boot', help='set the number of desired boxes')
+    boot_parser.set_defaults(command='boot')
+    boot_parser.add_argument("instance_type")
+    boot_parser.add_argument("count", type=int)
+
+    killall_parser = subparsers.add_parser('killall', help='kill everything')
+    killall_parser.set_defaults(command='killall')
 
     configureLogging()
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    if parsedArgs.inmem:
-        db = InMemServer().connect()
-        assert (parsedArgs.region
-            and parsedArgs.vpc_id
-            and parsedArgs.subnet
-            and parsedArgs.security_group
-            and parsedArgs.keypair
-            and parsedArgs.worker_name
-            and parsedArgs.worker_iam_role_name
-            and parsedArgs.linux_ami
-            and parsedArgs.defaultStorageSize
-            and parsedArgs.max_to_boot)
-    else:
-        db = connect(parsedArgs.hostname, parsedArgs.port)
+    db = connect(parsedArgs.hostname, parsedArgs.port)
 
-    if parsedArgs.configure or parsedArgs.inmem:
+    if parsedArgs.command == 'config':
         with db.transaction():
             AwsWorkerBootService.configure(
                 db_hostname=parsedArgs.hostname,
@@ -90,11 +88,11 @@ def main(argv):
                 max_to_boot=parsedArgs.max_to_boot
                 )
 
-    if parsedArgs.install:
+    if parsedArgs.command == 'install':
         with db.transaction():
             ServiceManager.createService(AwsWorkerBootService, "AwsWorkerBootService", placement="Master")
 
-    if parsedArgs.list:
+    if parsedArgs.command == 'list':
         with db.view():
             api = AwsApi()
             table = [["InstanceID", "InstanceType", "IP", "Uptime"]]
@@ -107,20 +105,20 @@ def main(argv):
                     ])
             print(formatTable(table))
 
-    if parsedArgs.boot:
-        with db.view():
-            AwsWorkerBootService.bootOneDirectly(parsedArgs.boot)
+    if parsedArgs.command == 'boot':
+        with db.transaction():
+            AwsWorkerBootService.setBootState(parsedArgs.instance_type, parsedArgs.count)
 
-    if parsedArgs.kill:
-        with db.view():
-            api = AwsApi()
-            api.terminateInstanceById(parsedArgs.kill)
+    if parsedArgs.command == 'killall':
+        with db.transaction():
+            AwsWorkerBootService.shutdownAll()
 
-    if parsedArgs.killall:
         with db.view():
-            api = AwsApi()
             for i in api.allRunningInstances():
-                api.terminateInstanceById(i)
+                try:
+                    api.terminateInstanceById(i)
+                except:
+                    pass
 
     return 0
 
