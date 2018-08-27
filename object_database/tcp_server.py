@@ -99,14 +99,18 @@ class EventLoopInThread:
 
 _eventLoop = EventLoopInThread()
 
-def connect(host, port):
+def connect(host, port, timeout=10.0):
     _, proto = _eventLoop.create_connection(
         lambda: ClientToServerProtocol(host, port),
         host,
         port
         )
 
-    return DatabaseConnection(proto)
+    conn = DatabaseConnection(proto)
+    conn.initialized.wait(timeout=timeout)
+    assert conn.initialized.is_set()
+    return conn
+
 
 class TcpServer(Server):
     def __init__(self, host, port, mem_store = None):

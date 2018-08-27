@@ -691,7 +691,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryStringStore()
-        self.databaseServer = TcpServer(self.mem_store, host="localhost", port=8888)
+        self.databaseServer = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
         self.databaseServer.start()
 
     def createNewDb(self):

@@ -493,7 +493,7 @@ class DatabaseConnection:
             
         
     def _get_versioned_set_data(self, key, transaction_id):
-        assert transaction_id >= self._min_transaction_num
+        assert transaction_id >= self._min_transaction_num, (transaction_id, self._min_transaction_num)
 
         with self._lock:
             if key in self._versioned_objects:

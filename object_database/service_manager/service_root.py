@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 #   Copyright 2018 Braxton Mckee
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,10 +14,29 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.tcp_server import connect, TcpServer
-from object_database.schema import Schema, Indexed, Index
-from object_database.core_schema import core_schema
-from object_database.service_manager.ServiceManagerSchema import service_schema
-from object_database.service_manager.ServiceBase import ServiceBase
-from object_database.view import revisionConflictRetry, RevisionConflictException
-from object_database.inmem_server import InMemServer
+
+import threading
+import argparse
+import sys
+import time
+from object_database import connect
+from object_database.service_manager.ServiceManager import ServiceManager
+
+def main(argv):
+    parser = argparse.ArgumentParser("Run the main service manager.")
+
+    parser.add_argument("host")
+    parser.add_argument("port")
+
+    parsedArgs = parser.parse_args(argv[1:])
+
+    db = connect(parsedArgs.host, parsedArgs.port)
+
+    manager = ServiceManager(db)
+    
+    manager.run()
+
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

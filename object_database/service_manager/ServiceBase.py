@@ -12,10 +12,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.tcp_server import connect, TcpServer
-from object_database.schema import Schema, Indexed, Index
-from object_database.core_schema import core_schema
-from object_database.service_manager.ServiceManagerSchema import service_schema
-from object_database.service_manager.ServiceBase import ServiceBase
-from object_database.view import revisionConflictRetry, RevisionConflictException
-from object_database.inmem_server import InMemServer
+
+import threading
+import traceback
+import logging
+import time
+
+class ServiceBase:
+    def __init__(self, db, serviceInstance):
+        self.db = db
+        self.serviceInstance = serviceInstance
+
+    def initialize(self):
+        pass
+
+    def doWork(self, shouldStop):
+        #subclasses actually do work in here.
+        shouldStop.wait()

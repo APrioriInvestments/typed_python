@@ -85,6 +85,9 @@ class Server:
                 return
 
             co = self._clientChannels[channel].connectionObject
+
+            logging.info("Server dropping connection for connectionObject._identity = %s", co._identity)
+
             del self._clientChannels[channel]
             self._dropConnectionEntry(co)
 

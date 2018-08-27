@@ -116,7 +116,7 @@ class Schema:
                 else:
                     self._addIndex(t, name)
             elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
-                if isinstance(val, FunctionType):
+                if isinstance(val, (FunctionType, staticmethod)):
                     setattr(t, name, val)
 
         return t
