@@ -109,6 +109,7 @@ class Service:
     service_module_name = str
     service_class_name = str
 
+    #per service, how many do we use?
     gbRamUsed = int
     coresUsed = int
     placement = OneOf("Master", "Worker", "Any")

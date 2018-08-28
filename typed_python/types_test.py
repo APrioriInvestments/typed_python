@@ -68,6 +68,9 @@ class TypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             int_list[0] = 1.1
 
+    def test_oneof_with_int_and_float(self):
+        self.assertEqual(TypeConvert(OneOf(int,float), 2.5, True), 2.5)
+
     def test_list_of_oneof_type(self):
         l = ListOf(OneOf(int, str))()
 

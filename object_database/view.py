@@ -116,6 +116,9 @@ class View(object):
         self._insistIndexReadsConsistent = False
         self._confirmCommitCallback = None
 
+    def db(self):
+        return self._db
+
     def transaction_id(self):
         return self._transaction_num
 
@@ -468,4 +471,8 @@ class Transaction(View):
 
         return self
 
+def current_transaction():
+    if not hasattr(_cur_view, "view"):
+        return None
+    return _cur_view.view
 

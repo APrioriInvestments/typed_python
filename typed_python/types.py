@@ -152,6 +152,12 @@ def OneOf(*args):
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
+            if allow_construct_new:
+                for o in OneOf.options:
+                    res = TryTypeConvert(o, value, False)
+                    if res:
+                        return res
+
             for o in OneOf.options:
                 res = TryTypeConvert(o, value, allow_construct_new)
                 if res:
@@ -417,6 +423,42 @@ def TupleOf(t):
             res.__contents__ = self.__contents__ + tuple(TypeConvert(t, x) for x in other)
             return res
 
+        def __lt__(self, other):
+            if not isinstance(other, TupleOf):
+                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self < x[0]
+
+            return self.__contents__ < other.__contents__
+
+        def __le__(self, other):
+            if not isinstance(other, TupleOf):
+                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self <= x[0]
+
+            return self.__contents__ <= other.__contents__
+
+        def __gt__(self, other):
+            if not isinstance(other, TupleOf):
+                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self > x[0]
+
+            return self.__contents__ > other.__contents__
+
+        def __ge__(self, other):
+            if not isinstance(other, TupleOf):
+                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self >= x[0]
+
+            return self.__contents__ >= other.__contents__
+
         def __eq__(self, other):
             if not isinstance(other, TupleOf):
                 x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
@@ -656,6 +698,42 @@ def Tuple(*args):
                 return self == x[0]
 
             return self.__contents__ == other.__contents__
+
+        def __lt__(self, other):
+            if not isinstance(other, Tuple):
+                x = TryTypeConvert(Tuple, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self < x[0]
+
+            return self.__contents__ < other.__contents__
+
+        def __le__(self, other):
+            if not isinstance(other, Tuple):
+                x = TryTypeConvert(Tuple, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self <= x[0]
+
+            return self.__contents__ <= other.__contents__
+
+        def __gt__(self, other):
+            if not isinstance(other, Tuple):
+                x = TryTypeConvert(Tuple, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self > x[0]
+
+            return self.__contents__ > other.__contents__
+
+        def __ge__(self, other):
+            if not isinstance(other, Tuple):
+                x = TryTypeConvert(Tuple, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self >= x[0]
+
+            return self.__contents__ >= other.__contents__
 
         def __hash__(self):
             return hash(self.__contents__)

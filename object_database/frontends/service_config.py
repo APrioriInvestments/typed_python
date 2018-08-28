@@ -110,6 +110,9 @@ def main(argv):
         else:
             paths = [findGitParent(os.getcwd())]
 
+        gbRamUsed = 1
+        coresUsed = 1
+
         with db.transaction():
             codebase = service_schema.Codebase.create(paths)
             fullClassname = getattr(parsedArgs, 'class')
@@ -125,7 +128,6 @@ def main(argv):
                 if actualClass is None:
                     print("Can't find", module, "in module", modulename)
 
-
                 if actualClass is None:
                     print("Can't find", classname, "in the codebase")
                     return 1
@@ -134,15 +136,19 @@ def main(argv):
                     print("Named class %s is not a ServiceBase subclass." % fullClassname)
                     return 1
 
+                coresUsed = actualClass.coresUsed
+                gbRamUsed = actualClass.gbRamUsed
+
             if not parsedArgs.name:
                 name = fullClassname.split(".")[-1]
             else:
                 name = parsedArgs.name
 
-            ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None, placement=parsedArgs.placement)
+            ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None, 
+                    placement=parsedArgs.placement, coresUsed=coresUsed, gbRamUsed=gbRamUsed)
 
     if parsedArgs.command == 'list':
-        table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount']]
+        table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount', 'Cores', 'RAM']]
 
         with db.view():
             for s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name):
@@ -152,7 +158,9 @@ def main(argv):
                     s.service_module_name,
                     s.service_class_name,
                     s.placement,
-                    str(s.target_count)
+                    str(s.target_count),
+                    s.coresUsed,
+                    s.gbRamUsed
                     ])
 
         print(formatTable(table))

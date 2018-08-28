@@ -64,7 +64,7 @@ class ServiceManager(object):
         return service
 
     @staticmethod
-    def createServiceWithCodebase(codebase, className, serviceName, targetCount=0, placement="Any"):
+    def createServiceWithCodebase(codebase, className, serviceName, targetCount=0, placement="Any", coresUsed=None, gbRamUsed=None):
         assert len(className.split(".")) > 1, "className should be a fully-qualified module.classname"
 
         service = service_schema.Service.lookupAny(name=serviceName)
@@ -76,12 +76,18 @@ class ServiceManager(object):
         service.service_module_name = ".".join(className.split(".")[:-1])
         service.service_class_name = className.split(".")[-1]
         
+        if coresUsed is not None:
+            service.coresUsed = coresUsed
+            
+        if gbRamUsed is not None:
+            service.gbRamUsed = gbRamUsed
+
         if targetCount is not None:
             service.target_count = targetCount
 
         if placement is not None:
             service.placement = placement
-        
+
         return service
 
     @staticmethod
@@ -100,7 +106,7 @@ class ServiceManager(object):
                     return True
             return False
 
-        return self.db.waitForCondition(isRunning,timeout)
+        return db.waitForCondition(isRunning,timeout)
 
     def stopAllServices(self, timeout):
         with self.db.transaction():

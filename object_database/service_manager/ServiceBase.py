@@ -19,6 +19,9 @@ import logging
 import time
 
 class ServiceBase:
+    coresUsed = 1
+    gbRamUsed = 1
+    
     def __init__(self, db, serviceInstance):
         self.db = db
         self.serviceInstance = serviceInstance
