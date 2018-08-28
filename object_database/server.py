@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.messages import ClientToServer, ServerToClient
+from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
 from object_database.schema import Schema
 from object_database.core_schema import core_schema
 from object_database.view import View, Transaction, _cur_view, data_key, index_key
@@ -20,6 +20,7 @@ from object_database.algebraic_protocol import AlgebraicProtocol
 from typed_python.hash import sha_hash
 from typed_python import *
 
+import time
 import uuid
 import logging
 import threading
@@ -33,6 +34,10 @@ class ConnectedChannel:
         self.channel = channel
         self.initial_tid = initial_tid
         self.connectionObject = connectionObject
+        self.lastHeartbeat = time.time()
+
+    def heartbeat(self):
+        self.lastHeartbeat = time.time()
 
     def sendKeyVersion(self, key, value, tid):
         toSend = value if not isinstance(value, set) else tupleOfString(value)
@@ -68,7 +73,7 @@ class ConnectedChannel:
 
 class Server:
     def __init__(self, kvstore):
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._kvstore = kvstore
 
         self._removeOldDeadConnections()
@@ -91,6 +96,17 @@ class Server:
                 {},
                 {connection_index: set(oldIds)}
                 )
+
+    def checkForDeadConnections(self):
+        with self._lock:
+            for c in list(self._clientChannels):
+                if time.time() - self._clientChannels[c].lastHeartbeat > getHeartbeatInterval() * 4:
+                    logging.info(
+                        "Connection %s has not heartbeat in a long time. Killing it.", 
+                        self._clientChannels[c].connectionObject._identity
+                        )
+
+                    c.close()
 
     def dropConnection(self, channel):
         with self._lock:
@@ -158,7 +174,9 @@ class Server:
 
     def _onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
-        if msg.matches.SendSets:
+        if msg.matches.Heartbeat:
+            connectedChannel.heartbeat()
+        elif msg.matches.SendSets:
             with self._lock:
                 for key in msg.keys:
                     connectedChannel.sendKeyVersion(

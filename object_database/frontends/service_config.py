@@ -24,7 +24,7 @@ import logging
 import traceback
 import logging.config
 
-from object_database import connect, service_schema
+from object_database import connect, service_schema, core_schema
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
 
 def main(argv):
@@ -36,6 +36,9 @@ def main(argv):
     parser.add_argument("--port", type=int, default=int(os.getenv("ODB_PORT", 8000)), required=False)
 
     subparsers = parser.add_subparsers()
+
+    connections_parser = subparsers.add_parser('connections', help='list live connections')
+    connections_parser.set_defaults(command='connections')
 
     list_parser = subparsers.add_parser('list', help='list installed services')
     list_parser.set_defaults(command='list')
@@ -56,11 +59,20 @@ def main(argv):
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
 
+    if parsedArgs.command == 'connections':
+        table = [['Connection ID']]
+        
+        with db.view():
+            for c in sorted(core_schema.Connection.lookupAll(), key=lambda c: c._identity):
+                table.append([c._identity])
+
+        print(formatTable(table))
+
     if parsedArgs.command == 'list':
         table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount']]
 
         with db.view():
-            for s in service_schema.Service.lookupAll():
+            for s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name):
                 table.append([
                     s.name,
                     str(s.codebase),
@@ -76,7 +88,7 @@ def main(argv):
         table = [['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT']]
 
         with db.view():
-            for s in service_schema.ServiceHost.lookupAll():
+            for s in sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname):
                 table.append([
                     s.connection._identity,
                     str(s.isMaster),

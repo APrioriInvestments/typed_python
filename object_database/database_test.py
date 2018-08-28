@@ -15,11 +15,13 @@
 from typed_python import Alternative, TupleOf, OneOf
 
 from object_database.schema import Indexed, Index, Schema
-from object_database.view import RevisionConflictException
+from object_database.core_schema import core_schema
+from object_database.view import RevisionConflictException, DisconnectedException
 from object_database.database_connection import TransactionListener, DatabaseConnection
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryStringStore
+import object_database.messages as messages
 import queue
 import unittest
 import threading
@@ -674,6 +676,30 @@ class ObjectDatabaseTests:
             n = Object()
             self.assertEqual(len(n.x), 0)
 
+    def test_heartbeats(self):
+        old_interval = messages.getHeartbeatInterval()
+        messages.setHeartbeatInterval(.25)
+
+        try:
+            db1 = self.createNewDb()
+            db2 = self.createNewDb()
+
+            with db1.view():
+                self.assertTrue(len(core_schema.Connection.lookupAll()), 2)
+
+            db1._stopHeartbeating()
+
+            self.assertTrue(
+                db2.waitForCondition(lambda: len(core_schema.Connection.lookupAll()) == 1, 5.0)
+                )
+
+            with self.assertRaises(DisconnectedException):
+                with db1.view():
+                    pass
+        finally:
+            messages.setHeartbeatInterval(old_interval)
+        
+
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryStringStore()
@@ -686,6 +712,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
     def tearDown(self):
         self.server.teardown()
+
 
 
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):

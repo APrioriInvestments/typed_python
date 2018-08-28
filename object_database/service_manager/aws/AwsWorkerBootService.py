@@ -186,11 +186,11 @@ class AwsWorkerBootService(ServiceBase):
 
     @staticmethod
     def currentTargets():
-        res = {s.instance_type: s.desired for s in State.lookupAll()}
+        return {s.instance_type: s.desired for s in State.lookupAll()}
 
     @staticmethod
     def currentBooted():
-        res = {s.instance_type: s.booted for s in State.lookupAll()}
+        return {s.instance_type: s.booted for s in State.lookupAll()}
 
     @staticmethod
     def setBootState(instance_type, target):

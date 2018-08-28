@@ -1,6 +1,6 @@
 from object_database.database_connection import DatabaseConnection
 from object_database.server import Server
-from object_database.messages import ClientToServer, ServerToClient
+from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
 from object_database.algebraic_protocol import AlgebraicProtocol
 from object_database.persistence import InMemoryStringStore
 
@@ -11,6 +11,7 @@ import logging
 import time
 import threading
 import traceback
+
 
 class ServerToClientProtocol(AlgebraicProtocol):
     def __init__(self, dbserver):
@@ -32,6 +33,9 @@ class ServerToClientProtocol(AlgebraicProtocol):
     def connection_lost(self, e):
         self.dbserver.dropConnection(self)
 
+    def close(self):
+        self.transport.close()
+
 class ClientToServerProtocol(AlgebraicProtocol):
     def __init__(self, host, port):
         AlgebraicProtocol.__init__(self, ServerToClient, ClientToServer)
@@ -40,6 +44,11 @@ class ClientToServerProtocol(AlgebraicProtocol):
         self.port = port
         self.handler = None
         self.msgs = []
+        self.disconnected = False
+        self._stopHeartbeatingSet = False
+
+    def _stopHeartbeating(self):
+        self._stopHeartbeatingSet = True
     
     def setServerToClientHandler(self, handler):
         with self.lock:
@@ -56,9 +65,15 @@ class ClientToServerProtocol(AlgebraicProtocol):
                 _eventLoop.loop.call_soon_threadsafe(self.handler, msg)
         
     def onConnected(self):
-        pass
+        _eventLoop.loop.call_later(getHeartbeatInterval(), self.heartbeat)
+
+    def heartbeat(self):
+        if not self.disconnected and not self._stopHeartbeatingSet:
+            self.sendMessage(ClientToServer.Heartbeat())
+            _eventLoop.loop.call_later(getHeartbeatInterval(), self.heartbeat)
 
     def connection_lost(self, e):
+        self.disconnected = True
         self.messageReceived(ServerToClient.Disconnected())
 
     def write(self, msg):
@@ -74,6 +89,7 @@ class EventLoopInThread:
     def runEventLoop(self):
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
+
 
     def start(self):
         if not self.started:
@@ -132,6 +148,7 @@ class TcpServer(Server):
         self.host = host
         self.port = port
         self.socket_server = None
+        self.stopped = False
 
     def start(self):
         self.socket_server = _eventLoop.create_server(
@@ -139,8 +156,15 @@ class TcpServer(Server):
             self.host, 
             self.port
             )
+        _eventLoop.loop.call_soon_threadsafe(self.checkHeartbeatsCallback)
+
+    def checkHeartbeatsCallback(self):
+        if not self.stopped:
+            _eventLoop.loop.call_later(getHeartbeatInterval(), self.checkHeartbeatsCallback)
+            self.checkForDeadConnections()
         
     def stop(self):
+        self.stopped = True
         if self.socket_server:
             self.socket_server.close()
 

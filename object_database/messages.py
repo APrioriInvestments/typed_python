@@ -1,5 +1,12 @@
 from typed_python import *
 
+_heartbeatInterval = [5.0]
+def setHeartbeatInterval(newInterval):
+    _heartbeatInterval[0] = newInterval
+
+def getHeartbeatInterval():
+    return _heartbeatInterval[0]
+
 ClientToServer = Alternative(
     "ClientToServer",
     NewTransaction = {
@@ -16,7 +23,8 @@ ClientToServer = Alternative(
         },
     SendSets = {
         "keys": TupleOf(str)
-        }
+        },
+    Heartbeat = {}
     )
 
 ServerToClient = Alternative(

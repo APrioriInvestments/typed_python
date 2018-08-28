@@ -93,6 +93,28 @@ def main(argv):
             ServiceManager.createService(AwsWorkerBootService, "AwsWorkerBootService", placement="Master")
 
     if parsedArgs.command == 'list':
+        print()
+        print()
+
+        with db.view():
+            api = AwsApi()
+            booted = AwsWorkerBootService.currentBooted()
+            targets = AwsWorkerBootService.currentTargets()
+
+            table = [["Instance Type", "Booted", "Desired"]]
+
+            for instance_type in sorted(set(list(booted) + list(targets))):
+                table.append([
+                    instance_type,
+                    booted.get(instance_type,0),
+                    targets.get(instance_type,0)
+                    ])
+
+            print(formatTable(table))
+
+        print()
+        print()
+
         with db.view():
             api = AwsApi()
             table = [["InstanceID", "InstanceType", "IP", "Uptime"]]
@@ -104,6 +126,10 @@ def main(argv):
                     secondsToHumanReadable(time.time() - instance['LaunchTime'].timestamp())
                     ])
             print(formatTable(table))
+
+        print()
+        print()
+
 
     if parsedArgs.command == 'boot':
         with db.transaction():

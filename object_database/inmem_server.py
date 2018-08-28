@@ -1,15 +1,17 @@
 from object_database.server import Server
 from object_database.database_connection import DatabaseConnection
-from object_database.messages import ClientToServer, ServerToClient
+from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
 from object_database.persistence import InMemoryStringStore
 import json
+import time
 import queue
 import logging
 import threading
 import traceback
 
 class InMemoryChannel:
-    def __init__(self):
+    def __init__(self, server):
+        self._server = server
         self._clientCallback = None
         self._serverCallback = None
         self._clientToServerMsgQueue = queue.Queue()
@@ -21,7 +23,17 @@ class InMemoryChannel:
         
         self._pumpThreadClient = threading.Thread(target=self.pumpMessagesFromClient)
         self._pumpThreadClient.daemon = True
-        
+
+        self._stopHeartbeatingSet = False
+
+    def _stopHeartbeating(self):
+        self._stopHeartbeatingSet = True
+
+    def close(self):
+        self.stop()
+        self._clientCallback(ServerToClient.Disconnected())
+        self._server.dropConnection(self)
+
     def pumpMessagesFromServer(self):
         while not self._shouldStop:
             try:
@@ -38,11 +50,16 @@ class InMemoryChannel:
                     return
         
     def pumpMessagesFromClient(self):
+        lastHeartbeat = time.time()
         while not self._shouldStop:
-            try:
-                e = self._clientToServerMsgQueue.get(timeout=0.01)
-            except queue.Empty:
-                e = None
+            if time.time() - lastHeartbeat > getHeartbeatInterval() and not self._stopHeartbeatingSet:
+                lastHeartbeat = time.time()
+                e = ClientToServer.Heartbeat()
+            else:
+                try:
+                    e = self._clientToServerMsgQueue.get(timeout=0.01)
+                except queue.Empty:
+                    e = None
 
             if e:
                 try:
@@ -85,9 +102,13 @@ class InMemServer(Server):
     def __init__(self, kvstore=None):
         Server.__init__(self, kvstore or InMemoryStringStore())
         self.channels = []
+        self.stopped = False
+        self.checkForDeadConnectionsLoopThread = threading.Thread(target=self.checkForDeadConnectionsLoop)
+        self.checkForDeadConnectionsLoopThread.daemon = True
+        self.checkForDeadConnectionsLoopThread.start()
 
     def getChannel(self):
-        channel = InMemoryChannel()
+        channel = InMemoryChannel(self)
         channel.start()
 
         self.addConnection(channel)
@@ -98,9 +119,20 @@ class InMemServer(Server):
     def connect(self):
         return DatabaseConnection(self.getChannel())
 
+    def checkForDeadConnectionsLoop(self):
+        lastCheck = time.time()
+        while not self.stopped:
+            if time.time() - lastCheck > getHeartbeatInterval():
+                self.checkForDeadConnections()
+                lastCheck = time.time()
+            else:
+                time.sleep(0.1)
+
     def teardown(self):
+        self.stopped = True
         for c in self.channels:
             c.stop()
+        self.checkForDeadConnectionsLoopThread.join()
 
     def __enter__(self):
         return self

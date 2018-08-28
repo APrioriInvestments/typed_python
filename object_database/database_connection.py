@@ -264,6 +264,9 @@ class DatabaseConnection:
 
         self._channel.setServerToClientHandler(self._onMessage)
 
+    def _stopHeartbeating(self):
+        self._channel._stopHeartbeating()
+
     def waitForCondition(self, cond, timeout):
         #eventally we will replace this with something that watches the calculation
         t0 = time.time()
