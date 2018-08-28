@@ -78,7 +78,7 @@ class ServiceManager(object):
         
         if coresUsed is not None:
             service.coresUsed = coresUsed
-            
+
         if gbRamUsed is not None:
             service.gbRamUsed = gbRamUsed
 
@@ -176,6 +176,11 @@ class ServiceManager(object):
                 else:
                     serviceHost.gbRamUsed = sum([i.service.gbRamUsed for i in instances if i.isActive()])
                     serviceHost.coresUsed = sum([i.service.coresUsed for i in instances if i.isActive()])
+
+        with self.db.transaction():
+            for serviceInstance in service_schema.ServiceInstance.lookupAll():
+                if not serviceInstance.host.exists() or serviceInstance.connection and not serviceInstance.connection.exists():
+                    serviceInstance.delete()
 
     def redeployServicesIfNecessary(self):
         needRedeploy = []
