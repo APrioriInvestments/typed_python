@@ -23,9 +23,19 @@ import signal
 import logging
 import traceback
 import logging.config
-
-from object_database import connect, service_schema, core_schema
+import tempfile
+from object_database.service_manager.ServiceManager import ServiceManager
+from object_database import connect, service_schema, core_schema, ServiceBase
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
+
+def findGitParent(p_root):
+    p = os.path.abspath(p_root)
+    while True:
+        if os.path.exists(os.path.join(p, ".git")):
+            return p
+        p = os.path.dirname(p)
+        if not p:
+            raise Exception("Can't find a git worktree at " + p_root)
 
 def main(argv):
     configureLogging()
@@ -40,6 +50,18 @@ def main(argv):
     connections_parser = subparsers.add_parser('connections', help='list live connections')
     connections_parser.set_defaults(command='connections')
 
+    install_parser = subparsers.add_parser('install', help='install a service')
+    install_parser.set_defaults(command='install')
+    install_parser.add_argument("--path", action='append', dest='paths')
+    install_parser.add_argument("--class")
+    install_parser.add_argument("--name", required=False)
+    install_parser.add_argument("--placement", required=False, default='Any', choices=['Any','Master','Worker'])
+
+    configure_parser = subparsers.add_parser('configure', help='configure a service')
+    configure_parser.set_defaults(command='configure')
+    configure_parser.add_argument("name")
+    configure_parser.add_argument("args", nargs=argparse.REMAINDER)
+    
     list_parser = subparsers.add_parser('list', help='list installed services')
     list_parser.set_defaults(command='list')
 
@@ -61,12 +83,63 @@ def main(argv):
 
     if parsedArgs.command == 'connections':
         table = [['Connection ID']]
-        
+
         with db.view():
             for c in sorted(core_schema.Connection.lookupAll(), key=lambda c: c._identity):
                 table.append([c._identity])
 
         print(formatTable(table))
+
+    if parsedArgs.command == 'configure':
+        try:
+            with tempfile.TemporaryDirectory() as tf:
+                with db.transaction():
+                    s = service_schema.Service.lookupAny(name=parsedArgs.name)
+                    
+                    module = s.codebase.instantiate(tf, s.service_module_name)
+                    svcClass = getattr(module, s.service_class_name)
+
+                    svcClass.configureFromCommandline(s, parsedArgs.args)
+        except Exception as e:
+            print("Failed to configure %s: %s" % (parsedArgs.name, e))
+            return 1
+
+    if parsedArgs.command == 'install':
+        if parsedArgs.paths:
+            paths = parsedArgs.paths
+        else:
+            paths = [findGitParent(os.getcwd())]
+
+        with db.transaction():
+            codebase = service_schema.Codebase.create(paths)
+            fullClassname = getattr(parsedArgs, 'class')
+            
+            with tempfile.TemporaryDirectory() as tf:
+                modulename, classname = fullClassname.rsplit(".",1)
+                module = codebase.instantiate(tf, modulename)
+
+                if module is None:
+                    print("Can't find", module, "in the codebase")
+
+                actualClass = module.__dict__.get(classname, None)
+                if actualClass is None:
+                    print("Can't find", module, "in module", modulename)
+
+
+                if actualClass is None:
+                    print("Can't find", classname, "in the codebase")
+                    return 1
+
+                if not issubclass(actualClass, ServiceBase):
+                    print("Named class %s is not a ServiceBase subclass." % fullClassname)
+                    return 1
+
+            if not parsedArgs.name:
+                name = fullClassname.split(".")[-1]
+            else:
+                name = parsedArgs.name
+
+            ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None, placement=parsedArgs.placement)
 
     if parsedArgs.command == 'list':
         table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount']]

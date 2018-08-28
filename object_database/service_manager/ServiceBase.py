@@ -23,6 +23,11 @@ class ServiceBase:
         self.db = db
         self.serviceInstance = serviceInstance
 
+    @staticmethod
+    def configureFromCommandline(args):
+        """Subclasses should take the remaining args from the commandline and configure using them"""
+        pass
+
     def initialize(self):
         pass
 

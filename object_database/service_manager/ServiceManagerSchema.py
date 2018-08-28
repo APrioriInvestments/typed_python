@@ -32,23 +32,24 @@ class Codebase:
     @staticmethod
     def create(root_paths, extensions=('.py',), maxTotalBytes = 1024 * 1024):
         files = {}
-        total_bytes = 0
+        total_bytes = [0]
 
         def walk(path, so_far):
-            for name in os.path.listdir(path):
+            for name in os.listdir(path):
                 fullpath = os.path.join(path, name)
+                so_far_with_name = os.path.join(so_far, name) if so_far else name
                 if os.path.isdir(fullpath):
-                    walk(fullpath, os.path.join(so_far, name) if so_far else name)
+                    walk(fullpath, so_far_with_name)
                 else:
                     if os.path.splitext(name)[1] in extensions:
                         with open(fullpath, "r") as f:
                             contents = f.read()
 
-                        total_bytes += len(contents)
+                        total_bytes[0] += len(contents)
                         
-                        assert total_bytes < maxTotalBytes, "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
+                        assert total_bytes[0] < maxTotalBytes, "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
 
-                        files[so_far] = contents
+                        files[so_far_with_name] = contents
 
         for path in root_paths:
             walk(path, '')

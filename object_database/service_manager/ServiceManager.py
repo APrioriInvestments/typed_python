@@ -57,7 +57,10 @@ class ServiceManager(object):
 
         if target_count is not None:
             service.target_count = target_count
-        
+
+        if placement is not None:
+            service.placement = placement
+
         return service
 
     @staticmethod
@@ -76,6 +79,9 @@ class ServiceManager(object):
         if targetCount is not None:
             service.target_count = targetCount
 
+        if placement is not None:
+            service.placement = placement
+        
         return service
 
     @staticmethod
