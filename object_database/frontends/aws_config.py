@@ -140,6 +140,8 @@ def main(argv):
             AwsWorkerBootService.shutdownAll()
 
         with db.view():
+            api = AwsApi()
+            
             for i in api.allRunningInstances():
                 try:
                     api.terminateInstanceById(i)

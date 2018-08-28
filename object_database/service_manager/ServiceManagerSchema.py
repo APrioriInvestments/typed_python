@@ -80,8 +80,8 @@ class Codebase:
             if not os.path.exists(fullpath):
                 os.makedirs(fullpath)
             
-            with open(os.path.join(fullpath, name), "w") as f:
-                f.write(fcontents)
+            with open(os.path.join(fullpath, name), "wb") as f:
+                f.write(fcontents.encode("utf-8"))
 
         sys.path = [disk_path] + sys.path
 

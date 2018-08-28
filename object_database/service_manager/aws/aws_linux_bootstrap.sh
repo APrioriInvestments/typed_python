@@ -65,4 +65,6 @@ $STORAGE/nativepython/object_database/frontends/service_manager.py \
     `hostname`  \
     {db_hostname} \
     {db_port} \
-    --logdir $INSTALL/logs
+    --logdir $INSTALL/logs 2>&1 > $INSTALL/logs/db_server.log
+
+
