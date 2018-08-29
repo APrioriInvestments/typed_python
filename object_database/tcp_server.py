@@ -140,7 +140,7 @@ def connect(host, port, timeout=10.0, retry = False):
             time.sleep(min(timeout, max(timeout / 100.0, 0.01)))
 
     if proto is None:
-        raise DisconnectedException()
+        raise ConnectionRefusedError()
 
     conn = DatabaseConnection(proto)
     conn.initialized.wait(timeout=max(timeout - (time.time() - t0), 0.0))

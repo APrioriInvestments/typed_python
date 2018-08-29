@@ -118,7 +118,7 @@ def main(argv):
                     shouldStop.wait(timeout=max(.5, serviceManager.shutdownTimeout / 10))
                     try:
                         serviceManager.cleanup()
-                    except DisconnectedException:
+                    except (ConnectionRefusedException, DisconnectedException):
                         if parsedArgs.run_db:
                             logging.error("Disconnected from object_database host.")
                             return 1
@@ -134,17 +134,17 @@ def main(argv):
 
         return 0
     finally:
+        if serviceManager is not None:
+            try:
+                serviceManager.stop(gracefully=False)
+            except:
+                logging.error("Failed to stop the service manager:\n%s", traceback.format_exc())
+
         if databaseServer is not None:
             try:
                 databaseServer.stop()
             except:
                 logging.error("Failed to stop the database server:\n%s", traceback.format_exc())
-
-        if serviceManager is not None:
-            try:
-                serviceManager.stop()
-            except:
-                logging.error("Failed to stop the service manager:\n%s", traceback.format_exc())
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))
