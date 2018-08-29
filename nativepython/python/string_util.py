@@ -36,3 +36,6 @@ def distance(s1, s2):
 
 def closest_in(name, names):
     return sorted((distance(name, x), x) for x in names)[0][1]
+
+def closest_N_in(name, names, count):
+    return [x[1] for x in sorted((distance(name, x), x) for x in names)[:count]]

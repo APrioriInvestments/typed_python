@@ -4,6 +4,7 @@ import json
 import logging
 import traceback
 import socket
+import time
 
 from object_database.algebraic_to_json import Encoder
 
@@ -26,8 +27,17 @@ class AlgebraicProtocol(asyncio.Protocol):
 
     def sendMessage(self, msg):
         assert isinstance(msg, self.sendType), "message %s is of type %s != %s" % (msg, type(msg), self.sendType)
-        dataToSend = bytes(json.dumps(self.encoder.to_json(self.sendType, msg)), 'utf8')
-        self.transport.write(longToString(len(dataToSend)) + dataToSend)
+
+        #cache the encoded message on the object in case we're sending this to multiple
+        #clients.
+        if '__encoded_message__' in msg.__dict__:
+            dataToSend = msg.__dict__['__encoded_message__']
+        else:
+            dataToSend = bytes(json.dumps(self.encoder.to_json(self.sendType, msg)), 'utf8')
+            dataToSend = longToString(len(dataToSend)) + dataToSend
+            msg.__dict__['__encoded_message__'] = dataToSend
+
+        self.transport.write(dataToSend)
 
     def messageReceived(self, msg):
         #subclasses override

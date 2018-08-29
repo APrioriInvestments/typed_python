@@ -15,17 +15,37 @@
 
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
+from object_database.service_manager.ServiceManagerSchema import service_schema
 from object_database import connect
 
+import time
 import logging
 import sys
 import subprocess
 import os
+import shutil
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
+def timestampToFileString(timestamp):
+    struct = time.localtime(timestamp)
+    return "%4d%02d%02d_%02d%02d%02d_%03d" % (
+        struct.tm_year,
+        struct.tm_mon,
+        struct.tm_mday,
+        struct.tm_hour,
+        struct.tm_min,
+        struct.tm_sec,
+        int(timestamp*1000) % 1000
+        )
+
+def parseLogfileToInstanceid(fname):
+    if not fname.endswith(".log.txt") or "-" not in fname:
+        return
+    return fname.split("-")[-1][:-8]
+
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None):
+    def __init__(self, own_hostname, host, port, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None, shutdownTimeout=None):
         self.own_hostname = own_hostname
         self.host = host
         self.port = port
@@ -38,7 +58,7 @@ class SubprocessServiceManager(ServiceManager):
         def dbConnectionFactory():
             return connect(host, port)
 
-        ServiceManager.__init__(self, dbConnectionFactory, isMaster, own_hostname, maxGbRam=maxGbRam, maxCores=maxCores)
+        ServiceManager.__init__(self, dbConnectionFactory, isMaster, own_hostname, maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout)
 
         self.serviceProcesses = {}
 
@@ -46,7 +66,7 @@ class SubprocessServiceManager(ServiceManager):
         if instanceIdentity in self.serviceProcesses:
             return
 
-        logfileName = service.name + "_" + instanceIdentity + ".log.txt"
+        logfileName = service.name + "-" + timestampToFileString(time.time()) + "-" + instanceIdentity + ".log.txt"
 
         if self.logfileDirectory is not None:
             output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
@@ -61,7 +81,7 @@ class SubprocessServiceManager(ServiceManager):
             stderr=subprocess.STDOUT
             )
 
-        self.serviceProcesses[instanceIdentity] = self.serviceProcesses.get(service, ()) + (process,)
+        self.serviceProcesses[instanceIdentity] = process
 
         if output_file:
             output_file.close()
@@ -80,13 +100,44 @@ class SubprocessServiceManager(ServiceManager):
                 process.pid
                 )
 
-    def stop(self, timeout=10.0):
-        self.stopAllServices(timeout)
+    def stop(self):
+        self.stopAllServices(self.shutdownTimeout)
 
-        for instanceIdentity, workers in self.serviceProcesses.items():
-            for worker in workers:
-                worker.terminate()
+        for instanceIdentity, workerProcess in self.serviceProcesses.items():
+            workerProcess.terminate()
+            workerProcess.wait()
 
         self.serviceProcesses = {}
 
         ServiceManager.stop(self)
+
+    def cleanup(self):
+        for identity, workerProcess in list(self.serviceProcesses.items()):
+            if workerProcess.poll() is not None:
+                workerProcess.wait()
+                del self.serviceProcesses[identity]
+
+        with self.db.view():
+            for identity in list(self.serviceProcesses):
+                serviceInstance = service_schema.ServiceInstance.fromIdentity(identity)
+
+                if serviceInstance.shouldShutdown and time.time() - serviceInstance.shutdownTimestamp > self.shutdownTimeout:
+                    workerProcess = self.serviceProcesses.get(identity)
+                    if workerProcess:
+                        workerProcess.terminate()
+                        workerProcess.wait()
+                        del self.serviceProcesses[identity]
+
+        self.cleanupOldLogfiles()
+
+    def cleanupOldLogfiles(self):
+        if self.logfileDirectory:
+            for file in os.listdir(self.logfileDirectory):
+                instanceId = parseLogfileToInstanceid(file)
+                if instanceId and instanceId not in self.serviceProcesses:
+                    if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
+                        os.makedirs(os.path.join(self.logfileDirectory, "old"))
+                    shutil.move(os.path.join(self.logfileDirectory, file), os.path.join(self.logfileDirectory, "old", file))
+
+
+

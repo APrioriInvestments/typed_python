@@ -23,8 +23,11 @@ import threading
 import time
 
 class ServiceManager(object):
-    def __init__(self, dbConnectionFactory, isMaster, ownHostname, maxGbRam=4, maxCores=4):
+    DEFAULT_SHUTDOWN_TIMEOUT = 10.0
+
+    def __init__(self, dbConnectionFactory, isMaster, ownHostname, maxGbRam=4, maxCores=4, shutdownTimeout=None):
         object.__init__(self)
+        self.shutdownTimeout = shutdownTimeout or ServiceManager.DEFAULT_SHUTDOWN_TIMEOUT
         self.ownHostname = ownHostname
         self.isMaster = isMaster
         self.maxGbRam = maxGbRam
@@ -204,7 +207,13 @@ class ServiceManager(object):
         with self.db.transaction():
             for i in needRedeploy:
                 if i.exists():
-                    i.shouldShutdown = True
+                    i.triggerShutdown()
+
+        #wait for them to be down before proceeding
+        self.db.waitForCondition(
+            lambda: not [x for x in needRedeploy if x.exists()], 
+            self.shutdownTimeout * 2.0
+            )
 
     @revisionConflictRetry
     def createInstanceRecords(self):
@@ -254,7 +263,7 @@ class ServiceManager(object):
 
         while service.target_count < len(actual_records):
             sInst = actual_records.pop()
-            sInst.shouldShutdown = True
+            sInst.triggerShutdown()
 
     def instanceRecordsToBoot(self):
         res = []
@@ -266,3 +275,6 @@ class ServiceManager(object):
 
     def _startServiceWorker(self, service, instanceIdentity):
         raise NotImplementedError()
+
+    def cleanup(self):
+        pass

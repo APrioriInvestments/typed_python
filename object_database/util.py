@@ -2,7 +2,7 @@ import logging
 
 def formatTable(rows):
     rows = [[str(r) for r in row] for row in rows]
-    
+
     cols = [[r[i] for r in rows] for i in range(len(rows[0]))]
     colWidth = [max([len(c) for c in col]) for col in cols]
 

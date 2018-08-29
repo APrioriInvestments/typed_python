@@ -17,6 +17,7 @@ class ServerToClientProtocol(AlgebraicProtocol):
     def __init__(self, dbserver):
         AlgebraicProtocol.__init__(self, ClientToServer, ServerToClient)
         self.dbserver = dbserver
+        self.connectionIsDead = False
 
     def setClientToServerHandler(self, handler):
         self.handler = handler
@@ -28,12 +29,18 @@ class ServerToClientProtocol(AlgebraicProtocol):
         self.dbserver.addConnection(self)
 
     def write(self, msg):
-        self.sendMessage(msg)
+        if not self.connectionIsDead:
+            self.sendMessage(msg)
 
     def connection_lost(self, e):
+        self.connectionIsDead = True
+        _eventLoop.loop.call_later(0.01, self.completeDropConnection)
+
+    def completeDropConnection(self):
         self.dbserver.dropConnection(self)
 
     def close(self):
+        self.connectionIsDead = True
         self.transport.close()
 
 class ClientToServerProtocol(AlgebraicProtocol):

@@ -26,7 +26,7 @@ import psutil
 import multiprocessing
 import logging.config
 
-def configureLogging(preamble=""):
+def configureLogging(preamble="service_manager"):
     logging.basicConfig(format='[%(asctime)s] %(levelname)6s %(filename)30s:%(lineno)4s' 
         + ("|" + preamble if preamble else '') 
         + '| %(message)s', level=logging.INFO
@@ -49,6 +49,7 @@ def main(argv):
 
     parser.add_argument("--max_gb_ram", type=float, default=None, required=False)
     parser.add_argument("--max_cores", type=int, default=None, required=False)
+    parser.add_argument("--shutdownTimeout", type=float, default=None, required=False)
 
     parser.add_argument('--logdir', default=None, required=False)
     configureLogging()
@@ -100,7 +101,8 @@ def main(argv):
             isMaster=parsedArgs.run_db,
             maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
             maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),
-            logfileDirectory=parsedArgs.logdir
+            logfileDirectory=parsedArgs.logdir,
+            shutdownTimeout=parsedArgs.shutdownTimeout
             )
         
         serviceManager.start()
@@ -109,7 +111,11 @@ def main(argv):
 
         try:
             while not shouldStop.is_set():
-                shouldStop.wait(timeout=1.0)
+                shouldStop.wait(timeout=max(.1, serviceManager.shutdownTimeout / 10))
+                try:
+                    serviceManager.cleanup()
+                except:
+                    logging.error("Service manager cleanup failed:\n%s", traceback.format_exc())
         except KeyboardInterrupt:
             return 0
 
@@ -119,13 +125,13 @@ def main(argv):
             try:
                 databaseServer.stop()
             except:
-                logging.info("Failed to stop the database server:\n%s", traceback.format_exc())
+                logging.error("Failed to stop the database server:\n%s", traceback.format_exc())
 
         if serviceManager is not None:
             try:
                 serviceManager.stop()
             except:
-                logging.info("Failed to stop the service manager:\n%s", traceback.format_exc())
+                logging.error("Failed to stop the service manager:\n%s", traceback.format_exc())
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))

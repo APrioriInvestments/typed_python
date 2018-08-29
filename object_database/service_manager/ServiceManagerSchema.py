@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 import importlib
+import time
 
 from object_database import Schema, Indexed, Index, core_schema
 from typed_python import *
@@ -128,6 +129,12 @@ class ServiceInstance:
     connection = Indexed(OneOf(None, core_schema.Connection))
 
     shouldShutdown = bool
+    shutdownTimestamp = OneOf(None, float)
+
+    def triggerShutdown(self):
+        if not self.shouldShutdown:
+            self.shouldShutdown = True
+            self.shutdownTimestamp = time.time()
 
     def markFailedToStart(self, reason):
         self.boot_timestamp = time.time()

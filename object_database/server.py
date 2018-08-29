@@ -50,15 +50,8 @@ class ConnectedChannel:
                 )
             )
 
-    def sendTransaction(self, key_value, setAdds, setRemoves, tid):
-        self.channel.write(
-            ServerToClient.Transaction(
-                writes={k:v for k,v in key_value.items()},
-                set_adds=setAdds,
-                set_removes=setRemoves,
-                transaction_id=tid
-                )
-            )
+    def sendTransaction(self, msg):
+        self.channel.write(msg)
 
     def sendInitializationMessage(self):
         self.channel.write(
@@ -278,12 +271,15 @@ class Server:
         #set the json representation in the database
         self._kvstore.setSeveral({k: v for k,v in key_value.items()}, set_adds, set_removes)
 
-        for client in self._clientChannels.values():
-            client.sendTransaction(
-                key_value,
-                set_adds,
-                set_removes,
-                transaction_id
+        if self._clientChannels:
+            transaction_message = ServerToClient.Transaction(
+                writes={k:v for k,v in key_value.items()},
+                set_adds=set_adds,
+                set_removes=set_removes,
+                transaction_id=transaction_id
                 )
+
+            for client in self._clientChannels.values():
+                client.sendTransaction(transaction_message)
 
         return True
