@@ -396,7 +396,7 @@ class DatabaseConnection:
             #this is the lowest write we have in the in-mem database
             lowest = self._version_numbers[0]
 
-            if self._min_reffed_version_number is None or self._min_reffed_version_number < lowest:
+            if self._min_reffed_version_number is not None and self._min_reffed_version_number < lowest:
                 #some transactions still refer to values before this version
                 return
 

@@ -24,6 +24,8 @@ import time
 import traceback
 import uuid
 
+LOG_SLOW_COMMIT_THRESHOLD = 1.0
+
 class DisconnectedException(Exception):
     pass
 
@@ -385,7 +387,15 @@ class View(object):
 
             if not self._confirmCommitCallback:
                 #this is the synchronous case - we want to wait for the confirm
+                t0 = time.time()
+
                 res = result_queue.get()
+                
+                if time.time() - t0 > LOG_SLOW_COMMIT_THRESHOLD:
+                    logging.info("Committing %s writes and %s set changes took %.1f seconds", 
+                        len(self._writes), len(self._set_adds) + len(self._set_removes), time.time() - t0
+                        )
+
                 if res.matches.Success:
                     return
                 if res.matches.Disconnected:

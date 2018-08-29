@@ -17,6 +17,7 @@ def formatTable(rows):
     return "\n".join(formattedRows)
 
 def configureLogging(preamble=""):
+    logging.getLogger('botocore.vendored.requests.packages.urllib3.connectionpool').setLevel(logging.CRITICAL)
     logging.getLogger('asyncio').setLevel(logging.CRITICAL)
     logging.basicConfig(format='[%(asctime)s] %(levelname)6s %(filename)30s:%(lineno)4s' 
         + ("|" + preamble if preamble else '') 

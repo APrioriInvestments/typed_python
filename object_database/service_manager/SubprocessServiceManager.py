@@ -18,6 +18,7 @@ from object_database.service_manager.ServiceWorker import ServiceWorker
 from object_database.service_manager.ServiceManagerSchema import service_schema
 from object_database import connect
 
+import threading
 import time
 import logging
 import sys
@@ -50,6 +51,7 @@ class SubprocessServiceManager(ServiceManager):
         self.host = host
         self.port = port
         self.logfileDirectory = logfileDirectory
+        self.lock = threading.Lock()
 
         if logfileDirectory is not None:
             if not os.path.exists(logfileDirectory):
@@ -66,25 +68,26 @@ class SubprocessServiceManager(ServiceManager):
         if instanceIdentity in self.serviceProcesses:
             return
 
-        logfileName = service.name + "-" + timestampToFileString(time.time()) + "-" + instanceIdentity + ".log.txt"
+        with self.lock:
+            logfileName = service.name + "-" + timestampToFileString(time.time()) + "-" + instanceIdentity + ".log.txt"
 
-        if self.logfileDirectory is not None:
-            output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
-        else:
-            output_file = None
-        
-        process = subprocess.Popen(
-            [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
-             self.host, str(self.port), instanceIdentity],
-            stdin=subprocess.DEVNULL,
-            stdout=output_file,
-            stderr=subprocess.STDOUT
-            )
+            if self.logfileDirectory is not None:
+                output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
+            else:
+                output_file = None
+            
+            process = subprocess.Popen(
+                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
+                 self.host, str(self.port), instanceIdentity],
+                stdin=subprocess.DEVNULL,
+                stdout=output_file,
+                stderr=subprocess.STDOUT
+                )
 
-        self.serviceProcesses[instanceIdentity] = process
+            self.serviceProcesses[instanceIdentity] = process
 
-        if output_file:
-            output_file.close()
+            if output_file:
+                output_file.close()
 
         if self.logfileDirectory:
             logging.info(
@@ -132,12 +135,13 @@ class SubprocessServiceManager(ServiceManager):
 
     def cleanupOldLogfiles(self):
         if self.logfileDirectory:
-            for file in os.listdir(self.logfileDirectory):
-                instanceId = parseLogfileToInstanceid(file)
-                if instanceId and instanceId not in self.serviceProcesses:
-                    if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
-                        os.makedirs(os.path.join(self.logfileDirectory, "old"))
-                    shutil.move(os.path.join(self.logfileDirectory, file), os.path.join(self.logfileDirectory, "old", file))
+            with self.lock:
+                for file in os.listdir(self.logfileDirectory):
+                    instanceId = parseLogfileToInstanceid(file)
+                    if instanceId and instanceId not in self.serviceProcesses:
+                        if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
+                            os.makedirs(os.path.join(self.logfileDirectory, "old"))
+                        shutil.move(os.path.join(self.logfileDirectory, file), os.path.join(self.logfileDirectory, "old", file))
 
 
 

@@ -71,8 +71,6 @@ class Codebase:
 
     def instantiate(self, disk_path, service_module):
         """Instantiate a codebase on disk and load it."""
-        logging.info(disk_path)
-
         for fpath, fcontents in self.files.items():
             path, name = os.path.split(fpath)
 
