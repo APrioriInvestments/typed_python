@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from object_database.tcp_server import connect, TcpServer
-from object_database.persistence import RedisStringStore, InMemoryStringStore
+from object_database.persistence import RedisPersistence, InMemoryPersistence
 from object_database.schema import Schema, Indexed, Index
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceManagerSchema import service_schema

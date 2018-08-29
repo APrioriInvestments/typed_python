@@ -1,7 +1,7 @@
 from object_database.server import Server
 from object_database.database_connection import DatabaseConnection
 from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
-from object_database.persistence import InMemoryStringStore
+from object_database.persistence import InMemoryPersistence
 import json
 import time
 import queue
@@ -37,7 +37,7 @@ class InMemoryChannel:
     def pumpMessagesFromServer(self):
         while not self._shouldStop:
             try:
-                e = self._serverToClientMsgQueue.get(timeout=0.01)
+                e = self._serverToClientMsgQueue.get(timeout=1.0)
             except queue.Empty:
                 e = None
 
@@ -57,7 +57,7 @@ class InMemoryChannel:
                 e = ClientToServer.Heartbeat()
             else:
                 try:
-                    e = self._clientToServerMsgQueue.get(timeout=0.01)
+                    e = self._clientToServerMsgQueue.get(timeout=1.0)
                 except queue.Empty:
                     e = None
 
@@ -75,6 +75,8 @@ class InMemoryChannel:
 
     def stop(self):
         self._shouldStop = True
+        self._clientToServerMsgQueue.put(None)
+        self._serverToClientMsgQueue.put(None)
         self._pumpThreadServer.join()
         self._pumpThreadClient.join()
 
@@ -100,7 +102,7 @@ class InMemoryChannel:
 
 class InMemServer(Server):
     def __init__(self, kvstore=None):
-        Server.__init__(self, kvstore or InMemoryStringStore())
+        Server.__init__(self, kvstore or InMemoryPersistence())
         self.channels = []
         self.stopped = False
         self.checkForDeadConnectionsLoopThread = threading.Thread(target=self.checkForDeadConnectionsLoop)

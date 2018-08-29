@@ -16,6 +16,7 @@ from typed_python.hash import sha_hash
 
 from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs
 
+from object_database.keymapping import *
 import object_database.algebraic_to_json as algebraic_to_json
 import logging
 import threading
@@ -54,17 +55,6 @@ class JsonWithPyRep:
     def __init__(self, jsonRep, pyRep):
         self.jsonRep = jsonRep
         self.pyRep = pyRep
-
-def data_key(obj_type, identity, field_name):
-    return obj_type.__schema__.name + "-" + obj_type.__qualname__ + "-val:" + identity + ":" + field_name
-
-def index_key(obj_type, field_name, value):
-    if isinstance(value, int):
-        value_hash = "int_" + str(value)
-    else:
-        value_hash = sha_hash(value).hexdigest
-
-    return obj_type.__schema__.name + "-" + obj_type.__qualname__ + "-ix:" + field_name + ":" + value_hash
 
 def default_initialize(t):
     if t in (str,bool,bytes,int,float):
@@ -215,7 +205,7 @@ class View(object):
         
         val = self._db._get_versioned_object_data(key, self._transaction_num)
 
-        return val.jsonRep is not None
+        return val is not None and val.jsonRep is not None
 
     def _delete(self, obj, identity, field_names):
         existing_index_vals = self._compute_index_vals(obj)

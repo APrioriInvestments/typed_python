@@ -19,7 +19,7 @@ import sys
 import time
 import typed_python
 import object_database.tcp_server as tcp_server
-from object_database.persistence import InMemoryStringStore, RedisStringStore
+from object_database.persistence import InMemoryPersistence, RedisPersistence
 
 def main(argv):
     parser = argparse.ArgumentParser("Run an object_database server")
@@ -32,9 +32,9 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     if parsedArgs.inmem:
-        mem_store = InMemoryStringStore()
+        mem_store = InMemoryPersistence()
     else:
-        mem_store = RedisStringStore(port=parsedArgs.redis_port)
+        mem_store = RedisPersistence(port=parsedArgs.redis_port)
 
     databaseServer = tcp_server.TcpServer(parsedArgs.host, parsedArgs.port, mem_store)
 

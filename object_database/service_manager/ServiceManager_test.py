@@ -62,6 +62,8 @@ class TestServiceLastTimestamp:
 
 class TestService(ServiceBase):
     def initialize(self):
+        self.db.subscribeToSchema(schema)
+
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
@@ -81,6 +83,8 @@ class TestService(ServiceBase):
 
 class HangingService(ServiceBase):
     def initialize(self):
+        self.db.subscribeToSchema(schema)
+        
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
@@ -110,6 +114,8 @@ def getTestServiceModule(version):
 
             class Service(ServiceBase):
                 def initialize(self):
+                    self.db.subscribeToSchema(schema)
+
                     with self.db.transaction():
                         self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
                         self.conn.version = {version}
@@ -138,6 +144,7 @@ class ServiceManagerTest(unittest.TestCase):
                 ]
             )
         self.database = connect("localhost", 8020, retry=True)
+        self.database.subscribeToSchema(core_schema, service_schema, schema)
 
     def tearDown(self):
         self.server.terminate()

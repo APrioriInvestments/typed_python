@@ -17,15 +17,26 @@ from types import FunctionType
 from typed_python import *
 import inspect
 
+TypeDefinition = NamedTuple(fields=TupleOf(str), indices=TupleOf(str))
+SchemaDefinition = ConstDict(str, TypeDefinition)
+
 class Schema:
     """A collection of types that can be used to access data in a database."""
-    def __init__(self, name="default"):
+    def __init__(self, name):
         self._name = name
         self._types = {}
         #class -> indexname -> fun(object->value)
         self._indices = {}
         self._indexTypes = {}
         self._frozen = False
+
+    def toDefinition(self):
+        return SchemaDefinition({
+            tname: self.typeToDef(t) for tname, t in self._types.items()
+            })
+
+    def typeToDef(self, t):
+        return TypeDefinition(fields = tuple(t.__types__.keys()) + (" exists",), indices= tuple(self._indices.get(t,{}).keys()))
 
     @property
     def name(self):

@@ -27,7 +27,7 @@ import multiprocessing
 import logging.config
 from object_database.util import configureLogging
 
-from object_database import connect, TcpServer, RedisStringStore, InMemoryStringStore, DisconnectedException
+from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
 def main(argv):
@@ -75,19 +75,14 @@ def main(argv):
             databaseServer = TcpServer(
                 parsedArgs.own_hostname, 
                 object_database_port, 
-                RedisStringStore(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None else
-                    InMemoryStringStore()
+                RedisPersistence(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None else
+                    InMemoryPersistence()
                 )
 
             databaseServer.start()
 
             logging.info("Started a database server on %s:%s", parsedArgs.own_hostname, object_database_port)
     
-        #verify we can connect first.
-        db = connect(parsedArgs.db_hostname, parsedArgs.port)
-
-        logging.info("Successfully connected to object database at %s:%s", parsedArgs.db_hostname, object_database_port)
-
         serviceManager = None
 
         logging.info("Started serviceManager.")
@@ -106,7 +101,7 @@ def main(argv):
                             logfileDirectory=parsedArgs.logdir,
                             shutdownTimeout=parsedArgs.shutdownTimeout
                             )
-                    except DisconnectedException:
+                    except (ConnectionRefusedError, DisconnectedException):
                         serviceManager = None
 
                     if serviceManager is None:
@@ -115,10 +110,10 @@ def main(argv):
                     else:
                         serviceManager.start()
                 else:
-                    shouldStop.wait(timeout=max(.5, serviceManager.shutdownTimeout / 10))
+                    shouldStop.wait(timeout=max(.1, serviceManager.shutdownTimeout / 10))
                     try:
                         serviceManager.cleanup()
-                    except (ConnectionRefusedException, DisconnectedException):
+                    except (ConnectionRefusedError, DisconnectedException):
                         if parsedArgs.run_db:
                             logging.error("Disconnected from object_database host.")
                             return 1

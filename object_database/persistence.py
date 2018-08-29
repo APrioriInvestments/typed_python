@@ -19,13 +19,7 @@ import threading
 import logging
 import os
 
-class InMemoryStringStore(object):
-    """Implements a string-to-string store in memory.
-
-    Keys must be strings. Values are also strings or sets of strings.
-
-    This class is thread-safe.
-    """
+class InMemoryPersistence(object):
     def __init__(self, db=0):
         self.values = {}
         self.lock = threading.RLock()
@@ -34,6 +28,7 @@ class InMemoryStringStore(object):
         with self.lock:
             if key not in self.values:
                 return None
+
             val = self.values.get(key)
 
             assert isinstance(val, str), key
@@ -48,25 +43,33 @@ class InMemoryStringStore(object):
             else:
                 self.values[key] = value
 
-    def setAdd(self, key, values):
+    def _setAdd(self, key, values):
+        if not values:
+            return
+        
         with self.lock:
             if key not in self.values:
                 self.values[key] = set()
             for value in values:
                 self.values[key].add(value)
 
-    def setRemove(self, key, values):
+    def _setRemove(self, key, values):
+        if not values:
+            return
+
         with self.lock:
-            s = self.values.get(key,None)
-            assert isinstance(s,set), (key,s)
+            s = self.values.get(key,set())
+
             for value in values:
-                assert value in s, (jv, s)
+                assert value in s, (key, value, s)
                 s.remove(value)
+            if not s:
+                del self.values[key]
 
     def storedStringCount(self):
         return len([x for x in self.values.values() if isinstance(x,str)])
 
-    def setMembers(self, key):
+    def getSetMembers(self, key):
         with self.lock:
             s = self.values.get(key, None)
             if s is None:
@@ -74,21 +77,15 @@ class InMemoryStringStore(object):
 
             assert isinstance(s,set)
 
-            return sorted([x for x in s])
-
-    def listKeys(self, prefix, suffix):
-        with self.lock:
-            res = []
-            for k in self.keys:
-                if k.startswith(prefix) and k.endswith(suffix) and len(k) >= len(prefix) + len(suffix):
-                    res.append(k)
-            return sorted(res)
+            return s
 
     def getSeveral(self, keys):
         with self.lock:
             return [self.get(k) for k in keys]
 
     def setSeveral(self, kvs, adds=None, removes=None):
+        new_sets, dropped_sets = set(), set()
+
         with self.lock:
             for k in (adds or []):
                 assert not isinstance(self.values.get(k, None), str), k + " is already a string"
@@ -100,11 +97,17 @@ class InMemoryStringStore(object):
 
             if adds:
                 for k,to_add in adds.items():
-                    self.setAdd(k, to_add)
+                    if k not in self.values:
+                        new_sets.add(k)
+                    self._setAdd(k, to_add)
 
             if removes:
                 for k,to_remove in removes.items():
-                    self.setRemove(k, to_remove)
+                    self._setRemove(k, to_remove)
+                    if k not in self.values:
+                        dropped_sets.add(k)
+
+        return new_sets, dropped_sets
 
     def exists(self, key):
         with self.lock:
@@ -119,23 +122,7 @@ class InMemoryStringStore(object):
         pass
 
 
-class RedisStringStore(object):
-    """Implements a string-to-store store using Redis.
-
-    Keys must be strings. Values are strings, or None.
-
-    You may store values using the "set" and "get" methods. 
-
-    You may store sets of values using the setAdd, setRemove, setMembers, methods.
-
-    You may not use a value-style method on a set-style key or vice versa.
-
-    Setting a key to None deletes it, and non-existent keys are implicity 'None'
-
-    You may delete any kind of value.
-
-    This class is thread-safe.
-    """
+class RedisPersistence(object):
     def __init__(self, db=0, port=None):
         self.lock = threading.RLock()
         kwds = {}
@@ -168,7 +155,7 @@ class RedisStringStore(object):
             if result is None:
                 return result
 
-            result = result
+            assert isinstance(result, str)
 
             self.cache[key] = result
 
@@ -196,16 +183,7 @@ class RedisStringStore(object):
 
             return [self.cache.get(k, None) for k in keys]
 
-    def listKeys(self, prefix, suffix):
-        """List all the keys (value or otherwise) with a given prefix and suffix."""
-        with self.lock:
-            for special in "\\*[]":
-                prefix = prefix.replace(special, "\\" + special)
-                suffix = suffix.replace(special, "\\" + special)
-
-            return sorted(self.redis.list(prefix + "*" + suffix))
-
-    def setMembers(self, key):
+    def getSetMembers(self, key):
         with self.lock:
             if key in self.cache:
                 assert isinstance(self.cache[key], set), "item is a string, not a set"
@@ -223,14 +201,8 @@ class RedisStringStore(object):
             self.cache[key] = set([k for k in vals])
             return self.cache[key]
 
-
-    def setAdd(self, key, values):
-        self.setSeveral({}, {key: values}, {})
-
-    def setRemove(self, key, values):
-        self.setSeveral({}, {}, {key: values})
-
     def setSeveral(self, kvs, setAdds=None, setRemoves=None):
+        new_sets, dropped_sets = set(),set()
         with self.lock:
             pipe = self.redis.pipeline()
 
@@ -241,10 +213,16 @@ class RedisStringStore(object):
                     pipe.set(key, value)
 
             for key, to_add in (setAdds or {}).items():
+                if key not in self.cache:
+                    self.getSetMembers(key)
+
                 for to_add_val in to_add:
                     pipe.sadd(key, to_add_val)
 
             for key, to_remove in (setRemoves or {}).items():
+                if key not in self.cache:
+                    self.getSetMembers(key)
+                
                 for to_remove_val in to_remove:
                     pipe.srem(key, to_remove_val)
 
@@ -261,14 +239,23 @@ class RedisStringStore(object):
             for key, to_add in (setAdds or {}).items():
                 if key not in self.cache:
                     self.cache[key] = set()
+                    new_sets.add(key)
+                else:
+                    assert self.cache[key]
+
                 for val in to_add:
                     self.cache[key].add(val)
 
             for key, to_remove in (setRemoves or {}).items():
-                if key not in self.cache:
-                    self.cache[key] = set()
+                assert self.cache.get(key)
+
                 for val in to_remove:
                     self.cache[key].discard(val)
+
+                if not self.cache[key]:
+                    dropped_sets.add(key)
+                    del self.cache[key]
+        return new_sets, dropped_sets
 
     def set(self, key, value):
         with self.lock:

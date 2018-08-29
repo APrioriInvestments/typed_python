@@ -35,6 +35,7 @@ class ServiceManager(object):
         self.serviceHostObject = None
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
+        self.db.subscribeToSchema(core_schema, service_schema)
 
         self.shouldStop = threading.Event()
         self.thread = threading.Thread(target=self.doWork)

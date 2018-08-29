@@ -2,7 +2,7 @@ from object_database.database_connection import DatabaseConnection
 from object_database.server import Server
 from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
 from object_database.algebraic_protocol import AlgebraicProtocol
-from object_database.persistence import InMemoryStringStore
+from object_database.persistence import InMemoryPersistence
 
 import asyncio
 import json
@@ -152,7 +152,7 @@ def connect(host, port, timeout=10.0, retry = False):
 
 class TcpServer(Server):
     def __init__(self, host, port, mem_store = None):
-        Server.__init__(self, mem_store or InMemoryStringStore())
+        Server.__init__(self, mem_store or InMemoryPersistence())
 
         self.mem_store = mem_store
         self.host = host

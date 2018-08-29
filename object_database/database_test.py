@@ -20,7 +20,7 @@ from object_database.view import RevisionConflictException, DisconnectedExceptio
 from object_database.database_connection import TransactionListener, DatabaseConnection
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
-from object_database.persistence import InMemoryStringStore
+from object_database.persistence import InMemoryPersistence
 import object_database.messages as messages
 import queue
 import unittest
@@ -43,7 +43,7 @@ expr.__str__ = lambda self: (
     "Mul(%s,%s)" % (self.l,self.r) if self.matches.Mul else "<unknown>"
     )
 
-schema = Schema()
+schema = Schema("test_schema")
 
 @schema.define
 class Root:
@@ -68,6 +68,7 @@ class Counter:
 class ObjectDatabaseTests:
     def test_methods(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             counter = Counter()
@@ -77,7 +78,8 @@ class ObjectDatabaseTests:
 
     def test_identity_transfer(self):
         db = self.createNewDb()
-
+        db.subscribeToSchema(schema)
+        
         with db.transaction():
             root = Root()
             root2 = Root.fromIdentity(root._identity)
@@ -87,8 +89,8 @@ class ObjectDatabaseTests:
 
     def test_transaction_handlers(self):
         db = self.createNewDb()
-        db.addSchema(schema)
-
+        db.subscribeToSchema(schema)
+        
         didOne = threading.Event()
 
         def handler(changed):
@@ -104,7 +106,8 @@ class ObjectDatabaseTests:
         
     def test_basic(self):
         db = self.createNewDb()
-
+        db.subscribeToSchema(schema)
+        
         with db.transaction():
             root = Root()
 
@@ -113,13 +116,16 @@ class ObjectDatabaseTests:
             root.obj = Object(k=expr.Constant(value=23))
 
         db2 = self.createNewDb()
+        db2.subscribeToSchema(schema)
+        
 
         with db2.view():
             self.assertEqual(root.obj.k.value, 23)
 
     def test_throughput(self):
         db = self.createNewDb()
-
+        db.subscribeToSchema(schema)
+        
         with db.transaction():
             root = Root()
             root.obj = Object(k=expr.Constant(value=0))
@@ -135,6 +141,7 @@ class ObjectDatabaseTests:
                 
     def test_delayed_transactions(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         confirmed = queue.Queue()
 
@@ -160,6 +167,7 @@ class ObjectDatabaseTests:
 
     def test_exists(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             root = Root()
@@ -174,12 +182,14 @@ class ObjectDatabaseTests:
             self.assertFalse(root.exists())
 
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.view():
             self.assertFalse(root.exists())
 
     def test_read_performance(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         objects = {}
         with db.transaction():
@@ -196,6 +206,7 @@ class ObjectDatabaseTests:
                 objects[i] = root
 
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         t0 = time.time()
         count = 0
@@ -208,6 +219,7 @@ class ObjectDatabaseTests:
 
     def test_transactions(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             root = Root()
@@ -231,6 +243,7 @@ class ObjectDatabaseTests:
 
     def test_conflicts(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             root = Root()
@@ -252,6 +265,7 @@ class ObjectDatabaseTests:
     
     def test_object_versions_robust(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         counters = []
         counter_vals_by_tn = {}
@@ -276,6 +290,7 @@ class ObjectDatabaseTests:
 
         for passIx in range(1000):
             with db.transaction():
+                didOne = False
                 for subix in range(int(random.random() * 5 + 1)):
                     counter = counters[int(random.random() * len(counters))]
 
@@ -285,10 +300,13 @@ class ObjectDatabaseTests:
                         else:
                             counter.k = int(random.random() * 100)
                         total_writes += 1
+                        didOne = True
 
-                counter_vals_by_tn[db._cur_transaction_num + 1] = {c: c.k for c in counters if c.exists()}
+                if didOne:
+                    counter_vals_by_tn[db._cur_transaction_num + 1] = {c: c.k for c in counters if c.exists()}
 
-            views_by_tn[db._cur_transaction_num] = db.view()
+            if didOne:
+                views_by_tn[db._cur_transaction_num] = db.view()
 
             while views_by_tn and random.random() < .5 or len(views_by_tn) > 10:
                 #pick a random view and check that it's consistent
@@ -298,7 +316,7 @@ class ObjectDatabaseTests:
                 with views_by_tn[tid]:
                     for c in counters:
                         if not c.exists():
-                            assert c not in counter_vals_by_tn[tid]
+                            assert c not in counter_vals_by_tn[tid], tid
                         else:
                             self.assertEqual(c.k, counter_vals_by_tn[tid][c])
 
@@ -306,31 +324,27 @@ class ObjectDatabaseTests:
 
             if random.random() < .05 and views_by_tn:
                 with db.view():
-                    max_counter_vals = {}
-                    for c in counters:
-                        if c.exists():
-                            max_counter_vals[c] = c.k
+                    curCounterVals = {c: c.k for c in counters if c.exists()}
 
                 #reset the database
                 db = self.createNewDb()
+                db.subscribeToSchema(schema)
 
-                new_counters = list(counters)
+                with db.view():
+                    newCounterVals = {c: c.k for c in counters if c.exists()}
+                
+                self.assertEqual(curCounterVals, newCounterVals)
 
-                views_by_tn = {db._cur_transaction_num: db.view()}
+                views_by_tn = {}
+                counter_vals_by_tn = {}
 
-                counter_vals_by_tn = {db._cur_transaction_num: 
-                    {new_counters[ix]: max_counter_vals[counters[ix]] for ix in 
-                        range(len(counters)) if counters[ix] in max_counter_vals}
-                    }
-
-                counters = new_counters
-
-        #we may have one or two for connection objects.
-        self.assertLess(self.mem_store.storedStringCount(), 102)
+        #we may have one or two for connection objects, and we have two values for every indexed thing
+        self.assertLess(self.mem_store.storedStringCount(), 202)
         self.assertTrue(total_writes > 500)
 
     def test_flush_db_works(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         counters = []
         with db.transaction():
@@ -350,7 +364,7 @@ class ObjectDatabaseTests:
         while time.time() - t0 < 1.0 and self.mem_store.storedStringCount() >= 2:
             time.sleep(.01)
 
-        self.assertLess(self.mem_store.storedStringCount(), 2)
+        self.assertLess(self.mem_store.storedStringCount(), 3)
 
         #but the view does!
         with view:
@@ -360,11 +374,13 @@ class ObjectDatabaseTests:
     def test_read_write_conflict(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Counter:
             k = int
+
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             o1 = Counter()
@@ -394,6 +410,7 @@ class ObjectDatabaseTests:
             
     def test_indices(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.view() as v:
             self.assertEqual(Counter.lookupAll(k=20), ())
@@ -422,6 +439,7 @@ class ObjectDatabaseTests:
 
     def test_indices_multiple_values(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction() as v:
             k1 = Counter(k=20)
@@ -450,12 +468,14 @@ class ObjectDatabaseTests:
 
     def test_indices_across_invocations(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             o = Counter(k=1)
             o.x = 10
 
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction() as v:
             o = Counter.lookupOne(k=1)
@@ -464,6 +484,7 @@ class ObjectDatabaseTests:
             o.x = 11
 
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction() as v:
             o = Counter.lookupOne(k=2)
@@ -471,6 +492,7 @@ class ObjectDatabaseTests:
             self.assertEqual(o.x, 11)
             
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction() as v:
             self.assertFalse(Counter.lookupAny(k=2))
@@ -482,7 +504,7 @@ class ObjectDatabaseTests:
     def test_index_consistency(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
@@ -492,6 +514,8 @@ class ObjectDatabaseTests:
             @Indexed
             def pair(self):
                 return (self.x, self.y)
+
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             o = Object(x=0,y=0)
@@ -517,6 +541,7 @@ class ObjectDatabaseTests:
 
     def test_indices_of_algebraics(self):
         db = self.createNewDb()
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             o1 = Object(k=expr.Constant(value=123))
@@ -525,7 +550,7 @@ class ObjectDatabaseTests:
             self.assertEqual(Object.lookupAll(k=expr.Constant(value=123)), (o1,))
 
     def test_frozen_schema(self):
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
@@ -538,7 +563,7 @@ class ObjectDatabaseTests:
             schema.SomeOtherObject
 
     def test_freezing_schema_with_undefined_fails(self):
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
@@ -558,7 +583,7 @@ class ObjectDatabaseTests:
     def test_index_functions(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
@@ -569,6 +594,8 @@ class ObjectDatabaseTests:
                 return self.k * 2
 
             pair_index = Index('k', 'k')
+
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             o1 = Object(k=10)
@@ -588,7 +615,8 @@ class ObjectDatabaseTests:
     def test_index_functions_None_semantics(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
+
         @schema.define
         class Object:
             k=Indexed(int)
@@ -596,6 +624,8 @@ class ObjectDatabaseTests:
             @Indexed
             def index(self):
                 return True if self.k > 10 else None
+
+        db.subscribeToSchema(schema)
 
         with db.transaction() as v:
             self.assertEqual(Object.lookupAll(index=True), ())
@@ -613,11 +643,13 @@ class ObjectDatabaseTests:
     def test_indices_update_during_transactions(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
             k=Indexed(int)
+
+        db.subscribeToSchema(schema)
         
         with db.transaction() as v:
             self.assertEqual(Object.lookupAll(k=10), ())
@@ -638,11 +670,13 @@ class ObjectDatabaseTests:
     def test_index_transaction_conflicts(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
             k=Indexed(int)
+
+        db.subscribeToSchema(schema)
 
         with db.transaction():
             o1 = Object(k=10)
@@ -666,43 +700,133 @@ class ObjectDatabaseTests:
     def test_default_constructor_for_list(self):
         db = self.createNewDb()
 
-        schema = Schema()
+        schema = Schema("test_schema")
 
         @schema.define
         class Object:
             x = TupleOf(int)
 
+        db.subscribeToSchema(schema)
+
         with db.transaction():
             n = Object()
             self.assertEqual(len(n.x), 0)
 
-    def test_heartbeats(self):
-        old_interval = messages.getHeartbeatInterval()
-        messages.setHeartbeatInterval(.25)
+    def test_index_subscriptions(self):
+        db_all = self.createNewDb()
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
 
-        try:
-            db1 = self.createNewDb()
-            db2 = self.createNewDb()
+        db_all.subscribeToSchema(schema)
+        with db_all.transaction():
+            c0 = Counter(k = 0)
+            c1 = Counter(k = 1)
 
-            with db1.view():
-                self.assertTrue(len(core_schema.Connection.lookupAll()), 2)
+            c0.x = 20
+            c1.x = 30
 
-            db1._stopHeartbeating()
+        db1.subscribeToIndex(Counter,k=0)
+        db2.subscribeToIndex(Counter,k=1)
 
-            self.assertTrue(
-                db2.waitForCondition(lambda: len(core_schema.Connection.lookupAll()) == 1, 5.0)
-                )
+        with db1.view():
+            self.assertTrue(c0.exists())
+            self.assertEqual(c0.x, 20)
+            self.assertFalse(c1.exists())
 
-            with self.assertRaises(DisconnectedException):
-                with db1.view():
-                    pass
-        finally:
-            messages.setHeartbeatInterval(old_interval)
+        with db2.view():
+            self.assertTrue(c1.exists())
+            self.assertEqual(c1.x, 30)
+            self.assertFalse(c0.exists())
+
+        #create a new value in the view and verify it shows up
+        with db_all.transaction():
+            c2_0 = Counter(k=0)
+            c2_1 = Counter(k=1)
+
+        db1.waitForCondition(lambda: c2_0.exists(), 2)
+        db2.waitForCondition(lambda: c2_1.exists(), 2)
+
+        with db2.view():
+            self.assertFalse(c2_0.exists())
+        with db1.view():
+            self.assertFalse(c2_1.exists())
+
+        #now move c2_0 from '0' to '1'. It should show up in db2 and still in db1
+        with db_all.transaction():
+            c2_0.k = 1
+
+        db1.waitForCondition(lambda: c2_0.exists(), 2)
+        db2.waitForCondition(lambda: c2_0.exists(), 2)
         
+        #now, we should see it get subscribed to in both
+        with db_all.transaction():
+            c2_0.x = 40
+
+        db1.waitForCondition(lambda: c2_0.x == 40, 2)
+        db2.waitForCondition(lambda: c2_0.x == 40, 2)
+        
+        #but if we make a new database connection and subscribe, we won't see it
+        db3 = self.createNewDb()
+        db3.subscribeToIndex(Counter,k=0)
+        db3.flush()
+
+        with db3.view():
+            self.assertTrue(not c2_0.exists())
+            self.assertTrue(not c2_1.exists())
+
+    def test_implicitly_subscribed_to_objects_we_create(self):
+        db1 = self.createNewDb()
+
+        with db1.transaction():
+            c = Counter(k=1)
+
+        with db1.view():
+            self.assertTrue(c.exists())
+
+    def test_subscription_matching_is_linear(self):
+        schemas = []
+        dbs = []
+        
+        db = self.createNewDb()
+
+        while len(schemas) < 20:
+            #make a new schema
+            s = Schema("schema_" + str(len(schemas)))
+            
+            @s.define
+            class Thing:
+                x = int
+
+            schemas.append(s)
+
+            #create a new database for this new schema and subscribe in both this one and
+            #the main connection
+            dbs.append(self.createNewDb())
+            dbs[-1].subscribeToSchema(s)
+            db.subscribeToSchema(s)
+
+            #create a new object in the schema
+            things = []
+            for i in range(len(schemas)):
+                with dbs[i].transaction():
+                    things.append(schemas[i].Thing(x=10))
+
+            #make sure that the main db sees it
+            for thing in things:
+                db.waitForCondition(lambda: thing.exists(), 10)
+
+            #verify the main db sees something quadratic in the number of transactions plus a constant
+            self.assertTrue(db._messages_received < (len(schemas) + 1) * (len(schemas) + 2) / 2 + 2)
+
+            #each database sees two transactions each pass
+            for i in range(len(dbs)):
+                self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
+
+
 
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
-        self.mem_store = InMemoryStringStore()
+        self.mem_store = InMemoryPersistence()
         self.server = InMemServer(self.mem_store)
 
     def createNewDb(self):
@@ -713,11 +837,39 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def tearDown(self):
         self.server.teardown()
 
+    def test_heartbeats(self):
+        old_interval = messages.getHeartbeatInterval()
+        messages.setHeartbeatInterval(.25)
 
+        try:
+            db1 = self.createNewDb()
+            db2 = self.createNewDb()
+
+            db1.subscribeToSchema(core_schema)
+            db2.subscribeToSchema(core_schema)
+
+            with db1.view():
+                self.assertTrue(len(core_schema.Connection.lookupAll()), 2)
+
+            with db2.view():
+                self.assertTrue(len(core_schema.Connection.lookupAll()), 2)
+
+            db1._stopHeartbeating()
+
+            db2.waitForCondition(lambda: len(core_schema.Connection.lookupAll()) == 1, 5.0)
+
+            with db2.view():
+                self.assertEqual(len(core_schema.Connection.lookupAll()), 1)
+
+            with self.assertRaises(DisconnectedException):
+                with db1.view():
+                    pass
+        finally:
+            messages.setHeartbeatInterval(old_interval)
 
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
-        self.mem_store = InMemoryStringStore()
+        self.mem_store = InMemoryPersistence()
         self.databaseServer = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
         self.databaseServer.start()
 

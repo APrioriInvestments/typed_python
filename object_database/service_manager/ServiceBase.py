@@ -18,12 +18,16 @@ import traceback
 import logging
 import time
 
+from object_database.core_schema import core_schema
+from object_database.service_manager.ServiceManagerSchema import service_schema
+
 class ServiceBase:
     coresUsed = 1
     gbRamUsed = 1
     
     def __init__(self, db, serviceInstance):
         self.db = db
+        self.db.subscribeToSchema(core_schema, service_schema)
         self.serviceInstance = serviceInstance
 
     @staticmethod

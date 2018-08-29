@@ -1,5 +1,7 @@
 from typed_python import *
 
+from object_database.schema import SchemaDefinition
+
 _heartbeatInterval = [5.0]
 def setHeartbeatInterval(newInterval):
     _heartbeatInterval[0] = newInterval
@@ -18,20 +20,36 @@ ClientToServer = Alternative(
         "as_of_version": int,
         "transaction_guid": str
         },
-    SendValues = {
-        "keys": TupleOf(str)
+    Heartbeat = {},
+    DefineSchema = { 'name': str, 'definition': SchemaDefinition },
+    Subscribe = { 
+        'schema': str, 
+        'typename': OneOf(None, str), 
+        'fieldname_and_value': OneOf(None, Tuple(str,str)) 
         },
-    SendSets = {
-        "keys": TupleOf(str)
-        },
-    Heartbeat = {}
+    Flush = {'guid': str}
     )
 
 ServerToClient = Alternative(
     "ServerToClient",
     Initialize = {'transaction_num': int, 'connIdentity': str},
     TransactionResult = {'transaction_guid': str, 'success': bool},
-    KeyInfo = {'key': str, 'data': OneOf(str, None, TupleOf(str)), 'transaction_id': int},
+    FlushResponse = {'guid': str},
+    Subscription = {
+        'schema': str, 
+        'typename': OneOf(None, str),
+        'fieldname_and_value': OneOf(None, Tuple(str,str)),
+        'values': ConstDict(str, OneOf(str, None)), #value
+        'sets': ConstDict(str, TupleOf(str)),
+        'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
+        'tid': int #marker transaction id
+        },
+    SubscriptionIncrease = {
+        'schema': str, 
+        'typename': str,
+        'fieldname_and_value': Tuple(str,str),
+        'identities': TupleOf(str), #the identities in play if this is an index-level subscription
+        },
     Disconnected = {},
     Transaction = {
         "writes": ConstDict(str, OneOf(str, None)),

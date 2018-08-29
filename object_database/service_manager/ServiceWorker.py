@@ -28,6 +28,8 @@ class ServiceWorker:
     def __init__(self, dbConnectionFactory, instance_id):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
+        self.db.subscribeToSchema(core_schema, service_schema)
+
         self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
         self.serviceObject = None
         self.serviceName = None

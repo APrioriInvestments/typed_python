@@ -13,9 +13,10 @@
 #   limitations under the License.
 
 from object_database.schema import Schema
-from object_database.messages import ClientToServer, ServerToClient
+from object_database.messages import ClientToServer, ServerToClient, SchemaDefinition
 from object_database.core_schema import core_schema
-from object_database.view import View, JsonWithPyRep, Transaction, _cur_view, data_key, index_key
+from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
+import object_database.keymapping as keymapping
 import json
 from typed_python.hash import sha_hash
 from typed_python import *
@@ -28,6 +29,9 @@ import traceback
 import time
 
 from object_database.view import RevisionConflictException, DisconnectedException
+
+class Everything:
+    """Singleton to mark subscription to everything in a slice."""
 
 TransactionResult = Alternative(
     "TransactionResult", 
@@ -227,8 +231,7 @@ class DatabaseConnection:
     def __init__(self, channel):
         self._channel = channel
         self._transaction_callbacks = {}
-        self._read_events = {}
-
+        
         self._lock = threading.Lock()
 
         #transaction of what's in the KV store
@@ -260,12 +263,113 @@ class DatabaseConnection:
         #transaction handlers. These must be nonblocking since we call them under lock
         self._onTransaction = []
 
+        self._flushEvents = {}
+
         self._schemas = {}
+
+        self._messages_received = 0
+
+        self._pendingSubscriptions = {}
+
+        #if we have object-level subscriptions to a particular type (e.g. not everything)
+        #then, this is from (schema, typename) -> {object_id -> transaction_id} so that
+        #we can tell when the subscription should become valid. Subscriptions are permanent
+        #otherwise, if we're subscribed, it's 'Everything'
+        self._schema_and_typename_to_subscription_set = {}
 
         self._channel.setServerToClientHandler(self._onMessage)
 
+        self._flushIx = 0
+
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
+
+    def addSchema(self, schema):
+        schema.freeze()
+
+        with self._lock:
+            assert schema.name not in self._schemas or self._schemas[schema.name] is schema
+
+            self._schemas[schema.name] = schema
+
+            schemaDesc = schema.toDefinition()
+
+            self._channel.write(
+                ClientToServer.DefineSchema(
+                    name=schema.name,
+                    definition=schemaDesc
+                    )
+                )
+
+    def flush(self):
+        """Make sure we know all transactions that have happened up to this point."""
+        with self._lock:
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
+            self._flushIx += 1
+            ix = str(self._flushIx)
+            e = self._flushEvents[ix] = threading.Event()
+            self._channel.write(ClientToServer.Flush(guid=ix))
+
+        e.wait()
+
+        if self.disconnected.is_set():
+            raise DisconnectedException()
+
+    def subscribeToObject(self, t):
+        self.subscribeToObjects([t])
+
+    def subscribeToObjects(self, objects):
+        for t in objects:
+            self.addSchema(type(t).__schema__)
+        self.subscribeMultiple([
+            (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity))
+            ])
+
+    def subscribeToIndex(self, t, **kwarg):
+        self.addSchema(t.__schema__)
+
+        toSubscribe = []
+        for fieldname,fieldvalue in kwarg.items():
+            toSubscribe.append((t.__schema__.name, t.__qualname__, (fieldname, keymapping.index_value_to_hash(fieldvalue))))
+
+        self.subscribeMultiple(toSubscribe)
+
+    def subscribeToType(self, t):
+        self.addSchema(t.__schema__)
+        self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None)])
+
+    def subscribeToSchema(self, *schemas):
+        for s in schemas:
+            self.addSchema(s)
+        self.subscribeMultiple([(schema.name, None, None) for schema in schemas])
+
+    def subscribeMultiple(self, subscriptionTuples):
+        with self._lock:
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
+            events = []
+
+            for tup in subscriptionTuples:
+                e = self._pendingSubscriptions.get(tup)
+
+                if not e:
+                    e = self._pendingSubscriptions[tup] = threading.Event()
+
+                self._channel.write(
+                    ClientToServer.Subscribe(schema=tup[0], typename=tup[1], fieldname_and_value=tup[2])
+                    )
+
+                events.append(e)
+
+        for e in events:
+            e.wait()
+
+        with self._lock:
+            if self.disconnected.is_set():
+                raise DisconnectedException()
 
     def waitForCondition(self, cond, timeout):
         #eventally we will replace this with something that watches the calculation
@@ -281,21 +385,10 @@ class DatabaseConnection:
                 time.sleep(timeout / 20)
         return False
 
-    def addSchema(self, schema):
-        schema.freeze()
-
-        if schema.name in self._schemas:
-            assert schema is self._schemas.get(schema.name), "Schema %s already defined" % schema.name
-            return
-
-        self._schemas[schema.name] = schema
-
     def _data_key_to_object(self, key):
-        typename,identity,fieldname = key.split(":")
-
-        schemaname, typename, suffix = typename.split("-")
+        schema_name, typename, identity, fieldname = keymapping.split_data_key(key)
         
-        schema = self._schemas.get(schemaname)
+        schema = self._schemas.get(schema_name)
         if not schema:
             return None,None
 
@@ -410,12 +503,47 @@ class DatabaseConnection:
             for key in keys_touched:
                 self._versioned_objects[key].cleanup(lowest)
 
+    def isSubscribedToObject(self, object):
+        return not self._suppressKey(object._identity)
+        
+    def _suppressKey(self, k):
+        keyname = schema, typename, ident, fieldname = keymapping.split_data_key(k)
+        
+        subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema,typename))
+        
+        if subscriptionSet is Everything:
+            return False
+        if isinstance(subscriptionSet, set) and ident in subscriptionSet:
+            return False
+        return True
+
+    def _suppressIdentities(self, index_key, identities):
+        schema, typename, fieldname, valhash = keymapping.split_index_key_full(index_key)
+
+        subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema,typename))
+        
+        if subscriptionSet is Everything:
+            return identities
+        elif subscriptionSet is None:
+            return set()
+        else:
+            return identities.intersection(subscriptionSet)
+
+
     def _onMessage(self, msg):
         with self._lock:
+            self._messages_received += 1
+
             if msg.matches.Disconnected:
                 self.disconnected.set()
                 self.connectionObject = None
-            
+                
+                for e in self._flushEvents.values():
+                    e.set()
+
+                for e in self._pendingSubscriptions.values():
+                    e.set()
+
                 for q in self._transaction_callbacks.values():
                     try:
                         q(TransactionResult.Disconnected())
@@ -425,11 +553,14 @@ class DatabaseConnection:
                             traceback.format_exc()
                             )
 
-                for i in self._read_events.values():
-                    i.set()
                 self._transaction_callbacks = {}
-                self._read_events = {}
-
+                self._flushEvents = {} 
+            elif msg.matches.FlushResponse:
+                e = self._flushEvents.get(msg.guid)
+                if not e:
+                    logging.error("Got an unrequested flush response: %s", msg.guid)
+                else:
+                    e.set()
             elif msg.matches.Initialize:
                 self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
                 self.connectionObject = core_schema.Connection.fromIdentity(msg.connIdentity)
@@ -445,46 +576,48 @@ class DatabaseConnection:
                         "Transaction commit callback threw an exception:\n%s", 
                         traceback.format_exc()
                         )
-            elif msg.matches.KeyInfo:
-                key = msg.key
-                if key not in self._versioned_objects:
-                    if isinstance(msg.data, TupleOf):
-                        self._versioned_objects[key] = VersionedSet(set(msg.data))
-                    else:
-                        self._versioned_objects[key] = VersionedValue(
-                            JsonWithPyRep(
-                                json.loads(msg.data) if msg.data is not None else msg.data,
-                                None
-                                ))
-
-                if key in self._read_events:
-                    self._read_events.pop(key).set()
-
             elif msg.matches.Transaction:
                 key_value = {}
                 priors = {}
-                for k,val_serialized in msg.writes.items():
-                    json_val = json.loads(val_serialized) if val_serialized is not None else None
 
-                    key_value[k] = json_val
+                writes = dict(msg.writes)
+                set_adds = dict(msg.set_adds)
+                set_removes = dict(msg.set_removes)
 
-                    versioned = self._versioned_objects[k]
+                for k,val_serialized in writes.items():
+                    if not self._suppressKey(k):
+                        json_val = json.loads(val_serialized) if val_serialized is not None else None
 
-                    priors[k] = versioned.newestValue()
+                        key_value[k] = json_val
 
-                    versioned.setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, None))
+                        if k not in self._versioned_objects:
+                            self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, None))
 
-                for k,a in msg.set_adds.items():
-                    self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(a), set())
+                        versioned = self._versioned_objects[k]
 
-                for k,r in msg.set_removes.items():
-                    self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(), set(r))
+                        priors[k] = versioned.newestValue()
+
+                        versioned.setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, None))
+
+                for k,a in set_adds.items():
+                    if k not in self._versioned_objects:
+                        self._versioned_objects[k] = VersionedSet(set())
+                    a = self._suppressIdentities(k, set(a))
+                    if a:
+                        self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, a, set())
+
+                for k,r in set_removes.items():
+                    if k not in self._versioned_objects:
+                        self._versioned_objects[k] = VersionedSet(set())
+                    r = self._suppressIdentities(k, set(r))
+                    if r:
+                        self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(), r)
 
                 self._cur_transaction_num = msg.transaction_id
 
                 for handler in self._onTransaction:
                     try:
-                        handler(key_value, priors, msg.set_adds, msg.set_removes, msg.transaction_id)
+                        handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
                     except:
                         logging.error(
                             "_onTransaction callback %s threw an exception:\n%s", 
@@ -493,7 +626,56 @@ class DatabaseConnection:
                             )
 
                 self._cleanup()
-            
+            elif msg.matches.SubscriptionIncrease:
+                subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
+                if subscribedIdentities is not Everything:
+                    subscribedIdentities.update(
+                        msg.identities
+                        )
+            elif msg.matches.Subscription:
+                event = self._pendingSubscriptions.get((msg.schema, msg.typename, msg.fieldname_and_value))
+
+                if not event:
+                    logging.error("Received unrequested subscription to schema %s / %s / %s", msg.schema, msg.typename, msg.fieldname_and_value)
+                    return
+
+                if msg.fieldname_and_value is None:
+                    if msg.typename is None:
+                        for tname in self._schemas[msg.schema]._types:
+                            self._schema_and_typename_to_subscription_set[msg.schema, tname] = Everything
+                    else:
+                        self._schema_and_typename_to_subscription_set[msg.schema, msg.typename] = Everything
+                else:
+                    subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
+                    if subscribedIdentities is not Everything:
+                        subscribedIdentities.update(
+                            msg.identities
+                            )
+
+                for key, val in msg.values.items():
+                    if key not in self._versioned_objects:
+                        self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, None))
+                        self._versioned_objects[key].setVersionedValue(
+                            msg.tid,
+                            JsonWithPyRep(
+                                json.loads(val) if val is not None else None,
+                                None
+                                )
+                            )
+
+                for key, setval in msg.sets.items():
+                    if key not in self._versioned_objects:
+                        self._versioned_objects[key] = VersionedSet(set())
+                        self._versioned_objects[key].setVersionedAddsAndRemoves(msg.tid, set(setval), set())
+
+                #this should be inline with the stream of messages coming from the server
+                assert self._cur_transaction_num <= msg.tid
+
+                self._cur_transaction_num = msg.tid
+
+                event.set()
+            else:
+                assert False, "unknown message type " + msg._which
         
     def _get_versioned_set_data(self, key, transaction_id):
         assert transaction_id >= self._min_transaction_num, (transaction_id, self._min_transaction_num)
@@ -505,20 +687,7 @@ class DatabaseConnection:
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
-            self._channel.write(ClientToServer.SendSets(keys=(key,)))
-
-            if key not in self._read_events:
-                self._read_events[key] = threading.Event()
-
-            e = self._read_events[key]
-
-        e.wait()
-
-        if self.disconnected.is_set():
-            raise DisconnectedException()
-
-        with self._lock:
-            return self._versioned_objects[key].valueForVersion(transaction_id)
+            return SetWithEdits(set(),set(),set())
 
     def _get_versioned_object_data(self, key, transaction_id):
         assert transaction_id >= self._min_transaction_num
@@ -530,20 +699,7 @@ class DatabaseConnection:
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
-            self._channel.write(ClientToServer.SendValues(keys=(key,)))
-
-            if key not in self._read_events:
-                self._read_events[key] = threading.Event()
-
-            e = self._read_events[key]
-
-        e.wait()
-
-        if self.disconnected.is_set():
-            raise DisconnectedException()
-
-        with self._lock:
-            return self._versioned_objects[key].valueForVersion(transaction_id)
+            return None
 
     def _set_versioned_object_data(self, 
                 key_value, 
