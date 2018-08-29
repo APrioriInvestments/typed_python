@@ -103,8 +103,9 @@ class SubprocessServiceManager(ServiceManager):
                 process.pid
                 )
 
-    def stop(self):
-        self.stopAllServices(self.shutdownTimeout)
+    def stop(self, gracefully=True):
+        if gracefully:
+            self.stopAllServices(self.shutdownTimeout)
 
         for instanceIdentity, workerProcess in self.serviceProcesses.items():
             workerProcess.terminate()

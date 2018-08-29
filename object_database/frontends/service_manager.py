@@ -27,7 +27,7 @@ import multiprocessing
 import logging.config
 from object_database.util import configureLogging
 
-from object_database import connect, TcpServer, RedisStringStore, InMemoryStringStore
+from object_database import connect, TcpServer, RedisStringStore, InMemoryStringStore, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
 def main(argv):
@@ -88,29 +88,47 @@ def main(argv):
 
         logging.info("Successfully connected to object database at %s:%s", parsedArgs.db_hostname, object_database_port)
 
-        #start the process manager
-        serviceManager = SubprocessServiceManager(
-            parsedArgs.own_hostname, 
-            parsedArgs.db_hostname, 
-            parsedArgs.port, 
-            isMaster=parsedArgs.run_db,
-            maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
-            maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),
-            logfileDirectory=parsedArgs.logdir,
-            shutdownTimeout=parsedArgs.shutdownTimeout
-            )
-        
-        serviceManager.start()
+        serviceManager = None
 
         logging.info("Started serviceManager.")
 
         try:
             while not shouldStop.is_set():
-                shouldStop.wait(timeout=max(.1, serviceManager.shutdownTimeout / 10))
-                try:
-                    serviceManager.cleanup()
-                except:
-                    logging.error("Service manager cleanup failed:\n%s", traceback.format_exc())
+                if serviceManager is None:
+                    try:
+                        serviceManager = SubprocessServiceManager(
+                            parsedArgs.own_hostname, 
+                            parsedArgs.db_hostname, 
+                            parsedArgs.port, 
+                            isMaster=parsedArgs.run_db,
+                            maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
+                            maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),
+                            logfileDirectory=parsedArgs.logdir,
+                            shutdownTimeout=parsedArgs.shutdownTimeout
+                            )
+                    except DisconnectedException:
+                        serviceManager = None
+
+                    if serviceManager is None:
+                        logging.error("Failed to connect to service manager. Sleeping and retrying")
+                        time.sleep(10)
+                    else:
+                        serviceManager.start()
+                else:
+                    shouldStop.wait(timeout=max(.5, serviceManager.shutdownTimeout / 10))
+                    try:
+                        serviceManager.cleanup()
+                    except DisconnectedException:
+                        if parsedArgs.run_db:
+                            logging.error("Disconnected from object_database host.")
+                            return 1
+                        else:
+                            #try to reconnect
+                            logging.error("Disconnected from object_database host. Attempting to reconnect.")
+                            serviceManager.stop(gracefully=False)
+                            serviceManager = None
+                    except:
+                        logging.error("Service manager cleanup failed:\n%s", traceback.format_exc())
         except KeyboardInterrupt:
             return 0
 
