@@ -17,9 +17,10 @@ def formatTable(rows):
     return "\n".join(formattedRows)
 
 def configureLogging(preamble=""):
+    logging.getLogger('asyncio').setLevel(logging.CRITICAL)
     logging.basicConfig(format='[%(asctime)s] %(levelname)6s %(filename)30s:%(lineno)4s' 
         + ("|" + preamble if preamble else '') 
-        + '| %(message)s', level=logging.ERROR
+        + '| %(message)s', level=logging.INFO
         )
 
 def secondsToHumanReadable(seconds):

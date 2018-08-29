@@ -23,13 +23,8 @@ import traceback
 import logging
 import logging.config
 from object_database import connect
+from object_database.util import configureLogging
 from object_database.service_manager.ServiceWorker import ServiceWorker
-
-def configureLogging(preamble=""):
-    logging.basicConfig(format='[%(asctime)s] %(levelname)6s %(filename)30s:%(lineno)4s' 
-        + ("|" + preamble if preamble else '') 
-        + '| %(message)s', level=logging.INFO
-        )
 
 def main(argv):
     parser = argparse.ArgumentParser("Run a specific service.")

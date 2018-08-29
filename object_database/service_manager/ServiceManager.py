@@ -251,6 +251,9 @@ class ServiceManager(object):
             if not host:
                 service.unbootable_count = service.target_count - len(actual_records)
                 return
+            else:
+                host.gbRamUsed = host.gbRamUsed + service.gbRamUsed
+                host.coresUsed = host.coresUsed + service.coresUsed
 
             instance = service_schema.ServiceInstance(
                 service=service, 

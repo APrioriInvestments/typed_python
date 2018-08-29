@@ -25,12 +25,7 @@ import traceback
 import psutil
 import multiprocessing
 import logging.config
-
-def configureLogging(preamble="service_manager"):
-    logging.basicConfig(format='[%(asctime)s] %(levelname)6s %(filename)30s:%(lineno)4s' 
-        + ("|" + preamble if preamble else '') 
-        + '| %(message)s', level=logging.INFO
-        )
+from object_database.util import configureLogging
 
 from object_database import connect, TcpServer, RedisStringStore, InMemoryStringStore
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
@@ -52,7 +47,7 @@ def main(argv):
     parser.add_argument("--shutdownTimeout", type=float, default=None, required=False)
 
     parser.add_argument('--logdir', default=None, required=False)
-    configureLogging()
+    configureLogging("service_manager")
 
     parsedArgs = parser.parse_args(argv[1:])
 
