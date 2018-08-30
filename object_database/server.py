@@ -82,6 +82,14 @@ class Server:
 
         self._id_to_channel = {}
 
+        self.longTransactionThreshold = 1.0
+        self.logFrequency = 10.0
+
+        self._transactions = 0
+        self._keys_set = 0
+        self._index_values_updated = 0
+        self._subscriptions_written = 0
+
     def _removeOldDeadConnections(self):        
         connection_index = keymapping.index_key(core_schema.Connection, " exists", True)
         oldIds = self._kvstore.getSetMembers(keymapping.index_key(core_schema.Connection, " exists", True))
@@ -197,6 +205,8 @@ class Server:
 
         assert definition is not None, "can't subscribe to a schema we don't know about!"
 
+        t0 = time.time()
+
         if msg.typename is None:
             types_to_subscribe = list(definition)
             assert msg.fieldname_and_value is None, "Can't subscribe to a fieldname and value without a type"
@@ -270,6 +280,16 @@ class Server:
                 identities=None if msg.fieldname_and_value is None else tuple(identities)
                 )
             )
+
+        if time.time() - t0 > self.longTransactionThreshold:
+            logging.info(
+                "Subscription for %s/%s/%s took %s seconds and produced %s values and %s sets with %s items.", 
+                schema_name, msg.typename, msg.fieldname_and_value,
+                time.time() - t0,
+                len(kvs),
+                len(sets),
+                sum(len(s) for s in sets.values())
+                )
 
     def onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
@@ -516,7 +536,7 @@ class Server:
 
             channel.sendTransaction(transaction_message)
         
-        if self.verbose:
+        if self.verbose or time.time() - t0 > self.longTransactionThreshold:
             logging.info("Transaction [%.2f/%.2f/%.2f] with %s writes, %s set ops: %s", 
                 t1 - t0, t2 - t1, time.time() - t2,
                 len(key_value), len(set_adds) + len(set_removes), sorted(key_value)[:3]

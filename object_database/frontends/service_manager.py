@@ -114,14 +114,10 @@ def main(argv):
                     try:
                         serviceManager.cleanup()
                     except (ConnectionRefusedError, DisconnectedException):
-                        if parsedArgs.run_db:
-                            logging.error("Disconnected from object_database host.")
-                            return 1
-                        else:
-                            #try to reconnect
-                            logging.error("Disconnected from object_database host. Attempting to reconnect.")
-                            serviceManager.stop(gracefully=False)
-                            serviceManager = None
+                        #try to reconnect
+                        logging.error("Disconnected from object_database host. Attempting to reconnect.")
+                        serviceManager.stop(gracefully=False)
+                        serviceManager = None
                     except:
                         logging.error("Service manager cleanup failed:\n%s", traceback.format_exc())
         except KeyboardInterrupt:
