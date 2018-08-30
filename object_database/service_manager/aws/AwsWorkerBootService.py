@@ -304,6 +304,8 @@ class AwsWorkerBootService(ServiceBase):
         state.desired = count
 
     def initialize(self):
+        self.db.subscribeToSchema(schema)
+        
         with self.db.transaction():
             self.api = AwsApi()
 
