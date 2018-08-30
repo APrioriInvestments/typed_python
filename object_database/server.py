@@ -207,67 +207,67 @@ class Server:
 
         t0 = time.time()
 
-        if msg.typename is None:
-            types_to_subscribe = list(definition)
-            assert msg.fieldname_and_value is None, "Can't subscribe to a fieldname and value without a type"
+        assert msg.typename is not None
+        typename = msg.typename
+
+        assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
+
+        typedef = definition[typename]
+
+        if msg.fieldname_and_value is None:
+            field, val = " exists", keymapping.index_value_to_hash(True)
         else:
-            types_to_subscribe = [msg.typename]
+            field, val = msg.fieldname_and_value
 
-        for typename in types_to_subscribe:
-            assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
+        if field == '_identity':
+            identities = set([val])
+        else:
+            identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
 
-            typedef = definition[typename]
+        t1 = time.time()
 
-            if msg.fieldname_and_value is None:
-                field, val = " exists", keymapping.index_value_to_hash(True)
+        for fieldname in typedef.fields:
+            keys = [keymapping.data_key_from_names(schema_name, typename, identity, fieldname)
+                            for identity in identities]
+
+            vals = self._kvstore.getSeveral(keys)
+
+            for i in range(len(keys)):
+                kvs[keys[i]] = vals[i]
+
+        for fieldname in typedef.indices:
+            index_group = keymapping.index_group(schema_name, typename, fieldname)
+            index_vals = self._kvstore.getSetMembers(index_group)
+
+            for iv in index_vals:
+                index_key = keymapping.index_group_and_hashval_to_index_key(index_group, iv)
+                sets[index_key] = self._kvstore.getSetMembers(index_key).intersection(identities)
+                if not sets[index_key]:
+                    del sets[index_key]
+
+        if msg.fieldname_and_value:
+            #this is an index subscription
+            for ident in identities:
+                self._id_to_channel.setdefault(ident, set()).add(connectedChannel)
+                connectedChannel.subscribedIds.add(ident)
+
+            if msg.fieldname_and_value[0] != '_identity':
+                index_key = keymapping.index_key_from_names_encoded(msg.schema, msg.typename, msg.fieldname_and_value[0], msg.fieldname_and_value[1])
+
+                self._index_to_channel.setdefault(index_key, set()).add(connectedChannel)
+                connectedChannel.subscribedIndexKeys.add(index_key)
             else:
-                field, val = msg.fieldname_and_value
+                #an object's identity cannot change, so we don't need to track our subscription to it
+                pass
+        else:
+            #this is a type-subscription
+            if (schema_name, typename) not in self._type_to_channel:
+                self._type_to_channel[schema_name, typename] = set()
 
-            if field == '_identity':
-                identities = set([val])
-            else:
-                identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
+            self._type_to_channel[schema_name, typename].add(connectedChannel)
+            connectedChannel.subscribedTypes.add((schema_name, typename))
 
-            for fieldname in typedef.fields:
-                keys = [keymapping.data_key_from_names(schema_name, typename, identity, fieldname)
-                                for identity in identities]
-
-                vals = self._kvstore.getSeveral(keys)
-
-                for i in range(len(keys)):
-                    kvs[keys[i]] = vals[i]
-
-            for fieldname in typedef.indices:
-                index_group = keymapping.index_group(schema_name, typename, fieldname)
-                index_vals = self._kvstore.getSetMembers(index_group)
-
-                for iv in index_vals:
-                    index_key = keymapping.index_group_and_hashval_to_index_key(index_group, iv)
-                    sets[index_key] = self._kvstore.getSetMembers(index_key).intersection(identities)
-                    if not sets[index_key]:
-                        del sets[index_key]
-
-            if msg.fieldname_and_value:
-                #this is an index subscription
-                for ident in identities:
-                    self._id_to_channel.setdefault(ident, set()).add(connectedChannel)
-                    connectedChannel.subscribedIds.add(ident)
-
-                if msg.fieldname_and_value[0] != '_identity':
-                    index_key = keymapping.index_key_from_names_encoded(msg.schema, msg.typename, msg.fieldname_and_value[0], msg.fieldname_and_value[1])
-
-                    self._index_to_channel.setdefault(index_key, set()).add(connectedChannel)
-                    connectedChannel.subscribedIndexKeys.add(index_key)
-                else:
-                    #an object's identity cannot change, so we don't need to track our subscription to it
-                    pass
-            else:
-                #this is a type-subscription
-                if (schema_name, typename) not in self._type_to_channel:
-                    self._type_to_channel[schema_name, typename] = set()
-
-                self._type_to_channel[schema_name, typename].add(connectedChannel)
-                connectedChannel.subscribedTypes.add((schema_name, typename))
+        t2 = time.time()
 
         connectedChannel.channel.write(
             ServerToClient.Subscription(
@@ -283,12 +283,15 @@ class Server:
 
         if time.time() - t0 > self.longTransactionThreshold:
             logging.info(
-                "Subscription for %s/%s/%s took %s seconds and produced %s values and %s sets with %s items.", 
-                schema_name, msg.typename, msg.fieldname_and_value,
-                time.time() - t0,
+                "Subscription took [%.2f, %.2f, %.2f] seconds and produced %s values over %s objects and %s sets with %s items for %s/%s/%s", 
+                t1 - t0,
+                t2 - t1,
+                time.time() - t2,
                 len(kvs),
+                len(identities),
                 len(sets),
-                sum(len(s) for s in sets.values())
+                sum(len(s) for s in sets.values()),
+                schema_name, msg.typename, msg.fieldname_and_value
                 )
 
     def onClientToServerMessage(self, connectedChannel, msg):

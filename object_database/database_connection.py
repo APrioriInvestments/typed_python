@@ -351,7 +351,7 @@ class DatabaseConnection:
         for s in schemas:
             self.addSchema(s)
 
-        self.subscribeMultiple([(schema.name, None, None) for schema in schemas])
+        self.subscribeMultiple([(schema.name, tname, None) for schema in schemas for tname in schema._types])
 
     def _isTypeSubscribed(self, t):
         return (t.__schema__.name, t.__qualname__) in self._schema_and_typename_to_subscription_set
@@ -372,6 +372,7 @@ class DatabaseConnection:
                 if not e:
                     e = self._pendingSubscriptions[tup] = threading.Event()
 
+                assert tup[0] and tup[1]
                 self._channel.write(
                     ClientToServer.Subscribe(schema=tup[0], typename=tup[1], fieldname_and_value=tup[2])
                     )
