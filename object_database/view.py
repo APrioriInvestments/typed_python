@@ -41,8 +41,8 @@ def revisionConflictRetry(f):
         while tries < MAX_TRIES:
             try:
                 return f(*args, **kwargs)
-            except RevisionConflictException:
-                logging.info("Handled a RevisionConflictException in %s. Retrying." % f.__name__)
+            except RevisionConflictException as e:
+                logging.info("Handled a %s in %s. Retrying." % (e, f.__name__))
                 tries += 1
 
         raise RevisionConflictException()
@@ -420,7 +420,7 @@ class View(object):
                 if res.matches.Disconnected:
                     raise DisconnectedException()
                 if res.matches.RevisionConflict:
-                    raise RevisionConflictException()
+                    raise RevisionConflictException(res.key)
 
                 assert False, "unknown transaction result: " + str(res)
 

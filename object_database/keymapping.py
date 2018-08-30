@@ -47,3 +47,6 @@ def index_group_and_hashval_to_index_key(index_group, hashval):
 
 def index_key(obj_type, field_name, value_hash):
     return index_key_from_names(obj_type.__schema__.name, obj_type.__qualname__, field_name, value_hash)
+
+def isIndexKey(key):
+    return ': ix:' in key

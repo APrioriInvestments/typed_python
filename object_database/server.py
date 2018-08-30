@@ -52,9 +52,9 @@ class ConnectedChannel:
             ServerToClient.Initialize(transaction_num=self.initial_tid, connIdentity=self.connectionObject._identity)
             )
 
-    def sendTransactionSuccess(self, guid, success):
+    def sendTransactionSuccess(self, guid, success, badKey):
         self.channel.write(
-            ServerToClient.TransactionResult(transaction_guid=guid,success=success)
+            ServerToClient.TransactionResult(transaction_guid=guid,success=success,badKey=badKey)
             )
 
 class Server:
@@ -108,7 +108,7 @@ class Server:
             for c in list(self._clientChannels):
                 missed = self._clientChannels[c].missedHeartbeats
                 self._clientChannels[c].missedHeartbeats += 1
-                
+
                 heartbeatCount[missed] = heartbeatCount.get(missed,0) + 1
 
                 if missed >= 4:
@@ -318,7 +318,7 @@ class Server:
         elif msg.matches.NewTransaction:
             try:
                 with self._lock:
-                    isOK = self._handleNewTransaction(
+                    isOK, badKey = self._handleNewTransaction(
                         connectedChannel,
                         {k: v for k,v in msg.writes.items()},
                         {k: set(a) for k,a in msg.set_adds.items() if a},
@@ -331,7 +331,7 @@ class Server:
                 logging.error("Unknown error committing transaction: %s", traceback.format_exc())
                 isOK = False
 
-            connectedChannel.sendTransactionSuccess(msg.transaction_guid, isOK)
+            connectedChannel.sendTransactionSuccess(msg.transaction_guid, isOK, badKey)
 
     def indexReverseLookupKvs(self, adds, removes):
         res = {}
@@ -467,7 +467,7 @@ class Server:
             for key in subset:
                 last_tid = self._version_numbers.get(key, -1)
                 if as_of_version < last_tid:
-                    return False
+                    return (False, key)
 
         for key in keysWritingTo:
             self._version_numbers[key] = transaction_id
@@ -554,4 +554,4 @@ class Server:
                 len(key_value), len(set_adds) + len(set_removes), sorted(key_value)[:3]
                 )
 
-        return True
+        return (True, None)

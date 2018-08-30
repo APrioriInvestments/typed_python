@@ -36,7 +36,7 @@ class Everything:
 TransactionResult = Alternative(
     "TransactionResult", 
     Success = {},
-    RevisionConflict = {},
+    RevisionConflict = {'key': str},
     Disconnected = {}
     )
 
@@ -584,7 +584,7 @@ class DatabaseConnection:
                 try:
                     self._transaction_callbacks.pop(msg.transaction_guid)(
                         TransactionResult.Success() if msg.success 
-                            else TransactionResult.RevisionConflict()
+                            else TransactionResult.RevisionConflict(key=msg.badKey)
                         )
                 except:
                     logging.error(

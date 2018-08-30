@@ -33,7 +33,7 @@ ClientToServer = Alternative(
 ServerToClient = Alternative(
     "ServerToClient",
     Initialize = {'transaction_num': int, 'connIdentity': str},
-    TransactionResult = {'transaction_guid': str, 'success': bool},
+    TransactionResult = {'transaction_guid': str, 'success': bool, 'badKey': OneOf(None, str) },
     FlushResponse = {'guid': str},
     Subscription = {
         'schema': str, 
