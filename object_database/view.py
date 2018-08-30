@@ -101,7 +101,6 @@ class View(object):
         self._set_removes = {}
         self._t0 = None
         self._stack = None
-        self._schemas = set()
         self._readWatcher = None
         self._insistReadsConsistent = True
         self._insistWritesConsistent = True
@@ -118,7 +117,8 @@ class View(object):
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
 
-        self._schemas.add(cls.__schema__)
+        if not self._db._isTypeSubscribed(cls):
+            raise Exception("No subscriptions exist for type %s" % cls)
 
         if "_identity" in kwds:
             identity = kwds["_identity"]
@@ -164,6 +164,9 @@ class View(object):
         return o        
 
     def _get(self, obj, identity, field_name, field_type):
+        if not self._db._isTypeSubscribed(type(obj)):
+            raise Exception("No subscriptions exist for type %s" % obj)
+
         key = data_key(type(obj), identity, field_name)
 
         self._reads.add(key)
@@ -195,6 +198,9 @@ class View(object):
         return dbValWithPyrep.pyRep
 
     def _exists(self, obj, identity):
+        if not self._db._isTypeSubscribed(type(obj)):
+            raise Exception("No subscriptions exist for type %s" % obj)
+
         key = data_key(type(obj), identity, " exists")
 
         if self._readWatcher:
@@ -208,6 +214,9 @@ class View(object):
         return val is not None and val.jsonRep is not None
 
     def _delete(self, obj, identity, field_names):
+        if not self._db._isTypeSubscribed(type(obj)):
+            raise Exception("No subscriptions exist for type %s" % obj)
+
         existing_index_vals = self._compute_index_vals(obj)
 
         for name in field_names:
@@ -219,6 +228,9 @@ class View(object):
         self._update_indices(obj, identity, existing_index_vals, {})
 
     def _set(self, obj, identity, field_name, field_type, val):
+        if not self._db._isTypeSubscribed(type(obj)):
+            raise Exception("No subscriptions exist for type %s" % obj)
+
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
 
@@ -281,6 +293,9 @@ class View(object):
             self._set_removes[index_key].add(identity)
 
     def indexLookup(self, db_type, **kwargs):
+        if not self._db._isTypeSubscribed(db_type):
+            raise Exception("No subscriptions exist for type %s" % db_type)
+
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
 
@@ -306,6 +321,9 @@ class View(object):
         return tuple([db_type.fromIdentity(x) for x in identities])
 
     def indexLookupAny(self, db_type, **kwargs):
+        if not self._db._isTypeSubscribed(db_type):
+            raise Exception("No subscriptions exist for type %s" % db_type)
+
         assert len(kwargs) == 1, "Can only lookup one index at a time."
         tname, value = list(kwargs.items())[0]
 
@@ -336,6 +354,17 @@ class View(object):
             return db_type.fromIdentity(res)
 
         return None
+
+    def indexLookupOne(self, lookup_type, **kwargs):
+        if not self._db._isTypeSubscribed(lookup_type):
+            raise Exception("No subscriptions exist for type %s" % lookup_type)
+
+        res = self.indexLookup(lookup_type, **kwargs)
+        if not res:
+            raise Exception("No instances of %s found with %s" % (lookup_type, kwargs))
+        if len(res) != 1:
+            raise Exception("Multiple instances of %s found with %s" % (lookup_type, kwargs))
+        return res[0]
 
     def commit(self):
         if not self._writeable:
@@ -418,14 +447,6 @@ class View(object):
             self.commit()
 
         self._db._releaseView(self)
-
-    def indexLookupOne(self, lookup_type, **kwargs):
-        res = self.indexLookup(lookup_type, **kwargs)
-        if not res:
-            raise Exception("No instances of %s found with %s" % (lookup_type, kwargs))
-        if len(res) != 1:
-            raise Exception("Multiple instances of %s found with %s" % (lookup_type, kwargs))
-        return res[0]
 
 class Transaction(View):
     _writeable = True

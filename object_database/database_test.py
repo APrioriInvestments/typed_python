@@ -712,6 +712,42 @@ class ObjectDatabaseTests:
             n = Object()
             self.assertEqual(len(n.x), 0)
 
+    def test_existence_from_nonsubscription(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(schema)
+        db2.subscribeToNone(Counter)
+
+        with db2.transaction():
+            c = Counter(k=0)
+
+        db1.flush()
+
+        with db1.view():
+            self.assertEqual(Counter.lookupAll(), (c,))
+
+    def test_existence_from_nonsubscription_subscribe_after(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db2.subscribeToNone(Counter)
+        
+        with db2.transaction():
+            c = Counter(k=0)
+
+        db1.flush()
+
+        db1.subscribeToNone(Counter)
+        
+        with db1.view():
+            self.assertEqual(Counter.lookupAll(), ())
+
+        db1.subscribeToSchema(schema)
+
+        with db1.view():
+            self.assertEqual(Counter.lookupAll(), (c,))
+
     def test_index_subscriptions(self):
         db_all = self.createNewDb()
         db1 = self.createNewDb()
@@ -776,7 +812,9 @@ class ObjectDatabaseTests:
 
     def test_implicitly_subscribed_to_objects_we_create(self):
         db1 = self.createNewDb()
-
+        
+        db1.subscribeToNone(Counter)
+        
         with db1.transaction():
             c = Counter(k=1)
 

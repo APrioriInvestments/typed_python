@@ -80,6 +80,7 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
+    db.subscribe(service_schema)
 
     if parsedArgs.command == 'connections':
         table = [['Connection ID']]
@@ -99,7 +100,7 @@ def main(argv):
                     module = s.codebase.instantiate(tf, s.service_module_name)
                     svcClass = getattr(module, s.service_class_name)
 
-                    svcClass.configureFromCommandline(s, parsedArgs.args)
+                svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
             print("Failed to configure %s: %s" % (parsedArgs.name, e))
             return 1

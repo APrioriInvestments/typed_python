@@ -203,8 +203,8 @@ class AwsApi:
 
 
 class AwsWorkerBootService(ServiceBase):
-    def __init__(self, dbConnectionFactory, serviceInstance):
-        ServiceBase.__init__(self, dbConnectionFactory, serviceInstance)
+    def __init__(self, db, serviceInstance):
+        ServiceBase.__init__(self, db, serviceInstance)
 
         self.SLEEP_INTERVAL = 10.0
 

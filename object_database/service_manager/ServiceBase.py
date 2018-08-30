@@ -27,11 +27,10 @@ class ServiceBase:
     
     def __init__(self, db, serviceInstance):
         self.db = db
-        self.db.subscribeToSchema(core_schema, service_schema)
         self.serviceInstance = serviceInstance
 
     @staticmethod
-    def configureFromCommandline(args):
+    def configureFromCommandline(db, serviceObject, args):
         """Subclasses should take the remaining args from the commandline and configure using them"""
         pass
 

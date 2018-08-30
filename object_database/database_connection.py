@@ -338,12 +338,25 @@ class DatabaseConnection:
 
     def subscribeToType(self, t):
         self.addSchema(t.__schema__)
+        if self._isTypeSubscribedAll(t):
+            return
         self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None)])
+
+    def subscribeToNone(self, t):
+        self.addSchema(t.__schema__)
+        with self._lock:
+            self._schema_and_typename_to_subscription_set.setdefault((t.__schema__.name, t.__qualname__), set())
 
     def subscribeToSchema(self, *schemas):
         for s in schemas:
             self.addSchema(s)
         self.subscribeMultiple([(schema.name, None, None) for schema in schemas])
+
+    def _isTypeSubscribed(self, t):
+        return (t.__schema__.name, t.__qualname__) in self._schema_and_typename_to_subscription_set
+
+    def _isTypeSubscribedAll(self, t):
+        return self._schema_and_typename_to_subscription_set.get((t.__schema__.name, t.__qualname__)) is Everything
 
     def subscribeMultiple(self, subscriptionTuples):
         with self._lock:
@@ -505,7 +518,7 @@ class DatabaseConnection:
 
     def isSubscribedToObject(self, object):
         return not self._suppressKey(object._identity)
-        
+
     def _suppressKey(self, k):
         keyname = schema, typename, ident, fieldname = keymapping.split_data_key(k)
         

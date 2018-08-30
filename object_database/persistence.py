@@ -241,7 +241,7 @@ class RedisPersistence(object):
                     self.cache[key] = set()
                     new_sets.add(key)
                 else:
-                    assert self.cache[key]
+                    assert isinstance(self.cache[key], set)
 
                 for val in to_add:
                     self.cache[key].add(val)

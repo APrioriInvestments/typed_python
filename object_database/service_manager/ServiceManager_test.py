@@ -62,7 +62,7 @@ class TestServiceLastTimestamp:
 
 class TestService(ServiceBase):
     def initialize(self):
-        self.db.subscribeToSchema(schema)
+        self.db.subscribeToSchema(core_schema, service_schema, schema)
 
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
@@ -83,7 +83,7 @@ class TestService(ServiceBase):
 
 class HangingService(ServiceBase):
     def initialize(self):
-        self.db.subscribeToSchema(schema)
+        self.db.subscribeToSchema(core_schema, service_schema, schema)
         
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
@@ -97,7 +97,7 @@ def getTestServiceModule(version):
     return {
         'test_service/__init__.py': '',
         'test_service/service.py': textwrap.dedent("""
-            from object_database import Schema, ServiceBase, Indexed, core_schema
+            from object_database import Schema, ServiceBase, Indexed, core_schema, service_schema
             import os
             import time
             import logging
@@ -114,7 +114,7 @@ def getTestServiceModule(version):
 
             class Service(ServiceBase):
                 def initialize(self):
-                    self.db.subscribeToSchema(schema)
+                    self.db.subscribeToSchema(core_schema, service_schema, schema)
 
                     with self.db.transaction():
                         self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
