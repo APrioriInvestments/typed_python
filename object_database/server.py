@@ -34,14 +34,14 @@ class ConnectedChannel:
         self.channel = channel
         self.initial_tid = initial_tid
         self.connectionObject = connectionObject
-        self.lastHeartbeat = time.time()
+        self.missedHeartbeats = 0
         self.definedSchemas = {}
         self.subscribedTypes = set() #schema, type
         self.subscribedIds = set() #identities
         self.subscribedIndexKeys = set() #full index keys
 
     def heartbeat(self):
-        self.lastHeartbeat = time.time()
+        self.missedHeartbeats = 0
 
     def sendTransaction(self, msg):
         #we need to cut the transaction down
@@ -103,14 +103,23 @@ class Server:
 
     def checkForDeadConnections(self):
         with self._lock:
+            heartbeatCount = {}
+
             for c in list(self._clientChannels):
-                if time.time() - self._clientChannels[c].lastHeartbeat > getHeartbeatInterval() * 4:
+                missed = self._clientChannels[c].missedHeartbeats
+                self._clientChannels[c].missedHeartbeats += 1
+                
+                heartbeatCount[missed] = heartbeatCount.get(missed,0) + 1
+
+                if missed >= 4:
                     logging.info(
                         "Connection %s has not heartbeat in a long time. Killing it.", 
                         self._clientChannels[c].connectionObject._identity
                         )
 
                     c.close()
+
+            logging.info("Connection heartbeat distribution is %s", heartbeatCount)
 
     def dropConnection(self, channel):
         with self._lock:
