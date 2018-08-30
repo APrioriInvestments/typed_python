@@ -27,7 +27,9 @@ import logging.config
 from object_database import connect, InMemServer
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
 from object_database.service_manager.ServiceManager import ServiceManager
+from object_database.service_manager.ServiceManagerSchema import service_schema
 from object_database.service_manager.aws.AwsWorkerBootService import AwsWorkerBootService, AwsApi
+from object_database.service_manager.aws.AwsWorkerBootService import schema as aws_worker_boot_schema
 
 def main(argv):
     parser = argparse.ArgumentParser("Control the AWS service")
@@ -70,6 +72,7 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
+    db.subscribeToSchema(aws_worker_boot_schema, service_schema)
 
     if parsedArgs.command == 'config':
         with db.transaction():
@@ -141,7 +144,7 @@ def main(argv):
 
         with db.view():
             api = AwsApi()
-            
+
             for i in api.allRunningInstances():
                 try:
                     api.terminateInstanceById(i)

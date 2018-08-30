@@ -84,7 +84,9 @@ linux_bootstrap_script = open(os.path.join(own_dir, "aws_linux_bootstrap.sh"), "
 
 class AwsApi:
     def __init__(self):
-        self.config = Configuration.lookupOne()
+        self.config = Configuration.lookupAny()
+        if not self.config:
+            raise Exception("Please configure the aws service.")
 
         self.ec2 = boto3.resource('ec2',region_name=self.config.region)
         self.ec2_client = boto3.client('ec2',region_name=self.config.region)

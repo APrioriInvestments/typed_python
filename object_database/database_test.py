@@ -20,10 +20,14 @@ from object_database.view import RevisionConflictException, DisconnectedExceptio
 from object_database.database_connection import TransactionListener, DatabaseConnection
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
-from object_database.persistence import InMemoryPersistence
+from object_database.persistence import InMemoryPersistence, RedisPersistence
 import object_database.messages as messages
 import queue
 import unittest
+import tempfile
+import redis
+import subprocess
+import os
 import threading
 import random
 import time
@@ -64,6 +68,10 @@ class Counter:
     
     def __str__(self):
         return "Counter(k=%s)" % self.k
+
+@schema.define
+class StringIndexed:
+    name = Indexed(str)
 
 class ObjectDatabaseTests:
     def test_methods(self):
@@ -821,6 +829,20 @@ class ObjectDatabaseTests:
         with db1.view():
             self.assertTrue(c.exists())
 
+    def test_create_resubscribe_and_lookup(self):
+        db1 = self.createNewDb()
+        
+        db1.subscribeToSchema(schema)
+        
+        with db1.transaction():
+            c = StringIndexed(name="name")
+
+        db2 = self.createNewDb()
+        db2.subscribeToSchema(schema)
+
+        with db2.transaction():
+            self.assertEqual(StringIndexed.lookupAll(name="name"), (c,))
+
     def test_subscription_matching_is_linear(self):
         schemas = []
         dbs = []
@@ -859,6 +881,47 @@ class ObjectDatabaseTests:
             #each database sees two transactions each pass
             for i in range(len(dbs)):
                 self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
+
+class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
+    def setUp(self):
+        self.tempDir = tempfile.TemporaryDirectory()
+        self.tempDirName = self.tempDir.__enter__()
+
+        if hasattr(self, 'redisProcess') and self.redisProcess:
+            self.redisProcess.teardown()
+            self.redisProcess.wait()
+
+        self.redisProcess = subprocess.Popen(
+            ["/usr/bin/redis-server",'--port', '1115', '--logfile', os.path.join(self.tempDirName, "log.txt"), 
+                "--dbfilename", "db.rdb", "--dir", os.path.join(self.tempDirName)]
+            )
+        time.sleep(.5)
+        assert self.redisProcess.poll() is None
+
+        redis.StrictRedis(db=0, decode_responses=True, port=1115).echo("hi")
+        self.mem_store = RedisPersistence(port=1115)
+        self.server = InMemServer(self.mem_store)
+
+    def createNewDb(self):
+        db = DatabaseConnection(self.server.getChannel())
+        db.initialized.wait()
+        return db
+
+    def tearDown(self):
+        self.server.teardown()
+        self.redisProcess.terminate()
+        self.redisProcess.wait()
+        self.redisProcess = None
+        self.tempDir.__exit__(None, None, None)
+
+    def test_throughput(self):
+        pass
+
+    def test_object_versions_robust(self):
+        pass
+
+    def test_flush_db_works(self):
+        pass
 
 
 

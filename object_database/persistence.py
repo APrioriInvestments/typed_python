@@ -73,7 +73,7 @@ class InMemoryPersistence(object):
         with self.lock:
             s = self.values.get(key, None)
             if s is None:
-                return []
+                return set()
 
             assert isinstance(s,set)
 
@@ -198,8 +198,11 @@ class RedisPersistence(object):
                     logging.info("Redis is still loading. Waiting...")
                     time.sleep(1.0)
 
-            self.cache[key] = set([k for k in vals])
-            return self.cache[key]
+            if vals:
+                self.cache[key] = set([k for k in vals])
+                return self.cache[key]
+            else:
+                return set()
 
     def setSeveral(self, kvs, setAdds=None, setRemoves=None):
         new_sets, dropped_sets = set(),set()
@@ -237,24 +240,25 @@ class RedisPersistence(object):
                     self.cache[key] = value
 
             for key, to_add in (setAdds or {}).items():
-                if key not in self.cache:
-                    self.cache[key] = set()
-                    new_sets.add(key)
-                else:
-                    assert isinstance(self.cache[key], set)
+                if to_add:
+                    if key not in self.cache or not self.cache[key]:
+                        self.cache[key] = set()
+                        new_sets.add(key)
 
-                for val in to_add:
-                    self.cache[key].add(val)
+                    for val in to_add:
+                        self.cache[key].add(val)
 
             for key, to_remove in (setRemoves or {}).items():
-                assert self.cache.get(key)
+                if to_remove:
+                    assert self.cache.get(key)
 
-                for val in to_remove:
-                    self.cache[key].discard(val)
+                    for val in to_remove:
+                        self.cache[key].remove(val)
 
-                if not self.cache[key]:
-                    dropped_sets.add(key)
-                    del self.cache[key]
+                    if not self.cache[key]:
+                        dropped_sets.add(key)
+                        del self.cache[key]
+
         return new_sets, dropped_sets
 
     def set(self, key, value):
@@ -264,8 +268,8 @@ class RedisPersistence(object):
                 if key in self.cache:
                     del self.cache[key]
             else:
-                self.cache[key] = value
                 self.redis.set(key, value)
+                self.cache[key] = value
 
     def exists(self, key):
         with self.lock:

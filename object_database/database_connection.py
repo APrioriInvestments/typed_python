@@ -350,6 +350,7 @@ class DatabaseConnection:
     def subscribeToSchema(self, *schemas):
         for s in schemas:
             self.addSchema(s)
+
         self.subscribeMultiple([(schema.name, None, None) for schema in schemas])
 
     def _isTypeSubscribed(self, t):
@@ -659,6 +660,7 @@ class DatabaseConnection:
                     else:
                         self._schema_and_typename_to_subscription_set[msg.schema, msg.typename] = Everything
                 else:
+                    assert msg.typename is not None
                     subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
                     if subscribedIdentities is not Everything:
                         subscribedIdentities.update(

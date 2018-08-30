@@ -75,7 +75,7 @@ class ServiceManager(object):
 
         if not service:
             service = service_schema.Service(name=serviceName, placement="Any")
-
+            
         service.codebase = codebase
         service.service_module_name = ".".join(className.split(".")[:-1])
         service.service_class_name = className.split(".")[-1]
