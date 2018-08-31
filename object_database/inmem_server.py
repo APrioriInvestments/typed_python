@@ -80,6 +80,9 @@ class InMemoryChannel:
         self._pumpThreadServer.join()
         self._pumpThreadClient.join()
 
+    def sendMessage(self, msg):
+        self.write(msg)
+
     def write(self, msg):
         if isinstance(msg, ClientToServer):
             self._clientToServerMsgQueue.put(msg)
@@ -130,14 +133,20 @@ class InMemServer(Server):
             else:
                 time.sleep(0.1)
 
-    def teardown(self):
+    def start(self):
+        Server.start(self)
+
+    def stop(self):
+        Server.stop(self)
+
         self.stopped = True
         for c in self.channels:
             c.stop()
         self.checkForDeadConnectionsLoopThread.join()
 
     def __enter__(self):
+        self.start()
         return self
 
-    def __exit__(self, type, val, tb):
-        self.teardown()
+    def __exit__(self, t,v,traceback):
+        self.stop()

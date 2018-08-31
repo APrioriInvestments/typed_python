@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from object_database.schema import Schema
-from object_database.messages import ClientToServer, ServerToClient, SchemaDefinition
+from object_database.messages import ClientToServer, ServerToClient, SchemaDefinition, getHeartbeatInterval
 from object_database.core_schema import core_schema
 from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
 import object_database.keymapping as keymapping
@@ -277,9 +277,16 @@ class DatabaseConnection:
         #otherwise, if we're subscribed, it's 'Everything'
         self._schema_and_typename_to_subscription_set = {}
 
+        #from (schema,typename,field_val) -> {'values', 'index_values', 'identities'}
+        self._subscription_buildup = {}
+
         self._channel.setServerToClientHandler(self._onMessage)
 
         self._flushIx = 0
+
+        self._largeSubscriptionHeartbeatDelay = 0
+
+
 
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
@@ -647,12 +654,36 @@ class DatabaseConnection:
                     subscribedIdentities.update(
                         msg.identities
                         )
-            elif msg.matches.Subscription:
+            elif msg.matches.SubscriptionData:
+                lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
+
+                if lookupTuple not in self._subscription_buildup:
+                    self._subscription_buildup[lookupTuple] = {'values': {}, 'index_values': {}, 'identities': None}
+
+                self._subscription_buildup[lookupTuple]['values'].update(msg.values)
+                self._subscription_buildup[lookupTuple]['index_values'].update(msg.index_values)
+
+                if msg.identities is not None:
+                    if self._subscription_buildup[lookupTuple]['identities'] is None:
+                        self._subscription_buildup[lookupTuple]['identities'] = set()
+                    self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
+
+            elif msg.matches.SubscriptionComplete:
                 event = self._pendingSubscriptions.get((msg.schema, msg.typename, msg.fieldname_and_value))
 
                 if not event:
                     logging.error("Received unrequested subscription to schema %s / %s / %s", msg.schema, msg.typename, msg.fieldname_and_value)
                     return
+
+                lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
+
+                identities = self._subscription_buildup[lookupTuple]['identities']
+                values = self._subscription_buildup[lookupTuple]['values']
+                index_values = self._subscription_buildup[lookupTuple]['index_values']
+
+                sets = self.indexValuesToSetAdds(index_values)
+
+                del self._subscription_buildup[lookupTuple]
 
                 if msg.fieldname_and_value is None:
                     if msg.typename is None:
@@ -665,10 +696,22 @@ class DatabaseConnection:
                     subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
                     if subscribedIdentities is not Everything:
                         subscribedIdentities.update(
-                            msg.identities
+                            identities
                             )
 
-                for key, val in msg.values.items():
+                t0 = time.time()
+                heartbeatInterval = getHeartbeatInterval()
+
+                #this is a fault injection to allow us to verify that heartbeating during this
+                #function will keep the server connection alive.
+                for _ in range(self._largeSubscriptionHeartbeatDelay):
+                    #print("Waiting for %s seconds because of _largeSubscriptionHeartbeatDelay" % heartbeatInterval)
+                    self._channel.sendMessage(
+                        ClientToServer.Heartbeat()
+                        )
+                    time.sleep(heartbeatInterval)
+
+                for key, val in values.items():
                     if key not in self._versioned_objects:
                         self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, None))
                         self._versioned_objects[key].setVersionedValue(
@@ -678,11 +721,28 @@ class DatabaseConnection:
                                 None
                                 )
                             )
+                    #this could take a long time, so we need to keep heartbeating
+                    if time.time() - t0 > heartbeatInterval:
+                        #note that this needs to be 'sendMessage' which sends immediately,
+                        #not, 'write' which queues the message after this function finishes!
+                        self._channel.sendMessage(
+                            ClientToServer.Heartbeat()
+                            )
+                        t0 = time.time()
 
-                for key, setval in msg.sets.items():
+                for key, setval in sets.items():
                     if key not in self._versioned_objects:
                         self._versioned_objects[key] = VersionedSet(set())
                         self._versioned_objects[key].setVersionedAddsAndRemoves(msg.tid, set(setval), set())
+
+                    #this could take a long time, so we need to keep heartbeating
+                    if time.time() - t0 > heartbeatInterval:
+                        #note that this needs to be 'sendMessage' which sends immediately,
+                        #not, 'write' which queues the message after this function finishes!
+                        self._channel.sendMessage(
+                            ClientToServer.Heartbeat()
+                            )
+                        t0 = time.time()
 
                 #this should be inline with the stream of messages coming from the server
                 assert self._cur_transaction_num <= msg.tid
@@ -692,7 +752,34 @@ class DatabaseConnection:
                 event.set()
             else:
                 assert False, "unknown message type " + msg._which
-        
+    
+    def indexValuesToSetAdds(self, indexValues):
+        #indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds 
+        #up the indices we need. We need to transpose to a dictionary ordered by the hash values,
+        #not the identities
+
+        t0 = time.time()
+        heartbeatInterval = getHeartbeatInterval()
+
+        setAdds = {}
+
+        for iv, val in indexValues.items():
+            schema_name, typename, identity, field_name = keymapping.split_data_reverse_index_key(iv)
+
+            index_key = keymapping.index_key_from_names_encoded(schema_name, typename, field_name, val)
+
+            setAdds.setdefault(index_key, set()).add(identity)
+
+            #this could take a long time, so we need to keep heartbeating
+            if time.time() - t0 > heartbeatInterval:
+                #note that this needs to be 'sendMessage' which sends immediately,
+                #not, 'write' which queues the message after this function finishes!
+                self._channel.sendMessage(
+                    ClientToServer.Heartbeat()
+                    )
+                t0 = time.time()
+        return setAdds
+
     def _get_versioned_set_data(self, key, transaction_id):
         assert transaction_id >= self._min_transaction_num, (transaction_id, self._min_transaction_num)
 

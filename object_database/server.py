@@ -20,6 +20,8 @@ from object_database.algebraic_protocol import AlgebraicProtocol
 from typed_python.hash import sha_hash
 from typed_python import *
 
+import redis
+import queue
 import time
 import uuid
 import logging
@@ -89,6 +91,40 @@ class Server:
         self._keys_set = 0
         self._index_values_updated = 0
         self._subscriptions_written = 0
+
+        self._subscriptionResponseThread = None
+
+        self._shouldStop = threading.Event()
+
+        #a queue of queue-subscription messages. we have to handle
+        #these on another thread because they can be quite large, and we don't want
+        #to prevent message processing on the main thread.
+        self._subscriptionQueue = queue.Queue()
+
+        #if we're building a subscription up, all the objects that have changed while our
+        #lock was released.
+        self._pendingSubscriptionRecheck = None
+
+    def start(self):
+        self._subscriptionResponseThread = threading.Thread(target=self.serviceSubscriptions)
+        self._subscriptionResponseThread.daemon = True
+        self._subscriptionResponseThread.start()
+
+    def stop(self):
+        self._shouldStop.set()
+        self._subscriptionQueue.put((None,None))
+        self._subscriptionResponseThread.join()
+
+    def serviceSubscriptions(self):
+        while not self._shouldStop.is_set():
+            try:
+                (connectedChannel, msg) = self._subscriptionQueue.get(timeout=1.0)
+                if connectedChannel is not None:
+                    self.handleSubscriptionOnBackgroundThread(connectedChannel, msg)
+            except queue.Empty:
+                pass
+            except:
+                logging.error("Unexpected error in serviceSubscription thread:\n%s", traceback.format_exc())
 
     def _removeOldDeadConnections(self):        
         connection_index = keymapping.index_key(core_schema.Connection, " exists", True)
@@ -203,41 +239,147 @@ class Server:
                 traceback.format_exc()
                 )
 
-    def _handleSubscription(self, connectedChannel, msg):
-        schema_name = msg.schema
-        
-        #gather all the subscription information we need
+    def handleSubscriptionOnBackgroundThread(self, connectedChannel, msg):
+        try:
+            with self._lock:
+                t0 = time.time()
+
+                if connectedChannel.channel not in self._clientChannels:
+                    logging.info("Ignoring subscription from dead channel.")
+                    return
+
+                schema_name = msg.schema
+                
+                definition = connectedChannel.definedSchemas.get(schema_name)
+
+                assert definition is not None, "can't subscribe to a schema we don't know about!"
+
+                assert msg.typename is not None
+                typename = msg.typename
+
+                assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
+
+                typedef = definition[typename]
+
+                if msg.fieldname_and_value is None:
+                    field, val = " exists", keymapping.index_value_to_hash(True)
+                else:
+                    field, val = msg.fieldname_and_value
+
+                if field == '_identity':
+                    identities = set([val])
+                else:
+                    identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
+
+                t1 = time.time()
+
+                self._pendingSubscriptionRecheck = set()
+
+            #we need to send everything we know about 'identities', keeping in mind that we have to 
+            #check any new identities that get written to in the background to see if they belong
+            #in the new set
+            identities_left_to_send = set(identities)
+
+            done = False
+            messageCount = 0
+            while True:
+                locktime_start = time.time()
+                with self._lock:
+                    messageCount += 1
+                    self._sendPartialSubscription(
+                        connectedChannel,
+                        schema_name, typename, msg.fieldname_and_value,
+                        typedef,
+                        identities,
+                        identities_left_to_send
+                        )
+
+                    if not identities_left_to_send:
+                        self._markSubscriptionComplete(
+                            schema_name, typename, msg.fieldname_and_value,
+                            identities,
+                            connectedChannel
+                            )
+
+                        connectedChannel.channel.write(
+                            ServerToClient.SubscriptionComplete(
+                                schema=schema_name,
+                                typename=msg.typename,
+                                fieldname_and_value=msg.fieldname_and_value,
+                                tid=self._cur_transaction_num
+                                )
+                            )
+
+                        break
+
+                #don't hold the lock more than 75% of the time.
+                time.sleep( (time.time() - locktime_start) / 3 )
+
+            if time.time() - t0 > self.longTransactionThreshold:
+                logging.info(
+                    "Subscription took [%.2f, %.2f] seconds over %s messages and produced %s objects for %s/%s/%s", 
+                    t1 - t0,
+                    time.time() - t1,
+                    messageCount,
+                    len(identities),
+                    schema_name, msg.typename, msg.fieldname_and_value
+                    )
+        finally:
+            with self._lock:
+                self._pendingSubscriptionRecheck = None
+
+    def _markSubscriptionComplete(self, schema, typename, fieldname_and_value, identities, connectedChannel):
+        if fieldname_and_value is not None:
+            #this is an index subscription
+            for ident in identities:
+                self._id_to_channel.setdefault(ident, set()).add(connectedChannel)
+                connectedChannel.subscribedIds.add(ident)
+
+            if fieldname_and_value[0] != '_identity':
+                index_key = keymapping.index_key_from_names_encoded(schema, typename, fieldname_and_value[0], fieldname_and_value[1])
+
+                self._index_to_channel.setdefault(index_key, set()).add(connectedChannel)
+
+                connectedChannel.subscribedIndexKeys.add(index_key)
+            else:
+                #an object's identity cannot change, so we don't need to track our subscription to it
+                pass
+        else:
+            #this is a type-subscription
+            if (schema, typename) not in self._type_to_channel:
+                self._type_to_channel[schema, typename] = set()
+
+            self._type_to_channel[schema, typename].add(connectedChannel)
+            connectedChannel.subscribedTypes.add((schema, typename))
+
+
+    def _sendPartialSubscription(self, 
+                connectedChannel,
+                schema_name, typename, fieldname_and_value,
+                typedef,
+                identities,
+                identities_left_to_send):
+
+        #get some objects to send
+        BATCH_SIZE = 100
+
         kvs = {}
-        sets = {}
+        index_vals = {}
 
-        definition = connectedChannel.definedSchemas.get(schema_name)
+        to_send = []
+        for ident in self._pendingSubscriptionRecheck:
+            if ident in identities:
+                identities_left_to_send.add(ident)
 
-        assert definition is not None, "can't subscribe to a schema we don't know about!"
+            #todo: check if the identity is now in our set!
+        self._pendingSubscriptionRecheck = set()
 
-        t0 = time.time()
-
-        assert msg.typename is not None
-        typename = msg.typename
-
-        assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
-
-        typedef = definition[typename]
-
-        if msg.fieldname_and_value is None:
-            field, val = " exists", keymapping.index_value_to_hash(True)
-        else:
-            field, val = msg.fieldname_and_value
-
-        if field == '_identity':
-            identities = set([val])
-        else:
-            identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
-
-        t1 = time.time()
-
+        while identities_left_to_send and len(to_send) < BATCH_SIZE:
+            to_send.append(identities_left_to_send.pop())
+                
         for fieldname in typedef.fields:
             keys = [keymapping.data_key_from_names(schema_name, typename, identity, fieldname)
-                            for identity in identities]
+                            for identity in to_send]
 
             vals = self._kvstore.getSeveral(keys)
 
@@ -245,63 +387,25 @@ class Server:
                 kvs[keys[i]] = vals[i]
 
         for fieldname in typedef.indices:
-            index_group = keymapping.index_group(schema_name, typename, fieldname)
-            index_vals = self._kvstore.getSetMembers(index_group)
+            keys = [keymapping.data_reverse_index_key(schema_name, typename, identity, fieldname)
+                            for identity in to_send]
 
-            for iv in index_vals:
-                index_key = keymapping.index_group_and_hashval_to_index_key(index_group, iv)
-                sets[index_key] = self._kvstore.getSetMembers(index_key).intersection(identities)
-                if not sets[index_key]:
-                    del sets[index_key]
+            vals = self._kvstore.getSeveral(keys)
 
-        if msg.fieldname_and_value:
-            #this is an index subscription
-            for ident in identities:
-                self._id_to_channel.setdefault(ident, set()).add(connectedChannel)
-                connectedChannel.subscribedIds.add(ident)
-
-            if msg.fieldname_and_value[0] != '_identity':
-                index_key = keymapping.index_key_from_names_encoded(msg.schema, msg.typename, msg.fieldname_and_value[0], msg.fieldname_and_value[1])
-
-                self._index_to_channel.setdefault(index_key, set()).add(connectedChannel)
-                connectedChannel.subscribedIndexKeys.add(index_key)
-            else:
-                #an object's identity cannot change, so we don't need to track our subscription to it
-                pass
-        else:
-            #this is a type-subscription
-            if (schema_name, typename) not in self._type_to_channel:
-                self._type_to_channel[schema_name, typename] = set()
-
-            self._type_to_channel[schema_name, typename].add(connectedChannel)
-            connectedChannel.subscribedTypes.add((schema_name, typename))
-
-        t2 = time.time()
+            for i in range(len(keys)):
+                index_vals[keys[i]] = vals[i]
 
         connectedChannel.channel.write(
-            ServerToClient.Subscription(
+            ServerToClient.SubscriptionData(
                 schema=schema_name,
-                typename=msg.typename,
-                fieldname_and_value=msg.fieldname_and_value,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
                 values=kvs,
-                sets=sets,
-                tid=self._cur_transaction_num,
-                identities=None if msg.fieldname_and_value is None else tuple(identities)
+                index_values=index_vals,
+                identities=None if fieldname_and_value is None else tuple(to_send)
                 )
             )
 
-        if time.time() - t0 > self.longTransactionThreshold:
-            logging.info(
-                "Subscription took [%.2f, %.2f, %.2f] seconds and produced %s values over %s objects and %s sets with %s items for %s/%s/%s", 
-                t1 - t0,
-                t2 - t1,
-                time.time() - t2,
-                len(kvs),
-                len(identities),
-                len(sets),
-                sum(len(s) for s in sets.values()),
-                schema_name, msg.typename, msg.fieldname_and_value
-                )
 
     def onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
@@ -313,8 +417,7 @@ class Server:
         elif msg.matches.DefineSchema:
             connectedChannel.definedSchemas[msg.name] = msg.definition
         elif msg.matches.Subscribe:
-            with self._lock:
-                self._handleSubscription(connectedChannel, msg)
+            self._subscriptionQueue.put((connectedChannel, msg))
         elif msg.matches.NewTransaction:
             try:
                 with self._lock:
@@ -337,16 +440,16 @@ class Server:
         res = {}
 
         for indexKey, identities in removes.items():
-            fieldname, valuehash = keymapping.split_index_key_to_fieldname_and_hash(indexKey)
+            schemaname, typename, fieldname, valuehash = keymapping.split_index_key_full(indexKey)
 
             for ident in identities:
-                res[keymapping.data_reverse_index_key(ident, fieldname)] = None
+                res[keymapping.data_reverse_index_key(schemaname, typename, ident, fieldname)] = None
 
         for indexKey, identities in adds.items():
-            fieldname, valuehash = keymapping.split_index_key_to_fieldname_and_hash(indexKey)
+            schemaname, typename, fieldname, valuehash = keymapping.split_index_key_full(indexKey)
 
             for ident in identities:
-                res[keymapping.data_reverse_index_key(ident, fieldname)] = valuehash
+                res[keymapping.data_reverse_index_key(schemaname, typename, ident, fieldname)] = valuehash
 
         return res
 
@@ -383,14 +486,14 @@ class Server:
         reverseKeys = []
         for index_name in typedef.indices:
             for ident in newIds:
-                reverseKeys.append(keymapping.data_reverse_index_key(ident, index_name))
+                reverseKeys.append(keymapping.data_reverse_index_key(schema_name, typename, ident, index_name))
 
         reverseVals = self._kvstore.getSeveral(reverseKeys)
         reverseKVMap = {reverseKeys[i]:reverseVals[i] for i in range(len(reverseKeys))}
 
         for index_name in typedef.indices:
             for ident in newIds:
-                fieldval = reverseKVMap.get(keymapping.data_reverse_index_key(ident, index_name))
+                fieldval = reverseKVMap.get(keymapping.data_reverse_index_key(schema_name, typename, ident, index_name))
 
                 if fieldval is not None:
                     ik = keymapping.index_key_from_names_encoded(schema_name, typename, index_name, fieldval)
@@ -483,7 +586,7 @@ class Server:
 
         new_sets, dropped_sets = self._kvstore.setSeveral(target_kvs, set_adds, set_removes)
 
-        #each update the metadata index
+        #update the metadata index
         indexSetAdds = {}
         indexSetRemoves = {}
         for s in new_sets:
@@ -536,6 +639,9 @@ class Server:
         for i in identities_mentioned:
             if i in self._id_to_channel:
                 channelsTriggered.update(self._id_to_channel[i])
+
+        if self._pendingSubscriptionRecheck:
+            self._pendingSubscriptionRecheck.update(identities_mentioned)
 
         for channel in channelsTriggered:
             if transaction_message is None:

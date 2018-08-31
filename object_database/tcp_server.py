@@ -44,8 +44,9 @@ class ServerToClientProtocol(AlgebraicProtocol):
         self.transport.close()
 
 class ClientToServerProtocol(AlgebraicProtocol):
-    def __init__(self, host, port):
+    def __init__(self, host, port, eventLoop):
         AlgebraicProtocol.__init__(self, ServerToClient, ClientToServer)
+        self.loop = eventLoop
         self.lock = threading.Lock()
         self.host = host
         self.port = port
@@ -61,7 +62,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
         with self.lock:
             self.handler = handler
             for m in self.msgs:
-                _eventLoop.loop.call_soon_threadsafe(self.handler, m)
+                self.loop.call_soon_threadsafe(self.handler, m)
             self.msgs = None
 
     def messageReceived(self, msg):
@@ -69,22 +70,22 @@ class ClientToServerProtocol(AlgebraicProtocol):
             if not self.handler:
                 self.msgs.append(msg)
             else:
-                _eventLoop.loop.call_soon_threadsafe(self.handler, msg)
+                self.loop.call_soon_threadsafe(self.handler, msg)
         
     def onConnected(self):
-        _eventLoop.loop.call_later(getHeartbeatInterval(), self.heartbeat)
+        self.loop.call_later(getHeartbeatInterval(), self.heartbeat)
 
     def heartbeat(self):
         if not self.disconnected and not self._stopHeartbeatingSet:
             self.sendMessage(ClientToServer.Heartbeat())
-            _eventLoop.loop.call_later(getHeartbeatInterval(), self.heartbeat)
+            self.loop.call_later(getHeartbeatInterval(), self.heartbeat)
 
     def connection_lost(self, e):
         self.disconnected = True
         self.messageReceived(ServerToClient.Disconnected())
 
     def write(self, msg):
-        _eventLoop.loop.call_soon_threadsafe(self.sendMessage, msg)
+        self.loop.call_soon_threadsafe(self.sendMessage, msg)
 
 class EventLoopInThread:
     def __init__(self):
@@ -123,14 +124,14 @@ class EventLoopInThread:
 
 _eventLoop = EventLoopInThread()
 
-def connect(host, port, timeout=10.0, retry = False):
+def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
     t0 = time.time()
 
     proto = None
     while proto is None:
         try:
-            _, proto = _eventLoop.create_connection(
-                lambda: ClientToServerProtocol(host, port),
+            _, proto = eventLoop.create_connection(
+                lambda: ClientToServerProtocol(host, port, eventLoop.loop),
                 host,
                 port
                 )
@@ -150,6 +151,8 @@ def connect(host, port, timeout=10.0, retry = False):
     return conn
 
 
+_eventLoop2 = []
+
 class TcpServer(Server):
     def __init__(self, host, port, mem_store = None):
         Server.__init__(self, mem_store or InMemoryPersistence())
@@ -161,6 +164,8 @@ class TcpServer(Server):
         self.stopped = False
 
     def start(self):
+        Server.start(self)
+
         self.socket_server = _eventLoop.create_server(
             lambda: ServerToClientProtocol(self), 
             self.host, 
@@ -174,12 +179,21 @@ class TcpServer(Server):
             self.checkForDeadConnections()
         
     def stop(self):
+        Server.stop(self)
+
         self.stopped = True
         if self.socket_server:
             self.socket_server.close()
 
-    def connect(self):
-        return connect(self.host, self.port)
+    def connect(self, useSecondaryLoop=False):
+        if useSecondaryLoop:
+            if not _eventLoop2:
+                _eventLoop2.append(EventLoopInThread())
+            loop = _eventLoop2[0]
+        else:
+            loop = _eventLoop
+
+        return connect(self.host, self.port, eventLoop=loop)
 
     def __enter__(self):
         self.start()

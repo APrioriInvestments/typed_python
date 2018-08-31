@@ -876,8 +876,8 @@ class ObjectDatabaseTests:
                 db.waitForCondition(lambda: thing.exists(), 10)
 
             #verify the main db sees something quadratic in the number of transactions plus a constant
-            self.assertTrue(db._messages_received < (len(schemas) + 1) * (len(schemas) + 2) / 2 + 2)
-
+            self.assertLess(db._messages_received, (len(schemas) + 1) * (len(schemas) + 2) + 8)
+            
             #each database sees two transactions each pass
             for i in range(len(dbs)):
                 self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
@@ -888,7 +888,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         self.tempDirName = self.tempDir.__enter__()
 
         if hasattr(self, 'redisProcess') and self.redisProcess:
-            self.redisProcess.teardown()
+            self.redisProcess.terminate()
             self.redisProcess.wait()
 
         self.redisProcess = subprocess.Popen(
@@ -901,6 +901,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         redis.StrictRedis(db=0, decode_responses=True, port=1115).echo("hi")
         self.mem_store = RedisPersistence(port=1115)
         self.server = InMemServer(self.mem_store)
+        self.server.start()
 
     def createNewDb(self):
         db = DatabaseConnection(self.server.getChannel())
@@ -908,7 +909,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         return db
 
     def tearDown(self):
-        self.server.teardown()
+        self.server.stop()
         self.redisProcess.terminate()
         self.redisProcess.wait()
         self.redisProcess = None
@@ -929,6 +930,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryPersistence()
         self.server = InMemServer(self.mem_store)
+        self.server.start()
 
     def createNewDb(self):
         db = DatabaseConnection(self.server.getChannel())
@@ -936,7 +938,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
         return db
 
     def tearDown(self):
-        self.server.teardown()
+        self.server.stop()
 
     def test_heartbeats(self):
         old_interval = messages.getHeartbeatInterval()
@@ -974,8 +976,8 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
         self.databaseServer = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
         self.databaseServer.start()
 
-    def createNewDb(self):
-        db = connect("localhost", 8888)
+    def createNewDb(self, useSecondaryLoop=False):
+        db = self.databaseServer.connect(useSecondaryLoop=useSecondaryLoop)
 
         db.initialized.wait()
 
@@ -983,5 +985,69 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
 
     def tearDown(self):
         self.databaseServer.stop()
+
+    def test_very_large_subscriptions(self):
+        old_interval = messages.getHeartbeatInterval()
+        messages.setHeartbeatInterval(.1)
+
+        try:
+            db1 = self.createNewDb()
+            db1.subscribeToSchema(schema)
+
+            for ix in range(1,3):
+                with db1.transaction():
+                    for i in range(5000):
+                        Counter(k=ix,x=i)
+
+            #now there's a lot of stuff in the database
+
+            isDone = [False]
+            maxLatency = [None]
+
+            def transactionLatencyTimer():
+                while not isDone[0]:
+                    t0 = time.time()
+                    
+                    with db1.transaction():
+                        Counter()
+
+                    latency = time.time() - t0
+                    maxLatency[0] = max(maxLatency[0] or 0.0, latency)
+
+                    time.sleep(0.01)
+
+            latencyMeasureThread = threading.Thread(target=transactionLatencyTimer)
+            latencyMeasureThread.start()
+
+            db2 = self.createNewDb(useSecondaryLoop=True)
+
+            t0 = time.time()
+            
+            db2._largeSubscriptionHeartbeatDelay = 10
+            db2.subscribeToSchema(schema)
+            db2._largeSubscriptionHeartbeatDelay = 0
+
+            subscriptionTime = time.time() - t0
+
+            isDone[0] = True
+            latencyMeasureThread.join()
+
+            #verify the properties of the subscription. we shouldn't be disconnected!
+            with db2.view():
+                self.assertEqual(len(Counter.lookupAll(k=1)), 5000)
+                self.assertEqual(len(Counter.lookupAll(k=2)), 5000)
+                self.assertEqual(
+                    sorted(set([c.x for c in Counter.lookupAll(k=1)])),
+                    sorted(range(5000))
+                    )
+
+            #we should never have had a really long latency
+            self.assertTrue(maxLatency[0] < subscriptionTime / 10.0, (maxLatency[0], subscriptionTime))
+
+        finally:
+            messages.setHeartbeatInterval(old_interval)
+
+
+
 
 

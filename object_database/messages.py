@@ -35,13 +35,18 @@ ServerToClient = Alternative(
     Initialize = {'transaction_num': int, 'connIdentity': str},
     TransactionResult = {'transaction_guid': str, 'success': bool, 'badKey': OneOf(None, str) },
     FlushResponse = {'guid': str},
-    Subscription = {
+    SubscriptionData = {
         'schema': str, 
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'values': ConstDict(str, OneOf(str, None)), #value
-        'sets': ConstDict(str, TupleOf(str)),
+        'index_values': ConstDict(str, OneOf(str, None)),
         'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
+        },
+    SubscriptionComplete = {
+        'schema': str, 
+        'typename': OneOf(None, str),
+        'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'tid': int #marker transaction id
         },
     SubscriptionIncrease = {
