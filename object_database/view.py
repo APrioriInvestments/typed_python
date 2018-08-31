@@ -42,7 +42,7 @@ def revisionConflictRetry(f):
             try:
                 return f(*args, **kwargs)
             except RevisionConflictException as e:
-                logging.info("Handled a %s in %s. Retrying." % (e, f.__name__))
+                logging.info("Handled a revision conflict on key %s in %s. Retrying." % (e, f.__name__))
                 tries += 1
 
         raise RevisionConflictException()
