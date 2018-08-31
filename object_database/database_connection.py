@@ -119,6 +119,13 @@ class VersionedSet(VersionedBase):
         self.removes.append(removes)
         self.version_numbers.append(version)
 
+    def updateVersionedAdds(self, version, adds):
+        if not self.version_numbers or self.version_numbers[-1] != version:
+            assert self.version_numbers[-1] < version
+            self.setVersionedAddsAndRemoves(version, adds, set())
+        else:
+            self.adds[-1].update(adds)
+
     def cleanup(self, version_number):
         assert self.version_numbers[0] == version_numbers
 
@@ -688,10 +695,9 @@ class DatabaseConnection:
                 identities = self._subscription_buildup[lookupTuple]['identities']
                 values = self._subscription_buildup[lookupTuple]['values']
                 index_values = self._subscription_buildup[lookupTuple]['index_values']
+                del self._subscription_buildup[lookupTuple]
 
                 sets = self.indexValuesToSetAdds(index_values)
-
-                del self._subscription_buildup[lookupTuple]
 
                 if msg.fieldname_and_value is None:
                     if msg.typename is None:
@@ -742,6 +748,9 @@ class DatabaseConnection:
                     if key not in self._versioned_objects:
                         self._versioned_objects[key] = VersionedSet(set())
                         self._versioned_objects[key].setVersionedAddsAndRemoves(msg.tid, set(setval), set())
+                    else:
+                        self._versioned_objects[key].updateVersionedAdds(msg.tid, set(setval))
+
 
                     #this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:

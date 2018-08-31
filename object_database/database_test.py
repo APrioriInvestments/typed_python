@@ -25,6 +25,7 @@ import object_database.messages as messages
 import queue
 import unittest
 import tempfile
+import numpy
 import redis
 import subprocess
 import os
@@ -114,6 +115,59 @@ class ObjectDatabaseTests:
 
             root.obj = Object(k=expr.Constant(value=23))
             self.assertEqual(root2.obj.k.value, 23)
+
+    def test_a_many_subscriptions(self):
+        OK = []
+        FINISHED = []
+        count = 10
+        threadCount = 10
+
+        def worker(index):
+            db = self.createNewDb()
+
+            indices = list(range(count))
+            numpy.random.shuffle(indices)
+
+            for i in indices:
+                db.subscribeToIndex(Counter,k=i)
+
+                with db.transaction():
+                    Counter(k=i, x=index)
+            
+            FINISHED.append(True)
+
+            db.waitForCondition(lambda: len(FINISHED) == threadCount, 10.0)
+            db.flush()
+
+            with db.view():
+                actuallyVisible = len(Counter.lookupAll())
+
+            if actuallyVisible != count * threadCount:
+                print("TOTAL is ", actuallyVisible, " != ", count*threadCount)
+            else:
+                OK.append(True)
+
+        threads = [threading.Thread(target=worker, args=(i,)) for i in range(threadCount)]
+        for t in threads:
+            t.daemon=True
+            t.start()
+        for t in threads:
+            t.join()
+
+        db1 = self.createNewDb()
+        db1.subscribeToSchema(schema)
+        with db1.view():
+            self.assertEqual(len(Counter.lookupAll()), count*threadCount)
+
+        db2 = self.createNewDb()
+
+        for i in range(count):
+            db2.subscribeToIndex(Counter,k=i)
+        db2.flush()
+        with db2.view():
+            self.assertEqual(len(Counter.lookupAll()), count*threadCount)
+
+        self.assertEqual(len(OK), 10)
 
     def test_transaction_handlers(self):
         db = self.createNewDb()

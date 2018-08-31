@@ -250,7 +250,7 @@ class Server:
                 t0 = time.time()
 
                 if connectedChannel.channel not in self._clientChannels:
-                    logging.info("Ignoring subscription from dead channel.")
+                    logging.warn("Ignoring subscription from dead channel.")
                     return
 
                 schema_name = msg.schema
@@ -388,7 +388,7 @@ class Server:
         for transactionMessage in self._pendingSubscriptionRecheck:
             for key, val in transactionMessage.writes.items():
                 #if we write to a key we've already sent, we'll need to resend it
-                schema_name, typename, identity, field_name = keymapping.split_data_key(key)
+                identity = keymapping.split_data_key(key)[2]
                 if identity in identities:
                     identities_left_to_send.add(identity)
 

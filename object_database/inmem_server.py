@@ -45,8 +45,7 @@ class InMemoryChannel:
                 try:
                     self._clientCallback(e)
                 except:
-                    traceback.print_exc()
-                    logging.error("Pump thread failed: %s", traceback.format_exc())
+                    logging.error("Pump thread failed for %s: %s", self, traceback.format_exc())
                     return
         
     def pumpMessagesFromClient(self):
