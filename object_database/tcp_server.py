@@ -14,9 +14,10 @@ import traceback
 
 
 class ServerToClientProtocol(AlgebraicProtocol):
-    def __init__(self, dbserver):
+    def __init__(self, dbserver, loop):
         AlgebraicProtocol.__init__(self, ClientToServer, ServerToClient)
         self.dbserver = dbserver
+        self.loop = loop
         self.connectionIsDead = False
 
     def setClientToServerHandler(self, handler):
@@ -36,7 +37,7 @@ class ServerToClientProtocol(AlgebraicProtocol):
 
     def write(self, msg):
         if not self.connectionIsDead:
-            self.sendMessage(msg)
+            self.loop.call_soon_threadsafe(self.sendMessage, msg)
 
     def connection_lost(self, e):
         self.connectionIsDead = True
@@ -179,7 +180,7 @@ class TcpServer(Server):
         Server.start(self)
 
         self.socket_server = _eventLoop.create_server(
-            lambda: ServerToClientProtocol(self), 
+            lambda: ServerToClientProtocol(self, _eventLoop.loop), 
             self.host, 
             self.port
             )

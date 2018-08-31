@@ -1,5 +1,6 @@
 import asyncio
 import struct
+import threading
 import json
 import logging
 import traceback
@@ -24,6 +25,7 @@ class AlgebraicProtocol(asyncio.Protocol):
         self.sendType = sendType
         self.transport = None
         self.buffer = bytes()
+        self.writelock = threading.Lock()
 
     def sendMessage(self, msg):
         assert isinstance(msg, self.sendType), "message %s is of type %s != %s" % (msg, type(msg), self.sendType)
@@ -37,7 +39,8 @@ class AlgebraicProtocol(asyncio.Protocol):
             dataToSend = longToString(len(dataToSend)) + dataToSend
             msg.__dict__['__encoded_message__'] = dataToSend
 
-        self.transport.write(dataToSend)
+        with self.writelock:
+            self.transport.write(dataToSend)
 
     def messageReceived(self, msg):
         #subclasses override
