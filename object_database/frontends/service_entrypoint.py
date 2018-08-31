@@ -46,9 +46,9 @@ def main(argv):
     def dbConnectionFactory():
         return connect(parsedArgs.host, parsedArgs.port)
 
-    manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid)
-    
     try:
+        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid)
+    
         manager.runAndWaitForShutdown()
         return 0
     except:

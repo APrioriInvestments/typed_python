@@ -85,7 +85,7 @@ def main(argv):
     
         serviceManager = None
 
-        logging.info("Started serviceManager.")
+        logging.info("Started object_database")
 
         try:
             while not shouldStop.is_set():
@@ -101,6 +101,7 @@ def main(argv):
                             logfileDirectory=parsedArgs.logdir,
                             shutdownTimeout=parsedArgs.shutdownTimeout
                             )
+                        logging.info("Connected the service-manager")
                     except (ConnectionRefusedError, DisconnectedException):
                         serviceManager = None
 

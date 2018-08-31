@@ -118,13 +118,15 @@ class Server:
     def serviceSubscriptions(self):
         while not self._shouldStop.is_set():
             try:
-                (connectedChannel, msg) = self._subscriptionQueue.get(timeout=1.0)
-                if connectedChannel is not None:
-                    self.handleSubscriptionOnBackgroundThread(connectedChannel, msg)
-            except queue.Empty:
-                pass
+                try:
+                    (connectedChannel, msg) = self._subscriptionQueue.get(timeout=1.0)
+                    if connectedChannel is not None:
+                        self.handleSubscriptionOnBackgroundThread(connectedChannel, msg)
+                except queue.Empty:
+                    pass
             except:
                 logging.error("Unexpected error in serviceSubscription thread:\n%s", traceback.format_exc())
+
 
     def _removeOldDeadConnections(self):        
         connection_index = keymapping.index_key(core_schema.Connection, " exists", True)
@@ -286,6 +288,12 @@ class Server:
                 locktime_start = time.time()
                 with self._lock:
                     messageCount += 1
+                    if messageCount == 2:
+                        logging.info(
+                            "Beginning large subscription for %s/%s/%s", 
+                            schema_name, msg.typename, msg.fieldname_and_value
+                            )
+
                     self._sendPartialSubscription(
                         connectedChannel,
                         schema_name, typename, msg.fieldname_and_value,
@@ -315,7 +323,7 @@ class Server:
                 #don't hold the lock more than 75% of the time.
                 time.sleep( (time.time() - locktime_start) / 3 )
 
-            if time.time() - t0 > self.longTransactionThreshold:
+            if messageCount > 5:
                 logging.info(
                     "Subscription took [%.2f, %.2f] seconds over %s messages and produced %s objects for %s/%s/%s", 
                     t1 - t0,

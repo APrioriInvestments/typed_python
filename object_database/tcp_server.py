@@ -20,7 +20,13 @@ class ServerToClientProtocol(AlgebraicProtocol):
         self.connectionIsDead = False
 
     def setClientToServerHandler(self, handler):
-        self.handler = handler
+        def callHandler(*args):
+            try:
+                return handler(*args)
+            except:
+                logging.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
+
+        self.handler = callHandler
 
     def messageReceived(self, msg):
         self.handler(msg)
@@ -60,7 +66,13 @@ class ClientToServerProtocol(AlgebraicProtocol):
     
     def setServerToClientHandler(self, handler):
         with self.lock:
-            self.handler = handler
+            def callHandler(*args):
+                try:
+                    return handler(*args)
+                except:
+                    logging.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
+
+            self.handler = callHandler
             for m in self.msgs:
                 self.loop.call_soon_threadsafe(self.handler, m)
             self.msgs = None

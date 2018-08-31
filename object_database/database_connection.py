@@ -752,7 +752,7 @@ class DatabaseConnection:
                 event.set()
             else:
                 assert False, "unknown message type " + msg._which
-    
+
     def indexValuesToSetAdds(self, indexValues):
         #indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds 
         #up the indices we need. We need to transpose to a dictionary ordered by the hash values,
@@ -764,20 +764,21 @@ class DatabaseConnection:
         setAdds = {}
 
         for iv, val in indexValues.items():
-            schema_name, typename, identity, field_name = keymapping.split_data_reverse_index_key(iv)
+            if val is not None:
+                schema_name, typename, identity, field_name = keymapping.split_data_reverse_index_key(iv)
 
-            index_key = keymapping.index_key_from_names_encoded(schema_name, typename, field_name, val)
+                index_key = keymapping.index_key_from_names_encoded(schema_name, typename, field_name, val)
 
-            setAdds.setdefault(index_key, set()).add(identity)
+                setAdds.setdefault(index_key, set()).add(identity)
 
-            #this could take a long time, so we need to keep heartbeating
-            if time.time() - t0 > heartbeatInterval:
-                #note that this needs to be 'sendMessage' which sends immediately,
-                #not, 'write' which queues the message after this function finishes!
-                self._channel.sendMessage(
-                    ClientToServer.Heartbeat()
-                    )
-                t0 = time.time()
+                #this could take a long time, so we need to keep heartbeating
+                if time.time() - t0 > heartbeatInterval:
+                    #note that this needs to be 'sendMessage' which sends immediately,
+                    #not, 'write' which queues the message after this function finishes!
+                    self._channel.sendMessage(
+                        ClientToServer.Heartbeat()
+                        )
+                    t0 = time.time()
         return setAdds
 
     def _get_versioned_set_data(self, key, transaction_id):
