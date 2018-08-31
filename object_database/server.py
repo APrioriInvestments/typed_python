@@ -105,6 +105,9 @@ class Server:
         #lock was released.
         self._pendingSubscriptionRecheck = None
 
+        #fault injector to test this thing
+        self._subscriptionBackgroundThreadCallback = None
+
     def start(self):
         self._subscriptionResponseThread = threading.Thread(target=self.serviceSubscriptions)
         self._subscriptionResponseThread.daemon = True
@@ -275,7 +278,7 @@ class Server:
 
                 t1 = time.time()
 
-                self._pendingSubscriptionRecheck = set()
+                self._pendingSubscriptionRecheck = []
 
             #we need to send everything we know about 'identities', keeping in mind that we have to 
             #check any new identities that get written to in the background to see if they belong
@@ -286,6 +289,10 @@ class Server:
             messageCount = 0
             while True:
                 locktime_start = time.time()
+
+                if self._subscriptionBackgroundThreadCallback:
+                    self._subscriptionBackgroundThreadCallback(messageCount)
+
                 with self._lock:
                     messageCount += 1
                     if messageCount == 2:
@@ -322,6 +329,9 @@ class Server:
 
                 #don't hold the lock more than 75% of the time.
                 time.sleep( (time.time() - locktime_start) / 3 )
+
+            if self._subscriptionBackgroundThreadCallback:
+                self._subscriptionBackgroundThreadCallback("DONE")
 
             if messageCount > 5:
                 logging.info(
@@ -375,12 +385,22 @@ class Server:
         index_vals = {}
 
         to_send = []
-        for ident in self._pendingSubscriptionRecheck:
-            if ident in identities:
-                identities_left_to_send.add(ident)
+        for transactionMessage in self._pendingSubscriptionRecheck:
+            for key, val in transactionMessage.writes.items():
+                #if we write to a key we've already sent, we'll need to resend it
+                schema_name, typename, identity, field_name = keymapping.split_data_key(key)
+                if identity in identities:
+                    identities_left_to_send.add(identity)
 
-            #todo: check if the identity is now in our set!
-        self._pendingSubscriptionRecheck = set()
+            for add_index_key, add_index_identities in transactionMessage.set_adds.items():
+                add_schema, add_typename, add_fieldname, add_hashVal = keymapping.split_index_key_full(add_index_key)
+                if add_schema == schema_name and add_typename == typename and (
+                        fieldname_and_value is None and add_fieldname == " exists" or 
+                        fieldname_and_value is not None and fieldname_and_value == (add_fieldname, add_hashVal)
+                        ):
+                    identities_left_to_send.update(add_index_identities)
+
+        self._pendingSubscriptionRecheck = []
 
         while identities_left_to_send and len(to_send) < BATCH_SIZE:
             to_send.append(identities_left_to_send.pop())
@@ -647,19 +667,18 @@ class Server:
         for i in identities_mentioned:
             if i in self._id_to_channel:
                 channelsTriggered.update(self._id_to_channel[i])
+    
+        transaction_message = ServerToClient.Transaction(
+            writes={k:v for k,v in key_value.items()},
+            set_adds=set_adds,
+            set_removes=set_removes,
+            transaction_id=transaction_id
+            )
 
-        if self._pendingSubscriptionRecheck:
-            self._pendingSubscriptionRecheck.update(identities_mentioned)
+        if self._pendingSubscriptionRecheck is not None:
+            self._pendingSubscriptionRecheck.append(transaction_message)
 
         for channel in channelsTriggered:
-            if transaction_message is None:
-                transaction_message = ServerToClient.Transaction(
-                    writes={k:v for k,v in key_value.items()},
-                    set_adds=set_adds,
-                    set_removes=set_removes,
-                    transaction_id=transaction_id
-                    )
-
             channel.sendTransaction(transaction_message)
         
         if self.verbose or time.time() - t0 > self.longTransactionThreshold:

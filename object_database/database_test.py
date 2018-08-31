@@ -32,6 +32,26 @@ import threading
 import random
 import time
 
+from object_database.util import configureLogging
+
+configureLogging("test", error=True)
+
+class BlockingCallback:
+    def __init__(self):
+        self.callbackArgs = queue.Queue()
+        self.is_released = queue.Queue()
+
+    def callback(self, arg=None):
+        self.callbackArgs.put(arg)
+        self.is_released.get(timeout=1.0)
+
+    def waitForCallback(self, timeout):
+        return self.callbackArgs.get(timeout=timeout)
+
+    def releaseCallback(self):
+        self.is_released.put(True)
+        
+
 expr = Alternative("Expr")
 expr.define(
     Constant = {'value': int},
@@ -843,6 +863,121 @@ class ObjectDatabaseTests:
         with db2.transaction():
             self.assertEqual(StringIndexed.lookupAll(name="name"), (c,))
 
+    def test_adding_while_subscribing_to_index(self):
+        self.test_adding_while_subscribing(shouldSubscribeToIndex=True)
+
+    def test_adding_while_subscribing(self, shouldSubscribeToIndex=False):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(schema)
+
+        with db1.transaction():
+            c1 = Counter(k = 123)
+            c1.x = 1
+
+        blocker = BlockingCallback()
+
+        self.server._subscriptionBackgroundThreadCallback = blocker.callback
+
+        if shouldSubscribeToIndex:
+            subscriptionEvents = db2.subscribeToIndex(Counter, k=123, block=False)
+        else:
+            subscriptionEvents = db2.subscribeToType(Counter, block=False)
+
+        self.assertEqual(blocker.waitForCallback(1.0), 0)
+
+        #make a transaction
+        with db1.transaction():
+            c1.x = 2
+            c2 = Counter(k = 123)
+
+        blocker.releaseCallback()
+        self.assertEqual(blocker.waitForCallback(1.0), "DONE")
+        blocker.releaseCallback()
+
+        for e in subscriptionEvents:
+            assert e.wait(timeout=1.0)
+
+        with db2.transaction():
+            #verify we see the write on c1
+            self.assertTrue(c1.exists())
+            self.assertTrue(c1.x == 2)
+
+            #check we see the creation of c2
+            self.assertTrue(c2.exists())
+
+    def test_adding_while_subscribing_and_moving_into_index(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(schema)
+
+        with db1.transaction():
+            c1 = Counter(k = 0)
+
+        blocker = BlockingCallback()
+
+        self.server._subscriptionBackgroundThreadCallback = blocker.callback
+
+        subscriptionEvents = db2.subscribeToIndex(Counter, k=123, block=False)
+        
+        self.assertEqual(blocker.waitForCallback(1.0), 0)
+
+        #make a transaction
+        with db1.transaction():
+            c1.k = 123
+
+        blocker.releaseCallback()
+        self.assertEqual(blocker.waitForCallback(1.0), "DONE")
+        blocker.releaseCallback()
+
+        for e in subscriptionEvents:
+            assert e.wait(timeout=1.0)
+
+        with db2.transaction():
+            #verify we see the write on c1
+            self.assertTrue(c1.exists())
+
+    def test_moving_into_index(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(schema)
+        db2.subscribeToIndex(Counter, k = 123)
+
+        with db1.transaction():
+            c = Counter(k=0)
+
+        db2.flush()
+        with db2.view():
+            self.assertFalse(c.exists())
+
+        with db1.transaction():
+            c.k = 123
+            c.x = 100
+
+        db2.flush()
+        with db2.view():
+            self.assertTrue(c.exists())
+            self.assertEqual(c.x, 100)
+
+        with db1.transaction():
+            c.k = 0
+
+        db2.flush()
+        with db2.view():
+            self.assertTrue(c.exists())
+            self.assertEqual(c.k, 0)
+
+        with db1.transaction():
+            c.x = 101
+
+        db2.flush()
+        with db2.view():
+            self.assertTrue(c.exists())
+            self.assertEqual(c.x, 101)
+
     def test_subscription_matching_is_linear(self):
         schemas = []
         dbs = []
@@ -973,18 +1108,18 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryPersistence()
-        self.databaseServer = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
-        self.databaseServer.start()
+        self.server = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
+        self.server.start()
 
     def createNewDb(self, useSecondaryLoop=False):
-        db = self.databaseServer.connect(useSecondaryLoop=useSecondaryLoop)
+        db = self.server.connect(useSecondaryLoop=useSecondaryLoop)
 
         db.initialized.wait()
 
         return db
 
     def tearDown(self):
-        self.databaseServer.stop()
+        self.server.stop()
 
     def test_very_large_subscriptions(self):
         old_interval = messages.getHeartbeatInterval()

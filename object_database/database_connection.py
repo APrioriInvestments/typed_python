@@ -334,31 +334,34 @@ class DatabaseConnection:
             (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity))
             ])
 
-    def subscribeToIndex(self, t, **kwarg):
+    def subscribeToIndex(self, t, block=True, **kwarg):
         self.addSchema(t.__schema__)
 
         toSubscribe = []
         for fieldname,fieldvalue in kwarg.items():
             toSubscribe.append((t.__schema__.name, t.__qualname__, (fieldname, keymapping.index_value_to_hash(fieldvalue))))
 
-        self.subscribeMultiple(toSubscribe)
+        return self.subscribeMultiple(toSubscribe, block=block)
 
-    def subscribeToType(self, t):
+    def subscribeToType(self, t, block=True):
         self.addSchema(t.__schema__)
-        if self._isTypeSubscribedAll(t):
-            return
-        self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None)])
 
-    def subscribeToNone(self, t):
+        if self._isTypeSubscribedAll(t):
+            return ()
+        
+        return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None)], block)
+
+    def subscribeToNone(self, t, block=True):
         self.addSchema(t.__schema__)
         with self._lock:
             self._schema_and_typename_to_subscription_set.setdefault((t.__schema__.name, t.__qualname__), set())
+        return ()
 
-    def subscribeToSchema(self, *schemas):
+    def subscribeToSchema(self, *schemas, block=True):
         for s in schemas:
             self.addSchema(s)
 
-        self.subscribeMultiple([(schema.name, tname, None) for schema in schemas for tname in schema._types])
+        return self.subscribeMultiple([(schema.name, tname, None) for schema in schemas for tname in schema._types], block=block)
 
     def _isTypeSubscribed(self, t):
         return (t.__schema__.name, t.__qualname__) in self._schema_and_typename_to_subscription_set
@@ -366,7 +369,7 @@ class DatabaseConnection:
     def _isTypeSubscribedAll(self, t):
         return self._schema_and_typename_to_subscription_set.get((t.__schema__.name, t.__qualname__)) is Everything
 
-    def subscribeMultiple(self, subscriptionTuples):
+    def subscribeMultiple(self, subscriptionTuples, block=True):
         with self._lock:
             if self.disconnected.is_set():
                 raise DisconnectedException()
@@ -386,12 +389,17 @@ class DatabaseConnection:
 
                 events.append(e)
 
+        if not block:
+            return tuple(events)
+
         for e in events:
             e.wait()
 
         with self._lock:
             if self.disconnected.is_set():
                 raise DisconnectedException()
+
+        return ()
 
     def waitForCondition(self, cond, timeout):
         #eventally we will replace this with something that watches the calculation
