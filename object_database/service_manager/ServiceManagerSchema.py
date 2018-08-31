@@ -17,11 +17,16 @@ import os
 import sys
 import importlib
 import time
+import os
 
 from object_database import Schema, Indexed, Index, core_schema
 from typed_python import *
+import threading
 
 service_schema = Schema("core.service")
+
+codebase_lock = threading.Lock()
+codebase_cache = {}
 
 @service_schema.define
 class Codebase:
@@ -69,25 +74,49 @@ class Codebase:
 
         return Codebase(hash=hashval, files=files)
 
-    def instantiate(self, disk_path, service_module):
+    def instantiate(self, service_module):
         """Instantiate a codebase on disk and load it."""
-        for fpath, fcontents in self.files.items():
-            path, name = os.path.split(fpath)
+        with codebase_lock:
+            root_path = os.path.abspath(os.getenv("ODB_SERVICE_CODE_CACHE") or ".")
 
-            fullpath = os.path.join(disk_path, path)
+            try:
+                if not os.path.exists(root_path):
+                    os.makedirs(root_path)
+            except:
+                logging.warn("Exception trying to make directory %s", root_path)
 
-            if not os.path.exists(fullpath):
-                os.makedirs(fullpath)
-            
-            with open(os.path.join(fullpath, name), "wb") as f:
-                f.write(fcontents.encode("utf-8"))
+            disk_path = os.path.join(root_path, self.hash)
 
-        sys.path = [disk_path] + sys.path
+            for fpath, fcontents in self.files.items():
+                path, name = os.path.split(fpath)
 
-        try:
-            return importlib.import_module(service_module)
-        finally:
-            sys.path.pop(0)
+                fullpath = os.path.join(disk_path, path)
+
+                if not os.path.exists(fullpath):
+                    try:
+                        os.makedirs(fullpath)
+                    except:
+                        logging.warn("Exception trying to make directory %s", root_path)
+                
+                with open(os.path.join(fullpath, name), "wb") as f:
+                    f.write(fcontents.encode("utf-8"))
+
+            if (self.hash, service_module) in codebase_cache:
+                return codebase_cache[self.hash, service_module]
+
+            modules = dict(sys.modules)
+            sys.path = [disk_path] + sys.path
+
+            try:
+                print(sys.path[:3])
+                module = importlib.import_module(service_module)
+            finally:
+                sys.path.pop(0)
+                sys.modules = modules
+
+            codebase_cache[self.hash, service_module] = module
+
+            return codebase_cache[self.hash, service_module]
 
 @service_schema.define
 class ServiceHost:
@@ -118,6 +147,32 @@ class Service:
 
     #how many would we like but we can't boot?
     unbootable_count = int
+
+    def instantiateServiceObject(self):
+        if self.codebase:
+            module = self.codebase.instantiate(self.service_module_name)
+
+            if self.service_class_name not in module.__dict__:
+                raise Exception("Provided module %s at %s has no class %s. Options are:\n%s" % (
+                    self.service_module_name,
+                    module.__file__,
+                    self.service_class_name,
+                    "\n".join(["  " + x for x in sorted(module.__dict__)])
+                    ))
+
+            service_type = module.__dict__[self.service_class_name]
+        else:
+            def _getobject(modname, attribute):
+                mod = __import__(modname, fromlist=[attribute])
+                return mod.__dict__[attribute]
+
+            service_type = _getobject(
+                self.service_module_name, 
+                self.service_class_name
+                )
+
+        return service_type
+
 
 @service_schema.define
 class ServiceInstance:

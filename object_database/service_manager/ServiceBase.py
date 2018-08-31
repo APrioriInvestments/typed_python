@@ -18,6 +18,7 @@ import traceback
 import logging
 import time
 
+from object_database.web.cells import Card
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceManagerSchema import service_schema
 
@@ -40,3 +41,7 @@ class ServiceBase:
     def doWork(self, shouldStop):
         #subclasses actually do work in here.
         shouldStop.wait()
+
+    @staticmethod
+    def serviceDisplay(serviceObject):
+        return Card("No details provided for service '%s'" % serviceObject.name)

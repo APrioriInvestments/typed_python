@@ -41,8 +41,6 @@ class ServiceWorker:
         self.shutdownPollThread = threading.Thread(target=self.checkForShutdown)
         self.shutdownPollThread.daemon = True
 
-        self.tempdir = None
-
     def initialize(self):
         assert self.db.waitForCondition(lambda: self.instance.exists(), 5.0)
 
@@ -136,39 +134,8 @@ class ServiceWorker:
         if self.shutdownPollThread.isAlive():
             self.shutdownPollThread.join()
 
-        if self.tempdir:
-            self.tempdir.__exit__(None, None, None)
-
     def _instantiateServiceObject(self):
-        if self.instance.service.codebase:
-            self.tempdir = tempfile.TemporaryDirectory()
-            tempdirName = self.tempdir.__enter__()
-
-            module = self.instance.service.codebase.instantiate(tempdirName, self.instance.service.service_module_name)
-
-            if self.instance.service.service_class_name not in module.__dict__:
-                raise Exception("Provided module %s at %s has no class %s. Options are:\n%s" % (
-                    self.instance.service.service_module_name,
-                    module.__file__,
-                    self.instance.service.service_class_name,
-                    "\n".join(["  " + x for x in sorted(module.__dict__)])
-                    ))
-
-            service_type = module.__dict__[self.instance.service.service_class_name]
-
-            logging.info("ServiceWorker loaded module code for service %s.%s",
-                self.instance.service.service_module_name,
-                self.instance.service.service_class_name
-                )
-        else:
-            def _getobject(modname, attribute):
-                mod = __import__(modname, fromlist=[attribute])
-                return mod.__dict__[attribute]
-
-            service_type = _getobject(
-                self.instance.service.service_module_name, 
-                self.instance.service.service_class_name
-                )
+        service_type = self.instance.service.instantiateServiceObject()
             
         assert isinstance(service_type, type), service_type
         assert issubclass(service_type, ServiceBase), service_type

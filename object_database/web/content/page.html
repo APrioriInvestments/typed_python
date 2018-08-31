@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" 
+      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" 
+    crossorigin="anonymous">
+
+<link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,400italic' rel='stylesheet' type='text/css'>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/octicons/4.4.0/font/octicons.min.css"/>
+<link rel="stylesheet" href="/content/object_database.css"/>
+
+<script>
+    var websocket;
+
+    var loc = window.location, new_uri;
+    if (loc.protocol === "https:") {
+        new_uri = "wss:";
+    } else {
+        new_uri = "ws:";
+    }
+    new_uri += "//" + loc.host;
+    new_uri += "/socket";
+    
+
+    if (window.WebSocket) { 
+        websocket = new WebSocket(new_uri); 
+    }
+    else if (window.MozWebSocket) {
+        websocket = MozWebSocket(new_uri);
+    }
+    else {
+        console.log('WebSocket Not Supported');
+    }
+
+    var buf = '';
+
+    function sendString_(str) {
+        websocket.send(str);
+    };
+
+    cells = {}
+
+    function htmlToDomElt(contents) {
+        elt = document.createElement("div")
+        elt.innerHTML = contents
+        return elt.children[0]
+    }
+
+    websocket.onmessage = function(event) {
+        update = JSON.parse(event.data)
+
+        if (cells["page_root"] === undefined) {
+          cells["page_root"] = document.getElementById("page_root")
+          cells['holding_pen'] = document.getElementById("holding_pen")
+        }
+
+        eltID = update.id //document ID to replace or update
+        replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
+
+        elt = htmlToDomElt(update.contents)
+
+        //install the element into the dom
+        if (cells[update.id] === undefined) {
+          //this is a totally new node. for the moment, add it to the holding pen
+          cells['holding_pen'].appendChild(elt)
+          cells[update.id] = elt
+          elt.id = update.id
+        } else {
+          //replace the existing copy of the node with this copy
+          if (cells[update.id].parentNode === null) {
+            cells['holding_pen'].appendChild(cells[update.id])
+          }
+
+          cells[update.id].parentNode.replaceChild(elt, cells[update.id])
+          cells[update.id] = elt
+          elt.id = update.id
+        }
+
+        //now wire in its children
+        replacementKeys = Object.keys(replacements)
+
+        for (i = 0; i < replacementKeys.length; i++) {
+          target = document.getElementById(replacementKeys[i])
+
+          if (cells[replacements[replacementKeys[i]]] === undefined) {
+            //this is actually a new node. we'll define it later in the event stream.
+            cells[replacements[replacementKeys[i]]] = document.createElement("div")
+            source = cells[replacements[replacementKeys[i]]]
+            source.id = replacements[replacementKeys[i]]
+            cells['holding_pen'].appendChild(source)
+          } else {
+            //not a new node. 
+            source = cells[replacements[replacementKeys[i]]]
+          }
+
+          target.parentNode.replaceChild(source, target)
+        }
+    };
+
+</script>
+</head>
+<body>
+
+<div id="page_root">
+    <div class="card">
+      <div class="card-body">
+        Loading...
+      </div>
+    </div>
+</div>
+
+<div id='holding_pen' style="display:none"></div>
+
+<script
+  src="https://code.jquery.com/jquery-3.3.1.min.js"
+  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+  crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+<script> 
+$(function () {
+  $('[data-toggle="tooltip"]').tooltip({
+    template: '<div class="tooltip" role="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner large"></div></div>'
+    });
+})
+const getChildProp = function(el, child) {
+  return $('.data-' + child, $(el).attr('data-bind')).html();
+};
+
+$('.popover-dismiss').popover({
+  trigger: 'focus'
+});
+
+$('[data-toggle="popover"]').popover({
+  html: true,
+  container: 'body',
+  placement: 'bottom',
+  title: function () {
+    return getChildProp(this, 'title');
+  },
+  content: function () {
+    return getChildProp(this, 'content');
+  },
+  placement: function () {
+    return getChildProp(this, 'placement');
+  }
+});
+$('[data-poload]').on('show.bs.dropdown', function (arg) {
+  var target = arg.currentTarget;
+
+  var ref=$(target).attr("data-poload");
+  var tgt=$($(target).attr("data-poload-target"))[0];
+
+  $(tgt).load(ref)
+})
+</script>
+</body>
+<html>

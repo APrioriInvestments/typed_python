@@ -178,8 +178,14 @@ class ServiceManager(object):
                         sInst.delete()
                     serviceHost.delete()
                 else:
-                    serviceHost.gbRamUsed = sum([i.service.gbRamUsed for i in instances if i.isActive()])
-                    serviceHost.coresUsed = sum([i.service.coresUsed for i in instances if i.isActive()])
+                    actualRam = sum([i.service.gbRamUsed for i in instances if i.isActive()])
+                    actualCores = sum([i.service.coresUsed for i in instances if i.isActive()])
+
+                    if serviceHost.gbRamUsed != actualRam:
+                        serviceHost.gbRamUsed = actualRam
+
+                    if serviceHost.coresUsed != actualCores:
+                        serviceHost.coresUsed = actualCores
 
         with self.db.transaction():
             for serviceInstance in service_schema.ServiceInstance.lookupAll():

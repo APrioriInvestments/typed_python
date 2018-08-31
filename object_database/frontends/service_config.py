@@ -65,6 +65,9 @@ def main(argv):
     list_parser = subparsers.add_parser('list', help='list installed services')
     list_parser.set_defaults(command='list')
 
+    instances_parser = subparsers.add_parser('instances', help='list running service instances')
+    instances_parser.set_defaults(command='instances')
+
     hosts_parser = subparsers.add_parser('hosts', help='list running hosts')
     hosts_parser.set_defaults(command='hosts')
 
@@ -80,7 +83,7 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
-    db.subscribeToSchema(service_schema)
+    db.subscribeToSchema(core_schema, service_schema)
 
     if parsedArgs.command == 'connections':
         table = [['Connection ID']]
@@ -93,14 +96,13 @@ def main(argv):
 
     if parsedArgs.command == 'configure':
         try:
-            with tempfile.TemporaryDirectory() as tf:
-                with db.transaction():
-                    s = service_schema.Service.lookupAny(name=parsedArgs.name)
-                    
-                    module = s.codebase.instantiate(tf, s.service_module_name)
-                    svcClass = getattr(module, s.service_class_name)
+            with db.transaction():
+                s = service_schema.Service.lookupAny(name=parsedArgs.name)
+                
+                module = s.codebase.instantiate(s.service_module_name)
+                svcClass = getattr(module, s.service_class_name)
 
-                svcClass.configureFromCommandline(db, s, parsedArgs.args)
+            svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
             print("Failed to configure %s: %s" % (parsedArgs.name, e))
             return 1
@@ -118,27 +120,26 @@ def main(argv):
             codebase = service_schema.Codebase.create(paths)
             fullClassname = getattr(parsedArgs, 'class')
             
-            with tempfile.TemporaryDirectory() as tf:
-                modulename, classname = fullClassname.rsplit(".",1)
-                module = codebase.instantiate(tf, modulename)
+            modulename, classname = fullClassname.rsplit(".",1)
+            module = codebase.instantiate(modulename)
 
-                if module is None:
-                    print("Can't find", module, "in the codebase")
+            if module is None:
+                print("Can't find", module, "in the codebase")
 
-                actualClass = module.__dict__.get(classname, None)
-                if actualClass is None:
-                    print("Can't find", module, "in module", modulename)
+            actualClass = module.__dict__.get(classname, None)
+            if actualClass is None:
+                print("Can't find", module, "in module", modulename)
 
-                if actualClass is None:
-                    print("Can't find", classname, "in the codebase")
-                    return 1
+            if actualClass is None:
+                print("Can't find", classname, "in the codebase")
+                return 1
 
-                if not issubclass(actualClass, ServiceBase):
-                    print("Named class %s is not a ServiceBase subclass." % fullClassname)
-                    return 1
+            if not issubclass(actualClass, ServiceBase):
+                print("Named class %s is not a ServiceBase subclass." % fullClassname)
+                return 1
 
-                coresUsed = actualClass.coresUsed
-                gbRamUsed = actualClass.gbRamUsed
+            coresUsed = actualClass.coresUsed
+            gbRamUsed = actualClass.gbRamUsed
 
             if not parsedArgs.name:
                 name = fullClassname.split(".")[-1]
@@ -162,6 +163,20 @@ def main(argv):
                     str(s.target_count),
                     s.coresUsed,
                     s.gbRamUsed
+                    ])
+
+        print(formatTable(table))
+
+    if parsedArgs.command == 'instances':
+        table = [['Service', 'Host', 'Connection', 'State']]
+
+        with db.view():
+            for s in sorted(service_schema.ServiceInstance.lookupAll(), key=lambda s:(s.service.name, s.host.hostname, s.state)):
+                table.append([
+                    s.service.name,
+                    s.host.hostname,
+                    s.connection if s.connection.exists() else "<DEAD>",
+                    s.state
                     ])
 
         print(formatTable(table))

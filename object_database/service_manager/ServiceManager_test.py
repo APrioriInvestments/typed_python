@@ -25,6 +25,7 @@ import threading
 import textwrap
 import time
 import numpy
+import tempfile
 import logging
 import subprocess
 import os
@@ -67,7 +68,7 @@ class TestService(ServiceBase):
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
-
+        
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
             time.sleep(0.01)
@@ -159,6 +160,11 @@ class ServiceManagerTest(unittest.TestCase):
             )
 
     def test_starting_services(self):        
+        time.sleep(1.0)
+        print("HIHIH")
+        print()
+        print()
+        
         with self.database.transaction():
             ServiceManager.createService(TestService, "TestService", target_count=1)
 
@@ -203,6 +209,42 @@ class ServiceManagerTest(unittest.TestCase):
 
         #make sure we don't have a bunch of zombie processes hanging underneath the service manager
         self.assertEqual(len(psutil.Process().children()[0].children()), 0)
+
+    def test_conflicting_codebases(self):
+        with tempfile.TemporaryDirectory() as tf:
+            with self.database.transaction():
+                os.environ["ODB_SERVICE_CODE_CACHE"] = tf
+
+                v1 = service_schema.Codebase.createFromFiles({
+                    'test_service/__init__.py': '',
+                    'test_service/service.py': textwrap.dedent("""
+                        def f():
+                            return 1
+                    """)
+                    })
+
+                v2 = service_schema.Codebase.createFromFiles({
+                    'test_service/__init__.py': '',
+                    'test_service/service.py': textwrap.dedent("""
+                        def f():
+                            return 2
+                    """)
+                    })
+
+                i1 = v1.instantiate("test_service.service")
+                i2 = v2.instantiate("test_service.service")
+                i12 = v1.instantiate("test_service.service")
+                i22 = v2.instantiate("test_service.service")
+
+                self.assertTrue(i1.f() == 1)
+                self.assertTrue(i2.f() == 2)
+                self.assertTrue(i12.f() == 1)
+                self.assertTrue(i22.f() == 2)
+
+                self.assertTrue(i1 is i12)
+                self.assertTrue(i2 is i22)
+
+
 
     def test_redeploy_hanging_services(self):
         with self.database.transaction():

@@ -461,6 +461,7 @@ class Server:
             except:
                 logging.error("Unknown error committing transaction: %s", traceback.format_exc())
                 isOK = False
+                badKey = "<NONE>"
 
             connectedChannel.sendTransactionSuccess(msg.transaction_guid, isOK, badKey)
 

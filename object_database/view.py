@@ -101,7 +101,6 @@ class View(object):
         self._set_removes = {}
         self._t0 = None
         self._stack = None
-        self._readWatcher = None
         self._insistReadsConsistent = True
         self._insistWritesConsistent = True
         self._insistIndexReadsConsistent = False
@@ -171,9 +170,6 @@ class View(object):
 
         self._reads.add(key)
 
-        if self._readWatcher:
-            self._readWatcher("key", key)
-
         if key in self._writes:
             res = self._writes[key][1]
             if isinstance(res, tuple):
@@ -203,14 +199,13 @@ class View(object):
 
         key = data_key(type(obj), identity, " exists")
 
-        if self._readWatcher:
-            self._readWatcher("key", key)
+        self._reads.add(key)
 
         if key in self._writes:
-            return self._writes[key] is not None
-        
-        val = self._db._get_versioned_object_data(key, self._transaction_num)
+            return self._writes[key]
 
+        val = self._db._get_versioned_object_data(key, self._transaction_num)
+        
         return val is not None and val.jsonRep is not None
 
     def _delete(self, obj, identity, field_names):
