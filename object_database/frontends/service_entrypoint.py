@@ -50,6 +50,7 @@ def main(argv):
         manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid)
     
         manager.runAndWaitForShutdown()
+        
         return 0
     except:
         logging.error("service_entrypoint failed with an exception:\n%s", traceback.format_exc())

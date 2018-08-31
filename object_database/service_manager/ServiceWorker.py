@@ -63,6 +63,7 @@ class ServiceWorker:
                 self.instance.end_timestamp = time.time()
                 return
         try:
+            logging.info("Initializing service object for %s", self.instance._identity)
             self.serviceObject.initialize()
         except:
             logging.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
@@ -95,6 +96,7 @@ class ServiceWorker:
             self.instance.state = "Running"
 
         try:
+            logging.info("Starting runloop for service object %s", self.instance._identity)
             self.serviceObject.doWork(self.shouldStop)
         except:
             logging.error("Service %s/%s failed: %s", 
