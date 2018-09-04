@@ -18,7 +18,7 @@ import sys
 import importlib
 import time
 import os
-
+import tempfile
 from object_database import Schema, Indexed, Index, core_schema
 from typed_python import *
 import threading
@@ -77,7 +77,7 @@ class Codebase:
     def instantiate(self, service_module):
         """Instantiate a codebase on disk and load it."""
         with codebase_lock:
-            root_path = os.path.abspath(os.getenv("ODB_SERVICE_CODE_CACHE") or ".")
+            root_path = os.path.abspath(os.getenv("ODB_SERVICE_CODE_CACHE") or tempfile.mkdtemp())
 
             try:
                 if not os.path.exists(root_path):
