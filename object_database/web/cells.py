@@ -15,7 +15,7 @@ from object_database.view import current_transaction
 
 MAX_TIMEOUT = 1.0
 MAX_TRIES = 10
-MAX_FPS = 20
+MAX_FPS = 10
 
 _cur_cell = threading.local()
 
@@ -657,12 +657,14 @@ class Expands(Cell):
         self.contents = """
             <div>
                 <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
-                        style="display:inline-block">
+                        style="display:inline-block;vertical-align:top">
                     <span class="octicon octicon-diff-__which__" aria-hidden="true"></span>
                 </div>
-            <div style="display:inline-block">
-                __child__
-            </div>
+
+                <div style="display:inline-block">
+                    __child__
+                </div>
+
             </div>
             """.replace("__identity__", self.identity).replace("__which__", 'removed' if self.isExpanded else 'added')
         self.children = {'__child__': self.open if self.isExpanded else self.closed}

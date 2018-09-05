@@ -181,6 +181,11 @@ class ActiveWebService(ServiceBase):
 
             timestamps = []
 
+            lastDumpTimestamp = time.time()
+            lastDumpMessages = 0
+            lastDumpFrames = 0
+            lastDumpTimeSpentCalculating = 0.0
+
             def readThread():
                 while not ws.closed:
                     msg = ws.receive()
@@ -203,9 +208,27 @@ class ActiveWebService(ServiceBase):
             while not ws.closed:
                 t0 = time.time()
                 cells.recalculate()
-                
-                for message in reversed(cells.renderMessages()): 
+                messages = reversed(cells.renderMessages())
+
+                lastDumpTimeSpentCalculating += time.time() - t0
+
+                for message in messages:
                     ws.send(json.dumps(message))
+                    lastDumpMessages += 1
+
+                lastDumpFrames += 1
+                if time.time() - lastDumpTimestamp > 5.0:
+                    logging.info("In the last %.2f seconds, spent %.2f seconds calculating %s messages over %s frames",
+                        time.time() - lastDumpTimestamp,
+                        lastDumpTimeSpentCalculating,
+                        lastDumpMessages,
+                        lastDumpFrames
+                        )
+
+                    lastDumpFrames = 0
+                    lastDumpMessages = 0
+                    lastDumpTimeSpentCalculating = 0
+                    lastDumpTimestamp = time.time() 
 
                 ws.send(json.dumps("postscripts"))
                 
