@@ -523,15 +523,16 @@ class Grid(Cell):
                 except:
                     self.existingItems[(None,col)] = new_children["__header_%s__" % col_ix] = Traceback(traceback.format_exc())
         
-        for row_ix, row in enumerate(self.rows):
-            seen.add((None, row))
-            if (row, None) in self.existingItems:
-                new_children["__rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
-            else:
-                try:
-                    self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
-                except:
-                    self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
+        if self.rowLabelFun is not None:
+            for row_ix, row in enumerate(self.rows):
+                seen.add((None, row))
+                if (row, None) in self.existingItems:
+                    new_children["__rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
+                else:
+                    try:
+                        self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
+                    except:
+                        self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
         
         seen = set()
         for row_ix, row in enumerate(self.rows):
@@ -553,14 +554,15 @@ class Grid(Cell):
 
         self.contents = """
             <table class="table-hscroll table-sm table-striped">
-            <tr><th></th>__headers__</tr>
+            <tr>""" + ("<th></th>" if self.rowLabelFun is not None else "") + """__headers__</tr>
             __rows__
             </table>
             """.replace("__headers__",
                 "".join("<th>__header_%s__</th>" % (col_ix)
                             for col_ix in range(len(self.cols)))
                 ).replace("__rows__", 
-                "\n".join("<tr><td>__rowlabel_%s__</td>" % row_ix + 
+                "\n".join("<tr>" + 
+                    ("<td>__rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") + 
                     "".join(
                         "<td>__child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
@@ -570,18 +572,16 @@ class Grid(Cell):
                     )
                 )
 
-class Button(Cell):
+class Clickable(Cell):
     def __init__(self, content, f):
         super().__init__()
 
         self.children = {'__contents__': Cell.makeCell(content)}
         self.contents = """
-            <button 
-                class='btn btn-primary' 
-                onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
-                >
+            <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))">
             __contents__
-            </button>""".replace('__identity__', self.identity)
+            </div>""".replace('__identity__', self.identity)
+
         self.f = f
 
     def onMessage(self, msgFrame):
@@ -602,3 +602,14 @@ class Button(Cell):
                 logging.error("Exception in button logic:\n%s", traceback.format_exc())
 
 
+class Button(Clickable):
+    def __init__(self, content, f):
+        super().__init__(content, f)
+
+        self.contents = """
+            <button 
+                class='btn btn-primary' 
+                onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
+                >
+            __contents__
+            </button>""".replace('__identity__', self.identity)

@@ -108,13 +108,18 @@ class ActiveWebService(ServiceBase):
                 service.target_count = ct
             return f
 
+        def curServiceSetter(s):
+            def f():
+                curService.set(s)
+            return f
+
         serviceGrid = Grid(
                 colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
                 rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
                 headerFun=lambda x: x,
-                rowLabelFun=lambda s: Subscribed(lambda: s.name),
+                rowLabelFun=None,
                 rendererFun=lambda s,field: Subscribed(lambda: 
-                    s.name if field == 'Service' else
+                    Clickable(s.name, curServiceSetter(s)) if field == 'Service' else
                     (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
                     s.service_module_name if field == 'Module' else
                     s.service_class_name if field == 'Class' else 
@@ -132,11 +137,6 @@ class ActiveWebService(ServiceBase):
         def displayForService(serviceObj):
             return serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot).serviceDisplay(serviceObj)
             
-        def curServiceSetter(s):
-            def f():
-                curService.set(s)
-            return f
-
         cells.root.setChild(
             HeaderBar(
                 [Subscribed(lambda: 
