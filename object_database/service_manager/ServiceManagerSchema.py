@@ -90,10 +90,12 @@ class Codebase:
 
         return module
 
-    def instantiate(self, disk_path, service_module_name):
+    def instantiate(self, root_path, service_module_name):
         """Instantiate a codebase on disk and load it."""
         with codebase_lock:
-            root_path = os.path.abspath(disk_path)
+            root_path = os.path.abspath(root_path)
+
+            importlib.invalidate_caches()
 
             try:
                 if not os.path.exists(root_path):

@@ -204,7 +204,7 @@ class ServiceManagerTest(unittest.TestCase):
 
         with self.database.view():
             self.assertEqual(svc.effectiveTargetCount(), 1)
-            
+
         self.assertTrue(
             self.database.waitForCondition(
                 lambda: svc.timesBootedUnsuccessfully == ServiceManagerSchema.MAX_BAD_BOOTS,
@@ -257,16 +257,22 @@ class ServiceManagerTest(unittest.TestCase):
         with self.database.transaction():
             v1 = service_schema.Codebase.createFromFiles({
                 'test_service/__init__.py': '',
+                'test_service/helper/__init__.py': 'g = 1',
                 'test_service/service.py': textwrap.dedent("""
+                    import test_service.helper as helper
                     def f():
+                        assert helper.g == 1
                         return 1
                 """)
                 })
 
             v2 = service_schema.Codebase.createFromFiles({
                 'test_service/__init__.py': '',
+                'test_service/helper/__init__.py': 'g = 2',
                 'test_service/service.py': textwrap.dedent("""
+                    import test_service.helper as helper
                     def f():
+                        assert helper.g == 2
                         return 2
                 """)
                 })
