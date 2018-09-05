@@ -98,9 +98,7 @@ def main(argv):
         try:
             with db.transaction():
                 s = service_schema.Service.lookupAny(name=parsedArgs.name)
-                
-                module = s.codebase.instantiate(s.service_module_name)
-                svcClass = getattr(module, s.service_class_name)
+                svcClass = s.instantiateServiceObject()
 
             svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
@@ -117,37 +115,59 @@ def main(argv):
         coresUsed = 1
 
         with db.transaction():
-            codebase = service_schema.Codebase.create(paths)
             fullClassname = getattr(parsedArgs, 'class')
-            
             modulename, classname = fullClassname.rsplit(".",1)
-            module = codebase.instantiate(modulename)
+            
+            if modulename.startswith("object_database"):
+                def _getobject(modname, attribute):
+                    mod = __import__(modname, fromlist=[attribute])
+                    return mod.__dict__[attribute]
 
-            if module is None:
-                print("Can't find", module, "in the codebase")
+                actualClass = _getobject(modulename, classname)
 
-            actualClass = module.__dict__.get(classname, None)
-            if actualClass is None:
-                print("Can't find", module, "in module", modulename)
 
-            if actualClass is None:
-                print("Can't find", classname, "in the codebase")
-                return 1
+                if not isinstance(actualClass, type):
+                    print("Named class %s is not a type." % fullClassname)
+                    return 1
 
-            if not issubclass(actualClass, ServiceBase):
-                print("Named class %s is not a ServiceBase subclass." % fullClassname)
-                return 1
+                if not issubclass(actualClass, ServiceBase):
+                    print("Named class %s is not a ServiceBase subclass." % fullClassname)
+                    return 1
 
-            coresUsed = actualClass.coresUsed
-            gbRamUsed = actualClass.gbRamUsed
-
-            if not parsedArgs.name:
-                name = fullClassname.split(".")[-1]
+                ServiceManager.createService(actualClass, classname, placement=parsedArgs.placement)
             else:
-                name = parsedArgs.name
+                codebase = service_schema.Codebase.create(paths)
+                module = codebase.instantiate(modulename)
 
-            ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None, 
-                    placement=parsedArgs.placement, coresUsed=coresUsed, gbRamUsed=gbRamUsed)
+                if module is None:
+                    print("Can't find", module, "in the codebase")
+
+                actualClass = module.__dict__.get(classname, None)
+                if actualClass is None:
+                    print("Can't find", module, "in module", modulename)
+
+                if actualClass is None:
+                    print("Can't find", classname, "in the codebase")
+                    return 1
+
+                if not isinstance(actualClass, type):
+                    print("Named class %s is not a type." % fullClassname)
+                    return 1
+
+                if not issubclass(actualClass, ServiceBase):
+                    print("Named class %s is not a ServiceBase subclass." % fullClassname)
+                    return 1
+
+                coresUsed = actualClass.coresUsed
+                gbRamUsed = actualClass.gbRamUsed
+
+                if not parsedArgs.name:
+                    name = fullClassname.split(".")[-1]
+                else:
+                    name = parsedArgs.name
+
+                ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None, 
+                        placement=parsedArgs.placement, coresUsed=coresUsed, gbRamUsed=gbRamUsed)
 
     if parsedArgs.command == 'list':
         table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount', 'Cores', 'RAM']]

@@ -108,7 +108,6 @@ class Codebase:
             sys.path = [disk_path] + sys.path
 
             try:
-                print(sys.path[:3])
                 module = importlib.import_module(service_module)
             finally:
                 sys.path.pop(0)
