@@ -41,6 +41,7 @@
     };
 
     cells = {}
+    postscripts = []
 
     function htmlToDomElt(contents) {
         elt = document.createElement("div")
@@ -48,54 +49,89 @@
         return elt.children[0]
     }
 
+    function updatePopovers() {
+      $('[data-toggle="popover"]').popover({
+          html: true,
+          container: 'body',
+          title: function () {
+            return getChildProp(this, 'title');
+          },
+          content: function () {
+            return getChildProp(this, 'content');
+          },
+          placement: function () {
+            return getChildProp(this, 'placement');
+          }
+      });
+      $('.popover-dismiss').popover({
+        trigger: 'focus'
+      });
+    }
+
     websocket.onmessage = function(event) {
         update = JSON.parse(event.data)
 
-        if (cells["page_root"] === undefined) {
-          cells["page_root"] = document.getElementById("page_root")
-          cells['holding_pen'] = document.getElementById("holding_pen")
-        }
+        if (update === "postscripts") {
+          updatePopovers()
 
-        eltID = update.id //document ID to replace or update
-        replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
-
-        elt = htmlToDomElt(update.contents)
-
-        //install the element into the dom
-        if (cells[update.id] === undefined) {
-          //this is a totally new node. for the moment, add it to the holding pen
-          cells['holding_pen'].appendChild(elt)
-          cells[update.id] = elt
-          elt.id = update.id
+          while (postscripts.length) {
+            try {
+              eval(postscripts.pop())
+            } catch(e) {
+              console.log("ERROR RUNNING POSTSCRIPT:", e)
+            }
+          }
         } else {
-          //replace the existing copy of the node with this copy
-          if (cells[update.id].parentNode === null) {
-            cells['holding_pen'].appendChild(cells[update.id])
+          if (cells["page_root"] === undefined) {
+            cells["page_root"] = document.getElementById("page_root")
+            cells['holding_pen'] = document.getElementById("holding_pen")
           }
 
-          cells[update.id].parentNode.replaceChild(elt, cells[update.id])
-          cells[update.id] = elt
-          elt.id = update.id
-        }
+          eltID = update.id //document ID to replace or update
+          replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
 
-        //now wire in its children
-        replacementKeys = Object.keys(replacements)
+          elt = htmlToDomElt(update.contents)
 
-        for (i = 0; i < replacementKeys.length; i++) {
-          target = document.getElementById(replacementKeys[i])
-
-          if (cells[replacements[replacementKeys[i]]] === undefined) {
-            //this is actually a new node. we'll define it later in the event stream.
-            cells[replacements[replacementKeys[i]]] = document.createElement("div")
-            source = cells[replacements[replacementKeys[i]]]
-            source.id = replacements[replacementKeys[i]]
-            cells['holding_pen'].appendChild(source)
+          //install the element into the dom
+          if (cells[update.id] === undefined) {
+            //this is a totally new node. for the moment, add it to the holding pen
+            cells['holding_pen'].appendChild(elt)
+            cells[update.id] = elt
+            elt.id = update.id
           } else {
-            //not a new node. 
-            source = cells[replacements[replacementKeys[i]]]
+            //replace the existing copy of the node with this copy
+            if (cells[update.id].parentNode === null) {
+              cells['holding_pen'].appendChild(cells[update.id])
+            }
+
+            cells[update.id].parentNode.replaceChild(elt, cells[update.id])
+            cells[update.id] = elt
+            elt.id = update.id
           }
 
-          target.parentNode.replaceChild(source, target)
+          //now wire in its children
+          replacementKeys = Object.keys(replacements)
+
+          for (i = 0; i < replacementKeys.length; i++) {
+            target = document.getElementById(replacementKeys[i])
+
+            if (cells[replacements[replacementKeys[i]]] === undefined) {
+              //this is actually a new node. we'll define it later in the event stream.
+              cells[replacements[replacementKeys[i]]] = document.createElement("div")
+              source = cells[replacements[replacementKeys[i]]]
+              source.id = replacements[replacementKeys[i]]
+              cells['holding_pen'].appendChild(source)
+            } else {
+              //not a new node. 
+              source = cells[replacements[replacementKeys[i]]]
+            }
+
+            target.parentNode.replaceChild(source, target)
+          }
+
+          if (update.postscript !== undefined) {
+            postscripts.push(update.postscript)
+          }
         }
     };
 
@@ -130,24 +166,6 @@ const getChildProp = function(el, child) {
   return $('.data-' + child, $(el).attr('data-bind')).html();
 };
 
-$('.popover-dismiss').popover({
-  trigger: 'focus'
-});
-
-$('[data-toggle="popover"]').popover({
-  html: true,
-  container: 'body',
-  placement: 'bottom',
-  title: function () {
-    return getChildProp(this, 'title');
-  },
-  content: function () {
-    return getChildProp(this, 'content');
-  },
-  placement: function () {
-    return getChildProp(this, 'placement');
-  }
-});
 $('[data-poload]').on('show.bs.dropdown', function (arg) {
   var target = arg.currentTarget;
 

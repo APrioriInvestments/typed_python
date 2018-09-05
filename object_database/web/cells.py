@@ -155,11 +155,15 @@ class Cells:
         except:
             raise Exception("Failed to format these contents with args %s:\n\n%s", formatArgs, contents)
 
-        return {
+        res = {
             'id': cell.identity,
             'contents': contents,
             'replacements': replaceDict
             }
+
+        if cell.postscript:
+            res['postscript'] = cell.postscript
+        return res
 
 class Slot:
     """Holds some arbitrary state for use in a session. Not mirrored in the DB."""
@@ -184,6 +188,7 @@ class Cell:
         self.children = {} #local node def to global node def
         self.contents = "" #some contents containing a local node def
         self._identity = None
+        self.postscript = None
 
     @property
     def identity(self):
@@ -462,24 +467,6 @@ class Popover(Cell):
                 <div class="data-content"><div style="width:__width__px">__detail__</div></div>
               </div>
             </div>
-
-            <script>
-
-            $('#popmain___identity__').popover({
-              html: true,
-              container: 'body',
-              placement: 'bottom',
-              title: function () {
-                return getChildProp(this, 'title');
-              },
-              content: function () {
-                return getChildProp(this, 'content');
-              },
-              placement: function () {
-                return getChildProp(this, 'placement');
-              }
-            });
-            </script>
 
             </div>
             """.replace("__identity__", self.identity).replace("__width__", str(width))

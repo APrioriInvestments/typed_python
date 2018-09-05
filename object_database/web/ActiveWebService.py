@@ -193,6 +193,8 @@ class ActiveWebService(ServiceBase):
                 
                 for message in reversed(cells.renderMessages()): 
                     ws.send(json.dumps(message))
+
+                ws.send(json.dumps("postscripts"))
                 
                 cells.gEventHasTransactions.wait()
 

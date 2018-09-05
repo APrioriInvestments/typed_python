@@ -23,6 +23,7 @@ import asyncio
 import websockets
 import tempfile
 
+from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
 
@@ -30,28 +31,41 @@ from object_database import Schema, Indexed, Index, core_schema, TcpServer, conn
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
-with tempfile.TemporaryDirectory() as tf:
-    try:
-        server = subprocess.Popen(
-            [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",'--source',tf,
-                '--shutdownTimeout', '.5'
-                ]
-            )
-        
-        database = connect("localhost", 8020, retry=True)
-        database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
+class UninitializableService(ServiceBase):
+    def initialize(self):
+        assert False
 
-        with database.transaction():
-            service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
-        ActiveWebService.configureFromCommandline(database, service, ['--port', '8050', '--host', 'localhost'])
+    def doWork(self, shouldStop):
+        time.sleep(120)
 
-        with database.transaction():
-            ServiceManager.startService("ActiveWebService", 1)
+if __name__ == '__main__':
+    with tempfile.TemporaryDirectory() as tf:
+        try:
+            server = subprocess.Popen(
+                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
+                    'localhost', 'localhost', "8020", "--run_db",'--source',tf,
+                    '--shutdownTimeout', '.5'
+                    ]
+                )
+            
+            database = connect("localhost", 8020, retry=True)
+            database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
-        while True:
-            time.sleep(.1)
-    finally:
-        server.terminate()
-        server.wait()
+            with database.transaction():
+                service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
+
+            ActiveWebService.configureFromCommandline(database, service, ['--port', '8050', '--host', 'localhost'])
+
+            with database.transaction():
+                ServiceManager.startService("ActiveWebService", 1)
+
+            with database.transaction():
+                service = ServiceManager.createService(UninitializableService, "UninitializableService", target_count=1)
+
+
+            while True:
+                time.sleep(.1)
+        finally:
+            server.terminate()
+            server.wait()
 
