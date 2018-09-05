@@ -368,7 +368,18 @@ class DatabaseConnection:
         for s in schemas:
             self.addSchema(s)
 
-        return self.subscribeMultiple([(schema.name, tname, None) for schema in schemas for tname in schema._types], block=block)
+        unsubscribedTypes = []
+        for schema in schemas:
+            for tname, t in schema._types.items():
+                if not self._isTypeSubscribedAll(t):
+                    unsubscribedTypes.append((schema.name, tname, None))
+
+        if unsubscribedTypes:
+            return self.subscribeMultiple(unsubscribedTypes, block=block)
+        return ()
+
+    def isSubscribedToType(self, t):
+        return self._isTypeSubscribed(t)
 
     def _isTypeSubscribed(self, t):
         return (t.__schema__.name, t.__qualname__) in self._schema_and_typename_to_subscription_set

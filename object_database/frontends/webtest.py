@@ -25,18 +25,12 @@ import tempfile
 
 from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.ServiceManager import ServiceManager
+from object_database.service_manager.ServiceManager_test import UninitializableService, HappyService
 from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema
+from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema, current_transaction
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
-
-class UninitializableService(ServiceBase):
-    def initialize(self):
-        assert False
-
-    def doWork(self, shouldStop):
-        time.sleep(120)
 
 if __name__ == '__main__':
     with tempfile.TemporaryDirectory() as tf:
@@ -61,6 +55,9 @@ if __name__ == '__main__':
 
             with database.transaction():
                 service = ServiceManager.createService(UninitializableService, "UninitializableService", target_count=1)
+
+            with database.transaction():
+                service = ServiceManager.createService(HappyService, "HappyService", target_count=1)
 
 
             while True:

@@ -19,8 +19,9 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 
 import object_database.service_manager.ServiceManagerSchema as ServiceManagerSchema
+from object_database.web.cells import *
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema
+from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema, current_transaction
 from typed_python import *
 import psutil
 import threading
@@ -102,6 +103,25 @@ class UninitializableService(ServiceBase):
     def doWork(self, shouldStop):
         time.sleep(120)
 
+happy = Schema("core.test.happy")
+@happy.define
+class Happy:
+    i = int
+
+class HappyService(ServiceBase):
+    def initialize(self):
+        pass
+
+    @staticmethod
+    def serviceDisplay(serviceObject):
+        if not current_transaction().db().isSubscribedToType(Happy):
+            raise SubscribeAndRetry(lambda db: db.subscribeToType(Happy))
+        
+        return Card("There are %s happy objects" % len(Happy.lookupAll()))
+
+    def doWork(self, shouldStop):
+        shouldStop.wait()
+    
 class CrashingService(ServiceBase):
     def initialize(self):
         assert False

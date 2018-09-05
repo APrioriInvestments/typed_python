@@ -124,7 +124,12 @@ class Cells:
 
             try:
                 _cur_cell.cell = n
-                n.recalculate()
+                while True:
+                    try:
+                        n.recalculate()
+                        break
+                    except SubscribeAndRetry as e:
+                        e.callback(self.db)
             except:
                 logging.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
             finally:
@@ -384,6 +389,8 @@ class Subscribed(Cell):
             self.contents = """<div>__contents__</div>"""
             try:
                 self.children = {'__contents__': Cell.makeCell(self.f())}
+            except SubscribeAndRetry:
+                raise
             except:
                 logging.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                 self.children = {'__contents__': Traceback(traceback.format_exc())}
@@ -397,6 +404,7 @@ class Subscribed(Cell):
                 self.cells.keysToCells.setdefault(k, set()).discard(self)
 
             self.subscriptions = new_subscriptions
+
 
 
 class SubscribedSequence(Cell):
@@ -415,6 +423,8 @@ class SubscribedSequence(Cell):
         with self.cells.db.view() as v:
             try:
                 self.spine = list(self.itemsFun())
+            except SubscribeAndRetry:
+                raise
             except:
                 logging.error("Spine calc threw an exception:\n%s", traceback.format_exc())
                 self.spine = []
@@ -436,6 +446,8 @@ class SubscribedSequence(Cell):
             else:
                 try:
                     self.existingItems[s] = new_children["__child_%s__" % ix] = self.rendererFun(s)
+                except SubscribeAndRetry:
+                    raise
                 except:
                     self.existingItems[s] = new_children["__child_%s__" % ix] = Traceback(traceback.format_exc())
         
@@ -491,11 +503,15 @@ class Grid(Cell):
         with self.cells.db.view() as v:
             try:
                 self.rows = list(self.rowFun())
+            except SubscribeAndRetry:
+                raise
             except:
                 logging.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
             try:
                 self.cols = list(self.colFun())
+            except SubscribeAndRetry:
+                raise
             except:
                 logging.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
@@ -520,6 +536,8 @@ class Grid(Cell):
             else:
                 try:
                     self.existingItems[(None,col)] = new_children["__header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col))
+                except SubscribeAndRetry:
+                    raise
                 except:
                     self.existingItems[(None,col)] = new_children["__header_%s__" % col_ix] = Traceback(traceback.format_exc())
         
@@ -531,6 +549,8 @@ class Grid(Cell):
                 else:
                     try:
                         self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
+                    except SubscribeAndRetry:
+                        raise
                     except:
                         self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
         
@@ -543,6 +563,8 @@ class Grid(Cell):
                 else:
                     try:
                         self.existingItems[(row,col)] = new_children["__child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
+                    except SubscribeAndRetry:
+                        raise
                     except:
                         self.existingItems[(row,col)] = new_children["__child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
             
@@ -613,3 +635,9 @@ class Button(Clickable):
                 >
             __contents__
             </button>""".replace('__identity__', self.identity)
+
+class SubscribeAndRetry(Exception):
+    def __init__(self, callback):
+        super().__init__("SubscribeAndRetry")
+        self.callback = callback
+
