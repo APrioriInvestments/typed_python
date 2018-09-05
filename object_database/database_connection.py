@@ -121,7 +121,7 @@ class VersionedSet(VersionedBase):
 
     def updateVersionedAdds(self, version, adds):
         if not self.version_numbers or self.version_numbers[-1] != version:
-            assert self.version_numbers[-1] < version
+            assert not self.version_numbers or self.version_numbers[-1] < version
             self.setVersionedAddsAndRemoves(version, adds, set())
         else:
             self.adds[-1].update(adds)
