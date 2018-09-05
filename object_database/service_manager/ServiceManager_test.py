@@ -18,6 +18,8 @@ import unittest
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 
+import object_database.service_manager.ServiceManagerSchema as ServiceManagerSchema
+
 from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema
 from typed_python import *
 import psutil
@@ -93,6 +95,20 @@ class HangingService(ServiceBase):
     def doWork(self, shouldStop):
         time.sleep(120)
 
+class UninitializableService(ServiceBase):
+    def initialize(self):
+        assert False
+
+    def doWork(self, shouldStop):
+        time.sleep(120)
+
+class CrashingService(ServiceBase):
+    def initialize(self):
+        assert False
+        
+    def doWork(self, shouldStop):
+        time.sleep(.5)
+        assert False
 
 def getTestServiceModule(version):
     return {
@@ -138,9 +154,12 @@ def getTestServiceModule(version):
 
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
+        self.tempDirObj = tempfile.TemporaryDirectory()
+        self.tempDirectoryName = self.tempDirObj.__enter__()
+
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",
+                'localhost', 'localhost', "8020", "--run_db",'--source',self.tempDirectoryName,
                 '--shutdownTimeout', '1.0'
                 ]
             )
@@ -150,6 +169,7 @@ class ServiceManagerTest(unittest.TestCase):
     def tearDown(self):
         self.server.terminate()
         self.server.wait()
+        self.tempDirObj.__exit__(None,None,None)
 
     def waitForCount(self, count):
         self.assertTrue(
@@ -160,15 +180,38 @@ class ServiceManagerTest(unittest.TestCase):
             )
 
     def test_starting_services(self):        
-        time.sleep(1.0)
-        print("HIHIH")
-        print()
-        print()
-        
         with self.database.transaction():
             ServiceManager.createService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
+
+    def test_starting_uninitializable_services(self):        
+        with self.database.transaction():
+            svc = ServiceManager.createService(UninitializableService, "UninitializableService", target_count=1)
+
+        self.assertTrue(
+            self.database.waitForCondition(
+                lambda: svc.timesBootedUnsuccessfully == ServiceManagerSchema.MAX_BAD_BOOTS,
+                10
+                )
+            )
+
+        with self.database.view():
+            self.assertEqual(svc.effectiveTargetCount(), 0)
+
+        with self.database.transaction():
+            svc.resetCounters()
+
+        with self.database.view():
+            self.assertEqual(svc.effectiveTargetCount(), 1)
+            
+        self.assertTrue(
+            self.database.waitForCondition(
+                lambda: svc.timesBootedUnsuccessfully == ServiceManagerSchema.MAX_BAD_BOOTS,
+                10
+                )
+            )
+
 
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
@@ -211,38 +254,35 @@ class ServiceManagerTest(unittest.TestCase):
         self.assertEqual(len(psutil.Process().children()[0].children()), 0)
 
     def test_conflicting_codebases(self):
-        with tempfile.TemporaryDirectory() as tf:
-            with self.database.transaction():
-                os.environ["ODB_SERVICE_CODE_CACHE"] = tf
+        with self.database.transaction():
+            v1 = service_schema.Codebase.createFromFiles({
+                'test_service/__init__.py': '',
+                'test_service/service.py': textwrap.dedent("""
+                    def f():
+                        return 1
+                """)
+                })
 
-                v1 = service_schema.Codebase.createFromFiles({
-                    'test_service/__init__.py': '',
-                    'test_service/service.py': textwrap.dedent("""
-                        def f():
-                            return 1
-                    """)
-                    })
+            v2 = service_schema.Codebase.createFromFiles({
+                'test_service/__init__.py': '',
+                'test_service/service.py': textwrap.dedent("""
+                    def f():
+                        return 2
+                """)
+                })
 
-                v2 = service_schema.Codebase.createFromFiles({
-                    'test_service/__init__.py': '',
-                    'test_service/service.py': textwrap.dedent("""
-                        def f():
-                            return 2
-                    """)
-                    })
+            i1 = v1.instantiate(self.tempDirectoryName, "test_service.service")
+            i2 = v2.instantiate(self.tempDirectoryName, "test_service.service")
+            i12 = v1.instantiate(self.tempDirectoryName, "test_service.service")
+            i22 = v2.instantiate(self.tempDirectoryName, "test_service.service")
 
-                i1 = v1.instantiate("test_service.service")
-                i2 = v2.instantiate("test_service.service")
-                i12 = v1.instantiate("test_service.service")
-                i22 = v2.instantiate("test_service.service")
+            self.assertTrue(i1.f() == 1)
+            self.assertTrue(i2.f() == 2)
+            self.assertTrue(i12.f() == 1)
+            self.assertTrue(i22.f() == 2)
 
-                self.assertTrue(i1.f() == 1)
-                self.assertTrue(i2.f() == 2)
-                self.assertTrue(i12.f() == 1)
-                self.assertTrue(i22.f() == 2)
-
-                self.assertTrue(i1 is i12)
-                self.assertTrue(i2 is i22)
+            self.assertTrue(i1 is i12)
+            self.assertTrue(i2 is i22)
 
 
 

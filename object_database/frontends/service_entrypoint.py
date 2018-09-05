@@ -32,6 +32,7 @@ def main(argv):
     parser.add_argument("host")
     parser.add_argument("port", type=int)
     parser.add_argument("instanceid")
+    parser.add_argument("sourceDir")
 
     parsedArgs = parser.parse_args(argv[1:])
 
@@ -47,10 +48,10 @@ def main(argv):
         return connect(parsedArgs.host, parsedArgs.port)
 
     try:
-        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid)
+        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.sourceDir)
     
         manager.runAndWaitForShutdown()
-        
+
         return 0
     except:
         logging.error("service_entrypoint failed with an exception:\n%s", traceback.format_exc())

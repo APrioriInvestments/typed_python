@@ -25,10 +25,11 @@ import time
 class ServiceManager(object):
     DEFAULT_SHUTDOWN_TIMEOUT = 10.0
 
-    def __init__(self, dbConnectionFactory, isMaster, ownHostname, maxGbRam=4, maxCores=4, shutdownTimeout=None):
+    def __init__(self, dbConnectionFactory, sourceDir, isMaster, ownHostname, maxGbRam=4, maxCores=4, shutdownTimeout=None):
         object.__init__(self)
         self.shutdownTimeout = shutdownTimeout or ServiceManager.DEFAULT_SHUTDOWN_TIMEOUT
         self.ownHostname = ownHostname
+        self.sourceDir = sourceDir
         self.isMaster = isMaster
         self.maxGbRam = maxGbRam
         self.maxCores = maxCores
@@ -51,11 +52,11 @@ class ServiceManager(object):
         self.thread.join()
 
     @staticmethod
-    def createService(serviceClass, serviceName, target_count=None, placement="Any"):
+    def createService(serviceClass, serviceName, target_count=None, placement=None, isSingleton=None):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
-            service = service_schema.Service(name=serviceName, placement=placement)
+            service = service_schema.Service(name=serviceName, placement=placement or "Any")
             service.service_module_name = serviceClass.__module__
             service.service_class_name = serviceClass.__qualname__
 
@@ -68,7 +69,7 @@ class ServiceManager(object):
         return service
 
     @staticmethod
-    def createServiceWithCodebase(codebase, className, serviceName, targetCount=0, placement="Any", coresUsed=None, gbRamUsed=None):
+    def createServiceWithCodebase(codebase, className, serviceName, targetCount=None, placement=None, coresUsed=None, gbRamUsed=None, isSingleton=None):
         assert len(className.split(".")) > 1, "className should be a fully-qualified module.classname"
 
         service = service_schema.Service.lookupAny(name=serviceName)
@@ -76,10 +77,11 @@ class ServiceManager(object):
         if not service:
             service = service_schema.Service(name=serviceName, placement="Any")
             
-        service.codebase = codebase
-        service.service_module_name = ".".join(className.split(".")[:-1])
-        service.service_class_name = className.split(".")[-1]
+        service.setCodebase(codebase, ".".join(className.split(".")[:-1]), className.split(".")[-1])
         
+        if isSingleton is not None:
+            service.isSingleton = isSingleton
+
         if coresUsed is not None:
             service.coresUsed = coresUsed
 
@@ -190,6 +192,10 @@ class ServiceManager(object):
         with self.db.transaction():
             for serviceInstance in service_schema.ServiceInstance.lookupAll():
                 if not serviceInstance.host.exists() or serviceInstance.connection and not serviceInstance.connection.exists():
+                    if serviceInstance.state == "FailedToStart":
+                        serviceInstance.service.timesBootedUnsuccessfully += 1
+                    elif serviceInstance.state == "Crashed":
+                        serviceInstance.service.timesCrashed += 1
                     serviceInstance.delete()
 
     def redeployServicesIfNecessary(self):
@@ -235,7 +241,7 @@ class ServiceManager(object):
 
         for service, actual_records in actual_by_service.items():
             with self.db.transaction():
-                if service.target_count != len(actual_records):
+                if service.effectiveTargetCount() != len(actual_records):
                     self._updateService(service, actual_records)
 
     def _pickHost(self, service):
@@ -252,11 +258,11 @@ class ServiceManager(object):
     def _updateService(self, service, actual_records):
         service.unbootable_count = 0
 
-        while service.target_count > len(actual_records):
+        while service.effectiveTargetCount() > len(actual_records):
             host = self._pickHost(service)
             
             if not host:
-                service.unbootable_count = service.target_count - len(actual_records)
+                service.unbootable_count = service.effectiveTargetCount() - len(actual_records)
                 return
             else:
                 host.gbRamUsed = host.gbRamUsed + service.gbRamUsed
@@ -271,7 +277,7 @@ class ServiceManager(object):
 
             actual_records.append(instance)
 
-        while service.target_count < len(actual_records):
+        while service.effectiveTargetCount() < len(actual_records):
             sInst = actual_records.pop()
             sInst.triggerShutdown()
 

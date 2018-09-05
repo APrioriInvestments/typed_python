@@ -28,6 +28,8 @@ service_schema = Schema("core.service")
 codebase_lock = threading.Lock()
 codebase_cache = {}
 
+MAX_BAD_BOOTS = 5
+
 @service_schema.define
 class Codebase:
     hash = Indexed(str)
@@ -74,10 +76,24 @@ class Codebase:
 
         return Codebase(hash=hashval, files=files)
 
-    def instantiate(self, service_module):
+    @staticmethod
+    def instantiateFromLocalSource(paths, service_module_name):
+        """Given a set of paths (that we would use to create a codebase), instantiate it directly."""
+        modules = dict(sys.modules)
+        sys.path = paths + sys.path
+
+        try:
+            module = importlib.import_module(service_module_name)
+        finally:
+            sys.path.pop(len(paths))
+            sys.modules = modules
+
+        return module
+
+    def instantiate(self, disk_path, service_module_name):
         """Instantiate a codebase on disk and load it."""
         with codebase_lock:
-            root_path = os.path.abspath(os.getenv("ODB_SERVICE_CODE_CACHE") or tempfile.mkdtemp())
+            root_path = os.path.abspath(disk_path)
 
             try:
                 if not os.path.exists(root_path):
@@ -101,21 +117,21 @@ class Codebase:
                 with open(os.path.join(fullpath, name), "wb") as f:
                     f.write(fcontents.encode("utf-8"))
 
-            if (self.hash, service_module) in codebase_cache:
-                return codebase_cache[self.hash, service_module]
+            if (self.hash, service_module_name) in codebase_cache:
+                return codebase_cache[self.hash, service_module_name]
 
             modules = dict(sys.modules)
             sys.path = [disk_path] + sys.path
 
             try:
-                module = importlib.import_module(service_module)
+                module = importlib.import_module(service_module_name)
             finally:
                 sys.path.pop(0)
                 sys.modules = modules
 
-            codebase_cache[self.hash, service_module] = module
+            codebase_cache[self.hash, service_module_name] = module
 
-            return codebase_cache[self.hash, service_module]
+            return codebase_cache[self.hash, service_module_name]
 
 @service_schema.define
 class ServiceHost:
@@ -140,6 +156,7 @@ class Service:
     gbRamUsed = int
     coresUsed = int
     placement = OneOf("Master", "Worker", "Any")
+    isSingleton = bool
 
     #how many do we want?
     target_count = int
@@ -147,9 +164,36 @@ class Service:
     #how many would we like but we can't boot?
     unbootable_count = int
 
-    def instantiateServiceObject(self):
+    timesBootedUnsuccessfully = int
+    timesCrashed = int
+
+    def isThrottled(self):
+        return self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS
+        
+    def resetCounters(self):
+        self.timesBootedUnsuccessfully = 0
+        self.timesCrashed = 0
+
+    def setCodebase(self, codebase, moduleName, className):
+        if codebase != self.codebase or moduleName != self.service_module_name or className != self.service_class_name:
+            self.codebase = codebase
+            self.service_module_name = moduleName
+            self.service_class_name = className
+            self.timesBootedUnsuccessfully = 0
+            self.timesCrashed = 0
+
+    def effectiveTargetCount(self):
+        if self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS:
+            return 0
+
+        if self.isSingleton:
+            return min(1, max(self.target_count, 0))
+        else:
+            return max(self.target_count, 0)
+
+    def instantiateServiceObject(self, diskPath):
         if self.codebase:
-            module = self.codebase.instantiate(self.service_module_name)
+            module = self.codebase.instantiate(diskPath, self.service_module_name)
 
             if self.service_class_name not in module.__dict__:
                 raise Exception("Provided module %s at %s has no class %s. Options are:\n%s" % (
@@ -192,10 +236,10 @@ class ServiceInstance:
         self.boot_timestamp = time.time()
         self.end_timestamp = self.boot_timestamp
         self.failureReason = reason
-        self.state = "Failed"
+        self.state = "FailedToStart"
 
     def isNotRunning(self):
-        return self.state in ("Stopped", "Failed") or (self.connection and not self.connection.exists())
+        return self.state in ("Stopped", "FailedToStart", "Crashed") or (self.connection and not self.connection.exists())
 
     def isActive(self):
         """Is this service instance up and intended to be up?"""
@@ -205,7 +249,7 @@ class ServiceInstance:
                 and (self.connection is None or self.connection.exists())
             )
 
-    state = Indexed(OneOf("Booting", "Initializing", "Running", "Stopped", "Failed"))
+    state = Indexed(OneOf("Booting", "Initializing", "Running", "Stopped", "FailedToStart", "Crashed"))
 
     boot_timestamp = OneOf(None, float)
     start_timestamp = OneOf(None, float)

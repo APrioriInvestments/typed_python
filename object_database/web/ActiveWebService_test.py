@@ -21,7 +21,7 @@ import sys
 import time
 import asyncio
 import websockets
-
+import tempfile
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
 
@@ -32,9 +32,12 @@ ownDir = os.path.dirname(os.path.abspath(__file__))
 
 class ActiveWebServiceTest(unittest.TestCase):
     def setUp(self):
+        self.tempDirObj = tempfile.TemporaryDirectory()
+        self.tempDirectoryName = self.tempDirObj.__enter__()
+
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",
+                'localhost', 'localhost', "8020", "--run_db",'--source',self.tempDirectoryName,
                 '--shutdownTimeout', '.5'
                 ]
             )
@@ -70,6 +73,7 @@ class ActiveWebServiceTest(unittest.TestCase):
     def tearDown(self):
         self.server.terminate()
         self.server.wait()
+        self.tempDirObj.__exit__(None, None, None)
 
     def test_start_web_service(self):
         res = requests.get("http://localhost:6000/content/object_database.css")

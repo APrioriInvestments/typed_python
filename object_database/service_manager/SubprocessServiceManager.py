@@ -46,7 +46,7 @@ def parseLogfileToInstanceid(fname):
     return fname.split("-")[-1][:-8]
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None, shutdownTimeout=None):
+    def __init__(self, own_hostname, host, port, sourceDir, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None, shutdownTimeout=None):
         self.own_hostname = own_hostname
         self.host = host
         self.port = port
@@ -60,7 +60,7 @@ class SubprocessServiceManager(ServiceManager):
         def dbConnectionFactory():
             return connect(host, port)
 
-        ServiceManager.__init__(self, dbConnectionFactory, isMaster, own_hostname, maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout)
+        ServiceManager.__init__(self, dbConnectionFactory, sourceDir, isMaster, own_hostname, maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout)
 
         self.serviceProcesses = {}
 
@@ -78,7 +78,7 @@ class SubprocessServiceManager(ServiceManager):
             
             process = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
-                 self.host, str(self.port), instanceIdentity],
+                 self.host, str(self.port), instanceIdentity, self.sourceDir],
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT

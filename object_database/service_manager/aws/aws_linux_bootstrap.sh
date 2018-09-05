@@ -54,6 +54,7 @@ export INSTALL=$STORAGE/install
 
 mkdir -p $INSTALL
 mkdir -p $INSTALL/logs
+mkdir -p $INSTALL/service_source
 
 cd $INSTALL
 
@@ -65,6 +66,7 @@ $STORAGE/nativepython/object_database/frontends/service_manager.py \
     `hostname`  \
     {db_hostname} \
     {db_port} \
+    --source $INSTALL/service_source \
     --logdir $INSTALL/logs &> $INSTALL/logs/db_server.log
 
 

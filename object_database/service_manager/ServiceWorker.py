@@ -15,7 +15,7 @@
 
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceManagerSchema import service_schema
-from object_database.service_manager.ServiceBase import ServiceBase
+from object_database.service_manager.ServiceBase import ServiceBase, ServiceRuntimeConfig
 
 import traceback
 import threading
@@ -25,10 +25,12 @@ import tempfile
 
 
 class ServiceWorker:
-    def __init__(self, dbConnectionFactory, instance_id):
+    def __init__(self, dbConnectionFactory, instance_id, sourceDir):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema, service_schema)
+        self.sourceDir = sourceDir
+        self.runtimeConfig = ServiceRuntimeConfig(sourceDir)
 
         self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
         self.serviceObject = None
@@ -56,9 +58,7 @@ class ServiceWorker:
                 self.serviceObject = self._instantiateServiceObject()
             except:
                 logging.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
-                self.instance.state = "Failed"
-                self.instance.failureReason = traceback.format_exc()
-                self.instance.end_timestamp = time.time()
+                self.instance.markFailedToStart(traceback.format_exc())
                 return
         try:
             logging.info("Initializing service object for %s", self.instance._identity)
@@ -69,9 +69,7 @@ class ServiceWorker:
             self.serviceObject = None
 
             with self.db.transaction():
-                self.instance.state = "Failed"
-                self.instance.failureReason = traceback.format_exc()
-                self.instance.end_timestamp = time.time()
+                self.instance.markFailedToStart(traceback.format_exc())
                 return
 
     def checkForShutdown(self):
@@ -104,7 +102,7 @@ class ServiceWorker:
                 )
             
             with self.db.transaction():
-                self.instance.state = "Failed"
+                self.instance.state = "Crashed"
                 self.instance.end_timestamp = time.time()
                 self.instance.failureReason = traceback.format_exc()
                 return
@@ -135,12 +133,14 @@ class ServiceWorker:
             self.shutdownPollThread.join()
 
     def _instantiateServiceObject(self):
-        service_type = self.instance.service.instantiateServiceObject()
+        service_type = self.instance.service.instantiateServiceObject(self.sourceDir)
             
         assert isinstance(service_type, type), service_type
         assert issubclass(service_type, ServiceBase), service_type
 
-        return service_type(self.db, self.instance)
+        service = service_type(self.db, self.instance, self.runtimeConfig)
+
+        return service
 
     def isRunning(self):
         return self.serviceWorkerThread.isAlive()

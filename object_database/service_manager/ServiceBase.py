@@ -22,13 +22,18 @@ from object_database.web.cells import Card
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceManagerSchema import service_schema
 
+class ServiceRuntimeConfig:
+    def __init__(self, serviceSourceRoot):
+        self.serviceSourceRoot = serviceSourceRoot
+
 class ServiceBase:
     coresUsed = 1
     gbRamUsed = 1
     
-    def __init__(self, db, serviceInstance):
+    def __init__(self, db, serviceInstance, runtimeConfig):
         self.db = db
         self.serviceInstance = serviceInstance
+        self.runtimeConfig = runtimeConfig
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):

@@ -16,8 +16,8 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
 class InProcessServiceManager(ServiceManager):
-    def __init__(self, dbConnectionFactory):
-        ServiceManager.__init__(self, dbConnectionFactory, isMaster=True, ownHostname="localhost")
+    def __init__(self, dbConnectionFactory, sourceDir=None):
+        ServiceManager.__init__(self, dbConnectionFactory, sourceDir, isMaster=True, ownHostname="localhost")
 
         self.serviceWorkers = {}
 
@@ -25,7 +25,7 @@ class InProcessServiceManager(ServiceManager):
         if instanceIdentity in self.serviceWorkers:
             return
 
-        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity)
+        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity, self.sourceDir)
 
         self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)
 

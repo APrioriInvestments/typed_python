@@ -51,8 +51,8 @@ class Configuration:
     hostname = str
 
 class ActiveWebService(ServiceBase):
-    def __init__(self, db, serviceInstance):
-        ServiceBase.__init__(self, db, serviceInstance)
+    def __init__(self, db, serviceInstance, serviceRuntimeConfig):
+        ServiceBase.__init__(self, db, serviceInstance, serviceRuntimeConfig)
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):
@@ -130,7 +130,7 @@ class ActiveWebService(ServiceBase):
                 )
         
         def displayForService(serviceObj):
-            return serviceObj.instantiateServiceObject().serviceDisplay(serviceObj)
+            return serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot).serviceDisplay(serviceObj)
             
         def curServiceSetter(s):
             def f():

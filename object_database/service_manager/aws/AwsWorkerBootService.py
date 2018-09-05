@@ -205,8 +205,8 @@ class AwsApi:
 
 
 class AwsWorkerBootService(ServiceBase):
-    def __init__(self, db, serviceInstance):
-        ServiceBase.__init__(self, db, serviceInstance)
+    def __init__(self, db, serviceInstance, serviceRuntimeConfig):
+        ServiceBase.__init__(self, db, serviceInstance, serviceRuntimeConfig)
 
         self.SLEEP_INTERVAL = 10.0
 
@@ -305,7 +305,7 @@ class AwsWorkerBootService(ServiceBase):
 
     def initialize(self):
         self.db.subscribeToSchema(schema)
-        
+
         with self.db.transaction():
             self.api = AwsApi()
 

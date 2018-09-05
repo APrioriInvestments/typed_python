@@ -56,6 +56,7 @@ def main(argv):
     install_parser.add_argument("--class")
     install_parser.add_argument("--name", required=False)
     install_parser.add_argument("--placement", required=False, default='Any', choices=['Any','Master','Worker'])
+    install_parser.add_argument("--singleton", required=False, action='store_true')
 
     configure_parser = subparsers.add_parser('configure', help='configure a service')
     configure_parser.set_defaults(command='configure')
@@ -96,11 +97,12 @@ def main(argv):
 
     if parsedArgs.command == 'configure':
         try:
-            with db.transaction():
-                s = service_schema.Service.lookupAny(name=parsedArgs.name)
-                svcClass = s.instantiateServiceObject()
+            with tempfile.TemporaryDirectory() as tf:
+                with db.transaction():
+                    s = service_schema.Service.lookupAny(name=parsedArgs.name)
+                    svcClass = s.instantiateServiceObject(tf)
 
-            svcClass.configureFromCommandline(db, s, parsedArgs.args)
+                svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
             print("Failed to configure %s: %s" % (parsedArgs.name, e))
             return 1
@@ -134,10 +136,12 @@ def main(argv):
                     print("Named class %s is not a ServiceBase subclass." % fullClassname)
                     return 1
 
-                ServiceManager.createService(actualClass, classname, placement=parsedArgs.placement)
+                ServiceManager.createService(actualClass, classname, placement=parsedArgs.placement, isSingleton=parsedArgs.singleton)
             else:
                 codebase = service_schema.Codebase.create(paths)
-                module = codebase.instantiate(modulename)
+
+                #make sure the codebase is importable, etc
+                module = service_schema.Codebase.instantiateFromLocalSource(paths, modulename)
 
                 if module is None:
                     print("Can't find", module, "in the codebase")
