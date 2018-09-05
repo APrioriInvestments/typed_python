@@ -293,8 +293,6 @@ class DatabaseConnection:
 
         self._largeSubscriptionHeartbeatDelay = 0
 
-
-
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
 
@@ -640,13 +638,13 @@ class DatabaseConnection:
                         key_value[k] = json_val
 
                         if k not in self._versioned_objects:
-                            self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, None))
+                            self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, {}))
 
                         versioned = self._versioned_objects[k]
 
                         priors[k] = versioned.newestValue()
 
-                        versioned.setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, None))
+                        versioned.setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, {}))
 
                 for k,a in set_adds.items():
                     if k not in self._versioned_objects:
@@ -739,12 +737,12 @@ class DatabaseConnection:
 
                 for key, val in values.items():
                     if key not in self._versioned_objects:
-                        self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, None))
+                        self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
                         self._versioned_objects[key].setVersionedValue(
                             msg.tid,
                             JsonWithPyRep(
                                 json.loads(val) if val is not None else None,
-                                None
+                                {}
                                 )
                             )
                     #this could take a long time, so we need to keep heartbeating

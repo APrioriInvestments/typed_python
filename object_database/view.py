@@ -188,10 +188,10 @@ class View(object):
         if dbValWithPyrep.jsonRep is None:
             return None
 
-        if dbValWithPyrep.pyRep is None:
-            dbValWithPyrep.pyRep = _encoder.from_json(dbValWithPyrep.jsonRep, field_type)
+        if dbValWithPyrep.pyRep.get(field_type) is None:
+            dbValWithPyrep.pyRep[field_type] = _encoder.from_json(dbValWithPyrep.jsonRep, field_type)
 
-        return dbValWithPyrep.pyRep
+        return dbValWithPyrep.pyRep[field_type]
 
     def _exists(self, obj, identity):
         if not self._db._isTypeSubscribed(type(obj)):
@@ -368,9 +368,9 @@ class View(object):
         if self._writes:
             def encode(val):
                 if isinstance(val, tuple) and len(val) == 2 and isinstance(val[0], type):
-                    return JsonWithPyRep(_encoder.to_json(val[0], val[1]), val[1])
+                    return JsonWithPyRep(_encoder.to_json(val[0], val[1]), {val[0]:val[1]})
                 else:
-                    return JsonWithPyRep(val, val)
+                    return JsonWithPyRep(val, {type(val): val})
 
             writes = {key: encode(v) for key, v in self._writes.items()}
             tid = self._transaction_num

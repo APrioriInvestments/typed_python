@@ -104,7 +104,6 @@ class ActiveWebService(ServiceBase):
 
         def serviceCountSetter(service, ct):
             def f():
-                print("Setting service ", service, " with tgc ", service.target_count, " to ", ct)
                 service.target_count = ct
             return f
 
@@ -147,7 +146,6 @@ class ActiveWebService(ServiceBase):
                     ""
                     )
                 )
-
         
         def displayForService(serviceObj):
             return serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot).serviceDisplay(serviceObj)
