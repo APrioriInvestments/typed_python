@@ -127,7 +127,9 @@ class Codebase:
                 module = importlib.import_module(service_module_name)
             finally:
                 sys.path.pop(0)
-                sys.modules = modules
+                for m, sysmodule in list(sys.modules.items()):
+                    if hasattr(sysmodule, '__file__') and sysmodule.__file__.startswith(disk_path):
+                        del sys.modules[m]
 
             codebase_cache[self.hash, service_module_name] = module
 
