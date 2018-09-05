@@ -645,3 +645,28 @@ class SubscribeAndRetry(Exception):
 def ensureSubscribedType(t):
     if not current_transaction().db().isSubscribedToType(t):
         raise SubscribeAndRetry(lambda db: db.subscribeToType(t))
+
+class Expands(Cell):
+    def __init__(self, closed, open):
+        super().__init__()
+        self.isExpanded = False
+        self.closed = closed
+        self.open = open
+
+    def recalculate(self):
+        self.contents = """
+            <div>
+                <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
+                        style="display:inline-block">
+                    <span class="octicon octicon-diff-__which__" aria-hidden="true"></span>
+                </div>
+            <div style="display:inline-block">
+                __child__
+            </div>
+            </div>
+            """.replace("__identity__", self.identity).replace("__which__", 'removed' if self.isExpanded else 'added')
+        self.children = {'__child__': self.open if self.isExpanded else self.closed}
+
+    def onMessage(self, msgFrame):
+        self.isExpanded = not self.isExpanded
+        self.markDirty()

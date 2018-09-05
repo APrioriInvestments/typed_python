@@ -117,7 +117,10 @@ class HappyService(ServiceBase):
         if not current_transaction().db().isSubscribedToType(Happy):
             raise SubscribeAndRetry(lambda db: db.subscribeToType(Happy))
         
-        return Card("There are %s happy objects" % len(Happy.lookupAll()))
+        return Card(
+            Text("There are %s happy objects" % len(Happy.lookupAll())) + 
+            Expands(Text("Closed"),Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
+            )
 
     def doWork(self, shouldStop):
         shouldStop.wait()
