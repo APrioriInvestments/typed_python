@@ -15,6 +15,7 @@
 import logging
 import os
 import sys
+import six
 import importlib
 import time
 import os
@@ -129,8 +130,14 @@ class Codebase:
                 module = importlib.import_module(service_module_name)
             finally:
                 sys.path.pop(0)
+                for f in list(sys.path_importer_cache):
+                    if f.startswith(disk_path):
+                        del sys.path_importer_cache[f]
+
                 for m, sysmodule in list(sys.modules.items()):
                     if hasattr(sysmodule, '__file__') and sysmodule.__file__.startswith(disk_path):
+                        del sys.modules[m]
+                    elif hasattr(sysmodule, '__path__') and hasattr(sysmodule.__path__, '_path'):
                         del sys.modules[m]
 
             codebase_cache[self.hash, service_module_name] = module
