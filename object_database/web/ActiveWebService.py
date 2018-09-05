@@ -132,7 +132,22 @@ class ActiveWebService(ServiceBase):
                     (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                     ""
                     )
+                ) + Grid(
+                colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT'],
+                rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
+                headerFun=lambda x: x,
+                rowLabelFun=None,
+                rendererFun=lambda s,field: Subscribed(lambda: 
+                    s.connection._identity if field == "Connection" else
+                    str(s.isMaster) if field == "IsMaster" else
+                    s.hostname if field == "Hostname" else
+                    "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM USAGE" else
+                    "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE USAGE" else
+                    str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
+                    ""
+                    )
                 )
+
         
         def displayForService(serviceObj):
             return serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot).serviceDisplay(serviceObj)

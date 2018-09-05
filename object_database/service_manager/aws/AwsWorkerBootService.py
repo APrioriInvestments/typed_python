@@ -28,6 +28,7 @@ import datetime
 import os
 
 from object_database import ServiceBase, service_schema, Schema, Indexed
+from object_database.web import cells
 from nativepython.python.string_util import closest_N_in
 
 schema = Schema("core.AwsWorkerBootService")
@@ -313,6 +314,50 @@ class AwsWorkerBootService(ServiceBase):
         while not shouldStop.is_set():
             if not self.pushTaskLoopForward():
                 time.sleep(1.0)
+
+
+
+    @staticmethod
+    def serviceDisplay(serviceObject):
+        cells.ensureSubscribedType(Configuration)
+        cells.ensureSubscribedType(State)
+        
+        c = Configuration.lookupAny()
+
+        if not c:
+            return cells.Card("No configuration defined for  AWS")
+
+        def bootCountSetter(state, ct):
+            def f():
+                state.desired = ct
+            return f
+
+        return cells.Grid(
+            colFun=lambda: ['Instance Type', 'Booted', 'Desired'],
+            rowFun=lambda: sorted(State.lookupAll(), key=lambda s:s.instance_type),
+            headerFun=lambda x: x,
+            rowLabelFun=None,
+            rendererFun=lambda s,field: cells.Subscribed(lambda: 
+                s.instance_type if field == 'Instance Type' else
+                s.booted  if field == 'Booted' else 
+                cells.Dropdown(str(s.desired), [(str(ct), bootCountSetter(s, ct)) for ct in range(10)]) 
+                        if field == 'Desired' else 
+                ""
+                )
+            ) + cells.Card(
+                cells.Text("db_hostname = " + str(c.db_hostname)) + 
+                cells.Text("db_port = " + str(c.db_port)) + 
+                cells.Text("region = " + str(c.region)) + 
+                cells.Text("vpc_id = " + str(c.vpc_id)) + 
+                cells.Text("subnet = " + str(c.subnet)) + 
+                cells.Text("security_group = " + str(c.security_group)) + 
+                cells.Text("keypair = " + str(c.keypair)) + 
+                cells.Text("worker_name = " + str(c.worker_name)) + 
+                cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) + 
+                cells.Text("linux_ami = " + str(c.linux_ami)) + 
+                cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) + 
+                cells.Text("max_to_boot = " + str(c.max_to_boot))
+                )
 
     def pushTaskLoopForward(self):
         with self.db.view():

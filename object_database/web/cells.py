@@ -11,6 +11,7 @@ import gevent.fileobject
 import threading
 
 from object_database.view import RevisionConflictException 
+from object_database.view import current_transaction
 
 MAX_TIMEOUT = 1.0
 MAX_TRIES = 10
@@ -641,3 +642,6 @@ class SubscribeAndRetry(Exception):
         super().__init__("SubscribeAndRetry")
         self.callback = callback
 
+def ensureSubscribedType(t):
+    if not current_transaction().db().isSubscribedToType(t):
+        raise SubscribeAndRetry(lambda db: db.subscribeToType(t))
