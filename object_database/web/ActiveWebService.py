@@ -94,9 +94,8 @@ class ActiveWebService(ServiceBase):
     
     def configureApp(self):
         self.app.route('/content/<path:path>')(self.sendContent)
-        self.sockets.route("/echo")(self.echoSocket)
+        self.app.route("/")(lambda: redirect("/content/page.html"))
         self.sockets.route("/socket")(self.mainSocket)
-        self.sockets.route("/")(lambda: redirect(url_for("content/page.html")))
         
     def createCells(self):
         cells = Cells(self.db)
@@ -110,7 +109,7 @@ class ActiveWebService(ServiceBase):
             return f
 
         serviceGrid = Grid(
-                colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM'],
+                colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
                 rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
                 headerFun=lambda x: x,
                 rowLabelFun=lambda s: Subscribed(lambda: s.name),
@@ -125,6 +124,7 @@ class ActiveWebService(ServiceBase):
                             if field == 'TargetCount' else 
                     str(s.coresUsed) if field == 'Cores' else 
                     str(s.gbRamUsed) if field == 'RAM' else 
+                    (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                     ""
                     )
                 )

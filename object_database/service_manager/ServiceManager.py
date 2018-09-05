@@ -194,8 +194,10 @@ class ServiceManager(object):
                 if not serviceInstance.host.exists() or serviceInstance.connection and not serviceInstance.connection.exists():
                     if serviceInstance.state == "FailedToStart":
                         serviceInstance.service.timesBootedUnsuccessfully += 1
+                        serviceInstance.service.lastFailureReason = serviceInstance.failureReason
                     elif serviceInstance.state == "Crashed":
                         serviceInstance.service.timesCrashed += 1
+                        serviceInstance.service.lastFailureReason = serviceInstance.failureReason
                     serviceInstance.delete()
 
     def redeployServicesIfNecessary(self):

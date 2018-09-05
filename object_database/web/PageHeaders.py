@@ -45,20 +45,6 @@ $('[data-table-enabled="true"]').DataTable({
     paging: false
     });
 
-$('[data-toggle="popover"]').popover({
-  html: true,
-  container: 'body',
-  placement: 'bottom',
-  title: function () {
-    return getChildProp(this, 'title');
-  },
-  content: function () {
-    return getChildProp(this, 'content');
-  },
-  placement: function () {
-    return getChildProp(this, 'placement');
-  }
-});
 $('[data-poload]').on('show.bs.dropdown', function (arg) {
   var target = arg.currentTarget;
 

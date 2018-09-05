@@ -223,6 +223,11 @@ class Card(Cell):
         </div>
         """
 
+class Octicon(Cell):
+    def __init__(self, which):
+        super().__init__()
+        self.contents = '<span class="octicon octicon-%s" aria-hidden="true"></span>' % which
+
 class Text(Cell):
     def __init__(self, text):
         super().__init__()
@@ -437,6 +442,47 @@ class SubscribedSequence(Cell):
                 del self.existingItems[i]
 
         self.contents = """<div>%s</div>""" % "\n".join(['__child_%s__' % i for i in range(len(self.spine))])
+
+class Popover(Cell):
+    def __init__(self, contents, title, detail, width=400):
+        super().__init__()
+        self.children = {
+            '__contents__': Cell.makeCell(contents),
+            '__detail__': Cell.makeCell(detail),
+            '__title__': Cell.makeCell(title)
+            }
+
+        self.contents = """
+            <div>
+            <a href="#popmain___identity__" data-toggle="popover" data-trigger="focus" data-bind="#pop___identity__" container="body" class="btn btn-xs" role="button">__contents__</a>
+            <div style="display:none;">
+              <div id="pop___identity__">
+                <div class='data-placement'>bottom</div>
+                <div class="data-title">__title__</div>
+                <div class="data-content"><div style="width:__width__px">__detail__</div></div>
+              </div>
+            </div>
+
+            <script>
+
+            $('#popmain___identity__').popover({
+              html: true,
+              container: 'body',
+              placement: 'bottom',
+              title: function () {
+                return getChildProp(this, 'title');
+              },
+              content: function () {
+                return getChildProp(this, 'content');
+              },
+              placement: function () {
+                return getChildProp(this, 'placement');
+              }
+            });
+            </script>
+
+            </div>
+            """.replace("__identity__", self.identity).replace("__width__", str(width))
 
 class Grid(Cell):
     def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun):

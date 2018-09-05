@@ -166,21 +166,22 @@ class Service:
 
     timesBootedUnsuccessfully = int
     timesCrashed = int
+    lastFailureReason = OneOf(str, None)
 
     def isThrottled(self):
         return self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS
-        
+
     def resetCounters(self):
         self.timesBootedUnsuccessfully = 0
         self.timesCrashed = 0
+        self.lastFailureReason = None
 
     def setCodebase(self, codebase, moduleName, className):
         if codebase != self.codebase or moduleName != self.service_module_name or className != self.service_class_name:
             self.codebase = codebase
             self.service_module_name = moduleName
             self.service_class_name = className
-            self.timesBootedUnsuccessfully = 0
-            self.timesCrashed = 0
+            self.resetCounters()
 
     def effectiveTargetCount(self):
         if self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS:

@@ -79,14 +79,3 @@ class ActiveWebServiceTest(unittest.TestCase):
         res = requests.get("http://localhost:6000/content/object_database.css")
         self.assertEqual(res.status_code, 200)
 
-    def test_connect_websocket(self):
-        result = []
-        async def hello(uri):
-            async with websockets.connect(uri) as websocket:
-                await websocket.send("Hello world!")
-                result.append(await websocket.recv())
-
-        asyncio.get_event_loop().run_until_complete(hello('ws://localhost:6000/echo'))
-
-        self.assertEqual(result[0], "Hello world!")
-
