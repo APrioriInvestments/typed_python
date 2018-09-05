@@ -302,7 +302,8 @@ class DatabaseConnection:
         schema.freeze()
 
         with self._lock:
-            assert schema.name not in self._schemas or self._schemas[schema.name] is schema
+            if schema.name in self._schemas:
+                return
 
             self._schemas[schema.name] = schema
 
