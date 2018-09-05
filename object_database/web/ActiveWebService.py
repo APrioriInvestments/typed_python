@@ -121,8 +121,7 @@ class ActiveWebService(ServiceBase):
                     s.service_class_name if field == 'Class' else 
                     s.placement if field == 'Placement' else 
                     Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
-                    Span(s.target_count) + 
-                        Dropdown("ct", [(str(ct), serviceCountSetter(s, ct)) for ct in range(10)]) 
+                    Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in range(10)]) 
                             if field == 'TargetCount' else 
                     str(s.coresUsed) if field == 'Cores' else 
                     str(s.gbRamUsed) if field == 'RAM' else 
@@ -133,6 +132,10 @@ class ActiveWebService(ServiceBase):
         def displayForService(serviceObj):
             return serviceObj.instantiateServiceObject().serviceDisplay(serviceObj)
             
+        def curServiceSetter(s):
+            def f():
+                curService.set(s)
+            return f
 
         cells.root.setChild(
             HeaderBar(
@@ -140,7 +143,7 @@ class ActiveWebService(ServiceBase):
                     Dropdown(
                         "Service",
                             [("All", lambda: curService.set(None))] + 
-                            [(s.name, lambda: curService.set(s)) for 
+                            [(s.name, curServiceSetter(s)) for 
                                 s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
                     )
