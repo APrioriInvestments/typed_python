@@ -126,7 +126,11 @@
               source = cells[replacements[replacementKeys[i]]]
             }
 
-            target.parentNode.replaceChild(source, target)
+            if (target != null) {
+              target.parentNode.replaceChild(source, target)
+            } else {
+              console.log("In message ", update, " couldn't find ", replacementKeys[i])
+            }
           }
 
           if (update.postscript !== undefined) {
