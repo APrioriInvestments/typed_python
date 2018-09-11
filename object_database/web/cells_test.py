@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.web.cells import Cells, Sequence, Container, Subscribed, Span
+from object_database.web.cells import Cells, Sequence, Container, Subscribed, Span, SubscribedSequence
 from object_database import InMemServer, Schema, Indexed
 
 import unittest
@@ -49,6 +49,8 @@ class CellsTests(unittest.TestCase):
         self.cells.recalculate()
 
         expectedCells = [self.cells.root, pairCell, pair[0], pair[1]]
+
+        print(self.cells.cells.keys())
 
         self.assertTrue(self.cells.root.identity in self.cells.cells)
         self.assertTrue(pairCell.identity in self.cells.cells)
@@ -92,7 +94,7 @@ class CellsTests(unittest.TestCase):
         self.cells.recalculate()
 
         #a new message for the child, and also for 'pair[0]'
-        self.assertEqual(len(self.cells.renderMessages()), 2)
+        self.assertEqual(len(self.cells.renderMessages()), 3)
 
     def test_subscriptions(self):
         self.cells.root.setChild(
@@ -117,6 +119,37 @@ class CellsTests(unittest.TestCase):
 
         self.cells.recalculate()
 
-        #three 'Span', three 'Text', the Sequence, and the Subscribed
-        self.assertEqual(len(self.cells.renderMessages()), 8)
-            
+        #three 'Span', three 'Text', the Sequence, the Subscribed, and a delete
+        self.assertEqual(len(self.cells.renderMessages()), 9)
+
+    def test_garbage_collection(self):
+        #create a cell that subscribes to a specific 'thing', but that
+        #creates new cells each time, and verify that we reduce our
+        #cell count, and that we send deletion messages
+
+        #subscribes to the set of cells with k=0 and displays something
+        self.cells.root.setChild(
+            SubscribedSequence(
+                lambda: Thing.lookupAll(k=0), 
+                lambda thing: Subscribed(
+                    lambda: Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
+                    )
+                )
+            )
+
+        with self.db.transaction():
+            thing = Thing(x=1, k=0)
+
+        for i in range(100):
+            with self.db.transaction():
+                thing.k = 1
+                thing = Thing(x=i,k=0)
+
+                for anything in Thing.lookupAll():
+                    anything.x = anything.x + 1
+
+            self.cells.recalculate()
+            messages = self.cells.renderMessages()
+
+            self.assertTrue(len(self.cells.cells) < 20, "Have %s cells at pass %s" % (len(self.cells.cells), i))
+            self.assertTrue(len(messages) < 20, "Got %s messages at pass %s" % (len(messages), i))

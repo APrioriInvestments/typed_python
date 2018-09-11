@@ -88,48 +88,53 @@
           }
 
           eltID = update.id //document ID to replace or update
-          replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
 
-          elt = htmlToDomElt(update.contents)
-
-          //install the element into the dom
-          if (cells[update.id] === undefined) {
-            //this is a totally new node. for the moment, add it to the holding pen
-            cells['holding_pen'].appendChild(elt)
-            cells[update.id] = elt
-            elt.id = update.id
+          if (update.discard !== undefined) {
+            cells[update.id].remove()
           } else {
-            //replace the existing copy of the node with this copy
-            if (cells[update.id].parentNode === null) {
-              cells['holding_pen'].appendChild(cells[update.id])
+            replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
+
+            elt = htmlToDomElt(update.contents)
+
+            //install the element into the dom
+            if (cells[update.id] === undefined) {
+              //this is a totally new node. for the moment, add it to the holding pen
+              cells['holding_pen'].appendChild(elt)
+              cells[update.id] = elt
+              elt.id = update.id
+            } else {
+              //replace the existing copy of the node with this copy
+              if (cells[update.id].parentNode === null) {
+                cells['holding_pen'].appendChild(cells[update.id])
+              }
+
+              cells[update.id].parentNode.replaceChild(elt, cells[update.id])
+              cells[update.id] = elt
+              elt.id = update.id
             }
 
-            cells[update.id].parentNode.replaceChild(elt, cells[update.id])
-            cells[update.id] = elt
-            elt.id = update.id
-          }
+            //now wire in its children
+            replacementKeys = Object.keys(replacements)
 
-          //now wire in its children
-          replacementKeys = Object.keys(replacements)
+            for (i = 0; i < replacementKeys.length; i++) {
+              target = document.getElementById(replacementKeys[i])
 
-          for (i = 0; i < replacementKeys.length; i++) {
-            target = document.getElementById(replacementKeys[i])
+              if (cells[replacements[replacementKeys[i]]] === undefined) {
+                //this is actually a new node. we'll define it later in the event stream.
+                cells[replacements[replacementKeys[i]]] = document.createElement("div")
+                source = cells[replacements[replacementKeys[i]]]
+                source.id = replacements[replacementKeys[i]]
+                cells['holding_pen'].appendChild(source)
+              } else {
+                //not a new node. 
+                source = cells[replacements[replacementKeys[i]]]
+              }
 
-            if (cells[replacements[replacementKeys[i]]] === undefined) {
-              //this is actually a new node. we'll define it later in the event stream.
-              cells[replacements[replacementKeys[i]]] = document.createElement("div")
-              source = cells[replacements[replacementKeys[i]]]
-              source.id = replacements[replacementKeys[i]]
-              cells['holding_pen'].appendChild(source)
-            } else {
-              //not a new node. 
-              source = cells[replacements[replacementKeys[i]]]
-            }
-
-            if (target != null) {
-              target.parentNode.replaceChild(source, target)
-            } else {
-              console.log("In message ", update, " couldn't find ", replacementKeys[i])
+              if (target != null) {
+                target.parentNode.replaceChild(source, target)
+              } else {
+                console.log("In message ", update, " couldn't find ", replacementKeys[i])
+              }
             }
           }
 

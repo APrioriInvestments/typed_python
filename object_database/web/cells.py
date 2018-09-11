@@ -45,16 +45,23 @@ class Cells:
         self.nodesNeedingBroadcast = set()
         self.root = RootCell()
 
-        self.cells = {self.root.identity: self.root}
-        self.nodesNeedingBroadcastOrder = [self.root]
+        self.cells = {}
+        self.cellsKnownChildren = {}
+
         self.nodesNeedingBroadcast.add(self.root)
+        self.nodesToDiscard = set()
 
         self.transactionQueue = queue.Queue()
         self.db._onTransaction.append(self._onTransaction)
         self.gEventHasTransactions = GeventPipe()
         self.keysToCells = {}
+        self._id = 0
 
-        self.addCell(self.root)
+        self._addCell(self.root, None)
+
+    def _newID(self):
+        self._id += 1
+        return str(self._id)
 
     def triggerIfHasDirty(self):
         if self.dirtyNodes:
@@ -66,44 +73,72 @@ class Cells:
 
     def _handleTransaction(self, key_value, priors, set_adds, set_removes, transactionId):
         for k in list(key_value) + list(set_adds) + list(set_removes):
-            for cell in self.keysToCells.get(k) or []:
-                cell.markDirty()
+            if k in self.keysToCells:
+                toDrop = []
+                for cell in self.keysToCells[k]:
+                    if not cell.garbageCollected:
+                        cell.markDirty()
+                    else:
+                        toDrop.append(cell)
+                for cell in toDrop:
+                    self.keysToCells[k].discard(cell)
+                if not self.keysToCells[k]:
+                    del self.keysToCells[k]
 
-    def addCell(self, cell):
+    def _addCell(self, cell, parent):
         assert isinstance(cell, Cell)
-        assert cell.cells is self or cell.cells is None, 'cell %s has cells %s != %s' % (cell, cell.cells, self)
+        assert cell.cells is None
 
         cell.cells = self
+        cell.parent = parent
+        cell.level = parent.level + 1 if parent else 0
 
-        if cell.identity in self.cells:
-            assert self.cells[cell.identity] is cell
-        else:
-            self.cells[cell.identity] = cell
-            self.dirtyNodes.add(cell)
-            
-            self.markForBroadcast(cell)
+        self.cellsKnownChildren[cell.identity] = set()
 
-            for child in cell.children.values():
-                assert isinstance(child, Cell), "Child of %s is %s, not a cell" % (cell, child)
-                self.addCell(child)
+        assert cell.identity not in self.cells
+        self.cells[cell.identity] = cell
 
-                self.markForBroadcast(child)
+        self.dirtyNodes.add(cell)
+        
+        self.markForBroadcast(cell)
+
+    def _cellOutOfScope(self, cell):
+        for c in cell.children.values():
+            self._cellOutOfScope(c)
+
+        self.nodesToDiscard.add(cell)
+        del self.cells[cell.identity]
+        del self.cellsKnownChildren[cell.identity]
+        
+        cell.garbageCollected = True
 
     def markForBroadcast(self, node):
-        if node not in self.nodesNeedingBroadcast:
-            self.nodesNeedingBroadcast.add(node)
-            self.nodesNeedingBroadcastOrder.append(node)
+        assert node.cells is self
+
+        self.nodesNeedingBroadcast.add(node)
 
     def renderMessages(self):
         self.recalculate()
 
         res = []
 
-        for n in self.nodesNeedingBroadcastOrder:
-            res.append(self.updateMessageFor(n))
+        cellsByLevel = {}
+
+        for n in self.nodesNeedingBroadcast:
+            if n not in self.nodesToDiscard:
+                if n.level not in cellsByLevel:
+                    cellsByLevel[n.level] = set()
+                cellsByLevel[n.level].add(n)
+
+        for level, cells in sorted(cellsByLevel.items()):
+            for n in cells:
+                res.append(self.updateMessageFor(n))
+
+        for n in self.nodesToDiscard:
+            res.append({'id': n.identity, 'discard': True})
 
         self.nodesNeedingBroadcast = set()
-        self.nodesNeedingBroadcastOrder = []
+        self.nodesToDiscard = set()
 
         return res
 
@@ -121,26 +156,40 @@ class Cells:
         while self.dirtyNodes:
             n = self.dirtyNodes.pop()
             
-            self.markForBroadcast(n)
+            if not n.garbageCollected:
+                self.markForBroadcast(n)
 
-            try:
-                _cur_cell.cell = n
-                while True:
-                    try:
-                        n.recalculate()
-                        break
-                    except SubscribeAndRetry as e:
-                        e.callback(self.db)
-            except:
-                logging.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
-            finally:
-                _cur_cell.cell = None
+                origChildren = self.cellsKnownChildren[n.identity]
 
-            for c in n.children.values():
-                assert isinstance(c, Cell)
-                self.addCell(c)
+                try:
+                    _cur_cell.cell = n
+                    while True:
+                        try:
+                            n.recalculate()
+                            break
+                        except SubscribeAndRetry as e:
+                            e.callback(self.db)
+                except:
+                    logging.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
+                finally:
+                    _cur_cell.cell = None
+
+
+                newChildren = set(n.children.values())
+
+                for c in newChildren.difference(origChildren):
+                    assert isinstance(c, Cell)
+                    assert c.cells is None, "Child of %s of %s is being reused!" % (c, n)
+                    self._addCell(c, n)
+                    
+                for c in origChildren.difference(newChildren):
+                    self._cellOutOfScope(c)
+
+                self.cellsKnownChildren[n.identity] = newChildren
 
     def markDirty(self, cell):
+        assert not cell.garbageCollected
+
         self.dirtyNodes.add(cell)
 
     def updateMessageFor(self, cell):
@@ -189,21 +238,26 @@ class Slot:
             self._subscribedCells = set()
 
 class Cell:
-    def __init__(self, cells=None):
-        self.cells = cells #will get set when its added to a 'Cells' object
+    def __init__(self):
+        self.cells = None #will get set when its added to a 'Cells' object
+        self.parent = None
+        self.level = None
         self.children = {} #local node def to global node def
         self.contents = "" #some contents containing a local node def
         self._identity = None
         self.postscript = None
+        self.garbageCollected = False
 
     @property
     def identity(self):
         if self._identity is None:
-            self._identity = str(uuid.uuid4()).replace("-","")
+            assert self.cells is not None, "Can't ask for identity for %s as it's not part of a cells package" % self
+            self._identity = self.cells._newID()
         return self._identity
 
     def markDirty(self):
-        self.cells.markDirty(self)
+        if not self.garbageCollected:
+            self.cells.markDirty(self)
 
     def recalculate(self):
         pass
@@ -297,10 +351,11 @@ class Dropdown(Cell):
         self.headersAndLambdas = headersAndLambdas
         self.title = title
 
+    def recalculate(self):
         items = []
         
-        for i in range(len(headersAndLambdas)):
-            header, _ = headersAndLambdas[i]
+        for i in range(len(self.headersAndLambdas)):
+            header, _ = self.headersAndLambdas[i]
             self.children["__child_%s__" % i] = Cell.makeCell(header)
 
             items.append(
@@ -323,7 +378,7 @@ class Dropdown(Cell):
                     __dropdown_items__
                   </div>
             </div>
-            """.replace("__title__", title).replace("__identity__", self.identity).replace("__dropdown_items__", "\n".join(items))
+            """.replace("__title__", self.title).replace("__identity__", self.identity).replace("__dropdown_items__", "\n".join(items))
 
     def onMessage(self, msgFrame):
         t0 = time.time()
@@ -385,6 +440,9 @@ class Subscribed(Cell):
 
         self.context = None
 
+    def __repr__(self):
+        return "Subscribed(%s)" % self.f
+
     def recalculate(self):
         with self.cells.db.view() as v:
             self.contents = """<div>__contents__</div>"""
@@ -405,8 +463,6 @@ class Subscribed(Cell):
                 self.cells.keysToCells.setdefault(k, set()).discard(self)
 
             self.subscriptions = new_subscriptions
-
-
 
 class SubscribedSequence(Cell):
     def __init__(self, itemsFun, rendererFun):
@@ -464,12 +520,15 @@ class SubscribedSequence(Cell):
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
         super().__init__()
+
+        self.width = width
         self.children = {
             '__contents__': Cell.makeCell(contents),
             '__detail__': Cell.makeCell(detail),
             '__title__': Cell.makeCell(title)
             }
 
+    def recalculate(self):
         self.contents = """
             <div>
             <a href="#popmain___identity__" data-toggle="popover" data-trigger="focus" data-bind="#pop___identity__" container="body" class="btn btn-xs" role="button">__contents__</a>
@@ -482,7 +541,7 @@ class Popover(Cell):
             </div>
 
             </div>
-            """.replace("__identity__", self.identity).replace("__width__", str(width))
+            """.replace("__identity__", self.identity).replace("__width__", str(self.width))
 
 class Grid(Cell):
     def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun):
@@ -598,14 +657,16 @@ class Grid(Cell):
 class Clickable(Cell):
     def __init__(self, content, f):
         super().__init__()
+        self.f = f
+        self.content = content
 
-        self.children = {'__contents__': Cell.makeCell(content)}
+
+    def recalculate(self):
+        self.children = {'__contents__': Cell.makeCell(self.content)}
         self.contents = """
             <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))">
             __contents__
             </div>""".replace('__identity__', self.identity)
-
-        self.f = f
 
     def onMessage(self, msgFrame):
         t0 = time.time()
@@ -626,9 +687,8 @@ class Clickable(Cell):
 
 
 class Button(Clickable):
-    def __init__(self, content, f):
-        super().__init__(content, f)
-
+    def recalculate(self):
+        self.children = {'__contents__': Cell.makeCell(self.content)}
         self.contents = """
             <button 
                 class='btn btn-primary' 

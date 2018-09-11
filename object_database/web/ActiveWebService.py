@@ -112,7 +112,8 @@ class ActiveWebService(ServiceBase):
                 curService.set(s)
             return f
 
-        serviceGrid = Grid(
+        def makeServiceGrid():
+            return Grid(
                 colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
                 rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
                 headerFun=lambda x: x,
@@ -163,7 +164,7 @@ class ActiveWebService(ServiceBase):
                 ]) +
             Main(
                 Subscribed(lambda:
-                    serviceGrid if curService.get() is None else
+                    makeServiceGrid() if curService.get() is None else
                         displayForService(curService.get())
                     )
                 )
@@ -208,7 +209,7 @@ class ActiveWebService(ServiceBase):
             while not ws.closed:
                 t0 = time.time()
                 cells.recalculate()
-                messages = reversed(cells.renderMessages())
+                messages = cells.renderMessages()
 
                 lastDumpTimeSpentCalculating += time.time() - t0
 
