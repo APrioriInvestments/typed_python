@@ -29,6 +29,7 @@ from object_database.service_manager.ServiceWorker import ServiceWorker
 def main(argv):
     parser = argparse.ArgumentParser("Run a specific service.")
 
+    parser.add_argument("servicename")
     parser.add_argument("host")
     parser.add_argument("port", type=int)
     parser.add_argument("instanceid")

@@ -78,7 +78,8 @@ class SubprocessServiceManager(ServiceManager):
             
             process = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
-                 self.host, str(self.port), instanceIdentity, self.sourceDir],
+                    service.name,
+                    self.host, str(self.port), instanceIdentity, self.sourceDir],
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT
