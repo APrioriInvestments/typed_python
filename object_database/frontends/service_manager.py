@@ -25,6 +25,7 @@ import traceback
 import psutil
 import multiprocessing
 import logging.config
+import concurrent.futures
 from object_database.util import configureLogging
 
 from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
@@ -116,7 +117,7 @@ def main(argv):
                     shouldStop.wait(timeout=max(.1, serviceManager.shutdownTimeout / 10))
                     try:
                         serviceManager.cleanup()
-                    except (ConnectionRefusedError, DisconnectedException):
+                    except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
                         #try to reconnect
                         logging.error("Disconnected from object_database host. Attempting to reconnect.")
                         serviceManager.stop(gracefully=False)
