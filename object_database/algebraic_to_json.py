@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple, TryTypeConvert
+from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple, TryTypeConvert, Class
 
 import logging
 import json
@@ -35,6 +35,12 @@ class Encoder(object):
         self.allowExtraFields=False
 
     def to_json(self, object_type, value):
+        if issubclass(object_type, Class):
+            return {
+                name: self.to_json(member_type, value.__dict__[name])
+                    for name,member_type in object_type.__typed_python_class_members__.items()
+                }
+
         if isinstance(object_type, OneOf):
             if value is None or isinstance(value, (int,float,str,bool)):
                 return value
@@ -92,6 +98,12 @@ class Encoder(object):
             return self.overrides[algebraic_type](self, algebraic_type, value)
         
         try:
+            if issubclass(algebraic_type, Class):
+                return algebraic_type.__typed_python_instantiate_directly__({
+                    name: self.from_json(value[name], member_type)
+                        for name,member_type in algebraic_type.__typed_python_class_members__.items()
+                    })
+
             if isinstance(algebraic_type, OneOf):
                 if isinstance(value, dict):
                     which_type = [o for o in algebraic_type.options if str(o) == value['type']]

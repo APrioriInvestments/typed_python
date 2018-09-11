@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, OneOf, sha_hash
+from typed_python import Alternative, TupleOf, OneOf, sha_hash, Class, NamedTuple
 from object_database.algebraic_to_json import Encoder
 import unittest
 
@@ -40,6 +40,39 @@ a = expr.Add(l=c10,r=c20)
 bin_a = expr.Binop(opcode=opcode.Sub(), l=c10, r=c20)
 several = expr.Many([c10, c20, a, expr.Possibly(None), expr.Possibly(c20), bin_a])
 
+class NamedTupleSubclass(NamedTuple(x=int, y=float)):
+    pass
+
+ntc = NamedTupleSubclass(x=20, y = 20.2)
+
+class HeldClass(Class):
+    h = float
+
+    def __init__(self):
+        self.h = 0.0
+
+    def __init__(self, h):
+        self.h = h
+
+    def __eq__(self, other):
+        return self.h == other.h
+
+class AClass(Class):
+    x = int
+    y = TupleOf(int)
+    z = HeldClass
+
+    def __init__(self, x,y,z):
+        self.x = x
+        self.y = y
+        self.z = z
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y and self.z == other.z
+
+hClass = HeldClass(2.0)
+aClass = AClass(10, (10,20), HeldClass(2.0))
+
 class AlgebraicToJsonTests(unittest.TestCase):
     def test_roundtrip(self):
         e = Encoder()
@@ -48,6 +81,12 @@ class AlgebraicToJsonTests(unittest.TestCase):
             self.assertEqual(
                 item, 
                 e.from_json(e.to_json(expr, item), expr)
+                )
+
+        for item in [hClass, ntc]:
+            self.assertEqual(
+                item, 
+                e.from_json(e.to_json(type(item), item), type(item))
                 )
 
     def test_convert_sha_hash_bytes(self):

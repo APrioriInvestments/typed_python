@@ -15,7 +15,8 @@
 from typed_python.hash import sha_hash
 from typed_python.types import  TypeFunction, ListOf, OneOf, Dict, \
                                 ConstDict, TypedFunction, Class, PackedArray, \
-                                Pointer, Internal, init, UndefinedBehaviorException, Stack, TupleOf, TypeConvert
+                                Pointer, Internal, init, UndefinedBehaviorException, Stack, \
+                                TupleOf, TypeConvert, NamedTuple
 
 import unittest
 import time
@@ -40,7 +41,21 @@ class BasicTypedClass(Class):
     def f(self, z: int, z2: int, z3: int) -> str:
         return self.x + z + z2 + z3
 
+class NamedTupleSubclass(NamedTuple(x=int, y=float)):
+    pass
+
 class TypesTests(unittest.TestCase):
+    def test_namedTupleSubclass(self):
+        ntc = NamedTupleSubclass(x=10, y = 20.0)
+
+        nt = NamedTuple(x=int, y=float)(x=10, y=20.0)
+
+        self.assertTrue(ntc == ntc)
+        self.assertTrue(ntc == nt)
+        self.assertTrue(ntc == {'x':10,'y':20.0})
+        self.assertTrue(ntc != {'x':10,'y':20.1})
+        self.assertFalse(ntc != ntc)
+
     def test_type_function_memoization(self):
         int_list_1 = ListOf(int)
         int_list_2 = ListOf(int)

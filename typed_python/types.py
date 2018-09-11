@@ -424,8 +424,8 @@ def TupleOf(t):
             return res
 
         def __lt__(self, other):
-            if not isinstance(other, TupleOf):
-                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
                 if x is None:
                     return NotImplemented
                 return self < x[0]
@@ -433,8 +433,8 @@ def TupleOf(t):
             return self.__contents__ < other.__contents__
 
         def __le__(self, other):
-            if not isinstance(other, TupleOf):
-                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
                 if x is None:
                     return NotImplemented
                 return self <= x[0]
@@ -442,8 +442,8 @@ def TupleOf(t):
             return self.__contents__ <= other.__contents__
 
         def __gt__(self, other):
-            if not isinstance(other, TupleOf):
-                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
                 if x is None:
                     return NotImplemented
                 return self > x[0]
@@ -451,8 +451,8 @@ def TupleOf(t):
             return self.__contents__ > other.__contents__
 
         def __ge__(self, other):
-            if not isinstance(other, TupleOf):
-                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
                 if x is None:
                     return NotImplemented
                 return self >= x[0]
@@ -460,13 +460,22 @@ def TupleOf(t):
             return self.__contents__ >= other.__contents__
 
         def __eq__(self, other):
-            if not isinstance(other, TupleOf):
-                x = TryTypeConvert(TupleOf, other, allow_construct_new=True)
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
                 if x is None:
                     return NotImplemented
                 return self == x[0]
 
             return self.__contents__ == other.__contents__
+
+        def __ne__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self != x[0]
+
+            return self.__contents__ != other.__contents__
 
         def __hash__(self):
             return hash(self.__contents__)
@@ -592,6 +601,63 @@ def NamedTuple(*namesAndTypes, **kwargs):
         def __str__(self):
             return repr(self)
 
+        def __eq__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self == x[0]
+
+            return self.__contents__ == other.__contents__
+
+        def __ne__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self != x[0]
+
+            return self.__contents__ != other.__contents__
+
+        def __lt__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self < x[0]
+
+            return self.__contents__ < other.__contents__
+
+        def __le__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self <= x[0]
+
+            return self.__contents__ <= other.__contents__
+
+        def __gt__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self > x[0]
+
+            return self.__contents__ > other.__contents__
+
+        def __ge__(self, other):
+            if not isinstance(other, type(self)):
+                x = TryTypeConvert(type(self), other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self >= x[0]
+
+            return self.__contents__ >= other.__contents__
+
+        def __hash__(self):
+            return hash(self.__contents__)
+
         def __sha_hash__(self):
             if self._sha_hash_cache is None:
                 base_hash = sha_hash(len(self.__contents__))
@@ -607,9 +673,9 @@ def NamedTuple(*namesAndTypes, **kwargs):
             return "(%s)" % (",".join("%s=%s" % (NamedTuple_.ElementNames[i], self.__contents__[i]) 
                         for i in range(len(self.__contents__))))
 
-        @staticmethod
-        def __typed_python_try_convert_instance__(value, allow_construct_new):
-            if isinstance(value, NamedTuple_):
+        @classmethod
+        def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
+            if isinstance(value, cls):
                 return (value,)
 
             if allow_construct_new:
@@ -629,25 +695,7 @@ def NamedTuple(*namesAndTypes, **kwargs):
 
                         members.append(converted[0])
 
-                    return (NamedTuple_(members),)
-                else:
-                    try:
-                        res = list(value.items())
-                    except:
-                        return None
-
-                    if len(res) != len(types):
-                        return None
-
-                    members = []
-
-                    for ix in range(len(types)):
-                        converted = TryTypeConvert(types[ix], res[ix], allow_construct_new)
-                        if converted is None:
-                            return None
-                        members.append(converted[0])
-
-                    return (NamedTuple_(members),)
+                    return (cls(members),)
 
             return None
 
@@ -698,6 +746,15 @@ def Tuple(*args):
                 return self == x[0]
 
             return self.__contents__ == other.__contents__
+
+        def __ne__(self, other):
+            if not isinstance(other, Tuple):
+                x = TryTypeConvert(Tuple, other, allow_construct_new=True)
+                if x is None:
+                    return NotImplemented
+                return self != x[0]
+
+            return self.__contents__ != other.__contents__
 
         def __lt__(self, other):
             if not isinstance(other, Tuple):
@@ -808,10 +865,12 @@ def Function(return_type, args):
             return tuple(converted_args), {}
 
         def __call__(self, *args, **kwargs):
+            orig_args, orig_kwargs = args, kwargs
+
             args, kwargs = self.__typed_python_matches__(*args, **kwargs)
 
             if args is None:
-                raise TypeError()
+                raise TypeError("Cannot match args to %s with %s/%s" % (self.__func__, orig_args, orig_kwargs))
 
             result = self.__func__(*args, **kwargs)
 
@@ -1098,6 +1157,7 @@ class Class(object, metaclass=ClassMeta):
         res = object.__new__(cls)
 
         res.__typed_python_class_context__ = (res, ())
+
         for m in cls.__typed_python_class_members__:
             res.__dict__[m] = Uninitialized
         
@@ -1136,6 +1196,15 @@ class Class(object, metaclass=ClassMeta):
             raise UndefinedBehaviorException("Instance was deleted already!")
 
         return object.__getattribute__(self, attr)
+
+    @classmethod
+    def __typed_python_instantiate_directly__(cls, members):
+        res = object.__new__(cls)
+
+        res.__typed_python_class_context__ = (res, ())
+        res.__dict__.update(members)
+
+        return res
 
     @classmethod
     def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
