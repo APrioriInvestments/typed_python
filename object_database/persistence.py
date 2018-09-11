@@ -253,7 +253,7 @@ class RedisPersistence(object):
                     assert self.cache.get(key)
 
                     for val in to_remove:
-                        self.cache[key].remove(val)
+                        self.cache[key].discard(val)
 
                     if not self.cache[key]:
                         dropped_sets.add(key)
