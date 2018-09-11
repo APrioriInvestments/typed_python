@@ -16,7 +16,7 @@ from typed_python import Alternative, TupleOf, OneOf
 
 from object_database.schema import Indexed, Index, Schema
 from object_database.core_schema import core_schema
-from object_database.view import RevisionConflictException, DisconnectedException
+from object_database.view import RevisionConflictException, DisconnectedException, ObjectDoesntExistException
 from object_database.database_connection import TransactionListener, DatabaseConnection
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
@@ -73,6 +73,7 @@ schema = Schema("test_schema")
 @schema.define
 class Root:
     obj=OneOf(None, schema.Object)
+    k = int
 
 @schema.define
 class Object:
@@ -255,10 +256,14 @@ class ObjectDatabaseTests:
             root = Root()
 
             self.assertTrue(root.exists())
+            self.assertEqual(root.k, 0)
 
             root.delete()
 
             self.assertFalse(root.exists())
+            
+            with self.assertRaises(ObjectDoesntExistException):
+                root.k
 
         with db.view():
             self.assertFalse(root.exists())

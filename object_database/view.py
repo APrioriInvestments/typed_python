@@ -33,6 +33,11 @@ class DisconnectedException(Exception):
 class RevisionConflictException(Exception):
     pass
 
+class ObjectDoesntExistException(Exception):
+    def __init__(self, obj):
+        super().__init__()
+        self.obj = obj
+
 def revisionConflictRetry(f):
     MAX_TRIES = 100
 
@@ -166,6 +171,9 @@ class View(object):
         if not self._db._isTypeSubscribed(type(obj)):
             raise Exception("No subscriptions exist for type %s" % obj)
 
+        if not obj.exists():
+            raise ObjectDoesntExistException(obj)
+
         key = data_key(type(obj), identity, field_name)
 
         self._reads.add(key)
@@ -184,6 +192,10 @@ class View(object):
     def unwrapJsonWithPyRep(dbValWithPyrep, field_type):
         if dbValWithPyrep is None:
             return None
+
+        if not isinstance(dbValWithPyrep, JsonWithPyRep):
+            #assume this is json
+            return _encoder.from_json(dbValWithPyrep, field_type)
 
         if dbValWithPyrep.jsonRep is None:
             return None
@@ -212,6 +224,9 @@ class View(object):
         if not self._db._isTypeSubscribed(type(obj)):
             raise Exception("No subscriptions exist for type %s" % obj)
 
+        if not obj.exists():
+            raise ObjectDoesntExistException(obj)
+
         existing_index_vals = self._compute_index_vals(obj)
 
         for name in field_names:
@@ -228,6 +243,9 @@ class View(object):
 
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
+
+        if not obj.exists():
+            raise ObjectDoesntExistException(obj)
 
         key = data_key(type(obj), identity, field_name)
 

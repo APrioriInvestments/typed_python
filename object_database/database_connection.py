@@ -226,11 +226,15 @@ class TransactionListener:
                     changed[o] = []
 
                 if fieldname != " exists":
-                    changed[o].append((
-                        fieldname,
-                        View.unwrapJsonWithPyRep(key_value[k], o.__types__[fieldname]),
-                        View.unwrapJsonWithPyRep(priors[k], o.__types__[fieldname])
-                        ))
+                    try:
+                        changed[o].append((
+                            fieldname,
+                            View.unwrapJsonWithPyRep(key_value[k], o.__types__[fieldname]),
+                            View.unwrapJsonWithPyRep(priors[k], o.__types__[fieldname])
+                            ))
+                    except:
+                        print("FAILED ON ", k, key_value[k], fieldname, o.__types__[fieldname])
+                        raise
 
         self._queue.put(changed)
 
