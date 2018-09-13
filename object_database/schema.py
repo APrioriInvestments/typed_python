@@ -25,6 +25,7 @@ class Schema:
     def __init__(self, name):
         self._name = name
         self._types = {}
+        self._supportingTypes = {}
         #class -> indexname -> fun(object->value)
         self._indices = {}
         self._indexTypes = {}
@@ -33,6 +34,7 @@ class Schema:
     def toDefinition(self):
         return SchemaDefinition({
             tname: self.typeToDef(t) for tname, t in self._types.items()
+                if issubclass(t, DatabaseObject)
             })
 
     def typeToDef(self, t):
@@ -57,13 +59,19 @@ class Schema:
         
         assert not self._frozen, "Schema is already frozen."
 
-        self._types[typename] = val
+        assert isinstance(val, type)
+        assert not issubclass(val, DatabaseObject)
+
+        self._supportingTypes[typename] = val
 
     def __getattr__(self, typename):
         assert '.' not in typename
 
         if typename[:1] == "_":
             return self.__dict__[typename]
+
+        if typename in self._supportingTypes:
+            return self._supportingTypes[typename]
 
         if typename not in self._types:
             if self._frozen:
@@ -127,7 +135,7 @@ class Schema:
                 else:
                     self._addIndex(t, name)
             elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
-                if isinstance(val, (FunctionType, staticmethod)):
+                if isinstance(val, (FunctionType, staticmethod, property)):
                     setattr(t, name, val)
 
         return t

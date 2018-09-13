@@ -14,7 +14,7 @@
 
 from typed_python.hash import sha_hash
 
-from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs
+from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs, NamedTuple
 
 from object_database.keymapping import *
 import object_database.algebraic_to_json as algebraic_to_json
@@ -70,6 +70,8 @@ def default_initialize(t):
         return Kwargs(**{k:default_initialize(t) for k,t in t.ElementTypes.items()})
     if isinstance(t, (TupleOf, ConstDict)):
         return t()
+    if isinstance(t, NamedTuple):
+        return t(**{k: default_initialize(v) for k,v in t.ElementNamesAndTypes})
     if isinstance(t, OneOf):
         if None in t.options:
             return None

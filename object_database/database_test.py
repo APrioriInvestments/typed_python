@@ -69,6 +69,7 @@ expr.__str__ = lambda self: (
     )
 
 schema = Schema("test_schema")
+schema.expr = expr
 
 @schema.define
 class Root:
@@ -79,6 +80,11 @@ class Root:
 class Object:
     k=Indexed(expr)
     other=OneOf(None, schema.Object)
+
+    @property
+    def otherK(self):
+        if self.other is not None:
+            return self.other.k
 
 @schema.define
 class Counter:
@@ -105,6 +111,17 @@ class ObjectDatabaseTests:
             counter.k = 2
             self.assertEqual(counter.f(), 3)
             self.assertEqual(str(counter), "Counter(k=2)")
+
+    def test_property_object(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            counter = Object(k=expr.Constant(value=10))
+            
+            counter2 = Object(other=counter,k=expr.Constant(value=0))
+
+            self.assertEqual(counter2.otherK, counter.k)
 
     def test_identity_transfer(self):
         db = self.createNewDb()
@@ -261,7 +278,7 @@ class ObjectDatabaseTests:
             root.delete()
 
             self.assertFalse(root.exists())
-            
+
             with self.assertRaises(ObjectDoesntExistException):
                 root.k
 
