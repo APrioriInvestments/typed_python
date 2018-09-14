@@ -16,7 +16,6 @@ import traceback
 import threading
 import logging
 import time
-import uuid
 import base64
 import json
 import sys

@@ -16,6 +16,7 @@ from object_database.schema import Schema
 from object_database.messages import ClientToServer, ServerToClient, SchemaDefinition, getHeartbeatInterval
 from object_database.core_schema import core_schema
 from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
+from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
 import json
 from typed_python.hash import sha_hash
@@ -24,7 +25,6 @@ from typed_python import *
 import queue
 import threading
 import logging
-import uuid
 import traceback
 import time
 
@@ -610,6 +610,7 @@ class DatabaseConnection:
                     e.set()
             elif msg.matches.Initialize:
                 self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
+                self.identityProducer = IdentityProducer(msg.identity_root)
                 self.connectionObject = core_schema.Connection.fromIdentity(msg.connIdentity)
                 self.initialized.set()
             elif msg.matches.TransactionResult:
@@ -843,7 +844,7 @@ class DatabaseConnection:
                 ):
         assert confirmCallback is not None
         
-        transaction_guid = str(uuid.uuid4()).replace("-","")
+        transaction_guid = self.identityProducer.createIdentity()
 
         self._transaction_callbacks[transaction_guid] = confirmCallback
 

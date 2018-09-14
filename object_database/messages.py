@@ -37,7 +37,7 @@ if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
 
     ServerToClient = Alternative(
         "ServerToClient",
-        Initialize = {'transaction_num': int, 'connIdentity': str},
+        Initialize = {'transaction_num': int, 'connIdentity': str, 'identity_root': int},
         TransactionResult = {'transaction_guid': str, 'success': bool, 'badKey': OneOf(None, str) },
         FlushResponse = {'guid': str},
         SubscriptionData = {
@@ -146,8 +146,8 @@ else:
             return dict(self.__dict__)
 
         @staticmethod
-        def Initialize(transaction_num, connIdentity):
-            return ServerToClient(type="Initialize", transaction_num=transaction_num,connIdentity=connIdentity)
+        def Initialize(transaction_num, connIdentity, identity_root):
+            return ServerToClient(type="Initialize", transaction_num=transaction_num,connIdentity=connIdentity, identity_root=identity_root)
 
         @staticmethod
         def TransactionResult(transaction_guid, success, badKey):

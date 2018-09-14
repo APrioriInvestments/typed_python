@@ -23,7 +23,6 @@ import threading
 import queue
 import time
 import traceback
-import uuid
 
 LOG_SLOW_COMMIT_THRESHOLD = 1.0
 
@@ -131,7 +130,7 @@ class View(object):
             kwds = dict(kwds)
             del kwds["_identity"]
         else:
-            identity = sha_hash(str(uuid.uuid4())).hexdigest
+            identity = self._db.identityProducer.createIdentity()
 
         o = cls.fromIdentity(identity)
 

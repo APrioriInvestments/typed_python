@@ -443,7 +443,7 @@ class ObjectDatabaseTests:
                 counter_vals_by_tn = {}
 
         #we may have one or two for connection objects, and we have two values for every indexed thing
-        self.assertLess(self.mem_store.storedStringCount(), 202)
+        self.assertLess(self.mem_store.storedStringCount(), 203)
         self.assertTrue(total_writes > 500)
 
     def test_flush_db_works(self):
@@ -468,7 +468,7 @@ class ObjectDatabaseTests:
         while time.time() - t0 < 1.0 and self.mem_store.storedStringCount() >= 2:
             time.sleep(.01)
 
-        self.assertLess(self.mem_store.storedStringCount(), 3)
+        self.assertLess(self.mem_store.storedStringCount(), 4)
 
         #but the view does!
         with view:

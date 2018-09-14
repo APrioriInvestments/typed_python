@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
+from object_database.identity import IdentityProducer
 from object_database.schema import Schema
 from object_database.messages import SchemaDefinition
 from object_database.core_schema import core_schema
@@ -24,14 +25,13 @@ from typed_python import *
 import redis
 import queue
 import time
-import uuid
 import logging
 import threading
 import traceback
 import json
 
 class ConnectedChannel:
-    def __init__(self, initial_tid, channel, connectionObject):
+    def __init__(self, initial_tid, channel, connectionObject, identityRoot):
         self.channel = channel
         self.initial_tid = initial_tid
         self.connectionObject = connectionObject
@@ -40,6 +40,7 @@ class ConnectedChannel:
         self.subscribedTypes = set() #schema, type
         self.subscribedIds = set() #identities
         self.subscribedIndexKeys = set() #full index keys
+        self.identityRoot = identityRoot
 
     def heartbeat(self):
         self.missedHeartbeats = 0
@@ -50,7 +51,11 @@ class ConnectedChannel:
 
     def sendInitializationMessage(self):
         self.channel.write(
-            ServerToClient.Initialize(transaction_num=self.initial_tid, connIdentity=self.connectionObject._identity)
+            ServerToClient.Initialize(
+                transaction_num=self.initial_tid, 
+                connIdentity=self.connectionObject._identity,
+                identity_root=self.identityRoot
+                )
             )
 
     def sendTransactionSuccess(self, guid, success, badKey):
@@ -107,6 +112,8 @@ class Server:
         #fault injector to test this thing
         self._subscriptionBackgroundThreadCallback = None
 
+        self.identityProducer = IdentityProducer(self.allocateNewIdentityRoot())
+
     def start(self):
         self._subscriptionResponseThread = threading.Thread(target=self.serviceSubscriptions)
         self._subscriptionResponseThread.daemon = True
@@ -116,6 +123,20 @@ class Server:
         self._shouldStop.set()
         self._subscriptionQueue.put((None,None))
         self._subscriptionResponseThread.join()
+
+    def allocateNewIdentityRoot(self):
+        with self._lock:
+            curIdentityRoot = self._kvstore.get(" identityRoot")
+            if curIdentityRoot is None:
+                curIdentityRoot = 0
+            else:
+                curIdentityRoot = int(curIdentityRoot)
+
+            result = curIdentityRoot
+
+            self._kvstore.set(" identityRoot", str(curIdentityRoot+1))
+
+            return result
 
     def serviceSubscriptions(self):
         while not self._shouldStop.is_set():
@@ -191,9 +212,10 @@ class Server:
             self._dropConnectionEntry(co)
 
     def _createConnectionEntry(self):
-        identity = sha_hash(str(uuid.uuid4())).hexdigest
+        identity = self.identityProducer.createIdentity()
         exists_key = keymapping.data_key(core_schema.Connection, identity, " exists")
         exists_index = keymapping.index_key(core_schema.Connection, " exists", True)
+        identityRoot = self.allocateNewIdentityRoot()
 
         self._handleNewTransaction(
             None,
@@ -205,7 +227,7 @@ class Server:
             self._cur_transaction_num
             )
 
-        return core_schema.Connection.fromIdentity(identity)
+        return core_schema.Connection.fromIdentity(identity), identityRoot
 
     def _dropConnectionEntry(self, entry):
         identity = entry._identity
@@ -226,9 +248,14 @@ class Server:
     def addConnection(self, channel):
         try:
             with self._lock:
-                connectionObject = self._createConnectionEntry()
+                connectionObject, identityRoot = self._createConnectionEntry()
 
-                connectedChannel = ConnectedChannel(self._cur_transaction_num, channel, connectionObject)
+                connectedChannel = ConnectedChannel(
+                    self._cur_transaction_num, 
+                    channel, 
+                    connectionObject,
+                    identityRoot
+                    )
 
                 self._clientChannels[channel] = connectedChannel
 
