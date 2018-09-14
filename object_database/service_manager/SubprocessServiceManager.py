@@ -126,7 +126,7 @@ class SubprocessServiceManager(ServiceManager):
             for identity in list(self.serviceProcesses):
                 serviceInstance = service_schema.ServiceInstance.fromIdentity(identity)
 
-                if serviceInstance.shouldShutdown and time.time() - serviceInstance.shutdownTimestamp > self.shutdownTimeout:
+                if not serviceInstance.exists() or serviceInstance.shouldShutdown and time.time() - serviceInstance.shutdownTimestamp > self.shutdownTimeout:
                     workerProcess = self.serviceProcesses.get(identity)
                     if workerProcess:
                         workerProcess.terminate()
