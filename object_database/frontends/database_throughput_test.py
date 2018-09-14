@@ -38,6 +38,8 @@ def main(argv):
     class Counter:
         k = int
 
+    db.subscribeToSchema(schema)
+
     t0 = time.time()
 
     transactionCount = []
