@@ -1,6 +1,8 @@
 from typed_python import *
-
 from object_database.schema import SchemaDefinition
+from object_database.algebraic_to_json import Encoder
+
+_encoder = Encoder()
 
 _heartbeatInterval = [5.0]
 def setHeartbeatInterval(newInterval):
@@ -9,57 +11,203 @@ def setHeartbeatInterval(newInterval):
 def getHeartbeatInterval():
     return _heartbeatInterval[0]
 
-ClientToServer = Alternative(
-    "ClientToServer",
-    NewTransaction = {
-        "writes": ConstDict(str, OneOf(None, str)),
-        "set_adds": ConstDict(str, TupleOf(str)),
-        "set_removes": ConstDict(str, TupleOf(str)),
-        "key_versions": TupleOf(str),
-        "index_versions": TupleOf(str),
-        "as_of_version": int,
-        "transaction_guid": str
-        },
-    Heartbeat = {},
-    DefineSchema = { 'name': str, 'definition': SchemaDefinition },
-    Subscribe = { 
-        'schema': str, 
-        'typename': OneOf(None, str), 
-        'fieldname_and_value': OneOf(None, Tuple(str,str)) 
-        },
-    Flush = {'guid': str}
-    )
+USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES = False
 
-ServerToClient = Alternative(
-    "ServerToClient",
-    Initialize = {'transaction_num': int, 'connIdentity': str},
-    TransactionResult = {'transaction_guid': str, 'success': bool, 'badKey': OneOf(None, str) },
-    FlushResponse = {'guid': str},
-    SubscriptionData = {
-        'schema': str, 
-        'typename': OneOf(None, str),
-        'fieldname_and_value': OneOf(None, Tuple(str,str)),
-        'values': ConstDict(str, OneOf(str, None)), #value
-        'index_values': ConstDict(str, OneOf(str, None)),
-        'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
-        },
-    SubscriptionComplete = {
-        'schema': str, 
-        'typename': OneOf(None, str),
-        'fieldname_and_value': OneOf(None, Tuple(str,str)),
-        'tid': int #marker transaction id
-        },
-    SubscriptionIncrease = {
-        'schema': str, 
-        'typename': str,
-        'fieldname_and_value': Tuple(str,str),
-        'identities': TupleOf(str), #the identities in play if this is an index-level subscription
-        },
-    Disconnected = {},
-    Transaction = {
-        "writes": ConstDict(str, OneOf(str, None)),
-        "set_adds": ConstDict(str, TupleOf(str)),
-        "set_removes": ConstDict(str, TupleOf(str)),
-        "transaction_id": int
-        }
-    )
+if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
+    ClientToServer = Alternative(
+        "ClientToServer",
+        NewTransaction = {
+            "writes": ConstDict(str, OneOf(None, str)),
+            "set_adds": ConstDict(str, TupleOf(str)),
+            "set_removes": ConstDict(str, TupleOf(str)),
+            "key_versions": TupleOf(str),
+            "index_versions": TupleOf(str),
+            "as_of_version": int,
+            "transaction_guid": str
+            },
+        Heartbeat = {},
+        DefineSchema = { 'name': str, 'definition': SchemaDefinition },
+        Subscribe = { 
+            'schema': str, 
+            'typename': OneOf(None, str), 
+            'fieldname_and_value': OneOf(None, Tuple(str,str)) 
+            },
+        Flush = {'guid': str}
+        )
+
+    ServerToClient = Alternative(
+        "ServerToClient",
+        Initialize = {'transaction_num': int, 'connIdentity': str},
+        TransactionResult = {'transaction_guid': str, 'success': bool, 'badKey': OneOf(None, str) },
+        FlushResponse = {'guid': str},
+        SubscriptionData = {
+            'schema': str, 
+            'typename': OneOf(None, str),
+            'fieldname_and_value': OneOf(None, Tuple(str,str)),
+            'values': ConstDict(str, OneOf(str, None)), #value
+            'index_values': ConstDict(str, OneOf(str, None)),
+            'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
+            },
+        SubscriptionComplete = {
+            'schema': str, 
+            'typename': OneOf(None, str),
+            'fieldname_and_value': OneOf(None, Tuple(str,str)),
+            'tid': int #marker transaction id
+            },
+        SubscriptionIncrease = {
+            'schema': str, 
+            'typename': str,
+            'fieldname_and_value': Tuple(str,str),
+            'identities': TupleOf(str), #the identities in play if this is an index-level subscription
+            },
+        Disconnected = {},
+        Transaction = {
+            "writes": ConstDict(str, OneOf(str, None)),
+            "set_adds": ConstDict(str, TupleOf(str)),
+            "set_removes": ConstDict(str, TupleOf(str)),
+            "transaction_id": int
+            }
+        )
+else:
+    class ClientToServer:
+        def __init__(self, **kwargs):
+            kwargs = dict(kwargs)
+
+            if 'definition' in kwargs:
+                if not isinstance(kwargs['definition'], SchemaDefinition):
+                    kwargs['definition'] = _encoder.from_json(kwargs['definition'], SchemaDefinition)
+                    
+            self.__dict__ = kwargs
+
+        @staticmethod
+        def from_json(msg):
+            return ClientToServer(**msg)
+
+        def to_json(self):
+            d = dict(self.__dict__)
+            if 'definition' in d:                        
+                d['definition'] = _encoder.to_json(SchemaDefinition, d['definition'])
+
+            return d
+
+        @staticmethod
+        def NewTransaction(writes, set_adds, set_removes, key_versions, index_versions, as_of_version, transaction_guid):
+            return ClientToServer(
+                type='NewTransaction', 
+                writes=writes, 
+                set_adds=set_adds, 
+                set_removes=set_removes, 
+                key_versions=key_versions, 
+                index_versions=index_versions, 
+                as_of_version=as_of_version, 
+                transaction_guid=transaction_guid
+                )
+
+        @staticmethod
+        def Heartbeat():
+            return ClientToServer(type="Heartbeat")
+
+        @staticmethod
+        def DefineSchema(name, definition):
+            return ClientToServer(type="DefineSchema", name=name, definition=definition)
+
+        @staticmethod
+        def Subscribe(schema, typename, fieldname_and_value):
+            return ClientToServer(type='Subscribe', schema=schema, typename=typename, fieldname_and_value=fieldname_and_value)
+
+        @staticmethod
+        def Flush(guid):
+            return ClientToServer(type='Flush', guid=guid)
+
+        @property
+        def matches(self):
+            class M:
+                def __getattr__(_, x):
+                    return x == self.type
+            return M()
+
+
+    class ServerToClient:
+        def __init__(self, **kwargs):
+            self.__dict__ = dict(kwargs)
+            if isinstance(self.__dict__.get('fieldname_and_value'), list):
+                self.__dict__['fieldname_and_value'] = tuple(self.__dict__['fieldname_and_value'])
+            if isinstance(self.__dict__.get('identities'), list):
+                self.__dict__['identities'] = tuple(self.__dict__['identities'])
+
+        def __str__(self):
+            return "ServerToClient." + self.type
+
+        @staticmethod
+        def from_json(msg):
+            return ServerToClient(**msg)
+
+        def to_json(self):
+            return dict(self.__dict__)
+
+        @staticmethod
+        def Initialize(transaction_num, connIdentity):
+            return ServerToClient(type="Initialize", transaction_num=transaction_num,connIdentity=connIdentity)
+
+        @staticmethod
+        def TransactionResult(transaction_guid, success, badKey):
+            return ServerToClient(type='TransactionResult', 
+                transaction_guid=transaction_guid,
+                success=success,
+                badKey=badKey
+                )
+        
+        @staticmethod
+        def FlushResponse(guid):
+            return ServerToClient(type='FlushResponse', guid=guid)
+        
+        @staticmethod
+        def SubscriptionData(schema, typename, fieldname_and_value, values, index_values, identities):
+            return ServerToClient(type='SubscriptionData',
+                schema=schema,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
+                values=values,
+                index_values=index_values,
+                identities=identities
+                )
+            
+        @staticmethod
+        def SubscriptionComplete(schema, typename, fieldname_and_value, tid):
+            return ServerToClient(type='SubscriptionComplete',
+                schema=schema,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
+                tid=tid
+                )
+        
+        @staticmethod
+        def SubscriptionIncrease(schema, typename, fieldname_and_value, identities):
+            return ServerToClient(
+                type='SubscriptionIncrease',
+                schema=schema,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
+                identities=identities,
+                )
+        
+        @staticmethod
+        def Disconnected():
+            return ServerToClient(type="Disconnected")
+        
+        @staticmethod
+        def Transaction(writes, set_adds, set_removes, transaction_id):
+            return ServerToClient(
+                type='Transaction', 
+                writes=writes,
+                set_adds={k:tuple(v) for k,v in set_adds.items()},
+                set_removes={k:tuple(v) for k,v in set_removes.items()},
+                transaction_id=transaction_id
+                )
+
+        @property
+        def matches(self):
+            class M:
+                def __getattr__(_, x):
+                    return x == self.type
+            return M()

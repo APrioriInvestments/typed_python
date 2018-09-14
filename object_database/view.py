@@ -182,7 +182,7 @@ class View(object):
 
         if key in self._writes:
             res = self._writes[key][1]
-            if isinstance(res, tuple):
+            if isinstance(res, (tuple, list)):
                 return res[1]
             return res
 
@@ -219,7 +219,7 @@ class View(object):
             return self._writes[key]
 
         val = self._db._get_versioned_object_data(key, self._transaction_num)
-        
+
         return val is not None and val.jsonRep is not None
 
     def _delete(self, obj, identity, field_names):

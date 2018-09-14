@@ -580,7 +580,7 @@ class DatabaseConnection:
     def _onMessage(self, msg):
         with self._lock:
             self._messages_received += 1
-
+            
             if msg.matches.Disconnected:
                 self.disconnected.set()
                 self.connectionObject = None
@@ -850,10 +850,10 @@ class DatabaseConnection:
         self._channel.write(
             ClientToServer.NewTransaction(
                 writes={k:json.dumps(v.jsonRep) if v.jsonRep is not None else None for k,v in key_value.items()},
-                set_adds=set_adds,
-                set_removes=set_removes,
-                key_versions=keys_to_check_versions,
-                index_versions=indices_to_check_versions,
+                set_adds={k: list(v) for k,v in set_adds.items()},
+                set_removes={k: list(v) for k,v in set_removes.items()},
+                key_versions=list(keys_to_check_versions),
+                index_versions=list(indices_to_check_versions),
                 as_of_version=as_of_version,
                 transaction_guid=transaction_guid
                 )

@@ -28,19 +28,23 @@ class AlgebraicProtocol(asyncio.Protocol):
         self.writelock = threading.Lock()
 
     def sendMessage(self, msg):
-        assert isinstance(msg, self.sendType), "message %s is of type %s != %s" % (msg, type(msg), self.sendType)
+        try:
+            assert isinstance(msg, self.sendType), "message %s is of type %s != %s" % (msg, type(msg), self.sendType)
 
-        #cache the encoded message on the object in case we're sending this to multiple
-        #clients.
-        if '__encoded_message__' in msg.__dict__:
-            dataToSend = msg.__dict__['__encoded_message__']
-        else:
-            dataToSend = bytes(json.dumps(self.encoder.to_json(self.sendType, msg)), 'utf8')
-            dataToSend = longToString(len(dataToSend)) + dataToSend
-            msg.__dict__['__encoded_message__'] = dataToSend
+            #cache the encoded message on the object in case we're sending this to multiple
+            #clients.
+            if '__encoded_message__' in msg.__dict__:
+                dataToSend = msg.__dict__['__encoded_message__']
+            else:
+                dataToSend = bytes(json.dumps(self.encoder.to_json(self.sendType, msg)), 'utf8')
+                dataToSend = longToString(len(dataToSend)) + dataToSend
+                msg.__dict__['__encoded_message__'] = dataToSend
 
-        with self.writelock:
-            self.transport.write(dataToSend)
+            with self.writelock:
+                self.transport.write(dataToSend)
+        except:
+            logging.error("Error in AlgebraicProtocol: %s", traceback.format_exc())
+            self.transport.close()
 
     def messageReceived(self, msg):
         #subclasses override

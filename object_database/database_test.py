@@ -234,7 +234,7 @@ class ObjectDatabaseTests:
         while time.time() < t0 + 1.0:
             with db.transaction() as t:
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
-
+        
         with db.view():
             self.assertTrue(root.obj.k.value > 500, root.obj.k.value)
             print(root.obj.k.value, "transactions per second")

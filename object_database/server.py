@@ -14,6 +14,7 @@
 
 from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
 from object_database.schema import Schema
+from object_database.messages import SchemaDefinition
 from object_database.core_schema import core_schema
 import object_database.keymapping as keymapping
 from object_database.algebraic_protocol import AlgebraicProtocol
@@ -28,8 +29,6 @@ import logging
 import threading
 import traceback
 import json
-
-tupleOfString = TupleOf(str)
 
 class ConnectedChannel:
     def __init__(self, initial_tid, channel, connectionObject):
@@ -394,9 +393,10 @@ class Server:
 
             for add_index_key, add_index_identities in transactionMessage.set_adds.items():
                 add_schema, add_typename, add_fieldname, add_hashVal = keymapping.split_index_key_full(add_index_key)
+
                 if add_schema == schema_name and add_typename == typename and (
                         fieldname_and_value is None and add_fieldname == " exists" or 
-                        fieldname_and_value is not None and fieldname_and_value == (add_fieldname, add_hashVal)
+                        fieldname_and_value is not None and tuple(fieldname_and_value) == (add_fieldname, add_hashVal)
                         ):
                     identities_left_to_send.update(add_index_identities)
 
@@ -437,12 +437,14 @@ class Server:
 
     def onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
+
         if msg.matches.Heartbeat:
             connectedChannel.heartbeat()
         elif msg.matches.Flush:
             with self._lock:
                 connectedChannel.channel.write(ServerToClient.FlushResponse(guid=msg.guid))
         elif msg.matches.DefineSchema:
+            assert isinstance(msg.definition, SchemaDefinition)
             connectedChannel.definedSchemas[msg.name] = msg.definition
         elif msg.matches.Subscribe:
             self._subscriptionQueue.put((connectedChannel, msg))

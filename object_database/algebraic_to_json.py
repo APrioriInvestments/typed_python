@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Alternative, TupleOf, ConstDict, OneOf, Tuple, Kwargs, NamedTuple, TryTypeConvert, Class
-
+import traceback
 import logging
 import json
 
@@ -35,6 +35,9 @@ class Encoder(object):
         self.allowExtraFields=False
 
     def to_json(self, object_type, value):
+        if hasattr(object_type, "to_json"):
+            return object_type.to_json(value)
+
         if issubclass(object_type, Class):
             return {
                 name: self.to_json(member_type, value.__dict__[name])
@@ -88,8 +91,6 @@ class Encoder(object):
             return str(value, 'raw_unicode_escape')
         elif isinstance(value, (int,float,bool,str)) or value is None:
             return value
-        elif hasattr(object_type, "to_json"):
-            return object_type.to_json(value)
         else:
             assert False, "Can't convert %s of type %s to JSON" % (value,object_type)
 
@@ -98,6 +99,9 @@ class Encoder(object):
             return self.overrides[algebraic_type](self, algebraic_type, value)
         
         try:
+            if hasattr(algebraic_type, "from_json"):
+                return algebraic_type.from_json(value)
+
             if issubclass(algebraic_type, Class):
                 return algebraic_type.__typed_python_instantiate_directly__({
                     name: self.from_json(value[name], member_type)
@@ -156,12 +160,9 @@ class Encoder(object):
                     fields[fieldname] = self.from_json(value["fields"][fieldname], ftype)
 
                 return alt_type(**fields)
-            
-            if hasattr(algebraic_type, "from_json"):
-                return algebraic_type.from_json(value)
 
             assert False, "Can't handle type %s as value %s" % (algebraic_type,value)
         except:
-            logging.error("Parsing error making %s:\n%s", algebraic_type, json.dumps(value,indent=2))
+            logging.error("Parsing error making %s:\n%s\n\n", algebraic_type, json.dumps(value,indent=2), traceback.format_exc())
             raise
 
