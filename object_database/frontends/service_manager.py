@@ -16,6 +16,7 @@
 
 
 import threading
+import resource
 import argparse
 import sys
 import time
@@ -67,6 +68,8 @@ def main(argv):
 
     signal.signal(signal.SIGINT, shutdownCleanly)
     signal.signal(signal.SIGTERM, shutdownCleanly)
+
+    resource.setrlimit(resource.RLIMIT_NOFILE, (2048,4096))
 
     object_database_port = parsedArgs.port
 
