@@ -373,7 +373,6 @@ class AwsWorkerBootService(ServiceBase):
         for t in instancesByType:
             instancesByType[t] = list(instancesByType[t])
 
-
         with self.db.transaction():
             for state in State.lookupAll():
                 if state.instance_type not in instanceTypes:
@@ -404,9 +403,14 @@ class AwsWorkerBootService(ServiceBase):
                         state.desired
                         )
 
-                    state.booted += 1
+                    try:
+                        self.api.bootWorker(state.instance_type)
 
-                    self.api.bootWorker(state.instance_type)
+                        state.booted += 1
+                    except:
+                        logging.error("Failed to boot a worker:\n%s", traceback.format_exc())
+                        time.sleep(self.SLEEP_INTERVAL)
+                        break
 
         time.sleep(self.SLEEP_INTERVAL)
         

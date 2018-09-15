@@ -118,12 +118,20 @@ class HappyService(ServiceBase):
             raise SubscribeAndRetry(lambda db: db.subscribeToType(Happy))
         
         return Card(
-            Text("There are %s happy objects" % len(Happy.lookupAll())) + 
+            Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) + 
             Expands(Text("Closed"),Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
             )
 
     def doWork(self, shouldStop):
-        shouldStop.wait()
+        self.db.subscribeToSchema(happy)
+
+        while not shouldStop.is_set():
+            time.sleep(.5)
+            with self.db.transaction():
+                h = Happy()
+            time.sleep(.5)
+            with self.db.transaction():
+                h.delete()            
 
 class StorageTest(ServiceBase):
     def initialize(self):

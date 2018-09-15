@@ -458,7 +458,9 @@ class Subscribed(Cell):
 
         self.subscriptions  = set()
 
-        self.context = None
+    def prepareForReuse(self):
+        self.subscriptions = set()
+        return super().prepareForReuse()
 
     def __repr__(self):
         return "Subscribed(%s)" % self.f
@@ -494,6 +496,12 @@ class SubscribedSequence(Cell):
 
         self.existingItems = {}
         self.spine = []
+
+    def prepareForReuse(self):
+        self.subscriptions = set()
+        self.existingItems = {}
+        self.spine = []
+        return super().prepareForReuse()
 
     def recalculate(self):
         with self.cells.db.view() as v:
@@ -577,6 +585,13 @@ class Grid(Cell):
         self.existingItems = {}
         self.rows = []
         self.cols = []
+
+    def prepareForReuse(self):
+        self.subscriptions = set()
+        self.existingItems = []
+        self.rows = []
+        self.cols = []
+        super().prepareForReuse()
 
     def recalculate(self):
         with self.cells.db.view() as v:
