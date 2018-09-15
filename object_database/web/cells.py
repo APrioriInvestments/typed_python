@@ -106,8 +106,9 @@ class Cells:
             self._cellOutOfScope(c)
 
         self.nodesToDiscard.add(cell)
-        del self.cells[cell.identity]
-        del self.cellsKnownChildren[cell.identity]
+        if cell.cells is not None:
+            del self.cells[cell.identity]
+            del self.cellsKnownChildren[cell.identity]
         
         cell.garbageCollected = True
 
@@ -134,7 +135,8 @@ class Cells:
                 res.append(self.updateMessageFor(n))
 
         for n in self.nodesToDiscard:
-            res.append({'id': n.identity, 'discard': True})
+            if n.cells is not None:
+                res.append({'id': n.identity, 'discard': True})
 
         self.nodesNeedingBroadcast = set()
         self.nodesToDiscard = set()
@@ -469,7 +471,6 @@ class Subscribed(Cell):
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                 self.children = {'__contents__': Traceback(traceback.format_exc())}
 
             new_subscriptions = set(v._reads).union(set(v._indexReads))
