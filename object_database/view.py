@@ -34,7 +34,7 @@ class RevisionConflictException(Exception):
 
 class ObjectDoesntExistException(Exception):
     def __init__(self, obj):
-        super().__init__()
+        super().__init__("%s(%s)" % (type(obj).__qualname__, obj._identity))
         self.obj = obj
 
 def revisionConflictRetry(f):
