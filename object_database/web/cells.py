@@ -129,7 +129,7 @@ class Cells:
                     cellsByLevel[n.level] = set()
                 cellsByLevel[n.level].add(n)
 
-        for level, cells in sorted(cellsByLevel.items()):
+        for level, cells in reversed(sorted(cellsByLevel.items())):
             for n in cells:
                 res.append(self.updateMessageFor(n))
 
@@ -170,15 +170,22 @@ class Cells:
                             e.callback(self.db)
                 except:
                     logging.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
+                    logging.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
+                    n.children = {'__contents__': Traceback(traceback.format_exc())}
+
                 finally:
                     _cur_cell.cell = None
-
 
                 newChildren = set(n.children.values())
 
                 for c in newChildren.difference(origChildren):
                     assert isinstance(c, Cell)
-                    assert c.cells is None, "Child of %s of %s is being reused!" % (c, n)
+
+                    if c.cells is not None and not c.prepareForReuse():
+                        for k,v in n.children.items():
+                            if v is c:
+                                c = n.children[k] = Traceback("Cell %s being used twice in the tree" % c)
+
                     self._addCell(c, n)
                     
                 for c in origChildren.difference(newChildren):
@@ -246,6 +253,18 @@ class Cell:
         self._identity = None
         self.postscript = None
         self.garbageCollected = False
+
+    def prepareForReuse(self):
+        if not self.garbageCollected:
+            return False
+
+        self.cells = None
+        self.postscript = None
+        self.garbageCollected = False
+        self._identity = None
+        self.parent = None
+
+        return True
 
     @property
     def identity(self):
