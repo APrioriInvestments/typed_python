@@ -34,6 +34,7 @@ def main(argv):
     parser.add_argument("port", type=int)
     parser.add_argument("instanceid")
     parser.add_argument("sourceDir")
+    parser.add_argument("storageRoot")
 
     parsedArgs = parser.parse_args(argv[1:])
 
@@ -49,7 +50,7 @@ def main(argv):
         return connect(parsedArgs.host, parsedArgs.port)
 
     try:
-        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.sourceDir)
+        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.sourceDir, parsedArgs.storageRoot)
     
         manager.runAndWaitForShutdown()
 

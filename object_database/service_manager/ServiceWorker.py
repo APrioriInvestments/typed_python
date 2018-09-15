@@ -22,15 +22,18 @@ import threading
 import time
 import logging
 import tempfile
-
+import os
 
 class ServiceWorker:
-    def __init__(self, dbConnectionFactory, instance_id, sourceDir):
+    def __init__(self, dbConnectionFactory, instance_id, sourceDir, storageRoot):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema, service_schema)
         self.sourceDir = sourceDir
-        self.runtimeConfig = ServiceRuntimeConfig(sourceDir)
+        self.runtimeConfig = ServiceRuntimeConfig(sourceDir, storageRoot)
+
+        if not os.path.exists(storageRoot):
+            os.makedirs(storageRoot)
 
         self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
         self.serviceObject = None

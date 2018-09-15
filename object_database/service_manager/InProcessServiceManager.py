@@ -15,17 +15,22 @@
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
+import tempfile
+import os
+
 class InProcessServiceManager(ServiceManager):
     def __init__(self, dbConnectionFactory, sourceDir=None):
         ServiceManager.__init__(self, dbConnectionFactory, sourceDir, isMaster=True, ownHostname="localhost")
 
         self.serviceWorkers = {}
 
+        self.storageRoot = tempfile.TemporaryDirectory()
+
     def _startServiceWorker(self, service, instanceIdentity):
         if instanceIdentity in self.serviceWorkers:
             return
 
-        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity, self.sourceDir)
+        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity, self.sourceDir, os.path.join(self.storageRoot.name, instanceIdentity))
 
         self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)
 
@@ -41,3 +46,6 @@ class InProcessServiceManager(ServiceManager):
         self.serviceWorkers = {}
 
         ServiceManager.stop(self)
+
+    def cleanup(self):
+        self.storageRoot.cleanup()

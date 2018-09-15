@@ -38,6 +38,7 @@ def main(argv):
     parser.add_argument("db_hostname")
     parser.add_argument("port", type=int)
     parser.add_argument("--source", help="path for the source trees used by services", required=True)
+    parser.add_argument("--storage", help="path for local storage used by services", required=True)
 
     parser.add_argument("--run_db", default=False, action='store_true')
     
@@ -98,6 +99,7 @@ def main(argv):
                             parsedArgs.db_hostname, 
                             parsedArgs.port,
                             parsedArgs.source,
+                            parsedArgs.storage,
                             isMaster=parsedArgs.run_db,
                             maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
                             maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),

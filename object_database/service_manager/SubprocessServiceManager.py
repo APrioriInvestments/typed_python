@@ -19,6 +19,7 @@ from object_database.service_manager.ServiceManagerSchema import service_schema
 from object_database import connect
 
 import threading
+import traceback
 import time
 import logging
 import sys
@@ -46,16 +47,21 @@ def parseLogfileToInstanceid(fname):
     return fname.split("-")[-1][:-8]
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, sourceDir, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None, shutdownTimeout=None):
+    def __init__(self, own_hostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None, shutdownTimeout=None):
         self.own_hostname = own_hostname
         self.host = host
         self.port = port
         self.logfileDirectory = logfileDirectory
         self.lock = threading.Lock()
+        self.storageDir = storageDir
 
         if logfileDirectory is not None:
             if not os.path.exists(logfileDirectory):
                 os.makedirs(logfileDirectory)
+
+        if not os.path.exists(storageDir):
+            os.makedirs(storageDir)
+
 
         def dbConnectionFactory():
             return connect(host, port)
@@ -79,7 +85,7 @@ class SubprocessServiceManager(ServiceManager):
             process = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
                     service.name,
-                    self.host, str(self.port), instanceIdentity, self.sourceDir],
+                    self.host, str(self.port), instanceIdentity, self.sourceDir, os.path.join(self.storageDir, instanceIdentity)],
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT
@@ -144,6 +150,17 @@ class SubprocessServiceManager(ServiceManager):
                         if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
                             os.makedirs(os.path.join(self.logfileDirectory, "old"))
                         shutil.move(os.path.join(self.logfileDirectory, file), os.path.join(self.logfileDirectory, "old", file))
+
+        if self.storageDir:
+            with self.lock:
+                for file in os.listdir(self.storageDir):
+                    if file not in self.serviceProcesses:
+                        try:
+                            path = os.path.join(self.storageDir, file)
+                            logging.info("Removing storage at path %s for dead service.", path)
+                            shutil.rmtree(path)
+                        except:
+                            logging.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
 
 
 

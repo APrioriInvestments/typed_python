@@ -124,6 +124,20 @@ class HappyService(ServiceBase):
 
     def doWork(self, shouldStop):
         shouldStop.wait()
+
+class StorageTest(ServiceBase):
+    def initialize(self):
+        with open(os.path.join(self.runtimeConfig.serviceTemporaryStorageRoot, "a.txt"), "w") as f:
+            f.write("This exists")
+
+        self.db.subscribeToSchema(core_schema, service_schema, schema)
+
+        with self.db.transaction():
+            self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+            self.version = 0
+
+    def doWork(self, shouldStop):
+        shouldStop.wait()
     
 class CrashingService(ServiceBase):
     def initialize(self):
@@ -175,16 +189,26 @@ def getTestServiceModule(version):
             """.format(version=version))
     }
 
+VERBOSE = False
+
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
 
+        if not VERBOSE:
+            kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
+        else:
+            kwargs = {}
+
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",'--source',self.tempDirectoryName,
+                'localhost', 'localhost', "8020", "--run_db",
+                '--source',os.path.join(self.tempDirectoryName,'source'),
+                '--storage',os.path.join(self.tempDirectoryName,'storage'),
                 '--shutdownTimeout', '1.0'
-                ]
+                ],
+            **kwargs
             )
         self.database = connect("localhost", 8020, retry=True)
         self.database.subscribeToSchema(core_schema, service_schema, schema)
@@ -205,6 +229,12 @@ class ServiceManagerTest(unittest.TestCase):
     def test_starting_services(self):        
         with self.database.transaction():
             ServiceManager.createService(TestService, "TestService", target_count=1)
+
+        self.waitForCount(1)
+
+    def test_service_storage(self):        
+        with self.database.transaction():
+            ServiceManager.createService(StorageTest, "StorageTest", target_count=1)
 
         self.waitForCount(1)
 

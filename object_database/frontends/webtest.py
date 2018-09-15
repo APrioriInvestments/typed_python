@@ -37,7 +37,8 @@ if __name__ == '__main__':
         try:
             server = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', "8020", "--run_db",'--source',tf,
+                    'localhost', 'localhost', "8020", "--run_db",'--source', os.path.join(tf,'source'),
+                    '--storage', os.path.join(tf,'storage'),
                     '--shutdownTimeout', '.5'
                     ]
                 )

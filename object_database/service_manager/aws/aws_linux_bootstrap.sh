@@ -67,6 +67,7 @@ $STORAGE/nativepython/object_database/frontends/service_manager.py \
     {db_hostname} \
     {db_port} \
     --source $INSTALL/service_source \
+    --storage $INSTALL/service_storage \
     --logdir $INSTALL/logs &> $INSTALL/logs/db_server.log
 
 

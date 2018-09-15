@@ -37,7 +37,9 @@ class ActiveWebServiceTest(unittest.TestCase):
 
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",'--source',self.tempDirectoryName,
+                'localhost', 'localhost', "8020", "--run_db",
+                '--source',os.path.join(self.tempDirectoryName,'source'),
+                '--storage',os.path.join(self.tempDirectoryName,'storage'),
                 '--shutdownTimeout', '.5'
                 ]
             )
