@@ -751,8 +751,9 @@ class DatabaseConnection:
                         self._versioned_objects[key].setVersionedValue(
                             msg.tid,
                             JsonWithPyRep(
-                                json.loads(val) if val is not None else None,
-                                {}
+                                None,
+                                {},
+                                val
                                 )
                             )
                     #this could take a long time, so we need to keep heartbeating

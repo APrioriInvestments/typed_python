@@ -19,6 +19,7 @@ from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tu
 from object_database.keymapping import *
 import object_database.algebraic_to_json as algebraic_to_json
 import logging
+import json
 import threading
 import queue
 import time
@@ -56,9 +57,17 @@ def revisionConflictRetry(f):
 
 class JsonWithPyRep:
     """A value stored as Json with a python representation."""
-    def __init__(self, jsonRep, pyRep):
-        self.jsonRep = jsonRep
+    def __init__(self, jsonRep, pyRep, strRep = None):
+        self.strRep = strRep
+        self._jsonRep = jsonRep
         self.pyRep = pyRep
+
+    @property
+    def jsonRep(self):
+        if self.strRep is not None:
+            self._jsonRep = json.loads(self.strRep)
+            self.strRep = None
+        return self._jsonRep
 
 def default_initialize(t):
     if t in (str,bool,bytes,int,float):
