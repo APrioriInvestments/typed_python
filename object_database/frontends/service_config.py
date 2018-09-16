@@ -61,6 +61,7 @@ def main(argv):
     configure_parser = subparsers.add_parser('configure', help='configure a service')
     configure_parser.set_defaults(command='configure')
     configure_parser.add_argument("name")
+    configure_parser.add_argument("-l", "--local", action='store_true', help='use the local codebase, not the remote')
     configure_parser.add_argument("args", nargs=argparse.REMAINDER)
     
     list_parser = subparsers.add_parser('list', help='list installed services')
@@ -100,7 +101,14 @@ def main(argv):
             with tempfile.TemporaryDirectory() as tf:
                 with db.transaction():
                     s = service_schema.Service.lookupAny(name=parsedArgs.name)
-                    svcClass = s.instantiateServiceObject(tf)
+
+                    if parsedArgs.local:
+                        svcClass = getattr(
+                            service_schema.Codebase.instantiateFromLocalSource([findGitParent(os.getcwd())], s.service_module_name), 
+                            s.service_class_name
+                            )
+                    else:
+                        svcClass = s.instantiateServiceObject(tf)
 
                 svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
