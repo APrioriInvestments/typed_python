@@ -736,6 +736,15 @@ class DatabaseConnection:
                         )
                     time.sleep(heartbeatInterval)
 
+                totalBytes = 0
+                for k,v in values.items():
+                    if v is not None:
+                        totalBytes += len(v)
+
+                if totalBytes > 1000000:
+                    logging.info("Subscription %s loaded %.2f mb of raw data.", lookupTuple, totalBytes / 1024.0 ** 2)
+
+
                 for key, val in values.items():
                     if key not in self._versioned_objects:
                         self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
