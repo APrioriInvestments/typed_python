@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, OneOf
+from typed_python import Alternative, TupleOf, OneOf, ConstDict
 
 from object_database.schema import Indexed, Index, Schema
 from object_database.core_schema import core_schema
@@ -87,6 +87,10 @@ class Object:
             return self.other.k
 
 @schema.define
+class ThingWithDicts:
+    x = ConstDict(str, bytes)
+
+@schema.define
 class Counter:
     k = Indexed(int)
     x = int
@@ -102,6 +106,33 @@ class StringIndexed:
     name = Indexed(str)
 
 class ObjectDatabaseTests:
+    def test_assigning_dicts(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            z = ThingWithDicts()
+            z.x = {'a': b'b'}
+
+        with db.transaction():
+            z2 = ThingWithDicts()
+            z2.x = z.x
+
+    def test_a_subscribe_excluding(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema,excluding=[ThingWithDicts])
+
+        with db.view():
+            with self.assertRaises(Exception):
+                z = ThingWithDicts.lookupAll()
+            Counter.lookupAll()
+
+        db.subscribeToSchema(schema)
+
+        with db.view():
+            z = ThingWithDicts.lookupAll()
+        
+
     def test_methods(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
@@ -134,7 +165,7 @@ class ObjectDatabaseTests:
             root.obj = Object(k=expr.Constant(value=23))
             self.assertEqual(root2.obj.k.value, 23)
 
-    def test_a_many_subscriptions(self):
+    def test_many_subscriptions(self):
         OK = []
         FINISHED = []
         count = 10

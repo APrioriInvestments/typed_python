@@ -363,14 +363,14 @@ class DatabaseConnection:
             self._schema_and_typename_to_subscription_set.setdefault((t.__schema__.name, t.__qualname__), set())
         return ()
 
-    def subscribeToSchema(self, *schemas, block=True):
+    def subscribeToSchema(self, *schemas, block=True, excluding=()):
         for s in schemas:
             self.addSchema(s)
 
         unsubscribedTypes = []
         for schema in schemas:
             for tname, t in schema._types.items():
-                if not self._isTypeSubscribedAll(t):
+                if not self._isTypeSubscribedAll(t) and t not in excluding:
                     unsubscribedTypes.append((schema.name, tname, None))
 
         if unsubscribedTypes:
