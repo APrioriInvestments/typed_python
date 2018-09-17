@@ -111,7 +111,7 @@ class ActiveWebService(ServiceBase):
                 curService.set(s)
             return f
 
-        serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25))
+        serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
 
         def makeServiceGrid():
             return Grid(
