@@ -37,6 +37,8 @@ class ServiceBase:
         self.serviceInstance = serviceInstance
         self.runtimeConfig = runtimeConfig
 
+        assert self.runtimeConfig.serviceSourceRoot is not None
+
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):
         """Subclasses should take the remaining args from the commandline and configure using them"""

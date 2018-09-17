@@ -112,7 +112,7 @@ def main(argv):
 
                 svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
-            print("Failed to configure %s: %s" % (parsedArgs.name, e))
+            traceback.print_exc()
             return 1
 
     if parsedArgs.command == 'install':

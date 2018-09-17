@@ -19,13 +19,15 @@ import tempfile
 import os
 
 class InProcessServiceManager(ServiceManager):
-    def __init__(self, dbConnectionFactory, sourceDir=None):
-        ServiceManager.__init__(self, dbConnectionFactory, sourceDir, isMaster=True, ownHostname="localhost")
+    def __init__(self, dbConnectionFactory):
+        self.storageRoot = tempfile.TemporaryDirectory()
+        self.sourceRoot = tempfile.TemporaryDirectory()
+        
+        ServiceManager.__init__(self, dbConnectionFactory, self.sourceRoot.name, isMaster=True, ownHostname="localhost")
 
         self.serviceWorkers = {}
 
-        self.storageRoot = tempfile.TemporaryDirectory()
-
+        
     def _startServiceWorker(self, service, instanceIdentity):
         if instanceIdentity in self.serviceWorkers:
             return
@@ -49,3 +51,5 @@ class InProcessServiceManager(ServiceManager):
 
     def cleanup(self):
         self.storageRoot.cleanup()
+        self.sourceRoot.cleanup()
+        

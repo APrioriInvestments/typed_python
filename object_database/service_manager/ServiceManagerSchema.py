@@ -80,16 +80,33 @@ class Codebase:
     @staticmethod
     def instantiateFromLocalSource(paths, service_module_name):
         """Given a set of paths (that we would use to create a codebase), instantiate it directly."""
-        modules = dict(sys.modules)
         sys.path = paths + sys.path
 
         try:
             module = importlib.import_module(service_module_name)
         finally:
-            sys.path.pop(len(paths))
-            sys.modules = modules
+            for _ in range(len(paths)):
+                sys.path.pop(0)
+
+            Codebase.removeUserModules(paths)
 
         return module
+
+
+    @staticmethod
+    def removeUserModules(paths):
+        paths = [os.path.abspath(path) for path in paths]
+
+        for f in list(sys.path_importer_cache):
+            if any(os.path.abspath(f).startswith(disk_path) for disk_path in paths):
+                del sys.path_importer_cache[f]
+
+        for m, sysmodule in list(sys.modules.items()):
+            if hasattr(sysmodule, '__file__') and any(sysmodule.__file__.startswith(p) for p in paths):
+                del sys.modules[m]
+            elif hasattr(sysmodule, '__path__') and hasattr(sysmodule.__path__, '_path'):
+                if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
+                    del sys.modules[m]
 
     def instantiate(self, root_path, service_module_name):
         """Instantiate a codebase on disk and load it."""
@@ -123,22 +140,13 @@ class Codebase:
             if (self.hash, service_module_name) in codebase_cache:
                 return codebase_cache[self.hash, service_module_name]
 
-            modules = dict(sys.modules)
             sys.path = [disk_path] + sys.path
 
             try:
                 module = importlib.import_module(service_module_name)
             finally:
                 sys.path.pop(0)
-                for f in list(sys.path_importer_cache):
-                    if f.startswith(disk_path):
-                        del sys.path_importer_cache[f]
-
-                for m, sysmodule in list(sys.modules.items()):
-                    if hasattr(sysmodule, '__file__') and sysmodule.__file__.startswith(disk_path):
-                        del sys.modules[m]
-                    elif hasattr(sysmodule, '__path__') and hasattr(sysmodule.__path__, '_path'):
-                        del sys.modules[m]
+                self.removeUserModules([disk_path])
 
             codebase_cache[self.hash, service_module_name] = module
 

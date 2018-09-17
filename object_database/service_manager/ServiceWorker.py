@@ -32,6 +32,8 @@ class ServiceWorker:
         self.sourceDir = sourceDir
         self.runtimeConfig = ServiceRuntimeConfig(sourceDir, storageRoot)
 
+        assert self.sourceDir is not None
+
         if not os.path.exists(storageRoot):
             os.makedirs(storageRoot)
 

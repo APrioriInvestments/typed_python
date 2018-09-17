@@ -111,6 +111,8 @@ class ActiveWebService(ServiceBase):
                 curService.set(s)
             return f
 
+        serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25))
+
         def makeServiceGrid():
             return Grid(
                 colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
@@ -124,7 +126,7 @@ class ActiveWebService(ServiceBase):
                     s.service_class_name if field == 'Class' else 
                     s.placement if field == 'Placement' else 
                     Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
-                    Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in range(10)]) 
+                    Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
                             if field == 'TargetCount' else 
                     str(s.coresUsed) if field == 'Cores' else 
                     str(s.gbRamUsed) if field == 'RAM' else 
