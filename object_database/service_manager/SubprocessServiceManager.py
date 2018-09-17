@@ -62,6 +62,9 @@ class SubprocessServiceManager(ServiceManager):
         if not os.path.exists(storageDir):
             os.makedirs(storageDir)
 
+        if not os.path.exists(sourceDir):
+            os.makedirs(sourceDir)
+
 
         def dbConnectionFactory():
             return connect(host, port)
@@ -85,7 +88,12 @@ class SubprocessServiceManager(ServiceManager):
             process = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
                     service.name,
-                    self.host, str(self.port), instanceIdentity, self.sourceDir, os.path.join(self.storageDir, instanceIdentity)],
+                    self.host, 
+                    str(self.port), 
+                    instanceIdentity, 
+                    os.path.join(self.sourceDir, instanceIdentity), 
+                    os.path.join(self.storageDir, instanceIdentity)
+                    ],
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT
@@ -161,6 +169,17 @@ class SubprocessServiceManager(ServiceManager):
                             shutil.rmtree(path)
                         except:
                             logging.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
+
+        if self.sourceDir:
+            with self.lock:
+                for file in os.listdir(self.sourceDir):
+                    if file not in self.serviceProcesses:
+                        try:
+                            path = os.path.join(self.sourceDir, file)
+                            logging.info("Removing source caches at path %s for dead service.", path)
+                            shutil.rmtree(path)
+                        except:
+                            logging.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
 
 
 
