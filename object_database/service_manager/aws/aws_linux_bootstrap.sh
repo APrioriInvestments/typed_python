@@ -46,7 +46,7 @@ sudo chmod 777 /var/run/docker.sock
 
 echo "Installing python dependencies"
 
-sudo apt-get install -y python3-pip
+sudo apt-get install -y python3-pip libtcmalloc-minimal4
 sudo pip3 install boto3 psutil docker==2.6.1 pandas numpy pytz redis flask_sockets websockets
 
 export PYTHONPATH=$STORAGE/nativepython
@@ -61,6 +61,8 @@ cd $INSTALL
 chmod 700 -R ~/.ssh
 
 git clone https://github.com/braxtonmckee/nativepython.git $STORAGE/nativepython
+
+export LD_PRELOAD=/usr/lib/libtcmalloc_minimal.so.4
 
 $STORAGE/nativepython/object_database/frontends/service_manager.py \
     `hostname`  \
