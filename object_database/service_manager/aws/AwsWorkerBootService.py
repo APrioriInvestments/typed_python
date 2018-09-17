@@ -340,7 +340,7 @@ class AwsWorkerBootService(ServiceBase):
             rendererFun=lambda s,field: cells.Subscribed(lambda: 
                 s.instance_type if field == 'Instance Type' else
                 s.booted  if field == 'Booted' else 
-                cells.Dropdown(str(s.desired), [(str(ct), bootCountSetter(s, ct)) for ct in range(10)]) 
+                cells.Dropdown(str(s.desired), [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
                         if field == 'Desired' else 
                 ""
                 )
