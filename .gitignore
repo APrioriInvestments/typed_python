@@ -1,4 +1,6 @@
 *.pyc
 *.log
-
-
+*.so
+__pycache__
+build/
+nativepython.egg-info

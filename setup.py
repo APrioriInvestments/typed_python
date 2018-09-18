@@ -1,4 +1,4 @@
-#   Copyright 2017 Braxton Mckee
+#   Copyright 2018 Braxton Mckee
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,15 +12,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.python_ast as python_ast
-import unittest
-import ast
+import setuptools
 
-class PythonASTTests(unittest.TestCase):
-    def test_conversion(self):
-        conversion = python_ast.convertPyAstToAlgebraic(ast.parse("lambda x: x+y+1.0", mode='eval'),"<eval>")
-        self.assertTrue(conversion.matches.Expression)
-        self.assertTrue(conversion.body.matches.Lambda)
-        self.assertTrue(conversion.body.args.matches.Item)
-        self.assertTrue(len(conversion.body.args.args) == 1)
-
+setuptools.setup(
+    name='nativepython',
+    version='0.0.1',
+    description='Tools for generating machine code using python.',
+    author='Braxton Mckee',
+    author_email='braxton.mckee@gmail.com',
+    url='https://github.com/braxtonmckee/nativepython',
+    packages=setuptools.find_packages(),
+    ext_modules=[
+        setuptools.Extension('typed_python._types', ['typed_python/_types.cc'])
+        ],
+    classifiers=[
+        "Programming Language :: Python :: 3"
+    	],
+    )

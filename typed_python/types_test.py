@@ -45,6 +45,10 @@ class NamedTupleSubclass(NamedTuple(x=int, y=float)):
     pass
 
 class TypesTests(unittest.TestCase):
+    def test_can_import_native_module(self):
+        import typed_python._types
+        self.assertTrue(typed_python._types.return_self() is typed_python._types)
+
     def test_namedTupleSubclass(self):
         ntc = NamedTupleSubclass(x=10, y = 20.0)
 

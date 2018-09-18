@@ -16,6 +16,9 @@
 
 """
 This is the primary unit-test entrypoint for nativepython.
+
+It assumes you've run 'python3 setup.py develop' or 'python3 setup.py install' so that
+it can find nativepython.
 """
 import sys
 import logging
@@ -29,10 +32,8 @@ import nose.loader
 import nose.plugins.manager
 import nose.plugins.xunit
 import argparse
-import nativepython
-import nativepython.runtime as runtime
-import nativepython_tests.test_config as test_config
 import traceback
+import subprocess
 
 class DirectoryScope(object):
     def __init__(self, directory):
@@ -45,18 +46,15 @@ class DirectoryScope(object):
     def __exit__(self, exc_type, exc_value, traceback):
         os.chdir(self.originalWorkingDir)
 
-
-
 def sortedBy(elts, sortFun):
     return [x[1] for x in sorted([(sortFun(y),y) for y in elts])]
 
-
-def loadTestModules(testFiles, rootDir, rootModule):
+def loadTestModules(testFiles, rootDir):
     modules = set()
     for f in testFiles:
         try:
-            with DirectoryScope(os.path.split(f)[0]):
-                moduleName  = fileNameToModuleName(f, rootDir, rootModule)
+            with DirectoryScope(rootDir):
+                moduleName  = fileNameToModuleName(f, rootDir)
                 logging.info('importing module %s', moduleName)
                 __import__(moduleName)
                 modules.add(sys.modules[moduleName])
@@ -67,8 +65,7 @@ def loadTestModules(testFiles, rootDir, rootModule):
 
     return modules
 
-
-def fileNameToModuleName(fileName, rootDir, rootModule):
+def fileNameToModuleName(fileName, rootDir):
     tr = (
         fileName
             .replace('.py', '')
@@ -107,61 +104,27 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             help="don't run tests, just list them"
             )
         self.add_argument(
-            '--deep',
-            dest='deep',
-            action='store_true',
-            default=False,
-            required=False,
-            help="run deeper level of testing in fuzztests"
+            '--filter',
+            nargs = 1,
+            help = 'restrict tests to a subset matching FILTER',
+            action = OrderedFilterAction,
+            default = None
             )
         self.add_argument(
-            '--dump_llvm',
-            dest='dump_llvm',
-            action='store_true',
-            default=False,
-            required=False,
-            help="dump llvm IR as it's produced"
+            '--add',
+            nargs = 1,
+            help = 'add back tests matching ADD',
+            action = OrderedFilterAction,
+            default = None
             )
         self.add_argument(
-            '--dump_type_signatures',
-            dest='dump_type_signatures',
-            action='store_true',
-            default=False,
-            required=False,
-            help="dump type signatures of functions as they're produced"
+            '--exclude',
+            nargs = 1,
+            help = "exclude python unittests matching 'regex'. "
+                  +"These go in a second pass after -filter",
+            action = OrderedFilterAction,
+            default = None
             )
-        self.add_argument(
-            '--disable_optimization',
-            dest='disable_optimization',
-            action='store_true',
-            default=False,
-            required=False,
-            help="disable optimization of llvm IR"
-            )
-        self.add_argument(
-            '--dump_native',
-            dest='dump_native',
-            action='store_true',
-            default=False,
-            required=False,
-            help="dump native ast code as it's produced"
-            )
-        self.add_argument('--filter',
-                            nargs = 1,
-                            help = 'restrict tests to a subset matching FILTER',
-                            action = OrderedFilterAction,
-                            default = None)
-        self.add_argument('--add',
-                            nargs = 1,
-                            help = 'add back tests matching ADD',
-                            action = OrderedFilterAction,
-                            default = None)
-        self.add_argument('--exclude',
-                            nargs = 1,
-                            help = "exclude python unittests matching 'regex'. "
-                                  +"These go in a second pass after -filter",
-                            action = OrderedFilterAction,
-                            default = None)
 
     def parse_args(self,toParse):
         argholder = super(PythonTestArgumentParser,self).parse_args(toParse)
@@ -171,6 +134,7 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             args = []
             for arg,l in argholder.ordered_actions:
                 args.append((arg,l[0]))
+
         return argholder, args
 
 def regexMatchesSubstring(pattern, toMatch):
@@ -240,9 +204,8 @@ def testCaseHasAttribute(testCase, attributeName):
         return True
     return False
 
-
-def loadTestCases(config, testFiles, rootDir, rootModule):
-    modules = sortedBy(loadTestModules(testFiles, rootDir, rootModule), lambda module: module.__name__)
+def loadTestCases(config, testFiles, rootDir):
+    modules = sortedBy(loadTestModules(testFiles, rootDir), lambda module: module.__name__)
     allSuites = loadTestsFromModules(config, modules)
     return extractTestCases(allSuites)
 
@@ -255,23 +218,6 @@ def findTestFiles(rootDir, testRegex):
 
     return testFiles
 
-def runPythonUnitTests(args, filter_actions):
-    """run python unittests in all files in the 'tests' directory in the project.
-
-    Args contains arguments from a UnitTestArgumentParser.
-
-    Returns True if any failed.
-    """
-    root_dir = os.path.join(
-        os.path.split(os.path.split(nativepython.__file__)[0])[0],
-        "nativepython_tests"
-        )
-
-    return runPythonUnitTests_(
-        args, filter_actions, testGroupName = "python",
-        testFiles = findTestFiles(root_dir, '.*_test.py$')
-        )
-
 def logAsInfo(*args):
     if len(args) == 1:
         print(time.asctime(), " | ", args)
@@ -282,7 +228,6 @@ def setLoggingLevel(level):
     logging.getLogger().setLevel(level)
     for handler in logging.getLogger().handlers:
         handler.setLevel(level)
-
 
 class OutputCapturePlugin(nose.plugins.base.Plugin):
     """
@@ -432,34 +377,13 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         """Restore stdout.
         """
 
-
-def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
+def runPythonUnitTests(args, filterActions, modules):
     testArgs = ["dummy"]
-
-    if args.deep:
-        test_config.tests_are_deep = args.deep
-
-    if args.dump_llvm:
-        runtime.Runtime.singleton().compiler.mark_llvm_codegen_verbose()
-
-    if args.dump_native:
-        runtime.Runtime.singleton().compiler.mark_converter_verbose()
-
-    if args.dump_type_signatures:
-        runtime.Runtime.singleton().converter.verbose = True
-
-    if args.disable_optimization:
-        runtime.Runtime.singleton().compiler.optimize = False
 
     if args.testHarnessVerbose or args.list:
         testArgs.append('--nocapture')
 
     testArgs.append('--verbosity=0')
-
-    if not args.list:
-        print("Executing %s unit tests." % testGroupName)
-
-    root_dir = os.path.split(os.path.split(nativepython.__file__)[0])[0]
 
     testCasesToRun = []
 
@@ -468,7 +392,14 @@ def runPythonUnitTests_(args, filterActions, testGroupName, testFiles):
     config = nose.config.Config(plugins=plugins)
     config.configure(testArgs)
     
-    testCases = loadTestCases(config, testFiles, root_dir, 'nativepython_tests')
+    testCases = []
+    for module in modules:
+        dir = os.path.dirname(module.__file__)
+        testCases += loadTestCases(config, 
+            findTestFiles(dir, '.*_test.py$'),
+            os.path.dirname(dir)
+            )
+
     if filterActions:
         testCases = applyFilterActions(filterActions, testCases)
 
@@ -488,7 +419,11 @@ def executeTests(args, filter_actions):
         print("nose version: ", nose.__version__)
         print(time.ctime(time.time()))
 
-    if runPythonUnitTests(args, filter_actions):
+    import nativepython
+    import typed_python
+    import object_database
+
+    if runPythonUnitTests(args, filter_actions, [nativepython, typed_python, object_database]):
         anyFailed = True
     else:
         anyFailed = False
@@ -499,12 +434,53 @@ def executeTests(args, filter_actions):
         return 1
     return 0
 
+def buildModule(args):
+    install_dir = os.path.abspath("./build/install")
+    if not os.path.exists(install_dir):
+        os.makedirs(install_dir)
+
+    sys.path.append(install_dir)
+
+    t0 = time.time()
+    print("Building nativepython...",end='')
+
+    result = subprocess.run(
+        ['python3', 'setup.py', 'build'], 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.STDOUT
+        )
+
+    if result.returncode != 0:
+        print("Build failed: ")
+        print(str(result.stdout, 'utf-8'))
+        return 1
+
+    result = subprocess.run(
+        ['python3', 'setup.py', 'develop', '--install-dir', './build/install'], 
+        stdout=subprocess.PIPE, 
+        stderr=subprocess.STDOUT, 
+        env={'PYTHONPATH': (os.environ['PYTHONPATH'] or "") + os.path.abspath("./build/install")}
+        )
+
+    if result.returncode != 0:
+        print("Develop install failed: ")
+        print(str(result.stdout, 'utf-8'))
+        return 1
+
+    print(". Finished in %.2f seconds" % (time.time() - t0))
+    print()
+
+
 def main(args):
     #parse args, return zero and exit if help string was printed
     parser = PythonTestArgumentParser()
     args, filter_actions = parser.parse_args(args[1:])
 
     try:
+        result = buildModule(args)
+        if result:
+            return result
+
         return executeTests(args, filter_actions)
     except:
         import traceback
