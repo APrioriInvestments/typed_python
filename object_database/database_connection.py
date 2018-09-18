@@ -378,7 +378,11 @@ class DatabaseConnection:
 
         if unsubscribedTypes:
             return self.subscribeMultiple(unsubscribedTypes, block=block)
+
         return ()
+
+    def isSubscribedToSchema(self, schema):
+        return all(self._isTypeSubscribed(t) for t in schema._types.values())
 
     def isSubscribedToType(self, t):
         return self._isTypeSubscribed(t)

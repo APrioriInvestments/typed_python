@@ -11,6 +11,7 @@ import threading
 
 from object_database.view import RevisionConflictException 
 from object_database.view import current_transaction
+from object_database.util import Timer
 
 MAX_TIMEOUT = 1.0
 MAX_TRIES = 10
@@ -736,9 +737,21 @@ class SubscribeAndRetry(Exception):
         super().__init__("SubscribeAndRetry")
         self.callback = callback
 
-def ensureSubscribedType(t):
+def ensureSubscribedType(t, lazy=False):
     if not current_transaction().db().isSubscribedToType(t):
-        raise SubscribeAndRetry(lambda db: db.subscribeToType(t))
+        raise SubscribeAndRetry(
+            Timer("Subscribing to type %s%s", t, " lazily" if lazy else "")(
+                lambda db: db.subscribeToType(t, lazySubscription=lazy)
+                )
+            )
+
+def ensureSubscribedSchema(t, lazy=False):
+    if not current_transaction().db().isSubscribedToSchema(t):
+        raise SubscribeAndRetry(
+            Timer("Subscribing to schema %s%s", t, " lazily" if lazy else "")(
+                lambda db: db.subscribeToSchema(t, lazySubscription=lazy)
+                )
+            )
 
 class Expands(Cell):
     def __init__(self, closed, open):

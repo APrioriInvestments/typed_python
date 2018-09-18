@@ -85,7 +85,7 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
-    db.subscribeToSchema(core_schema, service_schema)
+    db.subscribeToSchema(core_schema, service_schema, lazySubscription=True)
 
     if parsedArgs.command == 'connections':
         table = [['Connection ID']]

@@ -184,7 +184,7 @@ else:
                 fieldname_and_value=fieldname_and_value,
                 values=values,
                 index_values=index_values,
-                identities=identities
+                identities=tuple(identities) if identities is not None else None
                 )
             
         @staticmethod
@@ -204,7 +204,7 @@ else:
                 schema=schema,
                 typename=typename,
                 fieldname_and_value=fieldname_and_value,
-                identities=identities,
+                identities=tuple(identities) if identities is not None else None,
                 index_values=index_values
                 )
         
@@ -224,7 +224,7 @@ else:
                 schema=schema,
                 typename=typename,
                 fieldname_and_value=fieldname_and_value,
-                identities=identities,
+                identities=tuple(identities) if identities is not None else None,
                 )
         
         @staticmethod

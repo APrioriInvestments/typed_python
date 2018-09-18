@@ -72,7 +72,8 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
-    db.subscribeToSchema(aws_worker_boot_schema, service_schema)
+    db.subscribeToSchema(service_schema, lazySubscription=True)
+    db.subscribeToSchema(aws_worker_boot_schema)
 
     if parsedArgs.command == 'config':
         with db.transaction():

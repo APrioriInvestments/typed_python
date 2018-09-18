@@ -12,11 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.web.cells import Cells, Sequence, Container, Subscribed, Span, SubscribedSequence
+from object_database.web.cells import Cells, Sequence, Container, Subscribed, Span, SubscribedSequence, ensureSubscribedType
 from object_database import InMemServer, Schema, Indexed
 
 import unittest
-
+import threading
 
 test_schema = Schema("core.web.test")
 
@@ -121,6 +121,35 @@ class CellsTests(unittest.TestCase):
 
         #three 'Span', three 'Text', the Sequence, the Subscribed, and a delete
         self.assertEqual(len(self.cells.renderMessages()), 9)
+
+    def test_ensure_subscribed(self):
+        schema = Schema("core.web.test2")
+
+        @schema.define
+        class Thing2:
+            k = Indexed(int)
+            x = int
+
+        computed = threading.Event()
+
+        def checkThing2s():
+            ensureSubscribedType(Thing2)
+
+            res = Sequence([
+                    Span("Thing(k=%s).x = %s" % (thing.k, thing.x)) for thing in Thing2.lookupAll()
+                    ])
+
+            computed.set()
+
+            return res
+
+        self.cells.root.setChild(Subscribed(checkThing2s))
+
+        self.cells.recalculate()
+        self.cells.renderMessages()
+
+        self.assertTrue(computed.wait(timeout=5.0))
+
 
     def test_garbage_collection(self):
         #create a cell that subscribes to a specific 'thing', but that
