@@ -11,7 +11,7 @@ def setHeartbeatInterval(newInterval):
 def getHeartbeatInterval():
     return _heartbeatInterval[0]
 
-USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES = False
+USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES = True
 
 if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
     ClientToServer = Alternative(
@@ -27,10 +27,12 @@ if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
             },
         Heartbeat = {},
         DefineSchema = { 'name': str, 'definition': SchemaDefinition },
+        LoadLazyObject = { 'schema': str, 'typename': str, 'identity': str },
         Subscribe = { 
             'schema': str, 
             'typename': OneOf(None, str), 
-            'fieldname_and_value': OneOf(None, Tuple(str,str)) 
+            'fieldname_and_value': OneOf(None, Tuple(str,str)),
+            'isLazy': bool #load values when we first request them, instead of blocking on all the data.
             },
         Flush = {'guid': str}
         )
@@ -48,6 +50,15 @@ if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
             'index_values': ConstDict(str, OneOf(str, None)),
             'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
             },
+        LazyTransactionPriors = { 'writes': ConstDict(str, OneOf(str, None)) },
+        LazyLoadResponse = { 'identity': str, 'values': ConstDict(str, OneOf(str, None)) },
+        LazySubscriptionData = {
+            'schema': str, 
+            'typename': OneOf(None, str),
+            'fieldname_and_value': OneOf(None, Tuple(str,str)),
+            'identities': TupleOf(str),
+            'index_values': ConstDict(str, OneOf(str, None))
+            },
         SubscriptionComplete = {
             'schema': str, 
             'typename': OneOf(None, str),
@@ -58,7 +69,7 @@ if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
             'schema': str, 
             'typename': str,
             'fieldname_and_value': Tuple(str,str),
-            'identities': TupleOf(str), #the identities in play if this is an index-level subscription
+            'identities': TupleOf(str)
             },
         Disconnected = {},
         Transaction = {
@@ -112,8 +123,8 @@ else:
             return ClientToServer(type="DefineSchema", name=name, definition=definition)
 
         @staticmethod
-        def Subscribe(schema, typename, fieldname_and_value):
-            return ClientToServer(type='Subscribe', schema=schema, typename=typename, fieldname_and_value=fieldname_and_value)
+        def Subscribe(schema, typename, fieldname_and_value, isLazy):
+            return ClientToServer(type='Subscribe', schema=schema, typename=typename, fieldname_and_value=fieldname_and_value, isLazy=isLazy)
 
         @staticmethod
         def Flush(guid):
@@ -172,6 +183,16 @@ else:
                 identities=identities
                 )
             
+        @staticmethod
+        def LazySubscriptionData(schema, typename, fieldname_and_value, identities, indexValues):
+            return ServerToClient(type='LazySubscriptionData',
+                schema=schema,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
+                identities=identities,
+                indexValues=indexValues
+                )
+        
         @staticmethod
         def SubscriptionComplete(schema, typename, fieldname_and_value, tid):
             return ServerToClient(type='SubscriptionComplete',

@@ -37,9 +37,9 @@ class ConnectedChannel:
         self.connectionObject = connectionObject
         self.missedHeartbeats = 0
         self.definedSchemas = {}
-        self.subscribedTypes = set() #schema, type
+        self.subscribedTypes = {} #schema, type to the lazy transaction id (or -1 if not lazy)
         self.subscribedIds = set() #identities
-        self.subscribedIndexKeys = set() #full index keys
+        self.subscribedIndexKeys = {} #full index keys to lazy transaction id
         self.identityRoot = identityRoot
 
     def heartbeat(self):
@@ -86,6 +86,7 @@ class Server:
         #index-stringname to set(subscribed channel)
         self._index_to_channel = {}
 
+        #for each individually subscribed ID, a set of channels
         self._id_to_channel = {}
 
         self.longTransactionThreshold = 1.0
@@ -111,6 +112,7 @@ class Server:
 
         #fault injector to test this thing
         self._subscriptionBackgroundThreadCallback = None
+        self._lazyLoadCallback = None
 
         self.identityProducer = IdentityProducer(self.allocateNewIdentityRoot())
 
@@ -199,9 +201,10 @@ class Server:
                     del self._index_to_channel[index_key]
 
             for identity in connectedChannel.subscribedIds:
-                self._id_to_channel[identity].discard(connectedChannel)
-                if not self._id_to_channel[identity]:
-                    del self._id_to_channel[identity]
+                if identity in self._id_to_channel:
+                    self._id_to_channel[identity].discard(connectedChannel)
+                    if not self._id_to_channel[identity]:
+                        del self._id_to_channel[identity]
 
             co = connectedChannel.connectionObject
 
@@ -302,6 +305,17 @@ class Server:
                 else:
                     identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
 
+                if msg.isLazy:
+                    assert field != '_identity', 'makes no sense to lazily subscribe to specific values!'
+
+                    self._completeLazySubscription(
+                        schema_name, typename, msg.fieldname_and_value,
+                        typedef,
+                        identities,
+                        connectedChannel
+                        )
+                    return True
+
                 t1 = time.time()
 
                 self._pendingSubscriptionRecheck = []
@@ -339,7 +353,8 @@ class Server:
                         self._markSubscriptionComplete(
                             schema_name, typename, msg.fieldname_and_value,
                             identities,
-                            connectedChannel
+                            connectedChannel,
+                            isLazy=False
                             )
 
                         connectedChannel.channel.write(
@@ -372,11 +387,67 @@ class Server:
             with self._lock:
                 self._pendingSubscriptionRecheck = None
 
-    def _markSubscriptionComplete(self, schema, typename, fieldname_and_value, identities, connectedChannel):
+    def _completeLazySubscription(self,
+                        schema_name, 
+                        typename, 
+                        fieldname_and_value,
+                        typedef,
+                        identities,
+                        connectedChannel
+                        ):
+        index_vals = self._buildIndexValueMap(typedef, schema_name, typename, identities)
+
+        connectedChannel.channel.write(
+            ServerToClient.LazySubscriptionData(
+                schema=schema_name,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
+                identities=identities,
+                index_values=index_vals
+                )
+            )
+
+        #just send the identities
+        self._markSubscriptionComplete(
+            schema_name, 
+            typename, 
+            fieldname_and_value,
+            identities,
+            connectedChannel,
+            isLazy = True
+            )
+
+        connectedChannel.channel.write(
+            ServerToClient.SubscriptionComplete(
+                schema=schema_name,
+                typename=typename,
+                fieldname_and_value=fieldname_and_value,
+                tid=self._cur_transaction_num
+                )
+            )
+
+    def _buildIndexValueMap(self, typedef, schema_name, typename, identities):
+        #build a map from reverse-index-key to {identity}
+        index_vals = {}
+
+        for fieldname in typedef.indices:
+            keys = [keymapping.data_reverse_index_key(schema_name, typename, identity, fieldname)
+                            for identity in identities]
+
+            vals = self._kvstore.getSeveral(keys)
+
+            for i in range(len(keys)):
+                index_vals[keys[i]] = vals[i]
+
+        return index_vals
+
+        
+    def _markSubscriptionComplete(self, schema, typename, fieldname_and_value, identities, connectedChannel, isLazy):
         if fieldname_and_value is not None:
             #this is an index subscription
             for ident in identities:
                 self._id_to_channel.setdefault(ident, set()).add(connectedChannel)
+
                 connectedChannel.subscribedIds.add(ident)
 
             if fieldname_and_value[0] != '_identity':
@@ -384,25 +455,29 @@ class Server:
 
                 self._index_to_channel.setdefault(index_key, set()).add(connectedChannel)
 
-                connectedChannel.subscribedIndexKeys.add(index_key)
+                connectedChannel.subscribedIndexKeys[index_key] = -1 if not isLazy else self._cur_transaction_num
             else:
                 #an object's identity cannot change, so we don't need to track our subscription to it
-                pass
+                assert not isLazy
         else:
             #this is a type-subscription
             if (schema, typename) not in self._type_to_channel:
                 self._type_to_channel[schema, typename] = set()
 
             self._type_to_channel[schema, typename].add(connectedChannel)
-            connectedChannel.subscribedTypes.add((schema, typename))
 
+            connectedChannel.subscribedTypes[(schema, typename)] = -1 if not isLazy else self._cur_transaction_num
 
-    def _sendPartialSubscription(self, 
+    def _sendPartialSubscription(
+                self, 
                 connectedChannel,
-                schema_name, typename, fieldname_and_value,
+                schema_name, 
+                typename, 
+                fieldname_and_value,
                 typedef,
                 identities,
-                identities_left_to_send):
+                identities_left_to_send
+                ):
 
         #get some objects to send
         BATCH_SIZE = 100
@@ -440,15 +515,8 @@ class Server:
 
             for i in range(len(keys)):
                 kvs[keys[i]] = vals[i]
-
-        for fieldname in typedef.indices:
-            keys = [keymapping.data_reverse_index_key(schema_name, typename, identity, fieldname)
-                            for identity in to_send]
-
-            vals = self._kvstore.getSeveral(keys)
-
-            for i in range(len(keys)):
-                index_vals[keys[i]] = vals[i]
+        
+        index_vals = self._buildIndexValueMap(typedef, schema_name, typename, to_send)
 
         connectedChannel.channel.write(
             ServerToClient.SubscriptionData(
@@ -467,6 +535,13 @@ class Server:
 
         if msg.matches.Heartbeat:
             connectedChannel.heartbeat()
+        elif msg.matches.LoadLazyObject:
+            with self._lock:
+                self._loadLazyObject(connectedChannel, msg)
+
+            if self._lazyLoadCallback:
+                self._lazyLoadCallback(msg.identity)
+
         elif msg.matches.Flush:
             with self._lock:
                 connectedChannel.channel.write(ServerToClient.FlushResponse(guid=msg.guid))
@@ -525,21 +600,26 @@ class Server:
                 )
             )
 
+    def _loadValuesForObject(self, channel, schema_name, typename, identities):
+        typedef = channel.definedSchemas.get(schema_name).get(typename)
+
+        valsToGet = []
+        for field_to_pull in typedef.fields:
+            for ident in identities:
+                valsToGet.append(keymapping.data_key_from_names(schema_name,typename, ident, field_to_pull))
+
+        results = self._kvstore.getSeveral(valsToGet)
+        
+        return {valsToGet[i]: results[i] for i in range(len(valsToGet))}
+
     def _increaseBroadcastTransactionToInclude(self, channel, indexKey, newIds, key_value, set_adds, set_removes):
         #we need to include all the data for the objects in 'newIds' to the transaction
         #that we're broadcasting
         schema_name, typename, fieldname, fieldval = keymapping.split_index_key_full(indexKey)
 
         typedef = channel.definedSchemas.get(schema_name).get(typename)
-
-        valsToGet = []
-        for field_to_pull in typedef.fields:
-            for ident in newIds:
-                valsToGet.append(keymapping.data_key_from_names(schema_name,typename, ident, field_to_pull))
-
-        results = self._kvstore.getSeveral(valsToGet)
         
-        key_value.update({valsToGet[i]: results[i] for i in range(len(valsToGet))})
+        key_value.update(self._loadValuesForObject(channel, schema_name, typename, newIds))
 
         reverseKeys = []
         for index_name in typedef.indices:
@@ -556,6 +636,14 @@ class Server:
                 if fieldval is not None:
                     ik = keymapping.index_key_from_names_encoded(schema_name, typename, index_name, fieldval)
                     set_adds.setdefault(ik, set()).add(ident)
+    
+    def _loadLazyObject(self, channel, msg):
+        channel.channel.write(
+            ServerToClient.LazyLoadResponse(
+                identity=msg.identity, 
+                values=self._loadValuesForObject(channel, msg.schema, msg.typename, [msg.identity])
+                )
+            )
 
     def _handleNewTransaction(self, 
                 sourceChannel,
@@ -638,6 +726,8 @@ class Server:
 
         t1 = time.time()
 
+        priorValues = self._kvstore.getSeveralAsDictionary(key_value)
+
         #set the json representation in the database
         target_kvs = {k: v for k,v in key_value.items()}
         target_kvs.update(self.indexReverseLookupKvs(set_adds, set_removes))
@@ -663,6 +753,8 @@ class Server:
 
         t2 = time.time()
 
+        channelsTriggeredForPriors = set()
+
         #check any index-level subscriptions that are going to increase as a result of this
         #transaction and add the backing data to the relevant transaction.
         for index_key, adds in list(set_adds.items()):
@@ -670,11 +762,18 @@ class Server:
                 idsToAddToTransaction = set()
 
                 for channel in self._index_to_channel.get(index_key):
+                    if index_key in channel.subscribedIndexKeys and \
+                            channel.subscribedIndexKeys[index_key] >= 0:
+                        #this is a lazy subscription. We're not using the transaction ID yet because
+                        #we don't store it on a per-object basis here. Instead, we're always sending
+                        #everything twice to lazy subscribers.
+                        channelsTriggeredForPriors.add(channel)
+
                     newIds = adds.difference(channel.subscribedIds)
                     for new_id in newIds:
                         self._id_to_channel.setdefault(new_id, set()).add(channel)
                         channel.subscribedIds.add(new_id)
-    
+
                     self._broadcastSubscriptionIncrease(channel, index_key, newIds)
 
                     idsToAddToTransaction.update(newIds)
@@ -692,12 +791,21 @@ class Server:
         channelsTriggered = set()
 
         for schema_type_pair in schemaTypePairsWriting:
-            channelsTriggered.update(self._type_to_channel.get(schema_type_pair,()))
+            for channel in self._type_to_channel.get(schema_type_pair,()):
+                if channel.subscribedTypes[schema_type_pair] >= 0:
+                    #this is a lazy subscription. We're not using the transaction ID yet because
+                    #we don't store it on a per-object basis here. Instead, we're always sending
+                    #everything twice to lazy subscribers.
+                    channelsTriggeredForPriors.add(channel)
+                channelsTriggered.add(channel)
 
         for i in identities_mentioned:
             if i in self._id_to_channel:
                 channelsTriggered.update(self._id_to_channel[i])
     
+        for channel in channelsTriggeredForPriors:
+            lazy_message = ServerToClient.LazyTransactionPriors(priorValues)
+
         transaction_message = ServerToClient.Transaction(
             writes={k:v for k,v in key_value.items()},
             set_adds=set_adds,

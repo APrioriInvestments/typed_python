@@ -118,7 +118,7 @@ class ObjectDatabaseTests:
             z2 = ThingWithDicts()
             z2.x = z.x
 
-    def test_a_subscribe_excluding(self):
+    def test_subscribe_excluding(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema,excluding=[ThingWithDicts])
 
@@ -131,7 +131,36 @@ class ObjectDatabaseTests:
 
         with db.view():
             z = ThingWithDicts.lookupAll()
-        
+
+    def test_lazy_subscriptions(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        loadedIDs = queue.Queue()
+        self.server._lazyLoadCallback = loadedIDs.put
+
+        with db.transaction():
+            c = Counter(k=2,x=3)
+
+        db2 = self.createNewDb()
+        db2.subscribeToSchema(schema, lazySubscription=True)
+
+        with db2.view():
+            #lookup in the index doesn't dirty the object because we have to load
+            #the index values when we first subscribe
+            self.assertEqual(Counter.lookupAll(k=2), (c,))
+
+        with db2.view():
+            self.assertEqual(c.k, 2)
+
+        self.assertEqual(loadedIDs.get_nowait(), c._identity)
+
+        #at this point, the value is loaded
+        with db2.view():
+            self.assertEqual(c.x, 3)
+
+        with self.assertRaises(queue.Empty):
+            loadedIDs.get_nowait()
 
     def test_methods(self):
         db = self.createNewDb()

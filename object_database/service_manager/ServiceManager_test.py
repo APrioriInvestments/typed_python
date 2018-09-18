@@ -373,10 +373,12 @@ class ServiceManagerTest(unittest.TestCase):
 
         #this should force a redeploy. 
         maxProcessesEver = 0
-        for i in range(20):
+        for i in range(40):
             maxProcessesEver = max(maxProcessesEver, len(psutil.Process().children()[0].children()))
             time.sleep(.1)
 
+        self.database.flush()
+        
         #after 2 seconds, we should be redeployed
         with self.database.view():
             instances_redeployed = service_schema.ServiceInstance.lookupAll()

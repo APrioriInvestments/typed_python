@@ -79,6 +79,10 @@ class InMemoryPersistence(object):
 
             return s
 
+    def getSeveralAsDictionary(self, keys):
+        keys = list(keys)
+        return {keys[i]: value for i,value in enumerate(self.getSeveral(keys))}
+
     def getSeveral(self, keys):
         with self.lock:
             return [self.get(k) for k in keys]
@@ -118,10 +122,6 @@ class InMemoryPersistence(object):
             if key in self.values:
                 del self.values[key]
 
-    def clearCache(self):
-        pass
-
-
 class RedisPersistence(object):
     def __init__(self, db=0, port=None):
         self.lock = threading.RLock()
@@ -160,6 +160,10 @@ class RedisPersistence(object):
             self.cache[key] = result
 
             return result
+
+    def getSeveralAsDictionary(self, keys):
+        keys = list(keys)
+        return {keys[i]: value for i,value in enumerate(self.getSeveral(keys))}
 
     def getSeveral(self, keys):
         """Get the values (or None) stored in several value-style keys."""
@@ -283,6 +287,4 @@ class RedisPersistence(object):
                 del self.cache[key]
             self.redis.delete(key)
 
-    def clearCache(self):
-        self.cache = {}
     

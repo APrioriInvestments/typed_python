@@ -244,8 +244,7 @@ class DatabaseConnection:
         #transaction of what's in the KV store
         self._cur_transaction_num = 0
 
-        #minimum transaction we can support. This is the implicit transaction
-        #for all the 'tail values'
+        #minimum transaction we can deal with. This gets set when we initialize our connection.
         self._min_transaction_num = 0
 
         #for each version number in _version_numbers, how many views referring to it
@@ -261,6 +260,10 @@ class DatabaseConnection:
 
         #for each key, a VersionedValue or VersionedSet
         self._versioned_objects = {}
+
+        #a map from lazy object id to (schema, typename)
+        self._lazy_objects = {}
+        self._lazy_object_read_blocks = {}
 
         self.initialized = threading.Event()
         self.disconnected = threading.Event()
@@ -337,25 +340,25 @@ class DatabaseConnection:
         for t in objects:
             self.addSchema(type(t).__schema__)
         self.subscribeMultiple([
-            (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity))
+            (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity), False)
             ])
 
-    def subscribeToIndex(self, t, block=True, **kwarg):
+    def subscribeToIndex(self, t, block=True, lazySubscription=False, **kwarg):
         self.addSchema(t.__schema__)
 
         toSubscribe = []
         for fieldname,fieldvalue in kwarg.items():
-            toSubscribe.append((t.__schema__.name, t.__qualname__, (fieldname, keymapping.index_value_to_hash(fieldvalue))))
+            toSubscribe.append((t.__schema__.name, t.__qualname__, (fieldname, keymapping.index_value_to_hash(fieldvalue)), lazySubscription))
 
         return self.subscribeMultiple(toSubscribe, block=block)
 
-    def subscribeToType(self, t, block=True):
+    def subscribeToType(self, t, block=True, lazySubscription=False):
         self.addSchema(t.__schema__)
 
         if self._isTypeSubscribedAll(t):
             return ()
         
-        return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None)], block)
+        return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None, lazySubscription)], block)
 
     def subscribeToNone(self, t, block=True):
         self.addSchema(t.__schema__)
@@ -363,7 +366,7 @@ class DatabaseConnection:
             self._schema_and_typename_to_subscription_set.setdefault((t.__schema__.name, t.__qualname__), set())
         return ()
 
-    def subscribeToSchema(self, *schemas, block=True, excluding=()):
+    def subscribeToSchema(self, *schemas, block=True, lazySubscription=False, excluding=()):
         for s in schemas:
             self.addSchema(s)
 
@@ -371,7 +374,7 @@ class DatabaseConnection:
         for schema in schemas:
             for tname, t in schema._types.items():
                 if not self._isTypeSubscribedAll(t) and t not in excluding:
-                    unsubscribedTypes.append((schema.name, tname, None))
+                    unsubscribedTypes.append((schema.name, tname, None, lazySubscription))
 
         if unsubscribedTypes:
             return self.subscribeMultiple(unsubscribedTypes, block=block)
@@ -397,11 +400,11 @@ class DatabaseConnection:
                 e = self._pendingSubscriptions.get(tup)
 
                 if not e:
-                    e = self._pendingSubscriptions[tup] = threading.Event()
+                    e = self._pendingSubscriptions[(tup[0], tup[1], tup[2])] = threading.Event()
 
                 assert tup[0] and tup[1]
                 self._channel.write(
-                    ClientToServer.Subscribe(schema=tup[0], typename=tup[1], fieldname_and_value=tup[2])
+                    ClientToServer.Subscribe(schema=tup[0], typename=tup[1], fieldname_and_value=tup[2], isLazy=tup[3])
                     )
 
                 events.append(e)
@@ -445,10 +448,6 @@ class DatabaseConnection:
             return cls.fromIdentity(identity), fieldname
 
         return None,None
-
-    def clearCache(self):
-        with self._lock:
-            self._versioned_objects = {k:v for k,v in self._versioned_objects.items() if not v.isEmpty()}
 
     def __str__(self):
         return "DatabaseConnection(%s)" % id(self)
@@ -585,6 +584,9 @@ class DatabaseConnection:
                 self.disconnected.set()
                 self.connectionObject = None
                 
+                for e in self._lazy_object_read_blocks.values():
+                    e.set()
+
                 for e in self._flushEvents.values():
                     e.set()
 
@@ -684,7 +686,9 @@ class DatabaseConnection:
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
 
                 if lookupTuple not in self._subscription_buildup:
-                    self._subscription_buildup[lookupTuple] = {'values': {}, 'index_values': {}, 'identities': None}
+                    self._subscription_buildup[lookupTuple] = {'values': {}, 'index_values': {}, 'identities': None, 'markedLazy': False}
+                else:
+                    assert not self._subscription_buildup[lookupTuple]['markedLazy'], 'received non-lazy data for a lazy subscription'
 
                 self._subscription_buildup[lookupTuple]['values'].update(msg.values)
                 self._subscription_buildup[lookupTuple]['index_values'].update(msg.index_values)
@@ -693,6 +697,32 @@ class DatabaseConnection:
                     if self._subscription_buildup[lookupTuple]['identities'] is None:
                         self._subscription_buildup[lookupTuple]['identities'] = set()
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
+            elif msg.matches.LazyTransactionPriors:
+                for k,v in msg.writes.items():
+                    if k not in self._versioned_objects:
+                        self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, {}, v))
+            elif msg.matches.LazyLoadResponse:
+                for k,v in msg.values.items():
+                    if k not in self._versioned_objects:
+                        self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, {}, v))
+
+                self._lazy_objects.pop(msg.identity, None)
+
+                e = self._lazy_object_read_blocks.pop(msg.identity, None)
+                if e:
+                    e.set()
+
+            elif msg.matches.LazySubscriptionData:
+                lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
+
+                assert lookupTuple not in self._subscription_buildup
+
+                self._subscription_buildup[lookupTuple] = {
+                    'values': {}, 
+                    'index_values': msg.index_values, 
+                    'identities': msg.identities, 
+                    'markedLazy': True
+                    }
 
             elif msg.matches.SubscriptionComplete:
                 event = self._pendingSubscriptions.get((msg.schema, msg.typename, msg.fieldname_and_value))
@@ -706,6 +736,7 @@ class DatabaseConnection:
                 identities = self._subscription_buildup[lookupTuple]['identities']
                 values = self._subscription_buildup[lookupTuple]['values']
                 index_values = self._subscription_buildup[lookupTuple]['index_values']
+                markedLazy = self._subscription_buildup[lookupTuple]['markedLazy']
                 del self._subscription_buildup[lookupTuple]
 
                 sets = self.indexValuesToSetAdds(index_values)
@@ -744,6 +775,10 @@ class DatabaseConnection:
                 if totalBytes > 1000000:
                     logging.info("Subscription %s loaded %.2f mb of raw data.", lookupTuple, totalBytes / 1024.0 ** 2)
 
+                if markedLazy:
+                    schema_and_typename = lookupTuple[:2]
+                    for i in identities:
+                        self._lazy_objects[i] = schema_and_typename
 
                 for key, val in values.items():
                     if key not in self._versioned_objects:
@@ -771,7 +806,6 @@ class DatabaseConnection:
                         self._versioned_objects[key].setVersionedAddsAndRemoves(msg.tid, set(setval), set())
                     else:
                         self._versioned_objects[key].updateVersionedAdds(msg.tid, set(setval))
-
 
                     #this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:
@@ -837,11 +871,44 @@ class DatabaseConnection:
         with self._lock:
             if key in self._versioned_objects:
                 return self._versioned_objects[key].valueForVersion(transaction_id)
-
+            
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
+            identity = keymapping.split_data_key(key)[2]
+            if identity not in self._lazy_objects:
+                return None
+
+            event = self._loadLazyObject(identity)
+
+        event.wait()
+
+        with self._lock:
+            if self.disconnected.is_set():
+                raise DisconnectedException()
+
+            if key in self._versioned_objects:
+                return self._versioned_objects[key].valueForVersion(transaction_id)
+
             return None
+
+    def _loadLazyObject(self, identity):
+        e = self._lazy_object_read_blocks.get(identity)
+        
+        if e:
+            return e
+
+        e = self._lazy_object_read_blocks[identity] = threading.Event()
+
+        self._channel.write(
+            ClientToServer.LoadLazyObject(
+                identity=identity,
+                schema=self._lazy_objects[identity][0],
+                typename=self._lazy_objects[identity][1]
+                )
+            )
+
+        return e
 
     def _set_versioned_object_data(self, 
                 key_value, 
