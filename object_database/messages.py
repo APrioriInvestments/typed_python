@@ -11,7 +11,7 @@ def setHeartbeatInterval(newInterval):
 def getHeartbeatInterval():
     return _heartbeatInterval[0]
 
-USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES = True
+USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES = False
 
 if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
     ClientToServer = Alternative(
@@ -119,6 +119,10 @@ else:
             return ClientToServer(type="Heartbeat")
 
         @staticmethod
+        def LoadLazyObject(schema, typename, identity):
+            return ClientToServer(type="LoadLazyObject", schema=schema, typename=typename, identity=identity)
+
+        @staticmethod
         def DefineSchema(name, definition):
             return ClientToServer(type="DefineSchema", name=name, definition=definition)
 
@@ -184,13 +188,24 @@ else:
                 )
             
         @staticmethod
-        def LazySubscriptionData(schema, typename, fieldname_and_value, identities, indexValues):
+        def LazyTransactionPriors(writes):
+            return ServerToClient(type='LazyTransactionPriors', writes=writes)
+
+        @staticmethod
+        def LazyLoadResponse(identity, values):
+            return ServerToClient(type='LazyLoadResponse', 
+                identity=identity,
+                values=values
+                )
+
+        @staticmethod
+        def LazySubscriptionData(schema, typename, fieldname_and_value, identities, index_values):
             return ServerToClient(type='LazySubscriptionData',
                 schema=schema,
                 typename=typename,
                 fieldname_and_value=fieldname_and_value,
                 identities=identities,
-                indexValues=indexValues
+                index_values=index_values
                 )
         
         @staticmethod
