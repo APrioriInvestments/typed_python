@@ -122,13 +122,16 @@ class SubprocessServiceManager(ServiceManager):
         if gracefully:
             self.stopAllServices(self.shutdownTimeout)
 
-        for instanceIdentity, workerProcess in self.serviceProcesses.items():
-            workerProcess.terminate()
-            workerProcess.wait()
+        ServiceManager.stop(self)
+
+        with self.lock:
+            for instanceIdentity, workerProcess in self.serviceProcesses.items():
+                workerProcess.terminate()
+
+            for instanceIdentity, workerProcess in self.serviceProcesses.items():
+                workerProcess.wait()
 
         self.serviceProcesses = {}
-
-        ServiceManager.stop(self)
 
     def cleanup(self):
         for identity, workerProcess in list(self.serviceProcesses.items()):
