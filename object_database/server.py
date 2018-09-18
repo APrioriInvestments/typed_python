@@ -19,6 +19,7 @@ from object_database.messages import SchemaDefinition
 from object_database.core_schema import core_schema
 import object_database.keymapping as keymapping
 from object_database.algebraic_protocol import AlgebraicProtocol
+from object_database.util import Timer
 from typed_python.hash import sha_hash
 from typed_python import *
 
@@ -278,50 +279,53 @@ class Server:
 
     def _handleSubscriptionInForeground(self, channel, msg):
         #first see if this would be an easy subscription to handle
-        typedef, identities = self._parseSubscriptionMsg(channel, msg)
-        if not (msg.isLazy and len(identities) < self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY or len(identities) < self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY):
-            self._subscriptionQueue.put((channel, msg))
-            return
+        with Timer("Handle subscription in foreground: %s/%s/%s/isLazy=%s over %s", 
+                    msg.schema, msg.typename, msg.fieldname_and_value, msg.isLazy, lambda: len(identities)):
+            typedef, identities = self._parseSubscriptionMsg(channel, msg)
 
-        #handle this directly
-        if msg.isLazy:
-            self._completeLazySubscription(
-                msg.schema, msg.typename, msg.fieldname_and_value,
+            if not (msg.isLazy and len(identities) < self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY or len(identities) < self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY):
+                self._subscriptionQueue.put((channel, msg))
+                return
+
+            #handle this directly
+            if msg.isLazy:
+                self._completeLazySubscription(
+                    msg.schema, msg.typename, msg.fieldname_and_value,
+                    typedef,
+                    identities,
+                    channel
+                    )
+                return
+
+            self._sendPartialSubscription(
+                channel,
+                msg.schema, 
+                msg.typename, 
+                msg.fieldname_and_value,
                 typedef,
                 identities,
-                channel
+                set(identities),
+                BATCH_SIZE=None,
+                checkPending=False
                 )
-            return
 
-        self._sendPartialSubscription(
-            channel,
-            msg.schema, 
-            msg.typename, 
-            msg.fieldname_and_value,
-            typedef,
-            identities,
-            set(identities),
-            BATCH_SIZE=None,
-            checkPending=False
-            )
-
-        self._markSubscriptionComplete(
-            msg.schema, 
-            msg.typename, 
-            msg.fieldname_and_value,
-            identities,
-            channel,
-            isLazy=False
-            )
-
-        channel.channel.write(
-            ServerToClient.SubscriptionComplete(
-                schema=msg.schema,
-                typename=msg.typename,
-                fieldname_and_value=msg.fieldname_and_value,
-                tid=self._cur_transaction_num
+            self._markSubscriptionComplete(
+                msg.schema, 
+                msg.typename, 
+                msg.fieldname_and_value,
+                identities,
+                channel,
+                isLazy=False
                 )
-            )
+
+            channel.channel.write(
+                ServerToClient.SubscriptionComplete(
+                    schema=msg.schema,
+                    typename=msg.typename,
+                    fieldname_and_value=msg.fieldname_and_value,
+                    tid=self._cur_transaction_num
+                    )
+                )
 
     def _parseSubscriptionMsg(self, channel, msg):
         schema_name = msg.schema
@@ -351,103 +355,99 @@ class Server:
 
 
     def handleSubscriptionOnBackgroundThread(self, connectedChannel, msg):
-        try:
-            with self._lock:
-                t0 = time.time()
-
-                typedef, identities = self._parseSubscriptionMsg(connectedChannel, msg)
-
-                if connectedChannel.channel not in self._clientChannels:
-                    logging.warn("Ignoring subscription from dead channel.")
-                    return
-
-                if msg.isLazy:
-                    assert msg.fieldname_and_value is None or msg.fieldname_and_value[0] != '_identity', 'makes no sense to lazily subscribe to specific values!'
-
-                    self._completeLazySubscription(
-                        msg.schema, msg.typename, msg.fieldname_and_value,
-                        typedef,
-                        identities,
-                        connectedChannel
-                        )
-                    return True
-
-                t1 = time.time()
-
-                self._pendingSubscriptionRecheck = []
-
-            #we need to send everything we know about 'identities', keeping in mind that we have to 
-            #check any new identities that get written to in the background to see if they belong
-            #in the new set
-            identities_left_to_send = set(identities)
-
-            done = False
-            messageCount = 0
-            while True:
-                locktime_start = time.time()
-
-                if self._subscriptionBackgroundThreadCallback:
-                    self._subscriptionBackgroundThreadCallback(messageCount)
-
+        with Timer("Subscription requiring %s messages and produced %s objects for %s/%s/%s/isLazy=%s", 
+                    lambda: messageCount,
+                    lambda: len(identities),
+                    msg.schema, 
+                    msg.typename, 
+                    msg.fieldname_and_value,
+                    msg.isLazy
+                    ):
+            try:
                 with self._lock:
-                    messageCount += 1
-                    if messageCount == 2:
-                        logging.info(
-                            "Beginning large subscription for %s/%s/%s", 
-                            msg.schema, msg.typename, msg.fieldname_and_value
-                            )
+                    typedef, identities = self._parseSubscriptionMsg(connectedChannel, msg)
 
-                    self._sendPartialSubscription(
-                        connectedChannel,
-                        msg.schema, 
-                        msg.typename, 
-                        msg.fieldname_and_value,
-                        typedef,
-                        identities,
-                        identities_left_to_send
-                        )
+                    if connectedChannel.channel not in self._clientChannels:
+                        logging.warn("Ignoring subscription from dead channel.")
+                        return
+
+                    if msg.isLazy:
+                        assert msg.fieldname_and_value is None or msg.fieldname_and_value[0] != '_identity', 'makes no sense to lazily subscribe to specific values!'
+
+                        self._completeLazySubscription(
+                            msg.schema, msg.typename, msg.fieldname_and_value,
+                            typedef,
+                            identities,
+                            connectedChannel
+                            )
+                        return True
+
+                    t1 = time.time()
 
                     self._pendingSubscriptionRecheck = []
 
-                    if not identities_left_to_send:
-                        self._markSubscriptionComplete(
+                #we need to send everything we know about 'identities', keeping in mind that we have to 
+                #check any new identities that get written to in the background to see if they belong
+                #in the new set
+                identities_left_to_send = set(identities)
+
+                done = False
+                messageCount = 0
+                while True:
+                    locktime_start = time.time()
+
+                    if self._subscriptionBackgroundThreadCallback:
+                        self._subscriptionBackgroundThreadCallback(messageCount)
+
+                    with self._lock:
+                        messageCount += 1
+                        if messageCount == 2:
+                            logging.info(
+                                "Beginning large subscription for %s/%s/%s", 
+                                msg.schema, msg.typename, msg.fieldname_and_value
+                                )
+
+                        self._sendPartialSubscription(
+                            connectedChannel,
                             msg.schema, 
                             msg.typename, 
                             msg.fieldname_and_value,
+                            typedef,
                             identities,
-                            connectedChannel,
-                            isLazy=False
+                            identities_left_to_send
                             )
 
-                        connectedChannel.channel.write(
-                            ServerToClient.SubscriptionComplete(
-                                schema=msg.schema,
-                                typename=msg.typename,
-                                fieldname_and_value=msg.fieldname_and_value,
-                                tid=self._cur_transaction_num
+                        self._pendingSubscriptionRecheck = []
+
+                        if not identities_left_to_send:
+                            self._markSubscriptionComplete(
+                                msg.schema, 
+                                msg.typename, 
+                                msg.fieldname_and_value,
+                                identities,
+                                connectedChannel,
+                                isLazy=False
                                 )
-                            )
 
-                        break
+                            connectedChannel.channel.write(
+                                ServerToClient.SubscriptionComplete(
+                                    schema=msg.schema,
+                                    typename=msg.typename,
+                                    fieldname_and_value=msg.fieldname_and_value,
+                                    tid=self._cur_transaction_num
+                                    )
+                                )
 
-                #don't hold the lock more than 75% of the time.
-                time.sleep( (time.time() - locktime_start) / 3 )
+                            break
 
-            if self._subscriptionBackgroundThreadCallback:
-                self._subscriptionBackgroundThreadCallback("DONE")
+                    #don't hold the lock more than 75% of the time.
+                    time.sleep( (time.time() - locktime_start) / 3 )
 
-            if messageCount > 5:
-                logging.info(
-                    "Subscription took [%.2f, %.2f] seconds over %s messages and produced %s objects for %s/%s/%s", 
-                    t1 - t0,
-                    time.time() - t1,
-                    messageCount,
-                    len(identities),
-                    msg.schema, msg.typename, msg.fieldname_and_value
-                    )
-        finally:
-            with self._lock:
-                self._pendingSubscriptionRecheck = None
+                if self._subscriptionBackgroundThreadCallback:
+                    self._subscriptionBackgroundThreadCallback("DONE")
+            finally:
+                with self._lock:
+                    self._pendingSubscriptionRecheck = None
 
     def _completeLazySubscription(self,
                         schema_name, 
