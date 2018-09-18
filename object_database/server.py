@@ -92,6 +92,9 @@ class Server:
         self.longTransactionThreshold = 1.0
         self.logFrequency = 10.0
 
+        self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY = 1000
+        self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY = 10000
+
         self._transactions = 0
         self._keys_set = 0
         self._index_values_updated = 0
@@ -273,43 +276,96 @@ class Server:
                 traceback.format_exc()
                 )
 
+    def _handleSubscriptionInForeground(self, channel, msg):
+        #first see if this would be an easy subscription to handle
+        typedef, identities = self._parseSubscriptionMsg(channel, msg)
+        if not (msg.isLazy and len(identities) < self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY or len(identities) < self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY):
+            self._subscriptionQueue.put((channel, msg))
+            return
+
+        #handle this directly
+        if msg.isLazy:
+            self._completeLazySubscription(
+                msg.schema, msg.typename, msg.fieldname_and_value,
+                typedef,
+                identities,
+                channel
+                )
+            return
+
+        self._sendPartialSubscription(
+            channel,
+            msg.schema, 
+            msg.typename, 
+            msg.fieldname_and_value,
+            typedef,
+            identities,
+            set(identities),
+            BATCH_SIZE=None,
+            checkPending=False
+            )
+
+        self._markSubscriptionComplete(
+            msg.schema, 
+            msg.typename, 
+            msg.fieldname_and_value,
+            identities,
+            channel,
+            isLazy=False
+            )
+
+        channel.channel.write(
+            ServerToClient.SubscriptionComplete(
+                schema=msg.schema,
+                typename=msg.typename,
+                fieldname_and_value=msg.fieldname_and_value,
+                tid=self._cur_transaction_num
+                )
+            )
+
+    def _parseSubscriptionMsg(self, channel, msg):
+        schema_name = msg.schema
+        
+        definition = channel.definedSchemas.get(schema_name)
+
+        assert definition is not None, "can't subscribe to a schema we don't know about!"
+
+        assert msg.typename is not None
+        typename = msg.typename
+
+        assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
+
+        typedef = definition[typename]
+
+        if msg.fieldname_and_value is None:
+            field, val = " exists", keymapping.index_value_to_hash(True)
+        else:
+            field, val = msg.fieldname_and_value
+
+        if field == '_identity':
+            identities = set([val])
+        else:
+            identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
+
+        return typedef, identities
+
+
     def handleSubscriptionOnBackgroundThread(self, connectedChannel, msg):
         try:
             with self._lock:
                 t0 = time.time()
 
+                typedef, identities = self._parseSubscriptionMsg(connectedChannel, msg)
+
                 if connectedChannel.channel not in self._clientChannels:
                     logging.warn("Ignoring subscription from dead channel.")
                     return
 
-                schema_name = msg.schema
-                
-                definition = connectedChannel.definedSchemas.get(schema_name)
-
-                assert definition is not None, "can't subscribe to a schema we don't know about!"
-
-                assert msg.typename is not None
-                typename = msg.typename
-
-                assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
-
-                typedef = definition[typename]
-
-                if msg.fieldname_and_value is None:
-                    field, val = " exists", keymapping.index_value_to_hash(True)
-                else:
-                    field, val = msg.fieldname_and_value
-
-                if field == '_identity':
-                    identities = set([val])
-                else:
-                    identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
-
                 if msg.isLazy:
-                    assert field != '_identity', 'makes no sense to lazily subscribe to specific values!'
+                    assert msg.fieldname_and_value is None or msg.fieldname_and_value[0] != '_identity', 'makes no sense to lazily subscribe to specific values!'
 
                     self._completeLazySubscription(
-                        schema_name, typename, msg.fieldname_and_value,
+                        msg.schema, msg.typename, msg.fieldname_and_value,
                         typedef,
                         identities,
                         connectedChannel
@@ -338,20 +394,26 @@ class Server:
                     if messageCount == 2:
                         logging.info(
                             "Beginning large subscription for %s/%s/%s", 
-                            schema_name, msg.typename, msg.fieldname_and_value
+                            msg.schema, msg.typename, msg.fieldname_and_value
                             )
 
                     self._sendPartialSubscription(
                         connectedChannel,
-                        schema_name, typename, msg.fieldname_and_value,
+                        msg.schema, 
+                        msg.typename, 
+                        msg.fieldname_and_value,
                         typedef,
                         identities,
                         identities_left_to_send
                         )
 
+                    self._pendingSubscriptionRecheck = []
+
                     if not identities_left_to_send:
                         self._markSubscriptionComplete(
-                            schema_name, typename, msg.fieldname_and_value,
+                            msg.schema, 
+                            msg.typename, 
+                            msg.fieldname_and_value,
                             identities,
                             connectedChannel,
                             isLazy=False
@@ -359,7 +421,7 @@ class Server:
 
                         connectedChannel.channel.write(
                             ServerToClient.SubscriptionComplete(
-                                schema=schema_name,
+                                schema=msg.schema,
                                 typename=msg.typename,
                                 fieldname_and_value=msg.fieldname_and_value,
                                 tid=self._cur_transaction_num
@@ -381,7 +443,7 @@ class Server:
                     time.time() - t1,
                     messageCount,
                     len(identities),
-                    schema_name, msg.typename, msg.fieldname_and_value
+                    msg.schema, msg.typename, msg.fieldname_and_value
                     )
         finally:
             with self._lock:
@@ -476,35 +538,34 @@ class Server:
                 fieldname_and_value,
                 typedef,
                 identities,
-                identities_left_to_send
+                identities_left_to_send,
+                BATCH_SIZE=100,
+                checkPending=True
                 ):
 
         #get some objects to send
-        BATCH_SIZE = 100
-
         kvs = {}
         index_vals = {}
 
         to_send = []
-        for transactionMessage in self._pendingSubscriptionRecheck:
-            for key, val in transactionMessage.writes.items():
-                #if we write to a key we've already sent, we'll need to resend it
-                identity = keymapping.split_data_key(key)[2]
-                if identity in identities:
-                    identities_left_to_send.add(identity)
+        if checkPending:
+            for transactionMessage in self._pendingSubscriptionRecheck:
+                for key, val in transactionMessage.writes.items():
+                    #if we write to a key we've already sent, we'll need to resend it
+                    identity = keymapping.split_data_key(key)[2]
+                    if identity in identities:
+                        identities_left_to_send.add(identity)
 
-            for add_index_key, add_index_identities in transactionMessage.set_adds.items():
-                add_schema, add_typename, add_fieldname, add_hashVal = keymapping.split_index_key_full(add_index_key)
+                for add_index_key, add_index_identities in transactionMessage.set_adds.items():
+                    add_schema, add_typename, add_fieldname, add_hashVal = keymapping.split_index_key_full(add_index_key)
 
-                if add_schema == schema_name and add_typename == typename and (
-                        fieldname_and_value is None and add_fieldname == " exists" or 
-                        fieldname_and_value is not None and tuple(fieldname_and_value) == (add_fieldname, add_hashVal)
-                        ):
-                    identities_left_to_send.update(add_index_identities)
+                    if add_schema == schema_name and add_typename == typename and (
+                            fieldname_and_value is None and add_fieldname == " exists" or 
+                            fieldname_and_value is not None and tuple(fieldname_and_value) == (add_fieldname, add_hashVal)
+                            ):
+                        identities_left_to_send.update(add_index_identities)
 
-        self._pendingSubscriptionRecheck = []
-
-        while identities_left_to_send and len(to_send) < BATCH_SIZE:
+        while identities_left_to_send and (BATCH_SIZE is None or len(to_send) < BATCH_SIZE):
             to_send.append(identities_left_to_send.pop())
                 
         for fieldname in typedef.fields:
@@ -549,7 +610,7 @@ class Server:
             assert isinstance(msg.definition, SchemaDefinition)
             connectedChannel.definedSchemas[msg.name] = msg.definition
         elif msg.matches.Subscribe:
-            self._subscriptionQueue.put((connectedChannel, msg))
+            self._handleSubscriptionInForeground(connectedChannel, msg)
         elif msg.matches.NewTransaction:
             try:
                 with self._lock:

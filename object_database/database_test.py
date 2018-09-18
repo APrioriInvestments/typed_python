@@ -1009,6 +1009,10 @@ class ObjectDatabaseTests:
         db1.subscribeToSchema(schema)
 
         with db1.transaction():
+            #make sure we have values in there.
+            for _ in range(10000):
+                Counter(k=123,x=-1)
+
             c1 = Counter(k = 123)
             c1.x = 1
 
@@ -1029,6 +1033,10 @@ class ObjectDatabaseTests:
             c2 = Counter(k = 123)
 
         blocker.releaseCallback()
+        for i in range(1,101):
+            self.assertEqual(blocker.waitForCallback(1.0), i)
+            blocker.releaseCallback()
+
         self.assertEqual(blocker.waitForCallback(1.0), "DONE")
         blocker.releaseCallback()
 
@@ -1050,6 +1058,9 @@ class ObjectDatabaseTests:
         db1.subscribeToSchema(schema)
 
         with db1.transaction():
+            for _ in range(10000):
+                Counter(k=123,x=-1)
+
             c1 = Counter(k = 0)
 
         blocker = BlockingCallback()
@@ -1058,13 +1069,24 @@ class ObjectDatabaseTests:
 
         subscriptionEvents = db2.subscribeToIndex(Counter, k=123, block=False)
         
-        self.assertEqual(blocker.waitForCallback(1.0), 0)
+        for i in range(0,50):
+            self.assertEqual(blocker.waitForCallback(1.0), i)
+            blocker.releaseCallback()
+
+        #even while this is going, we should be able to subscribe to something small
+        db3 = self.createNewDb()
+        db3.subscribeToIndex(Counter, k=0)
+        with db3.view():
+            self.assertTrue(c1.exists())
 
         #make a transaction
         with db1.transaction():
             c1.k = 123
 
-        blocker.releaseCallback()
+        for i in range(50,101):
+            self.assertEqual(blocker.waitForCallback(1.0), i)
+            blocker.releaseCallback()
+
         self.assertEqual(blocker.waitForCallback(1.0), "DONE")
         blocker.releaseCallback()
 
