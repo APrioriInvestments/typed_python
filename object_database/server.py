@@ -374,6 +374,8 @@ class Server:
                     if msg.isLazy:
                         assert msg.fieldname_and_value is None or msg.fieldname_and_value[0] != '_identity', 'makes no sense to lazily subscribe to specific values!'
 
+                        messageCount = 1
+                        
                         self._completeLazySubscription(
                             msg.schema, msg.typename, msg.fieldname_and_value,
                             typedef,
