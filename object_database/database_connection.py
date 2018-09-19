@@ -929,13 +929,78 @@ class DatabaseConnection:
 
         self._transaction_callbacks[transaction_guid] = confirmCallback
 
+        out_writes = {}
+
+        for k,v in key_value.items():
+            out_writes[k] = json.dumps(v.jsonRep) if v.jsonRep is not None else None
+            if len(out_writes) > 10000:
+                self._channel.write(
+                    ClientToServer.TransactionData(writes=out_writes, set_adds={}, set_removes={},
+                        key_versions=(),index_versions=(), transaction_guid=transaction_guid)
+                    )
+                self._channel.write(ClientToServer.Heartbeat())
+                out_writes = {}
+
+        ct = 0
+        out_set_adds = {}
+        for k,v in set_adds.items():
+            out_set_adds[k] = tuple(v)
+            ct += len(v)
+
+            if len(out_set_adds) > 10000 or ct > 100000:
+                self._channel.write(
+                    ClientToServer.TransactionData(writes={}, set_adds=out_set_adds, set_removes={},
+                        key_versions=(),index_versions=(), transaction_guid=transaction_guid)
+                    )
+                self._channel.write(ClientToServer.Heartbeat())
+                out_set_adds = {}
+                ct = 0
+
+        ct = 0
+        out_set_removes = {}
+        for k,v in set_removes.items():
+            out_set_removes[k] = tuple(v)
+            ct += len(v)
+
+            if len(out_set_removes) > 10000 or ct > 100000:
+                self._channel.write(
+                    ClientToServer.TransactionData(writes={}, set_adds={}, set_removes=out_set_removes,
+                        key_versions=(),index_versions=(), transaction_guid=transaction_guid)
+                    )
+                self._channel.write(ClientToServer.Heartbeat())
+                out_set_removes = {}
+                ct = 0
+
+        keys_to_check_versions = list(keys_to_check_versions)
+        while len(keys_to_check_versions) > 10000:
+            self._channel.write(
+                ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
+                    key_versions=keys_to_check_versions[:10000],index_versions=(), transaction_guid=transaction_guid)
+                )
+            self._channel.write(ClientToServer.Heartbeat())
+            keys_to_check_versions = keys_to_check_versions[10000:]
+
+        indices_to_check_versions = list(indices_to_check_versions)
+        while len(indices_to_check_versions) > 10000:
+            self._channel.write(
+                ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
+                    key_versions=(),index_versions=indices_to_check_versions[:10000], transaction_guid=transaction_guid)
+                )
+            indices_to_check_versions = indices_to_check_versions[10000:]
+
         self._channel.write(
-            ClientToServer.NewTransaction(
-                writes={k:json.dumps(v.jsonRep) if v.jsonRep is not None else None for k,v in key_value.items()},
-                set_adds={k: list(v) for k,v in set_adds.items()},
-                set_removes={k: list(v) for k,v in set_removes.items()},
-                key_versions=list(keys_to_check_versions),
-                index_versions=list(indices_to_check_versions),
+            ClientToServer.TransactionData(
+                writes=out_writes, 
+                set_adds=out_set_adds, 
+                set_removes=out_set_removes,
+                key_versions=keys_to_check_versions,
+                index_versions=indices_to_check_versions,
+                transaction_guid=transaction_guid
+                )
+            )
+
+        self._channel.write(
+            ClientToServer.CompleteTransaction(
                 as_of_version=as_of_version,
                 transaction_guid=transaction_guid
                 )

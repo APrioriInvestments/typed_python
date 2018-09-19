@@ -1002,6 +1002,22 @@ class ObjectDatabaseTests:
     def test_adding_while_subscribing_to_index(self):
         self.test_adding_while_subscribing(shouldSubscribeToIndex=True)
 
+    def test_big_transactions(self):
+        db1 = self.createNewDb()
+        
+        db1.subscribeToSchema(schema)
+
+        with db1.transaction():
+            for i in range(21000):
+                Counter(k=i,x=i)
+
+        with db1.transaction():
+            for i in range(21000):
+                Counter.lookupOne(k=i).k = 0
+
+        with db1.transaction():
+            self.assertEqual(len(Counter.lookupAll(k=0)), 21000)
+
     def test_adding_while_subscribing(self, shouldSubscribeToIndex=False):
         db1 = self.createNewDb()
         db2 = self.createNewDb()

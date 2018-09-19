@@ -16,12 +16,15 @@ USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES = False
 if USE_SLOWER_BUT_STRONGLY_TYPED_MESSAGES:
     ClientToServer = Alternative(
         "ClientToServer",
-        NewTransaction = {
+        TransactionData = {
             "writes": ConstDict(str, OneOf(None, str)),
             "set_adds": ConstDict(str, TupleOf(str)),
             "set_removes": ConstDict(str, TupleOf(str)),
             "key_versions": TupleOf(str),
             "index_versions": TupleOf(str),
+            "transaction_guid": str
+            },
+        CompleteTransaction = {
             "as_of_version": int,
             "transaction_guid": str
             },
@@ -102,14 +105,21 @@ else:
             return d
 
         @staticmethod
-        def NewTransaction(writes, set_adds, set_removes, key_versions, index_versions, as_of_version, transaction_guid):
+        def TransactionData(writes, set_adds, set_removes, key_versions, index_versions, transaction_guid):
             return ClientToServer(
-                type='NewTransaction', 
+                type='TransactionData', 
                 writes=writes, 
                 set_adds=set_adds, 
                 set_removes=set_removes, 
                 key_versions=key_versions, 
-                index_versions=index_versions, 
+                index_versions=index_versions,
+                transaction_guid=transaction_guid
+                )
+
+        @staticmethod
+        def CompleteTransaction(as_of_version, transaction_guid):
+            return ClientToServer(
+                type='CompleteTransaction', 
                 as_of_version=as_of_version, 
                 transaction_guid=transaction_guid
                 )

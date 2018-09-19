@@ -42,6 +42,7 @@ class ConnectedChannel:
         self.subscribedIds = set() #identities
         self.subscribedIndexKeys = {} #full index keys to lazy transaction id
         self.identityRoot = identityRoot
+        self.pendingTransactions = {}
 
     def heartbeat(self):
         self.missedHeartbeats = 0
@@ -63,6 +64,26 @@ class ConnectedChannel:
         self.channel.write(
             ServerToClient.TransactionResult(transaction_guid=guid,success=success,badKey=badKey)
             )
+
+    def handleTransactionData(self, msg):
+        guid = msg.transaction_guid
+        if guid not in self.pendingTransactions:
+            self.pendingTransactions[guid] = {
+                'writes':{}, 
+                'set_adds': {}, 
+                'set_removes': {}, 
+                'key_versions': set(), 
+                'index_versions': set()
+                }
+
+        self.pendingTransactions[guid]['writes'].update({k: v for k,v in msg.writes.items()})
+        self.pendingTransactions[guid]['set_adds'].update({k: set(a) for k,a in msg.set_adds.items() if a})
+        self.pendingTransactions[guid]['set_removes'].update({k: set(a) for k,a in msg.set_removes.items() if a})
+        self.pendingTransactions[guid]['key_versions'].update(msg.key_versions)
+        self.pendingTransactions[guid]['index_versions'].update(msg.index_versions)
+
+    def extractTransactionData(self, guid):
+        return self.pendingTransactions.pop(guid)
 
 class Server:
     def __init__(self, kvstore):
@@ -375,7 +396,7 @@ class Server:
                         assert msg.fieldname_and_value is None or msg.fieldname_and_value[0] != '_identity', 'makes no sense to lazily subscribe to specific values!'
 
                         messageCount = 1
-                        
+
                         self._completeLazySubscription(
                             msg.schema, msg.typename, msg.fieldname_and_value,
                             typedef,
@@ -613,16 +634,20 @@ class Server:
             connectedChannel.definedSchemas[msg.name] = msg.definition
         elif msg.matches.Subscribe:
             self._handleSubscriptionInForeground(connectedChannel, msg)
-        elif msg.matches.NewTransaction:
+        elif msg.matches.TransactionData:
+            connectedChannel.handleTransactionData(msg)
+        elif msg.matches.CompleteTransaction:
             try:
+                data = connectedChannel.extractTransactionData(msg.transaction_guid)
+
                 with self._lock:
                     isOK, badKey = self._handleNewTransaction(
                         connectedChannel,
-                        {k: v for k,v in msg.writes.items()},
-                        {k: set(a) for k,a in msg.set_adds.items() if a},
-                        {k: set(a) for k,a in msg.set_removes.items() if a},
-                        msg.key_versions,
-                        msg.index_versions,
+                        data['writes'],
+                        data['set_adds'],
+                        data['set_removes'],
+                        data['key_versions'],
+                        data['index_versions'],
                         msg.as_of_version
                         )
             except:
