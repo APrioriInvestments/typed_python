@@ -16,7 +16,6 @@ valid_primitive_types = (str,int,bool,float,bytes,type(None))
 
 import types
 import nativepython.python.inspect_override as inspect
-
 from typed_python.hash import sha_hash
 
 _null_hash = sha_hash(None)
@@ -376,7 +375,7 @@ def ConstDict(K,V):
                     members.append((converted_k[0], converted_v[0]))
 
                 return (ConstDict_(members),)
-
+            
             return None
 
     ConstDict_.__qualname__ = "ConstDict(%s->%s)" % (TypeToString(K), TypeToString(V))

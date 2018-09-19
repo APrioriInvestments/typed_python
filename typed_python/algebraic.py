@@ -14,7 +14,6 @@
 
 from typed_python.hash import sha_hash
 from typed_python.types import IsTypeFilter, TypeConvert, TryTypeConvert
-
 import types
 
 def valid_fieldname(name):
@@ -116,8 +115,8 @@ class Alternative(metaclass=AlternativeMetaclass):
             def __str__(self):
                 return repr(self)
 
-        AlternativeCls.define(**kwds)
         AlternativeCls.__qualname__ = name
+        AlternativeCls.define(**kwds)
         return AlternativeCls
 
 def makeAlternativeOption(Alternative, which, inTypedict):

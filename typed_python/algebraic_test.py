@@ -38,6 +38,18 @@ class AlgebraicTests(unittest.TestCase):
         self.assertTrue(xb.matches.B)
         self.assertFalse(xb.matches.A)
 
+    def test_names(self):
+        X = Alternative('X', A={}, B={})
+        self.assertEqual(X.__qualname__, 'X')
+        self.assertEqual(X.A.__qualname__, 'X.A')
+        self.assertEqual(X.B.__qualname__, 'X.B')
+
+        X2 = Alternative('X2')
+        X2.define(A={}, B={})
+        self.assertEqual(X2.__qualname__, 'X2')
+        self.assertEqual(X2.A.__qualname__, 'X2.A')
+        self.assertEqual(X2.B.__qualname__, 'X2.B')
+
     def test_conversion(self):
         X = Alternative('X')
         X.define(A = {'x': int}, B = {'x': X, 'y': int})
@@ -65,6 +77,7 @@ class AlgebraicTests(unittest.TestCase):
 
         TypeConvert(C2, c1, True)
         TypeConvert(C1, c2, True)
+        TypeConvert(C1, {'b':x2}, True)
 
 
     def test_field_lookup(self):
