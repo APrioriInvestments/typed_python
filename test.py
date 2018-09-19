@@ -21,6 +21,7 @@ It assumes you've run 'python3 setup.py develop' or 'python3 setup.py install' s
 it can find nativepython.
 """
 import sys
+import shutil
 import logging
 import unittest
 import os
@@ -435,9 +436,10 @@ def executeTests(args, filter_actions):
     return 0
 
 def buildModule(args):
+    shutil.rmtree("./build")
+
     install_dir = os.path.abspath("./build/install")
-    if not os.path.exists(install_dir):
-        os.makedirs(install_dir)
+    os.makedirs(install_dir)
 
     sys.path.append(install_dir)
 
@@ -445,7 +447,7 @@ def buildModule(args):
     print("Building nativepython...",end='')
 
     result = subprocess.run(
-        ['python3', 'setup.py', 'build'], 
+        ['python3', 'setup.py', 'clean', 'build'], 
         stdout=subprocess.PIPE, 
         stderr=subprocess.STDOUT
         )
