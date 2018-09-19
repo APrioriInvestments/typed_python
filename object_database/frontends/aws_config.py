@@ -67,6 +67,9 @@ def main(argv):
     killall_parser = subparsers.add_parser('killall', help='kill everything')
     killall_parser.set_defaults(command='killall')
 
+    reset_parser = subparsers.add_parser('reset', help='kill everything')
+    reset_parser.set_defaults(command='reset')
+
     configureLogging()
 
     parsedArgs = parser.parse_args(argv[1:])
@@ -74,6 +77,11 @@ def main(argv):
     db = connect(parsedArgs.hostname, parsedArgs.port)
     db.subscribeToSchema(service_schema, lazySubscription=True)
     db.subscribeToSchema(aws_worker_boot_schema)
+
+    if parsedArgs.command == 'reset':
+        with db.transaction():
+            for s in aws_worker_boot_schema.State.lookupAll():
+                s.delete()
 
     if parsedArgs.command == 'config':
         with db.transaction():
@@ -122,7 +130,7 @@ def main(argv):
         with db.view():
             api = AwsApi()
             table = [["InstanceID", "InstanceType", "IP", "Uptime"]]
-            for instanceId, instance in api.allRunningInstances().items():
+            for instanceId, instance in api.allRunningInstances(spot=None).items():
                 table.append([
                     instance['InstanceId'],
                     instance['InstanceType'], 

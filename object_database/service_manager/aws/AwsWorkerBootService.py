@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import traceback
+import datetime
 import logging
 import time
 import boto3
@@ -27,7 +28,7 @@ import traceback
 import datetime
 import os
 
-from typed_python import OneOf
+from typed_python import OneOf, ConstDict
 from object_database import ServiceBase, service_schema, Schema, Indexed
 from object_database.web import cells
 from nativepython.python.string_util import closest_N_in
@@ -162,7 +163,10 @@ valid_instance_types = {
     }
 
 
-
+instance_types_to_show = set([x for x in valid_instance_types if 
+    ('xlarge' in x and '.xlarge' not in x) and 
+     x.split(".")[0] in ['m4','m5','c4','c5','r4','r5','i3', 'g2', 'x1']
+    ])
 
 
 
@@ -189,7 +193,6 @@ class Configuration:
     worker_iam_role_name = str #AIM role to boot workers into
     linux_ami = str            #default linux AMI to use when booting linux workers
     defaultStorageSize =  int  #gb of disk to mount on booted workers (if they need ebs)
-
     max_to_boot = int          #maximum number of workers we'll boot
 
 @schema.define
@@ -198,8 +201,11 @@ class State:
 
     booted = int
     desired = int
+    spot_desired = int
+    spot_booted = int
     observedLimit = OneOf(None, int) #maximum observed limit count
     capacityConstrained = bool
+    spotPrices = ConstDict(str,float)
 
 own_dir = os.path.split(__file__)[0]
 
@@ -216,7 +222,7 @@ class AwsApi:
         self.s3 = boto3.resource('s3',region_name=self.config.region)
         self.s3_client = boto3.client('s3',region_name=self.config.region)
 
-    def allRunningInstances(self, includePending=True):
+    def allRunningInstances(self, includePending=True, spot=False):
         filters = [{  
             'Name': 'tag:Name',
             'Values': [self.config.worker_name]
@@ -227,9 +233,38 @@ class AwsApi:
         for reservations in self.ec2_client.describe_instances(Filters=filters)["Reservations"]:
             for instance in reservations["Instances"]:
                 if instance['State']['Name'] in ('running','pending') if includePending else ('running',):
-                    res[str(instance["InstanceId"])] = instance
+                    if instance['InstanceLifecycle'] == ('scheduled' if not spot else 'spot') or spot is None:
+                        res[str(instance["InstanceId"])] = instance
 
         return res
+
+    def allSpotRequests(self, allRequests=False):
+        filters = [{  
+            'Name': 'tag:Name',
+            'Values': [self.config.worker_name]
+            }]
+
+        res = {}
+
+        for spot_request in self.ec2_client.describe_spot_instance_requests(Filters=filters)["SpotInstanceRequests"]:
+            if spot_request['State'] in ('open', 'active') or allRequests:
+                res[str(spot_request['SpotInstanceRequestId'])] = spot_request
+
+        return res
+
+    def tagSpotRequest(self, instanceId):
+        srs = self.allSpotRequests(allRequests=True)
+        for srId, srVal in srs.items():
+            if srVal['InstanceId'] == instanceId:
+                self.ec2_client.create_tags(
+                    Resources=[srId],
+                    Tags=[{'Key': 'Name', 'Value': self.config.worker_name}]
+                    )
+                return True
+            else:
+                logging.info("srVal %s doesn't match %s", srVal, instanceId)
+
+        return False
 
     def isInstanceWeOwn(self, instance):
         #make sure this instance is definitely one we booted.
@@ -248,11 +283,42 @@ class AwsApi:
         
         return True
 
+    def terminateSpotRequestById(self, id):
+        self.ec2_client.cancel_spot_instance_requests(SpotInstanceRequestsIds=[id])
+
     def terminateInstanceById(self, id):
         instance = self.ec2.Instance(id)
         assert self.isInstanceWeOwn(instance)
         logging.info("Terminating AWS instance %s", instance)
         instance.terminate()
+
+    def getSpotPrices(self):
+        logging.info("Requesting spot price history...")
+        results = {}
+
+        for x in self.ec2_client.get_paginator('describe_spot_price_history').paginate(
+                    Filters=[{'Name':'product-description','Values':['Linux/UNIX']}],
+                    StartTime=datetime.datetime.now() - datetime.timedelta(hours=1)
+                    ):
+            for record in x['SpotPriceHistory']:
+                ts = record['Timestamp']
+                instance_type = record['InstanceType']
+                az = record['AvailabilityZone']
+
+                try:
+                    price = float(record['SpotPrice'])
+                except:
+                    price = None
+
+                if (instance_type, az) not in results:
+                    results[(instance_type, az)] = (ts, price)
+                elif ts > results[(instance_type, az)][0]:
+                    results[(instance_type, az)] = (ts, price)
+
+        to_return = []
+        for instance_type, az in results:
+            to_return.append((instance_type, az, results[instance_type,az][1]))
+        return to_return
 
     def bootWorker(self, 
             instanceType,
@@ -261,7 +327,8 @@ class AwsApi:
             bootScriptOverride=None,
             nameValueOverride=None,
             extraTags=None,
-            wantsTerminateOnShutdown=True
+            wantsTerminateOnShutdown=True,
+            spotPrice=None
             ):
         boot_script = (
             linux_bootstrap_script.format(
@@ -303,6 +370,17 @@ class AwsApi:
 
         nameValue = nameValueOverride or self.config.worker_name
 
+        if spotPrice:
+            InstanceMarketOptions={
+                'MarketType': 'spot',
+                'SpotOptions': {
+                    'SpotInstanceType': 'one-time',
+                    'MaxPrice': str(spotPrice)
+                }
+            }
+        else:
+            InstanceMarketOptions = None
+
         return str(self.ec2.create_instances(
             ImageId=ami,
             InstanceType=instanceType,
@@ -316,6 +394,7 @@ class AwsApi:
             IamInstanceProfile={'Name': self.config.worker_iam_role_name},
             UserData=boot_script, #base64.b64encode(boot_script.encode("ASCII")),
             BlockDeviceMappings=[deviceMapping],
+            InstanceMarketOptions=InstanceMarketOptions,
             TagSpecifications=[
                 {
                     'ResourceType': 'instance',
@@ -332,6 +411,7 @@ class AwsWorkerBootService(ServiceBase):
         ServiceBase.__init__(self, db, serviceInstance, serviceRuntimeConfig)
 
         self.SLEEP_INTERVAL = 10.0
+        self.lastSpotPriceRequest = 0.0
 
     @staticmethod
     def currentTargets():
@@ -422,8 +502,10 @@ class AwsWorkerBootService(ServiceBase):
 
     def setBootCount(self, instance_type, count):
         state = State.lookupAny(instance_type=instType)
+
         if not state:
             state = State(instance_type=instType)
+
         state.desired = count
 
     def initialize(self):
@@ -458,9 +540,14 @@ class AwsWorkerBootService(ServiceBase):
                 state.desired = ct
             return f
 
+        def bootCountSetterSpot(state, ct):
+            def f():
+                state.spot_desired = ct
+            return f
+
         return cells.Grid(
-            colFun=lambda: ['Instance Type', 'COST', 'RAM', 'CPU', 'Booted', 'Desired','ObservedLimit', 'CapacityConstrained'],
-            rowFun=lambda: sorted(State.lookupAll(), key=lambda s:s.instance_type),
+            colFun=lambda: ['Instance Type', 'COST', 'RAM', 'CPU', 'Booted', 'Desired', 'SpotBooted', 'SpotDesired', 'ObservedLimit', 'CapacityConstrained', 'Spot-us-east-1', 'a', 'b','c','d','e','f'],
+            rowFun=lambda: sorted([x for x in State.lookupAll() if x.instance_type in instance_types_to_show], key=lambda s:s.instance_type),
             headerFun=lambda x: x,
             rowLabelFun=None,
             rendererFun=lambda s,field: cells.Subscribed(lambda: 
@@ -468,11 +555,15 @@ class AwsWorkerBootService(ServiceBase):
                 s.booted  if field == 'Booted' else 
                 cells.Dropdown(str(s.desired), [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
                         if field == 'Desired' else 
+                s.spot_booted if field == 'SpotBooted' else 
+                cells.Dropdown(str(s.spot_desired), [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
+                        if field == 'SpotDesired' else 
                 ("" if s.observedLimit is None else s.observedLimit) if field == 'ObservedLimit' else 
                 ("Yes" if s.capacityConstrained else "") if field == 'CapacityConstrained' else 
                 valid_instance_types[s.instance_type]['COST'] if field == 'COST' else 
                 valid_instance_types[s.instance_type]['RAM'] if field == 'RAM' else 
                 valid_instance_types[s.instance_type]['CPU'] if field == 'CPU' else 
+                s.spotPrices.get('us-east-1' + field, "") if field in 'abcdef' else
                 ""
                 )
             ) + cells.Card(
@@ -491,29 +582,51 @@ class AwsWorkerBootService(ServiceBase):
                 )
 
     def pushTaskLoopForward(self):
+        if time.time()- self.lastSpotPriceRequest > 60.0:
+            with self.db.transaction():
+                for instance_type, availability_zone, price in self.api.getSpotPrices():
+                    state = State.lookupAny(instance_type=instance_type)
+                    if not state:
+                        state = State(instance_type=instance_type)
+                    if state:
+                        state.spotPrices = state.spotPrices + {availability_zone:price}
+            self.lastSpotPriceRequest = time.time()
+
         with self.db.view():
-            actuallyUsed = self.api.allRunningInstances()
+            onDemandInstances = self.api.allRunningInstances(spot=False)
+            spotInstances = self.api.allRunningInstances(spot=True)
 
-        instanceTypes = {}
         instancesByType = {}
+        spotInstancesByType = {}
 
-        for machineId, instance in actuallyUsed.items():
-            instanceTypes[instance["InstanceType"]] = instanceTypes.get(instance["InstanceType"],0)+1
-            instancesByType[instance["InstanceType"]] = instancesByType.get(instance["InstanceType"],())+(instance,)
+        for machineId, instance in onDemandInstances.items():
+            instancesByType.setdefault(instance["InstanceType"],[]).append(instance)
 
-        for t in instancesByType:
-            instancesByType[t] = list(instancesByType[t])
+        for machineId, instance in spotInstances.items():
+            spotInstancesByType.setdefault(instance["InstanceType"], []).append(instance)
 
         with self.db.transaction():
             for state in State.lookupAll():
-                if state.instance_type not in instanceTypes:
+                if state.instance_type not in instancesByType:
                     state.booted = 0
+                elif state.instance_type not in spotRequestsByType:
+                    state.spot_booted = 0
 
-            for instType, count in instanceTypes.items():
+            for type in valid_instance_types:
+                if not State.lookupAny(instance_type=type):
+                    State(instance_type=type)
+
+            for instType, instances in instancesByType.items():
                 state = State.lookupAny(instance_type=instType)
                 if not state:
                     state = State(instance_type=instType)
-                state.booted = count
+                state.booted = len(instances)
+
+            for instType, instances in spotInstancesByType.items():
+                state = State.lookupAny(instance_type=instType)
+                if not state:
+                    state = State(instance_type=instType)
+                state.spot_booted = len(instances)
 
             for state in State.lookupAll():
                 while state.booted > state.desired:
@@ -526,6 +639,17 @@ class AwsWorkerBootService(ServiceBase):
                     instance = instancesByType[state.instance_type].pop()
                     self.api.terminateInstanceById(instance["InstanceId"])
                     state.booted -= 1
+
+                while state.spot_booted > state.spot_desired:
+                    logging.info("We have %s spot instances of type %s requested vs %s desired. Terminating one down.", 
+                        state.spot_booted,
+                        state.instance_type,
+                        state.spot_desired
+                        )
+
+                    instance = spotInstancesByType[state.instance_type].pop()
+                    self.api.terminateInstanceById(instance["InstanceId"])
+                    state.spot_booted -= 1
 
                 while state.booted < state.desired:
                     logging.info("We have %s instances of type %s booted vs %s desired. Booting one.", 
@@ -551,6 +675,28 @@ class AwsWorkerBootService(ServiceBase):
                         else:
                             logging.error("Failed to boot a worker:\n%s", traceback.format_exc())
                             time.sleep(self.SLEEP_INTERVAL)
+                            break
+
+                while state.spot_booted < state.spot_desired:
+                    logging.info("We have %s spot instances of type %s booted vs %s desired. Booting one.", 
+                        state.spot_booted,
+                        state.instance_type,
+                        state.spot_desired
+                        )
+
+                    try:
+                        instanceId = self.api.bootWorker(state.instance_type, spotPrice=valid_instance_types[state.instance_type]['COST'])
+                        if not self.api.tagSpotRequest(instanceId):
+                            logging.error("Failed to tag spot-request associated with instance %s", instanceId)
+                        state.spot_booted += 1
+                    except Exception as e:
+                        if 'You have requested more instances ' in str(e):
+                            maxCount = int(str(e).split('than your current instance limit of ')[1].split(' ')[0])
+                            logging.info("Visible limit of %s observed for instance type %s", maxCount, state.instance_type)
+                            state.observedLimit = maxCount
+                            state.desired = min(state.desired, maxCount)
+                        else:
+                            logging.error("Failed to boot a worker:\n%s", traceback.format_exc())
                             break
 
         time.sleep(self.SLEEP_INTERVAL)
