@@ -264,14 +264,16 @@ def ConstDict(K,V):
     assert IsTypeFilter(K)
     assert IsTypeFilter(V)
     
-    class ConstDict:
+    class ConstDict_:
         KeyType=K
         ValueType=V
+
+        __typed_python_is_const_dict__ = True
 
         def __init__(self, iterable = ()):
             self._sha_hash_cache = None
 
-            if isinstance(iterable, ConstDict):
+            if isinstance(iterable, ConstDict_):
                 self.__contents__ = dict(iterable.__contents__)
             elif isinstance(iterable, dict):
                 self.__contents__ = {TypeConvert(K, k): TypeConvert(V,v) for k,v in iterable.items()}
@@ -290,8 +292,8 @@ def ConstDict(K,V):
             return self._sha_hash_cache
 
         def __eq__(self, other):
-            if not isinstance(other, ConstDict):
-                x = TryTypeConvert(ConstDict, other, allow_construct_new=True)
+            if not isinstance(other, ConstDict_):
+                x = TryTypeConvert(ConstDict_, other, allow_construct_new=True)
 
                 if x is None:
                     return NotImplemented
@@ -313,9 +315,9 @@ def ConstDict(K,V):
             return len(self.__contents__)
 
         def __add__(self, other):
-            other = TypeConvert(ConstDict, other)
+            other = TypeConvert(ConstDict_, other)
 
-            res = ConstDict(self)
+            res = ConstDict_(self)
             res.__contents__.update(other.__contents__)
 
             return res
@@ -339,7 +341,7 @@ def ConstDict(K,V):
             return self.__contents__.values()
 
         def __sub__(self, other):
-            res = ConstDict(self)
+            res = ConstDict_(self)
 
             for k in other:
                 k = TypeConvert(K, k)
@@ -353,7 +355,7 @@ def ConstDict(K,V):
 
         @staticmethod
         def __typed_python_try_convert_instance__(value, allow_construct_new):
-            if isinstance(value, ConstDict):
+            if isinstance(value, ConstDict_):
                 return (value,)
 
             if allow_construct_new or isinstance(value, dict):
@@ -373,13 +375,13 @@ def ConstDict(K,V):
 
                     members.append((converted_k[0], converted_v[0]))
 
-                return (ConstDict(members),)
+                return (ConstDict_(members),)
 
             return None
 
-    ConstDict.__qualname__ = "ConstDict(%s->%s)" % (TypeToString(K), TypeToString(V))
+    ConstDict_.__qualname__ = "ConstDict(%s->%s)" % (TypeToString(K), TypeToString(V))
 
-    return ConstDict
+    return ConstDict_
 
 @TypeFunction
 def TupleOf(t):
@@ -578,10 +580,10 @@ def NamedTuple(*namesAndTypes, **kwargs):
             if iterable is not None:
                 assert len(iterable) == len(namesAndTypes)
 
-                self.__contents__ = tuple(TypeConvert(types[i], iterable[i]) for i in range(len(namesAndTypes)))
+                self.__contents__ = tuple(TypeConvert(types[i], iterable[i], allow_construct_new=True) for i in range(len(namesAndTypes)))
             else:
                 assert len(kwargs) == len(namesAndTypes)
-                self.__contents__ = tuple(TypeConvert(types[i], kwargs[names[i]]) for i in range(len(namesAndTypes)))
+                self.__contents__ = tuple(TypeConvert(types[i], kwargs[names[i]], allow_construct_new=True) for i in range(len(namesAndTypes)))
 
         def __getitem__(self, x):
             return self.__contents__[x]
@@ -725,7 +727,7 @@ def Tuple(*args):
         def __init__(self, iterable):
             assert len(iterable) == len(args)
             self._sha_hash_cache = None
-            self.__contents__ = tuple(TypeConvert(args[i], iterable[i]) for i in range(len(args)))
+            self.__contents__ = tuple(TypeConvert(args[i], iterable[i], allow_construct_new=True) for i in range(len(args)))
 
         def __sha_hash__(self):
             if self._sha_hash_cache is None:

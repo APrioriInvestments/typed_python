@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.hash import sha_hash
-from typed_python.types import IsTypeFilter, TypeConvert
+from typed_python.types import IsTypeFilter, TypeConvert, TryTypeConvert
 
 import types
 
@@ -58,6 +58,27 @@ class Alternative(metaclass=AlternativeMetaclass):
             def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
                 if isinstance(value, cls):
                     return (value,)
+
+                if allow_construct_new and hasattr(type(value), '__typed_python_alternative__') and type(value).__qualname__.startswith(cls.__qualname__ + "."):
+                    #convert an instance of another alternative that has the same names and fields.
+                    mySubclass = getattr(cls, value._which)
+                    fields = dict(mySubclass._typedict)
+                    fields.update(cls._common_fields)
+
+                    if len(value._fields.keys()) != len(fields):
+                        return None
+
+                    values = {}
+                    for fname, ftype in fields.items():
+                        if not fname in value._fields:
+                            return None
+                        converted = TryTypeConvert(ftype, value._fields.get(fname), True)
+                        if converted is None:
+                            return None
+                        values[fname] = converted[0]
+
+                    return (mySubclass(**values),)
+
                 return None
                 
             @classmethod

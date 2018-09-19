@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python.algebraic import Alternative
-from typed_python.types import ListOf, TupleOf, OneOf
+from typed_python.types import ListOf, TupleOf, OneOf, TypeConvert, ConstDict
 
 import unittest
 
@@ -37,6 +37,35 @@ class AlgebraicTests(unittest.TestCase):
 
         self.assertTrue(xb.matches.B)
         self.assertFalse(xb.matches.A)
+
+    def test_conversion(self):
+        X = Alternative('X')
+        X.define(A = {'x': int}, B = {'x': X, 'y': int})
+
+        X2 = Alternative('X')
+        X2.define(A = {'x': int}, B = {'x': X2, 'y': int})
+        
+        x1 = X.B(x=X.A(x=10),y=20)
+        x2 = X2.B(x=X.A(x=10),y=20)
+        x3 = X2.B(x=X2.A(x=10),y=20)
+
+        for possibleType in [X, X2]:
+            for possibleValue in [x1,x2,x3]:
+                c = TypeConvert(possibleType, possibleValue, True)
+                self.assertTrue(c.matches.B)
+                self.assertTrue(c.x.matches.A)
+                self.assertTrue(c.x.x is 10)
+                self.assertTrue(c.y is 20)
+
+        C1 = ConstDict(str, X)
+        C2 = ConstDict(str, X2)
+
+        c1 = C1({'a': x1})
+        c2 = C2({'b': x2})
+
+        TypeConvert(C2, c1, True)
+        TypeConvert(C1, c2, True)
+
 
     def test_field_lookup(self):
         X = Alternative('X', A = {'a': int}, B = {'b': float})
