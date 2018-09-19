@@ -104,11 +104,9 @@ class Codebase:
         for m, sysmodule in list(sys.modules.items()):
             if hasattr(sysmodule, '__file__') and any(sysmodule.__file__.startswith(p) for p in paths):
                 del sys.modules[m]
-                logging.info("Discarding module at path %s", sysmodule.__file__)
             elif hasattr(sysmodule, '__path__') and hasattr(sysmodule.__path__, '_path'):
                 if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
                     del sys.modules[m]
-                    logging.info("Discarding module at path %s", sysmodule.__path__)
 
     def instantiate(self, root_path, service_module_name):
         """Instantiate a codebase on disk and load it."""
