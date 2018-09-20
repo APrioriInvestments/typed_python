@@ -451,6 +451,12 @@ class Traceback(Cell):
         self.contents = """<div class='alert alert-primary'><pre>__child__</pre></alert>"""
         self.children = {"__child__": Cell.makeCell(traceback)}
 
+class Code(Cell):
+    def __init__(self, traceback):
+        super().__init__()
+        self.contents = """<pre><code>__child__</code></pre>"""
+        self.children = {"__child__": Cell.makeCell(traceback)}
+
 class Subscribed(Cell):
     def __init__(self, f):
         super().__init__()

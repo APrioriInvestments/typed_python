@@ -31,6 +31,10 @@ log "Installing git"
 
 sudo apt-get install -y git
 
+log "Installing awscli"
+
+sudo apt-get install -y awscli
+
 echo "Moving docker directory to $STORAGE"
 sudo service docker stop
 
@@ -63,6 +67,8 @@ chmod 700 -R ~/.ssh
 git clone https://github.com/braxtonmckee/nativepython.git $STORAGE/nativepython
 
 export LD_PRELOAD=/usr/lib/libtcmalloc_minimal.so.4
+
+{extra_boot_script}
 
 $STORAGE/nativepython/object_database/frontends/service_manager.py \
     `hostname`  \

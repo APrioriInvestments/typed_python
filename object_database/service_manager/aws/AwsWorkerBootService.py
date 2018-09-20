@@ -194,6 +194,7 @@ class Configuration:
     linux_ami = str            #default linux AMI to use when booting linux workers
     defaultStorageSize =  int  #gb of disk to mount on booted workers (if they need ebs)
     max_to_boot = int          #maximum number of workers we'll boot
+    extra_boot_script = str    #additional installation commands to run to configure the worker
 
 @schema.define
 class State:
@@ -322,9 +323,9 @@ class AwsApi:
 
     def bootWorker(self, 
             instanceType,
+            extra_boot_script=None,
             clientToken=None,
             amiOverride=None,
-            bootScriptOverride=None,
             nameValueOverride=None,
             extraTags=None,
             wantsTerminateOnShutdown=True,
@@ -333,7 +334,8 @@ class AwsApi:
         boot_script = (
             linux_bootstrap_script.format(
                 db_hostname=self.config.db_hostname,
-                db_port=self.config.db_port
+                db_port=self.config.db_port,
+                extra_boot_script=self.config.extra_boot_script or ""
                 )
             )
 
@@ -469,7 +471,8 @@ class AwsWorkerBootService(ServiceBase):
             worker_iam_role_name,
             linux_ami,
             defaultStorageSize,
-            max_to_boot
+            max_to_boot,
+            extra_boot_script
             ):
         c = Configuration.lookupAny()
         if not c:
@@ -499,6 +502,8 @@ class AwsWorkerBootService(ServiceBase):
             c.defaultStorageSize = defaultStorageSize
         if max_to_boot is not None:
             c.max_to_boot = max_to_boot
+        if extra_boot_script is not None:
+            c.extra_boot_script = extra_boot_script
 
     def setBootCount(self, instance_type, count):
         state = State.lookupAny(instance_type=instType)
@@ -578,7 +583,9 @@ class AwsWorkerBootService(ServiceBase):
                 cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) + 
                 cells.Text("linux_ami = " + str(c.linux_ami)) + 
                 cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) + 
-                cells.Text("max_to_boot = " + str(c.max_to_boot))
+                cells.Text("max_to_boot = " + str(c.max_to_boot)) + 
+                cells.Text("extra_boot_script = ") + 
+                cells.Code(c.extra_boot_script)
                 )
 
     def pushTaskLoopForward(self):
