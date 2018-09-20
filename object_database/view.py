@@ -201,14 +201,14 @@ class View(object):
     @staticmethod
     def unwrapJsonWithPyRep(dbValWithPyrep, field_type):
         if dbValWithPyrep is None:
-            return None
+            return default_initialize(field_type)
 
         if not isinstance(dbValWithPyrep, JsonWithPyRep):
             #assume this is json
             return _encoder.from_json(dbValWithPyrep, field_type)
 
         if dbValWithPyrep.jsonRep is None:
-            return None
+            return default_initialize(field_type)
 
         if dbValWithPyrep.pyRep.get(field_type) is None:
             dbValWithPyrep.pyRep[field_type] = _encoder.from_json(dbValWithPyrep.jsonRep, field_type)

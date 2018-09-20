@@ -194,6 +194,34 @@ class ObjectDatabaseTests:
             root.obj = Object(k=expr.Constant(value=23))
             self.assertEqual(root2.obj.k.value, 23)
 
+    def test_adding_fields_to_type(self):
+        schema = Schema("schema")
+
+        @schema.define
+        class Test:
+            i = int
+
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            t = Test(i=1)
+
+        schema2 = Schema("schema")
+        @schema2.define
+        class Test:
+            i = int
+            k = int
+
+        db2 = self.createNewDb()
+        db2.subscribeToSchema(schema2)
+
+        t = Test.fromIdentity(t._identity)
+
+        with db2.view():
+            self.assertEqual(t.i, 1)
+            self.assertEqual(t.k, 0)
+
     def test_many_subscriptions(self):
         OK = []
         FINISHED = []
