@@ -309,15 +309,28 @@ class Card(Cell):
         </div>
         """
 
+class CardTitle(Cell):
+    def __init__(self, inner):
+        super().__init__()
+
+        self.children = {"__contents__": Cell.makeCell(inner)}
+        self.contents = """
+        <div class='card-title'>
+          __contents__
+        </div>
+        """
+
 class Octicon(Cell):
     def __init__(self, which):
         super().__init__()
         self.contents = '<span class="octicon octicon-%s" aria-hidden="true"></span>' % which
 
 class Text(Cell):
+    div_class = None
+
     def __init__(self, text):
         super().__init__()
-        self.contents = "<div>%s</div>" % cgi.escape(str(text))
+        self.contents = "<div>%s</div>" % (cgi.escape(str(text)) if text else "&nbsp;")
 
 class Span(Cell):
     def __init__(self, text):
