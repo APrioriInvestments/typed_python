@@ -20,7 +20,7 @@ import importlib
 import time
 import os
 import tempfile
-from object_database import Schema, Indexed, Index, core_schema
+from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
 from typed_python import *
 import threading
 
@@ -32,6 +32,7 @@ codebase_cache = {}
 MAX_BAD_BOOTS = 5
 
 @service_schema.define
+@SubscribeLazilyByDefault
 class Codebase:
     hash = Indexed(str)
 

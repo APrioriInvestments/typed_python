@@ -38,6 +38,7 @@ class ServiceWorker:
             os.makedirs(storageRoot)
 
         self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
+        
         self.serviceObject = None
         self.serviceName = None
 

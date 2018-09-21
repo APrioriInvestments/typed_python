@@ -20,6 +20,10 @@ import inspect
 TypeDefinition = NamedTuple(fields=TupleOf(str), indices=TupleOf(str))
 SchemaDefinition = ConstDict(str, TypeDefinition)
 
+def SubscribeLazilyByDefault(t):
+    t.__object_database_lazy_subscription__ = True
+    return t
+
 class Schema:
     """A collection of types that can be used to access data in a database."""
     def __init__(self, name):
@@ -137,5 +141,8 @@ class Schema:
             elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
                 if isinstance(val, (FunctionType, staticmethod, property)):
                     setattr(t, name, val)
+
+        if hasattr(cls, '__object_database_lazy_subscription__'):
+            t.__object_database_lazy_subscription__ = cls.__object_database_lazy_subscription__
 
         return t

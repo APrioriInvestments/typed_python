@@ -343,22 +343,35 @@ class DatabaseConnection:
             (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity), False)
             ])
 
-    def subscribeToIndex(self, t, block=True, lazySubscription=False, **kwarg):
+    def _lazinessForType(self, typeObj, desiredLaziness):
+        if desiredLaziness is not None:
+            return desiredLaziness
+        if hasattr(typeObj, '__object_database_lazy_subscription__'):
+            return True
+        return False
+
+    def subscribeToIndex(self, t, block=True, lazySubscription=None, **kwarg):
         self.addSchema(t.__schema__)
 
         toSubscribe = []
         for fieldname,fieldvalue in kwarg.items():
-            toSubscribe.append((t.__schema__.name, t.__qualname__, (fieldname, keymapping.index_value_to_hash(fieldvalue)), lazySubscription))
+            toSubscribe.append((
+                t.__schema__.name, 
+                t.__qualname__, 
+                (fieldname, keymapping.index_value_to_hash(fieldvalue)), 
+                self._lazinessForType(t, lazySubscription)
+                )
+            )
 
         return self.subscribeMultiple(toSubscribe, block=block)
 
-    def subscribeToType(self, t, block=True, lazySubscription=False):
+    def subscribeToType(self, t, block=True, lazySubscription=None):
         self.addSchema(t.__schema__)
 
         if self._isTypeSubscribedAll(t):
             return ()
         
-        return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None, lazySubscription)], block)
+        return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None, self._lazinessForType(t, lazySubscription))], block)
 
     def subscribeToNone(self, t, block=True):
         self.addSchema(t.__schema__)
@@ -366,7 +379,7 @@ class DatabaseConnection:
             self._schema_and_typename_to_subscription_set.setdefault((t.__schema__.name, t.__qualname__), set())
         return ()
 
-    def subscribeToSchema(self, *schemas, block=True, lazySubscription=False, excluding=()):
+    def subscribeToSchema(self, *schemas, block=True, lazySubscription=None, excluding=()):
         for s in schemas:
             self.addSchema(s)
 
@@ -374,7 +387,7 @@ class DatabaseConnection:
         for schema in schemas:
             for tname, t in schema._types.items():
                 if not self._isTypeSubscribedAll(t) and t not in excluding:
-                    unsubscribedTypes.append((schema.name, tname, None, lazySubscription))
+                    unsubscribedTypes.append((schema.name, tname, None, self._lazinessForType(t, lazySubscription)))
 
         if unsubscribedTypes:
             return self.subscribeMultiple(unsubscribedTypes, block=block)
