@@ -15,7 +15,6 @@ class Int8;
 class Int16;
 class Int32;
 class Int64;
-class Long;
 class String;
 class Bytes;
 class Float32;
@@ -45,7 +44,6 @@ public:
         catInt16,
         catInt32,
         catInt64,
-        catLong,
         catString,
         catBytes,
         catFloat32,
@@ -98,8 +96,6 @@ public:
                 return f(*(Int32*)this);
             case catInt64:
                 return f(*(Int64*)this);
-            case catLong:
-                return f(*(Long*)this);
             case catString:
                 return f(*(String*)this);
             case catBytes:
@@ -276,11 +272,11 @@ public:
             m_element_type(type)
     {
         m_name = "TupleOf(...)";
-        m_size = computeBytecount();
+        m_size = sizeof(void*);
     }
 
-    size_t computeBytecount() const { 
-        return sizeof(void*); 
+    Type* getEltType() const {
+        return m_element_type;
     }
 
     static TupleOf* Make(Type* elt) {
@@ -450,17 +446,6 @@ public:
     }
 
     static Int64* Make() { static Int64 res; return &res; }
-};
-
-class Long : public Type {
-public:
-    Long() : Type(TypeCategory::catLong)
-    {
-        m_name = "Long";
-        m_size = sizeof(void*);
-    }
-
-    static Long* Make() { static Long res; return &res; }
 };
 
 class Float32 : public PrimitiveType {
