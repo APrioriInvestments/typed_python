@@ -63,10 +63,16 @@ public:
         catPointer
     };
 
-    TypeCategory getTypeCategory() const { return m_typeCategory; }
+    TypeCategory getTypeCategory() const { 
+        return m_typeCategory; 
+    }
+
+    const std::string& name() const {
+        return m_name;
+    }
 
     size_t bytecount() const {
-        return check([](const auto& self) { return self.concreteBytecount(); });
+        return m_size;
     }
 
     template<class T>
@@ -131,15 +137,16 @@ public:
 
 protected:
     Type(TypeCategory in_typeCategory) : 
-            m_typeCategory(in_typeCategory)
+            m_typeCategory(in_typeCategory),
+            m_size(0),
+            m_name("Undefined")
         {}
 
-    size_t concreteBytecount() const {
-        throw std::runtime_error("NotImplemented");
-        }
-
-private:
     TypeCategory m_typeCategory;
+    
+    size_t m_size;
+
+    std::string m_name;
 };
 
 class Value : public Type {
@@ -148,10 +155,9 @@ public:
             Type(TypeCategory::catValue),
             m_type(type),
             m_data(data)
-        {}
-
-    size_t concreteBytecount() const {
-        return m_type->bytecount();
+        {
+        m_size = 0;
+        m_name = "Value(...)";
         }
 
 private:
@@ -164,9 +170,12 @@ public:
     OneOf(const std::vector<Type*>& types) : 
             Type(TypeCategory::catOneOf),
             m_types(types)
-        {}
+        {
+        m_size = computeBytecount();
+        m_name = "OneOf(...)";
+        }
 
-    size_t concreteBytecount() const { 
+    size_t computeBytecount() const { 
         size_t res = 0;
         for (auto t: m_types)
             res = std::max(res, t->bytecount());
@@ -187,9 +196,11 @@ public:
             Type(in_typeCategory),
             m_types(types),
             m_names(names)
-        {}
+    {
+        m_size = computeBytecount();
+    }
 
-    size_t concreteBytecount() const { 
+    size_t computeBytecount() const { 
         size_t res = 0;
         for (auto t: m_types)
             res += t->bytecount();
@@ -223,7 +234,9 @@ class NamedTuple : public CompositeType {
 public:
     NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catNamedTuple, types, names)
-        {}
+    {
+        m_name = "NamedTuple(...)";
+    }
 
     static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         return MakeSubtype<NamedTuple>(types,names);
@@ -234,7 +247,9 @@ class Kwargs : public CompositeType {
 public:
     Kwargs(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catKwargs, types, names)
-        {}
+    {
+        m_name = "Kwargs(...)";
+    }
 
     static Kwargs* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         return MakeSubtype<Kwargs>(types,names);
@@ -245,7 +260,9 @@ class Tuple : public CompositeType {
 public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catTuple, types, names)
-        {}
+    {
+        m_name = "Tuple(...)";
+    }
 
     static Tuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         return MakeSubtype<Tuple>(types,names);
@@ -257,9 +274,12 @@ public:
     TupleOf(Type* type) : 
             Type(TypeCategory::catTupleOf),
             m_element_type(type)
-        {}
+    {
+        m_name = "TupleOf(...)";
+        m_size = computeBytecount();
+    }
 
-    size_t concreteBytecount() const { 
+    size_t computeBytecount() const { 
         return sizeof(void*); 
     }
 
@@ -288,9 +308,10 @@ public:
             Type(TypeCategory::catConstDict),
             m_key(key),
             m_value(value)
-        {}
-
-    size_t concreteBytecount() const { return sizeof(void*); }
+    {
+        m_name = "ConstDict(...)";
+        m_size = sizeof(void*);
+    }
 
     static ConstDict* Make(Type* key, Type* value) {
         static std::mutex guard;
@@ -323,152 +344,167 @@ public:
 class None : public PrimitiveType {
 public:
     None() : PrimitiveType(TypeCategory::catNone)
-        {}
+    {
+        m_name = "NoneType";
+        m_size = 0;
+    }
 
     static None* Make() { static None res; return &res; }
-
-    size_t concreteBytecount() const { return 0; }
 
 };
 
 class Bool : public PrimitiveType {
 public:
     Bool() : PrimitiveType(TypeCategory::catBool)
-        {}
+    {
+        m_name = "Bool";
+        m_size = 1;
+    }
 
     static Bool* Make() { static Bool res; return &res; }
-    
-    size_t concreteBytecount() const { return 1; }
 };
 
 class UInt8 : public PrimitiveType {
 public:
     UInt8() : PrimitiveType(TypeCategory::catUInt8)
-        {}
+    {
+        m_name = "UInt8";
+        m_size = 1;
+    }
 
     static UInt8* Make() { static UInt8 res; return &res; }
-
-    size_t concreteBytecount() const { return 1; }
 };
 
 class UInt16 : public PrimitiveType {
 public:
     UInt16() : PrimitiveType(TypeCategory::catUInt16)
-        {}
+    {
+        m_name = "UInt16";
+        m_size = 2;
+    }
 
     static UInt16* Make() { static UInt16 res; return &res; }
-
-    size_t concreteBytecount() const { return 2; }
 };
 
 class UInt32 : public PrimitiveType {
 public:
     UInt32() : PrimitiveType(TypeCategory::catUInt32)
-        {}
+    {
+        m_name = "UInt32";
+        m_size = 4;
+    }
 
     static UInt32* Make() { static UInt32 res; return &res; }
-
-    size_t concreteBytecount() const { return 4; }
 };
 
 class UInt64 : public PrimitiveType {
 public:
     UInt64() : PrimitiveType(TypeCategory::catUInt64)
-        {}
+    {
+        m_name = "UInt64";
+        m_size = 8;
+    }
 
     static UInt64* Make() { static UInt64 res; return &res; }
-        
-    size_t concreteBytecount() const { return 8; }
 };
 
 class Int8 : public PrimitiveType {
 public:
     Int8() : PrimitiveType(TypeCategory::catInt8)
-        {}
+    {
+        m_name = "Int8";
+        m_size = 1;
+    }
 
     static Int8* Make() { static Int8 res; return &res; }
-        
-    size_t concreteBytecount() const { return 1; }
 };
 
 class Int16 : public PrimitiveType {
 public:
     Int16() : PrimitiveType(TypeCategory::catInt16)
-        {}
+    {
+        m_name = "Int16";
+        m_size = 2;
+    }
 
     static Int16* Make() { static Int16 res; return &res; }
-        
-    size_t concreteBytecount() const { return 2; }
 };
 
 class Int32 : public PrimitiveType {
 public:
     Int32() : PrimitiveType(TypeCategory::catInt32)
-        {}
+    {
+        m_name = "Int32";
+        m_size = 4;
+    }
 
     static Int32* Make() { static Int32 res; return &res; }
-        
-    size_t concreteBytecount() const { return 4; }
 };
 
 class Int64 : public PrimitiveType {
 public:
     Int64() : PrimitiveType(TypeCategory::catInt64)
-        {}
+    {
+        m_name = "Int64";
+        m_size = 8;
+    }
 
     static Int64* Make() { static Int64 res; return &res; }
-        
-    size_t concreteBytecount() const { return 8; }
 };
 
 class Long : public Type {
 public:
     Long() : Type(TypeCategory::catLong)
-        {}
+    {
+        m_name = "Long";
+        m_size = sizeof(void*);
+    }
 
     static Long* Make() { static Long res; return &res; }
-        
-    size_t concreteBytecount() const { return sizeof(void*); }
 };
 
 class Float32 : public PrimitiveType {
 public:
     Float32() : PrimitiveType(TypeCategory::catFloat32)
-        {}
+    {
+        m_name = "Float32";
+        m_size = 4;
+    }
 
     static Float32* Make() { static Float32 res; return &res; }
-        
-    size_t concreteBytecount() const { return 4; }
 };
 
 class Float64 : public PrimitiveType {
 public:
     Float64() : PrimitiveType(TypeCategory::catFloat64)
-        {}
+    {
+        m_name = "Float64";
+        m_size = 8;
+    }
 
     static Float64* Make() { static Float64 res; return &res; }
-        
-    size_t concreteBytecount() const { return 8; }
 };
 
 class String : public PrimitiveType {
 public:
     String() : PrimitiveType(TypeCategory::catString)
-        {}
+    {
+        m_name = "String";
+        m_size = sizeof(void*);
+    }
 
     static String* Make() { static String res; return &res; }
-        
-    size_t concreteBytecount() const { return sizeof(void*); }
 };
 
 class Bytes : public PrimitiveType {
 public:
     Bytes() : PrimitiveType(TypeCategory::catBytes)
-        {}
+    {
+        m_name = "Bytes";
+        m_size = sizeof(void*);
+    }
 
     static Bytes* Make() { static Bytes res; return &res; }
-        
-    size_t concreteBytecount() const { return sizeof(void*); }
 };
 
 class Alternative : public Type {};

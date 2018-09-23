@@ -25,3 +25,7 @@ class NativeTypesTests(unittest.TestCase):
     def test_object_bytecounts(self):
         self.assertEqual(NativeType.NoneType().bytecount(), 0)
         self.assertEqual(NativeType.Int8().bytecount(), 1)
+
+    def test_type_stringification(self):
+        for t in ['Int8', 'NoneType']:
+            self.assertEqual(str(getattr(NativeType,t)()), t)
