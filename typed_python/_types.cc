@@ -5,30 +5,31 @@
 #include <string>
 #include "Type.hpp"
 
-class TupleOfLayout {
+class Handle {
 public:
-    size_t count;
-    unsigned char data[0];
-
-    unsigned char* ptr(Type* t, size_t ix) {
-        return &data[t->bytecount() * ix];
+    Handle(Type* t) : 
+                mType(t) ,
+                mIsInitialized(false)
+    {
+        m_data.resize(mType->bytecount());
     }
 
-    static TupleOfLayout* alloc(size_t count, size_t bytes_per_record) {
-        TupleOfLayout* ptr = (TupleOfLayout*)malloc(sizeof(TupleOfLayout) + count * bytes_per_record);
-        ptr->count = count;
-        return ptr;
+    ~Handle() {
+        if (mIsInitialized) {
+            mType->destroy(get());
+        }
     }
-};
 
-class Arena {
-public:
+    Type* mType;
     std::vector<unsigned char> m_data;
+    bool mIsInitialized;
 
-    template<class T>
-    T& asType() {
-        assert(sizeof(T) == m_data.size());
-        return *(T*)&m_data[0];
+    uint8_t* get() {
+        if (m_data.size()) {
+            return &m_data[0];
+        }
+
+        return (uint8_t*)this;
     }
 };
 
@@ -41,11 +42,7 @@ struct NativeTypeWrapper {
 struct native_instance_wrapper {
     PyObject_HEAD
   
-    Type* mType;
-
-    std::shared_ptr<Arena> mArenaPtr;
-
-    size_t mArenaOffset;
+    std::shared_ptr<Handle> mHandle;
 
     static PyObject* bytecount(PyObject* o) {
         NativeTypeWrapper* w = (NativeTypeWrapper*)o;
@@ -64,21 +61,50 @@ struct native_instance_wrapper {
     static void tp_dealloc(PyObject* self) {
         native_instance_wrapper* wrapper = (native_instance_wrapper*)self;
 
-        wrapper->mArenaPtr.~shared_ptr();
+        wrapper->mHandle.~shared_ptr();
 
         Py_TYPE(self)->tp_free((PyObject*)self);
     }
 
-    static bool initialize_targetFromPython(Type* eltType, unsigned char* tgt, PyObject* o) {
-        if (eltType->getTypeCategory() == Type::TypeCategory::catInt64) {
-            if (PyLong_Check(o)) {
-                ((int64_t*)tgt)[0] = PyLong_AsLong(o);
-                return true;
+    static void copy_initialize(Type* eltType, unsigned char* tgt, PyObject* pyRepresentation) {
+        Type::TypeCategory cat = eltType->getTypeCategory();
+
+        if (cat == Type::TypeCategory::catInt64) {
+            if (PyLong_Check(pyRepresentation)) {
+                ((int64_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
+                return;
+            }
+            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+                std::string(pyRepresentation->ob_type->tp_name));
+        }
+
+        if (PyObject_TypeCheck(pyRepresentation, typeObj(eltType))) {
+            //it's already the right kind of instance
+            eltType->copy_constructor(tgt, ((native_instance_wrapper*)pyRepresentation)->mHandle->get());
+            return;
+        }
+
+        if (cat == Type::TypeCategory::catTupleOf) {
+            if (!PyTuple_Check(pyRepresentation)) {
+                throw std::runtime_error("wanted a tuple");
+            }
+
+            ((TupleOf*)eltType)->constructor(tgt, PyTuple_Size(pyRepresentation), 
+                [&](uint8_t* eltPtr, int64_t k) {
+                    copy_initialize(((TupleOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                    }
+                );
+            return;
+        }
+
+        if (cat == Type::TypeCategory::catInt64) {
+            if (PyLong_Check(pyRepresentation)) {
+                ((int64_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
+                return;
             }
         }
 
-
-        return false;
+        throw std::logic_error("Couldn't initialize internal elt.");
     }
 
     static PyObject* extractPythonObject(unsigned char* data, Type* eltType) {
@@ -86,78 +112,128 @@ struct native_instance_wrapper {
             return PyLong_FromLong(*(int64_t*)data);
         }
 
-        PyErr_SetString(PyExc_TypeError, "cant convert this back to python");
-        return NULL;
+        std::shared_ptr<Handle> handle(new Handle(eltType));
+
+        try {
+            eltType->copy_constructor(handle->get(), data);
+
+            handle->mIsInitialized = true;
+
+            native_instance_wrapper* self = (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
+
+            new (&self->mHandle) std::shared_ptr<Handle>(handle);
+
+            return (PyObject*)self;
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return NULL;
+        }
+    }
+
+    static std::shared_ptr<Handle> initialize(Type* t, PyObject* args, PyObject* kwargs) {
+        std::shared_ptr<Handle> handle(new Handle(t));
+
+        Type::TypeCategory cat = t->getTypeCategory();
+
+        if (cat == Type::TypeCategory::catTupleOf) {
+            if (PyTuple_Size(args) != 1) {
+                throw std::runtime_error("wrong argument count");
+            }
+            PyObject* argTuple = PyTuple_GetItem(args, 0);
+
+            copy_initialize(t, handle->get(), argTuple);
+
+            handle->mIsInitialized = true;
+        } else {
+            throw std::logic_error("Unknown");
+        }
+
+        return handle;
     }
 
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
         NativeTypeWrapper* t = (NativeTypeWrapper*)subtype;
 
-        std::shared_ptr<Arena> arena(new Arena());
-        arena->m_data.resize(t->mType->bytecount());
+        std::shared_ptr<Handle> handle;
 
-        native_instance_wrapper* self = (native_instance_wrapper*)subtype->tp_alloc(subtype, 0);
-        self->mType = t->mType;
-        self->mArenaOffset = 0;
-        new (&self->mArenaPtr) std::shared_ptr<Arena>(arena);
+        try {
+            handle = initialize(t->mType, args, kwds);
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+        }
 
-        Type::TypeCategory cat = t->mType->getTypeCategory();
-
-        if (cat == Type::TypeCategory::catTupleOf) {
-            if (PyTuple_Size(args) != 1) {
-                PyErr_SetString(PyExc_TypeError, "error out because we should only have one argument and leaking an arena pointer because we are sloppy.");
-                return NULL;
-            }
-            PyObject* argTuple = PyTuple_GetItem(args, 0);
-            if (!PyTuple_Check(argTuple)) {
-                PyErr_SetString(PyExc_TypeError, "error out because we wanted a tuple, and leaking an arena pointer because we are sloppy.");
-                return NULL;
-            }
-
-            Type* heldType = ((TupleOf*)t->mType)->getEltType();
-            auto& layout = arena->asType<TupleOfLayout*>();
-
-            layout = TupleOfLayout::alloc(PyTuple_Size(argTuple), heldType->bytecount());
-
-            for (long k = 0; k < PyTuple_Size(argTuple); k++) {
-                if (!initialize_targetFromPython(heldType, layout->ptr(heldType, k), PyTuple_GetItem(argTuple,k))) {
-                    PyErr_SetString(PyExc_TypeError, "error out because we tried and failed to initialize a tuple elt, and leak an arena pointer due to sloppiness.");
-                    return NULL;
-                }
-            }
-        } else {
-            PyErr_SetString(PyExc_TypeError, "error out and leaking an arena pointer because we are sloppy.");
+        if (!handle) {
             return NULL;
         }
+
+        native_instance_wrapper* self = (native_instance_wrapper*)subtype->tp_alloc(subtype, 0);
+
+        new (&self->mHandle) std::shared_ptr<Handle>(handle);
 
         return (PyObject*)self;
     }
 
     static Py_ssize_t sq_length(native_instance_wrapper* w) {
-        if (w->mType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            return w->mArenaPtr->asType<TupleOfLayout*>()->count;
+        if (w->mHandle->mType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            return ((TupleOf*)w->mHandle->mType)->count(w->mHandle->get());
         }
 
         PyErr_SetString(PyExc_TypeError, "not a __len__'able thing.");
     }
 
     static PyObject* sq_item(native_instance_wrapper* w, Py_ssize_t ix) {
-        if (w->mType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            TupleOfLayout* tup = w->mArenaPtr->asType<TupleOfLayout*>();
-            if (ix >= tup->count) {
+        if (w->mHandle->mType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            int64_t count = ((TupleOf*)w->mHandle->mType)->count(w->mHandle->get());
+
+            if (ix >= count || ix < 0) {
                 PyErr_SetString(PyExc_IndexError, "out of bounds");
                 return NULL;
             }
 
-            Type* eltType = (Type*)((TupleOf*)w->mType)->getEltType();
-            return extractPythonObject(tup->ptr(eltType, ix), eltType);
+            Type* eltType = (Type*)((TupleOf*)w->mHandle->mType)->getEltType();
+            return extractPythonObject(
+                ((TupleOf*)w->mHandle->mType)->eltPtr(w->mHandle->get(), ix), 
+                eltType
+                );
         }
 
         PyErr_SetString(PyExc_TypeError, "not a __getitem__'able thing.");
         return NULL;
     }
 
-    static PyTypeObject* typeObj(Type* inType) { 
+    static PyTypeObject* typeObjCheck(Type* inType) {
+        if (!inType->getTypeRep()) {
+            inType->setTypeRep(typeObj(inType));
+        }
+            
+        return inType->getTypeRep();
+    }
+
+    static PySequenceMethods* sequenceMethods() {
+        static PySequenceMethods* res = 
+            new PySequenceMethods {
+                (lenfunc)native_instance_wrapper::sq_length,
+                0,
+                0,
+                (ssizeargfunc)native_instance_wrapper::sq_item,
+                0,
+                0,
+                0,
+                0
+                };
+
+        return res;
+    }
+
+    static Type* extractTypeFrom(PyTypeObject* typeObj) {
+        if (typeObj->tp_as_sequence == sequenceMethods()) {
+            return ((NativeTypeWrapper*)typeObj)->mType;
+        }
+
+        return nullptr;
+    }
+
+    static PyTypeObject* typeObj(Type* inType) {
         static std::mutex mutex;
         static std::map<Type*, NativeTypeWrapper*> types;
 
@@ -180,15 +256,7 @@ struct native_instance_wrapper {
                 0,                         // tp_reserved
                 0,                         // tp_repr
                 0,                         // tp_as_number
-                new PySequenceMethods{
-                 (lenfunc)native_instance_wrapper::sq_length,
-                 0,
-                 0,
-                 (ssizeargfunc)native_instance_wrapper::sq_item,
-                 0,
-                 0,
-                 0,
-                 0},                       // tp_as_sequence
+                sequenceMethods(),         // tp_as_sequence
                 0,                         // tp_as_mapping
                 0,                         // tp_hash
                 0,                         // tp_call
@@ -241,6 +309,10 @@ Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
         return Float64::Make();
     }
 
+    Type* res = native_instance_wrapper::extractTypeFrom((PyTypeObject*)typearg);
+    if (res) {
+        return res;
+    }
 
     PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type.");
     return NULL;

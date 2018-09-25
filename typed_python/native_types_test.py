@@ -33,6 +33,21 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_tuple_of(self):
         tupleOfInt = TupleOf(int)
+        i = tupleOfInt(())
         i = tupleOfInt((1,2,3))
         self.assertEqual(len(i), 3)
         self.assertEqual(tuple(i), (1,2,3))
+
+        for x in range(10):
+            self.assertEqual(tuple(tupleOfInt(tuple(range(x)))), tuple(range(x)))
+
+    def test_tuple_of_tuple_of(self):
+        tupleOfInt = TupleOf(int)
+        tupleOfTupleOfInt = TupleOf(tupleOfInt)
+
+        pyVersion = (1,2,3),(1,2,3,4)
+        nativeVersion = tupleOfTupleOfInt(pyVersion)
+
+        self.assertEqual(len(nativeVersion), 2)
+        self.assertEqual(len(nativeVersion[0]), 3)
+        self.assertEqual(tuple(tuple(x) for x in nativeVersion), pyVersion)

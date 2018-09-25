@@ -1,9 +1,11 @@
 #pragma once
 
+#include <Python.h>
 #include <string>
 #include <vector>
 #include <mutex>
 #include <utility>
+#include <atomic>
 
 class None;
 class Bool;
@@ -30,6 +32,8 @@ class Alternative;
 class Class;
 class PackedArray;
 class Pointer;
+
+typedef uint8_t* instance_ptr;
 
 class Type {
 public:
@@ -131,6 +135,30 @@ public:
         }
     }
 
+    void constructor(instance_ptr self) const {
+        this->check([&](auto& subtype) { subtype.constructor(self); } );
+    }
+
+    void destroy(instance_ptr self) const {
+        this->check([&](auto& subtype) { subtype.destroy(self); } );
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+        this->check([&](auto& subtype) { subtype.copy_constructor(self, other); } );
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+        this->check([&](auto& subtype) { subtype.assign(self, other); } );
+    }
+
+    PyTypeObject* getTypeRep() const {
+        return mTypeRep;
+    }
+
+    void setTypeRep(PyTypeObject* o) {
+        mTypeRep = o;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) : 
             m_typeCategory(in_typeCategory),
@@ -143,6 +171,8 @@ protected:
     size_t m_size;
 
     std::string m_name;
+
+    PyTypeObject* mTypeRep;
 };
 
 class Value : public Type {
@@ -155,6 +185,22 @@ public:
         m_size = 0;
         m_name = "Value(...)";
         }
+
+    void constructor(instance_ptr self) const {
+
+    }
+
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
 
 private:
     Type* m_type;
@@ -178,6 +224,22 @@ public:
         return res + 1;
     }
 
+    void constructor(instance_ptr self) const {
+        
+    }
+
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+    
 private:
     std::vector<Type*> m_types;
 };
@@ -202,6 +264,23 @@ public:
             res += t->bytecount();
         return res;
     }
+
+    void constructor(instance_ptr self) const {
+        
+    }
+
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+    
 
 protected:
     template<class subtype>
@@ -266,6 +345,13 @@ public:
 };
 
 class TupleOf : public Type {
+    class layout {
+    public:
+        std::atomic<int64_t> refcount;
+        int64_t count;
+        uint8_t data[];
+    };
+
 public:
     TupleOf(Type* type) : 
             Type(TypeCategory::catTupleOf),
@@ -294,9 +380,67 @@ public:
         return it->second;
     };
 
+    instance_ptr eltPtr(instance_ptr self, int64_t i) const {
+        return (*(layout**)self)->data + i * m_element_type->bytecount();
+    }
+
+    int64_t count(instance_ptr self) const {
+        return (*(layout**)self)->count;
+    }
+
+    template<class sub_constructor>
+    void constructor(instance_ptr self, int64_t count, const sub_constructor& allocator) const {
+        (*(layout**)self) = (layout*)malloc(sizeof(layout) + getEltType()->bytecount() * count);
+
+        (*(layout**)self)->count = count;
+        (*(layout**)self)->refcount = 1;
+        
+        for (int64_t k = 0; k < count; k++) {
+            try {
+                allocator(eltPtr(self, k), k);
+            } catch(...) {
+                for (long k2 = k-1; k2 >= 0; k2--) {
+                    m_element_type->destroy(eltPtr(self,k2));
+                }
+                free(*(layout**)self);
+                throw;
+            }
+        }
+    }
+
+    void constructor(instance_ptr self) const {
+        constructor(self, 0, [](instance_ptr i, int64_t k) {});
+    }
+
+    void destroy(instance_ptr self) const {
+        (*(layout**)self)->refcount--;
+        if ((*(layout**)self)->refcount == 0) {
+            for (long k = 0; k < (*(layout**)self)->count; k++) {
+                m_element_type->destroy(eltPtr(self, k));
+            }
+            free((*(layout**)self));
+        }
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+        (*(layout**)self) = (*(layout**)other);
+        (*(layout**)self)->refcount++;
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+        layout* old = (*(layout**)self);
+
+        (*(layout**)self) = (*(layout**)other);
+        (*(layout**)self)->refcount++;
+
+        destroy((instance_ptr)&old);
+    }
+
 private:
     Type* m_element_type;
 };
+
+
 
 class ConstDict : public Type {
 public:
@@ -326,6 +470,23 @@ public:
         return it->second;
     };
 
+    void constructor(instance_ptr self) const {
+    
+    }
+    
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+    
+
 private:
     Type* m_key;
     Type* m_value;
@@ -335,6 +496,22 @@ class PrimitiveType : public Type {
 public:
     PrimitiveType(TypeCategory kind) : Type(kind) 
         {}
+
+    void constructor(instance_ptr self) const {
+    
+    }
+
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
 };
 
 class None : public PrimitiveType {
@@ -490,10 +667,98 @@ public:
     }
 
     static Bytes* Make() { static Bytes res; return &res; }
+
+    void constructor(instance_ptr self) const {
+    
+    }
+    
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
 };
 
-class Alternative : public Type {};
-class Class : public Type {};
-class PackedArray : public Type {};
-class Pointer : public Type {};
+class Alternative : public Type {
+public:
+    void constructor(instance_ptr self) const {
+    
+    }
+    
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+};
+
+class Class : public Type {
+public:
+    void constructor(instance_ptr self) const {
+    
+    }
+    
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+};
+
+class PackedArray : public Type {
+public:
+    void constructor(instance_ptr self) const {
+    
+    }
+    
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+};
+
+class Pointer : public Type {
+public:
+    void constructor(instance_ptr self) const {
+    
+    }
+    
+    void destroy(instance_ptr self) const {
+
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+
+    }
+};
+
 
