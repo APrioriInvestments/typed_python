@@ -19,6 +19,27 @@ MAX_FPS = 10
 
 _cur_cell = threading.local()
 
+def multiReplace(msg, replacements):
+    for k,v in replacements.items():
+        assert k[:4] == "____"
+    chunks = msg.split("____")
+    outChunks = []
+    for chunk in chunks:
+        subchunk = chunk.split("__", 1)
+        if len(subchunk) == 2:
+            lookup = "____" + subchunk[0] + "__"
+            if lookup in replacements:
+                outChunks.append(replacements.pop(lookup))
+                outChunks.append(subchunk[1])
+            else:
+                outChunks.append("____" + chunk)
+        else:
+            outChunks.append("____" + chunk)
+
+    assert not replacements, "Didn't use up replacement %s in %s" % (replacements.key(), msg)
+
+    return "".join(outChunks)
+
 class GeventPipe:
     """A simple mechanism for triggering the gevent webserver from a thread other than
     the webserver thread. Gevent itself expects everything to happen on greenelts. The
@@ -214,8 +235,7 @@ class Cells:
             replaceDict[cell.identity + "_" + childName] = childNode.identity
 
         try:
-            for k,v in formatArgs.items():
-                contents = contents.replace(k, v)
+            contents = multiReplace(contents, formatArgs)
         except:
             raise Exception("Failed to format these contents with args %s:\n\n%s", formatArgs, contents)
 
@@ -300,11 +320,11 @@ class Card(Cell):
     def __init__(self, inner):
         super().__init__()
 
-        self.children = {"__contents__": Cell.makeCell(inner)}
+        self.children = {"____contents__": Cell.makeCell(inner)}
         self.contents = """
         <div class='card'>
           <div class="card-body">
-            __contents__
+            ____contents__
           </div>
         </div>
         """
@@ -313,10 +333,10 @@ class CardTitle(Cell):
     def __init__(self, inner):
         super().__init__()
 
-        self.children = {"__contents__": Cell.makeCell(inner)}
+        self.children = {"____contents__": Cell.makeCell(inner)}
         self.contents = """
         <div class='card-title'>
-          __contents__
+          ____contents__
         </div>
         """
 
@@ -343,8 +363,8 @@ class Sequence(Cell):
         elements = [Cell.makeCell(x) for x in elements]
 
         self.elements = elements
-        self.children = {"__c_%s__" % i: elements[i] for i in range(len(elements)) }
-        self.contents = "<div>" + "\n".join("__c_%s__" % i for i in range(len(elements))) + "</div>"
+        self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
+        self.contents = "<div>" + "\n".join("____c_%s__" % i for i in range(len(elements))) + "</div>"
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -361,9 +381,9 @@ class HeaderBar(Cell):
             <div class="p-2 bg-light mr-auto tl-navbar">
                 %s
             </div>
-        """ % "".join(["<span class='tl-navbar-item px-2'>__child_%s__</span>" % i for i in range(len(navbarItems))])
+        """ % "".join(["<span class='tl-navbar-item px-2'>____child_%s__</span>" % i for i in range(len(navbarItems))])
 
-        self.children = {'__child_%s__' % i: navbarItems[i] for i in range(len(navbarItems))}
+        self.children = {'____child_%s__' % i: navbarItems[i] for i in range(len(navbarItems))}
 
 class Main(Cell):
     def __init__(self, child):
@@ -372,11 +392,11 @@ class Main(Cell):
         self.contents = """
             <main class="py-md-2">
             <div class="container-fluid">
-                __child__
+                ____child__
             </div>
             </main>
         """
-        self.children = {'__child__': child}
+        self.children = {'____child__': child}
 
 class Dropdown(Cell):
     def __init__(self, title, headersAndLambdas):
@@ -390,14 +410,14 @@ class Dropdown(Cell):
         
         for i in range(len(self.headersAndLambdas)):
             header, _ = self.headersAndLambdas[i]
-            self.children["__child_%s__" % i] = Cell.makeCell(header)
+            self.children["____child_%s__" % i] = Cell.makeCell(header)
 
             items.append(
                 """
                     <a class='dropdown-item' 
                         onclick="websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))"
                         >
-                    __child___ix____
+                    ____child___ix____
                     </a>
                 """.replace("__ix__", str(i)).replace("__identity__", self.identity)
                 )
@@ -439,11 +459,11 @@ class Container(Cell):
             self.contents = ""
             self.children = {}
         else:
-            self.contents = "<div>__child__</div>"
-            self.children = {"__child__": Cell.makeCell(child)}
+            self.contents = "<div>____child__</div>"
+            self.children = {"____child__": Cell.makeCell(child)}
 
     def setChild(self, child):
-        self.setContents("<div>__child__</div>", {"__child__": Cell.makeCell(child)})
+        self.setContents("<div>____child__</div>", {"____child__": Cell.makeCell(child)})
 
     def setContents(self, newContents, newChildren):
         self.contents = newContents
@@ -456,19 +476,19 @@ class RootCell(Container):
         return "page_root"
 
     def setChild(self, child):
-        self.setContents("<div>__c__</div>", {"__c__": child})
+        self.setContents("<div>____c__</div>", {"____c__": child})
 
 class Traceback(Cell):
     def __init__(self, traceback):
         super().__init__()
-        self.contents = """<div class='alert alert-primary'><pre>__child__</pre></alert>"""
-        self.children = {"__child__": Cell.makeCell(traceback)}
+        self.contents = """<div class='alert alert-primary'><pre>____child__</pre></alert>"""
+        self.children = {"____child__": Cell.makeCell(traceback)}
 
 class Code(Cell):
     def __init__(self, traceback):
         super().__init__()
-        self.contents = """<pre><code>__child__</code></pre>"""
-        self.children = {"__child__": Cell.makeCell(traceback)}
+        self.contents = """<pre><code>____child__</code></pre>"""
+        self.children = {"____child__": Cell.makeCell(traceback)}
 
 class Subscribed(Cell):
     def __init__(self, f):
@@ -487,13 +507,13 @@ class Subscribed(Cell):
 
     def recalculate(self):
         with self.cells.db.view() as v:
-            self.contents = """<div>__contents__</div>"""
+            self.contents = """<div>____contents__</div>"""
             try:
-                self.children = {'__contents__': Cell.makeCell(self.f())}
+                self.children = {'____contents__': Cell.makeCell(self.f())}
             except SubscribeAndRetry:
                 raise
             except:
-                self.children = {'__contents__': Traceback(traceback.format_exc())}
+                self.children = {'____contents__': Traceback(traceback.format_exc())}
 
             new_subscriptions = set(v._reads).union(set(v._indexReads))
 
@@ -549,11 +569,11 @@ class SubscribedSequence(Cell):
                 new_children["__child_%s__" % ix] = self.existingItems[s]
             else:
                 try:
-                    self.existingItems[s] = new_children["__child_%s__" % ix] = self.rendererFun(s)
+                    self.existingItems[s] = new_children["____child_%s__" % ix] = self.rendererFun(s)
                 except SubscribeAndRetry:
                     raise
                 except:
-                    self.existingItems[s] = new_children["__child_%s__" % ix] = Traceback(traceback.format_exc())
+                    self.existingItems[s] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
         
         self.children = new_children
 
@@ -562,7 +582,7 @@ class SubscribedSequence(Cell):
             if i not in spineAsSet:
                 del self.existingItems[i]
 
-        self.contents = """<div>%s</div>""" % "\n".join(['__child_%s__' % i for i in range(len(self.spine))])
+        self.contents = """<div>%s</div>""" % "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
 
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
@@ -570,20 +590,20 @@ class Popover(Cell):
 
         self.width = width
         self.children = {
-            '__contents__': Cell.makeCell(contents),
-            '__detail__': Cell.makeCell(detail),
-            '__title__': Cell.makeCell(title)
+            '____contents__': Cell.makeCell(contents),
+            '____detail__': Cell.makeCell(detail),
+            '____title__': Cell.makeCell(title)
             }
 
     def recalculate(self):
         self.contents = """
             <div>
-            <a href="#popmain___identity__" data-toggle="popover" data-trigger="focus" data-bind="#pop___identity__" container="body" class="btn btn-xs" role="button">__contents__</a>
+            <a href="#popmain___identity__" data-toggle="popover" data-trigger="focus" data-bind="#pop___identity__" container="body" class="btn btn-xs" role="button">____contents__</a>
             <div style="display:none;">
               <div id="pop___identity__">
                 <div class='data-placement'>bottom</div>
-                <div class="data-title">__title__</div>
-                <div class="data-content"><div style="width:__width__px">__detail__</div></div>
+                <div class="data-title">____title__</div>
+                <div class="data-content"><div style="width:__width__px">____detail__</div></div>
               </div>
             </div>
 
@@ -646,41 +666,41 @@ class Grid(Cell):
         for col_ix, col in enumerate(self.cols):
             seen.add((None, col))
             if (None,col) in self.existingItems:
-                new_children["__header_%s__" % (col_ix)] = self.existingItems[(None,col)]
+                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None,col)]
             else:
                 try:
-                    self.existingItems[(None,col)] = new_children["__header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col))
+                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col))
                 except SubscribeAndRetry:
                     raise
                 except:
-                    self.existingItems[(None,col)] = new_children["__header_%s__" % col_ix] = Traceback(traceback.format_exc())
+                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
         
         if self.rowLabelFun is not None:
             for row_ix, row in enumerate(self.rows):
                 seen.add((None, row))
                 if (row, None) in self.existingItems:
-                    new_children["__rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
+                    new_children["____rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
                 else:
                     try:
-                        self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
+                        self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
                     except SubscribeAndRetry:
                         raise
                     except:
-                        self.existingItems[(row, None)] = new_children["__rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
+                        self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
         
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
                 seen.add((row,col))
                 if (row,col) in self.existingItems:
-                    new_children["__child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row,col)]
+                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row,col)]
                 else:
                     try:
-                        self.existingItems[(row,col)] = new_children["__child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
+                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
                     except SubscribeAndRetry:
                         raise
                     except:
-                        self.existingItems[(row,col)] = new_children["__child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
+                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
             
         self.children = new_children
 
@@ -694,13 +714,13 @@ class Grid(Cell):
             __rows__
             </table>
             """.replace("__headers__",
-                "".join("<th>__header_%s__</th>" % (col_ix)
+                "".join("<th>____header_%s__</th>" % (col_ix)
                             for col_ix in range(len(self.cols)))
                 ).replace("__rows__", 
                 "\n".join("<tr>" + 
-                    ("<td>__rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") + 
+                    ("<td>____rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") + 
                     "".join(
-                        "<td>__child_%s_%s__</td>" % (row_ix, col_ix)
+                        "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
                         )
                     + "</tr>"
@@ -716,10 +736,10 @@ class Clickable(Cell):
 
 
     def recalculate(self):
-        self.children = {'__contents__': Cell.makeCell(self.content)}
+        self.children = {'____contents__': Cell.makeCell(self.content)}
         self.contents = """
             <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))">
-            __contents__
+            ____contents__
             </div>""".replace('__identity__', self.identity)
 
     def onMessage(self, msgFrame):
@@ -742,13 +762,13 @@ class Clickable(Cell):
 
 class Button(Clickable):
     def recalculate(self):
-        self.children = {'__contents__': Cell.makeCell(self.content)}
+        self.children = {'____contents__': Cell.makeCell(self.content)}
         self.contents = """
             <button 
                 class='btn btn-primary' 
                 onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
                 >
-            __contents__
+            ____contents__
             </button>""".replace('__identity__', self.identity)
 
 class SubscribeAndRetry(Exception):
@@ -788,12 +808,12 @@ class Expands(Cell):
                 </div>
 
                 <div style="display:inline-block">
-                    __child__
+                    ____child__
                 </div>
 
             </div>
             """.replace("__identity__", self.identity).replace("__which__", 'removed' if self.isExpanded else 'added')
-        self.children = {'__child__': self.open if self.isExpanded else self.closed}
+        self.children = {'____child__': self.open if self.isExpanded else self.closed}
 
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded
