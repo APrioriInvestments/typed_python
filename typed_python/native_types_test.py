@@ -35,6 +35,7 @@ class NativeTypesTests(unittest.TestCase):
         tupleOfInt = TupleOf(int)
         i = tupleOfInt(())
         i = tupleOfInt((1,2,3))
+
         self.assertEqual(len(i), 3)
         self.assertEqual(tuple(i), (1,2,3))
 
@@ -51,3 +52,14 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(len(nativeVersion), 2)
         self.assertEqual(len(nativeVersion[0]), 3)
         self.assertEqual(tuple(tuple(x) for x in nativeVersion), pyVersion)
+
+        bigTup = tupleOfInt(list(range(1000)))
+
+        t0 = time.time()
+        t = (bigTup,bigTup,bigTup,bigTup,bigTup)
+        for i in range(1000000):
+            tupleOfTupleOfInt(t)
+        print(time.time() - t0, " to do 1mm")
+
+        #like 5mm/sec
+        self.assertTrue(time.time() - t0 < 1.0)

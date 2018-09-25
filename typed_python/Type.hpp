@@ -143,6 +143,15 @@ public:
         this->check([&](auto& subtype) { subtype.destroy(self); } );
     }
 
+    template<class ptr_func>
+    void destroy(int64_t count, const ptr_func& ptrToChild) const {
+        this->check([&](auto& subtype) { 
+            for (long k = 0; k < count; k++) {
+                subtype.destroy(ptrToChild(k)); 
+            }
+        });
+    }
+
     void copy_constructor(instance_ptr self, instance_ptr other) const {
         this->check([&](auto& subtype) { subtype.copy_constructor(self, other); } );
     }
@@ -163,7 +172,8 @@ protected:
     Type(TypeCategory in_typeCategory) : 
             m_typeCategory(in_typeCategory),
             m_size(0),
-            m_name("Undefined")
+            m_name("Undefined"),
+            mTypeRep(nullptr)
         {}
 
     TypeCategory m_typeCategory;
@@ -415,9 +425,7 @@ public:
     void destroy(instance_ptr self) const {
         (*(layout**)self)->refcount--;
         if ((*(layout**)self)->refcount == 0) {
-            for (long k = 0; k < (*(layout**)self)->count; k++) {
-                m_element_type->destroy(eltPtr(self, k));
-            }
+            m_element_type->destroy((*(layout**)self)->count, [&](int64_t k) {return eltPtr(self,k);});
             free((*(layout**)self));
         }
     }
