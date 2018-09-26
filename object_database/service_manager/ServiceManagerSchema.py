@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import logging
+import importlib
 import os
 import sys
 import six
@@ -20,6 +21,7 @@ import importlib
 import time
 import os
 import tempfile
+import urllib.parse
 from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
 from typed_python import *
 import threading
@@ -211,6 +213,46 @@ class Service:
             return min(1, max(self.target_count, 0))
         else:
             return max(self.target_count, 0)
+
+    def instantiateType(self, diskPath, typename):
+        modulename = ".".join(typename.split(".")[:-1])
+        typename = typename.split(".")[-1]
+
+        if self.codebase:
+            module = self.codebase.instantiate(diskPath, modulename)
+
+            if typename not in module.__dict__:
+                return None
+
+            return module.__dict__[typename]
+        else:
+            def _getobject(modname, attribute):
+                mod = __import__(modname, fromlist=[attribute])
+                return mod.__dict__[attribute]
+
+            return _getobject(modulename, typename)
+
+    def urlForObject(self, obj, **queryParams):
+        return "/services/%s/%s/%s" % (
+            self.name,
+            type(obj).__schema__.name + "." + type(obj).__qualname__,
+            obj._identity
+            ) + ("" if not queryParams else "?" + urllib.parse.urlencode({k:str(v) for k,v in queryParams.items()}))
+    
+    def findModuleSchemas(self, diskPath):
+        """Find all Schema objects in the same module as our type object."""
+        if self.codebase:
+            module = self.codebase.instantiate(diskPath, self.service_module_name)
+        else:
+            module = importlib.import_module(self.service_module_name)
+
+        res = []
+
+        for o in dir(module):
+            if isinstance(getattr(module, o), Schema):
+                res.append(getattr(module, o))
+        
+        return res
 
     def instantiateServiceObject(self, diskPath):
         if self.codebase:

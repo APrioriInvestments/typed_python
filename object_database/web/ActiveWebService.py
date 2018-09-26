@@ -35,10 +35,10 @@ from object_database.web.cells import *
 from gevent.greenlet import Greenlet
 from gevent import sleep
 
-from flask import Flask, send_from_directory, redirect, url_for
+from flask import Flask, send_from_directory, redirect, url_for, request
 from flask_sockets import Sockets
 
-from object_database import ServiceBase, service_schema, Schema, Indexed, Index
+from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
 
 active_webservice_schema = Schema("core.active_webservice")
 
@@ -92,94 +92,121 @@ class ActiveWebService(ServiceBase):
         server.serve_forever()
     
     def configureApp(self):
-        self.app.route('/content/<path:path>')(self.sendContent)
-        self.app.route("/")(lambda: redirect("/content/page.html"))
-        self.sockets.route("/socket")(self.mainSocket)
-        
-    def createCells(self):
-        cells = Cells(self.db)
+        instanceName = self.serviceInstance.service.name
+        self.app.route("/")(lambda: redirect("/services"))
 
-        curService = Slot(None)
+        self.app.route('/services')(self.sendPage)
+        self.app.route('/services/<path:path>')(self.sendPage)
+        self.sockets.route("/socket/<path:path>")(self.mainSocket)
 
+    def sendPage(self, path=None):
+        return self.sendContent("page.html")
+
+    def mainDisplay(self):
         def serviceCountSetter(service, ct):
             def f():
                 service.target_count = ct
             return f
 
-        def curServiceSetter(s):
-            def f():
-                curService.set(s)
-            return f
-
         serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
 
-        def makeServiceGrid():
-            return Grid(
-                colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
-                rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
-                headerFun=lambda x: x,
-                rowLabelFun=None,
-                rendererFun=lambda s,field: Subscribed(lambda: 
-                    Clickable(s.name, curServiceSetter(s)) if field == 'Service' else
-                    (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
-                    s.service_module_name if field == 'Module' else
-                    s.service_class_name if field == 'Class' else 
-                    s.placement if field == 'Placement' else 
-                    Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
-                    Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
-                            if field == 'TargetCount' else 
-                    str(s.coresUsed) if field == 'Cores' else 
-                    str(s.gbRamUsed) if field == 'RAM' else 
-                    (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
-                    ""
-                    )
-                ) + Grid(
-                colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT'],
-                rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
-                headerFun=lambda x: x,
-                rowLabelFun=None,
-                rendererFun=lambda s,field: Subscribed(lambda: 
-                    s.connection._identity if field == "Connection" else
-                    str(s.isMaster) if field == "IsMaster" else
-                    s.hostname if field == "Hostname" else
-                    "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM USAGE" else
-                    "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE USAGE" else
-                    str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
-                    ""
-                    )
+        return Grid(
+            colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
+            rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
+            headerFun=lambda x: x,
+            rowLabelFun=None,
+            rendererFun=lambda s,field: Subscribed(lambda: 
+                Clickable(s.name, "/services/" + s.name) if field == 'Service' else
+                (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
+                s.service_module_name if field == 'Module' else
+                s.service_class_name if field == 'Class' else 
+                s.placement if field == 'Placement' else 
+                Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
+                Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
+                        if field == 'TargetCount' else 
+                str(s.coresUsed) if field == 'Cores' else 
+                str(s.gbRamUsed) if field == 'RAM' else 
+                (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
+                ""
                 )
-        
-        def displayForService(serviceObj):
-            return serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot).serviceDisplay(serviceObj)
+            ) + Grid(
+            colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT'],
+            rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
+            headerFun=lambda x: x,
+            rowLabelFun=None,
+            rendererFun=lambda s,field: Subscribed(lambda: 
+                s.connection._identity if field == "Connection" else
+                str(s.isMaster) if field == "IsMaster" else
+                s.hostname if field == "Hostname" else
+                "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM USAGE" else
+                "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE USAGE" else
+                str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
+                ""
+                )
+            )
+
+    def pathToDisplay(self, path, queryArgs):
+        if len(path) and path[0] == 'services':
+            if len(path) == 1:
+                return self.mainDisplay()
+            serviceObj = service_schema.Service.lookupAny(name=path[1])
             
-        cells.root.setChild(
+            if serviceObj is None:
+                return Traceback("Unknown service %s" % path[1])
+            
+            serviceInst = serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot)
+            
+            if len(path) == 2:
+                return Subscribed(lambda: serviceInst.serviceDisplay(serviceObj, queryArgs=queryArgs))
+
+            typename = path[2]
+
+            schemas = serviceObj.findModuleSchemas(self.runtimeConfig.serviceSourceRoot)
+            typeObj = None
+            for s in schemas:
+                typeObj = s.lookupFullyQualifiedTypeByName(typename)
+                if typeObj:
+                    break
+
+            if typeObj is None:
+                return Traceback("Can't find fully-qualified type %s" % typename)
+
+            if len(path) == 3:
+                return serviceInst.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
+
+            instance = typeObj.fromIdentity(path[3])
+
+            return serviceInst.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
+
+        return Traceback("Invalid url path: %s" % path)
+
+
+    def addMainBar(self, display):
+        return (
             HeaderBar(
                 [Subscribed(lambda: 
                     Dropdown(
                         "Service",
-                            [("All", lambda: curService.set(None))] + 
-                            [(s.name, curServiceSetter(s)) for 
+                            [("All", "/services")] + 
+                            [(s.name, "/services/" + s.name) for 
                                 s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
                     )
                 ]) +
-            Main(
-                Subscribed(lambda:
-                    makeServiceGrid() if curService.get() is None else
-                        displayForService(curService.get())
-                    )
-                )
+            Main(display)
             )
 
-        return cells
-
-    def mainSocket(self, ws):
+    def mainSocket(self, ws, path):
+        path = str(path).split("/")
+        queryArgs = dict(request.args)
+        logging.info("path = %s", path)
         reader = None
 
         try:
             logging.info("Starting main websocket handler with %s", ws)
 
-            cells = self.createCells()
+            cells = Cells(self.db)
+            cells.root.setChild(self.addMainBar(Subscribed(lambda: self.pathToDisplay(path, queryArgs))))
 
             timestamps = []
 
@@ -260,7 +287,7 @@ class ActiveWebService(ServiceBase):
         return send_from_directory(os.path.join(own_dir, "content"), path)
 
     @staticmethod
-    def serviceDisplay(serviceObject):
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         c = Configuration.lookupAny(service=serviceObject)
 
         return Card(Text("Host: " + c.hostname) + Text("Port: " + str(c.port)))

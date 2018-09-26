@@ -531,7 +531,7 @@ class AwsWorkerBootService(ServiceBase):
 
 
     @staticmethod
-    def serviceDisplay(serviceObject):
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         cells.ensureSubscribedType(Configuration)
         cells.ensureSubscribedType(State)
         

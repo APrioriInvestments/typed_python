@@ -108,22 +108,36 @@ happy = Schema("core.test.happy")
 class Happy:
     i = int
 
+    def display(self, queryParams=None):
+        ensureSubscribedType(Happy)
+        return "Happy %s. " % self.i + str(queryParams)
+
 class HappyService(ServiceBase):
     def initialize(self):
         pass
 
     @staticmethod
-    def serviceDisplay(serviceObject):
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         if not current_transaction().db().isSubscribedToType(Happy):
             raise SubscribeAndRetry(lambda db: db.subscribeToType(Happy))
+
+        if instance:
+            return instance.display(queryArgs)
         
         return Card(
             Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) + 
             Expands(Text("Closed"),Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
-            )
+            ) + Button("go to google", "http://google.com/") + SubscribedSequence(
+                lambda: Happy.lookupAll(),
+                lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
+                )
 
     def doWork(self, shouldStop):
         self.db.subscribeToSchema(happy)
+
+        with self.db.transaction():
+            h = Happy(i = 1)
+            h = Happy(i = 2)
 
         while not shouldStop.is_set():
             time.sleep(.5)

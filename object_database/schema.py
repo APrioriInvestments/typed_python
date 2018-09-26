@@ -41,6 +41,11 @@ class Schema:
                 if issubclass(t, DatabaseObject)
             })
 
+    def lookupFullyQualifiedTypeByName(self, name):
+        if not name.startswith(self.name + "."):
+            return None
+        return self._types.get(name[len(self.name)+1:])
+
     def typeToDef(self, t):
         return TypeDefinition(fields = tuple(t.__types__.keys()) + (" exists",), indices= tuple(self._indices.get(t,{}).keys()))
 

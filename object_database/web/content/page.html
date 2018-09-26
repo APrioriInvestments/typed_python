@@ -21,9 +21,8 @@
         new_uri = "ws:";
     }
     new_uri += "//" + loc.host;
-    new_uri += "/socket";
+    new_uri += "/socket" + loc.pathname + loc.search;
     
-
     if (window.WebSocket) { 
         websocket = new WebSocket(new_uri); 
     }

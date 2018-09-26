@@ -19,9 +19,15 @@ MAX_FPS = 10
 
 _cur_cell = threading.local()
 
+def quoteForJs(string, quoteType):
+    if quoteType == "'":
+        return string.replace("\\", "\\\\").replace("'", "\\'")
+    else:
+        return string.replace("\\", "\\\\").replace('"', '\\"')
+
 def multiReplace(msg, replacements):
     for k,v in replacements.items():
-        assert k[:4] == "____"
+        assert k[:4] == "____", k
     chunks = msg.split("____")
     outChunks = []
     for chunk in chunks:
@@ -42,7 +48,7 @@ def multiReplace(msg, replacements):
 
 class GeventPipe:
     """A simple mechanism for triggering the gevent webserver from a thread other than
-    the webserver thread. Gevent itself expects everything to happen on greenelts. The
+    the webserver thread. Gevent itself expects everything to happen on greenlets. The
     database connection in the background is not based on gevent, so we cannot use any
     standard gevent-based event or queue objects from the db-trigger thread.
     """
@@ -195,7 +201,7 @@ class Cells:
                 except:
                     logging.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
                     logging.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
-                    n.children = {'__contents__': Traceback(traceback.format_exc())}
+                    n.children = {'____contents__': Traceback(traceback.format_exc())}
 
                 finally:
                     _cur_cell.cell = None
@@ -256,7 +262,8 @@ class Slot:
         self._subscribedCells = set()
 
     def get(self):
-        self._subscribedCells.add(_cur_cell.cell)
+        if _cur_cell.cell:
+            self._subscribedCells.add(_cur_cell.cell)
         return self._value
 
     def set(self, val):
@@ -276,6 +283,16 @@ class Cell:
         self._identity = None
         self.postscript = None
         self.garbageCollected = False
+        self._nowrap = False
+
+    def _divStyle(self):
+        if self._nowrap:
+            return "style='display:inline-block'"
+        return ""
+
+    def nowrap(self):
+        self._nowrap = True
+        return self
 
     def prepareForReuse(self):
         if not self.garbageCollected:
@@ -346,11 +363,15 @@ class Octicon(Cell):
         self.contents = '<span class="octicon octicon-%s" aria-hidden="true"></span>' % which
 
 class Text(Cell):
-    div_class = None
-
     def __init__(self, text):
         super().__init__()
-        self.contents = "<div>%s</div>" % (cgi.escape(str(text)) if text else "&nbsp;")
+        self.text = text
+
+    def recalculate(self):
+        self.contents = "<div %s>%s</div>" % (
+            self._divStyle(),
+            cgi.escape(str(self.text)) if self.text else "&nbsp;"
+            )
 
 class Span(Cell):
     def __init__(self, text):
@@ -364,7 +385,7 @@ class Sequence(Cell):
 
         self.elements = elements
         self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
-        self.contents = "<div>" + "\n".join("____c_%s__" % i for i in range(len(elements))) + "</div>"
+        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" % i for i in range(len(elements))) + "</div>"
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -409,17 +430,22 @@ class Dropdown(Cell):
         items = []
         
         for i in range(len(self.headersAndLambdas)):
-            header, _ = self.headersAndLambdas[i]
+            header, onDropdown = self.headersAndLambdas[i]
             self.children["____child_%s__" % i] = Cell.makeCell(header)
 
             items.append(
                 """
                     <a class='dropdown-item' 
-                        onclick="websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))"
+                        onclick="__onclick__"
                         >
                     ____child___ix____
                     </a>
-                """.replace("__ix__", str(i)).replace("__identity__", self.identity)
+                """.replace(
+                    "__onclick__",
+                    "websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))"
+                        if not isinstance(onDropdown, str) else
+                    quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(onDropdown, "'")), '"')
+                    ).replace("__ix__", str(i)).replace("__identity__", self.identity)
                 )
 
         self.contents = """
@@ -451,6 +477,7 @@ class Dropdown(Cell):
                     return
             except:
                 logging.error("Exception in button logic:\n%s", traceback.format_exc())
+                return
 
 class Container(Cell):
     def __init__(self, child=None):
@@ -507,7 +534,7 @@ class Subscribed(Cell):
 
     def recalculate(self):
         with self.cells.db.view() as v:
-            self.contents = """<div>____contents__</div>"""
+            self.contents = """<div %s>____contents__</div>""" % self._divStyle()
             try:
                 self.children = {'____contents__': Cell.makeCell(self.f())}
             except SubscribeAndRetry:
@@ -563,17 +590,17 @@ class SubscribedSequence(Cell):
 
             self.subscriptions = new_subscriptions
 
-        new_children = {}
-        for ix, s in enumerate(self.spine):
-            if s in self.existingItems:
-                new_children["__child_%s__" % ix] = self.existingItems[s]
-            else:
-                try:
-                    self.existingItems[s] = new_children["____child_%s__" % ix] = self.rendererFun(s)
-                except SubscribeAndRetry:
-                    raise
-                except:
-                    self.existingItems[s] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
+            new_children = {}
+            for ix, s in enumerate(self.spine):
+                if s in self.existingItems:
+                    new_children["____child_%s__" % ix] = self.existingItems[s]
+                else:
+                    try:
+                        self.existingItems[s] = new_children["____child_%s__" % ix] = self.rendererFun(s)
+                    except SubscribeAndRetry:
+                        raise
+                    except:
+                        self.existingItems[s] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
         
         self.children = new_children
 
@@ -582,7 +609,10 @@ class SubscribedSequence(Cell):
             if i not in spineAsSet:
                 del self.existingItems[i]
 
-        self.contents = """<div>%s</div>""" % "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
+        self.contents = """<div %s>%s</div>""" % (
+            self._divStyle(),
+            "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
+            )
 
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
@@ -597,7 +627,7 @@ class Popover(Cell):
 
     def recalculate(self):
         self.contents = """
-            <div>
+            <div __style__>
             <a href="#popmain___identity__" data-toggle="popover" data-trigger="focus" data-bind="#pop___identity__" container="body" class="btn btn-xs" role="button">____contents__</a>
             <div style="display:none;">
               <div id="pop___identity__">
@@ -608,7 +638,7 @@ class Popover(Cell):
             </div>
 
             </div>
-            """.replace("__identity__", self.identity).replace("__width__", str(self.width))
+            """.replace("__style__", self._divStyle()).replace("__identity__", self.identity).replace("__width__", str(self.width))
 
 class Grid(Cell):
     def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun):
@@ -734,13 +764,19 @@ class Clickable(Cell):
         self.f = f
         self.content = content
 
+    def calculatedOnClick(self):
+        if isinstance(self.f, str):
+            return quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(self.f, "'")), '"')
+        else:
+            return "websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))".replace("__identity__", self.identity)
 
     def recalculate(self):
         self.children = {'____contents__': Cell.makeCell(self.content)}
+
         self.contents = """
-            <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))">
+            <div onclick="__onclick__">
             ____contents__
-            </div>""".replace('__identity__', self.identity)
+            </div>""".replace('__onclick__', self.calculatedOnClick())
 
     def onMessage(self, msgFrame):
         t0 = time.time()
@@ -759,17 +795,43 @@ class Clickable(Cell):
             except:
                 logging.error("Exception in button logic:\n%s", traceback.format_exc())
 
-
 class Button(Clickable):
+    def __init__(self, *args, small=False, **kwargs):
+        Clickable.__init__(self, *args, **kwargs)
+        self.small = small
+
     def recalculate(self):
         self.children = {'____contents__': Cell.makeCell(self.content)}
-        self.contents = """
+        self.contents = ("""
             <button 
-                class='btn btn-primary' 
-                onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
+                class='btn btn-primary __size__' 
+                onclick="__onclick__"
                 >
             ____contents__
-            </button>""".replace('__identity__', self.identity)
+            </button>"""
+            .replace("__size__", "" if not self.small else "btn-sm")
+            .replace('__identity__', self.identity)
+            .replace("__onclick__", self.calculatedOnClick())
+        )
+
+class LoadContentsFromUrl(Cell):
+    def __init__(self, targetUrl):
+        Cell.__init__(self)
+        self.targetUrl = targetUrl
+
+    def recalculate(self):
+        self.children = {}
+        self.contents = """
+            <div>
+            <div id='loadtarget__identity__'></div>
+            </div>
+            """.replace('__identity__', self._identity)
+
+        self.postscript = (
+            "$('#loadtarget__identity__').load('__url__')"
+                .replace("__identity__", self._identity)
+                .replace("__url__", quoteForJs(self.targetUrl, "'"))
+            )
 
 class SubscribeAndRetry(Exception):
     def __init__(self, callback):
