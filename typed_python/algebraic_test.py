@@ -18,6 +18,7 @@ from typed_python.types import ListOf, TupleOf, OneOf, TypeConvert, ConstDict
 import unittest
 
 expr = Alternative("Expr")
+
 expr.define(
     Constant={'value': int},
     Add={'l': expr, 'r': expr},

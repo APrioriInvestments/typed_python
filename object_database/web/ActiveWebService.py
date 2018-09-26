@@ -37,6 +37,7 @@ from gevent import sleep
 
 from flask import Flask, send_from_directory, redirect, url_for, request
 from flask_sockets import Sockets
+from flask_cors import CORS
 
 from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
 
@@ -77,6 +78,7 @@ class ActiveWebService(ServiceBase):
 
         with self.db.transaction():
             self.app = Flask(__name__)
+            CORS(self.app)
             self.sockets = Sockets(self.app)
             self.configureApp()
 

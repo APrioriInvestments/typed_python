@@ -51,7 +51,7 @@ sudo chmod 777 /var/run/docker.sock
 echo "Installing python dependencies"
 
 sudo apt-get install -y python3-pip libtcmalloc-minimal4
-sudo pip3 install boto3 psutil docker==2.6.1 pandas numpy pytz redis flask_sockets websockets
+sudo pip3 install boto3 psutil docker==2.6.1 pandas numpy pytz redis flask_sockets flask-cors websockets
 
 export PYTHONPATH=$STORAGE/nativepython
 export INSTALL=$STORAGE/install
