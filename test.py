@@ -436,7 +436,8 @@ def executeTests(args, filter_actions):
     return 0
 
 def buildModule(args):
-    shutil.rmtree("./build")
+    if os.path.exists('./build'):
+        shutil.rmtree("./build")
 
     install_dir = os.path.abspath("./build/install")
     os.makedirs(install_dir)
@@ -461,7 +462,7 @@ def buildModule(args):
         ['python3', 'setup.py', 'develop', '--install-dir', './build/install'], 
         stdout=subprocess.PIPE, 
         stderr=subprocess.STDOUT, 
-        env={'PYTHONPATH': (os.environ['PYTHONPATH'] or "") + os.path.abspath("./build/install")}
+        env={'PYTHONPATH': (os.environ['PYTHONPATH'] + ":" or "") + os.path.abspath("./build/install")}
         )
 
     if result.returncode != 0:
