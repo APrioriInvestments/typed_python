@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Int8, NoneType, TupleOf
+from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple
 import typed_python._types as _types
 
 import unittest
@@ -63,3 +63,64 @@ class NativeTypesTests(unittest.TestCase):
 
         #like 5mm/sec
         self.assertTrue(time.time() - t0 < 1.0)
+
+    def test_tuple_of_various_things(self):
+        for thing, typeOfThing in [("hi", str), (b"somebytes", bytes), 
+                                   (1.0, float), (2, int),
+                                   (None, type(None))
+                                   ]:
+            tupleType = TupleOf(typeOfThing)
+            t = tupleType((thing,))
+            self.assertTrue(type(t[0]) is typeOfThing)
+            self.assertEqual(t[0], thing)
+
+    def test_one_of(self):
+        o = OneOf(None, str)
+
+        self.assertEqual(o("hi"), "hi")
+        self.assertTrue(o(None) is None)
+
+    def test_one_of_in_tuple(self):
+        t = Tuple(OneOf(None, str), str)
+
+        self.assertEqual(t(("hi","hi2"))[0], "hi")
+        self.assertEqual(t(("hi","hi2"))[1], "hi2")
+        self.assertEqual(t((None,"hi2"))[1], "hi2")
+        self.assertEqual(t((None,"hi2"))[0], None)
+        with self.assertRaises(TypeError):
+            t((None,None))
+        with self.assertRaises(IndexError):
+            t((None,"hi2"))[2]
+        
+    def test_one_of_composite(self):
+        t = OneOf(TupleOf(str), TupleOf(float))
+
+        self.assertIsInstance(t((1.0,2.0)), TupleOf(float))
+        self.assertIsInstance(t(("1.0","2.0")), TupleOf(str))
+
+        with self.assertRaises(TypeError):
+            t((1.0,"2.0"))
+
+    def test_named_tuple(self):
+        t = NamedTuple(a=int, b=int)
+
+        with self.assertRaises(AttributeError):
+            t().asdf
+
+        self.assertEqual(t()[0], 0)
+        self.assertEqual(t().a, 0)
+        self.assertEqual(t()[1], 0)
+
+        self.assertEqual(t(a=1,b=2).a, 1)
+        self.assertEqual(t(a=1,b=2).b, 2)
+
+    def test_named_tuple_str(self):
+        t = NamedTuple(a=str, b=str)
+
+        self.assertEqual(t(a='1',b='2').a, '1')
+        self.assertEqual(t(a='1',b='2').b, '2')
+
+        self.assertEqual(t(b='2').a, '')
+        self.assertEqual(t(b='2').b, '2')
+        self.assertEqual(t().a, '')
+        self.assertEqual(t().b, '')
