@@ -20,6 +20,7 @@ struct native_instance_wrapper {
     }
 
     int64_t mIsInitialized;
+    int64_t mIteratorOffset; //-1 if we're not an iterator
     uint8_t data[0];
 
     static PyObject* bytecount(PyObject* o) {
@@ -109,7 +110,7 @@ struct native_instance_wrapper {
             if (pyRepresentation == Py_None) {
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize a None from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -127,7 +128,7 @@ struct native_instance_wrapper {
                 ((int32_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an int32 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -136,7 +137,7 @@ struct native_instance_wrapper {
                 ((int16_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an int16 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -145,7 +146,7 @@ struct native_instance_wrapper {
                 ((int8_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an int8 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -154,7 +155,7 @@ struct native_instance_wrapper {
                 ((uint64_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an uint64 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -163,7 +164,7 @@ struct native_instance_wrapper {
                 ((uint32_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an uint32 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -172,7 +173,7 @@ struct native_instance_wrapper {
                 ((uint16_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an uint16 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -181,7 +182,7 @@ struct native_instance_wrapper {
                 ((uint8_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize an uint8 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
         if (cat == Type::TypeCategory::catBool) {
@@ -189,7 +190,7 @@ struct native_instance_wrapper {
                 ((bool*)tgt)[0] = PyLong_AsLong(pyRepresentation) != 0;
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize a Bool from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -213,7 +214,7 @@ struct native_instance_wrapper {
                     );
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize a String from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -226,7 +227,7 @@ struct native_instance_wrapper {
                     );
                 return;
             }
-            throw std::logic_error("Can't initialize an int64 from an instance of " + 
+            throw std::logic_error("Can't initialize a Bytes object from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
         }
 
@@ -239,8 +240,42 @@ struct native_instance_wrapper {
                 ((double*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
                 return;
             }
-            throw std::logic_error("Can't initialize a flaot64 from an instance of " + 
+            throw std::logic_error("Can't initialize a float64 from an instance of " + 
                 std::string(pyRepresentation->ob_type->tp_name));
+        }
+
+        if (cat == Type::TypeCategory::catConstDict) {
+            if (PyDict_Check(pyRepresentation)) {
+                ConstDict* dictType = ((ConstDict*)eltType);
+                dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
+
+                try {
+                    PyObject *key, *value;
+                    Py_ssize_t pos = 0;
+
+                    int i = 0;
+
+                    while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
+                        copy_initialize(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
+                        try {
+                            copy_initialize(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
+                        } catch(...) {
+                            dictType->keyType()->destroy(dictType->kvPairPtrValue(tgt,i));
+                        }
+                        dictType->incKvPairCount(tgt);
+                        i++;
+                    }
+
+                    dictType->sortKvPairs(tgt);
+                } catch(...) {
+                    dictType->destroy(tgt);
+                    throw;
+                }
+                return;
+            }
+    
+            throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() 
+                    + " with a " + pyRepresentation->ob_type->tp_name);
         }
 
         if (cat == Type::TypeCategory::catTupleOf) {
@@ -260,6 +295,9 @@ struct native_instance_wrapper {
                     );
                 return;
             }
+    
+            throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() 
+                    + " with a " + pyRepresentation->ob_type->tp_name);
         }
 
         if (eltType->isComposite()) {
@@ -289,7 +327,7 @@ struct native_instance_wrapper {
             }
         }
 
-        throw std::logic_error("Couldn't initialize internal elt.");
+        throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name());
     }
 
     static void initialize(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
@@ -381,6 +419,7 @@ struct native_instance_wrapper {
         native_instance_wrapper* self = (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
         try {
+            self->mIteratorOffset = -1;
             self->mIsInitialized = false;
 
             eltType->copy_constructor(self->data, data);
@@ -494,6 +533,17 @@ struct native_instance_wrapper {
                 1
                 );
         }
+        if (w->getType()->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            if (ix < 0 || ix >= (int64_t)Bytes().count(w->data)) {
+                PyErr_SetString(PyExc_IndexError, "index out of range");
+                return NULL;
+            }
+
+            return PyBytes_FromStringAndSize(
+                (const char*)Bytes().eltPtr(w->data, ix),
+                1
+                );
+        }
 
         PyErr_SetString(PyExc_TypeError, "not a __getitem__'able thing.");
         return NULL;
@@ -507,7 +557,7 @@ struct native_instance_wrapper {
         return inType->getTypeRep();
     }
 
-    static PySequenceMethods* sequenceMethods() {
+    static PySequenceMethods* sequenceMethods(Type* t) {
         static PySequenceMethods* res = 
             new PySequenceMethods {
                 (lenfunc)native_instance_wrapper::sq_length,
@@ -520,11 +570,140 @@ struct native_instance_wrapper {
                 0
                 };
 
+        if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || 
+                t->getTypeCategory() == Type::TypeCategory::catTuple || 
+                t->getTypeCategory() == Type::TypeCategory::catNamedTuple || 
+                t->getTypeCategory() == Type::TypeCategory::catString || 
+                t->getTypeCategory() == Type::TypeCategory::catBytes) {
+            return res;
+        }
+
+        return 0;
+    }
+
+    static PyNumberMethods* numberMethods(Type* t) {
+        static PyNumberMethods* res = 
+            new PyNumberMethods {
+                0, //binaryfunc nb_add
+                0, //binaryfunc nb_subtract
+                0, //binaryfunc nb_multiply
+                0, //binaryfunc nb_remainder
+                0, //binaryfunc nb_divmod
+                0, //ternaryfunc nb_power
+                0, //unaryfunc nb_negative
+                0, //unaryfunc nb_positive
+                0, //unaryfunc nb_absolute
+                0, //inquiry nb_bool
+                0, //unaryfunc nb_invert
+                0, //binaryfunc nb_lshift
+                0, //binaryfunc nb_rshift
+                0, //binaryfunc nb_and
+                0, //binaryfunc nb_xor
+                0, //binaryfunc nb_or
+                0, //unaryfunc nb_int
+                0, //void *nb_reserved
+                0, //unaryfunc nb_float
+                0, //binaryfunc nb_inplace_add
+                0, //binaryfunc nb_inplace_subtract
+                0, //binaryfunc nb_inplace_multiply
+                0, //binaryfunc nb_inplace_remainder
+                0, //ternaryfunc nb_inplace_power
+                0, //binaryfunc nb_inplace_lshift
+                0, //binaryfunc nb_inplace_rshift
+                0, //binaryfunc nb_inplace_and
+                0, //binaryfunc nb_inplace_xor
+                0, //binaryfunc nb_inplace_or
+                0, //binaryfunc nb_floor_divide
+                0, //binaryfunc nb_true_divide
+                0, //binaryfunc nb_inplace_floor_divide
+                0, //binaryfunc nb_inplace_true_divide
+                0, //unaryfunc nb_index
+                0, //binaryfunc nb_matrix_multiply
+                0  //binaryfunc nb_inplace_matrix_multiply
+                };
+
         return res;
     }
 
+    static Py_ssize_t mp_length(PyObject* o) {
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        Type* t = extractTypeFrom(o->ob_type);
+
+        if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            return ((ConstDict*)t)->size(w->data);
+        }
+
+        return 0;
+    }
+
+    static PyObject* mp_subscript(PyObject* o, PyObject* item) {
+        native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+        Type* self_type = extractTypeFrom(o->ob_type);
+        Type* item_type = extractTypeFrom(o->ob_type);
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            ConstDict* dict_t = (ConstDict*)self_type;
+
+            if (item_type == dict_t->keyType()) {
+                native_instance_wrapper* item_w = (native_instance_wrapper*)item;
+
+                instance_ptr i = dict_t->lookupValueByKey(self_w->data, item_w->data);
+                
+                if (!i) {
+                    PyErr_SetObject(PyExc_KeyError, item);
+                    return NULL;
+                }
+
+                return extractPythonObject(i, dict_t->valueType());
+            } else {
+                instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
+                try {
+                    copy_initialize(dict_t->keyType(), tempObj, item);
+                } catch(std::exception& e) {
+                    free(tempObj);
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    return NULL;
+                }
+
+                instance_ptr i = dict_t->lookupValueByKey(self_w->data, tempObj);
+
+                dict_t->keyType()->destroy(tempObj);
+                free(tempObj);
+
+                if (!i) {
+                    PyErr_SetObject(PyExc_KeyError, item);
+                    return NULL;
+                }
+
+                return extractPythonObject(i, dict_t->valueType());
+            }
+
+            PyErr_SetString(PyExc_TypeError, "Invalid ConstDict lookup type");
+            return NULL;
+        }
+        PyErr_SetObject(PyExc_KeyError, item);
+        return NULL;
+    }
+
+    static PyMappingMethods* mappingMethods(Type* t) {
+        static PyMappingMethods* res = 
+            new PyMappingMethods {
+                native_instance_wrapper::mp_length, //mp_length
+                native_instance_wrapper::mp_subscript, //mp_subscript
+                0 //mp_ass_subscript
+                };
+
+        if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            return res;
+        }
+
+        return 0;
+    }
+
     static Type* extractTypeFrom(PyTypeObject* typeObj) {
-        if (typeObj->tp_as_sequence == sequenceMethods()) {
+        if (typeObj->tp_dealloc == native_instance_wrapper::tp_dealloc) {
             return ((NativeTypeWrapper*)typeObj)->mType;
         }
 
@@ -543,12 +722,87 @@ struct native_instance_wrapper {
                         nt->getTypes()[k]
                         );
                 }
-            }   
+            }
+        }
 
         PyErr_SetString(PyExc_AttributeError, attr_name);
-
         return NULL;
+    }
+    static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op) {
+        Type* own = extractTypeFrom(a->ob_type);
+        Type* other = extractTypeFrom(b->ob_type);
+
+        if (!other) {
+            Py_INCREF(Py_NotImplemented);
+            return Py_NotImplemented;
         }
+        
+        char cmp = 0;
+
+        if (own == other) {
+            cmp = own->cmp(((native_instance_wrapper*)a)->data, ((native_instance_wrapper*)b)->data);
+        } else if (own < other) {
+            cmp = -1;
+        } else {
+            cmp = 1;
+        }
+
+        PyObject* res;
+
+        if (op == Py_LT) {
+            res = (cmp < 0 ? Py_True : Py_False);
+        } else if (op == Py_LE) {
+            res = (cmp <= 0 ? Py_True : Py_False);
+        } else if (op == Py_EQ) {
+            res = (cmp == 0 ? Py_True : Py_False);
+        } else if (op == Py_NE) {
+            res = (cmp != 0 ? Py_True : Py_False);
+        } else if (op == Py_GT) {
+            res = (cmp > 0 ? Py_True : Py_False);
+        } else if (op == Py_GE) {
+            res = (cmp >= 0 ? Py_True : Py_False);
+        } else {
+            res = Py_NotImplemented;
+        }
+
+        Py_INCREF(res);
+
+        return res;
+    }
+
+    static PyObject* tp_iter(PyObject *o) {
+        Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            native_instance_wrapper* self = (native_instance_wrapper*)typeObj(self_type)->tp_alloc(o->ob_type, 0);
+
+            self->mIteratorOffset = 0;
+            self_type->copy_constructor(self->data, w->data);
+            self->mIsInitialized = true;
+
+            return (PyObject*)self;
+        }
+
+        PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
+        return NULL;
+    }
+
+    static PyObject* tp_iternext(PyObject *o) {
+        Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        assert(self_type->getTypeCategory() == Type::TypeCategory::catConstDict);
+
+        ConstDict* dict_t = (ConstDict*)self_type;
+
+        if (w->mIteratorOffset >= dict_t->size(w->data)) {
+            return NULL;
+        }
+
+        w->mIteratorOffset++;
+
+        return extractPythonObject(dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), dict_t->keyType());
     }
 
     static PyTypeObject* typeObjInternal(Type* inType) {
@@ -573,9 +827,9 @@ struct native_instance_wrapper {
                 0,                         // tp_setattr
                 0,                         // tp_reserved
                 0,                         // tp_repr
-                0,                         // tp_as_number
-                sequenceMethods(),         // tp_as_sequence
-                0,                         // tp_as_mapping
+                numberMethods(inType),     // tp_as_number
+                sequenceMethods(inType),   // tp_as_sequence
+                mappingMethods(inType),    // tp_as_mapping
                 0,                         // tp_hash
                 0,                         // tp_call
                 0,                         // tp_str
@@ -586,10 +840,12 @@ struct native_instance_wrapper {
                 0,                         // tp_doc
                 0,                         // traverseproc tp_traverse;
                 0,                         // inquiry tp_clear;
-                0,                         // richcmpfunc tp_richcompare;
+                tp_richcompare,            // richcmpfunc tp_richcompare;
                 0,                         // Py_ssize_t tp_weaklistoffset;
-                0,                         // getiterfunc tp_iter;
-                0,                         // iternextfunc tp_iternext;
+                inType->getTypeCategory() == Type::TypeCategory::catConstDict ? 
+                    native_instance_wrapper::tp_iter
+                :   0,                     // getiterfunc tp_iter;
+                native_instance_wrapper::tp_iternext,// iternextfunc tp_iternext;
                 typeMethods(),             // struct PyMethodDef *tp_methods;
                 0,                         // struct PyMemberDef *tp_members;
                 0,                         // struct PyGetSetDef *tp_getset;
@@ -680,6 +936,28 @@ PyObject *Tuple(PyObject* nullValue, PyObject* args) {
     }
 
     PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(Tuple::Make(types));
+
+    Py_INCREF(typeObj);
+    return typeObj;
+}
+
+PyObject *ConstDict(PyObject* nullValue, PyObject* args) {
+    std::vector<Type*> types;
+    for (long k = 0; k < PyTuple_Size(args); k++) {
+        types.push_back(unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
+        if (not types.back()) {
+            return NULL;
+        }
+    }
+
+    if (types.size() != 2) {
+        PyErr_SetString(PyExc_TypeError, "ConstDict accepts two arguments");
+        return NULL;
+    }
+
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(
+        ConstDict::Make(types[0],types[1])
+        );
 
     Py_INCREF(typeObj);
     return typeObj;
@@ -818,6 +1096,7 @@ static PyMethodDef module_methods[] = {
     {"Tuple", (PyCFunction)Tuple, METH_VARARGS, NULL},
     {"NamedTuple", (PyCFunction)NamedTuple, METH_VARARGS | METH_KEYWORDS, NULL},
     {"OneOf", (PyCFunction)OneOf, METH_VARARGS, NULL},
+    {"ConstDict", (PyCFunction)ConstDict, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 

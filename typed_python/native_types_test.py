@@ -12,8 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple
+from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict
 import typed_python._types as _types
+
+#from typed_python import ConstDict
 
 import unittest
 import time
@@ -80,6 +82,12 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(o("hi"), "hi")
         self.assertTrue(o(None) is None)
 
+    def test_one_of_conversion_failure(self):
+        o = OneOf(None, str)
+
+        with self.assertRaises(Exception):
+            o(b"bytes")
+        
     def test_one_of_in_tuple(self):
         t = Tuple(OneOf(None, str), str)
 
@@ -124,3 +132,117 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(t(b='2').b, '2')
         self.assertEqual(t().a, '')
         self.assertEqual(t().b, '')
+
+    def test_tuple_of_string_perf(self):
+        t = NamedTuple(a=str, b=str)
+
+        t0 = time.time()
+        for i in range(1000000):
+            t(a="a", b="b").a
+
+        print("Took ", time.time() - t0, " to do 1mm")
+        self.assertTrue(time.time() - t0 < 1.0)
+
+    def test_comparisons_in_one_of(self):
+        t = OneOf(None, float)
+        
+        def map(x):
+            if x is None:
+                return -1000000.0
+            else:
+                return x
+
+        lt = lambda a,b: map(a) < map(b)    
+        le = lambda a,b: map(a) <= map(b)   
+        eq = lambda a,b: map(a) == map(b)   
+        ne = lambda a,b: map(a) != map(b)
+        gt = lambda a,b: map(a) > map(b)    
+        ge = lambda a,b: map(a) >= map(b)
+        
+        funcs = [lt,le,eq,ne,gt,ge]
+        ts = [None,1.0,2.0,3.0]
+
+        for f in funcs:
+            for t1 in ts:
+                for t2 in ts:
+                    self.assertTrue(f(t1,t2) is f(t(t1),t(t2)))
+        
+    def test_comparisons_equivalence(self):
+        t = TupleOf(OneOf(None, str, bytes, float, int, bool, TupleOf(int)),)
+
+        def lt(a,b): return a < b    
+        def le(a,b): return a <= b   
+        def eq(a,b): return a == b   
+        def ne(a,b): return a != b
+        def gt(a,b): return a > b    
+        def ge(a,b): return a >= b
+        
+        funcs = [lt,le,eq,ne,gt,ge]
+
+        tgroups = [
+            [1.0,2.0,3.0],
+            [1,2,3],
+            [True,False],
+            ["a","b","ab","bb","ba","aaaaaaa","","asdf"],
+            [b"a",b"b",b"ab",b"bb",b"ba",b"aaaaaaa",b"",b"asdf"],
+            [(1,2),(1,2,3),(),(1,1),(1,)]
+            ]
+
+        for ts in tgroups:
+            for f in funcs:
+                for t1 in ts:
+                    for t2 in ts:
+                        self.assertTrue(f(t1,t2) is f(t((t1,)),t((t2,))), 
+                            (f, t1,t2, f(t1,t2), f(t((t1,)),t((t2,))))
+                            )
+
+    def test_const_dict(self):
+        t = ConstDict(str,str)
+
+        self.assertEqual(len(t()), 0)
+        self.assertEqual(len(t({})), 0)
+        self.assertEqual(len(t({'a':'b'})), 1)
+        self.assertEqual(t({'a':'b'})['a'], 'b')
+        self.assertEqual(t({'a':'b','b':'c'})['b'], 'c')
+
+
+    def test_const_dict_str_perf(self):
+        t = ConstDict(str,str)
+
+        t0 = time.time()
+        for i in range(100000):
+            t({str(k): str(k+1) for k in range(10)})
+
+        print("Took ", time.time() - t0, " to do 1mm")
+        self.assertTrue(time.time() - t0 < 1.0)
+
+    def test_const_dict_int_perf(self):
+        t = ConstDict(int,int)
+
+        t0 = time.time()
+        for i in range(100000):
+            t({k:k+1 for k in range(10)})
+
+        print("Took ", time.time() - t0, " to do 1mm")
+        self.assertTrue(time.time() - t0 < 1.0)
+
+    def test_const_dict_iter_int(self):
+        t = ConstDict(int,int)
+
+        aDict = t({k:k+1 for k in range(100)})
+        for k in aDict:
+            self.assertEqual(aDict[k], k+1)
+
+    def test_const_dict_iter_str(self):
+        t = ConstDict(str,str)
+
+        aDict = t({str(k):str(k+1) for k in range(100)})
+        for k in aDict:
+            self.assertEqual(aDict[str(k)], str(int(k)+1))
+
+
+
+
+
+
+

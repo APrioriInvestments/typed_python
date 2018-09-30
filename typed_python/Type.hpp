@@ -7,6 +7,7 @@
 #include <set>
 #include <utility>
 #include <atomic>
+#include <iostream>
 
 class None;
 class Bool;
@@ -81,6 +82,29 @@ public:
 
     size_t bytecount() const {
         return m_size;
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        return this->check([&](auto& subtype) {
+            return subtype.cmp(left, right);
+        });
+    }
+
+    static char byteCompare(uint8_t* l, uint8_t* r, size_t count) {
+        while (count > 8 && *(uint64_t*)l == *(uint64_t*)r) {
+            l += 8;
+            r += 8;
+        }
+
+        for (long k = 0; k < count; k++) {
+            if (l[k] < r[k]) {
+                return -1;
+            }
+            if (l[k] > r[k]) {
+                return 1;
+            }
+        }
+        return 0;
     }
 
     template<class T>
@@ -220,6 +244,17 @@ public:
         }
     }
 
+    char cmp(instance_ptr left, instance_ptr right) const {
+        if (((uint8_t*)left)[0] < ((uint8_t*)right)[0]) {
+            return -1;
+        }
+        if (((uint8_t*)left)[0] > ((uint8_t*)right)[0]) {
+            return 1;
+        }
+
+        return m_types[*((uint8_t*)left)]->cmp(left+1,right+1);
+    }
+
     std::pair<Type*, instance_ptr> unwrap(instance_ptr self) const {
         return std::make_pair(m_types[*(uint8_t*)self], self+1);
     }
@@ -341,6 +376,17 @@ public:
         return self + m_byte_offsets[ix];
     }
 
+    char cmp(instance_ptr left, instance_ptr right) const {
+        for (long k = 0; k < m_types.size(); k++) {
+            char res = m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
+            if (res != 0) {
+                return res;
+            }
+        }
+
+        return 0;
+    }
+
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {
         for (int64_t k = 0; k < getTypes().size(); k++) {
@@ -459,6 +505,41 @@ public:
         m_size = sizeof(void*);
     }
 
+    char cmp(instance_ptr left, instance_ptr right) const {
+        if (!(*(layout**)left) && (*(layout**)right)) {
+            return -1;
+        }
+        if (!(*(layout**)right) && (*(layout**)left)) {
+            return 1;
+        }
+        if (!(*(layout**)right) && !(*(layout**)left)) {
+            return 0;
+        }
+        layout& left_layout = **(layout**)left;
+        layout& right_layout = **(layout**)right;
+
+        size_t bytesPer = m_element_type->bytecount();
+
+        for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
+            char res = m_element_type->cmp(left_layout.data + bytesPer * k, 
+                                           right_layout.data + bytesPer * k);
+
+            if (res != 0) {
+                return res;
+            }
+        }
+
+        if (left_layout.count < right_layout.count) {
+            return -1;
+        }
+
+        if (left_layout.count > right_layout.count) {
+            return 1;
+        }
+
+        return 0;
+    }
+
     Type* getEltType() const {
         return m_element_type;
     }
@@ -479,15 +560,28 @@ public:
     };
 
     instance_ptr eltPtr(instance_ptr self, int64_t i) const {
+        if (!(*(layout**)self)) {
+            return self;
+        }
+
         return (*(layout**)self)->data + i * m_element_type->bytecount();
     }
 
     int64_t count(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return 0;
+        }
+
         return (*(layout**)self)->count;
     }
 
     template<class sub_constructor>
     void constructor(instance_ptr self, int64_t count, const sub_constructor& allocator) const {
+        if (count == 0) {
+            (*(layout**)self) = nullptr;
+            return;
+        }
+
         (*(layout**)self) = (layout*)malloc(sizeof(layout) + getEltType()->bytecount() * count);
 
         (*(layout**)self)->count = count;
@@ -511,6 +605,10 @@ public:
     }
 
     void destroy(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return;
+        }
+
         (*(layout**)self)->refcount--;
         if ((*(layout**)self)->refcount == 0) {
             m_element_type->destroy((*(layout**)self)->count, [&](int64_t k) {return eltPtr(self,k);});
@@ -520,14 +618,19 @@ public:
 
     void copy_constructor(instance_ptr self, instance_ptr other) const {
         (*(layout**)self) = (*(layout**)other);
-        (*(layout**)self)->refcount++;
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
     }
 
     void assign(instance_ptr self, instance_ptr other) const {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
-        (*(layout**)self)->refcount++;
+
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
 
         destroy((instance_ptr)&old);
     }
@@ -539,6 +642,15 @@ private:
 
 
 class ConstDict : public Type {
+    class layout {
+    public:
+        std::atomic<int64_t> refcount;
+        int32_t count;
+        int32_t subpointers; //if 0, then all values are inline as pairs of (key,value)
+                             //otherwise, its an array of '(key, ConstDict(key,value))'
+        uint8_t data[];
+    };
+
 public:
     ConstDict(Type* key, Type* value) : 
             Type(TypeCategory::catConstDict),
@@ -547,6 +659,10 @@ public:
     {
         m_name = "ConstDict(...)";
         m_size = sizeof(void*);
+        m_is_default_constructible = true;
+        m_bytes_per_key = m_key->bytecount();
+        m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
+        m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
     }
 
     static ConstDict* Make(Type* key, Type* value) {
@@ -566,26 +682,206 @@ public:
         return it->second;
     };
 
-    void constructor(instance_ptr self) const {
-    
+    char cmp(instance_ptr left, instance_ptr right) const {
+        //direct pointer comparison for now. this could get expensive...
+        if ((*(layout**)left) < (*(layout**)right)) {
+            return -1;
+        }
+        if ((*(layout**)left) > (*(layout**)right)) {
+            return 1;
+        }
+        return 0;
     }
-    
-    void destroy(instance_ptr self) const {
 
+    instance_ptr kvPairPtrKey(instance_ptr self, int64_t i) const {
+        if (!(*(layout**)self)) {
+            return self;
+        }
+
+        layout& record = **(layout**)self;
+
+        return record.data + m_bytes_per_key_value_pair * i;
+    }
+
+    instance_ptr kvPairPtrValue(instance_ptr self, int64_t i) const {
+        if (!(*(layout**)self)) {
+            return self;
+        }
+
+        layout& record = **(layout**)self;
+
+        return record.data + m_bytes_per_key_value_pair * i + m_bytes_per_key;
+    }
+
+    void incKvPairCount(instance_ptr self) const {
+        layout& record = **(layout**)self;
+        record.count++;
+    }
+
+    void sortKvPairs(instance_ptr self) const {
+        /*
+        if (!*(layout**)self) {
+            return;
+        }
+
+        layout& record = **(layout**)self;
+
+        assert(!record.subpointers);
+
+        if (record.count <= 1) { 
+            return; 
+        }
+        else if (record.count == 2) {
+            if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1)) > 0) {
+                swapKvPairs(self, 0,1);
+            }
+            return;
+        } else {
+
+        }*/
+    }
+
+    instance_ptr keyTreePtr(instance_ptr self, int64_t i) const {
+        if (!(*(layout**)self)) {
+            return self;
+        }
+
+        layout& record = **(layout**)self;
+
+        return record.data + m_bytes_per_key_subtree_pair * i;
+    }
+
+    bool instanceIsSubtrees(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return self;
+        }
+
+        layout& record = **(layout**)self;
+
+        return record.subpointers != 0;
+    }
+
+    int64_t count(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return 0;
+        }
+
+        layout& record = **(layout**)self;
+
+        if (record.subpointers) {
+            return record.subpointers;
+        }
+
+        return record.count;
+    }
+
+    int64_t size(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return 0;
+        }
+
+        return (*(layout**)self)->count;
+    }
+
+    instance_ptr lookupValueByKey(instance_ptr self, instance_ptr key) const {
+        if (!(*(layout**)self)) {
+            return 0;
+        }
+
+        layout& record = **(layout**)self;
+
+        assert(record.subpointers == 0); //this is not implemented yet
+
+        //linear search. proper sorted search not implemented yet because the tree's items
+        //are not sorted either.
+        for (long k = 0; k < count(self); k++) {
+            if (m_key->cmp(kvPairPtrKey(self, k), key) == 0) {
+                return kvPairPtrValue(self, k);
+            }
+        }
+
+        return 0;
+    }
+
+    void constructor(instance_ptr self, int64_t space, bool isPointerTree) const {
+        if (space == 0) {
+            (*(layout**)self) = nullptr;
+            return;
+        }
+
+        int bytesPer = isPointerTree ? m_bytes_per_key_subtree_pair : m_bytes_per_key_value_pair;
+
+        (*(layout**)self) = (layout*)malloc(sizeof(layout) + bytesPer * space);
+
+        layout& record = **(layout**)self;
+
+        record.count = 0;
+        record.subpointers = 0;
+        record.refcount = 1;
+    }
+
+    void constructor(instance_ptr self) const {
+        (*(layout**)self) = nullptr;
+    }
+
+    void destroy(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return;
+        }
+
+        layout& record = **(layout**)self;
+
+        record.refcount--;
+        if (record.refcount == 0) {
+            if (record.subpointers == 0) {
+                m_key->destroy(record.count, [&](long ix) { 
+                    return record.data + m_bytes_per_key_value_pair * ix; 
+                });
+                m_value->destroy(record.count, [&](long ix) { 
+                    return record.data + m_bytes_per_key_value_pair * ix + m_bytes_per_key; 
+                });
+            } else {
+                m_key->destroy(record.subpointers, [&](long ix) { 
+                    return record.data + m_bytes_per_key_subtree_pair * ix; 
+                });
+                ((Type*)this)->destroy(record.subpointers, [&](long ix) { 
+                    return record.data + m_bytes_per_key_subtree_pair * ix + m_bytes_per_key; 
+                });
+            }
+
+            free((*(layout**)self));
+        }
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) const {
-
+        (*(layout**)self) = (*(layout**)other);
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
     }
 
     void assign(instance_ptr self, instance_ptr other) const {
+        layout* old = (*(layout**)self);
 
+        (*(layout**)self) = (*(layout**)other);
+
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
+
+        destroy((instance_ptr)&old);
     }
     
+    
+    Type* keyType() const { return m_key; }
+    Type* valueType() const { return m_value; }
 
 private:
     Type* m_key;
     Type* m_value;
+    size_t m_bytes_per_key;
+    size_t m_bytes_per_key_value_pair;
+    size_t m_bytes_per_key_subtree_pair;
 };
 
 class None : public Type {
@@ -595,6 +891,10 @@ public:
         m_name = "NoneType";
         m_size = 0;
         m_is_default_constructible = true;
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        return 0;
     }
 
     void constructor(instance_ptr self) const {}
@@ -618,6 +918,18 @@ public:
         m_is_default_constructible = true;
     }
 
+    char cmp(instance_ptr left, instance_ptr right) const {
+        if ( (*(T*)left) < (*(T*)right) ) {
+            return -1;
+        }
+        if ( (*(T*)left) > (*(T*)right) ) {
+            return 1;
+        }
+
+        return 0;
+    }
+    
+    
     void constructor(instance_ptr self) const {
         new ((T*)self) T();
     }
@@ -767,6 +1079,48 @@ public:
 
     static String* Make() { static String res; return &res; }
 
+    char cmp(instance_ptr left, instance_ptr right) const {
+        if ( !(*(layout**)left) && !(*(layout**)right) ) {
+            return 0;
+        }
+        if ( !(*(layout**)left) && (*(layout**)right) ) {
+            return -1;
+        }
+        if ( (*(layout**)left) && !(*(layout**)right) ) {
+            return 1;
+        }
+
+        if (bytes_per_codepoint(left) < bytes_per_codepoint(right)) {
+            return -1;
+        }
+
+        if (bytes_per_codepoint(left) > bytes_per_codepoint(right)) {
+            return 1;
+        }
+
+        int bytesPer = bytes_per_codepoint(right);
+
+        char res = byteCompare(
+            eltPtr(left, 0), 
+            eltPtr(right, 0), 
+            bytesPer * std::min(count(left), count(right))
+            );
+
+        if (res) {
+            return res;
+        }
+
+        if (count(left) < count(right)) { 
+            return -1; 
+        }
+
+        if (count(left) > count(right)) { 
+            return 1; 
+        }
+
+        return 0;
+    }
+
     void constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const {
         if (count == 0) {
             *(layout**)self = nullptr;
@@ -783,8 +1137,10 @@ public:
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t i) const {
+        const static char* emptyPtr = "";
+
         if (*(layout**)self == nullptr) { 
-            return self;
+            return (instance_ptr)emptyPtr;
         }
 
         return (*(layout**)self)->eltPtr(i);
@@ -833,7 +1189,7 @@ public:
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
-        
+
         if (*(layout**)self) {
             (*(layout**)self)->refcount++;
         }
@@ -850,6 +1206,34 @@ public:
         int64_t bytecount;
         uint8_t data[];
     };
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        if ( !(*(layout**)left) && !(*(layout**)right) ) {
+            return 0;
+        }
+        if ( !(*(layout**)left) && (*(layout**)right) ) {
+            return -1;
+        }
+        if ( (*(layout**)left) && !(*(layout**)right) ) {
+            return 1;
+        }
+
+        char res = byteCompare(eltPtr(left, 0), eltPtr(right, 0), std::min(count(left), count(right)));
+
+        if (res) {
+            return res;
+        }
+
+        if (count(left) < count(right)) { 
+            return -1; 
+        }
+
+        if (count(left) > count(right)) { 
+            return 1; 
+        }
+
+        return 0;
+    }
 
     Bytes() : Type(TypeCategory::catBytes)
     {
@@ -933,6 +1317,10 @@ public:
         m_is_default_constructible = true;
         m_name = "Value(...)";
         }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        return 0;
+    }
 
     void constructor(instance_ptr self) const {}
 
