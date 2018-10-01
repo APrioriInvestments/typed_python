@@ -10,6 +10,7 @@ import queue
 import logging
 import time
 import threading
+import socket
 import traceback
 
 
@@ -121,7 +122,7 @@ class EventLoopInThread:
         self.start()
 
         async def doit():
-            return await self.loop.create_connection(callback, host, port)
+            return await self.loop.create_connection(callback, host, port, family=socket.AF_INET)
 
         return asyncio.run_coroutine_threadsafe(doit(), self.loop).result(10)
 
@@ -129,7 +130,7 @@ class EventLoopInThread:
         self.start()
 
         async def doit():
-            return await self.loop.create_server(callback, host, port)
+            return await self.loop.create_server(callback, host, port, family=socket.AF_INET)
 
         res = asyncio.run_coroutine_threadsafe(doit(), self.loop)
 

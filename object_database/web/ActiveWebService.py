@@ -97,6 +97,7 @@ class ActiveWebService(ServiceBase):
         instanceName = self.serviceInstance.service.name
         self.app.route("/")(lambda: redirect("/services"))
 
+        self.app.route('/content/<path:path>')(self.sendContent)
         self.app.route('/services')(self.sendPage)
         self.app.route('/services/<path:path>')(self.sendPage)
         self.sockets.route("/socket/<path:path>")(self.mainSocket)
