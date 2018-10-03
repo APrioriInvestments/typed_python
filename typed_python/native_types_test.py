@@ -17,6 +17,9 @@ import typed_python._types as _types
 
 import unittest
 import time
+import numpy
+import sys
+
 
 class NativeTypesTests(unittest.TestCase):
     def test_objects_are_singletons(self):
@@ -182,6 +185,7 @@ class NativeTypesTests(unittest.TestCase):
             [1,2,3],
             [True,False],
             ["a","b","ab","bb","ba","aaaaaaa","","asdf"],
+            ["1","2","3","12","13","23","24","123123", "0", ""],
             [b"a",b"b",b"ab",b"bb",b"ba",b"aaaaaaa",b"",b"asdf"],
             [(1,2),(1,2,3),(),(1,1),(1,)]
             ]
@@ -203,6 +207,55 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(t({'a':'b'})['a'], 'b')
         self.assertEqual(t({'a':'b','b':'c'})['b'], 'c')
 
+    def test_const_dict_mixed(self):
+        t = ConstDict(str,int)
+        self.assertTrue(t({"a":10})["a"] == 10)
+
+        t = ConstDict(int, str)
+        self.assertTrue(t({10:"a"})[10] == "a")
+
+    def test_const_dict_comparison(self):
+        t = ConstDict(str,str)
+
+        self.assertEqual(t({'a':'b'}), t({'a':'b'}))
+        self.assertLess(t({}), t({'a':'b'}))
+
+    def test_const_dict_lookup(self):
+        for type_to_use, vals in [
+                    (int, list(range(20))), 
+                    (bytes, [b'1', b'2', b'3', b'4', b'5'])
+                    ]:
+            t = ConstDict(type_to_use, type_to_use)
+
+            for _ in range(10):
+                ks = list(vals)
+                vs = list(vals)
+
+                numpy.random.shuffle(ks)
+                numpy.random.shuffle(vs)
+
+                py_d = {}
+                for i in range(len(ks)):
+                    py_d[ks[i]] = vs[i]
+
+                typed_d = t(py_d)
+
+                for k in py_d:
+                    self.assertEqual(py_d[k], typed_d[k])
+
+                last_k = None
+                for k in typed_d:
+                    assert last_k is None or k > last_k, (k,last_k)
+                    last_k = k
+
+    def test_const_dict_lookup_time(self):
+        int_dict = ConstDict(int, int)
+
+        d = int_dict({k:k for k in range(1000000)})
+
+        for k in range(1000000):
+            self.assertTrue(k in d)
+            self.assertTrue(d[k] == k)
 
     def test_const_dict_str_perf(self):
         t = ConstDict(str,str)
@@ -256,7 +309,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(a.y, 20)
         self.assertTrue(a.matches.child_ints)
         self.assertFalse(a.matches.child_strings)
-        
+
     def test_alternatives_perf(self):
         alt = Alternative(
             "Alt",

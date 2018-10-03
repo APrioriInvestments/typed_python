@@ -3,6 +3,7 @@
 #include <Python.h>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <mutex>
 #include <set>
 #include <utility>
@@ -92,8 +93,35 @@ public:
         });
     }
 
+    void swap(instance_ptr left, instance_ptr right) const {
+        if (left == right) {
+            return;
+        }
+
+        size_t remaining = m_size;
+        while (remaining >= 8) {
+            int64_t temp = *(int64_t*)left;
+            *(int64_t*)left = *(int64_t*)right;
+            *(int64_t*)right = temp;
+
+            remaining -= 8;
+            left += 8;
+            right += 8;
+        }
+
+        while (remaining > 0) {
+            int8_t temp = *(int8_t*)left;
+            *(int8_t*)left = *(int8_t*)right;
+            *(int8_t*)right = temp;
+
+            remaining -= 1;
+            left += 1;
+            right += 1;
+        }
+    }
+
     static char byteCompare(uint8_t* l, uint8_t* r, size_t count) {
-        while (count > 8 && *(uint64_t*)l == *(uint64_t*)r) {
+        while (count >= 8 && *(uint64_t*)l == *(uint64_t*)r) {
             l += 8;
             r += 8;
         }
@@ -693,14 +721,34 @@ public:
         return it->second;
     };
 
+    //to make this fast(er), we do dict size comparison first, then keys, then values
     char cmp(instance_ptr left, instance_ptr right) const {
-        //direct pointer comparison for now. this could get expensive...
-        if ((*(layout**)left) < (*(layout**)right)) {
+        if (size(left) < size(right)) {
             return -1;
         }
-        if ((*(layout**)left) > (*(layout**)right)) {
+        if (size(left) > size(right)) {
             return 1;
         }
+
+        int ct = count(left);
+        for (long k = 0; k < ct; k++) {
+            char res = m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k));
+            if (!res) { 
+                return res;
+            }
+        }
+
+        for (long k = 0; k < ct; k++) {
+            char res = m_value->cmp(
+                kvPairPtrValue(left,k), 
+                kvPairPtrValue(right,k)
+                );
+
+            if (!res) { 
+                return res;
+            }
+        }
+
         return 0;
     }
 
@@ -730,7 +778,6 @@ public:
     }
 
     void sortKvPairs(instance_ptr self) const {
-        /*
         if (!*(layout**)self) {
             return;
         }
@@ -744,12 +791,37 @@ public:
         }
         else if (record.count == 2) {
             if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1)) > 0) {
-                swapKvPairs(self, 0,1);
+                m_key->swap(kvPairPtrKey(self,0), kvPairPtrKey(self,1));
+                m_value->swap(kvPairPtrValue(self,0), kvPairPtrValue(self,1));
             }
             return;
         } else {
+            std::vector<int> indices;
+            for (long k=0;k<record.count;k++) {
+                indices.push_back(k);
+            }
 
-        }*/
+            std::sort(indices.begin(), indices.end(), [&](int l, int r) {
+                char res = m_key->cmp(kvPairPtrKey(self,l),kvPairPtrKey(self,r));
+                return res < 0;
+                });
+
+            //create a temporary buffer
+            std::vector<uint8_t> d;
+            d.resize(m_bytes_per_key_value_pair * record.count);
+
+            //final_lookup contains the location of each value in the original sort
+            for (long k = 0; k < indices.size(); k++) {
+                m_key->swap(kvPairPtrKey(self, indices[k]), &d[m_bytes_per_key_value_pair*k]);
+                m_value->swap(kvPairPtrValue(self, indices[k]), &d[m_bytes_per_key_value_pair*k+m_bytes_per_key]);
+            }
+
+            //now move them back
+            for (long k = 0; k < indices.size(); k++) {
+                m_key->swap(kvPairPtrKey(self, k), &d[m_bytes_per_key_value_pair*k]);
+                m_value->swap(kvPairPtrValue(self, k), &d[m_bytes_per_key_value_pair*k+m_bytes_per_key]);
+            }
+        }
     }
 
     instance_ptr keyTreePtr(instance_ptr self, int64_t i) const {
@@ -803,11 +875,19 @@ public:
 
         assert(record.subpointers == 0); //this is not implemented yet
 
-        //linear search. proper sorted search not implemented yet because the tree's items
-        //are not sorted either.
-        for (long k = 0; k < count(self); k++) {
-            if (m_key->cmp(kvPairPtrKey(self, k), key) == 0) {
-                return kvPairPtrValue(self, k);
+        long low = 0;
+        long high = record.count;
+
+        while (low < high) {
+            long mid = (low+high)/2;
+            char res = m_key->cmp(kvPairPtrKey(self, mid), key);
+            
+            if (res == 0) {
+                return kvPairPtrValue(self, mid);
+            } else if (res < 0) {
+                low = mid;
+            } else {
+                high = mid;
             }
         }
 
@@ -1402,6 +1482,30 @@ public:
         m_size = (m_all_alternatives_empty ? 1 : sizeof(void*));
     }
 
+    char cmp(instance_ptr left, instance_ptr right) const {
+        if (m_all_alternatives_empty) {
+            if (*(uint8_t*)left < *(uint8_t*)right) {
+                return -1;
+            }
+            if (*(uint8_t*)left > *(uint8_t*)right) {
+                return -1;
+            }
+            return 0;
+        }
+
+        layout& record_l = **(layout**)left;
+        layout& record_r = **(layout**)right;
+
+        if (record_l.which < record_r.which) {
+            return -1;
+        }
+        if (record_l.which > record_r.which) {
+            return 1;
+        }
+
+        return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data);
+    }
+
     instance_ptr eltPtr(instance_ptr self) const {
         if (m_all_alternatives_empty) {
             return self;
@@ -1516,6 +1620,10 @@ public:
         m_name = m_alternative->name() + "." + m_alternative->subtypes()[which].first;
         m_size = m_alternative->bytecount();
         m_is_default_constructible = m_alternative->subtypes()[which].second->is_default_constructible();
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        return m_alternative->cmp(left,right);
     }
 
     void constructor(instance_ptr self) const {

@@ -543,17 +543,6 @@ struct native_instance_wrapper {
                 1
                 );
         }
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catConstDict) {
-            if (ix < 0 || ix >= (int64_t)Bytes().count(w->data)) {
-                PyErr_SetString(PyExc_IndexError, "index out of range");
-                return NULL;
-            }
-
-            return PyBytes_FromStringAndSize(
-                (const char*)Bytes().eltPtr(w->data, ix),
-                1
-                );
-        }
 
         PyErr_SetString(PyExc_TypeError, "not a __getitem__'able thing.");
         return NULL;
@@ -567,24 +556,23 @@ struct native_instance_wrapper {
         return inType->getTypeRep();
     }
 
-    static PySequenceMethods* sequenceMethods(Type* t) {
-        static PySequenceMethods* res = 
-            new PySequenceMethods {
-                (lenfunc)native_instance_wrapper::sq_length,
-                0,
-                0,
-                (ssizeargfunc)native_instance_wrapper::sq_item,
-                0,
-                0,
-                0,
-                0
-                };
-
+    static PySequenceMethods* sequenceMethodsFor(Type* t) {
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || 
                 t->getTypeCategory() == Type::TypeCategory::catTuple || 
                 t->getTypeCategory() == Type::TypeCategory::catNamedTuple || 
                 t->getTypeCategory() == Type::TypeCategory::catString || 
-                t->getTypeCategory() == Type::TypeCategory::catBytes) {
+                t->getTypeCategory() == Type::TypeCategory::catBytes || 
+                t->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            PySequenceMethods* res =
+                new PySequenceMethods {0,0,0,0,0,0,0,0};
+
+            if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
+                res->sq_contains = (objobjproc)native_instance_wrapper::sq_contains;
+            } else {
+                res->sq_length = (lenfunc)native_instance_wrapper::sq_length;
+                res->sq_item = (ssizeargfunc)native_instance_wrapper::sq_item;
+            }
+
             return res;
         }
 
@@ -647,6 +635,50 @@ struct native_instance_wrapper {
         return 0;
     }
 
+    static int sq_contains(PyObject* o, PyObject* item) {
+        native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+        Type* self_type = extractTypeFrom(o->ob_type);
+        Type* item_type = extractTypeFrom(o->ob_type);
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            ConstDict* dict_t = (ConstDict*)self_type;
+
+            if (item_type == dict_t->keyType()) {
+                native_instance_wrapper* item_w = (native_instance_wrapper*)item;
+
+                instance_ptr i = dict_t->lookupValueByKey(self_w->data, item_w->data);
+                
+                if (!i) {
+                    return 0;
+                }
+
+                return 1;
+            } else {
+                instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
+                try {
+                    copy_initialize(dict_t->keyType(), tempObj, item);
+                } catch(std::exception& e) {
+                    free(tempObj);
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    return -1;
+                }
+
+                instance_ptr i = dict_t->lookupValueByKey(self_w->data, tempObj);
+
+                dict_t->keyType()->destroy(tempObj);
+                free(tempObj);
+
+                if (!i) {
+                    return 0;
+                }
+
+                return 1;
+            }
+        }
+
+        return 0;
+    }
     static PyObject* mp_subscript(PyObject* o, PyObject* item) {
         native_instance_wrapper* self_w = (native_instance_wrapper*)o;
 
@@ -904,7 +936,7 @@ struct native_instance_wrapper {
                 0,                         // tp_reserved
                 0,                         // tp_repr
                 numberMethods(inType),     // tp_as_number
-                sequenceMethods(inType),   // tp_as_sequence
+                sequenceMethodsFor(inType),   // tp_as_sequence
                 mappingMethods(inType),    // tp_as_mapping
                 0,                         // tp_hash
                 0,                         // tp_call
