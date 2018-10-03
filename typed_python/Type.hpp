@@ -38,6 +38,51 @@ class Pointer;
 
 typedef uint8_t* instance_ptr;
 
+class Hash32Accumulator {
+public:
+    Hash32Accumulator(int32_t init) : 
+        m_state(init) 
+    {
+    }
+
+    void add(int32_t i) {
+        m_state = (m_state * 1000003) ^ i;
+    }
+
+    void addBytes(uint8_t* bytes, int64_t count) {
+        while (count >= 4) {
+            add(*(int32_t*)bytes);
+            bytes += 4;
+            count -= 4;
+        }
+        while (count) {
+            add((int32_t)*bytes);
+            bytes++;
+            count--;
+        }
+    }
+
+    int32_t get() const {
+        return m_state;
+    }
+
+    void addRegister(uint8_t i) { add(i); }
+    void addRegister(uint16_t i) { add(i); }
+    void addRegister(uint32_t i) { add(i); }
+    void addRegister(uint64_t i) { addBytes((uint8_t*)&i, sizeof(i)); }
+
+    void addRegister(int8_t i) { add(i); }
+    void addRegister(int16_t i) { add(i); }
+    void addRegister(int32_t i) { add(i); }
+    void addRegister(int64_t i) { addBytes((uint8_t*)&i, sizeof(i)); }
+
+    void addRegister(float i) { addBytes((uint8_t*)&i, sizeof(i)); }
+    void addRegister(double i) { addBytes((uint8_t*)&i, sizeof(i)); }
+
+private:
+    int32_t m_state;
+};
+
 class Type {
 public:
     enum TypeCategory {
@@ -90,6 +135,12 @@ public:
     char cmp(instance_ptr left, instance_ptr right) const {
         return this->check([&](auto& subtype) {
             return subtype.cmp(left, right);
+        });
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        return this->check([&](auto& subtype) {
+            return subtype.hash32(left);
         });
     }
 
@@ -283,6 +334,15 @@ public:
         }
     }
 
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)getTypeCategory());
+
+        acc.add(*(uint8_t*)left);
+        acc.add(m_types[*((uint8_t*)left)]->hash32(left+1));
+
+        return acc.get();
+    }
+
     char cmp(instance_ptr left, instance_ptr right) const {
         if (((uint8_t*)left)[0] < ((uint8_t*)right)[0]) {
             return -1;
@@ -426,6 +486,18 @@ public:
         return 0;
     }
 
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)getTypeCategory());
+
+        for (long k = 0; k < getTypes().size();k++) {
+            acc.add(getTypes()[k]->hash32(eltPtr(left,k)));
+        }
+
+        acc.add(getTypes().size());
+
+        return acc.get();
+    }
+
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {
         for (int64_t k = 0; k < getTypes().size(); k++) {
@@ -531,7 +603,8 @@ class TupleOf : public Type {
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        int64_t count;
+        int32_t hash_cache;
+        int32_t count;
         uint8_t data[];
     };
 
@@ -542,6 +615,30 @@ public:
     {
         m_name = "TupleOf(...)";
         m_size = sizeof(void*);
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        if (!(*(layout**)left)) {
+            return 0x123;
+        }
+
+        if ((*(layout**)left)->hash_cache == -1) {
+            Hash32Accumulator acc((int)getTypeCategory());
+            
+            int32_t ct = count(left);
+            acc.add(ct);
+
+            for (long k = 0; k < ct;k++) {
+                acc.add(m_element_type->hash32(eltPtr(left, k)));
+            }
+
+            (*(layout**)left)->hash_cache = acc.get();
+            if ((*(layout**)left)->hash_cache == -1) {
+                (*(layout**)left)->hash_cache = -2;
+            }
+        }
+
+        return (*(layout**)left)->hash_cache;
     }
 
     char cmp(instance_ptr left, instance_ptr right) const {
@@ -625,6 +722,7 @@ public:
 
         (*(layout**)self)->count = count;
         (*(layout**)self)->refcount = 1;
+        (*(layout**)self)->hash_cache = -1;
         
         for (int64_t k = 0; k < count; k++) {
             try {
@@ -684,6 +782,7 @@ class ConstDict : public Type {
     class layout {
     public:
         std::atomic<int64_t> refcount;
+        int32_t hash_cache;
         int32_t count;
         int32_t subpointers; //if 0, then all values are inline as pairs of (key,value)
                              //otherwise, its an array of '(key, ConstDict(key,value))'
@@ -721,7 +820,31 @@ public:
         return it->second;
     };
 
-    //to make this fast(er), we do dict size comparison first, then keys, then values
+    int32_t hash32(instance_ptr left) const {
+        if (size(left) == 0) {
+            return 0x123456;
+        }
+
+        if ((*(layout**)left)->hash_cache == -1) {
+            Hash32Accumulator acc((int)getTypeCategory());
+
+            int32_t count = size(left);
+            acc.add(count);
+            for (long k = 0; k < count;k++) {
+                acc.add(m_key->hash32(kvPairPtrKey(left,k)));
+                acc.add(m_value->hash32(kvPairPtrValue(left,k)));
+            }
+
+            (*(layout**)left)->hash_cache = acc.get();
+            if ((*(layout**)left)->hash_cache == -1) {
+                (*(layout**)left)->hash_cache = -2;
+            }
+        }
+
+        return (*(layout**)left)->hash_cache;
+    }
+
+    //to make this fast(er), we do dict size comparison first, then keys, then values    
     char cmp(instance_ptr left, instance_ptr right) const {
         if (size(left) < size(right)) {
             return -1;
@@ -885,7 +1008,7 @@ public:
             if (res == 0) {
                 return kvPairPtrValue(self, mid);
             } else if (res < 0) {
-                low = mid;
+                low = mid+1;
             } else {
                 high = mid;
             }
@@ -909,6 +1032,7 @@ public:
         record.count = 0;
         record.subpointers = 0;
         record.refcount = 1;
+        record.hash_cache = -1;
     }
 
     void constructor(instance_ptr self) const {
@@ -988,6 +1112,10 @@ public:
         return 0;
     }
 
+    int32_t hash32(instance_ptr left) const {
+        return (int)getTypeCategory();
+    }
+
     void constructor(instance_ptr self) const {}
 
     void destroy(instance_ptr self) const {}
@@ -1020,7 +1148,14 @@ public:
         return 0;
     }
     
-    
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)getTypeCategory());
+
+        acc.addRegister(*(T*)left);
+
+        return acc.get();
+    }
+
     void constructor(instance_ptr self) const {
         new ((T*)self) T();
     }
@@ -1152,6 +1287,7 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
+        int32_t hash_cache;
         int32_t pointcount;
         int32_t bytes_per_codepoint; //1 implies 
         uint8_t data[];
@@ -1169,6 +1305,23 @@ public:
     }
 
     static String* Make() { static String res; return &res; }
+
+    int32_t hash32(instance_ptr left) const {
+        if (!(*(layout**)left)) {
+            return 0x12345;
+        }
+
+        if ((*(layout**)left)->hash_cache == -1) {
+            Hash32Accumulator acc((int)getTypeCategory());
+            acc.addBytes(eltPtr(left, 0), bytes_per_codepoint(left) * count(left));
+            (*(layout**)left)->hash_cache = acc.get();
+            if ((*(layout**)left)->hash_cache == -1) {
+                (*(layout**)left)->hash_cache = -2;
+            }
+        }
+
+        return (*(layout**)left)->hash_cache;
+    }
 
     char cmp(instance_ptr left, instance_ptr right) const {
         if ( !(*(layout**)left) && !(*(layout**)right) ) {
@@ -1222,6 +1375,7 @@ public:
 
         (*(layout**)self)->bytes_per_codepoint = bytes_per_codepoint;
         (*(layout**)self)->pointcount = count;
+        (*(layout**)self)->hash_cache = -1;
         (*(layout**)self)->refcount = 1;
         
         ::memcpy((*(layout**)self)->data, data, count * bytes_per_codepoint);
@@ -1294,9 +1448,29 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        int64_t bytecount;
+        int32_t hash_cache;
+        int32_t bytecount;
         uint8_t data[];
     };
+
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)getTypeCategory());
+
+        if (!(*(layout**)left)) {
+            return 0x1234;
+        }
+
+        if ((*(layout**)left)->hash_cache == -1) {
+            Hash32Accumulator acc((int)getTypeCategory());
+            acc.addBytes(eltPtr(left, 0), count(left));
+            (*(layout**)left)->hash_cache = acc.get();
+            if ((*(layout**)left)->hash_cache == -1) {
+                (*(layout**)left)->hash_cache = -2;
+            }
+        }
+
+        return (*(layout**)left)->hash_cache;
+    }
 
     char cmp(instance_ptr left, instance_ptr right) const {
         if ( !(*(layout**)left) && !(*(layout**)right) ) {
@@ -1340,6 +1514,7 @@ public:
 
         (*(layout**)self)->bytecount = count;
         (*(layout**)self)->refcount = 1;
+        (*(layout**)self)->hash_cache = -1;
         
         ::memcpy((*(layout**)self)->data, data, count);
     }
@@ -1411,6 +1586,10 @@ public:
 
     char cmp(instance_ptr left, instance_ptr right) const {
         return 0;
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        return m_type->hash32((uint8_t*)&m_data[0]);
     }
 
     void constructor(instance_ptr self) const {}
@@ -1504,6 +1683,15 @@ public:
         }
 
         return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data);
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)TypeCategory::catAlternative);
+
+        acc.add(which(left));
+        acc.add(m_subtypes[which(left)].second->hash32(eltPtr(left)));
+
+        return acc.get();
     }
 
     instance_ptr eltPtr(instance_ptr self) const {
@@ -1620,6 +1808,10 @@ public:
         m_name = m_alternative->name() + "." + m_alternative->subtypes()[which].first;
         m_size = m_alternative->bytecount();
         m_is_default_constructible = m_alternative->subtypes()[which].second->is_default_constructible();
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        return m_alternative->hash32(left);
     }
 
     char cmp(instance_ptr left, instance_ptr right) const {

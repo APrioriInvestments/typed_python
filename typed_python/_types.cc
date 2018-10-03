@@ -832,6 +832,18 @@ struct native_instance_wrapper {
         PyErr_SetString(PyExc_AttributeError, attr_name);
         return NULL;
     }
+    
+    static Py_hash_t tp_hash(PyObject *o) {
+        Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        int32_t h = self_type->hash32(w->data);
+        if (h == -1) {
+            h = -2;
+        }
+
+        return h;
+    }
 
     static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op) {
         Type* own = extractTypeFrom(a->ob_type);
@@ -938,7 +950,7 @@ struct native_instance_wrapper {
                 numberMethods(inType),     // tp_as_number
                 sequenceMethodsFor(inType),   // tp_as_sequence
                 mappingMethods(inType),    // tp_as_mapping
-                0,                         // tp_hash
+                tp_hash,                   // tp_hash
                 0,                         // tp_call
                 0,                         // tp_str
                 0,                         // tp_getattro

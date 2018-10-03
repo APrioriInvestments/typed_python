@@ -257,6 +257,30 @@ class NativeTypesTests(unittest.TestCase):
             self.assertTrue(k in d)
             self.assertTrue(d[k] == k)
 
+    def test_const_dict_of_dict(self):
+        int_dict = ConstDict(int, int)
+        int_dict_2 = ConstDict(int_dict,int_dict)
+
+        d = int_dict({1:2})
+        d2 = int_dict({1:2,3:4})
+
+        big = int_dict_2({d:d2})
+
+        self.assertTrue(d in big)
+        self.assertTrue(d2 not in big)
+        self.assertTrue(big[d] == d2)
+
+    def test_dict_hash_perf(self):
+        str_dict = ConstDict(str, str)
+
+        s = str_dict({'a' * 1000000: 'b' * 1000000})
+
+        t0 = time.time()
+        for k in range(1000000):
+            hash(s)
+        print(time.time() - t0, " to do 1mm")
+        self.assertTrue(time.time() - t0 < 1.0)
+
     def test_const_dict_str_perf(self):
         t = ConstDict(str,str)
 
