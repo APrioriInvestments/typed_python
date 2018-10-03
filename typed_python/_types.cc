@@ -19,7 +19,8 @@ struct native_instance_wrapper {
         return ((const NativeTypeWrapper*)((PyObject*)this)->ob_type)->mType;
     }
 
-    int64_t mIsInitialized;
+    bool mIsInitialized;
+    bool mIsMatcher; //-1 if we're not an iterator
     int64_t mIteratorOffset; //-1 if we're not an iterator
     uint8_t data[0];
 
@@ -333,6 +334,14 @@ struct native_instance_wrapper {
     static void initialize(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
         Type::TypeCategory cat = t->getTypeCategory();
 
+        if (cat == Type::TypeCategory::catConcreteAlternative) {
+            ConcreteAlternative* alt = (ConcreteAlternative*)t;
+            alt->constructor(data, [&](instance_ptr p) {
+                initialize(p, alt->elementType(), args, kwargs);
+            });
+            return;
+        }
+
         if (kwargs == NULL) {
             if (args == NULL || PyTuple_Size(args) == 0) {
                 if (t->is_default_constructible()) {
@@ -421,6 +430,7 @@ struct native_instance_wrapper {
         try {
             self->mIteratorOffset = -1;
             self->mIsInitialized = false;
+            self->mIsMatcher = false;
 
             eltType->copy_constructor(self->data, data);
 
@@ -713,12 +723,74 @@ struct native_instance_wrapper {
     static PyObject* tp_getattr(PyObject *o, char *attr_name) {
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
-            NamedTuple* nt = (NamedTuple*)w->getType();
+        Type::TypeCategory cat = w->getType()->getTypeCategory();
+
+        if (w->mIsMatcher) {
+            PyObject* res;
+            
+            if (cat == Type::TypeCategory::catAlternative) {
+                Alternative* a = (Alternative*)w->getType();
+                if (a->subtypes()[a->which(w->data)].first == attr_name) {
+                    res = Py_True;
+                } else {
+                    res = Py_False;
+                }
+            } else {
+                ConcreteAlternative* a = (ConcreteAlternative*)w->getType();
+                if (a->getAlternative()->subtypes()[a->which()].first == attr_name) {
+                    res = Py_True;
+                } else {
+                    res = Py_False;
+                }
+            }
+
+            Py_INCREF(res);
+            return res;
+        }
+
+        if (cat == Type::TypeCategory::catAlternative ||
+                cat == Type::TypeCategory::catConcreteAlternative) {
+            if (strcmp(attr_name,"matches") == 0) {
+                native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
+
+                self->mIteratorOffset = 0;
+                w->getType()->copy_constructor(self->data, w->data);
+                self->mIsInitialized = true;
+                self->mIsMatcher = true;
+
+                return (PyObject*)self;
+            }
+        }
+
+        return getattr(w->getType(), w->data, attr_name);
+    }
+
+    static PyObject* getattr(Type* type, instance_ptr data, char* attr_name) {
+        if (type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            ConcreteAlternative* t = (ConcreteAlternative*)type;
+           
+            return getattr(
+                t->getAlternative()->subtypes()[t->which()].second,
+                t->getAlternative()->eltPtr(data),
+                attr_name
+                );
+        }
+        if (type->getTypeCategory() == Type::TypeCategory::catAlternative) {
+            Alternative* t = (Alternative*)type;
+           
+            return getattr(
+                t->subtypes()[t->which(data)].second,
+                t->eltPtr(data),
+                attr_name
+                );
+        }
+
+        if (type->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
+            NamedTuple* nt = (NamedTuple*)type;
             for (long k = 0; k < nt->getNames().size();k++) {
                 if (nt->getNames()[k] == attr_name) {
                     return extractPythonObject(
-                        nt->eltPtr(w->data, k), 
+                        nt->eltPtr(data, k), 
                         nt->getTypes()[k]
                         );
                 }
@@ -728,6 +800,7 @@ struct native_instance_wrapper {
         PyErr_SetString(PyExc_AttributeError, attr_name);
         return NULL;
     }
+
     static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op) {
         Type* own = extractTypeFrom(a->ob_type);
         Type* other = extractTypeFrom(b->ob_type);
@@ -775,11 +848,12 @@ struct native_instance_wrapper {
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-            native_instance_wrapper* self = (native_instance_wrapper*)typeObj(self_type)->tp_alloc(o->ob_type, 0);
+            native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
             self->mIteratorOffset = 0;
             self_type->copy_constructor(self->data, w->data);
             self->mIsInitialized = true;
+            self->mIsMatcher = false;
 
             return (PyObject*)self;
         }
@@ -792,7 +866,9 @@ struct native_instance_wrapper {
         Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
-        assert(self_type->getTypeCategory() == Type::TypeCategory::catConstDict);
+        if (self_type->getTypeCategory() != Type::TypeCategory::catConstDict) {
+            return NULL;
+        }
 
         ConstDict* dict_t = (ConstDict*)self_type;
 
@@ -806,10 +882,10 @@ struct native_instance_wrapper {
     }
 
     static PyTypeObject* typeObjInternal(Type* inType) {
-        static std::mutex mutex;
+        static std::recursive_mutex mutex;
         static std::map<Type*, NativeTypeWrapper*> types;
 
-        std::lock_guard<std::mutex> lock(mutex);
+        std::lock_guard<std::recursive_mutex> lock(mutex);
 
         auto it = types.find(inType);
         if (it != types.end()) {
@@ -870,7 +946,28 @@ struct native_instance_wrapper {
                 }, inType
                 };
 
+        //at this point, the dictionary has an entry, so if we recurse back to this function
+        //we will return the correct entry.
+        //at this point, the dictionary has an entry, so if we recurse back to this function
+        //we will return the correct entry.
+        if (inType->getBaseType()) {
+            types[inType]->typeObj.tp_base = typeObjInternal((Type*)inType->getBaseType());
+            Py_INCREF(types[inType]->typeObj.tp_base);
+        }
+
         PyType_Ready((PyTypeObject*)types[inType]);
+
+        if (inType->getTypeCategory() == Type::TypeCategory::catAlternative) {
+            Alternative* alt = (Alternative*)inType;
+            for (long k = 0; k < alt->subtypes().size(); k++) {
+                PyDict_SetItemString(
+                    types[inType]->typeObj.tp_dict, 
+                    alt->subtypes()[k].first.c_str(), 
+                    (PyObject*)typeObjInternal(ConcreteAlternative::Make(alt, k))
+                    );
+            }
+        }
+
         return (PyTypeObject*)types[inType];
     }
 };
@@ -990,8 +1087,8 @@ PyObject *OneOf(PyObject* nullValue, PyObject* args) {
     return typeObj;
 }
 
-PyObject *NamedTuple(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
-    if (PyTuple_Size(args)) {
+PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    if (args && PyTuple_Check(args) && PyTuple_Size(args)) {
         PyErr_SetString(PyExc_TypeError, "NamedTuple takes no positional arguments.");
         return NULL;
     }
@@ -1080,6 +1177,51 @@ PyObject *NoneType(PyObject* nullValue, PyObject* args) {
     return res;
 }
 
+PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+    if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
+        PyErr_SetString(PyExc_TypeError, "Alternative takes a single string positional argument.");
+        return NULL;
+    }
+
+    std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
+
+    std::vector<std::pair<std::string, NamedTuple*> > definitions;
+
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+
+    int i = 0;
+
+    while (PyDict_Next(kwargs, &pos, &key, &value)) {
+        assert(PyUnicode_Check(key));
+
+        std::string fieldName(PyUnicode_AsUTF8(key));
+
+        if (!PyDict_Check(value)) {
+            PyErr_SetString(PyExc_TypeError, "Alternative members must be initialized with dicts.");
+            return NULL;
+        }
+
+        PyObject* ntPyPtr = MakeNamedTupleType(nullptr, nullptr, value);
+        if (!ntPyPtr) {
+            return NULL;
+        }
+
+        NamedTuple* ntPtr = (NamedTuple*)native_instance_wrapper::extractTypeFrom((PyTypeObject*)ntPyPtr);
+        
+        assert(ntPtr);
+
+        definitions.push_back(std::make_pair(fieldName, ntPtr));
+    };
+
+    PyObject* res = (PyObject*)native_instance_wrapper::typeObj(
+        ::Alternative::Make(name, definitions)
+        );
+
+    Py_INCREF(res);
+    return res;
+}
+
 static PyMethodDef module_methods[] = {
     {"NoneType", (PyCFunction)NoneType, METH_VARARGS, NULL},
     {"Int8", (PyCFunction)Int8, METH_VARARGS, NULL},
@@ -1094,9 +1236,10 @@ static PyMethodDef module_methods[] = {
     {"Bytes", (PyCFunction)Bytes, METH_VARARGS, NULL},
     {"TupleOf", (PyCFunction)TupleOf, METH_VARARGS, NULL},
     {"Tuple", (PyCFunction)Tuple, METH_VARARGS, NULL},
-    {"NamedTuple", (PyCFunction)NamedTuple, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"OneOf", (PyCFunction)OneOf, METH_VARARGS, NULL},
     {"ConstDict", (PyCFunction)ConstDict, METH_VARARGS, NULL},
+    {"Alternative", (PyCFunction)Alternative, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

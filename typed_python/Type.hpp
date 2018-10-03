@@ -30,6 +30,7 @@ class NamedTuple;
 class Tuple;
 class ConstDict;
 class Alternative;
+class ConcreteAlternative;
 class Class;
 class PackedArray;
 class Pointer;
@@ -60,6 +61,7 @@ public:
         catTuple,
         catConstDict,
         catAlternative,
+        catConcreteAlternative, //concrete Alternative subclass
         catClass,
         catPackedArray,
         catPointer
@@ -152,6 +154,8 @@ public:
                 return f(*(ConstDict*)this);
             case catAlternative:
                 return f(*(Alternative*)this);
+            case catConcreteAlternative:
+                return f(*(ConcreteAlternative*)this);
             case catClass:
                 return f(*(Class*)this);
             case catPackedArray:
@@ -161,6 +165,10 @@ public:
             default:
                 throw std::runtime_error("Invalid type found");
         }
+    }
+
+    const Type* getBaseType() const {
+        return m_base;
     }
 
     void constructor(instance_ptr self) const {
@@ -206,7 +214,8 @@ protected:
             m_size(0),
             m_is_default_constructible(false),
             m_name("Undefined"),
-            mTypeRep(nullptr)
+            mTypeRep(nullptr),
+            m_base(nullptr)
         {}
 
     TypeCategory m_typeCategory;
@@ -218,6 +227,8 @@ protected:
     std::string m_name;
 
     PyTypeObject* mTypeRep;
+
+    const Type* m_base;
 };
 
 class OneOf : public Type {
@@ -1312,11 +1323,11 @@ public:
             Type(TypeCategory::catValue),
             m_type(type),
             m_data(data)
-        {
+    {
         m_size = 0;
         m_is_default_constructible = true;
         m_name = "Value(...)";
-        }
+    }
 
     char cmp(instance_ptr left, instance_ptr right) const {
         return 0;
@@ -1346,22 +1357,259 @@ private:
 
 class Alternative : public Type {
 public:
-    void constructor(instance_ptr self) const {
-    
-    }
-    
-    void destroy(instance_ptr self) const {
+    class layout {
+    public:
+        std::atomic<int64_t> refcount;
+        int64_t which;
+        uint8_t data[];
+    };
 
+    Alternative(std::string name, const std::vector<std::pair<std::string, NamedTuple*> >& subtypes) :
+            Type(TypeCategory::catAlternative),
+            m_default_construction_ix(0),
+            m_default_construction_type(nullptr),
+            m_subtypes(subtypes)
+    {
+        m_name = name;
+            
+        if (m_subtypes.size() > 255) {
+            throw std::runtime_error("Can't have an alternative with more than 255 subelements");
+        }
+
+        m_size = sizeof(void*);
+
+        m_is_default_constructible = false;
+        m_all_alternatives_empty = true;
+
+        for (auto& subtype_pair: m_subtypes) {
+            if (subtype_pair.second->bytecount() > 0) {
+                m_all_alternatives_empty = false;
+            }
+
+            if (m_arg_positions.find(subtype_pair.first) != m_arg_positions.end()) {
+                throw std::runtime_error("Can't create an alternative with " + 
+                        subtype_pair.first + " defined twice.");
+            }
+
+            m_arg_positions[subtype_pair.first] = m_arg_positions.size();
+
+            if (subtype_pair.second->is_default_constructible()) {
+                m_is_default_constructible = true;
+                m_default_construction_ix = m_arg_positions[subtype_pair.first];
+            }
+        }
+
+        m_size = (m_all_alternatives_empty ? 1 : sizeof(void*));
+    }
+
+    instance_ptr eltPtr(instance_ptr self) const {
+        if (m_all_alternatives_empty) {
+            return self;
+        }
+
+        layout& record = **(layout**)self;
+        
+        return record.data;
+    }
+
+    int64_t which(instance_ptr self) const {
+        if (m_all_alternatives_empty) {
+            return *(uint8_t*)self;
+        }
+
+        layout& record = **(layout**)self;
+        
+        return record.which;
+    }
+
+    void constructor(instance_ptr self) const;
+
+    void destroy(instance_ptr self) const {
+        if (m_all_alternatives_empty) {
+            return;
+        }
+
+        layout& record = **(layout**)self;
+        
+        record.refcount--;
+        if (record.refcount == 0) {
+            m_subtypes[record.which].second->destroy(record.data);
+            free(*(layout**)self);
+        }
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) const {
+        if (m_all_alternatives_empty) {
+            *(uint8_t*)self = *(uint8_t*)other;
+            return;
+        }
 
+        (*(layout**)self) = (*(layout**)other);
+
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
     }
 
     void assign(instance_ptr self, instance_ptr other) const {
+        layout* old = (*(layout**)self);
 
+        (*(layout**)self) = (*(layout**)other);
+
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
+
+        destroy((instance_ptr)&old);
     }
+
+    static Alternative* Make(std::string name,
+                         const std::vector<std::pair<std::string, NamedTuple*> >& types
+                         ) {
+        static std::mutex guard;
+
+        std::lock_guard<std::mutex> lock(guard);
+
+        typedef std::pair<std::string, std::vector<std::pair<std::string, NamedTuple*> > > keytype;
+
+        static std::map<keytype, Alternative*> m;
+
+        auto it = m.find(keytype(name, types));
+
+        if (it == m.end()) {
+            it = m.insert(std::make_pair(keytype(name, types), new Alternative(name, types))).first;
+        }
+
+        return it->second;
+    }
+
+    const std::vector<std::pair<std::string, NamedTuple*> >& subtypes() const {
+        return m_subtypes;
+    }
+
+    bool all_alternatives_empty() const {
+        return m_all_alternatives_empty;
+    }
+
+private:
+    bool m_all_alternatives_empty;
+
+    int m_default_construction_ix;
+
+    mutable const Type* m_default_construction_type;
+
+    std::vector<std::pair<std::string, NamedTuple*> > m_subtypes;
+
+    std::map<std::string, int> m_arg_positions;
 };
+
+class ConcreteAlternative : public Type {
+public:
+    typedef Alternative::layout layout;
+
+    ConcreteAlternative(const Alternative* m_alternative, int64_t which) :
+            Type(TypeCategory::catConcreteAlternative),
+            m_alternative(m_alternative),
+            m_which(which)
+    {   
+        m_base = m_alternative;
+        m_name = m_alternative->name() + "." + m_alternative->subtypes()[which].first;
+        m_size = m_alternative->bytecount();
+        m_is_default_constructible = m_alternative->subtypes()[which].second->is_default_constructible();
+    }
+
+    void constructor(instance_ptr self) const {
+        if (m_alternative->all_alternatives_empty()) {
+            *(uint8_t*)self = m_which;
+        } else {
+            constructor(self, [&](instance_ptr i) {
+                m_alternative->subtypes()[m_which].second->constructor(i);
+            });
+        }
+    }
+
+    //returns an uninitialized object of type-index 'which'
+    template<class subconstructor>
+    void constructor(instance_ptr self, const subconstructor& s) const {
+        if (m_alternative->all_alternatives_empty()) {
+            *(uint8_t*)self = m_which;
+            s(self);
+        } else {
+            *(layout**)self = (layout*)malloc(
+                sizeof(layout) + 
+                elementType()->bytecount()
+                );
+
+            layout& record = **(layout**)self;
+            record.refcount = 1;
+            record.which = m_which;
+            try {
+                s(record.data);
+            } catch(...) {
+                free(*(layout**)self);
+                throw;
+            }
+        }
+    }
+
+    void destroy(instance_ptr self) const {
+        m_alternative->destroy(self);
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+        m_alternative->copy_constructor(self, other);
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+        m_alternative->assign(self, other);
+    }
+
+    static ConcreteAlternative* Make(const Alternative* alt, int64_t which) {
+        static std::mutex guard;
+
+        std::lock_guard<std::mutex> lock(guard);
+
+        typedef std::pair<const Alternative*, int64_t> keytype;
+
+        static std::map<keytype, ConcreteAlternative*> m;
+
+        auto it = m.find(keytype(alt ,which));
+
+        if (it == m.end()) {
+            it = m.insert(
+                std::make_pair(keytype(alt,which), new ConcreteAlternative(alt,which))
+                ).first;
+        }
+
+        return it->second;
+    }
+
+    Type* elementType() const {
+        return m_alternative->subtypes()[m_which].second;
+    }
+
+    const Alternative* getAlternative() const {
+        return m_alternative;
+    }
+
+    int64_t which() const {
+        return m_which;
+    }
+
+private:
+    const Alternative* m_alternative;
+
+    int64_t m_which;
+};
+
+inline void Alternative::constructor(instance_ptr self) const {
+    if (!m_default_construction_type) {
+        m_default_construction_type = ConcreteAlternative::Make(this, m_default_construction_ix);
+    }
+
+    m_default_construction_type->constructor(self);
+}
+
 
 class Class : public Type {
 public:

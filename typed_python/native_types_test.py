@@ -12,10 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict
+from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict, Alternative
 import typed_python._types as _types
-
-#from typed_python import ConstDict
 
 import unittest
 import time
@@ -240,9 +238,40 @@ class NativeTypesTests(unittest.TestCase):
         for k in aDict:
             self.assertEqual(aDict[str(k)], str(int(k)+1))
 
+    def test_alternatives(self):
+        alt = Alternative(
+            "Alt",
+            child_ints={'x': int, 'y': int},
+            child_strings={'x': str, 'y': str}
+            )
 
+        self.assertTrue(issubclass(alt.child_ints, alt))
+        self.assertTrue(issubclass(alt.child_strings, alt))
 
+        a = alt.child_ints(x=10,y=20)
+        self.assertTrue(isinstance(a, alt))
+        self.assertTrue(isinstance(a, alt.child_ints))
 
+        self.assertEqual(a.x, 10)
+        self.assertEqual(a.y, 20)
+        self.assertTrue(a.matches.child_ints)
+        self.assertFalse(a.matches.child_strings)
+        
+    def test_alternatives_perf(self):
+        alt = Alternative(
+            "Alt",
+            child_ints={'x': int, 'y': int},
+            child_strings={'x': str, 'y': str}
+            )
 
+        t0 = time.time()
+        
+        for i in range(1000000):
+            a = alt.child_ints(x=10,y=20)
+            a.matches.child_ints
+            a.x
 
+        print("took ", time.time() - t0, " to do 1mm")
+        self.assertTrue(time.time() - t0 < 2.0)
 
+        

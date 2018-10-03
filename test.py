@@ -97,6 +97,14 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             help="run test harness verbosely"
             )
         self.add_argument(
+            '-s',
+            dest='skip_build',
+            action='store_true',
+            default=False,
+            required=False,
+            help="dont rebuild"
+            )
+        self.add_argument(
             '--list',
             dest='list',
             action='store_true',
@@ -480,9 +488,10 @@ def main(args):
     args, filter_actions = parser.parse_args(args[1:])
 
     try:
-        result = buildModule(args)
-        if result:
-            return result
+        if not args.skip_build:
+            result = buildModule(args)
+            if result:
+                return result
 
         return executeTests(args, filter_actions)
     except:
