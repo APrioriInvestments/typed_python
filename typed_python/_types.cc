@@ -489,6 +489,48 @@ struct native_instance_wrapper {
         return 0;
     }
 
+    static PyObject* sq_concat(PyObject* lhs, PyObject* rhs) {
+        Type* lhs_type = extractTypeFrom(lhs->ob_type);
+        Type* rhs_type = extractTypeFrom(rhs->ob_type);
+
+        if (lhs_type && rhs_type) {
+            native_instance_wrapper* w_lhs = (native_instance_wrapper*)lhs;
+            native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
+
+            if (lhs_type->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+                if (lhs_type == rhs_type) {
+                    TupleOf* tupT = (TupleOf*)lhs_type;
+                    Type* eltType = tupT->getEltType();
+                    native_instance_wrapper* self = 
+                        (native_instance_wrapper*)typeObj(tupT)
+                            ->tp_alloc(typeObj(tupT), 0);
+
+                    int count_lhs = tupT->count(w_lhs->data);
+                    int count_rhs = tupT->count(w_rhs->data);
+
+                    tupT->constructor(self->data, count_lhs + count_rhs, 
+                        [&](uint8_t* eltPtr, int64_t k) {
+                            eltType->copy_constructor(
+                                eltPtr, 
+                                k < count_lhs ? tupT->eltPtr(w_lhs->data, k) : 
+                                    tupT->eltPtr(w_rhs->data, k - count_lhs)
+                                );
+                            }
+                        );
+
+                    return (PyObject*)self;
+                }
+            }
+        }
+    
+        PyErr_SetString(
+            PyExc_TypeError, 
+            (std::string("cannot concatenate ") + lhs->ob_type->tp_name + " and "
+                    + rhs->ob_type->tp_name).c_str()
+            );
+        return NULL;
+    }
+
     static PyObject* sq_item(native_instance_wrapper* w, Py_ssize_t ix) {
         if (w->getType()->getTypeCategory() == Type::TypeCategory::catTupleOf) {
             int64_t count = ((TupleOf*)w->getType())->count(w->data);
@@ -577,6 +619,8 @@ struct native_instance_wrapper {
                 res->sq_length = (lenfunc)native_instance_wrapper::sq_length;
                 res->sq_item = (ssizeargfunc)native_instance_wrapper::sq_item;
             }
+
+            res->sq_concat = native_instance_wrapper::sq_concat;
 
             return res;
         }
@@ -871,7 +915,7 @@ struct native_instance_wrapper {
         if (other == Py_None) {
             return (t->getTypeCategory() == Type::TypeCategory::catNone ? 0 : 1);
         }
-        
+
         if (PyLong_Check(other)) {
             int64_t other_l = PyLong_AsLong(other);
             int64_t self_l;

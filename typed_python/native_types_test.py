@@ -524,3 +524,12 @@ class NativeTypesTests(unittest.TestCase):
                 if tup1 != tup2:
                     self.assertNotEqual( makeTupleOf(*tup1), tup2 )
 
+
+    def test_add_tuple_of(self):
+        tupleOfInt = TupleOf(int)
+
+        tups = [(),(1,2),(1,),(1,2,3,4)]
+
+        for tup1 in tups:
+            for tup2 in tups:
+                self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1+tup2))
