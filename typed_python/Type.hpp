@@ -524,6 +524,9 @@ public:
 
             getTypes()[k]->repr(eltPtr(self,k),stream);
         }
+        if (getTypes().size() == 1) {
+            stream << ",";
+        }
 
         stream << ")";
     }
@@ -1617,15 +1620,21 @@ public:
     };
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
-        stream << "b" << "\"";
+        stream << "b" << "'";
         long bytes = count(self);
         uint8_t* base = eltPtr(self,0);
 
         static char hexDigits[] = "0123456789abcdef";
         
         for (long k = 0; k < bytes;k++) {
-            if (base[k] == '\"') {
-                stream << "\\\"";
+            if (base[k] == '\'') {
+                stream << "\\'";
+            } else if (base[k] == '\r') {
+                stream << "\\r";
+            } else if (base[k] == '\n') {
+                stream << "\\n";
+            } else if (base[k] == '\t') {
+                stream << "\\t";
             } else if (base[k] == '\\') {
                 stream << "\\\\";
             } else if (isprint(base[k])) {
@@ -1635,7 +1644,7 @@ public:
             }
         }
         
-        stream << "\"";
+        stream << "'";
     }
 
     int32_t hash32(instance_ptr left) const {

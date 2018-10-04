@@ -489,7 +489,7 @@ class NativeTypesTests(unittest.TestCase):
 
             for v1 in values:
                 for v2 in values:
-                    if v1 == v2:
+                    if type(v1) == type(v2) and v1 == v2:
                         self.assertEqual(hash(v1), hash(v2))
                         if type(v1) is type(v2):
                             self.assertEqual(repr(v1), repr(v2), (v1, v2, type(v1),type(v2)))
@@ -499,3 +499,28 @@ class NativeTypesTests(unittest.TestCase):
             for i in range(len(values)-1):
                 self.assertTrue(values[i] <= values[i+1])
                 self.assertTrue(values[i+1] >= values[i])
+
+    def test_bytes_repr(self):
+        for _ in range(100000):
+            #always start with a '"' because otherwise python keeps chosing different
+            #initial characters.
+            someBytes = b'"' + numpy.random.uniform(size=2).tostring()
+            self.assertEqual(repr(makeTuple(someBytes)), repr((someBytes,)))
+
+    def test_equality_with_native_python_objects(self):
+        tups = [(1,2,3), (), ("2",), (b"2",), (1,2,3, "b"), (2,), (None,)]
+
+        for tup1 in tups:
+            self.assertEqual( makeTuple(*tup1), tup1 )
+
+            for tup2 in tups:
+                if tup1 != tup2:
+                    self.assertNotEqual( makeTuple(*tup1), tup2 )
+
+        for tup1 in tups:
+            self.assertEqual( makeTupleOf(*tup1), tup1 )
+
+            for tup2 in tups:
+                if tup1 != tup2:
+                    self.assertNotEqual( makeTupleOf(*tup1), tup2 )
+
