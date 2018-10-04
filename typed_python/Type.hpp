@@ -56,7 +56,7 @@ public:
             count -= 4;
         }
         while (count) {
-            add((int32_t)*bytes);
+            add((uint8_t)*bytes);
             bytes++;
             count--;
         }
@@ -66,6 +66,7 @@ public:
         return m_state;
     }
 
+    void addRegister(bool i) { add(i ? 1:0); }
     void addRegister(uint8_t i) { add(i); }
     void addRegister(uint16_t i) { add(i); }
     void addRegister(uint32_t i) { add(i); }
@@ -322,7 +323,19 @@ public:
 
         m_size = computeBytecount();
         
-        m_name = "OneOf(...)";
+        m_name = "OneOf(";
+        bool first = true;
+        for (auto t: types) {
+            if (first) { 
+                first = false;
+            } else {
+                m_name += ",";
+            }
+
+            m_name += t->name();
+        }
+
+        m_name += ")";
         
         m_is_default_constructible = false;
 
@@ -578,7 +591,16 @@ public:
     NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
-        m_name = "NamedTuple(...)";
+        assert(types.size() == names.size());
+
+        m_name = "NamedTuple(";
+        for (long k = 0; k < types.size();k++) {
+            if (k) {
+                m_name += ",";
+            }
+            m_name += names[k] + "=" + types[k]->name();
+        }
+        m_name += ")";
     }
 
     static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
@@ -591,7 +613,14 @@ public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catTuple, types, names)
     {
-        m_name = "Tuple(...)";
+        m_name = "Tuple(";
+        for (long k = 0; k < types.size();k++) {
+            if (k) {
+                m_name += ",";
+            }
+            m_name += types[k]->name();
+        }
+        m_name += ")";
     }
 
     static Tuple* Make(const std::vector<Type*>& types) {
@@ -613,8 +642,9 @@ public:
             Type(TypeCategory::catTupleOf),
             m_element_type(type)
     {
-        m_name = "TupleOf(...)";
+        m_name = "TupleOf(" + type->name() + ")";
         m_size = sizeof(void*);
+        m_is_default_constructible = true;
     }
 
     int32_t hash32(instance_ptr left) const {
@@ -795,7 +825,7 @@ public:
             m_key(key),
             m_value(value)
     {
-        m_name = "ConstDict(...)";
+        m_name = "ConstDict(" + key->name() + "->" + value->name() + ")";
         m_size = sizeof(void*);
         m_is_default_constructible = true;
         m_bytes_per_key = m_key->bytecount();
@@ -856,7 +886,7 @@ public:
         int ct = count(left);
         for (long k = 0; k < ct; k++) {
             char res = m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k));
-            if (!res) { 
+            if (res) { 
                 return res;
             }
         }
@@ -867,7 +897,7 @@ public:
                 kvPairPtrValue(right,k)
                 );
 
-            if (!res) { 
+            if (res) { 
                 return res;
             }
         }
@@ -1462,7 +1492,9 @@ public:
 
         if ((*(layout**)left)->hash_cache == -1) {
             Hash32Accumulator acc((int)getTypeCategory());
+            
             acc.addBytes(eltPtr(left, 0), count(left));
+
             (*(layout**)left)->hash_cache = acc.get();
             if ((*(layout**)left)->hash_cache == -1) {
                 (*(layout**)left)->hash_cache = -2;

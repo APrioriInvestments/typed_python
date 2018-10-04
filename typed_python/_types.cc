@@ -396,6 +396,11 @@ struct native_instance_wrapper {
         if (eltType->getTypeCategory() == Type::TypeCategory::catInt64) {
             return PyLong_FromLong(*(int64_t*)data);
         }
+        if (eltType->getTypeCategory() == Type::TypeCategory::catBool) {
+            PyObject* res = *(bool*)data ? Py_True : Py_False;
+            Py_INCREF(res);
+            return res;
+        }
         if (eltType->getTypeCategory() == Type::TypeCategory::catFloat64) {
             return PyFloat_FromDouble(*(double*)data);
         }
@@ -1018,32 +1023,39 @@ struct native_instance_wrapper {
 
 Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
     if (PyType_Check(typearg)) {
-        if ((PyTypeObject*)typearg == &PyLong_Type) {
+        PyTypeObject* pyType = (PyTypeObject*)typearg;
+
+        if (pyType == &PyLong_Type) {
             return Int64::Make();
         }
-        if ((PyTypeObject*)typearg == &PyFloat_Type) {
+        if (pyType == &PyFloat_Type) {
             return Float64::Make();
         }
-        if ((PyTypeObject*)typearg == Py_None->ob_type) {
+        if (pyType == Py_None->ob_type) {
             return None::Make();
         }
-        if ((PyTypeObject*)typearg == &PyBool_Type) {
+        if (pyType == &PyBool_Type) {
             return Bool::Make();
         }
-        if ((PyTypeObject*)typearg == &PyBytes_Type) {
+        if (pyType == &PyBytes_Type) {
             return Bytes::Make();
         }
-        if ((PyTypeObject*)typearg == &PyUnicode_Type) {
+        if (pyType == &PyUnicode_Type) {
             return String::Make();
         }
 
-        Type* res = native_instance_wrapper::extractTypeFrom((PyTypeObject*)typearg);
+        Type* res = native_instance_wrapper::extractTypeFrom(pyType);
         if (res) {
             return res;
         }
+
+        PyErr_SetString(PyExc_TypeError, 
+            ("Cannot convert " + std::string(pyType->tp_name) + " to a native type.").c_str()
+            );
+        return NULL;
     }
 
-    PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type.");
+    PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type because it't not a type.");
     return NULL;
 }
 
@@ -1140,20 +1152,22 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
     std::vector<Type*> types;
     std::vector<std::string> names;
 
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
+    if (kwargs) {
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
 
-    while (PyDict_Next(kwargs, &pos, &key, &value)) {
-        if (!PyUnicode_Check(key)) {
-            PyErr_SetString(PyExc_TypeError, "NamedTuple keywords are supposed to be strings.");
-            return NULL;
-        }
+        while (PyDict_Next(kwargs, &pos, &key, &value)) {
+            if (!PyUnicode_Check(key)) {
+                PyErr_SetString(PyExc_TypeError, "NamedTuple keywords are supposed to be strings.");
+                return NULL;
+            }
 
-        names.push_back(PyUnicode_AsUTF8(key));
-        types.push_back(unwrapTypeArgToTypePtr(value));
+            names.push_back(PyUnicode_AsUTF8(key));
+            types.push_back(unwrapTypeArgToTypePtr(value));
 
-        if (not types.back()) {
-            return NULL;
+            if (not types.back()) {
+                return NULL;
+            }
         }
     }
 

@@ -16,10 +16,139 @@ from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTupl
 import typed_python._types as _types
 
 import unittest
+import traceback
 import time
 import numpy
 import sys
 
+def typeFor(t):
+    assert not isinstance(t, list), t
+    return type(t)
+
+def typeForSeveral(t):
+    ts = set(typeFor(a) for a in t)
+    if len(ts) == 1:
+        return list(ts)[0]
+    return OneOf(*ts)
+
+def makeTupleOf(*args):
+    if not args:
+        return TupleOf(int)()
+    return TupleOf(typeForSeveral(args))(args)
+
+def makeNamedTuple(**kwargs):
+    if not kwargs:
+        return NamedTuple()()
+    return NamedTuple(**{k:typeFor(v) for k,v in kwargs.items()})(**kwargs)
+
+def makeTuple(*args):
+    if not args:
+        return Tuple()()
+    return Tuple(*[typeFor(v) for v in args])(args)
+
+def makeDict(d):
+    if not d:
+        return ConstDict(int,int)()
+
+    return ConstDict(typeForSeveral(d.keys()), typeForSeveral(d.values()))(d)
+
+def makeAlternative(severalDicts):
+    types = list(
+        set(
+            tuple(
+                (k,typeFor(v)) for k,v in ntDict.items()
+                )
+            for ntDict in severalDicts
+            )
+        )
+
+    alt = Alternative("Alt", **{
+        "a_%s" % i: dict(types[i]) for i in range(len(types))
+        })
+
+    res = []
+    for thing in severalDicts:
+        did = False
+        for i in range(len(types)):
+            try:
+                res.append(getattr(alt,"a_%s" % i)(**thing))
+                did = True
+            except:
+                pass
+
+            if did:
+                break
+    assert len(res) == len(severalDicts)
+
+    return res
+
+def choice(x):
+    #numpy.random.choice([1,(1,2)]) blows up because it looks 'multidimensional'
+    #so we have to pick from a list of indices
+    if not isinstance(x,list):
+        x = list(x)
+    return x[numpy.random.choice(list(range(len(x))))]
+
+class RandomValueProducer:
+    def __init__(self):
+        self.levels = {0: [b'1', b'', '2', '', 0, 1, 0.0, 1.0, None, False, True]}
+
+    def addEvenly(self, levels, count):
+        for level in range(1, levels+1):
+            self.addValues(level, count)
+
+    def all(self):
+        res = []
+        for valueList in self.levels.values():
+            res.extend(valueList)
+        return res 
+
+    def addValues(self, level, count, sublevels = None):
+        assert level > 0
+
+        if sublevels is None:
+            sublevels = list(range(level))
+        sublevels = [x for x in sublevels if x in self.levels]
+
+        assert sublevels
+
+        def picker():
+            whichLevel = choice(sublevels)
+            try:
+                return choice(self.levels[whichLevel])
+            except:
+                print(self.levels[whichLevel])
+                raise
+
+        for _ in range(count):
+            val = self.randomValue(picker)
+            if not isinstance(val,list):
+                val = [val]    
+            self.levels.setdefault(level, []).extend(val)
+
+    def randomValue(self, picker):
+        def randomTuple():
+            return makeTuple(*[picker() for i in range(choice([0,1,2,3,4]))])
+
+        def randomNamedTupleDict():
+            return {"x_%s" % i: picker() for i in range(choice([0,1,2,3,4]))}
+
+        def randomNamedTuple():
+            return makeNamedTuple(**randomNamedTupleDict())
+
+        def randomDict():
+            return makeDict({picker():picker() for i in range(choice([0,1,2,3,4]))})
+
+        def randomTupleOf():
+            return makeTupleOf(*[picker() for i in range(choice([0,1,2,3,4]))])
+
+        def randomAlternative():
+            return makeAlternative([randomNamedTupleDict() for i in range(choice([1,2,3,4]))])
+
+        return choice([randomTuple,randomNamedTuple,randomDict,randomTupleOf,randomAlternative,picker])()
+
+    def pickRandomly(self):
+        return choice(self.levels[choice(list(self.levels))])
 
 class NativeTypesTests(unittest.TestCase):
     def test_objects_are_singletons(self):
@@ -351,4 +480,20 @@ class NativeTypesTests(unittest.TestCase):
         print("took ", time.time() - t0, " to do 1mm")
         self.assertTrue(time.time() - t0 < 2.0)
 
-        
+    def test_object_hashing_and_equality(self):
+        for _ in range(1000):
+            producer = RandomValueProducer()
+            producer.addEvenly(20, 2)
+
+            values = producer.all()
+
+            for v1 in values:
+                for v2 in values:
+                    if v1 == v2:
+                        self.assertEqual(hash(v1), hash(v2))
+
+            values = sorted([makeTuple(v) for v in values])
+
+            for i in range(len(values)-1):
+                self.assertTrue(values[i] <= values[i+1])
+                self.assertTrue(values[i+1] >= values[i])
