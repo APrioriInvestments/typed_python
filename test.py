@@ -35,7 +35,9 @@ import nose.plugins.xunit
 import argparse
 import traceback
 import subprocess
-
+import pickle
+import hashlib
+    
 class DirectoryScope(object):
     def __init__(self, directory):
         self.directory = directory
@@ -443,7 +445,38 @@ def executeTests(args, filter_actions):
         return 1
     return 0
 
+def hashSource(rootPath):
+    contents = []
+    for root, dirs, files in os.walk(rootPath):
+        for f in files:
+            path = os.path.join(root, f)
+
+            if "/.git/" not in path and "/build/" not in path and (
+                    path.endswith(".cc") or 
+                    path.endswith(".hpp") or 
+                    path.endswith(".cpp") or 
+                    path.endswith(".c") or 
+                    "setup.py" in path
+                    ):
+                with open(path, "rb") as f:
+                    contents.append((path, f.read()))
+
+    contents = sorted(contents)
+    sha = hashlib.sha256()
+    sha.update(pickle.dumps(contents))
+    return sha.hexdigest()
+
+
 def buildModule(args):
+    contentHash = hashSource(".")
+
+    if os.path.exists("./build/hash.txt"):
+        existing_hash = open("./build/hash.txt","r").read().strip()
+        
+        if contentHash == existing_hash:
+            print("Build and hash contents are the same. Skipping build.")
+            return
+
     if os.path.exists('./build'):
         shutil.rmtree("./build")
 
@@ -480,6 +513,9 @@ def buildModule(args):
 
     print(". Finished in %.2f seconds" % (time.time() - t0))
     print()
+
+    with open("./build/hash.txt","w") as f:
+        f.write(contentHash)
 
 
 def main(args):
