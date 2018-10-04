@@ -481,7 +481,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(time.time() - t0 < 2.0)
 
     def test_object_hashing_and_equality(self):
-        for _ in range(1000):
+        for _ in range(100):
             producer = RandomValueProducer()
             producer.addEvenly(20, 2)
 
@@ -491,6 +491,8 @@ class NativeTypesTests(unittest.TestCase):
                 for v2 in values:
                     if v1 == v2:
                         self.assertEqual(hash(v1), hash(v2))
+                        if type(v1) is type(v2):
+                            self.assertEqual(repr(v1), repr(v2), (v1, v2, type(v1),type(v2)))
 
             values = sorted([makeTuple(v) for v in values])
 

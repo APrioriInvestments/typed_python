@@ -9,6 +9,7 @@
 #include <utility>
 #include <atomic>
 #include <iostream>
+#include <sstream>
 
 class None;
 class Bool;
@@ -131,6 +132,12 @@ public:
 
     size_t bytecount() const {
         return m_size;
+    }
+
+    void repr(instance_ptr self, std::ostringstream& out) const {
+        this->check([&](auto& subtype) {
+            subtype.repr(self, out);
+        });
     }
 
     char cmp(instance_ptr left, instance_ptr right) const {
@@ -329,7 +336,7 @@ public:
             if (first) { 
                 first = false;
             } else {
-                m_name += ",";
+                m_name += ", ";
             }
 
             m_name += t->name();
@@ -345,6 +352,10 @@ public:
                 break;
             }
         }
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        m_types[*((uint8_t*)self)]->repr(self+1, stream);
     }
 
     int32_t hash32(instance_ptr left) const {
@@ -499,6 +510,24 @@ public:
         return 0;
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "(";
+
+        for (long k = 0; k < getTypes().size();k++) {
+            if (k > 0) {
+                stream << ", ";
+            }
+
+            if (k < m_names.size()) {
+                stream << m_names[k] << "=";
+            }
+
+            getTypes()[k]->repr(eltPtr(self,k),stream);
+        }
+
+        stream << ")";
+    }
+
     int32_t hash32(instance_ptr left) const {
         Hash32Accumulator acc((int)getTypeCategory());
 
@@ -596,7 +625,7 @@ public:
         m_name = "NamedTuple(";
         for (long k = 0; k < types.size();k++) {
             if (k) {
-                m_name += ",";
+                m_name += ", ";
             }
             m_name += names[k] + "=" + types[k]->name();
         }
@@ -616,7 +645,7 @@ public:
         m_name = "Tuple(";
         for (long k = 0; k < types.size();k++) {
             if (k) {
-                m_name += ",";
+                m_name += ", ";
             }
             m_name += types[k]->name();
         }
@@ -645,6 +674,22 @@ public:
         m_name = "TupleOf(" + type->name() + ")";
         m_size = sizeof(void*);
         m_is_default_constructible = true;
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "(";
+
+        int32_t ct = count(self);
+
+        for (long k = 0; k < ct;k++) {
+            if (k > 0) {
+                stream << ", ";
+            }
+
+            m_element_type->repr(eltPtr(self,k),stream);
+        }
+
+        stream << ")";
     }
 
     int32_t hash32(instance_ptr left) const {
@@ -849,6 +894,24 @@ public:
 
         return it->second;
     };
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "{";
+
+        int32_t ct = count(self);
+
+        for (long k = 0; k < ct;k++) {
+            if (k > 0) {
+                stream << ", ";
+            }
+
+            m_key->repr(kvPairPtrKey(self,k),stream);
+            stream << ": ";
+            m_value->repr(kvPairPtrValue(self,k),stream);
+        }
+
+        stream << "}";
+    }
 
     int32_t hash32(instance_ptr left) const {
         if (size(left) == 0) {
@@ -1156,6 +1219,9 @@ public:
 
     static None* Make() { static None res; return &res; }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "None";
+    }
 };
 
 template<class T>
@@ -1177,7 +1243,7 @@ public:
 
         return 0;
     }
-    
+
     int32_t hash32(instance_ptr left) const {
         Hash32Accumulator acc((int)getTypeCategory());
 
@@ -1208,6 +1274,10 @@ public:
         m_name = "Bool";
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (*(bool*)self ? "True":"False");
+    }
+
     static Bool* Make() { static Bool res; return &res; }
 };
 
@@ -1216,6 +1286,10 @@ public:
     UInt8() : RegisterType(TypeCategory::catUInt8)
     {
         m_name = "UInt8";
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (uint64_t)*(uint8_t*)self << "u8";
     }
 
     static UInt8* Make() { static UInt8 res; return &res; }
@@ -1228,6 +1302,10 @@ public:
         m_name = "UInt16";
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (uint64_t)*(uint16_t*)self << "u16";
+    }
+
     static UInt16* Make() { static UInt16 res; return &res; }
 };
 
@@ -1238,6 +1316,10 @@ public:
         m_name = "UInt32";
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (uint64_t)*(uint32_t*)self << "u32";
+    }
+
     static UInt32* Make() { static UInt32 res; return &res; }
 };
 
@@ -1246,6 +1328,10 @@ public:
     UInt64() : RegisterType(TypeCategory::catUInt64)
     {
         m_name = "UInt64";
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << *(uint64_t*)self << "u64";
     }
 
     static UInt64* Make() { static UInt64 res; return &res; }
@@ -1259,6 +1345,10 @@ public:
         m_size = 1;
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (int64_t)*(int8_t*)self << "i8";
+    }
+
     static Int8* Make() { static Int8 res; return &res; }
 };
 
@@ -1267,6 +1357,10 @@ public:
     Int16() : RegisterType(TypeCategory::catInt16)
     {
         m_name = "Int16";
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (int64_t)*(int16_t*)self << "i16";
     }
 
     static Int16* Make() { static Int16 res; return &res; }
@@ -1279,6 +1373,10 @@ public:
         m_name = "Int32";
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << (int64_t)*(int32_t*)self << "i32";
+    }
+
     static Int32* Make() { static Int32 res; return &res; }
 };
 
@@ -1287,6 +1385,10 @@ public:
     Int64() : RegisterType(TypeCategory::catInt64)
     {
         m_name = "Int64";
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << *(int64_t*)self;
     }
 
     static Int64* Make() { static Int64 res; return &res; }
@@ -1299,6 +1401,10 @@ public:
         m_name = "Float32";
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << *(float*)self << "f32";
+    }
+
     static Float32* Make() { static Float32 res; return &res; }
 };
 
@@ -1307,6 +1413,10 @@ public:
     Float64() : RegisterType(TypeCategory::catFloat64)
     {
         m_name = "Float64";
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << *(double*)self;
     }
 
     static Float64* Make() { static Float64 res; return &res; }
@@ -1411,6 +1521,29 @@ public:
         ::memcpy((*(layout**)self)->data, data, count * bytes_per_codepoint);
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        //as if it were bytes, which is totally wrong...
+        stream << "\"";
+        long bytes = count(self);
+        uint8_t* base = eltPtr(self,0);
+
+        static char hexDigits[] = "0123456789abcdef";
+        
+        for (long k = 0; k < bytes;k++) {
+            if (base[k] == '"') {
+                stream << "\\\"";
+            } else if (base[k] == '\\') {
+                stream << "\\\\";
+            } else if (isprint(base[k])) {
+                stream << base[k];
+            } else {
+                stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+            }
+        }
+
+        stream << "\"";
+    }
+
     instance_ptr eltPtr(instance_ptr self, int64_t i) const {
         const static char* emptyPtr = "";
 
@@ -1482,6 +1615,28 @@ public:
         int32_t bytecount;
         uint8_t data[];
     };
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "b" << "\"";
+        long bytes = count(self);
+        uint8_t* base = eltPtr(self,0);
+
+        static char hexDigits[] = "0123456789abcdef";
+        
+        for (long k = 0; k < bytes;k++) {
+            if (base[k] == '\"') {
+                stream << "\\\"";
+            } else if (base[k] == '\\') {
+                stream << "\\\\";
+            } else if (isprint(base[k])) {
+                stream << base[k];
+            } else {
+                stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+            }
+        }
+        
+        stream << "\"";
+    }
 
     int32_t hash32(instance_ptr left) const {
         Hash32Accumulator acc((int)getTypeCategory());
@@ -1717,6 +1872,11 @@ public:
         return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data);
     }
 
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << m_subtypes[which(self)].first;
+        m_subtypes[which(self)].second->repr(eltPtr(self), stream);
+    }
+
     int32_t hash32(instance_ptr left) const {
         Hash32Accumulator acc((int)TypeCategory::catAlternative);
 
@@ -1845,6 +2005,11 @@ public:
     int32_t hash32(instance_ptr left) const {
         return m_alternative->hash32(left);
     }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        m_alternative->repr(self,stream);
+    }
+
 
     char cmp(instance_ptr left, instance_ptr right) const {
         return m_alternative->cmp(left,right);

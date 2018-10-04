@@ -930,6 +930,18 @@ struct native_instance_wrapper {
         return extractPythonObject(dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), dict_t->keyType());
     }
 
+    static PyObject* tp_repr(PyObject *o) {
+        Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        std::ostringstream str;
+        str << std::showpoint;
+
+        self_type->repr(w->data, str);
+
+        return PyUnicode_FromString(str.str().c_str());
+   }
+
     static PyTypeObject* typeObjInternal(Type* inType) {
         static std::recursive_mutex mutex;
         static std::map<Type*, NativeTypeWrapper*> types;
@@ -951,7 +963,7 @@ struct native_instance_wrapper {
                 native_instance_wrapper::tp_getattr,                         // tp_getattr
                 0,                         // tp_setattr
                 0,                         // tp_reserved
-                0,                         // tp_repr
+                tp_repr,                   // tp_repr
                 numberMethods(inType),     // tp_as_number
                 sequenceMethodsFor(inType),   // tp_as_sequence
                 mappingMethods(inType),    // tp_as_mapping
