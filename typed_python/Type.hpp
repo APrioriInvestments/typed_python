@@ -971,6 +971,67 @@ public:
         return 0;
     }
 
+    void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
+        std::vector<instance_ptr> keep;
+        
+        int64_t lhsCount = count(lhs);
+        int64_t rhsCount = count(rhs);
+        
+        for (long k = 0; k < lhsCount; k++) {
+            instance_ptr lhsVal = kvPairPtrKey(lhs, k);
+
+            if (!lookupValueByKey(rhs, lhsVal)) {
+                keep.push_back(lhsVal);
+            }
+        }
+
+        constructor(output, rhsCount + keep.size(), false);
+
+        for (long k = 0; k < rhsCount; k++) {
+            m_key->copy_constructor(kvPairPtrKey(output,k), kvPairPtrKey(rhs, k));
+            m_value->copy_constructor(kvPairPtrValue(output,k), kvPairPtrValue(rhs, k));
+        }
+        for (long k = 0; k < keep.size(); k++) {
+            m_key->copy_constructor(kvPairPtrKey(output,k + rhsCount), keep[k]);
+            m_value->copy_constructor(kvPairPtrValue(output,k + rhsCount), keep[k] + m_bytes_per_key);
+        }
+        incKvPairCount(output, keep.size() + rhsCount);
+    }
+
+    TupleOf* tupleOfKeysType() const {
+        return TupleOf::Make(m_key);
+    }
+
+    void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
+        TupleOf* tupleType = tupleOfKeysType();
+        
+        int64_t lhsCount = count(lhs);
+        int64_t rhsCount = tupleType->count(rhs);
+
+        std::set<int> remove;
+            
+        for (long k = 0; k < rhsCount; k++) {
+            int64_t index = lookupIndexByKey(lhs, tupleType->eltPtr(rhs, k));
+            if (index != -1) {
+                remove.insert(index);
+            }
+        }
+
+        constructor(output, lhsCount - remove.size(), false);
+
+        long written = 0;
+        for (long k = 0; k < lhsCount; k++) {
+            if (remove.find(k) == remove.end()) {
+                m_key->copy_constructor(kvPairPtrKey(output,written), kvPairPtrKey(lhs, k));
+                m_value->copy_constructor(kvPairPtrValue(output,written), kvPairPtrValue(lhs, k));
+
+                written++;
+            }
+        }
+
+        incKvPairCount(output, written);
+    }
+
     instance_ptr kvPairPtrKey(instance_ptr self, int64_t i) const {
         if (!(*(layout**)self)) {
             return self;
@@ -991,9 +1052,13 @@ public:
         return record.data + m_bytes_per_key_value_pair * i + m_bytes_per_key;
     }
 
-    void incKvPairCount(instance_ptr self) const {
+    void incKvPairCount(instance_ptr self, int by = 1) const {
+        if (by == 0) {
+            return;
+        }
+
         layout& record = **(layout**)self;
-        record.count++;
+        record.count += by;
     }
 
     void sortKvPairs(instance_ptr self) const {
@@ -1085,9 +1150,9 @@ public:
         return (*(layout**)self)->count;
     }
 
-    instance_ptr lookupValueByKey(instance_ptr self, instance_ptr key) const {
+    int64_t lookupIndexByKey(instance_ptr self, instance_ptr key) const {
         if (!(*(layout**)self)) {
-            return 0;
+            return -1;
         }
 
         layout& record = **(layout**)self;
@@ -1102,7 +1167,7 @@ public:
             char res = m_key->cmp(kvPairPtrKey(self, mid), key);
             
             if (res == 0) {
-                return kvPairPtrValue(self, mid);
+                return mid;
             } else if (res < 0) {
                 low = mid+1;
             } else {
@@ -1110,7 +1175,15 @@ public:
             }
         }
 
-        return 0;
+        return -1;
+    }
+
+    instance_ptr lookupValueByKey(instance_ptr self, instance_ptr key) const {
+        int64_t offset = lookupIndexByKey(self, key);
+        if (offset == -1) {
+            return 0;
+        }
+        return kvPairPtrValue(self, offset);
     }
 
     void constructor(instance_ptr self, int64_t space, bool isPointerTree) const {

@@ -533,3 +533,36 @@ class NativeTypesTests(unittest.TestCase):
         for tup1 in tups:
             for tup2 in tups:
                 self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1+tup2))
+                self.assertEqual(tupleOfInt(tup1) + tup2, tupleOfInt(tup1+tup2))
+
+    def test_dictionary_subtraction_basic(self):
+        intDict = ConstDict(int,int)
+
+        self.assertEqual(intDict({1:2}) - (1,), intDict({}))
+        self.assertEqual(intDict({1:2, 3:4}) - (1,), intDict({3:4}))
+        self.assertEqual(intDict({1:2, 3:4}) - (3,), intDict({1:2}))
+
+    def test_dictionary_addition_and_subtraction(self):
+        someDicts = [{i:choice([1,2,3,4,5]) for i in range(choice([4,6,10,20]))} for _ in range(20)]
+        intDict = ConstDict(int,int)
+
+        for d1 in someDicts:
+            for d2 in someDicts:
+                addResult = dict(d1)
+                addResult.update(d2)
+
+                self.assertEqual(intDict(d1) + intDict(d2), intDict(addResult))
+
+                res = intDict(addResult)
+
+                while len(res):
+                    toRemove = []
+
+                    for i in range(choice(list(range(len(res))))+1):
+                        key = choice(list(addResult))
+                        del addResult[key]
+                        toRemove.append(key)
+
+                    res = res - toRemove
+
+                    self.assertEqual(res, intDict(addResult))

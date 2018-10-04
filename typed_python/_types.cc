@@ -12,6 +12,8 @@ struct NativeTypeWrapper {
     Type* mType;
 };
 
+class InternalPyException {};
+
 struct native_instance_wrapper {
     PyObject_HEAD
   
@@ -489,16 +491,107 @@ struct native_instance_wrapper {
         return 0;
     }
 
+    static PyObject* nb_subtract(PyObject* lhs, PyObject* rhs) {
+        Type* lhs_type = extractTypeFrom(lhs->ob_type);
+        Type* rhs_type = extractTypeFrom(rhs->ob_type);
+
+        if (lhs_type) {
+            native_instance_wrapper* w_lhs = (native_instance_wrapper*)lhs;
+
+            if (lhs_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+                ConstDict* dict_t = (ConstDict*)lhs_type;
+
+                Type* tupleOfKeysType = dict_t->tupleOfKeysType();
+
+                if (lhs_type == tupleOfKeysType) {
+                    native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
+
+                    native_instance_wrapper* self = 
+                        (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
+
+                    ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->data, w_rhs->data, self->data);
+
+                    return (PyObject*)self;
+                } else {
+                    //attempt to convert rhs to a relevant dict type.
+                    instance_ptr tempObj = (instance_ptr)malloc(tupleOfKeysType->bytecount());
+
+                    try {
+                        copy_initialize(tupleOfKeysType, tempObj, rhs);
+                    } catch(std::exception& e) {
+                        free(tempObj);
+                        PyErr_SetString(PyExc_TypeError, e.what());
+                        return NULL;
+                    }
+
+                    native_instance_wrapper* self = 
+                        (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
+
+                    ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->data, tempObj, self->data);
+
+                    tupleOfKeysType->destroy(tempObj);
+
+                    free(tempObj);
+
+                    return (PyObject*)self;                    
+                }
+            }
+        }
+
+        PyErr_SetString(
+            PyExc_TypeError, 
+            (std::string("cannot subtract ") + rhs->ob_type->tp_name + " from "
+                    + lhs->ob_type->tp_name).c_str()
+            );
+        return NULL;
+    }
+
     static PyObject* sq_concat(PyObject* lhs, PyObject* rhs) {
         Type* lhs_type = extractTypeFrom(lhs->ob_type);
         Type* rhs_type = extractTypeFrom(rhs->ob_type);
 
-        if (lhs_type && rhs_type) {
+        if (lhs_type) {
             native_instance_wrapper* w_lhs = (native_instance_wrapper*)lhs;
-            native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
 
-            if (lhs_type->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            if (lhs_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
                 if (lhs_type == rhs_type) {
+                    native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
+
+                    native_instance_wrapper* self = 
+                        (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
+
+                    ((ConstDict*)lhs_type)->addDicts(w_lhs->data, w_rhs->data, self->data);
+
+                    return (PyObject*)self;
+                } else {
+                    //attempt to convert rhs to a relevant dict type.
+                    instance_ptr tempObj = (instance_ptr)malloc(lhs_type->bytecount());
+
+                    try {
+                        copy_initialize(lhs_type, tempObj, rhs);
+                    } catch(std::exception& e) {
+                        free(tempObj);
+                        PyErr_SetString(PyExc_TypeError, e.what());
+                        return NULL;
+                    }
+
+                    native_instance_wrapper* self = 
+                        (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
+
+                    ((ConstDict*)lhs_type)->addDicts(w_lhs->data, tempObj, self->data);
+
+                    lhs_type->destroy(tempObj);
+
+                    free(tempObj);
+
+                    return (PyObject*)self;                    
+                }
+            }
+            if (lhs_type->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+                //TupleOf(X) + TupleOf(X) fastpath
+                if (lhs_type == rhs_type) {
+                    native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
+
                     TupleOf* tupT = (TupleOf*)lhs_type;
                     Type* eltType = tupT->getEltType();
                     native_instance_wrapper* self = 
@@ -519,6 +612,53 @@ struct native_instance_wrapper {
                         );
 
                     return (PyObject*)self;
+                }
+                //generic path to add any kind of iterable.
+                if (PyObject_Length(rhs) != -1) {
+                    TupleOf* tupT = (TupleOf*)lhs_type;
+                    Type* eltType = tupT->getEltType();
+
+                    native_instance_wrapper* self = 
+                        (native_instance_wrapper*)typeObj(tupT)
+                            ->tp_alloc(typeObj(tupT), 0);
+
+                    int count_lhs = tupT->count(w_lhs->data);
+                    int count_rhs = PyObject_Length(rhs);
+
+                    try {
+                        tupT->constructor(self->data, count_lhs + count_rhs, 
+                            [&](uint8_t* eltPtr, int64_t k) {
+                                if (k < count_lhs) {
+                                    eltType->copy_constructor(
+                                        eltPtr, 
+                                        tupT->eltPtr(w_lhs->data, k)
+                                        );
+                                } else {
+                                    PyObject* kval = PyLong_FromLong(k - count_lhs);
+                                    PyObject* o = PyObject_GetItem(rhs, kval);
+                                    Py_DECREF(kval);
+
+                                    if (!o) {
+                                        throw InternalPyException();
+                                    }
+                                    
+                                    try {
+                                        copy_initialize(eltType, eltPtr, o);
+                                    } catch(...) {
+                                        Py_DECREF(o);
+                                        throw;
+                                    }
+
+                                    Py_DECREF(o);
+                                }
+                            });
+                    } catch(std::exception& e) {
+                        typeObj(self->getType())->tp_dealloc((PyObject*)self);
+                        PyErr_SetString(PyExc_TypeError, e.what());
+                        return NULL;
+                    }
+
+                    return (PyObject*)self;                    
                 }
             }
         }
@@ -632,7 +772,7 @@ struct native_instance_wrapper {
         static PyNumberMethods* res = 
             new PyNumberMethods {
                 0, //binaryfunc nb_add
-                0, //binaryfunc nb_subtract
+                nb_subtract, //binaryfunc nb_subtract
                 0, //binaryfunc nb_multiply
                 0, //binaryfunc nb_remainder
                 0, //binaryfunc nb_divmod
