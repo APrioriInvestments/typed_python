@@ -585,3 +585,11 @@ class NativeTypesTests(unittest.TestCase):
                     res = res - toRemove
 
                     self.assertEqual(res, intDict(addResult))
+
+    def test_subclassing(self):
+        class NTSubclass(NamedTuple(x=int,y=float)):
+            def f(self):
+                return self.x + self.y
+
+        self.assertEqual(NTSubclass(x=10, y=20).f(), 30)
+

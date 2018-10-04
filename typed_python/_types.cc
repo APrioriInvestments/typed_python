@@ -455,23 +455,46 @@ struct native_instance_wrapper {
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
         Type* eltType = extractTypeFrom(subtype);
 
-        instance_ptr tgt = (instance_ptr)malloc(eltType->bytecount());
-            
-        try{
-            initialize(tgt, eltType, args, kwds);
-        } catch(std::exception& e) {
+        if (isSubclassOfNativeType(subtype)) {
+            native_instance_wrapper* self = (native_instance_wrapper*)subtype->tp_alloc(subtype, 0);
+
+            try {
+                self->mIteratorOffset = -1;
+                self->mIsInitialized = false;
+                self->mIsMatcher = false;
+
+                initialize(self->data, eltType, args, kwds);
+
+                self->mIsInitialized = true;
+
+                return (PyObject*)self;
+            } catch(std::exception& e) {
+                subtype->tp_dealloc((PyObject*)self);
+
+                PyErr_SetString(PyExc_TypeError, e.what());
+                return NULL;
+            }
+
+            return (PyObject*)self;
+        } else {
+            instance_ptr tgt = (instance_ptr)malloc(eltType->bytecount());
+                
+            try{
+                initialize(tgt, eltType, args, kwds);
+            } catch(std::exception& e) {
+                free(tgt);
+                PyErr_SetString(PyExc_TypeError, e.what());
+                return NULL;
+            }
+
+
+            PyObject* result = extractPythonObject(tgt, eltType);
+
+            eltType->destroy(tgt);
             free(tgt);
-            PyErr_SetString(PyExc_TypeError, e.what());
-            return NULL;
+
+            return result;
         }
-
-
-        PyObject* result = extractPythonObject(tgt, eltType);
-
-        eltType->destroy(tgt);
-        free(tgt);
-
-        return result;
     }
 
     static Py_ssize_t sq_length(native_instance_wrapper* w) {
@@ -975,7 +998,17 @@ struct native_instance_wrapper {
         return 0;
     }
 
+    static bool isSubclassOfNativeType(PyTypeObject* typeObj) {
+        return typeObj->tp_base != &PyBaseObject_Type;
+    }
+
     static Type* extractTypeFrom(PyTypeObject* typeObj) {
+        while (typeObj->tp_base && 
+                    typeObj->tp_base->tp_dealloc == native_instance_wrapper::tp_dealloc
+                ) {
+            typeObj = typeObj->tp_base;
+        }
+
         if (typeObj->tp_dealloc == native_instance_wrapper::tp_dealloc) {
             return ((NativeTypeWrapper*)typeObj)->mType;
         }
@@ -1348,7 +1381,11 @@ struct native_instance_wrapper {
         self_type->repr(w->data, str);
 
         return PyUnicode_FromString(str.str().c_str());
-   }
+    }
+
+    static bool typeCanBeSubclassed(Type* t) {
+        return t->getTypeCategory() == Type::TypeCategory::catNamedTuple;
+    }
 
     static PyTypeObject* typeObjInternal(Type* inType) {
         static std::recursive_mutex mutex;
@@ -1381,7 +1418,9 @@ struct native_instance_wrapper {
                 0,                         // tp_getattro
                 0,                         // tp_setattro
                 0,                         // tp_as_buffer
-                Py_TPFLAGS_DEFAULT,        // tp_flags
+                typeCanBeSubclassed(inType) ? 
+                    Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
+                :   Py_TPFLAGS_DEFAULT,    // tp_flags
                 0,                         // tp_doc
                 0,                         // traverseproc tp_traverse;
                 0,                         // inquiry tp_clear;
