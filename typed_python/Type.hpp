@@ -33,6 +33,7 @@ class Tuple;
 class ConstDict;
 class Alternative;
 class ConcreteAlternative;
+class PythonSubclass;
 class Class;
 class PackedArray;
 class Pointer;
@@ -110,6 +111,7 @@ public:
         catConstDict,
         catAlternative,
         catConcreteAlternative, //concrete Alternative subclass
+        catPythonSubclass,
         catClass,
         catPackedArray,
         catPointer
@@ -243,6 +245,8 @@ public:
                 return f(*(Alternative*)this);
             case catConcreteAlternative:
                 return f(*(ConcreteAlternative*)this);
+            case catPythonSubclass:
+                return f(*(PythonSubclass*)this);
             case catClass:
                 return f(*(Class*)this);
             case catPackedArray:
@@ -2188,6 +2192,76 @@ inline void Alternative::constructor(instance_ptr self) const {
 
     m_default_construction_type->constructor(self);
 }
+
+class PythonSubclass : public Type {
+public:
+    PythonSubclass(const Type* base, PyTypeObject* typePtr) :
+            Type(TypeCategory::catPythonSubclass)
+    {   
+        m_base = base;
+        m_name = typePtr->tp_name;
+        m_size = m_base->bytecount();
+        mTypeRep = typePtr;
+        m_is_default_constructible = m_base->is_default_constructible();
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        return m_base->hash32(left);
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        m_base->repr(self,stream);
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        return m_base->cmp(left,right);
+    }
+
+    void constructor(instance_ptr self) const {
+        m_base->constructor(self);
+    }
+
+    void destroy(instance_ptr self) const {
+        m_base->destroy(self);
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+        m_base->copy_constructor(self, other);
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+        m_base->assign(self, other);
+    }
+
+    static PythonSubclass* Make(const Type* base, PyTypeObject* pyType) {
+        static std::mutex guard;
+
+        std::lock_guard<std::mutex> lock(guard);
+
+        typedef std::pair<const Type*, PyTypeObject*> keytype;
+
+        static std::map<keytype, PythonSubclass*> m;
+
+        auto it = m.find(keytype(base, pyType));
+
+        if (it == m.end()) {
+            it = m.insert(
+                std::make_pair(keytype(base,pyType), new PythonSubclass(base, pyType))
+                ).first;
+        }
+
+        return it->second;
+    }
+
+    const Type* baseType() const {
+        return m_base;
+    }
+
+    PyTypeObject* pyType() const {
+        return mTypeRep;
+    }
+};
+
 
 
 class Class : public Type {

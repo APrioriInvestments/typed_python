@@ -587,9 +587,34 @@ class NativeTypesTests(unittest.TestCase):
                     self.assertEqual(res, intDict(addResult))
 
     def test_subclassing(self):
-        class NTSubclass(NamedTuple(x=int,y=float)):
+        BaseTuple = NamedTuple(x=int,y=float)
+        class NTSubclass(BaseTuple):
             def f(self):
                 return self.x + self.y
 
-        self.assertEqual(NTSubclass(x=10, y=20).f(), 30)
+            def __repr__(self):
+                return "ASDF"
 
+        inst = NTSubclass(x=10,y=20)
+
+        self.assertTrue(isinstance(inst, BaseTuple))
+        self.assertTrue(isinstance(inst, NTSubclass))
+        self.assertTrue(type(inst) is NTSubclass)
+
+        self.assertEqual(repr(inst), "ASDF")
+        self.assertNotEqual(BaseTuple.__repr__(inst), "ASDF")
+
+        self.assertEqual(inst.x, 10)
+        self.assertEqual(inst.f(), 30)
+
+        TupleOfSubclass = TupleOf(NTSubclass)
+
+        instTup = TupleOfSubclass((inst,BaseTuple(x=20,y=20.0)))
+
+        self.assertTrue(isinstance(instTup[0], NTSubclass))
+        self.assertTrue(isinstance(instTup[1], NTSubclass))
+        self.assertEqual(instTup[0].f(), 30)
+        self.assertEqual(instTup[1].f(), 40)
+
+        self.assertEqual(BaseTuple(inst).x, 10)
+        

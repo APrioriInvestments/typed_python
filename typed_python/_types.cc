@@ -17,10 +17,6 @@ class InternalPyException {};
 struct native_instance_wrapper {
     PyObject_HEAD
   
-    Type* getType() const {
-        return ((const NativeTypeWrapper*)((PyObject*)this)->ob_type)->mType;
-    }
-
     bool mIsInitialized;
     bool mIsMatcher; //-1 if we're not an iterator
     int64_t mIteratorOffset; //-1 if we're not an iterator
@@ -44,7 +40,7 @@ struct native_instance_wrapper {
         native_instance_wrapper* wrapper = (native_instance_wrapper*)self;
 
         if (wrapper->mIsInitialized) {
-            wrapper->getType()->destroy(wrapper->data);
+            extractTypeFrom(self->ob_type)->destroy(wrapper->data);
         }
 
         Py_TYPE(self)->tp_free((PyObject*)self);
@@ -63,13 +59,20 @@ struct native_instance_wrapper {
     }
 
     static void copy_initialize(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
-        if (pyRepresentation->ob_type == typeObj(eltType)) {
+        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
+        if ((argType && argType->getBaseType() == eltType) || argType == eltType) {
             //it's already the right kind of instance
             eltType->copy_constructor(tgt, ((native_instance_wrapper*)pyRepresentation)->data);
             return;
         }
 
         Type::TypeCategory cat = eltType->getTypeCategory();
+
+        if (cat == Type::TypeCategory::catPythonSubclass) {
+            copy_initialize((Type*)eltType->getBaseType(), tgt, pyRepresentation);
+            return;
+        }
 
         if (cat == Type::TypeCategory::catValue) {
             Value* v = (Value*)eltType;
@@ -336,6 +339,11 @@ struct native_instance_wrapper {
     static void initialize(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
         Type::TypeCategory cat = t->getTypeCategory();
 
+        if (cat == Type::TypeCategory::catPythonSubclass) {
+            initialize(data, (Type*)t->getBaseType(), args, kwargs);
+            return;
+        }
+
         if (cat == Type::TypeCategory::catConcreteAlternative) {
             ConcreteAlternative* alt = (ConcreteAlternative*)t;
             alt->constructor(data, [&](instance_ptr p) {
@@ -445,7 +453,7 @@ struct native_instance_wrapper {
 
             return (PyObject*)self;
         } catch(std::exception& e) {
-            typeObj(self->getType())->tp_dealloc((PyObject*)self);
+            typeObj(eltType)->tp_dealloc((PyObject*)self);
 
             PyErr_SetString(PyExc_TypeError, e.what());
             return NULL;
@@ -475,7 +483,9 @@ struct native_instance_wrapper {
                 return NULL;
             }
 
-            return (PyObject*)self;
+            //not reachable
+            assert(false);
+
         } else {
             instance_ptr tgt = (instance_ptr)malloc(eltType->bytecount());
                 
@@ -497,17 +507,21 @@ struct native_instance_wrapper {
         }
     }
 
-    static Py_ssize_t sq_length(native_instance_wrapper* w) {
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            return ((TupleOf*)w->getType())->count(w->data);
+    static Py_ssize_t sq_length(PyObject* o) {
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        Type* t = extractTypeFrom(o->ob_type);
+
+        if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            return ((TupleOf*)t)->count(w->data);
         }
-        if (w->getType()->isComposite()) {
-            return ((CompositeType*)w->getType())->getTypes().size();
+        if (t->isComposite()) {
+            return ((CompositeType*)t)->getTypes().size();
         }
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catString) {
+        if (t->getTypeCategory() == Type::TypeCategory::catString) {
             return String().count(w->data);
         }
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catBytes) {
+        if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
             return Bytes().count(w->data);
         }
 
@@ -676,7 +690,7 @@ struct native_instance_wrapper {
                                 }
                             });
                     } catch(std::exception& e) {
-                        typeObj(self->getType())->tp_dealloc((PyObject*)self);
+                        typeObj(tupT)->tp_dealloc((PyObject*)self);
                         PyErr_SetString(PyExc_TypeError, e.what());
                         return NULL;
                     }
@@ -694,9 +708,12 @@ struct native_instance_wrapper {
         return NULL;
     }
 
-    static PyObject* sq_item(native_instance_wrapper* w, Py_ssize_t ix) {
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            int64_t count = ((TupleOf*)w->getType())->count(w->data);
+    static PyObject* sq_item(PyObject* o, Py_ssize_t ix) {
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+        Type* t = extractTypeFrom(o->ob_type);
+
+        if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            int64_t count = ((TupleOf*)t)->count(w->data);
 
             if (ix < 0) {
                 ix += count;
@@ -707,15 +724,15 @@ struct native_instance_wrapper {
                 return NULL;
             }
 
-            Type* eltType = (Type*)((TupleOf*)w->getType())->getEltType();
+            Type* eltType = (Type*)((TupleOf*)t)->getEltType();
             return extractPythonObject(
-                ((TupleOf*)w->getType())->eltPtr(w->data, ix), 
+                ((TupleOf*)t)->eltPtr(w->data, ix), 
                 eltType
                 );
         }
         
-        if (w->getType()->isComposite()) {
-            auto compType = (CompositeType*)w->getType();
+        if (t->isComposite()) {
+            auto compType = (CompositeType*)t;
 
             if (ix < 0 || ix >= (int64_t)compType->getTypes().size()) {
                 PyErr_SetString(PyExc_IndexError, "index out of range");
@@ -730,7 +747,7 @@ struct native_instance_wrapper {
                 );
         }
 
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catBytes) {
+        if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
             if (ix < 0 || ix >= (int64_t)Bytes().count(w->data)) {
                 PyErr_SetString(PyExc_IndexError, "index out of range");
                 return NULL;
@@ -741,7 +758,7 @@ struct native_instance_wrapper {
                 1
                 );
         }
-        if (w->getType()->getTypeCategory() == Type::TypeCategory::catString) {
+        if (t->getTypeCategory() == Type::TypeCategory::catString) {
             if (ix < 0 || ix >= (int64_t)String().count(w->data)) {
                 PyErr_SetString(PyExc_IndexError, "index out of range");
                 return NULL;
@@ -974,7 +991,7 @@ struct native_instance_wrapper {
             }
 
             if (PyLong_Check(item)) {
-                return sq_item(self_w, PyLong_AsLong(item));
+                return sq_item((PyObject*)self_w, PyLong_AsLong(item));
             }
         }
 
@@ -999,12 +1016,13 @@ struct native_instance_wrapper {
     }
 
     static bool isSubclassOfNativeType(PyTypeObject* typeObj) {
-        return typeObj->tp_base != &PyBaseObject_Type;
+        return typeObj->tp_as_buffer != bufferProcs();
     }
 
     static Type* extractTypeFrom(PyTypeObject* typeObj) {
         while (typeObj->tp_base && 
-                    typeObj->tp_base->tp_dealloc == native_instance_wrapper::tp_dealloc
+                    typeObj->tp_base->tp_dealloc == native_instance_wrapper::tp_dealloc && 
+                    typeObj->tp_as_buffer != bufferProcs()
                 ) {
             typeObj = typeObj->tp_base;
         }
@@ -1016,23 +1034,32 @@ struct native_instance_wrapper {
         return nullptr;
     }
 
-    static PyObject* tp_getattr(PyObject *o, char *attr_name) {
+    static PyObject* tp_getattro(PyObject *o, PyObject* attrName) {
+        if (!PyUnicode_Check(attrName)) {
+            PyErr_SetString(PyExc_AttributeError, "attribute is not a string");
+            return NULL;
+        }
+
+        char *attr_name = PyUnicode_AsUTF8(attrName);
+
+        Type* t = extractTypeFrom(o->ob_type);
+        
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
-        Type::TypeCategory cat = w->getType()->getTypeCategory();
+        Type::TypeCategory cat = t->getTypeCategory();
 
         if (w->mIsMatcher) {
             PyObject* res;
             
             if (cat == Type::TypeCategory::catAlternative) {
-                Alternative* a = (Alternative*)w->getType();
+                Alternative* a = (Alternative*)t;
                 if (a->subtypes()[a->which(w->data)].first == attr_name) {
                     res = Py_True;
                 } else {
                     res = Py_False;
                 }
             } else {
-                ConcreteAlternative* a = (ConcreteAlternative*)w->getType();
+                ConcreteAlternative* a = (ConcreteAlternative*)t;
                 if (a->getAlternative()->subtypes()[a->which()].first == attr_name) {
                     res = Py_True;
                 } else {
@@ -1050,7 +1077,7 @@ struct native_instance_wrapper {
                 native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
                 self->mIteratorOffset = 0;
-                w->getType()->copy_constructor(self->data, w->data);
+                t->copy_constructor(self->data, w->data);
                 self->mIsInitialized = true;
                 self->mIsMatcher = true;
 
@@ -1058,7 +1085,13 @@ struct native_instance_wrapper {
             }
         }
 
-        return getattr(w->getType(), w->data, attr_name);
+        PyObject* result = getattr(t, w->data, attr_name);
+
+        if (result) {
+            return result;
+        }
+
+        return PyObject_GenericGetAttr(o, attrName);
     }
 
     static PyObject* getattr(Type* type, instance_ptr data, char* attr_name) {
@@ -1093,7 +1126,6 @@ struct native_instance_wrapper {
             }
         }
 
-        PyErr_SetString(PyExc_AttributeError, attr_name);
         return NULL;
     }
     
@@ -1387,6 +1419,11 @@ struct native_instance_wrapper {
         return t->getTypeCategory() == Type::TypeCategory::catNamedTuple;
     }
 
+    static PyBufferProcs* bufferProcs() {
+        static PyBufferProcs* procs = new PyBufferProcs { 0, 0 };
+        return procs;
+    }
+
     static PyTypeObject* typeObjInternal(Type* inType) {
         static std::recursive_mutex mutex;
         static std::map<Type*, NativeTypeWrapper*> types;
@@ -1405,7 +1442,7 @@ struct native_instance_wrapper {
                 0,                         // tp_itemsize
                 native_instance_wrapper::tp_dealloc,// tp_dealloc
                 0,                         // tp_print
-                native_instance_wrapper::tp_getattr,                         // tp_getattr
+                0,                         // tp_getattr
                 0,                         // tp_setattr
                 0,                         // tp_reserved
                 tp_repr,                   // tp_repr
@@ -1415,9 +1452,9 @@ struct native_instance_wrapper {
                 tp_hash,                   // tp_hash
                 0,                         // tp_call
                 0,                         // tp_str
-                0,                         // tp_getattro
+                native_instance_wrapper::tp_getattro, // tp_getattro
                 0,                         // tp_setattro
-                0,                         // tp_as_buffer
+                bufferProcs(),             // tp_as_buffer
                 typeCanBeSubclassed(inType) ? 
                     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
                 :   Py_TPFLAGS_DEFAULT,    // tp_flags
@@ -1454,8 +1491,6 @@ struct native_instance_wrapper {
                 }, inType
                 };
 
-        //at this point, the dictionary has an entry, so if we recurse back to this function
-        //we will return the correct entry.
         //at this point, the dictionary has an entry, so if we recurse back to this function
         //we will return the correct entry.
         if (inType->getBaseType()) {
@@ -1503,6 +1538,15 @@ Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
             return String::Make();
         }
 
+        if (native_instance_wrapper::isSubclassOfNativeType(pyType)) {
+            Type* nativeT = native_instance_wrapper::extractTypeFrom(pyType);
+
+            //this is now a permanent object
+            Py_INCREF(typearg);
+
+            return PythonSubclass::Make(nativeT, pyType);
+        }
+
         Type* res = native_instance_wrapper::extractTypeFrom(pyType);
         if (res) {
             return res;
@@ -1514,7 +1558,7 @@ Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
         return NULL;
     }
 
-    PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type because it't not a type.");
+    PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type because is't not a type.");
     return NULL;
 }
 
