@@ -675,6 +675,10 @@ struct native_instance_wrapper {
         if (w->getType()->getTypeCategory() == Type::TypeCategory::catTupleOf) {
             int64_t count = ((TupleOf*)w->getType())->count(w->data);
 
+            if (ix < 0) {
+                ix += count;
+            }
+
             if (ix >= count || ix < 0) {
                 PyErr_SetString(PyExc_IndexError, "index out of range");
                 return NULL;
@@ -821,6 +825,10 @@ struct native_instance_wrapper {
             return ((ConstDict*)t)->size(w->data);
         }
 
+        if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            return ((TupleOf*)t)->count(w->data);
+        }
+
         return 0;
     }
 
@@ -914,6 +922,39 @@ struct native_instance_wrapper {
             PyErr_SetString(PyExc_TypeError, "Invalid ConstDict lookup type");
             return NULL;
         }
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            if (PySlice_Check(item)) {
+                TupleOf* tupType = (TupleOf*)self_type;
+
+                Py_ssize_t start,stop,step,slicelength;
+                if (PySlice_GetIndicesEx(item, tupType->count(self_w->data), &start,
+                            &stop, &step, &slicelength) == -1) {
+                    return NULL;
+                }
+
+                Type* eltType = tupType->getEltType();
+
+                native_instance_wrapper* result = 
+                    (native_instance_wrapper*)typeObj(tupType)->tp_alloc(typeObj(tupType), 0);
+
+                tupType->constructor(result->data, slicelength, 
+                    [&](uint8_t* eltPtr, int64_t k) {
+                        eltType->copy_constructor(
+                            eltPtr, 
+                            tupType->eltPtr(self_w->data, start + k * step)
+                            );
+                        }
+                    );
+
+                return (PyObject*)result;
+            }
+
+            if (PyLong_Check(item)) {
+                return sq_item(self_w, PyLong_AsLong(item));
+            }
+        }
+
         PyErr_SetObject(PyExc_KeyError, item);
         return NULL;
     }
@@ -926,7 +967,8 @@ struct native_instance_wrapper {
                 0 //mp_ass_subscript
                 };
 
-        if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
+        if (t->getTypeCategory() == Type::TypeCategory::catConstDict || 
+            t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
             return res;
         }
 

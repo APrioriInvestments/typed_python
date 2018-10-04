@@ -535,6 +535,25 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertEqual(tupleOfInt(tup1) + tupleOfInt(tup2), tupleOfInt(tup1+tup2))
                 self.assertEqual(tupleOfInt(tup1) + tup2, tupleOfInt(tup1+tup2))
 
+    def test_slice_tuple_of(self):
+        tupleOfInt = TupleOf(int)
+
+        ints = tuple(range(20))
+        aTuple = tupleOfInt(ints);
+
+        for i in range(-21,21):
+            for i2 in range(-21, 21):
+                for step in range(-3, 3):
+                    if step != 0:
+                        self.assertEqual(aTuple[i:i2:step], ints[i:i2:step])
+
+            try:
+                ints[i]
+                self.assertEqual(aTuple[i], ints[i])
+            except IndexError:
+                with self.assertRaises(IndexError):
+                    aTuple[i]
+
     def test_dictionary_subtraction_basic(self):
         intDict = ConstDict(int,int)
 
