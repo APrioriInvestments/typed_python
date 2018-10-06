@@ -86,6 +86,115 @@ private:
     int32_t m_state;
 };
 
+class SerializationBuffer {
+public:
+    SerializationBuffer() :
+            m_buffer(nullptr),
+            m_size(0),
+            m_reserved(0)
+    {
+    }
+
+    ~SerializationBuffer() {
+        if (m_buffer) {
+            free(m_buffer);
+        }
+    }
+
+    SerializationBuffer(const SerializationBuffer&) = delete;
+    SerializationBuffer& operator=(const SerializationBuffer&) = delete;
+
+    void write_uint8(uint8_t i) {
+        ensure(sizeof(i));
+        m_buffer[m_size++] = i;
+    }
+
+    void write_uint32(uint32_t i) {
+        ensure(sizeof(i));
+        *(uint32_t*)(m_buffer+m_size) = i;
+        m_size += sizeof(i);
+    }
+
+    void write_bytes(uint8_t* ptr, size_t bytecount) {
+        ensure(bytecount);
+        memcpy(m_buffer+m_size,ptr,bytecount);
+        m_size += bytecount;
+    }
+
+    uint8_t* buffer() const {
+        return m_buffer;
+    }
+
+    size_t size() const {
+        return m_size;
+    }
+
+    void ensure(size_t t) {
+        if (m_size + t > m_reserved) {
+            m_reserved = m_size + t + 1024 * 128;
+            m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
+        }
+    }
+
+private:
+    uint8_t* m_buffer;
+    size_t m_size;
+    size_t m_reserved;
+};
+
+class DeserializationBuffer {
+public:
+    DeserializationBuffer(uint8_t* ptr, size_t sz) :
+            m_buffer(ptr),
+            m_size(sz)
+    {
+    }
+
+    DeserializationBuffer(const SerializationBuffer&) = delete;
+    DeserializationBuffer& operator=(const SerializationBuffer&) = delete;
+
+    uint8_t read_uint8() {
+        if (m_size < sizeof(uint8_t)) {
+            throw std::runtime_error("out of data");
+        }
+        uint8_t* ptr = (uint8_t*)m_buffer;
+
+        m_size -= sizeof(uint8_t);
+        m_buffer += sizeof(uint8_t);
+        
+        return *ptr;
+    }
+
+    uint32_t read_uint32() {
+        if (m_size < sizeof(uint32_t)) {
+            throw std::runtime_error("out of data");
+        }
+        uint32_t* ptr = (uint32_t*)m_buffer;
+
+        m_size -= sizeof(uint32_t);
+        m_buffer += sizeof(uint32_t);
+        
+        return *ptr;
+    }
+
+    void read_bytes(uint8_t* ptr, size_t bytecount) {
+        if (m_size < bytecount) {
+            throw std::runtime_error("out of data");
+        }
+        memcpy(ptr,m_buffer,bytecount);
+
+        m_size -= bytecount;
+        m_buffer += bytecount;
+    }
+
+    size_t remaining() const {
+        return m_size;
+    }
+private:
+    uint8_t* m_buffer;
+    size_t m_size;
+};
+
 class Type {
 public:
     enum TypeCategory {
@@ -151,6 +260,20 @@ public:
     int32_t hash32(instance_ptr left) const {
         return this->check([&](auto& subtype) {
             return subtype.hash32(left);
+        });
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr left, buf_t& buffer) const {
+        return this->check([&](auto& subtype) {
+            return subtype.serialize(left, buffer);
+        });
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr left, buf_t& buffer) const {
+        return this->check([&](auto& subtype) {
+            return subtype.deserialize(left, buffer);
         });
     }
 
@@ -358,6 +481,22 @@ public:
         }
     }
 
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        uint8_t which = buffer.read_uint8();
+        if (which >= m_types.size()) {
+            throw std::runtime_error("Corrupt data");
+        }
+        *(uint8_t*)self = which;
+        m_types[which]->deserialize(self+1, buffer);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        buffer.write_uint8(*(uint8_t*)self);
+        m_types[*((uint8_t*)self)]->serialize(self+1, buffer);
+    }
+
     void repr(instance_ptr self, std::ostringstream& stream) const {
         m_types[*((uint8_t*)self)]->repr(self+1, stream);
     }
@@ -512,6 +651,20 @@ public:
         }
 
         return 0;
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        for (long k = 0; k < getTypes().size();k++) {
+            getTypes()[k]->deserialize(eltPtr(self,k),buffer);
+        }
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        for (long k = 0; k < getTypes().size();k++) {
+            getTypes()[k]->serialize(eltPtr(self,k),buffer);
+        }
     }
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
@@ -681,6 +834,28 @@ public:
         m_name = "TupleOf(" + type->name() + ")";
         m_size = sizeof(void*);
         m_is_default_constructible = true;
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        int32_t ct = count(self);
+        buffer.write_uint32(ct);
+        for (long k = 0; k < ct;k++) {
+            m_element_type->serialize(eltPtr(self,k),buffer);
+        }
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        int32_t ct = buffer.read_uint32();
+        
+        if (ct > buffer.remaining() && m_element_type->bytecount()) {
+            throw std::runtime_error("Corrupt data");
+        }
+
+        constructor(self, ct, [&](instance_ptr tgt, int k) {
+            m_element_type->deserialize(tgt, buffer);
+        });
     }
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
@@ -901,6 +1076,34 @@ public:
 
         return it->second;
     };
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        int32_t ct = count(self);
+        buffer.write_uint32(ct);
+        for (long k = 0; k < ct;k++) {
+            m_key->serialize(kvPairPtrKey(self,k),buffer);
+            m_value->serialize(kvPairPtrValue(self,k),buffer);
+        }
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        int32_t ct = buffer.read_uint32();
+
+        if (ct > buffer.remaining() && m_bytes_per_key_value_pair) {
+            throw std::runtime_error("Corrupt data");
+        }
+
+        constructor(self, ct, false);
+
+        for (long k = 0; k < ct;k++) {
+            m_key->deserialize(kvPairPtrKey(self,k),buffer);
+            m_value->deserialize(kvPairPtrValue(self,k),buffer);
+        }
+
+        incKvPairCount(self, ct);
+    }
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
         stream << "{";
@@ -1299,6 +1502,14 @@ public:
 
     static None* Make() { static None res; return &res; }
 
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+    }
+
     void repr(instance_ptr self, std::ostringstream& stream) const {
         stream << "None";
     }
@@ -1344,6 +1555,16 @@ public:
 
     void assign(instance_ptr self, instance_ptr other) const {
         *((T*)self) = *((T*)other);
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        buffer.read_bytes(self, m_size);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        buffer.write_bytes(self, m_size);
     }
 };
 
@@ -1526,6 +1747,30 @@ public:
 
     static String* Make() { static String res; return &res; }
 
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        buffer.write_uint32(count(self));
+        buffer.write_uint8(bytes_per_codepoint(self));
+        buffer.write_bytes(eltPtr(self,0), bytes_per_codepoint(self) * count(self));
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        int32_t ct = buffer.read_uint32();
+        uint8_t bytes_per = buffer.read_uint8();
+
+        if ((bytes_per != 1 && bytes_per != 2 && bytes_per != 4) || 
+                ct > buffer.remaining()) {
+            throw std::runtime_error("Corrupt data");
+        }
+
+        constructor(self, bytes_per, ct, nullptr);
+
+        if (ct) {
+            buffer.read_bytes(eltPtr(self,0), bytes_per * ct);
+        }
+    }
+
     int32_t hash32(instance_ptr left) const {
         if (!(*(layout**)left)) {
             return 0x12345;
@@ -1598,7 +1843,9 @@ public:
         (*(layout**)self)->hash_cache = -1;
         (*(layout**)self)->refcount = 1;
         
-        ::memcpy((*(layout**)self)->data, data, count * bytes_per_codepoint);
+        if (data) {
+            ::memcpy((*(layout**)self)->data, data, count * bytes_per_codepoint);
+        }
     }
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
@@ -1724,6 +1971,27 @@ public:
         stream << "'";
     }
 
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        buffer.write_uint32(count(self));
+        buffer.write_bytes(eltPtr(self, 0), count(self));
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        int32_t ct = buffer.read_uint32();
+        
+        if (ct > buffer.remaining()) {
+            throw std::runtime_error("Corrupt data");
+        }
+
+        constructor(self, ct, nullptr);
+
+        if (ct) {
+            buffer.read_bytes(eltPtr(self,0), ct);
+        }
+    }
+    
     int32_t hash32(instance_ptr left) const {
         Hash32Accumulator acc((int)getTypeCategory());
 
@@ -1783,13 +2051,19 @@ public:
     static Bytes* Make() { static Bytes res; return &res; }
 
     void constructor(instance_ptr self, int64_t count, const char* data) const {
+        if (count == 0) {
+            *(layout**)self = nullptr;
+            return;
+        }
         (*(layout**)self) = (layout*)malloc(sizeof(layout) + count);
 
         (*(layout**)self)->bytecount = count;
         (*(layout**)self)->refcount = 1;
         (*(layout**)self)->hash_cache = -1;
         
-        ::memcpy((*(layout**)self)->data, data, count);
+        if (data) {
+            ::memcpy((*(layout**)self)->data, data, count);
+        }
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t i) const {
@@ -1863,6 +2137,10 @@ public:
 
     int32_t hash32(instance_ptr left) const {
         return m_type->hash32((uint8_t*)&m_data[0]);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
     }
 
     void constructor(instance_ptr self) const {}
@@ -1956,6 +2234,36 @@ public:
         }
 
         return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        buffer.write_uint8(which(self));
+        m_subtypes[which(self)].second->serialize(eltPtr(self), buffer);
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        uint8_t w = buffer.read_uint8();
+        if (w >= m_subtypes.size()) {
+            throw std::runtime_error("Corrupt data");
+        }
+
+        if (all_alternatives_empty()) {
+            *(uint8_t*)self = w;
+            return;
+        }
+
+        *(layout**)self = (layout*)malloc(
+            sizeof(layout) + 
+            m_subtypes[w].second->bytecount()
+            );
+
+        layout& record = **(layout**)self;
+        record.refcount = 1;
+        record.which = w;
+
+        m_subtypes[w].second->deserialize(record.data, buffer);
     }
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
@@ -2096,6 +2404,15 @@ public:
         m_alternative->repr(self,stream);
     }
 
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        m_alternative->deserialize(self,buffer);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        m_alternative->serialize(self,buffer);
+    }
 
     char cmp(instance_ptr left, instance_ptr right) const {
         return m_alternative->cmp(left,right);
@@ -2209,6 +2526,16 @@ public:
         return m_base->hash32(left);
     }
 
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        m_base->serialize(self,buffer);
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        m_base->deserialize(self,buffer);
+    }
+
     void repr(instance_ptr self, std::ostringstream& stream) const {
         m_base->repr(self,stream);
     }
@@ -2262,14 +2589,20 @@ public:
     }
 };
 
-
-
 class Class : public Type {
 public:
     void constructor(instance_ptr self) const {
     
     }
     
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+    }
+    
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+    }
+
     void destroy(instance_ptr self) const {
 
     }
@@ -2289,6 +2622,14 @@ public:
     
     }
     
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+    }
+
     void destroy(instance_ptr self) const {
 
     }
@@ -2308,6 +2649,14 @@ public:
     
     }
     
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+    }
+    
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+    }
+
     void destroy(instance_ptr self) const {
 
     }

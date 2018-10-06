@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict, Alternative
+from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict, Alternative, serialize, deserialize
 import typed_python._types as _types
 
 import unittest
@@ -444,6 +444,13 @@ class NativeTypesTests(unittest.TestCase):
         for k in aDict:
             self.assertEqual(aDict[str(k)], str(int(k)+1))
 
+    def test_alternatives_with_Bytes(self):
+        alt = Alternative(
+            "Alt",
+            x_0={'a':bytes}
+            )
+        self.assertEqual(alt.x_0(a=b''), alt.x_0(a=b''))
+
     def test_alternatives(self):
         alt = Alternative(
             "Alt",
@@ -455,6 +462,10 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(issubclass(alt.child_strings, alt))
 
         a = alt.child_ints(x=10,y=20)
+        a2 = alt.child_ints(x=10,y=20)
+
+        self.assertEqual(a,a2)
+
         self.assertTrue(isinstance(a, alt))
         self.assertTrue(isinstance(a, alt.child_ints))
 
@@ -617,4 +628,34 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(instTup[1].f(), 40)
 
         self.assertEqual(BaseTuple(inst).x, 10)
+
+    def test_serialization(self):
+        ints = TupleOf(int)((1,2,3,4))
+
+        self.assertEqual(
+            len(serialize(ints)),
+            36
+            )
+
+        while len(ints) < 1000000:
+            ints = ints + ints
+            t0 = time.time()
+            self.assertEqual(len(serialize(ints)), len(ints) * 8 + 4)
+            print(time.time() - t0, " for ", len(ints))
         
+    def test_serialization_roundtrip(self):
+        badlen = None
+
+        for _ in range(100):
+            producer = RandomValueProducer()
+            producer.addEvenly(30, 3)
+
+            values = producer.all()
+            for v in values:
+                if not isinstance(v,(str,float,int,bytes)) and v is not None:
+                    ser = serialize(v)
+                    v2 = deserialize(type(v), ser)
+                    ser2 = serialize(v2)
+
+                    self.assertEqual(ser,ser2)
+                    self.assertEqual(v, v2)

@@ -1738,6 +1738,67 @@ PyObject *NoneType(PyObject* nullValue, PyObject* args) {
     return res;
 }
 
+PyObject *serialize(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "serialize takes 1 positional argument");
+        return NULL;
+    }
+    Type* t = native_instance_wrapper::extractTypeFrom(PyTuple_GetItem(args,0)->ob_type);
+    
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "serialize needs a typed python object.");
+        return NULL;
+    }
+
+    SerializationBuffer b;
+    t->serialize(((native_instance_wrapper*)PyTuple_GetItem(args,0))->data, b);
+
+    return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
+}
+
+PyObject *deserialize(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "serialize takes 1 positional argument");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+    PyObject* a2 = PyTuple_GetItem(args, 1);
+
+    if (!PyType_Check(a1) || !native_instance_wrapper::extractTypeFrom((PyTypeObject*)a1)) {
+        PyErr_SetString(PyExc_TypeError, "first argument to serialize must be a native type object");
+        return NULL;
+    }
+    if (!PyBytes_Check(a2)) {
+        PyErr_SetString(PyExc_TypeError, "second argument to serialize must be a bytes object");
+        return NULL;
+    }
+
+
+    Type* eltType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)a1);
+    PyTypeObject* pyType = (PyTypeObject*)a1;
+
+    DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE(a2));
+
+    native_instance_wrapper* self = (native_instance_wrapper*)pyType->tp_alloc(pyType, 0);
+
+    try {
+        self->mIteratorOffset = -1;
+        self->mIsInitialized = false;
+        self->mIsMatcher = false;
+
+        eltType->deserialize(self->data, buf);
+
+        self->mIsInitialized = true;
+
+        return (PyObject*)self;
+    } catch(std::exception& e) {
+        pyType->tp_dealloc((PyObject*)self);
+
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+}
+
 PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
         PyErr_SetString(PyExc_TypeError, "Alternative takes a single string positional argument.");
@@ -1801,6 +1862,8 @@ static PyMethodDef module_methods[] = {
     {"OneOf", (PyCFunction)OneOf, METH_VARARGS, NULL},
     {"ConstDict", (PyCFunction)ConstDict, METH_VARARGS, NULL},
     {"Alternative", (PyCFunction)Alternative, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
+    {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 
