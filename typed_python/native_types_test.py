@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict, Alternative, serialize, deserialize
+from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict, Alternative, serialize, deserialize, Value
 import typed_python._types as _types
 
 import unittest
@@ -211,6 +211,72 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(o("hi"), "hi")
         self.assertTrue(o(None) is None)
+
+        o = OneOf(None, "hi", 1.5, 1, True, b"hi2")
+
+        self.assertTrue(o(None) is None)
+        self.assertTrue(o("hi") == "hi")
+        self.assertTrue(o(b"hi2") == b"hi2")
+        self.assertTrue(o(1.5) == 1.5)
+        self.assertTrue(o(1) is 1)
+        self.assertTrue(o(True) is True)
+
+        with self.assertRaises(TypeError):
+            o("hi2")
+        with self.assertRaises(TypeError):
+            o(b"hi")
+        with self.assertRaises(TypeError):
+            o(3)
+        with self.assertRaises(TypeError):
+            o(False)
+
+    def test_one_of_flattening(self):
+        self.assertEqual(OneOf(OneOf(None, 1.0), OneOf(2.0, 3.0)), OneOf(None, 1.0, 2.0, 3.0))
+
+    def test_one_of_order_matters(self):
+        self.assertNotEqual(OneOf(1.0, 2.0), OneOf(2.0, 1.0))
+
+    def test_tuple_of_one_of_fixed_size(self):
+        t = TupleOf(OneOf(0,1,2,3,4))
+
+        ints = tuple([x % 5 for x in range(1000000)])
+        
+        typedInts = t(ints)
+
+        self.assertEqual(len(serialize(typedInts)), len(ints) + 4)
+        self.assertEqual(tuple(typedInts), ints)
+
+    def test_tuple_of_one_of_multi(self):
+        t = TupleOf(OneOf(int, bool))
+
+        someThings = tuple([100 + x % 5 if x % 17 != 0 else bool(x%19) for x in range(1000000)])
+        
+        typedThings = t(someThings)
+
+        self.assertEqual(
+            len(serialize(typedThings)), 
+            sum(2 if isinstance(t,bool) else 9 for t in someThings) + 4
+            )
+
+        self.assertEqual(tuple(typedThings), someThings)
+
+    def test_compound_oneof(self):
+        producer = RandomValueProducer()
+        producer.addEvenly(1000, 2)
+
+        for _ in range(1000):
+            vals = (producer.pickRandomly(), producer.pickRandomly(), producer.pickRandomly())
+
+            a = OneOf(vals[0], vals[1], type(vals[2]))
+
+            for v in vals:
+                self.assertEqual(a(v), v)
+
+            tup = TupleOf(a)
+            tupInst = tup(vals)
+
+            for i in range(len(vals)):
+                self.assertEqual(tupInst[i], vals[i], vals)
 
     def test_one_of_conversion_failure(self):
         o = OneOf(None, str)

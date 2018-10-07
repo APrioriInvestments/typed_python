@@ -414,7 +414,7 @@ public:
         return mTypeRep;
     }
 
-    void setTypeRep(PyTypeObject* o) {
+    void setTypeRep(PyTypeObject* o) const {
         mTypeRep = o;
     }
 
@@ -440,14 +440,14 @@ protected:
 
     std::string m_name;
 
-    PyTypeObject* mTypeRep;
+    mutable PyTypeObject* mTypeRep;
 
     const Type* m_base;
 };
 
 class OneOf : public Type {
 public:
-    OneOf(const std::vector<Type*>& types) : 
+    OneOf(const std::vector<const Type*>& types) : 
                     Type(TypeCategory::catOneOf),
                     m_types(types)
     {   
@@ -521,7 +521,7 @@ public:
         return m_types[*((uint8_t*)left)]->cmp(left+1,right+1);
     }
 
-    std::pair<Type*, instance_ptr> unwrap(instance_ptr self) const {
+    std::pair<const Type*, instance_ptr> unwrap(instance_ptr self) const {
         return std::make_pair(m_types[*(uint8_t*)self], self+1);
     }
 
@@ -570,16 +570,16 @@ public:
         }
     }
     
-    const std::vector<Type*>& getTypes() const {
+    const std::vector<const Type*>& getTypes() const {
         return m_types;
     }
 
-    static OneOf* Make(const std::vector<Type*>& types) {
-        std::vector<Type*> flat_typelist;
-        std::set<Type*> seen;
+    static OneOf* Make(const std::vector<const Type*>& types) {
+        std::vector<const Type*> flat_typelist;
+        std::set<const Type*> seen;
 
         //make sure we only get each type once and don't have any other 'OneOf' in there...
-        std::function<void (const std::vector<Type*>)> visit = [&](const std::vector<Type*>& subvec) {
+        std::function<void (const std::vector<const Type*>)> visit = [&](const std::vector<const Type*>& subvec) {
             for (auto t: subvec) {
                 if (t->getTypeCategory() == catOneOf) {
                     visit( ((OneOf*)t)->getTypes() );
@@ -596,27 +596,27 @@ public:
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef const std::vector<Type*> keytype;
+        typedef const std::vector<const Type*> keytype;
 
         static std::map<keytype, OneOf*> m;
 
-        auto it = m.find(types);
+        auto it = m.find(flat_typelist);
         if (it == m.end()) {
-            it = m.insert(std::make_pair(types, new OneOf(types))).first;
+            it = m.insert(std::make_pair(flat_typelist, new OneOf(flat_typelist))).first;
         }
 
         return it->second;
     }
 
 private:
-    std::vector<Type*> m_types;
+    std::vector<const Type*> m_types;
 };
 
 class CompositeType : public Type {
 public:
     CompositeType(
                 TypeCategory in_typeCategory,
-                const std::vector<Type*>& types,
+                const std::vector<const Type*>& types,
                 const std::vector<std::string>& names
                 ) : 
             Type(in_typeCategory),
@@ -742,7 +742,7 @@ public:
         }
     }
     
-    const std::vector<Type*>& getTypes() const {
+    const std::vector<const Type*>& getTypes() const {
         return m_types;
     }
     const std::vector<size_t>& getOffsets() const {
@@ -753,12 +753,12 @@ public:
     }
 protected:
     template<class subtype>
-    static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names) {
+    static subtype* MakeSubtype(const std::vector<const Type*>& types, const std::vector<std::string>& names) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<const std::vector<Type*>, const std::vector<std::string> > keytype;
+        typedef std::pair<const std::vector<const Type*>, const std::vector<std::string> > keytype;
 
         static std::map<keytype, subtype*> m;
 
@@ -770,14 +770,14 @@ protected:
         return it->second;
     }
 
-    std::vector<Type*> m_types;
+    std::vector<const Type*> m_types;
     std::vector<size_t> m_byte_offsets;
     std::vector<std::string> m_names;
 };
 
 class NamedTuple : public CompositeType {
 public:
-    NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
+    NamedTuple(const std::vector<const Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
@@ -792,14 +792,14 @@ public:
         m_name += ")";
     }
 
-    static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
+    static NamedTuple* Make(const std::vector<const Type*>& types, const std::vector<std::string>& names) {
         return MakeSubtype<NamedTuple>(types,names);
     }
 };
 
 class Tuple : public CompositeType {
 public:
-    Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
+    Tuple(const std::vector<const Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catTuple, types, names)
     {
         m_name = "Tuple(";
@@ -812,7 +812,7 @@ public:
         m_name += ")";
     }
 
-    static Tuple* Make(const std::vector<Type*>& types) {
+    static Tuple* Make(const std::vector<const Type*>& types) {
         return MakeSubtype<Tuple>(types, std::vector<std::string>());
     }
 };
@@ -827,7 +827,7 @@ class TupleOf : public Type {
     };
 
 public:
-    TupleOf(Type* type) : 
+    TupleOf(const Type* type) : 
             Type(TypeCategory::catTupleOf),
             m_element_type(type)
     {
@@ -933,16 +933,16 @@ public:
         return 0;
     }
 
-    Type* getEltType() const {
+    const Type* getEltType() const {
         return m_element_type;
     }
 
-    static TupleOf* Make(Type* elt) {
+    static TupleOf* Make(const Type* elt) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        static std::map<Type*, TupleOf*> m;
+        static std::map<const Type*, TupleOf*> m;
 
         auto it = m.find(elt);
         if (it == m.end()) {
@@ -1030,7 +1030,7 @@ public:
     }
 
 private:
-    Type* m_element_type;
+    const Type* m_element_type;
 };
 
 
@@ -1047,7 +1047,7 @@ class ConstDict : public Type {
     };
 
 public:
-    ConstDict(Type* key, Type* value) : 
+    ConstDict(const Type* key, const Type* value) : 
             Type(TypeCategory::catConstDict),
             m_key(key),
             m_value(value)
@@ -1060,12 +1060,12 @@ public:
         m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
     }
 
-    static ConstDict* Make(Type* key, Type* value) {
+    static ConstDict* Make(const Type* key, const Type* value) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        static std::map<std::pair<Type*, Type*>, ConstDict*> m;
+        static std::map<std::pair<const Type*, const Type*>, ConstDict*> m;
 
         auto lookup_key = std::make_pair(key,value);
 
@@ -1435,7 +1435,7 @@ public:
                 m_key->destroy(record.subpointers, [&](long ix) { 
                     return record.data + m_bytes_per_key_subtree_pair * ix; 
                 });
-                ((Type*)this)->destroy(record.subpointers, [&](long ix) { 
+                ((const Type*)this)->destroy(record.subpointers, [&](long ix) { 
                     return record.data + m_bytes_per_key_subtree_pair * ix + m_bytes_per_key; 
                 });
             }
@@ -1464,12 +1464,12 @@ public:
     }
     
     
-    Type* keyType() const { return m_key; }
-    Type* valueType() const { return m_value; }
+    const Type* keyType() const { return m_key; }
+    const Type* valueType() const { return m_value; }
 
 private:
-    Type* m_key;
-    Type* m_value;
+    const Type* m_key;
+    const Type* m_value;
     size_t m_bytes_per_key;
     size_t m_bytes_per_key_value_pair;
     size_t m_bytes_per_key_subtree_pair;
@@ -2119,16 +2119,103 @@ public:
     }
 };
 
+class Instance {
+private:
+    class layout {
+    public:
+        std::atomic<int64_t> refcount;
+        const Type* type;
+        uint8_t data[];
+    };
+
+    Instance(layout* l) : 
+        mLayout(l) 
+    {
+    }
+
+public:
+    static Instance create(const Type*t, instance_ptr data) {
+        return createAndInitialize(t, [&](instance_ptr tgt) {
+            t->copy_constructor(tgt, data);
+        });
+    }
+
+    template<class initializer_type>
+    static Instance createAndInitialize(const Type*t, const initializer_type& initFun) {
+        layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
+        
+        try {
+            initFun(l->data);
+        } catch(...) {
+            free(l);
+            throw;
+        }
+
+        l->refcount = 1;
+        l->type = t;
+
+        return Instance(l);
+    }
+
+    Instance(const Instance& other) : mLayout(other.mLayout) {
+        mLayout->refcount++;
+    }
+
+    Instance& operator=(const Instance& other) {
+        other.mLayout->refcount++;
+
+        mLayout->refcount--;
+        if (mLayout->refcount == 0) {
+            mLayout->type->destroy(mLayout->data);
+            free(mLayout);
+        }
+
+        mLayout = other.mLayout;
+        return *this;
+    }
+
+    bool operator<(const Instance& other) const {
+        if (mLayout->type < other.mLayout->type) {
+            return true;
+        }
+        if (mLayout->type > other.mLayout->type) {
+            return false;
+        }
+        return mLayout->type->cmp(mLayout->data, other.mLayout->data) < 0;
+    }
+
+    std::string repr() const {
+        std::ostringstream s;
+        s << std::showpoint;
+        mLayout->type->repr(mLayout->data, s);
+        return s.str();
+    }
+
+    int32_t hash32() const {
+        return mLayout->type->hash32(mLayout->data);
+    }
+
+    const Type* type() const {
+        return mLayout->type;
+    }
+
+    instance_ptr data() const {
+        return mLayout->data;
+    }
+
+private:
+    layout* mLayout;
+};
+
 class Value : public Type {
 public:
-    Value(Type* type, std::string data) : 
+    Value(Instance instance) : 
             Type(TypeCategory::catValue),
-            m_type(type),
-            m_data(data)
+            mInstance(instance)
     {
         m_size = 0;
         m_is_default_constructible = true;
-        m_name = "Value(...)";
+        m_name = mInstance.repr();
     }
 
     char cmp(instance_ptr left, instance_ptr right) const {
@@ -2136,7 +2223,11 @@ public:
     }
 
     int32_t hash32(instance_ptr left) const {
-        return m_type->hash32((uint8_t*)&m_data[0]);
+        return mInstance.hash32();
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        mInstance.type()->repr(mInstance.data(), stream);
     }
 
     template<class buf_t>
@@ -2151,18 +2242,50 @@ public:
 
     void assign(instance_ptr self, instance_ptr other) const {}
 
-    std::pair<Type*, instance_ptr> unwrap() const {
-        return std::make_pair(m_type, (instance_ptr)&m_data[0]);
+    const Instance& value() const {
+        return mInstance;
     }
 
-    //when we have an ability to compare instances directly, we'll implement this...
-    //static None* Make() { static None res; return &res; }
+    static const Type* Make(Instance i) { 
+        static std::mutex guard;
 
-    static Value* ForNone() { static Value res(None::Make(), ""); return &res; }
+        std::lock_guard<std::mutex> lock(guard);
+
+        static std::map<Instance, Value*> m;
+
+        auto it = m.find(i);
+
+        if (it == m.end()) {
+            it = m.insert(std::make_pair(i, new Value(i))).first;
+        }
+
+        return it->second;
+    }
+
+    static const Type* MakeInt64(int64_t i) { 
+        return Make(Instance::create(Int64::Make(), (instance_ptr)&i));
+    }
+    static const Type* MakeFloat64(double i) { 
+        return Make(Instance::create(Float64::Make(), (instance_ptr)&i));
+    }
+    static const Type* MakeBool(bool i) { 
+        return Make(Instance::create(Bool::Make(), (instance_ptr)&i));
+    }
+
+    static const Type* MakeBytes(char* data, size_t count) { 
+        return Make(Instance::createAndInitialize(Bytes::Make(), [&](instance_ptr i) {
+            Bytes::Make()->constructor(i, count, data);
+        }));
+    }
+
+    static const Type* MakeString(size_t bytesPerCodepoint, size_t count, char* data) { 
+        return Make(Instance::createAndInitialize(String::Make(), [&](instance_ptr i) {
+            String::Make()->constructor(i, bytesPerCodepoint, count, data);
+        }));
+    }
 
 private:
-    Type* m_type;
-    std::string m_data;
+    Instance mInstance;
 };
 
 class Alternative : public Type {
@@ -2484,7 +2607,7 @@ public:
         return it->second;
     }
 
-    Type* elementType() const {
+    const Type* elementType() const {
         return m_alternative->subtypes()[m_which].second;
     }
 
