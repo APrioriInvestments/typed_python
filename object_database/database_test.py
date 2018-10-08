@@ -53,19 +53,11 @@ class BlockingCallback:
         self.is_released.put(True)
         
 
-expr = Alternative("Expr")
-expr.define(
+expr = Alternative("Expr",
     Constant = {'value': int},
-    Add = {'l': expr, 'r': expr},
-    Sub = {'l': expr, 'r': expr},
-    Mul = {'l': expr, 'r': expr}
-    )
-
-expr.__str__ = lambda self: (
-    "Constant(%s)" % self.value if self.matches.Constant else
-    "Add(%s,%s)" % (self.l,self.r) if self.matches.Add else
-    "Sub(%s,%s)" % (self.l,self.r) if self.matches.Sub else
-    "Mul(%s,%s)" % (self.l,self.r) if self.matches.Mul else "<unknown>"
+    #Add = {'l': expr, 'r': expr},
+    #Sub = {'l': expr, 'r': expr},
+    #Mul = {'l': expr, 'r': expr}
     )
 
 schema = Schema("test_schema")
@@ -299,7 +291,7 @@ class ObjectDatabaseTests:
         with db.transaction():
             root = Root()
 
-            self.assertTrue(root.obj is None)
+            self.assertTrue(root.obj is None, root.obj)
 
             root.obj = Object(k=expr.Constant(value=23))
 
@@ -389,10 +381,7 @@ class ObjectDatabaseTests:
                 root = Root()
 
                 e = expr.Constant(value=i)
-                e = expr.Add(l=e,r=e)
-                e = expr.Add(l=e,r=e)
-                e = expr.Add(l=e,r=e)
-
+    
                 root.obj = Object(k=e)
 
                 objects[i] = root
@@ -406,7 +395,7 @@ class ObjectDatabaseTests:
         while time.time() < t0 + 1.0:
             with db.transaction() as t:
                 for i in range(100):
-                    count += objects[i].obj.k.l.r.l.value
+                    count += objects[i].obj.k.value
                     steps += 1
 
     def test_transactions(self):
@@ -703,9 +692,7 @@ class ObjectDatabaseTests:
             x = int
             y = int
 
-            @Indexed
-            def pair(self):
-                return (self.x, self.y)
+            pair=Index('x','y')
 
         db.subscribeToSchema(schema)
 
@@ -771,7 +758,6 @@ class ObjectDatabaseTests:
 
         schema.freeze()
         
-        
     def test_index_functions(self):
         db = self.createNewDb()
 
@@ -780,10 +766,6 @@ class ObjectDatabaseTests:
         @schema.define
         class Object:
             k=Indexed(int)
-
-            @Indexed
-            def k2(self) -> int:
-                return self.k * 2
 
             pair_index = Index('k', 'k')
 
@@ -794,43 +776,13 @@ class ObjectDatabaseTests:
 
         with db.view() as v:
             self.assertEqual(Object.lookupAll(k=10), (o1,))
-            self.assertEqual(Object.lookupAll(k2=20), (o1,))
             self.assertEqual(Object.lookupAll(k=20), ())
-            self.assertEqual(o1.k2(), o1.k * 2)
-
+            
             self.assertEqual(Object.lookupAll(pair_index=(10,10)), (o1,))
             self.assertEqual(Object.lookupAll(pair_index=(10,11)), ())
 
             with self.assertRaises(Exception):
                 self.assertEqual(Object.lookupAll(pair_index=(10,"hi")), (o1,))
-
-    def test_index_functions_None_semantics(self):
-        db = self.createNewDb()
-
-        schema = Schema("test_schema")
-
-        @schema.define
-        class Object:
-            k=Indexed(int)
-
-            @Indexed
-            def index(self):
-                return True if self.k > 10 else None
-
-        db.subscribeToSchema(schema)
-
-        with db.transaction() as v:
-            self.assertEqual(Object.lookupAll(index=True), ())
-            o1 = Object(k=10)
-            self.assertEqual(Object.lookupAll(index=True), ())
-            o1.k = 20
-            self.assertEqual(Object.lookupAll(index=True), (o1,))
-            o1.k = 10
-            self.assertEqual(Object.lookupAll(index=True), ())
-            o1.k = 20
-            self.assertEqual(Object.lookupAll(index=True), (o1,))
-            o1.delete()
-            self.assertEqual(Object.lookupAll(index=True), ())
 
     def test_indices_update_during_transactions(self):
         db = self.createNewDb()

@@ -14,10 +14,9 @@
 
 from typed_python.hash import sha_hash
 
-from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs, NamedTuple
+from typed_python import Alternative, OneOf, TupleOf, ConstDict, Tuple, deserialize
 
 from object_database.keymapping import *
-import object_database.algebraic_to_json as algebraic_to_json
 import logging
 import json
 import threading
@@ -55,50 +54,15 @@ def revisionConflictRetry(f):
     inner.__name__ = f.__name__
     return inner
 
-class JsonWithPyRep:
+class SerializedDatabaseValue:
     """A value stored as Json with a python representation."""
-    def __init__(self, jsonRep, pyRep, strRep = None):
-        self.strRep = strRep
-        self._jsonRep = jsonRep
+    def __init__(self, serializedByteRep, pyRep):
+        assert serializedByteRep is None or isinstance(serializedByteRep, bytes), serializedByteRep
         self.pyRep = pyRep
-
-    @property
-    def jsonRep(self):
-        if self.strRep is not None:
-            self._jsonRep = json.loads(self.strRep)
-            self.strRep = None
-        return self._jsonRep
+        self.serializedByteRep = serializedByteRep
 
 def default_initialize(t):
-    if t in (str,bool,bytes,int,float):
-        return t()
-    if t is type(None):
-        return None
-    if isinstance(t, Kwargs):
-        return Kwargs(**{k:default_initialize(t) for k,t in t.ElementTypes.items()})
-    if isinstance(t, (TupleOf, ConstDict)):
-        return t()
-    if isinstance(t, NamedTuple):
-        return t(**{k: default_initialize(v) for k,v in t.ElementNamesAndTypes})
-    if isinstance(t, OneOf):
-        if None in t.options:
-            return None
-        for o in t.options:
-            if isinstance(o, (str,bool,bytes,int,float)):
-                return o
-        for o in sorted(t.options, key=str):
-            if hasattr(o, '__default_initializer__'):
-                return o.__default_initializer__()
-
-        raise Exception("can't default initialize OneOf(%s)" % t.options)
-
-    if hasattr(t, '__default_initializer__'):
-        return t.__default_initializer__()
-
-    raise Exception("Can't default initialize %s" % (t))
-
-_encoder = algebraic_to_json.Encoder()
-_encoder.allowExtraFields = True
+    return t()
 
 _cur_view = threading.local()
 
@@ -158,11 +122,11 @@ class View(object):
             if kwd not in cls.__types__:
                 raise TypeError("Unknown field %s on %s" % (kwd, cls))
 
-            coerced_val = TypeConvert(cls.__types__[kwd], val, allow_construct_new=True)
+            coerced_val = cls.__types__[kwd](val)
 
             writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
 
-        writes[data_key(cls, identity, " exists")] = True
+        writes[data_key(cls, identity, " exists")] = (bool, True)
 
         self._writes.update(writes)
 
@@ -171,7 +135,8 @@ class View(object):
                 val = index_fun(o)
 
                 if val is not None:
-                    ik = index_key(cls, index_name, val)
+                    indexType = cls.__schema__._indexTypes[cls][index_name]
+                    ik = index_key(cls, index_name, indexType(val))
 
                     self._add_to_index(ik, identity)
 
@@ -196,22 +161,21 @@ class View(object):
 
         dbValWithPyrep = self._db._get_versioned_object_data(key, self._transaction_num)
 
-        return self.unwrapJsonWithPyRep(dbValWithPyrep, field_type)
+        return self.unwrapSerializedDatabaseValue(dbValWithPyrep, field_type)
 
     @staticmethod
-    def unwrapJsonWithPyRep(dbValWithPyrep, field_type):
+    def unwrapSerializedDatabaseValue(dbValWithPyrep, field_type):
         if dbValWithPyrep is None:
             return default_initialize(field_type)
 
-        if not isinstance(dbValWithPyrep, JsonWithPyRep):
-            #assume this is json
-            return _encoder.from_json(dbValWithPyrep, field_type)
+        if isinstance(dbValWithPyrep, str):
+            dbValWithPyrep = SerializedDatabaseValue(bytes.fromhex(dbValWithPyrep), {})
 
-        if dbValWithPyrep.jsonRep is None:
+        if dbValWithPyrep.serializedByteRep is None:
             return default_initialize(field_type)
 
         if dbValWithPyrep.pyRep.get(field_type) is None:
-            dbValWithPyrep.pyRep[field_type] = _encoder.from_json(dbValWithPyrep.jsonRep, field_type)
+            dbValWithPyrep.pyRep[field_type] = deserialize(field_type, dbValWithPyrep.serializedByteRep)
 
         return dbValWithPyrep.pyRep[field_type]
 
@@ -228,7 +192,7 @@ class View(object):
 
         val = self._db._get_versioned_object_data(key, self._transaction_num)
 
-        return val is not None and val.jsonRep is not None
+        return val is not None and val.serializedByteRep is not None
 
     def _delete(self, obj, identity, field_names):
         if not self._db._isTypeSubscribed(type(obj)):
@@ -272,7 +236,13 @@ class View(object):
 
         if type(obj) in obj.__schema__._indices:
             for index_name, index_fun in obj.__schema__._indices[type(obj)].items():
-                existing_index_vals[index_name] = index_fun(obj)
+                indexType = obj.__schema__._indexTypes[type(obj)][index_name]
+
+                unconvertedVal = index_fun(obj)
+
+                if unconvertedVal is not None and indexType is None:
+                    assert False, (obj, index_name, unconvertedVal)
+                existing_index_vals[index_name] = indexType(unconvertedVal) if unconvertedVal is not None else None
 
         return existing_index_vals
 
@@ -331,7 +301,7 @@ class View(object):
         indexType = db_type.__schema__._indexTypes[db_type][tname]
 
         if indexType is not None:
-            value = TypeConvert(indexType, value, allow_construct_new=True)
+            value = indexType(value)
 
         keyname = index_key(db_type, tname, value)
 
@@ -359,7 +329,7 @@ class View(object):
         indexType = db_type.__schema__._indexTypes[db_type][tname]
 
         if indexType is not None:
-            value = TypeConvert(indexType, value, allow_construct_new=True)
+            value = indexType(value)
 
         keyname = index_key(db_type, tname, value)
 
@@ -396,9 +366,11 @@ class View(object):
         if self._writes:
             def encode(val):
                 if isinstance(val, tuple) and len(val) == 2 and isinstance(val[0], type):
-                    return JsonWithPyRep(_encoder.to_json(val[0], val[1]), {val[0]:val[1]})
+                    return SerializedDatabaseValue(serialize(val[0], val[1]), {val[0]:val[1]})
+                elif val is None:
+                    return SerializedDatabaseValue(val, {})
                 else:
-                    return JsonWithPyRep(val, {type(val): val})
+                    assert False, "bad write: %s" % val
 
             writes = {key: encode(v) for key, v in self._writes.items()}
             tid = self._transaction_num

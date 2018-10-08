@@ -14,6 +14,7 @@
 
 import hashlib
 import struct
+from typed_python._types import serialize
 
 class Hash:
     def __init__(self, digest):
@@ -77,8 +78,11 @@ def sha_hash(val):
     if isinstance(val, str):
         return Hash.from_string(val)
     if isinstance(val, bytes):
-        return Hash.from_string(str(val))
+        return Hash.from_string(repr(val))
     if val is None:
         return Hash.from_string("")
 
-    return val.__sha_hash__()
+    if hasattr(val, "__sha_hash__"):
+        return val.__sha_hash__()
+
+    return sha_hash(serialize(type(val), val))

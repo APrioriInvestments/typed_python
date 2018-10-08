@@ -12,18 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.algebraic import Alternative
-from typed_python.types import ListOf, TupleOf, OneOf, TypeConvert, ConstDict
+from typed_python import TupleOf, OneOf, ConstDict, Alternative
 
 import unittest
 
-expr = Alternative("Expr")
-
-expr.define(
+expr = Alternative("Expr", 
     Constant={'value': int},
-    Add={'l': expr, 'r': expr},
-    Sub={'l': expr, 'r': expr},
-    Mul={'l': expr, 'r': expr}
+    #Add={'l': expr, 'r': expr},
+    #Sub={'l': expr, 'r': expr},
+    #Mul={'l': expr, 'r': expr}
     )
 
 class AlgebraicTests(unittest.TestCase):
@@ -109,13 +106,13 @@ class AlgebraicTests(unittest.TestCase):
 
     def test_stringification(self):
         self.assertEqual(
-            repr(expr.Add(l = expr.Constant(10), r = expr.Constant(20))),
+            repr(expr.Add(l = expr.Constant(value=10), r = expr.Constant(value=20))),
             "Expr.Add(l=Expr.Constant(value=10),r=Expr.Constant(value=20))"
             )
 
     def test_isinstance(self):
-        self.assertTrue(isinstance(expr.Constant(10), expr))
-        self.assertTrue(isinstance(expr.Constant(10), expr.Constant))
+        self.assertTrue(isinstance(expr.Constant(value=10), expr))
+        self.assertTrue(isinstance(expr.Constant(value=10), expr.Constant))
 
     def test_coercion(self):
         Sub = Alternative('Sub', I={}, S={})
@@ -130,7 +127,7 @@ class AlgebraicTests(unittest.TestCase):
             X.A(val=Sub.S)
 
     def test_cant_assign(self):
-        e = expr.Constant(10)
+        e = expr.Constant(value=10)
         with self.assertRaises(Exception):
             e.value = 20
 

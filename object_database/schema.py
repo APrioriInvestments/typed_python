@@ -92,6 +92,7 @@ class Schema:
             class cls(DatabaseObject):
                 pass
 
+            cls.__name__ = typename
             cls.__qualname__ = typename
             cls.__schema__ = self
 

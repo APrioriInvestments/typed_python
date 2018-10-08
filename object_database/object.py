@@ -16,12 +16,13 @@ from object_database.view import _cur_view
 
 from typed_python.hash import sha_hash
 
-from typed_python import Alternative, OneOf, TupleOf, ConstDict, TypeConvert, Tuple, Kwargs
+from typed_python import Alternative, OneOf, TupleOf, ConstDict, Tuple, NamedTuple
 
 from types import FunctionType
 
-class DatabaseObject(object):
-    __typed_python_type__ = True
+_base = NamedTuple(_identity=str)
+
+class DatabaseObject(_base):
     __types__ = None
     __schema__ = None
     
@@ -39,20 +40,11 @@ class DatabaseObject(object):
         return hash(self._identity)
 
     @classmethod
-    def __typed_python_try_convert_instance__(cls, value, allow_construct_new):
-        if isinstance(value, cls):
-            return (value,)
-        
-        return None
-
-    @classmethod
     def fromIdentity(cls, identity):
         assert isinstance(identity, str), type(identity)
         cls.__schema__.freeze()
 
-        o = object.__new__(cls)
-        o.__dict__['_identity'] = identity
-        return o
+        return _base.__new__(cls, _identity=identity)
 
     def __new__(cls, **kwds):
         if not hasattr(_cur_view, "view"):
@@ -112,7 +104,7 @@ class DatabaseObject(object):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
 
-        coerced_val = TypeConvert(self.__types__[name], val, allow_construct_new=True)
+        coerced_val = self.__types__[name](val)
 
         _cur_view.view._set(self, self._identity, name, self.__types__[name], coerced_val)
 

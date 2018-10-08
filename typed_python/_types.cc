@@ -58,7 +58,7 @@ struct native_instance_wrapper {
 
         const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
         if (argType) {
-            return argType == t;
+            return argType == t || argType == t->getBaseType();
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catNamedTuple || 
@@ -304,7 +304,8 @@ struct native_instance_wrapper {
                         try {
                             copy_initialize(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
                         } catch(...) {
-                            dictType->keyType()->destroy(dictType->kvPairPtrValue(tgt,i));
+                            dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
+                            throw;
                         }
                         dictType->incKvPairCount(tgt);
                         i++;
@@ -337,6 +338,26 @@ struct native_instance_wrapper {
                         copy_initialize(((TupleOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
                         }
                     );
+                return;
+            }
+            if (PySet_Check(pyRepresentation)) {
+                if (PySet_Size(pyRepresentation) == 0) {
+                    ((TupleOf*)eltType)->constructor(tgt);
+                    return; 
+                }
+
+                PyObject *iterator = PyObject_GetIter(pyRepresentation);
+
+                ((TupleOf*)eltType)->constructor(tgt, PySet_Size(pyRepresentation), 
+                    [&](uint8_t* eltPtr, int64_t k) {
+                        PyObject* item = PyIter_Next(iterator);
+                        copy_initialize(((TupleOf*)eltType)->getEltType(), eltPtr, item);
+                        Py_DECREF(item);
+                        }
+                    );
+
+                Py_DECREF(iterator);
+
                 return;
             }
     
@@ -406,7 +427,7 @@ struct native_instance_wrapper {
                 return;
             }
 
-            throw std::logic_error("Can't initialize " + t->name() + " with these arguments.");
+            throw std::logic_error("Can't initialize " + t->name() + " with these in-place arguments.");
         } else {
             if (cat == Type::TypeCategory::catNamedTuple) {
                 CompositeType* compositeT = ((CompositeType*)t);
@@ -428,7 +449,7 @@ struct native_instance_wrapper {
                 return;
             }
 
-            throw std::logic_error("Can't initialize " + t->name() + " from python yet.");
+            throw std::logic_error("Can't initialize " + t->name() + " from python with kwargs.");
         }
     }
 
@@ -482,20 +503,22 @@ struct native_instance_wrapper {
             return extractPythonObject(child.second, child.first);
         }
 
-        native_instance_wrapper* self = (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
+        const Type* concreteT = eltType->pickConcreteSubclass(data);
+
+        native_instance_wrapper* self = (native_instance_wrapper*)typeObj(concreteT)->tp_alloc(typeObj(concreteT), 0);
 
         try {
             self->mIteratorOffset = -1;
             self->mIsInitialized = false;
             self->mIsMatcher = false;
 
-            eltType->copy_constructor(self->data, data);
+            concreteT->copy_constructor(self->data, data);
 
             self->mIsInitialized = true;
 
             return (PyObject*)self;
         } catch(std::exception& e) {
-            typeObj(eltType)->tp_dealloc((PyObject*)self);
+            typeObj(concreteT)->tp_dealloc((PyObject*)self);
 
             PyErr_SetString(PyExc_TypeError, e.what());
             return NULL;
@@ -1058,18 +1081,26 @@ struct native_instance_wrapper {
     }
 
     static bool isSubclassOfNativeType(PyTypeObject* typeObj) {
-        return typeObj->tp_as_buffer != bufferProcs();
-    }
+        if (typeObj->tp_as_buffer == bufferProcs()) {
+            return false;
+        }
 
-    static const Type* extractTypeFrom(PyTypeObject* typeObj) {
-        while (typeObj->tp_base && 
-                    typeObj->tp_base->tp_dealloc == native_instance_wrapper::tp_dealloc && 
-                    typeObj->tp_as_buffer != bufferProcs()
-                ) {
+        while (typeObj) {
+            if (typeObj->tp_as_buffer == bufferProcs()) {
+                return true;
+            }
             typeObj = typeObj->tp_base;
         }
 
-        if (typeObj->tp_dealloc == native_instance_wrapper::tp_dealloc) {
+        return false;
+    }
+
+    static const Type* extractTypeFrom(PyTypeObject* typeObj) {
+        while (typeObj->tp_base && typeObj->tp_as_buffer != bufferProcs()) {
+            typeObj = typeObj->tp_base;
+        }
+
+        if (typeObj->tp_as_buffer == bufferProcs()) {
             return ((NativeTypeWrapper*)typeObj)->mType;
         }
 
@@ -1659,6 +1690,13 @@ const Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
         if (native_instance_wrapper::isSubclassOfNativeType(pyType)) {
             const Type* nativeT = native_instance_wrapper::extractTypeFrom(pyType);
 
+            if (!nativeT) {
+                PyErr_SetString(PyExc_TypeError, 
+                    ("Type " + std::string(pyType->tp_name) + " looked like a native type subclass, but has no base").c_str()
+                    );
+                return NULL;
+            }
+
             //this is now a permanent object
             Py_INCREF(typearg);
 
@@ -1894,19 +1932,45 @@ PyObject *Value(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *serialize(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "serialize takes 1 positional argument");
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "serialize takes 2 positional arguments");
         return NULL;
     }
-    const Type* t = native_instance_wrapper::extractTypeFrom(PyTuple_GetItem(args,0)->ob_type);
     
-    if (!t) {
-        PyErr_SetString(PyExc_TypeError, "serialize needs a typed python object.");
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+    PyObject* a2 = PyTuple_GetItem(args, 1);
+
+    const Type* serializeType = unwrapTypeArgToTypePtr(a1);
+
+    if (!serializeType) {
+        PyErr_Format(
+            PyExc_TypeError, 
+            "first argument to serialize must be a native type object, not %S",
+            a1
+            );
         return NULL;
     }
 
+    const Type* actualType = native_instance_wrapper::extractTypeFrom(a2->ob_type);
+
     SerializationBuffer b;
-    t->serialize(((native_instance_wrapper*)PyTuple_GetItem(args,0))->data, b);
+    
+    if (actualType == serializeType) {
+        //the simple case
+        actualType->serialize(((native_instance_wrapper*)a2)->data, b);
+    } else {
+        //try to construct a 'serialize type' from the argument and then serialize that
+        try{
+            Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
+                native_instance_wrapper::copy_initialize(serializeType, p, a2);
+            });
+            
+            i.type()->serialize(i.data(), b);
+        } catch (std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return NULL;            
+        }
+    }
 
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
@@ -1919,7 +1983,9 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     PyObject* a1 = PyTuple_GetItem(args, 0);
     PyObject* a2 = PyTuple_GetItem(args, 1);
 
-    if (!PyType_Check(a1) || !native_instance_wrapper::extractTypeFrom((PyTypeObject*)a1)) {
+    const Type* serializeType = unwrapTypeArgToTypePtr(a1);
+
+    if (!serializeType) {
         PyErr_SetString(PyExc_TypeError, "first argument to serialize must be a native type object");
         return NULL;
     }
@@ -1928,29 +1994,17 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-
-    const Type* eltType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)a1);
-    PyTypeObject* pyType = (PyTypeObject*)a1;
-
     DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE(a2));
 
-    native_instance_wrapper* self = (native_instance_wrapper*)pyType->tp_alloc(pyType, 0);
-
     try {
-        self->mIteratorOffset = -1;
-        self->mIsInitialized = false;
-        self->mIsMatcher = false;
+        Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
+            serializeType->deserialize(p, buf);
+        });
 
-        eltType->deserialize(self->data, buf);
-
-        self->mIsInitialized = true;
-
-        return (PyObject*)self;
+        return native_instance_wrapper::extractPythonObject(i.data(), i.type());
     } catch(std::exception& e) {
-        pyType->tp_dealloc((PyObject*)self);
-
         PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
+        return NULL;        
     }
 }
 
@@ -1969,7 +2023,7 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 
     int i = 0;
 
-    while (PyDict_Next(kwargs, &pos, &key, &value)) {
+    while (kwargs && PyDict_Next(kwargs, &pos, &key, &value)) {
         assert(PyUnicode_Check(key));
 
         std::string fieldName(PyUnicode_AsUTF8(key));

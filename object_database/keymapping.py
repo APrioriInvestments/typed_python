@@ -1,4 +1,4 @@
-from typed_python.hash import sha_hash
+from typed_python import sha_hash, serialize
 
 def data_key(obj_type, identity, field_name):
     return data_key_from_names(obj_type.__schema__.name, obj_type.__qualname__, identity, field_name)
@@ -46,8 +46,8 @@ def index_group(schema_name, typename, field_name):
 def index_group_and_hashval_to_index_key(index_group, hashval):
     return index_group + ":" + hashval
 
-def index_key(obj_type, field_name, value_hash):
-    return index_key_from_names(obj_type.__schema__.name, obj_type.__qualname__, field_name, value_hash)
+def index_key(obj_type, field_name, value):
+    return index_key_from_names(obj_type.__schema__.name, obj_type.__qualname__, field_name, value)
 
 def isIndexKey(key):
     return ': ix:' in key

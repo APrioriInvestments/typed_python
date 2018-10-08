@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <functional>
 #include <mutex>
 #include <set>
 #include <utility>
@@ -245,6 +246,16 @@ public:
         return m_size;
     }
 
+    const Type* pickConcreteSubclass(instance_ptr data) const {
+        return this->check([&](auto& subtype) {
+            return subtype.pickConcreteSubclassConcrete(data);
+        });
+    }
+
+    const Type* pickConcreteSubclassConcrete(instance_ptr data) const {
+        return this;
+    }
+
     void repr(instance_ptr self, std::ostringstream& out) const {
         this->check([&](auto& subtype) {
             subtype.repr(self, out);
@@ -308,6 +319,7 @@ public:
         while (count >= 8 && *(uint64_t*)l == *(uint64_t*)r) {
             l += 8;
             r += 8;
+            count -= 8;
         }
 
         for (long k = 0; k < count; k++) {
@@ -543,6 +555,7 @@ public:
             if (m_types[k]->is_default_constructible()) {
                 *(uint8_t*)self = k;
                 m_types[k]->constructor(self+1);
+                return;
             }
         }
     }
@@ -2134,6 +2147,12 @@ private:
     }
 
 public:
+    static Instance deserialized(const Type* t, DeserializationBuffer& buf) {
+        return createAndInitialize(t, [&](instance_ptr tgt) {
+            t->deserialize(tgt, buf);
+        });
+    }
+
     static Instance create(const Type*t, instance_ptr data) {
         return createAndInitialize(t, [&](instance_ptr tgt) {
             t->copy_constructor(tgt, data);
@@ -2341,7 +2360,7 @@ public:
                 return -1;
             }
             if (*(uint8_t*)left > *(uint8_t*)right) {
-                return -1;
+                return 1;
             }
             return 0;
         }
@@ -2372,7 +2391,7 @@ public:
             throw std::runtime_error("Corrupt data");
         }
 
-        if (all_alternatives_empty()) {
+        if (m_all_alternatives_empty) {
             *(uint8_t*)self = w;
             return;
         }
@@ -2491,6 +2510,8 @@ public:
     bool all_alternatives_empty() const {
         return m_all_alternatives_empty;
     }
+
+    const Type* pickConcreteSubclassConcrete(instance_ptr data) const;
 
 private:
     bool m_all_alternatives_empty;
@@ -2624,6 +2645,12 @@ private:
 
     int64_t m_which;
 };
+
+inline const Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) const {
+    uint8_t i = which(data);
+
+    return ConcreteAlternative::Make(this, i);
+}
 
 inline void Alternative::constructor(instance_ptr self) const {
     if (!m_default_construction_type) {

@@ -15,10 +15,9 @@
 from object_database.schema import Schema
 from object_database.messages import ClientToServer, ServerToClient, SchemaDefinition, getHeartbeatInterval
 from object_database.core_schema import core_schema
-from object_database.view import View, JsonWithPyRep, Transaction, _cur_view
+from object_database.view import View, Transaction, _cur_view, SerializedDatabaseValue
 from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
-import json
 from typed_python.hash import sha_hash
 from typed_python import *
 
@@ -78,8 +77,6 @@ class VersionedValue(VersionedBase):
         self.values = []
 
     def setVersionedValue(self, version_number, val):
-        assert isinstance(val, JsonWithPyRep), val
-
         self.version_numbers.append(version_number)
         self.values.append(val)
 
@@ -92,7 +89,7 @@ class VersionedValue(VersionedBase):
         return self.values[i]
 
     def needsToTrack(self):
-        return len(self.version_numbers) != 1 or self.values[0].jsonRep is None
+        return len(self.version_numbers) != 1 or self.values[0].serializedByteRep is None
 
     def cleanup(self, version_number):
         if not self.values:
@@ -100,7 +97,7 @@ class VersionedValue(VersionedBase):
 
         while self.values and self.version_numbers[0] < version_number:
             if len(self.values) == 1:
-                if self.values[0].jsonRep is None:
+                if self.values[0].serializedByteRep is None:
                     #this value was deleted and we can just remove this whole entry
                     return True
                 else:
@@ -113,7 +110,7 @@ class VersionedValue(VersionedBase):
                     self.version_numbers[0] = version_number
 
     def __repr__(self):
-        return "VersionedValue(ids=%s,jsons=%s)" % (self.version_numbers, [x.jsonRep for x in self.values])
+        return "VersionedValue(ids=%s)" % (self.version_numbers,)
 
 class VersionedSet(VersionedBase):
     #values in sets are always strings
@@ -276,7 +273,7 @@ class ManyVersionedObjects:
 
         self._version_number_objects[version_number].add(key)
 
-    def setVersionedValue(self, key, version_number, json_val):
+    def setVersionedValue(self, key, version_number, serialized_val):
         self._object_has_version(key, version_number)
 
         if key not in self._versioned_objects:
@@ -286,7 +283,7 @@ class ManyVersionedObjects:
 
         initialValue = versioned.newestValue()
 
-        versioned.setVersionedValue(version_number, JsonWithPyRep(json_val, {}))
+        versioned.setVersionedValue(version_number, SerializedDatabaseValue(serialized_val, {}))
 
         return initialValue
 
@@ -299,26 +296,11 @@ class ManyVersionedObjects:
         if adds or removes:
             self._versioned_objects[key].setVersionedAddsAndRemoves(version_number, adds, removes)
 
-    def setVersionedTailValueStringified(self, key, stringifiedVal):
+    def setVersionedTailValueStringified(self, key, serialized_val):
         if key not in self._versioned_objects:
             self._object_has_version(key, -1)
             self._versioned_objects[key] = VersionedValue()
-            self._versioned_objects[key].setVersionedValue(-1, JsonWithPyRep(None, {}, stringifiedVal))
-
-    def setVersionedValueStringified(self, key, version_number, stringifiedVal):
-        self._object_has_version(key, version_number)
-        
-        if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedValue()
-
-        self._versioned_objects[key].setVersionedValue(
-            version_number,
-            JsonWithPyRep(
-                None,
-                {},
-                stringifiedVal
-                )
-            )
+            self._versioned_objects[key].setVersionedValue(-1, SerializedDatabaseValue(serialized_val, {}))
 
     def updateVersionedAdds(self, key, version_number, adds):
         self._object_has_version(key, version_number)
@@ -412,8 +394,8 @@ class TransactionListener:
                 if fieldname != " exists":
                     changed[o].append((
                         fieldname,
-                        View.unwrapJsonWithPyRep(key_value[k], o.__types__[fieldname]),
-                        View.unwrapJsonWithPyRep(priors[k], o.__types__[fieldname])
+                        View.unwrapSerializedDatabaseValue(key_value[k], o.__types__[fieldname]),
+                        View.unwrapSerializedDatabaseValue(priors[k], o.__types__[fieldname])
                         ))
 
         self._queue.put(changed)
@@ -766,17 +748,18 @@ class DatabaseConnection:
                 key_value = {}
                 priors = {}
 
-                writes = dict(msg.writes)
-                set_adds = dict(msg.set_adds)
-                set_removes = dict(msg.set_removes)
+                writes = {k:msg.writes[k] for k in msg.writes}
+                set_adds = {k: msg.set_adds[k] for k in msg.set_adds}
+                set_removes = {k: msg.set_removes[k] for k in msg.set_removes}
 
                 for k,val_serialized in writes.items():
                     if not self._suppressKey(k):
-                        json_val = json.loads(val_serialized) if val_serialized is not None else None
+                        key_value[k] = val_serialized
 
-                        key_value[k] = json_val
-
-                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id, json_val)
+                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id, 
+                            bytes.fromhex(val_serialized)
+                                    if val_serialized is not None else None
+                            )
 
                 for k,a in set_adds.items():
                     a = self._suppressIdentities(k, set(a))
@@ -815,8 +798,8 @@ class DatabaseConnection:
                 else:
                     assert not self._subscription_buildup[lookupTuple]['markedLazy'], 'received non-lazy data for a lazy subscription'
 
-                self._subscription_buildup[lookupTuple]['values'].update(msg.values)
-                self._subscription_buildup[lookupTuple]['index_values'].update(msg.index_values)
+                self._subscription_buildup[lookupTuple]['values'].update({k:msg.values[k] for k in msg.values})
+                self._subscription_buildup[lookupTuple]['index_values'].update({k: msg.index_values[k] for k in msg.index_values})
 
                 if msg.identities is not None:
                     if self._subscription_buildup[lookupTuple]['identities'] is None:
@@ -824,10 +807,10 @@ class DatabaseConnection:
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
             elif msg.matches.LazyTransactionPriors:
                 for k,v in msg.writes.items():
-                    self._versioned_data.setVersionedTailValueStringified(k,v)
+                    self._versioned_data.setVersionedTailValueStringified(k,bytes.fromhex(v) if v is not None else None)
             elif msg.matches.LazyLoadResponse:
                 for k,v in msg.values.items():
-                    self._versioned_data.setVersionedTailValueStringified(k,v)
+                    self._versioned_data.setVersionedTailValueStringified(k,bytes.fromhex(v) if v is not None else None)
 
                 self._lazy_objects.pop(msg.identity, None)
 
@@ -848,10 +831,12 @@ class DatabaseConnection:
                     }
 
             elif msg.matches.SubscriptionComplete:
-                event = self._pendingSubscriptions.get((msg.schema, msg.typename, msg.fieldname_and_value))
+                event = self._pendingSubscriptions.get((msg.schema, msg.typename, 
+                    tuple(msg.fieldname_and_value) if msg.fieldname_and_value is not None else None))
 
                 if not event:
-                    logging.error("Received unrequested subscription to schema %s / %s / %s", msg.schema, msg.typename, msg.fieldname_and_value)
+                    logging.error("Received unrequested subscription to schema %s / %s / %s. have %s", 
+                        msg.schema, msg.typename, msg.fieldname_and_value, self._pendingSubscriptions)
                     return
 
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
@@ -903,7 +888,7 @@ class DatabaseConnection:
                         self._lazy_objects[i] = schema_and_typename
 
                 for key, val in values.items():
-                    self._versioned_data.setVersionedValueStringified(key, msg.tid, val)
+                    self._versioned_data.setVersionedValue(key, msg.tid, None if val is None else bytes.fromhex(val))
 
                     #this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:
@@ -945,7 +930,9 @@ class DatabaseConnection:
 
         setAdds = {}
 
-        for iv, val in indexValues.items():
+        for iv in indexValues:
+            val = indexValues[iv]
+
             if val is not None:
                 schema_name, typename, identity, field_name = keymapping.split_data_reverse_index_key(iv)
 
@@ -1031,7 +1018,7 @@ class DatabaseConnection:
         out_writes = {}
 
         for k,v in key_value.items():
-            out_writes[k] = json.dumps(v.jsonRep) if v.jsonRep is not None else None
+            out_writes[k] = v.serializedByteRep.hex() if v.serializedByteRep is not None else None
             if len(out_writes) > 10000:
                 self._channel.write(
                     ClientToServer.TransactionData(writes=out_writes, set_adds={}, set_removes={},

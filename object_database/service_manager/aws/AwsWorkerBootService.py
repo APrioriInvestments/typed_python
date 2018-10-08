@@ -31,7 +31,7 @@ import os
 from typed_python import OneOf, ConstDict
 from object_database import ServiceBase, service_schema, Schema, Indexed
 from object_database.web import cells
-from nativepython.python.string_util import closest_N_in
+from object_database.util import closest_N_in
 
 schema = Schema("core.AwsWorkerBootService")
 

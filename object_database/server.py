@@ -78,9 +78,9 @@ class ConnectedChannel:
                 'index_versions': set()
                 }
 
-        self.pendingTransactions[guid]['writes'].update({k: v for k,v in msg.writes.items()})
-        self.pendingTransactions[guid]['set_adds'].update({k: set(a) for k,a in msg.set_adds.items() if a})
-        self.pendingTransactions[guid]['set_removes'].update({k: set(a) for k,a in msg.set_removes.items() if a})
+        self.pendingTransactions[guid]['writes'].update({k: msg.writes[k] for k in msg.writes})
+        self.pendingTransactions[guid]['set_adds'].update({k: set(msg.set_adds[k]) for k in msg.set_adds if msg.set_adds[k]})
+        self.pendingTransactions[guid]['set_removes'].update({k: set(msg.set_removes[k]) for k in msg.set_removes if msg.set_removes[k]})
         self.pendingTransactions[guid]['key_versions'].update(msg.key_versions)
         self.pendingTransactions[guid]['index_versions'].update(msg.index_versions)
 
@@ -164,11 +164,11 @@ class Server:
             if curIdentityRoot is None:
                 curIdentityRoot = 0
             else:
-                curIdentityRoot = int(curIdentityRoot)
+                curIdentityRoot = deserialize(int, bytes.fromhex(curIdentityRoot))
 
             result = curIdentityRoot
 
-            self._kvstore.set(" identityRoot", str(curIdentityRoot+1))
+            self._kvstore.set(" identityRoot", serialize(int, curIdentityRoot+1).hex())
 
             return result
 
@@ -254,7 +254,7 @@ class Server:
 
         self._handleNewTransaction(
             None,
-            {exists_key: "true"},
+            {exists_key: serialize(bool, True).hex()},
             {exists_index: set([identity])},
             {},
             [],
@@ -580,13 +580,17 @@ class Server:
         to_send = []
         if checkPending:
             for transactionMessage in self._pendingSubscriptionRecheck:
-                for key, val in transactionMessage.writes.items():
+                for key in transactionMessage.writes:
+                    val = transactionMessage.writes[key]
+
                     #if we write to a key we've already sent, we'll need to resend it
                     identity = keymapping.split_data_key(key)[2]
                     if identity in identities:
                         identities_left_to_send.add(identity)
 
-                for add_index_key, add_index_identities in transactionMessage.set_adds.items():
+                for add_index_key in transactionMessage.set_adds:
+                    add_index_identities = transactionMessage.set_adds[add_index_key]
+
                     add_schema, add_typename, add_fieldname, add_hashVal = keymapping.split_index_key_full(add_index_key)
 
                     if add_schema == schema_name and add_typename == typename and (
@@ -697,7 +701,7 @@ class Server:
             )
 
     def _loadValuesForObject(self, channel, schema_name, typename, identities):
-        typedef = channel.definedSchemas.get(schema_name).get(typename)
+        typedef = channel.definedSchemas.get(schema_name)[typename]
 
         valsToGet = []
         for field_to_pull in typedef.fields:
@@ -713,7 +717,7 @@ class Server:
         #that we're broadcasting
         schema_name, typename, fieldname, fieldval = keymapping.split_index_key_full(indexKey)
 
-        typedef = channel.definedSchemas.get(schema_name).get(typename)
+        typedef = channel.definedSchemas.get(schema_name)[typename]
         
         key_value.update(self._loadValuesForObject(channel, schema_name, typename, newIds))
 

@@ -7,7 +7,7 @@ import traceback
 import socket
 import time
 
-from object_database.algebraic_to_json import Encoder
+from typed_python import serialize, deserialize
 
 sizeType = '<L'
 longLength = struct.calcsize(sizeType)
@@ -20,7 +20,6 @@ def stringToLong(l):
 
 class AlgebraicProtocol(asyncio.Protocol):
     def __init__(self, receiveType, sendType):
-        self.encoder = Encoder()
         self.receiveType = receiveType
         self.sendType = sendType
         self.transport = None
@@ -31,15 +30,9 @@ class AlgebraicProtocol(asyncio.Protocol):
         try:
             assert isinstance(msg, self.sendType), "message %s is of type %s != %s" % (msg, type(msg), self.sendType)
 
-            #cache the encoded message on the object in case we're sending this to multiple
-            #clients.
-            if '__encoded_message__' in msg.__dict__:
-                dataToSend = msg.__dict__['__encoded_message__']
-            else:
-                dataToSend = bytes(json.dumps(self.encoder.to_json(self.sendType, msg)), 'utf8')
-                dataToSend = longToString(len(dataToSend)) + dataToSend
-                msg.__dict__['__encoded_message__'] = dataToSend
-
+            dataToSend = serialize(self.sendType, msg)
+            dataToSend = longToString(len(dataToSend)) + dataToSend
+            
             with self.writelock:
                 self.transport.write(dataToSend)
         except:
@@ -69,7 +62,7 @@ class AlgebraicProtocol(asyncio.Protocol):
                 self.buffer = self.buffer[bytesToRead + longLength:]
 
                 try:
-                    self.messageReceived(self.encoder.from_json(json.loads(str(toConsume,'utf8')), self.receiveType))
+                    self.messageReceived(deserialize(self.receiveType, toConsume))
                 except:
                     logging.info("Error in AlgebraicProtocol: %s", traceback.format_exc())
                     self.transport.close()

@@ -36,6 +36,8 @@ class InMemoryPersistence(object):
             return val
 
     def set(self, key, value):
+        assert isinstance(value, str) or value is None, (key, value)
+
         with self.lock:
             if value is None:
                 if key in self.values:
