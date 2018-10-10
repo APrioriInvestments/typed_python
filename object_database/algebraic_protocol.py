@@ -62,9 +62,10 @@ class AlgebraicProtocol(asyncio.Protocol):
                 self.buffer = self.buffer[bytesToRead + longLength:]
 
                 try:
-                    self.messageReceived(deserialize(self.receiveType, toConsume))
+                    x = deserialize(self.receiveType, toConsume)
+                    self.messageReceived(x)
                 except:
-                    logging.info("Error in AlgebraicProtocol: %s", traceback.format_exc())
+                    logging.error("Error in AlgebraicProtocol: %s", traceback.format_exc())
                     self.transport.close()
             else:
                 return

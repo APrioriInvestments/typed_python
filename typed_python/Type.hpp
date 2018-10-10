@@ -497,7 +497,7 @@ public:
     void deserialize(instance_ptr self, buf_t& buffer) const {
         uint8_t which = buffer.read_uint8();
         if (which >= m_types.size()) {
-            throw std::runtime_error("Corrupt data");
+            throw std::runtime_error("Corrupt OneOf");
         }
         *(uint8_t*)self = which;
         m_types[which]->deserialize(self+1, buffer);
@@ -863,7 +863,7 @@ public:
         int32_t ct = buffer.read_uint32();
         
         if (ct > buffer.remaining() && m_element_type->bytecount()) {
-            throw std::runtime_error("Corrupt data");
+            throw std::runtime_error("Corrupt data (tuplecount)");
         }
 
         constructor(self, ct, [&](instance_ptr tgt, int k) {
@@ -1105,7 +1105,7 @@ public:
         int32_t ct = buffer.read_uint32();
 
         if (ct > buffer.remaining() && m_bytes_per_key_value_pair) {
-            throw std::runtime_error("Corrupt data");
+            throw std::runtime_error("Corrupt data (dictcount)");
         }
 
         constructor(self, ct, false);
@@ -1774,7 +1774,7 @@ public:
 
         if ((bytes_per != 1 && bytes_per != 2 && bytes_per != 4) || 
                 ct > buffer.remaining()) {
-            throw std::runtime_error("Corrupt data");
+            throw std::runtime_error("Corrupt data (stringsize)");
         }
 
         constructor(self, bytes_per, ct, nullptr);
@@ -1995,7 +1995,7 @@ public:
         int32_t ct = buffer.read_uint32();
         
         if (ct > buffer.remaining()) {
-            throw std::runtime_error("Corrupt data");
+            throw std::runtime_error("Corrupt data (bytes)");
         }
 
         constructor(self, ct, nullptr);
@@ -2388,7 +2388,7 @@ public:
     void deserialize(instance_ptr self, buf_t& buffer) const {
         uint8_t w = buffer.read_uint8();
         if (w >= m_subtypes.size()) {
-            throw std::runtime_error("Corrupt data");
+            throw std::runtime_error("Corrupt data (alt which)");
         }
 
         if (m_all_alternatives_empty) {

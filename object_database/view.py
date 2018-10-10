@@ -122,7 +122,10 @@ class View(object):
             if kwd not in cls.__types__:
                 raise TypeError("Unknown field %s on %s" % (kwd, cls))
 
-            coerced_val = cls.__types__[kwd](val)
+            try:
+                coerced_val = cls.__types__[kwd](val)
+            except:
+                raise TypeError("Can't coerce %s to type %s" % (val, cls.__types__[kwd]))
 
             writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
 
@@ -242,6 +245,7 @@ class View(object):
 
                 if unconvertedVal is not None and indexType is None:
                     assert False, (obj, index_name, unconvertedVal)
+
                 existing_index_vals[index_name] = indexType(unconvertedVal) if unconvertedVal is not None else None
 
         return existing_index_vals

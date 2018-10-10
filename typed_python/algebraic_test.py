@@ -42,15 +42,13 @@ class AlgebraicTests(unittest.TestCase):
         self.assertEqual(X.A.__qualname__, 'X.A')
         self.assertEqual(X.B.__qualname__, 'X.B')
 
-        X2 = Alternative('X2')
-        X2.define(A={}, B={})
+        X2 = Alternative('X2', A={}, B={})
         self.assertEqual(X2.__qualname__, 'X2')
         self.assertEqual(X2.A.__qualname__, 'X2.A')
         self.assertEqual(X2.B.__qualname__, 'X2.B')
 
     def test_conversion(self):
-        X = Alternative('X')
-        X.define(A = {'x': int}, B = {'x': X, 'y': int})
+        X = Alternative('X', A = {'x': int}, B = {'x': X, 'y': int})
 
         X2 = Alternative('X')
         X2.define(A = {'x': int}, B = {'x': X2, 'y': int})

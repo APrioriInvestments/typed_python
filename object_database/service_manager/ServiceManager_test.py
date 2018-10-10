@@ -218,22 +218,31 @@ class ServiceManagerTest(unittest.TestCase):
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
 
+        os.makedirs(os.path.join(self.tempDirectoryName,'source'))
+        os.makedirs(os.path.join(self.tempDirectoryName,'storage'))
+
         if not VERBOSE:
             kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
         else:
             kwargs = {}
 
-        self.server = subprocess.Popen(
-            [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",
-                '--source',os.path.join(self.tempDirectoryName,'source'),
-                '--storage',os.path.join(self.tempDirectoryName,'storage'),
-                '--shutdownTimeout', '1.0'
-                ],
-            **kwargs
-            )
-        self.database = connect("localhost", 8020, retry=True)
-        self.database.subscribeToSchema(core_schema, service_schema, schema)
+        try:
+            self.server = subprocess.Popen(
+                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
+                    'localhost', 'localhost', "8020", "--run_db",
+                    '--source',os.path.join(self.tempDirectoryName,'source'),
+                    '--storage',os.path.join(self.tempDirectoryName,'storage'),
+                    '--shutdownTimeout', '1.0'
+                    ],
+                **kwargs
+                )
+            self.database = connect("localhost", 8020, retry=True)
+            self.database.subscribeToSchema(core_schema, service_schema, schema)
+        except:
+            self.server.terminate()
+            self.server.wait()
+            self.tempDirObj.__exit__(None,None,None)
+            raise
 
     def tearDown(self):
         self.server.terminate()

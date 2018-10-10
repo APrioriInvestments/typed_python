@@ -182,25 +182,27 @@ class SubprocessServiceManager(ServiceManager):
 
         if self.storageDir:
             with self.lock:
-                for file in os.listdir(self.storageDir):
-                    if file not in self.serviceProcesses:
-                        try:
-                            path = os.path.join(self.storageDir, file)
-                            logging.info("Removing storage at path %s for dead service.", path)
-                            shutil.rmtree(path)
-                        except:
-                            logging.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
+                if os.path.exists(self.storageDir):
+                    for file in os.listdir(self.storageDir):
+                        if file not in self.serviceProcesses:
+                            try:
+                                path = os.path.join(self.storageDir, file)
+                                logging.info("Removing storage at path %s for dead service.", path)
+                                shutil.rmtree(path)
+                            except:
+                                logging.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
 
         if self.sourceDir:
             with self.lock:
-                for file in os.listdir(self.sourceDir):
-                    if file not in self.serviceProcesses:
-                        try:
-                            path = os.path.join(self.sourceDir, file)
-                            logging.info("Removing source caches at path %s for dead service.", path)
-                            shutil.rmtree(path)
-                        except:
-                            logging.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
+                if os.path.exists(self.sourceDir):
+                    for file in os.listdir(self.sourceDir):
+                        if file not in self.serviceProcesses:
+                            try:
+                                path = os.path.join(self.sourceDir, file)
+                                logging.info("Removing source caches at path %s for dead service.", path)
+                                shutil.rmtree(path)
+                            except:
+                                logging.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
 
 
 
