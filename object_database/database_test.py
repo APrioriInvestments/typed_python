@@ -1037,7 +1037,7 @@ class ObjectDatabaseTests:
         blocker.releaseCallback()
 
         for e in subscriptionEvents:
-            assert e.wait(timeout=1.0)
+            assert e.wait(timeout=2.0)
 
         with db2.transaction():
             #verify we see the write on c1
