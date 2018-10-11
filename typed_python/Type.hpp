@@ -147,7 +147,8 @@ class DeserializationBuffer {
 public:
     DeserializationBuffer(uint8_t* ptr, size_t sz) :
             m_buffer(ptr),
-            m_size(sz)
+            m_size(sz),
+            m_orig_size(sz)
     {
     }
 
@@ -191,9 +192,15 @@ public:
     size_t remaining() const {
         return m_size;
     }
+
+    size_t pos() const {
+        return m_orig_size - m_size;
+    }
+
 private:
     uint8_t* m_buffer;
     size_t m_size;
+    size_t m_orig_size;
 };
 
 class Type {
@@ -1071,6 +1078,7 @@ public:
         m_bytes_per_key = m_key->bytecount();
         m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
         m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
+        m_key_value_pair_type = Tuple::Make({m_key, m_value});
     }
 
     static ConstDict* Make(const Type* key, const Type* value) {
@@ -1477,12 +1485,14 @@ public:
     }
     
     
+    const Type* keyValuePairType() const { return m_key_value_pair_type; }
     const Type* keyType() const { return m_key; }
     const Type* valueType() const { return m_value; }
 
 private:
     const Type* m_key;
     const Type* m_value;
+    const Type* m_key_value_pair_type;
     size_t m_bytes_per_key;
     size_t m_bytes_per_key_value_pair;
     size_t m_bytes_per_key_subtree_pair;
@@ -1772,8 +1782,12 @@ public:
         int32_t ct = buffer.read_uint32();
         uint8_t bytes_per = buffer.read_uint8();
 
-        if ((bytes_per != 1 && bytes_per != 2 && bytes_per != 4) || 
-                ct > buffer.remaining()) {
+        if (bytes_per != 1 && bytes_per != 2 && bytes_per != 4) {
+            throw std::runtime_error("Corrupt data (bytes per unicode character): " 
+                + std::to_string(bytes_per) + " " + std::to_string(ct) + ". pos is " + std::to_string(buffer.pos()));
+        }
+
+        if (ct > buffer.remaining()) {
             throw std::runtime_error("Corrupt data (stringsize)");
         }
 
@@ -2251,6 +2265,10 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) const {
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
     }
 
     void constructor(instance_ptr self) const {}

@@ -50,8 +50,7 @@ class AlgebraicTests(unittest.TestCase):
     def test_conversion(self):
         X = Alternative('X', A = {'x': int}, B = {'x': X, 'y': int})
 
-        X2 = Alternative('X')
-        X2.define(A = {'x': int}, B = {'x': X2, 'y': int})
+        X2 = Alternative('X', A = {'x': int}, B = {'x': X2, 'y': int})
         
         x1 = X.B(x=X.A(x=10),y=20)
         x2 = X2.B(x=X.A(x=10),y=20)
@@ -88,8 +87,7 @@ class AlgebraicTests(unittest.TestCase):
             X.B(11.0).a
     
     def test_tuples(self):
-        X = Alternative('X')
-        X.define(
+        X = Alternative('X',
             A = {'val': int},
             B = {'val': TupleOf(X)}
             )
@@ -131,7 +129,7 @@ class AlgebraicTests(unittest.TestCase):
 
     def test_null(self):
         Sub = Alternative("Sub", I={})
-        X = Alternative('X', I={'val': OneOf(Sub, None)})
+        X = Alternative('X', I={'val': OneOf(None, Sub)})
 
         self.assertTrue(isinstance(X.I(Sub.I()).val, Sub))
         self.assertTrue(X.I(None).val is None)

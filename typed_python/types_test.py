@@ -414,6 +414,32 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue("c" in deserialize(t,serialize(t, t({'a':'b','b':'c','c':'d','def':'e'}))))
         self.assertTrue("def" in deserialize(t,serialize(t, t({'a':'b','b':'c','c':'d','def':'e'}))))
 
+    def test_const_dict_get(self):
+        a = ConstDict(str,str)({'a':'b','c':'d'})
+
+        self.assertEqual(a.get('a'),'b')
+        self.assertEqual(a.get('asdf'),None)
+        self.assertEqual(a.get('asdf',20),20)
+
+    def test_const_dict_items(self):
+        a = ConstDict(str,str)({'a':'b','c':'d'})
+
+        self.assertEqual(sorted(a.items()), [('a','b'),('c','d')])
+
+    def test_empty_string(self):
+        a = ConstDict(str,str)({'a':''})
+
+        print(a['a'])
+
+    def test_dict_to_oneof(self):
+        t = ConstDict(str,OneOf("A","B","ABCDEF"))
+        a = t({'a':'A','b':'ABCDEF'})
+
+        self.assertEqual(a['a'], "A")
+        self.assertEqual(a['b'], "ABCDEF")
+
+        self.assertEqual(a, deserialize(t,serialize(t,a)))
+        
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
         self.assertTrue(isinstance(x,str))

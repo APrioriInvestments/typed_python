@@ -173,6 +173,8 @@ class ServiceManager(object):
                 self.collectDeadHosts()
                 self.createInstanceRecords()
 
+
+
             instances = self.instanceRecordsToBoot()
                 
             bad_instances = {}
@@ -285,7 +287,7 @@ class ServiceManager(object):
             with self.db.transaction():
                 if service.effectiveTargetCount() != len(actual_records):
                     self._updateService(service, actual_records)
-
+        
     def _pickHost(self, service):
         for h in service_schema.ServiceHost.lookupAll():
             if h.connection.exists():
@@ -302,7 +304,6 @@ class ServiceManager(object):
 
         while service.effectiveTargetCount() > len(actual_records):
             host = self._pickHost(service)
-            
             if not host:
                 service.unbootable_count = service.effectiveTargetCount() - len(actual_records)
                 return
@@ -318,7 +319,7 @@ class ServiceManager(object):
                 )
 
             actual_records.append(instance)
-
+            
         while service.effectiveTargetCount() < len(actual_records):
             sInst = actual_records.pop()
             sInst.triggerShutdown()

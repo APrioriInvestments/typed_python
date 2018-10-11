@@ -37,14 +37,15 @@ class ActiveWebServiceTest(unittest.TestCase):
 
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8020", "--run_db",
+                'localhost', 'localhost', "8023", "--run_db",
                 '--source',os.path.join(self.tempDirectoryName,'source'),
                 '--storage',os.path.join(self.tempDirectoryName,'storage'),
                 '--shutdownTimeout', '.5'
                 ]
             )
         try:
-            self.database = connect("localhost", 8020, retry=True)
+            self.database = connect("localhost", 8023, retry=True)
+
             self.database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
             with self.database.transaction():

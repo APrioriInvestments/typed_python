@@ -229,14 +229,14 @@ class ServiceManagerTest(unittest.TestCase):
         try:
             self.server = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', "8020", "--run_db",
+                    'localhost', 'localhost', "8023", "--run_db",
                     '--source',os.path.join(self.tempDirectoryName,'source'),
                     '--storage',os.path.join(self.tempDirectoryName,'storage'),
                     '--shutdownTimeout', '1.0'
                     ],
                 **kwargs
                 )
-            self.database = connect("localhost", 8020, retry=True)
+            self.database = connect("localhost", 8023, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, schema)
         except:
             self.server.terminate()

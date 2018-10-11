@@ -179,7 +179,7 @@ class View(object):
 
         if dbValWithPyrep.pyRep.get(field_type) is None:
             dbValWithPyrep.pyRep[field_type] = deserialize(field_type, dbValWithPyrep.serializedByteRep)
-
+            
         return dbValWithPyrep.pyRep[field_type]
 
     def _exists(self, obj, identity):

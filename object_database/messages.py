@@ -43,18 +43,18 @@ ServerToClient = Alternative(
         'schema': str, 
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
-        'values': ConstDict(str, OneOf(str, None)), #value
-        'index_values': ConstDict(str, OneOf(str, None)),
+        'values': ConstDict(str, OneOf(None, str)), #value
+        'index_values': ConstDict(str, OneOf(None, str)),
         'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
         },
-    LazyTransactionPriors = { 'writes': ConstDict(str, OneOf(str, None)) },
-    LazyLoadResponse = { 'identity': str, 'values': ConstDict(str, OneOf(str, None)) },
+    LazyTransactionPriors = { 'writes': ConstDict(str, OneOf(None, str)) },
+    LazyLoadResponse = { 'identity': str, 'values': ConstDict(str, OneOf(None, str)) },
     LazySubscriptionData = {
         'schema': str, 
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'identities': TupleOf(str),
-        'index_values': ConstDict(str, OneOf(str, None))
+        'index_values': ConstDict(str, OneOf(None, str))
         },
     SubscriptionComplete = {
         'schema': str, 
@@ -70,7 +70,7 @@ ServerToClient = Alternative(
         },
     Disconnected = {},
     Transaction = {
-        "writes": ConstDict(str, OneOf(str, None)),
+        "writes": ConstDict(str, OneOf(None, str)),
         "set_adds": ConstDict(str, TupleOf(str)),
         "set_removes": ConstDict(str, TupleOf(str)),
         "transaction_id": int

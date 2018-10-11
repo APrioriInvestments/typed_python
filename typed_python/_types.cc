@@ -6,6 +6,9 @@
 #include "Type.hpp"
 #include <iostream>
 
+static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
+
+
 //extension of PyTypeObject that stashes a Type* on the end.
 struct NativeTypeWrapper {
     PyTypeObject typeObj;
@@ -19,6 +22,7 @@ struct native_instance_wrapper {
   
     bool mIsInitialized;
     bool mIsMatcher; //-1 if we're not an iterator
+    bool mIteratorIsPairs;
     int64_t mIteratorOffset; //-1 if we're not an iterator
     uint8_t data[0];
 
@@ -27,13 +31,99 @@ struct native_instance_wrapper {
         return PyLong_FromLong(w->mType->bytecount());
     }
 
-    static PyMethodDef* typeMethods() {
-        static PyMethodDef typed_python_TypeMethods[] = {
+    static PyObject* constDictItems(PyObject *o) {
+        const Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
+
+            self->mIteratorOffset = 0;
+            self->mIteratorIsPairs = 1;
+            self_type->copy_constructor(self->data, w->data);
+            self->mIsInitialized = true;
+            self->mIsMatcher = false;
+
+            return (PyObject*)self;
+        }
+
+        PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
+        return NULL;
+    }
+
+    static PyObject* constDictGet(PyObject* o, PyObject* args) {
+        native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+        if (PyTuple_Size(args) < 1 || PyTuple_Size(args) > 2) {
+            PyErr_SetString(PyExc_TypeError, "ConstDict.get takes one or two arguments");
+            return NULL;
+        }
+
+        PyObject* item = PyTuple_GetItem(args,0);
+        PyObject* ifNotFound = (PyTuple_Size(args) == 2 ? PyTuple_GetItem(args,1) : Py_None);
+
+        const Type* self_type = extractTypeFrom(o->ob_type);
+        const Type* item_type = extractTypeFrom(item->ob_type);
+        
+        if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            ConstDict* dict_t = (ConstDict*)self_type;
+
+            if (item_type == dict_t->keyType()) {
+                native_instance_wrapper* item_w = (native_instance_wrapper*)item;
+
+                instance_ptr i = dict_t->lookupValueByKey(self_w->data, item_w->data);
+                
+                if (!i) {
+                    Py_INCREF(ifNotFound);
+                    return ifNotFound;
+                }
+
+                return extractPythonObject(i, dict_t->valueType());
+            } else {
+                instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
+                try {
+                    copy_initialize(dict_t->keyType(), tempObj, item);
+                } catch(std::exception& e) {
+                    free(tempObj);
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    return NULL;
+                }
+
+                instance_ptr i = dict_t->lookupValueByKey(self_w->data, tempObj);
+
+                dict_t->keyType()->destroy(tempObj);
+                free(tempObj);
+
+                if (!i) {
+                    Py_INCREF(ifNotFound);
+                    return ifNotFound;
+                }
+
+                return extractPythonObject(i, dict_t->valueType());
+            }
+
+            PyErr_SetString(PyExc_TypeError, "Invalid ConstDict lookup type");
+            return NULL;
+        }
+
+        PyErr_SetString(PyExc_TypeError, "Wrong type!");
+        return NULL;
+    }
+
+    static PyMethodDef* typeMethods(const Type* t) {
+        if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            return new PyMethodDef [4] {
+                {"bytecount", (PyCFunction)native_instance_wrapper::bytecount, METH_CLASS | METH_NOARGS, NULL},
+                {"get", (PyCFunction)native_instance_wrapper::constDictGet, METH_VARARGS, NULL},
+                {"items", (PyCFunction)native_instance_wrapper::constDictItems, METH_NOARGS, NULL},
+                {NULL, NULL}
+            };
+        }
+
+        return new PyMethodDef [2] {
             {"bytecount", (PyCFunction)native_instance_wrapper::bytecount, METH_CLASS | METH_NOARGS, NULL},
             {NULL, NULL}
         };
-
-        return typed_python_TypeMethods;
     };
 
     static void tp_dealloc(PyObject* self) {
@@ -392,7 +482,7 @@ struct native_instance_wrapper {
             }
         }
 
-        throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name());
+        throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
     }
 
     static void initialize(uint8_t* data, const Type* t, PyObject* args, PyObject* kwargs) {
@@ -941,7 +1031,7 @@ struct native_instance_wrapper {
         native_instance_wrapper* self_w = (native_instance_wrapper*)o;
 
         const Type* self_type = extractTypeFrom(o->ob_type);
-        const Type* item_type = extractTypeFrom(o->ob_type);
+        const Type* item_type = extractTypeFrom(item->ob_type);
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
             ConstDict* dict_t = (ConstDict*)self_type;
@@ -985,7 +1075,7 @@ struct native_instance_wrapper {
         native_instance_wrapper* self_w = (native_instance_wrapper*)o;
 
         const Type* self_type = extractTypeFrom(o->ob_type);
-        const Type* item_type = extractTypeFrom(o->ob_type);
+        const Type* item_type = extractTypeFrom(item->ob_type);
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
             ConstDict* dict_t = (ConstDict*)self_type;
@@ -1149,7 +1239,7 @@ struct native_instance_wrapper {
             if (strcmp(attr_name,"matches") == 0) {
                 native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
-                self->mIteratorOffset = 0;
+                self->mIteratorOffset = -1;
                 t->copy_constructor(self->data, w->data);
                 self->mIsInitialized = true;
                 self->mIsMatcher = true;
@@ -1477,6 +1567,7 @@ struct native_instance_wrapper {
             native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
             self->mIteratorOffset = 0;
+            self->mIteratorIsPairs = w->mIteratorIsPairs;
             self_type->copy_constructor(self->data, w->data);
             self->mIsInitialized = true;
             self->mIsMatcher = false;
@@ -1504,7 +1595,28 @@ struct native_instance_wrapper {
 
         w->mIteratorOffset++;
 
-        return extractPythonObject(dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), dict_t->keyType());
+        if (w->mIteratorIsPairs) {
+            auto t1 = extractPythonObject(
+                    dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), 
+                    dict_t->keyType()
+                    );
+            auto t2 = extractPythonObject(
+                    dict_t->kvPairPtrValue(w->data, w->mIteratorOffset-1), 
+                    dict_t->valueType()
+                    );
+            
+            auto res = PyTuple_Pack(2, t1, t2);
+
+            Py_DECREF(t1);
+            Py_DECREF(t2);
+
+            return res;
+        } else {
+            return extractPythonObject(
+                dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), 
+                dict_t->keyType()
+                );
+        }
     }
 
     static PyObject* tp_repr(PyObject *o) {
@@ -1571,7 +1683,7 @@ struct native_instance_wrapper {
                     native_instance_wrapper::tp_iter
                 :   0,                     // getiterfunc tp_iter;
                 native_instance_wrapper::tp_iternext,// iternextfunc tp_iternext;
-                typeMethods(),             // struct PyMethodDef *tp_methods;
+                typeMethods(inType),       // struct PyMethodDef *tp_methods;
                 0,                         // struct PyMemberDef *tp_members;
                 0,                         // struct PyGetSetDef *tp_getset;
                 0,                         // struct _typeobject *tp_base;
@@ -1820,8 +1932,7 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
         return NULL;
     }
 
-    std::vector<const Type*> types;
-    std::vector<std::string> names;
+    std::vector<std::pair<std::string, const Type*> > namesAndTypes;
 
     if (kwargs) {
         PyObject *key, *value;
@@ -1833,13 +1944,32 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
                 return NULL;
             }
 
-            names.push_back(PyUnicode_AsUTF8(key));
-            types.push_back(unwrapTypeArgToTypePtr(value));
+            namesAndTypes.push_back(
+                std::make_pair(
+                    PyUnicode_AsUTF8(key),
+                    unwrapTypeArgToTypePtr(value)
+                    )
+                );
 
-            if (not types.back()) {
+            if (not namesAndTypes.back().second) {
                 return NULL;
             }
         }
+    }
+
+    if (PY_MINOR_VERSION <= 5) {
+        //we cannot rely on the ordering of 'kwargs' here because of the python version, so
+        //we sort it. this will be a problem for anyone running some processes using different
+        //python versions that share python code.
+        std::sort(namesAndTypes.begin(), namesAndTypes.end());
+    }
+
+    std::vector<std::string> names;
+    std::vector<const Type*> types;
+
+    for (auto p: namesAndTypes) {
+        names.push_back(p.first);
+        types.push_back(p.second);
     }
 
     PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(NamedTuple::Make(types, names));
@@ -2044,6 +2174,15 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 
         definitions.push_back(std::make_pair(fieldName, ntPtr));
     };
+
+    static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
+
+    if (PY_MINOR_VERSION <= 5) {
+        //we cannot rely on the ordering of 'kwargs' here because of the python version, so
+        //we sort it. this will be a problem for anyone running some processes using different
+        //python versions that share python code.
+        std::sort(definitions.begin(), definitions.end());
+    }
 
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(
         ::Alternative::Make(name, definitions)

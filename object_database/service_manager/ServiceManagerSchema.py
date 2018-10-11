@@ -188,7 +188,7 @@ class ServiceHost:
 @service_schema.define
 class Service:
     name = Indexed(str)
-    codebase = OneOf(service_schema.Codebase, None)
+    codebase = OneOf(None, service_schema.Codebase)
 
     service_module_name = str
     service_class_name = str
@@ -207,7 +207,7 @@ class Service:
 
     timesBootedUnsuccessfully = int
     timesCrashed = int
-    lastFailureReason = OneOf(str, None)
+    lastFailureReason = OneOf(None, str)
 
     def isThrottled(self):
         return self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS
@@ -303,7 +303,7 @@ class Service:
 class ServiceInstance:
     host = Indexed(ServiceHost)
     service = Indexed(service_schema.Service)
-    codebase = OneOf(service_schema.Codebase, None)
+    codebase = OneOf(None, service_schema.Codebase)
     connection = Indexed(OneOf(None, core_schema.Connection))
 
     shouldShutdown = bool

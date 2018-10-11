@@ -107,7 +107,9 @@ class RingInvariantTest(unittest.TestCase):
 
         def writeSome():
             with db.transaction():
-                numpy.random.choice(Ring.lookupAll()).insert(numpy.random.choice(10))
+                rings = Ring.lookupAll()
+                ring = rings[numpy.random.choice(len(rings))]
+                ring.insert(numpy.random.choice(10))
 
         def checkSome(lazy, k=None):
             db2 = self.createNewDb()
@@ -120,7 +122,8 @@ class RingInvariantTest(unittest.TestCase):
                 db2.subscribeToSchema(schema)
 
             with db2.transaction():
-                return numpy.random.choice(Ring.lookupAll()).check()
+                rings = Ring.lookupAll()
+                return rings[numpy.random.choice(len(rings))].check()
 
         for i in range(100):
             writeSome()
