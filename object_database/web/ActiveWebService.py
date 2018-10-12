@@ -132,7 +132,8 @@ class ActiveWebService(ServiceBase):
                 str(s.gbRamUsed) if field == 'RAM' else 
                 (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                 ""
-                )
+                ),
+            enableDatatable=True
             ) + Grid(
             colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT'],
             rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
@@ -146,7 +147,8 @@ class ActiveWebService(ServiceBase):
                 "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE USAGE" else
                 str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
                 ""
-                )
+                ),
+            enableDatatable=True
             )
 
     def pathToDisplay(self, path, queryArgs):

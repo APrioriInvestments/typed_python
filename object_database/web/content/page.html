@@ -10,6 +10,7 @@
 <link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,400italic' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/octicons/4.4.0/font/octicons.min.css"/>
 <link rel="stylesheet" href="/content/object_database.css"/>
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.19/css/jquery.dataTables.min.css"/>
 
 <script>
     var websocket;
@@ -160,7 +161,7 @@
 <body>
 <div id="page_root">
   <div class="container-fluid">
-    <div class="card">
+    <div class="card mt-5">
       <div class="card-body">
         Loading...
       </div>
@@ -176,6 +177,9 @@
   crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+<script src="https://cdn.datatables.net/1.10.19/js/jquery.dataTables.min.js"></script>
+
 
 <script> 
 $(function () {
@@ -195,6 +199,11 @@ $('[data-poload]').on('show.bs.dropdown', function (arg) {
 
   $(tgt).load(ref)
 })
+
+$('[data-table-enabled="true"]').DataTable({
+    paging: false
+    });
+
 </script>
 </body>
 <html>

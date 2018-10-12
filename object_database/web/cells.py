@@ -642,9 +642,9 @@ class Popover(Cell):
             """.replace("__style__", self._divStyle()).replace("__identity__", self.identity).replace("__width__", str(self.width))
 
 class Grid(Cell):
-    def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun):
+    def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun, enableDatatable=False):
         super().__init__()
-
+        self.enableDatatable = enableDatatable
         self.colFun = colFun
         self.rowFun = rowFun
         self.headerFun = headerFun
@@ -738,11 +738,13 @@ class Grid(Cell):
         for i in list(self.existingItems):
             if i not in seen:
                 del self.existingItems[i]
-
+                      
         self.contents = """
             <table class="table-hscroll table-sm table-striped">
-            <tr>""" + ("<th></th>" if self.rowLabelFun is not None else "") + """__headers__</tr>
+            <thead><tr>""" + ("<th></th>" if self.rowLabelFun is not None else "") + """__headers__</tr></thead>
+            <tbody>
             __rows__
+            </tbody>
             </table>
             """.replace("__headers__",
                 "".join("<th>____header_%s__</th>" % (col_ix)
@@ -758,6 +760,20 @@ class Grid(Cell):
                         for row_ix in range(len(self.rows))
                     )
                 )
+
+        if self.enableDatatable:
+            self.postscript = (
+                """
+                $('#__identity__').DataTable({'paging': false,'searching':false})
+                $('#__identity__').on( 'order.dt', function() {
+                    $('#__identity__').DataTable().rows().invalidate()
+                })
+                $('#__identity__').on( 'search.dt', function() {
+                    $('#__identity__').DataTable().rows().invalidate()
+                })
+                """
+                    .replace("__identity__", self._identity)
+            )
 
 class Clickable(Cell):
     def __init__(self, content, f):
