@@ -457,7 +457,7 @@ class ServiceManagerTest(unittest.TestCase):
         #we want to ensure that we don't have some problem where our transaction throughput
         #goes down because we have left-over connections or something similar in the server,
         #which would be a real problem!
-        self.assertTrue(emptyThroughputs[-1] * 2 > emptyThroughputs[0])
+        self.assertTrue(emptyThroughputs[-1] * 2 > emptyThroughputs[0], (emptyThroughputs))
 
     def DISABLEDtest_throughput_with_many_workers(self):
         with self.database.transaction():

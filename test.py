@@ -503,7 +503,7 @@ def buildModule(args):
         ['python3', 'setup.py', 'develop', '--install-dir', './build/install'], 
         stdout=subprocess.PIPE, 
         stderr=subprocess.STDOUT, 
-        env={'PYTHONPATH': (os.environ['PYTHONPATH'] + ":" or "") + os.path.abspath("./build/install")}
+        env={'PYTHONPATH': (os.environ.get('PYTHONPATH','') + ":") + os.path.abspath("./build/install")}
         )
 
     if result.returncode != 0:
@@ -529,6 +529,9 @@ def main(args):
             if result:
                 return result
 
+        #set the python path so that we load the right version of the library.
+        os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH','') + ":" + os.path.abspath("./build/install")
+        
         return executeTests(args, filter_actions)
     except:
         import traceback
