@@ -1197,6 +1197,58 @@ struct native_instance_wrapper {
         return nullptr;
     }
 
+    static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal) {
+        if (!PyUnicode_Check(attrName)) {
+            PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S'", o->ob_type, attrName);
+            return -1;
+        }
+
+        const Type* type = extractTypeFrom(o->ob_type);
+
+        if (type->getTypeCategory() == Type::TypeCategory::catClass) {
+            native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+            Class* nt = (Class*)type;
+
+            int i = nt->memberNamed(PyUnicode_AsUTF8(attrName));
+            
+            if (i < 0) {
+                PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S'", o->ob_type, attrName);
+                return -1;
+            }
+
+            const Type* eltType = nt->getMembers()[i].second;
+
+            const Type* attrType = extractTypeFrom(attrVal->ob_type);
+
+            if (eltType == attrType) {
+                native_instance_wrapper* item_w = (native_instance_wrapper*)attrVal;
+
+                attrType->assign(nt->eltPtr(self_w->data, i), item_w->data);
+
+                return 0;
+            } else {
+                instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
+                try {
+                    copy_initialize(eltType, tempObj, attrVal);
+                } catch(std::exception& e) {
+                    free(tempObj);
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    return -1;
+                }
+
+                eltType->assign(nt->eltPtr(self_w->data, i), tempObj);
+
+                eltType->destroy(tempObj);
+                free(tempObj);
+
+                return 0;
+            }
+        }
+
+        PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S'", o->ob_type, attrName);
+        return -1;
+    }
+
     static PyObject* tp_getattro(PyObject *o, PyObject* attrName) {
         if (!PyUnicode_Check(attrName)) {
             PyErr_SetString(PyExc_AttributeError, "attribute is not a string");
@@ -1284,6 +1336,18 @@ struct native_instance_wrapper {
                     return extractPythonObject(
                         nt->eltPtr(data, k), 
                         nt->getTypes()[k]
+                        );
+                }
+            }
+        }
+
+        if (type->getTypeCategory() == Type::TypeCategory::catClass) {
+            Class* nt = (Class*)type;
+            for (long k = 0; k < nt->getMembers().size();k++) {
+                if (nt->getMembers()[k].first == attr_name) {
+                    return extractPythonObject(
+                        nt->eltPtr(data, k), 
+                        nt->getMembers()[k].second
                         );
                 }
             }
@@ -1669,7 +1733,7 @@ struct native_instance_wrapper {
                 0,                         // tp_call
                 0,                         // tp_str
                 native_instance_wrapper::tp_getattro, // tp_getattro
-                0,                         // tp_setattro
+                native_instance_wrapper::tp_setattro, // tp_setattro
                 bufferProcs(),             // tp_as_buffer
                 typeCanBeSubclassed(inType) ? 
                     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
@@ -2061,6 +2125,66 @@ PyObject *Value(PyObject* nullValue, PyObject* args) {
     return NULL;    
 }
 
+PyObject *Class(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "Class takes 2 arguments (name and a list of class members)");
+        return NULL;
+    }
+    
+    PyObject* nameArg = PyTuple_GetItem(args,0);
+
+    if (!PyUnicode_Check(nameArg)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a string in the first argument");
+        return NULL;
+    }
+
+    std::string name = PyUnicode_AsUTF8(nameArg);
+
+    PyObject* classmembers = PyTuple_GetItem(args,1); 
+
+    if (!PyTuple_Check(classmembers)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, typemember) in the second argument");
+        return NULL;
+    }
+
+    std::vector<std::pair<std::string, const Type*> > members;
+    std::set<std::string> memberNames;
+
+    for (int i = 0; i < PyTuple_Size(classmembers); ++i) {
+        PyObject* entry = PyTuple_GetItem(classmembers, i);
+
+        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2 
+                || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
+                || !unwrapTypeArgToTypePtr(PyTuple_GetItem(entry, 1))
+                )
+        {
+            PyErr_SetString(PyExc_TypeError, "Badly formed class type argument.");
+            return NULL;
+        }
+
+        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry,0));
+
+        if (memberNames.find(memberName) != memberNames.end()) {
+            PyErr_Format(PyExc_TypeError, "Cannot redefine Class member %s", memberName.c_str());
+            return NULL;
+        }
+
+        memberNames.insert(memberName);
+
+        members.push_back(
+            std::make_pair(
+                memberName,
+                unwrapTypeArgToTypePtr(PyTuple_GetItem(entry,1))
+                )
+            );
+    }
+
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(Class::Make(name, members));
+
+    Py_INCREF(typeObj);
+    return typeObj;
+}
+
 PyObject *serialize(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "serialize takes 2 positional arguments");
@@ -2211,6 +2335,7 @@ static PyMethodDef module_methods[] = {
     {"ConstDict", (PyCFunction)ConstDict, METH_VARARGS, NULL},
     {"Alternative", (PyCFunction)Alternative, METH_VARARGS | METH_KEYWORDS, NULL},
     {"Value", (PyCFunction)Value, METH_VARARGS, NULL},
+    {"Class", (PyCFunction)Class, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {NULL, NULL}

@@ -2759,29 +2759,167 @@ public:
 
 class Class : public Type {
 public:
-    void constructor(instance_ptr self) const {
-    
+    Class(std::string inName, const std::vector<std::pair<std::string, const Type*> >& members) : 
+            Type(catClass),
+            m_members(members)
+    {
+        m_name = inName;
+
+        m_is_default_constructible = true;
+
+        m_size = 0;
+        for (auto t: m_members) {
+            m_byte_offsets.push_back(m_size);
+            m_size += t.second->bytecount();
+
+            if (!t.second->is_default_constructible()) {
+                m_is_default_constructible = false;
+            }
+        }
     }
-    
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+
+    instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
+        return self + m_byte_offsets[ix];
     }
-    
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        for (long k = 0; k < m_members.size(); k++) {
+            char res = m_members[k].second->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
+            if (res != 0) {
+                return res;
+            }
+        }
+
+        return 0;
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) const {
+        for (long k = 0; k < m_members.size();k++) {
+            m_members[k].second->deserialize(eltPtr(self,k),buffer);
+        }
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        for (long k = 0; k < m_members.size();k++) {
+            m_members[k].second->serialize(eltPtr(self,k),buffer);
+        }
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "(";
+
+        for (long k = 0; k < m_members.size();k++) {
+            if (k > 0) {
+                stream << ", ";
+            }
+
+            stream << m_members[k].first << "=";
+
+            m_members[k].second->repr(eltPtr(self,k),stream);
+        }
+        if (m_members.size() == 1) {
+            stream << ",";
+        }
+
+        stream << ")";
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)getTypeCategory());
+
+        for (long k = 0; k < m_members.size();k++) {
+            acc.add(m_members[k].second->hash32(eltPtr(left,k)));
+        }
+
+        acc.add(m_members.size());
+
+        return acc.get();
+    }
+
+    template<class sub_constructor>
+    void constructor(instance_ptr self, const sub_constructor& initializer) const {
+        for (int64_t k = 0; k < m_members.size(); k++) {
+            try {
+                initializer(eltPtr(self, k), k);
+            } catch(...) {
+                for (long k2 = k-1; k2 >= 0; k2--) {
+                    m_members[k2].second->destroy(eltPtr(self,k2));
+                }
+                throw;
+            }
+        }
+    }
+
+    void constructor(instance_ptr self) const {
+        if (!m_is_default_constructible) {
+            throw std::runtime_error(m_name + " is not default-constructible");
+        }
+
+        for (size_t k = 0; k < m_members.size(); k++) {
+            m_members[k].second->constructor(self+m_byte_offsets[k]);
+        }
     }
 
     void destroy(instance_ptr self) const {
-
+        for (long k = (long)m_members.size() - 1; k >= 0; k--) {
+            m_members[k].second->destroy(self+m_byte_offsets[k]);
+        }
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) const {
-
+        for (long k = (long)m_members.size() - 1; k >= 0; k--) {
+            m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+        }
     }
 
     void assign(instance_ptr self, instance_ptr other) const {
-
+        for (long k = (long)m_members.size() - 1; k >= 0; k--) {
+            m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+        }
     }
+    const std::vector<std::pair<std::string, const Type*> >& getMembers() const {
+        return m_members;
+    }
+    const std::vector<size_t>& getOffsets() const {
+        return m_byte_offsets;
+    }
+
+    static Class* Make(std::string name, const std::vector<std::pair<std::string, const Type*> >& members) {
+        static std::mutex guard;
+
+        std::lock_guard<std::mutex> lock(guard);
+
+        typedef std::pair<std::string, std::vector<std::pair<std::string, const Type*> > > keytype;
+
+        static std::map<keytype, Class*> m;
+
+        auto it = m.find(std::make_pair(name, members));
+
+        if (it == m.end()) {
+            it = m.insert(
+                std::make_pair(std::make_pair(name, members), new Class(name, members))
+                ).first;
+        }
+
+        return it->second;
+    }
+
+    int memberNamed(const char* c) const {
+        for (long k = 0; k < m_members.size(); k++) {
+            if (m_members[k].first == c) {
+                return k;
+            }
+        }
+
+        return -1;
+    }
+    
+private:
+    std::vector<size_t> m_byte_offsets;
+
+    std::vector<std::pair<std::string, const Type*> > m_members;
 };
 
 class PackedArray : public Type {

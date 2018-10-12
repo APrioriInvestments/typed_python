@@ -12,7 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict, Alternative, serialize, deserialize, Value
+from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
+    ConstDict, Alternative, serialize, deserialize, Value, Class
+
 import typed_python._types as _types
 
 import unittest
@@ -814,3 +816,26 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertTrue(type(v2) is type(v))
                 self.assertEqual(ser,ser2)
                 self.assertEqual(v, v2)
+        
+    def test_class(self):
+        with self.assertRaises(TypeError):
+            class A(Class):
+                x = (1,2,3)
+
+        class A(Class):
+            x = int
+
+        self.assertEqual(A.bytecount(), 8)
+
+        a = A()
+
+        with self.assertRaises(AttributeError):
+            a.not_an_attribute
+
+        self.assertEqual(a.x, 0)
+
+        a.x = 10
+
+        self.assertEqual(a.x, 10)
+
+
