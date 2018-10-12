@@ -67,6 +67,18 @@
       });
     }
 
+    websocket.onclose = function(event) {
+      document.getElementById("page_root").innerHTML =  `
+      <main role="main" class="container">
+            <div class='alert alert-primary center-block mt-5'>
+              Disconnected!
+            </div>
+      </main>`
+    }
+    websocket.onerror = function(event) {
+      console.log("SOCKET ERRORED: ", event)
+    }
+
     websocket.onmessage = function(event) {
         update = JSON.parse(event.data)
 
@@ -146,13 +158,14 @@
 </script>
 </head>
 <body>
-
 <div id="page_root">
+  <div class="container-fluid">
     <div class="card">
       <div class="card-body">
         Loading...
       </div>
     </div>
+  </div>
 </div>
 
 <div id='holding_pen' style="display:none"></div>

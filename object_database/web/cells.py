@@ -79,12 +79,13 @@ class Cells:
         self.nodesToDiscard = set()
 
         self.transactionQueue = queue.Queue()
-        self.db._onTransaction.append(self._onTransaction)
         self.gEventHasTransactions = GeventPipe()
         self.keysToCells = {}
         self._id = 0
 
         self._addCell(self.root, None)
+
+        self.db._onTransaction.append(self._onTransaction)
 
     def _newID(self):
         self._id += 1

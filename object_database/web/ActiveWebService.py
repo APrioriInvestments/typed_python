@@ -27,6 +27,7 @@ import traceback
 import datetime
 import os
 import json
+import gevent.socket
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 
@@ -245,6 +246,8 @@ class ActiveWebService(ServiceBase):
                 lastDumpTimeSpentCalculating += time.time() - t0
 
                 for message in messages:
+                    gevent.socket.wait_write(ws.stream.handler.socket.fileno())
+
                     ws.send(json.dumps(message))
                     lastDumpMessages += 1
 
