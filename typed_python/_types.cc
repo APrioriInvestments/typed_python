@@ -1791,8 +1791,34 @@ struct native_instance_wrapper {
             }
         }
 
+        if (inType->getTypeCategory() == Type::TypeCategory::catClass) {
+            for (auto nameAndObj: ((Class*)inType)->getClassMembers()) {
+                PyDict_SetItemString(
+                    types[inType]->typeObj.tp_dict, 
+                    nameAndObj.first.c_str(), 
+                    nameAndObj.second
+                    );
+            }
+        }
+
         return (PyTypeObject*)types[inType];
     }
+
+    static const Type* tryUnwrapPyInstanceToType(PyObject* arg) {
+        if (PyType_Check(arg)) {
+            const Type* possibleType = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
+            if (!possibleType) {
+                return NULL;
+            }
+            return possibleType;
+        }
+
+        if (arg == Py_None) {
+            return None::Make();
+        }
+
+        return  native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
+    }        
 
     static const Type* tryUnwrapPyInstanceToValueType(PyObject* typearg) {
         if (PyBool_Check(typearg)) {
@@ -1838,72 +1864,72 @@ struct native_instance_wrapper {
 
         return nullptr;
     }
-};
 
-const Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
-    if (PyType_Check(typearg)) {
-        PyTypeObject* pyType = (PyTypeObject*)typearg;
+    static const Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
+        if (PyType_Check(typearg)) {
+            PyTypeObject* pyType = (PyTypeObject*)typearg;
 
-        if (pyType == &PyLong_Type) {
-            return Int64::Make();
-        }
-        if (pyType == &PyFloat_Type) {
-            return Float64::Make();
-        }
-        if (pyType == Py_None->ob_type) {
-            return None::Make();
-        }
-        if (pyType == &PyBool_Type) {
-            return Bool::Make();
-        }
-        if (pyType == &PyBytes_Type) {
-            return Bytes::Make();
-        }
-        if (pyType == &PyUnicode_Type) {
-            return String::Make();
-        }
-
-        if (native_instance_wrapper::isSubclassOfNativeType(pyType)) {
-            const Type* nativeT = native_instance_wrapper::extractTypeFrom(pyType);
-
-            if (!nativeT) {
-                PyErr_SetString(PyExc_TypeError, 
-                    ("Type " + std::string(pyType->tp_name) + " looked like a native type subclass, but has no base").c_str()
-                    );
-                return NULL;
+            if (pyType == &PyLong_Type) {
+                return Int64::Make();
+            }
+            if (pyType == &PyFloat_Type) {
+                return Float64::Make();
+            }
+            if (pyType == Py_None->ob_type) {
+                return None::Make();
+            }
+            if (pyType == &PyBool_Type) {
+                return Bool::Make();
+            }
+            if (pyType == &PyBytes_Type) {
+                return Bytes::Make();
+            }
+            if (pyType == &PyUnicode_Type) {
+                return String::Make();
             }
 
-            //this is now a permanent object
-            Py_INCREF(typearg);
+            if (native_instance_wrapper::isSubclassOfNativeType(pyType)) {
+                const Type* nativeT = native_instance_wrapper::extractTypeFrom(pyType);
 
-            return PythonSubclass::Make(nativeT, pyType);
+                if (!nativeT) {
+                    PyErr_SetString(PyExc_TypeError, 
+                        ("Type " + std::string(pyType->tp_name) + " looked like a native type subclass, but has no base").c_str()
+                        );
+                    return NULL;
+                }
+
+                //this is now a permanent object
+                Py_INCREF(typearg);
+
+                return PythonSubclass::Make(nativeT, pyType);
+            }
+
+            const Type* res = native_instance_wrapper::extractTypeFrom(pyType);
+            if (res) {
+                return res;
+            }
+
+            PyErr_SetString(PyExc_TypeError, 
+                ("Cannot convert " + std::string(pyType->tp_name) + " to a native type.").c_str()
+                );
+            return NULL;
         }
 
-        const Type* res = native_instance_wrapper::extractTypeFrom(pyType);
-        if (res) {
-            return res;
+        const Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
+
+        if (valueType) {
+            return valueType;
         }
 
-        PyErr_SetString(PyExc_TypeError, 
-            ("Cannot convert " + std::string(pyType->tp_name) + " to a native type.").c_str()
-            );
+        PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type because is't not a type.");
         return NULL;
     }
-
-    const Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
-
-    if (valueType) {
-        return valueType;
-    }
-
-    PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type because is't not a type.");
-    return NULL;
-}
+};
 
 PyObject *TupleOf(PyObject* nullValue, PyObject* args) {
     std::vector<const Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        types.push_back(unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
+        types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
         if (not types.back()) {
             return NULL;
         }
@@ -1923,7 +1949,7 @@ PyObject *TupleOf(PyObject* nullValue, PyObject* args) {
 PyObject *Tuple(PyObject* nullValue, PyObject* args) {
     std::vector<const Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        types.push_back(unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
+        types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
         if (not types.back()) {
             return NULL;
         }
@@ -1938,7 +1964,7 @@ PyObject *Tuple(PyObject* nullValue, PyObject* args) {
 PyObject *ConstDict(PyObject* nullValue, PyObject* args) {
     std::vector<const Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        types.push_back(unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
+        types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
         if (not types.back()) {
             return NULL;
         }
@@ -1962,25 +1988,13 @@ PyObject *OneOf(PyObject* nullValue, PyObject* args) {
     for (long k = 0; k < PyTuple_Size(args); k++) {
         PyObject* arg = PyTuple_GetItem(args,k);
 
-        if (PyType_Check(arg)) {
-            const Type* possibleType = unwrapTypeArgToTypePtr(arg);
-            if (!possibleType) {
-                return NULL;
-            }
-            types.push_back(possibleType);
-        } else {
-            if (arg == Py_None) {
-                types.push_back(None::Make());
-            } else {
-                const Type* t = native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
+        const Type* t = native_instance_wrapper::tryUnwrapPyInstanceToType(arg);
 
-                if (t) {
-                    types.push_back(t);
-                } else {
-                    PyErr_SetString(PyExc_TypeError, "Can't handle values like this in Types.");
-                    return NULL;
-                }
-            }
+        if (t) {
+            types.push_back(t);
+        } else {
+            PyErr_SetString(PyExc_TypeError, "Can't handle values like this in Types.");
+            return NULL;
         }
     }
 
@@ -2011,7 +2025,7 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
             namesAndTypes.push_back(
                 std::make_pair(
                     PyUnicode_AsUTF8(key),
-                    unwrapTypeArgToTypePtr(value)
+                    native_instance_wrapper::unwrapTypeArgToTypePtr(value)
                     )
                 );
 
@@ -2125,8 +2139,205 @@ PyObject *Value(PyObject* nullValue, PyObject* args) {
     return NULL;    
 }
 
+bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::string, const Type*> >& out) {
+    std::set<std::string> memberNames;
+
+    for (int i = 0; i < PyTuple_Size(tuple); ++i) {
+        PyObject* entry = PyTuple_GetItem(tuple, i);
+        const Type* targetType = NULL;
+
+        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2 
+                || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
+                || !(targetType = 
+                    native_instance_wrapper::tryUnwrapPyInstanceToType(
+                        PyTuple_GetItem(entry, 1)
+                        ))
+                )
+        {
+            PyErr_SetString(PyExc_TypeError, "Badly formed class type argument.");
+            return false;
+        }
+
+        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry,0));
+
+        if (memberNames.find(memberName) != memberNames.end()) {
+            PyErr_Format(PyExc_TypeError, "Cannot redefine Class member %s", memberName.c_str());
+            return false;
+        }
+
+        memberNames.insert(memberName);
+
+        out.push_back(
+            std::make_pair(memberName, targetType)
+            );
+    }
+
+    return true;
+}
+
+bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::string, PyObject*> >& out) {
+    std::set<std::string> memberNames;
+
+    for (int i = 0; i < PyTuple_Size(tuple); ++i) {
+        PyObject* entry = PyTuple_GetItem(tuple, i);
+        const Type* targetType = NULL;
+
+        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2 
+                || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
+                )
+        {
+            PyErr_SetString(PyExc_TypeError, "Badly formed class type argument.");
+            return false;
+        }
+
+        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry,0));
+
+        if (memberNames.find(memberName) != memberNames.end()) {
+            PyErr_Format(PyExc_TypeError, "Cannot redefine Class member %s", memberName.c_str());
+            return false;
+        }
+
+        memberNames.insert(memberName);
+
+        PyObject* item = PyTuple_GetItem(entry, 1);
+        Py_INCREF(item);
+
+        out.push_back(
+            std::make_pair(memberName, item)
+            );
+    }
+
+    return true;
+}
+
+PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 4 && PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "Function takes 2 or 4 arguments");
+        return NULL;
+    }
+
+    const Function* resType;
+
+    if (PyTuple_Size(args) == 2) {
+        PyObject* a0 = PyTuple_GetItem(args,0);
+        PyObject* a1 = PyTuple_GetItem(args,1);
+
+        const Type* t0 = native_instance_wrapper::unwrapTypeArgToTypePtr(a0);
+        const Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+        if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
+            PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
+            return NULL;
+        }
+        if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
+            PyErr_SetString(PyExc_TypeError, "Expected second argument to be a function");
+            return NULL;
+        }
+
+        resType = Function::merge((const Function*)t0, (const Function*)t1);
+    } else {
+        PyObject* nameObj = PyTuple_GetItem(args,0);
+        if (!PyUnicode_Check(nameObj)) {
+            PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
+            return NULL;
+        }
+
+        PyObject* retType = PyTuple_GetItem(args,1);
+        PyObject* funcObj = PyTuple_GetItem(args,2);
+        PyObject* argTuple = PyTuple_GetItem(args,3);
+
+        if (!PyFunction_Check(funcObj)) {
+            PyErr_SetString(PyExc_TypeError, "Third arg should be a function.");
+            return NULL;
+        }
+
+        const Type* rType = 0;
+
+        if (retType != Py_None) {
+            rType = native_instance_wrapper::unwrapTypeArgToTypePtr(retType);
+            if (!rType) {
+                PyErr_SetString(PyExc_TypeError, "Expected second argument to be None or a type");
+                return NULL;
+            }
+        }
+
+        if (!PyTuple_Check(argTuple)) {
+            PyErr_SetString(PyExc_TypeError, "Expected fourth argument to be a tuple of args");
+            return NULL;
+        }
+
+        std::vector<Function::FunctionArg> argList;
+
+        for (long k = 0; k < PyTuple_Size(argTuple); k++) {
+            PyObject* kTup = PyTuple_GetItem(argTuple, k);
+            if (!PyTuple_Check(kTup) || PyTuple_Size(kTup) != 5) {
+                PyErr_SetString(PyExc_TypeError, "Argtuple elements should be tuples of five things.");
+                return NULL;
+            }
+
+            PyObject* k0 = PyTuple_GetItem(kTup, 0);
+            PyObject* k1 = PyTuple_GetItem(kTup, 1);
+            PyObject* k2 = PyTuple_GetItem(kTup, 2);
+            PyObject* k3 = PyTuple_GetItem(kTup, 3);
+            PyObject* k4 = PyTuple_GetItem(kTup, 4);
+
+            if (!PyUnicode_Check(k0)) {
+                PyErr_Format(PyExc_TypeError, "Argument %S has a name which is not a string.", k0);
+                return NULL;
+            }
+            
+            const Type* argT = nullptr;
+            if (k1 != Py_None) {
+                argT = native_instance_wrapper::unwrapTypeArgToTypePtr(k1);
+                if (!argT) {
+                    PyErr_Format(PyExc_TypeError, "Argument %S has a type argument %S which "
+                            "should be None or a Type.", k0, k1);
+                    return NULL;
+                }
+            }
+
+            if ((k3 != Py_True && k3 != Py_False) || (k4 != Py_True && k4 != Py_False)) {
+                PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", k0);
+                return NULL;
+            }
+
+            PyObject* val = nullptr;
+            if (k2 != Py_None) {
+                if (!PyTuple_Check(k2) || PyTuple_Size(k2) != 1) {
+                    PyErr_Format(PyExc_TypeError, "Argument %S has a malformed type tuple", k0);
+                    return NULL;                    
+                }
+
+                val = PyTuple_GetItem(k2,0);
+                Py_INCREF(val);
+            }
+
+            argList.push_back(Function::FunctionArg(
+                PyUnicode_AsUTF8(k0),
+                argT,
+                val,
+                k3 == Py_True,
+                k4 == Py_True
+                ));
+        }
+
+        std::vector<Function::FunctionOverload> overloads;
+        overloads.push_back(
+            Function::FunctionOverload((PyFunctionObject*)funcObj, rType, argList) 
+            );
+
+        resType = new Function(PyUnicode_AsUTF8(nameObj), overloads);
+    }
+
+
+
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(resType);
+    Py_INCREF(typeObj);
+    return typeObj;
+}
+
 PyObject *Class(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 2) {
+    if (PyTuple_Size(args) != 5) {
         PyErr_SetString(PyExc_TypeError, "Class takes 2 arguments (name and a list of class members)");
         return NULL;
     }
@@ -2140,46 +2351,87 @@ PyObject *Class(PyObject* nullValue, PyObject* args) {
 
     std::string name = PyUnicode_AsUTF8(nameArg);
 
-    PyObject* classmembers = PyTuple_GetItem(args,1); 
+    PyObject* memberTuple = PyTuple_GetItem(args,1); 
+    PyObject* memberFunctionTuple = PyTuple_GetItem(args,2); 
+    PyObject* staticFunctionTuple = PyTuple_GetItem(args,3); 
+    PyObject* classMemberTuple = PyTuple_GetItem(args,4); 
 
-    if (!PyTuple_Check(classmembers)) {
-        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, typemember) in the second argument");
+    if (!PyTuple_Check(memberTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, member_type) in the second argument");
+        return NULL;
+    }
+
+    if (!PyTuple_Check(memberFunctionTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, Function) in the third argument");
+        return NULL;
+    }
+
+    if (!PyTuple_Check(memberFunctionTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, Function) in the fourth argument");
+        return NULL;
+    }
+
+    if (!PyTuple_Check(classMemberTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the fifth argument");
         return NULL;
     }
 
     std::vector<std::pair<std::string, const Type*> > members;
-    std::set<std::string> memberNames;
-
-    for (int i = 0; i < PyTuple_Size(classmembers); ++i) {
-        PyObject* entry = PyTuple_GetItem(classmembers, i);
-
-        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2 
-                || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
-                || !unwrapTypeArgToTypePtr(PyTuple_GetItem(entry, 1))
-                )
-        {
-            PyErr_SetString(PyExc_TypeError, "Badly formed class type argument.");
+    std::vector<std::pair<std::string, const Type*> > memberFunctions;
+    std::vector<std::pair<std::string, const Type*> > staticFunctions;
+    std::vector<std::pair<std::string, PyObject*> > classMembers;
+    
+    if (!unpackTupleToStringAndTypes(memberTuple, members)) {
+        return NULL;
+    }
+    if (!unpackTupleToStringAndTypes(memberFunctionTuple, memberFunctions)) {
+        return NULL;
+    }
+    if (!unpackTupleToStringAndTypes(staticFunctionTuple, staticFunctions)) {
+        return NULL;
+    }
+    if (!unpackTupleToStringAndObjects(classMemberTuple, classMembers)) {
+        return NULL;
+    }
+    
+    std::map<std::string, const Function*> memberFuncs;
+    std::map<std::string, const Function*> staticFuncs;
+    
+    for (auto mf: memberFunctions) {
+        if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
+            PyErr_Format(PyExc_TypeError, "Class member %s is not a function.", mf.first.c_str());
             return NULL;
         }
-
-        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry,0));
-
-        if (memberNames.find(memberName) != memberNames.end()) {
-            PyErr_Format(PyExc_TypeError, "Cannot redefine Class member %s", memberName.c_str());
+        if (memberFuncs.find(mf.first) != memberFuncs.end()) {
+            PyErr_Format(PyExc_TypeError, "Class member %s repeated. This should have" 
+                                    " been compressed as an overload.", mf.first.c_str());
             return NULL;
         }
-
-        memberNames.insert(memberName);
-
-        members.push_back(
-            std::make_pair(
-                memberName,
-                unwrapTypeArgToTypePtr(PyTuple_GetItem(entry,1))
-                )
-            );
+        memberFuncs[mf.first] = (const Function*)mf.second;
     }
 
-    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(Class::Make(name, members));
+    for (auto mf: staticFunctions) {
+        if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
+            PyErr_Format(PyExc_TypeError, "Class member %s is not a function.", mf.first.c_str());
+            return NULL;
+        }
+        if (staticFuncs.find(mf.first) != staticFuncs.end()) {
+            PyErr_Format(PyExc_TypeError, "Class member %s repeated. This should have" 
+                                    " been compressed as an overload.", mf.first.c_str());
+            return NULL;
+        }
+        staticFuncs[mf.first] = (const Function*)mf.second;
+    }
+
+    std::map<std::string, PyObject*> clsMembers;
+
+    for (auto mf: classMembers) {
+        clsMembers[mf.first] = mf.second;
+    }
+
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(
+        Class::Make(name, members, memberFuncs, staticFuncs, clsMembers)
+        );
 
     Py_INCREF(typeObj);
     return typeObj;
@@ -2194,7 +2446,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     PyObject* a1 = PyTuple_GetItem(args, 0);
     PyObject* a2 = PyTuple_GetItem(args, 1);
 
-    const Type* serializeType = unwrapTypeArgToTypePtr(a1);
+    const Type* serializeType = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
         PyErr_Format(
@@ -2237,7 +2489,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     PyObject* a1 = PyTuple_GetItem(args, 0);
     PyObject* a2 = PyTuple_GetItem(args, 1);
 
-    const Type* serializeType = unwrapTypeArgToTypePtr(a1);
+    const Type* serializeType = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
         PyErr_SetString(PyExc_TypeError, "first argument to serialize must be a native type object");
@@ -2336,6 +2588,7 @@ static PyMethodDef module_methods[] = {
     {"Alternative", (PyCFunction)Alternative, METH_VARARGS | METH_KEYWORDS, NULL},
     {"Value", (PyCFunction)Value, METH_VARARGS, NULL},
     {"Class", (PyCFunction)Class, METH_VARARGS, NULL},
+    {"Function", (PyCFunction)MakeFunction, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {NULL, NULL}

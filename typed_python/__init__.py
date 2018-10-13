@@ -14,37 +14,8 @@
 
 __version__="0.2"
 
-import typed_python._types
-
+from typed_python.internals import Class, Function, Member
 from typed_python.hash import sha_hash
 from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
                                 Alternative, Value, serialize, deserialize, Int8, \
                                 Int16, Int32, UInt8, UInt32, UInt64, NoneType
-
-
-class ClassMetaNamespace:
-    def __init__(self):
-        self.ns = {}
-        self.order = []
-
-    def __getitem__(self, k):
-        return self.ns[k]
-
-    def __setitem__(self, k, v):
-        self.ns[k] = v
-        self.order.append((k,v))
-
-class ClassMetaclass(type):
-    @classmethod
-    def __prepare__(cls, *args, **kwargs):
-        return ClassMetaNamespace()
-
-    def __new__(cls, name, bases, namespace, **kwds):
-        if not bases:
-            return type.__new__(cls, name,bases, namespace.ns, **kwds)
-
-        return typed_python._types.Class(name, tuple(namespace.order))
-
-class Class(metaclass=ClassMetaclass):
-    """Base class for all typed python Class objects."""
-    pass

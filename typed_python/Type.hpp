@@ -36,6 +36,7 @@ class Alternative;
 class ConcreteAlternative;
 class PythonSubclass;
 class Class;
+class Function;
 class PackedArray;
 class Pointer;
 
@@ -230,6 +231,7 @@ public:
         catConcreteAlternative, //concrete Alternative subclass
         catPythonSubclass,
         catClass,
+        catFunction,
         catPackedArray,
         catPointer
     };
@@ -391,6 +393,8 @@ public:
                 return f(*(PythonSubclass*)this);
             case catClass:
                 return f(*(Class*)this);
+            case catFunction:
+                return f(*(Function*)this);
             case catPackedArray:
                 return f(*(PackedArray*)this);
             case catPointer:
@@ -2757,11 +2761,149 @@ public:
     }
 };
 
+class Function : public Type {
+public:
+    class FunctionArg {
+    public:
+        FunctionArg(std::string name, const Type* typeFilterOrNull, PyObject* defaultValue, bool isStarArg, bool isKwarg) : 
+            m_name(name),
+            m_typeFilter(typeFilterOrNull),
+            m_defaultValue(defaultValue),
+            m_isStarArg(isStarArg),
+            m_isKwarg(isKwarg)
+        {
+            assert(!(isStarArg && isKwarg));
+        }
+
+        std::string getName() const {
+            return m_name;
+        }
+
+        const Type* getTypeFilter() const {
+            return m_typeFilter;
+        }
+
+        bool getIsStarArg() const {
+            return m_isStarArg;
+        }
+
+        bool getIsKwarg() const {
+            return m_isKwarg;
+        }
+
+    private:
+        std::string m_name;
+        const Type* m_typeFilter;
+        PyObject* m_defaultValue;
+        bool m_isStarArg;
+        bool m_isKwarg;
+    };
+
+    class FunctionOverload {
+    public:
+        FunctionOverload(
+            PyFunctionObject* functionObj, 
+            const Type* returnType, 
+            const std::vector<FunctionArg>& args
+            ) : 
+                mFunctionObj(functionObj),
+                mReturnType(returnType),
+                mArgs(args)
+        {
+        }
+
+        PyFunctionObject* getFunctionObj() const {
+            return mFunctionObj;
+        }
+
+        const Type* getReturnType() const {
+            return mReturnType;
+        }
+
+        const std::vector<FunctionArg>& getArgs() const {
+            return mArgs;
+        }
+
+
+    private:
+        PyFunctionObject* mFunctionObj;
+        const Type* mReturnType;
+        std::vector<FunctionArg> mArgs;
+    };
+
+    Function(std::string inName, 
+            const std::vector<FunctionOverload>& overloads
+            ) :
+        Type(catFunction),
+        mOverloads(overloads)
+    {
+        m_name = inName;
+        m_is_default_constructible = true;
+        m_size = 0;
+    }
+
+    static Function* merge(const Function* f1, const Function* f2) {
+        std::vector<FunctionOverload> overloads(f1->mOverloads);
+        for (auto o: f2->mOverloads) {
+            overloads.push_back(o);
+        }
+        return new Function(f1->m_name, overloads);
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        return 0;
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << "<function " << m_name << ">";
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        Hash32Accumulator acc((int)getTypeCategory());
+
+        acc.addRegister((uint64_t)mPyFunc);
+
+        return acc.get();
+    }
+
+    void constructor(instance_ptr self) const {
+    }
+
+    void destroy(instance_ptr self) const {
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+    }
+
+private:
+    PyFunctionObject* mPyFunc;
+    std::vector<FunctionOverload> mOverloads;
+};
+
 class Class : public Type {
 public:
-    Class(std::string inName, const std::vector<std::pair<std::string, const Type*> >& members) : 
+    Class(std::string inName, 
+          const std::vector<std::pair<std::string, const Type*> >& members,
+          const std::map<std::string, const Function*>& memberFunctions,
+          const std::map<std::string, const Function*>& staticFunctions,
+          const std::map<std::string, PyObject*>& classMembers
+          ) : 
             Type(catClass),
-            m_members(members)
+            m_members(members),
+            m_memberFunctions(memberFunctions),
+            m_staticFunctions(staticFunctions),
+            m_classMembers(classMembers)
     {
         m_name = inName;
 
@@ -2776,6 +2918,17 @@ public:
                 m_is_default_constructible = false;
             }
         }
+    }
+
+    static Class* Make(
+            std::string inName, 
+            const std::vector<std::pair<std::string, const Type*> >& members,
+            const std::map<std::string, const Function*>& memberFunctions,
+            const std::map<std::string, const Function*>& staticFunctions,
+            const std::map<std::string, PyObject*>& classMembers
+            )
+    {
+        return new Class(inName, members, memberFunctions, staticFunctions, classMembers);
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
@@ -2882,28 +3035,21 @@ public:
     const std::vector<std::pair<std::string, const Type*> >& getMembers() const {
         return m_members;
     }
-    const std::vector<size_t>& getOffsets() const {
-        return m_byte_offsets;
+
+    const std::map<std::string, const Function*>& getMemberFunctions() const {
+        return m_memberFunctions;
     }
 
-    static Class* Make(std::string name, const std::vector<std::pair<std::string, const Type*> >& members) {
-        static std::mutex guard;
+    const std::map<std::string, const Function*>& getStaticFunctions() const {
+        return m_staticFunctions;
+    }
 
-        std::lock_guard<std::mutex> lock(guard);
-
-        typedef std::pair<std::string, std::vector<std::pair<std::string, const Type*> > > keytype;
-
-        static std::map<keytype, Class*> m;
-
-        auto it = m.find(std::make_pair(name, members));
-
-        if (it == m.end()) {
-            it = m.insert(
-                std::make_pair(std::make_pair(name, members), new Class(name, members))
-                ).first;
-        }
-
-        return it->second;
+    const std::map<std::string, PyObject*>& getClassMembers() const {
+        return m_classMembers;
+    }
+    
+    const std::vector<size_t>& getOffsets() const {
+        return m_byte_offsets;
     }
 
     int memberNamed(const char* c) const {
@@ -2915,11 +3061,15 @@ public:
 
         return -1;
     }
-    
+
 private:
     std::vector<size_t> m_byte_offsets;
 
     std::vector<std::pair<std::string, const Type*> > m_members;
+
+    std::map<std::string, const Function*> m_memberFunctions;
+    std::map<std::string, const Function*> m_staticFunctions;
+    std::map<std::string, PyObject*> m_classMembers;
 };
 
 class PackedArray : public Type {

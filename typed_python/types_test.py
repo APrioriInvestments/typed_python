@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class
+    ConstDict, Alternative, serialize, deserialize, Value, Class, Member
 
 import typed_python._types as _types
 
@@ -820,12 +820,18 @@ class NativeTypesTests(unittest.TestCase):
     def test_class(self):
         with self.assertRaises(TypeError):
             class A(Class):
-                x = (1,2,3)
+                x = Member((1,2,3))
 
         class A(Class):
-            x = int
+            x = Member(int)
+
+            y = int #not a member. Just a value.
+
+            def f(self):
+                return 10
 
         self.assertEqual(A.bytecount(), 8)
+        self.assertTrue(A.y is int)
 
         a = A()
 
