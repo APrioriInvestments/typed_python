@@ -182,6 +182,17 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(O(X.V(a=10)), X.V(a=10))
 
+    def test_one_of_py_subclass(self):
+        class X(NamedTuple(x=int)):
+            def f(self):
+                return self.x
+
+        O = OneOf(None, X)
+
+        self.assertEqual(NamedTuple(x=int)(x=10).x, 10)
+        self.assertEqual(X(x=10).f(), 10)
+        self.assertEqual(O(X(x=10)).f(), 10)
+
     def test_tuple_of_tuple_of(self):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)

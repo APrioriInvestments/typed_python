@@ -147,8 +147,9 @@ struct native_instance_wrapper {
         }
 
         const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
         if (argType) {
-            return argType == t || argType->getBaseType() == t;
+            return argType == t || argType->getBaseType() == t || argType == t->getBaseType();
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catNamedTuple || 
@@ -193,7 +194,7 @@ struct native_instance_wrapper {
     static void copy_initialize(const Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
         const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-        if ((argType && argType->getBaseType() == eltType) || argType == eltType) {
+        if (argType && (argType->getBaseType() == eltType || argType == eltType || argType == eltType->getBaseType())) {
             //it's already the right kind of instance
             eltType->copy_constructor(tgt, ((native_instance_wrapper*)pyRepresentation)->data);
             return;
@@ -231,7 +232,8 @@ struct native_instance_wrapper {
                         copy_initialize(subtype, tgt+1, pyRepresentation);
                         *(uint8_t*)tgt = k;
                         return;
-                    } catch(...) {}
+                    } catch(...) {
+                    }
                 }
             }
 
