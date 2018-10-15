@@ -101,6 +101,7 @@ class ActiveWebService(ServiceBase):
         self.app.route('/content/<path:path>')(self.sendContent)
         self.app.route('/services')(self.sendPage)
         self.app.route('/services/<path:path>')(self.sendPage)
+        self.app.route('/service_instances/<path:path>')(self.sendPage)
         self.sockets.route("/socket/<path:path>")(self.mainSocket)
 
     def sendPage(self, path=None):
@@ -115,7 +116,7 @@ class ActiveWebService(ServiceBase):
         serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
 
         return Grid(
-            colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
+            colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Logs', 'Cores', 'RAM', 'Boot Status'],
             rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
             headerFun=lambda x: x,
             rowLabelFun=None,
@@ -126,6 +127,10 @@ class ActiveWebService(ServiceBase):
                 s.service_class_name if field == 'Class' else 
                 s.placement if field == 'Placement' else 
                 Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
+                Dropdown("", [(si._identity + " on " + si.host.hostname, "/service_instances/" + si._identity)
+                            for si in service_schema.ServiceInstance.lookupAll(service=s)
+                            ]) 
+                        if field == 'Logs' else 
                 Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
                         if field == 'TargetCount' else 
                 str(s.coresUsed) if field == 'Cores' else 
@@ -151,6 +156,38 @@ class ActiveWebService(ServiceBase):
                 ""
                 ),
             enableDatatable=True
+            )
+
+    def pageForServiceInstance(self, serviceInstanceObj):
+        logSubscription = Slot()
+
+        def update():
+            if logSubscription.get() and not isinstance(logSubscription.get(), str):
+                logSubscription.get().delete()
+
+            sub = service_schema.LogRequest(
+                serviceInstance=serviceInstanceObj, 
+                host=serviceInstanceObj.host,
+                maxBytes = 100 * 1024,
+                timestamp = time.time()
+                )
+
+            logSubscription.set(sub)
+
+        def readLogSubscription():
+            if logSubscription.get() is None:
+                return ""
+            if isinstance(logSubscription.get(), str):
+                return Code(logSubscription.get())
+            else:
+                if logSubscription.get().response is not None:
+                    logSubscription.set(logSubscription.get().response.data)
+                    return Code(logSubscription.get())
+                return ""
+
+        return Card(
+            Button(Octicon("sync"), update) + 
+            Subscribed(readLogSubscription)
             )
 
     def pathToDisplay(self, path, queryArgs):
@@ -185,6 +222,11 @@ class ActiveWebService(ServiceBase):
             instance = typeObj.fromIdentity(path[3])
 
             return serviceInst.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
+
+        if len(path) == 2 and path[0] == "service_instances":
+            serviceInstanceObj = service_schema.ServiceInstance.fromIdentity(path[1])
+
+            return self.pageForServiceInstance(serviceInstanceObj)
 
         return Traceback("Invalid url path: %s" % path)
 

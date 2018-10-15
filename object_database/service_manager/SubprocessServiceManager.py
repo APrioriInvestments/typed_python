@@ -152,6 +152,24 @@ class SubprocessServiceManager(ServiceManager):
 
         self.cleanupOldLogfiles()
 
+    def extractLogData(self, targetInstanceId, maxBytes):
+        if self.logfileDirectory:
+            with self.lock:
+                for file in os.listdir(self.logfileDirectory):
+                    instanceId = parseLogfileToInstanceid(file)
+                    if instanceId and instanceId == targetInstanceId:
+                        fpath = os.path.join(self.logfileDirectory, file)
+                        with open(fpath, "r") as f:
+                            f.seek(0, 2)
+                            curPos = f.tell()
+                            f.seek(max(curPos-maxBytes,0))
+
+                            return f.read()
+
+        return "<logfile not found>"
+
+
+
     def cleanupOldLogfiles(self):
         if self.logfileDirectory:
             with self.lock:

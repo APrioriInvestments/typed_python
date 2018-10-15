@@ -156,6 +156,21 @@ class Codebase:
             return codebase_cache[self.hash, service_module_name]
 
 @service_schema.define
+@SubscribeLazilyByDefault
+class LogResponse:
+    data = str
+
+@service_schema.define
+class LogRequest:
+    host = Indexed(service_schema.ServiceHost)
+    serviceInstance = service_schema.ServiceInstance
+    maxBytes = int
+    
+    response = OneOf(None, service_schema.LogResponse)
+    timestamp = float #so we can clean up old requests that timed out
+
+
+@service_schema.define
 class ServiceHost:
     connection = Indexed(core_schema.Connection)
     isMaster = bool
