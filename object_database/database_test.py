@@ -1218,6 +1218,7 @@ class ObjectDatabaseTests:
             #each database sees two transactions each pass
             for i in range(len(dbs)):
                 self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
+                
 
 class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):

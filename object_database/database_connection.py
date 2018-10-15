@@ -100,6 +100,11 @@ class VersionedValue(VersionedBase):
         self.version_numbers.pop(0)
         self.values.pop(0)
 
+        if not self.version_numbers and self.tailValue is None:
+            return True
+        
+        print(self.tailValue)
+
 class VersionedSet(VersionedBase):
     #values in sets are always strings
     def __init__(self, tailValue):
@@ -137,6 +142,8 @@ class VersionedSet(VersionedBase):
         self.adds.pop(0)
         self.removes.pop(0)
 
+        print(self.tailValue)
+
     def valueForVersion(self, version):
         ix = self._best_version_offset_for(version)
         if ix is None:
@@ -171,6 +178,120 @@ class SetWithEdits:
         for a in self.s:
             if a not in removed and a not in toAvoid:
                 return a
+
+class ManyVersionedObjects:
+    def __init__(self):
+        #for each version number we have outstanding
+        self._version_number_counts = {}
+
+        self._min_reffed_version_number = None
+
+        #for each version number, the set of keys that are set with it
+        self._version_number_objects = {}
+
+        #for each key, a VersionedValue or VersionedSet
+        self._versioned_objects = {}
+
+    def versionIncref(self, version_number):
+        if version_number not in self._version_number_counts:
+            self._version_number_counts[version_number] = 1
+            
+            if self._min_reffed_version_number is None:
+                self._min_reffed_version_number = version_number
+            else:
+                self._min_reffed_version_number = min(version_number, self._min_reffed_version_number)
+        else:
+            self._version_number_counts[version_number] += 1
+
+    def versionDecref(self, version_number):
+        assert version_number in self._version_number_counts
+
+        self._version_number_counts[version_number] -= 1
+
+        assert self._version_number_counts[version_number] >= 0
+
+        if self._version_number_counts[version_number] == 0:
+            del self._version_number_counts[version_number]
+
+            if version_number == self._min_reffed_version_number:
+                if not self._version_number_counts:
+                    self._min_reffed_version_number = None
+                else:
+                    self._min_reffed_version_number = min(self._version_number_counts)
+
+    def setForVersion(self, key, version_number):
+        if key in self._versioned_objects:
+            return self._versioned_objects[key].valueForVersion(version_number)
+        
+        return SetWithEdits(set(),set(),set())
+
+    def hasValueForVersion(self, key, version_number):
+        return key in self._versioned_objects
+
+    def valueForVersion(self, key, version_number):
+        return self._versioned_objects[key].valueForVersion(version_number)
+
+    def setVersionedValue(self, key, version_number, json_val):
+        if key not in self._versioned_objects:
+            self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
+
+        versioned = self._versioned_objects[key]
+
+        initialValue = versioned.newestValue()
+
+        versioned.setVersionedValue(version_number, JsonWithPyRep(json_val, {}))
+
+        return initialValue
+
+    def setVersionedAddsAndRemoves(self, key, version_number, adds, removes):
+        if key not in self._versioned_objects:
+            self._versioned_objects[key] = VersionedSet(set())
+        if adds or removes:
+            self._versioned_objects[key].setVersionedAddsAndRemoves(version_number, adds, removes)
+
+    def setVersionedTailValueStringified(self, key, stringifiedVal):
+        if key not in self._versioned_objects:
+            self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}, stringifiedVal))
+
+    def setVersionedValueStringified(self, key, version_number, stringifiedVal):
+        if key not in self._versioned_objects:
+            self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
+        self._versioned_objects[key].setVersionedValue(
+            version_number,
+            JsonWithPyRep(
+                None,
+                {},
+                stringifiedVal
+                )
+            )
+
+    def updateVersionedAdds(self, key, version_number, adds):
+        if key not in self._versioned_objects:
+            self._versioned_objects[key] = VersionedSet(set())
+            self._versioned_objects[key].setVersionedAddsAndRemoves(version_number, adds, set())
+        else:
+            self._versioned_objects[key].updateVersionedAdds(version_number, adds)
+
+    def cleanup(self):
+        """Get rid of old objects we don't need to keep around and increase the min_transaction_id"""
+        return
+
+        while True:
+            self._version_number_objects
+            if self._min_reffed_version_number is not None and self._min_reffed_version_number < lowest:
+                #some transactions still refer to values before this version
+                return
+
+            self._version_numbers.pop(0)
+
+            keys_touched = self._version_number_objects[lowest]
+            del self._version_number_objects[lowest]
+
+            for key in keys_touched:
+                if self._versioned_objects[key].cleanup(lowest):
+                    del self._versioned_objects[key]
+
+        
 
 class TransactionListener:
     def __init__(self, db, handler):
@@ -244,22 +365,9 @@ class DatabaseConnection:
         #transaction of what's in the KV store
         self._cur_transaction_num = 0
 
-        #minimum transaction we can deal with. This gets set when we initialize our connection.
-        self._min_transaction_num = 0
-
-        #for each version number in _version_numbers, how many views referring to it
-        self._version_number_counts = {}
-        self._min_reffed_version_number = None
-
-        #list of outstanding version numbers in increasing order where we have writes
-        #_min_transaction_num is the minimum of these and the current transaction
-        self._version_numbers = []
-
-        #for each version number, a set of keys that were set
-        self._version_number_objects = {}
-
-        #for each key, a VersionedValue or VersionedSet
-        self._versioned_objects = {}
+        #a datastructure that keeps track of all the different versions of the objects
+        #we have mapped in.
+        self._versioned_data = ManyVersionedObjects()
 
         #a map from lazy object id to (schema, typename)
         self._lazy_objects = {}
@@ -486,39 +594,12 @@ class DatabaseConnection:
                 transaction_id = self._cur_transaction_num
 
             assert transaction_id <= self._cur_transaction_num
-            assert transaction_id >= self._min_transaction_num, transaction_id
-
+            
             view = View(self, transaction_id)
 
-            self._incversion(transaction_id)
+            self._versioned_data.versionIncref(transaction_id)
 
             return view
-
-    def _incversion(self, transaction_id):
-        if transaction_id not in self._version_number_counts:
-            self._version_number_counts[transaction_id] = 1
-            if self._min_reffed_version_number is None:
-                self._min_reffed_version_number = transaction_id
-            else:
-                self._min_reffed_version_number = min(transaction_id, self._min_reffed_version_number)
-        else:
-            self._version_number_counts[transaction_id] += 1
-
-    def _decversion(self, transaction_id):
-        assert transaction_id in self._version_number_counts
-
-        self._version_number_counts[transaction_id] -= 1
-
-        assert self._version_number_counts[transaction_id] >= 0
-
-        if self._version_number_counts[transaction_id] == 0:
-            del self._version_number_counts[transaction_id]
-
-            if transaction_id == self._min_reffed_version_number:
-                if not self._version_number_counts:
-                    self._min_reffed_version_number = None
-                else:
-                    self._min_reffed_version_number = min(self._version_number_counts)
 
     def transaction(self):
         """Only one transaction may be committed on the current transaction number."""
@@ -530,41 +611,13 @@ class DatabaseConnection:
 
             transaction_id = self._cur_transaction_num
 
-            self._incversion(transaction_id)
+            self._versioned_data.versionIncref(transaction_id)
 
             return view
 
     def _releaseView(self, view):
-        transaction_id = view._transaction_num
-
         with self._lock:
-            self._decversion(transaction_id)
-
-            self._cleanup()
-
-    def _cleanup(self):
-        """Get rid of old objects we don't need to keep around and increase the min_transaction_id"""
-        while True:
-            if not self._version_numbers:
-                #nothing to cleanup because we have no transactions
-                return
-
-            #this is the lowest write we have in the in-mem database
-            lowest = self._version_numbers[0]
-
-            if self._min_reffed_version_number is not None and self._min_reffed_version_number < lowest:
-                #some transactions still refer to values before this version
-                return
-
-            self._version_numbers.pop(0)
-
-            keys_touched = self._version_number_objects[lowest]
-            del self._version_number_objects[lowest]
-
-            self._min_transaction_num = lowest
-
-            for key in keys_touched:
-                self._versioned_objects[key].cleanup(lowest)
+            self._versioned_data.versionDecref(view._transaction_num)
 
     def isSubscribedToObject(self, object):
         return not self._suppressKey(object._identity)
@@ -628,7 +681,7 @@ class DatabaseConnection:
                 else:
                     e.set()
             elif msg.matches.Initialize:
-                self._min_transaction_num = self._cur_transaction_num = msg.transaction_num
+                self._cur_transaction_num = msg.transaction_num
                 self.identityProducer = IdentityProducer(msg.identity_root)
                 self.connectionObject = core_schema.Connection.fromIdentity(msg.connIdentity)
                 self.initialized.set()
@@ -657,28 +710,16 @@ class DatabaseConnection:
 
                         key_value[k] = json_val
 
-                        if k not in self._versioned_objects:
-                            self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, {}))
-
-                        versioned = self._versioned_objects[k]
-
-                        priors[k] = versioned.newestValue()
-
-                        versioned.setVersionedValue(msg.transaction_id, JsonWithPyRep(json_val, {}))
+                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id, json_val)
 
                 for k,a in set_adds.items():
-                    if k not in self._versioned_objects:
-                        self._versioned_objects[k] = VersionedSet(set())
                     a = self._suppressIdentities(k, set(a))
-                    if a:
-                        self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, a, set())
+                    
+                    self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, a, set())
 
                 for k,r in set_removes.items():
-                    if k not in self._versioned_objects:
-                        self._versioned_objects[k] = VersionedSet(set())
                     r = self._suppressIdentities(k, set(r))
-                    if r:
-                        self._versioned_objects[k].setVersionedAddsAndRemoves(msg.transaction_id, set(), r)
+                    self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, set(), r)
 
                 self._cur_transaction_num = msg.transaction_id
 
@@ -692,7 +733,8 @@ class DatabaseConnection:
                             traceback.format_exc()
                             )
 
-                self._cleanup()
+                self._versioned_data.cleanup()
+
             elif msg.matches.SubscriptionIncrease:
                 subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
                 if subscribedIdentities is not Everything:
@@ -716,12 +758,10 @@ class DatabaseConnection:
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
             elif msg.matches.LazyTransactionPriors:
                 for k,v in msg.writes.items():
-                    if k not in self._versioned_objects:
-                        self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, {}, v))
+                    self._versioned_data.setVersionedTailValueStringified(k,v)
             elif msg.matches.LazyLoadResponse:
                 for k,v in msg.values.items():
-                    if k not in self._versioned_objects:
-                        self._versioned_objects[k] = VersionedValue(JsonWithPyRep(None, {}, v))
+                    self._versioned_data.setVersionedTailValueStringified(k,v)
 
                 self._lazy_objects.pop(msg.identity, None)
 
@@ -778,7 +818,6 @@ class DatabaseConnection:
                 #this is a fault injection to allow us to verify that heartbeating during this
                 #function will keep the server connection alive.
                 for _ in range(self._largeSubscriptionHeartbeatDelay):
-                    #print("Waiting for %s seconds because of _largeSubscriptionHeartbeatDelay" % heartbeatInterval)
                     self._channel.sendMessage(
                         ClientToServer.Heartbeat()
                         )
@@ -798,16 +837,8 @@ class DatabaseConnection:
                         self._lazy_objects[i] = schema_and_typename
 
                 for key, val in values.items():
-                    if key not in self._versioned_objects:
-                        self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
-                        self._versioned_objects[key].setVersionedValue(
-                            msg.tid,
-                            JsonWithPyRep(
-                                None,
-                                {},
-                                val
-                                )
-                            )
+                    self._versioned_data.setVersionedValueStringified(key, msg.tid, val)
+
                     #this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:
                         #note that this needs to be 'sendMessage' which sends immediately,
@@ -818,11 +849,7 @@ class DatabaseConnection:
                         t0 = time.time()
 
                 for key, setval in sets.items():
-                    if key not in self._versioned_objects:
-                        self._versioned_objects[key] = VersionedSet(set())
-                        self._versioned_objects[key].setVersionedAddsAndRemoves(msg.tid, set(setval), set())
-                    else:
-                        self._versioned_objects[key].updateVersionedAdds(msg.tid, set(setval))
+                    self._versioned_data.updateVersionedAdds(key, msg.tid, set(setval))
 
                     #this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:
@@ -871,23 +898,16 @@ class DatabaseConnection:
         return setAdds
 
     def _get_versioned_set_data(self, key, transaction_id):
-        assert transaction_id >= self._min_transaction_num, (transaction_id, self._min_transaction_num)
-
         with self._lock:
-            if key in self._versioned_objects:
-                return self._versioned_objects[key].valueForVersion(transaction_id)
-            
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
-            return SetWithEdits(set(),set(),set())
+            return self._versioned_data.setForVersion(key, transaction_id)
 
     def _get_versioned_object_data(self, key, transaction_id):
-        assert transaction_id >= self._min_transaction_num
-
         with self._lock:
-            if key in self._versioned_objects:
-                return self._versioned_objects[key].valueForVersion(transaction_id)
+            if self._versioned_data.hasValueForVersion(key, transaction_id):
+                return self._versioned_data.valueForVersion(key, transaction_id)
             
             if self.disconnected.is_set():
                 raise DisconnectedException()
@@ -904,8 +924,8 @@ class DatabaseConnection:
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
-            if key in self._versioned_objects:
-                return self._versioned_objects[key].valueForVersion(transaction_id)
+            if self._versioned_data.hasValueForVersion(key, transaction_id):
+                return self._versioned_data.valueForVersion(key, transaction_id)
 
             return None
 
