@@ -166,6 +166,10 @@ class ServiceHost:
     gbRamUsed = float
     coresUsed = float
 
+    cpuUse = float
+    actualMemoryUseGB = float
+    statsLastUpdateTime = float
+
 @service_schema.define
 class Service:
     name = Indexed(str)

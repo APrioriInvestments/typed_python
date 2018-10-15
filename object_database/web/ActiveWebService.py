@@ -135,7 +135,7 @@ class ActiveWebService(ServiceBase):
                 ),
             enableDatatable=True
             ) + Grid(
-            colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT'],
+            colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
             rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
             headerFun=lambda x: x,
             rowLabelFun=None,
@@ -143,9 +143,11 @@ class ActiveWebService(ServiceBase):
                 s.connection._identity if field == "Connection" else
                 str(s.isMaster) if field == "IsMaster" else
                 s.hostname if field == "Hostname" else
-                "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM USAGE" else
-                "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE USAGE" else
+                "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM ALLOCATION" else
+                "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE ALLOCATION" else
                 str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
+                "%2.1f" % (s.cpuUse * 100) + "%" if field == "CPU USE" else
+                ("%2.1f" % s.actualMemoryUseGB) + " GB" if field == "RAM USE" else
                 ""
                 ),
             enableDatatable=True

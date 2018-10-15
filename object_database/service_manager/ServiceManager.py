@@ -17,6 +17,7 @@ from object_database.view import revisionConflictRetry
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceManagerSchema import service_schema
 
+import psutil
 import logging
 import traceback
 import threading
@@ -140,6 +141,8 @@ class ServiceManager(object):
         logging.info("ServiceManager starting work loop.")
 
         while not self.shouldStop.is_set():
+            self.updateServiceHostStats()
+
             #redeploy our own services
             self.redeployServicesIfNecessary()
 
@@ -167,6 +170,11 @@ class ServiceManager(object):
 
             time.sleep(self.SLEEP_INTERVAL)
 
+    def updateServiceHostStats(self):
+        with self.db.transaction():
+            self.serviceHostObject.cpuUse = psutil.cpu_percent() / 100.0
+            self.serviceHostObject.actualMemoryUseGB = psutil.virtual_memory().used / 1024**3
+            self.serviceHostObject.statsLastUpdateTime = time.time()
     
     @revisionConflictRetry
     def collectDeadHosts(self):
