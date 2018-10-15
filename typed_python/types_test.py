@@ -440,10 +440,12 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(a.get('asdf'),None)
         self.assertEqual(a.get('asdf',20),20)
 
-    def test_const_dict_items(self):
+    def test_const_dict_items_keys_and_values(self):
         a = ConstDict(str,str)({'a':'b','c':'d'})
 
         self.assertEqual(sorted(a.items()), [('a','b'),('c','d')])
+        self.assertEqual(sorted(a.keys()), ['a','c'])
+        self.assertEqual(sorted(a.values()), ['b','d'])
 
     def test_empty_string(self):
         a = ConstDict(str,str)({'a':''})

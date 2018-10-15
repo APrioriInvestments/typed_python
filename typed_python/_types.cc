@@ -22,7 +22,7 @@ struct native_instance_wrapper {
   
     bool mIsInitialized;
     bool mIsMatcher; //-1 if we're not an iterator
-    bool mIteratorIsPairs;
+    char mIteratorFlag; //0 is keys, 1 is values, 2 is pairs
     int64_t mIteratorOffset; //-1 if we're not an iterator
     uint8_t data[0];
 
@@ -39,7 +39,47 @@ struct native_instance_wrapper {
             native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
             self->mIteratorOffset = 0;
-            self->mIteratorIsPairs = 1;
+            self->mIteratorFlag = 2;
+            self_type->copy_constructor(self->data, w->data);
+            self->mIsInitialized = true;
+            self->mIsMatcher = false;
+
+            return (PyObject*)self;
+        }
+
+        PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
+        return NULL;
+    }
+
+    static PyObject* constDictKeys(PyObject *o) {
+        const Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
+
+            self->mIteratorOffset = 0;
+            self->mIteratorFlag = 0;
+            self_type->copy_constructor(self->data, w->data);
+            self->mIsInitialized = true;
+            self->mIsMatcher = false;
+
+            return (PyObject*)self;
+        }
+
+        PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
+        return NULL;
+    }
+
+    static PyObject* constDictValues(PyObject *o) {
+        const Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
+
+            self->mIteratorOffset = 0;
+            self->mIteratorFlag = 1;
             self_type->copy_constructor(self->data, w->data);
             self->mIsInitialized = true;
             self->mIsMatcher = false;
@@ -112,9 +152,11 @@ struct native_instance_wrapper {
 
     static PyMethodDef* typeMethods(const Type* t) {
         if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
-            return new PyMethodDef [4] {
+            return new PyMethodDef [5] {
                 {"get", (PyCFunction)native_instance_wrapper::constDictGet, METH_VARARGS, NULL},
                 {"items", (PyCFunction)native_instance_wrapper::constDictItems, METH_NOARGS, NULL},
+                {"keys", (PyCFunction)native_instance_wrapper::constDictKeys, METH_NOARGS, NULL},
+                {"values", (PyCFunction)native_instance_wrapper::constDictValues, METH_NOARGS, NULL},
                 {NULL, NULL}
             };
         }
@@ -1663,7 +1705,7 @@ struct native_instance_wrapper {
             native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
             self->mIteratorOffset = 0;
-            self->mIteratorIsPairs = w->mIteratorIsPairs;
+            self->mIteratorFlag = w->mIteratorFlag;
             self_type->copy_constructor(self->data, w->data);
             self->mIsInitialized = true;
             self->mIsMatcher = false;
@@ -1691,7 +1733,7 @@ struct native_instance_wrapper {
 
         w->mIteratorOffset++;
 
-        if (w->mIteratorIsPairs) {
+        if (w->mIteratorFlag == 2) {
             auto t1 = extractPythonObject(
                     dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), 
                     dict_t->keyType()
@@ -1707,6 +1749,11 @@ struct native_instance_wrapper {
             Py_DECREF(t2);
 
             return res;
+        } else if (w->mIteratorFlag == 1) {
+            return extractPythonObject(
+                dict_t->kvPairPtrValue(w->data, w->mIteratorOffset-1), 
+                dict_t->valueType()
+                );
         } else {
             return extractPythonObject(
                 dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), 
