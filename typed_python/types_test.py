@@ -176,6 +176,12 @@ class NativeTypesTests(unittest.TestCase):
         for x in range(10):
             self.assertEqual(tuple(tupleOfInt(tuple(range(x)))), tuple(range(x)))
 
+    def test_one_of_alternative(self):
+        X = Alternative("X", V={'a': int})
+        O = OneOf(None, X)
+
+        self.assertEqual(O(X.V(a=10)), X.V(a=10))
+
     def test_tuple_of_tuple_of(self):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)

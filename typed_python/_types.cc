@@ -148,7 +148,7 @@ struct native_instance_wrapper {
 
         const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
         if (argType) {
-            return argType == t || argType == t->getBaseType();
+            return argType == t || argType->getBaseType() == t;
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catNamedTuple || 
