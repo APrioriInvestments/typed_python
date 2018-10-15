@@ -73,12 +73,9 @@ class VersionedBase:
             return self.valueForVersion(None)
 
 class VersionedValue(VersionedBase):
-    def __init__(self, tailValue):
+    def __init__(self):
         self.version_numbers = []
         self.values = []
-
-        #the value for the lowest possible revision
-        self.tailValue = tailValue
 
     def setVersionedValue(self, version_number, val):
         assert isinstance(val, JsonWithPyRep), val
@@ -90,29 +87,40 @@ class VersionedValue(VersionedBase):
         i = self._best_version_offset_for(version)
 
         if i is None:
-            return self.tailValue
+            return None
+
         return self.values[i]
 
+    def needsToTrack(self):
+        return len(self.version_numbers) != 1 or self.values[0].jsonRep is None
+
     def cleanup(self, version_number):
-        assert self.version_numbers[0] == version_number
-
-        self.tailValue = self.values[0]
-        self.version_numbers.pop(0)
-        self.values.pop(0)
-
-        if not self.version_numbers and self.tailValue is None:
+        if not self.values:
             return True
-        
-        print(self.tailValue)
+
+        while self.values and self.version_numbers[0] < version_number:
+            if len(self.values) == 1:
+                if self.values[0].jsonRep is None:
+                    #this value was deleted and we can just remove this whole entry
+                    return True
+                else:
+                    self.version_numbers[0] = version_number
+            else:
+                if self.version_numbers[1] <= version_number:
+                    self.values.pop(0)
+                    self.version_numbers.pop(0)
+                else:
+                    self.version_numbers[0] = version_number
+
+    def __repr__(self):
+        return "VersionedValue(ids=%s,jsons=%s)" % (self.version_numbers, [x.jsonRep for x in self.values])
 
 class VersionedSet(VersionedBase):
     #values in sets are always strings
-    def __init__(self, tailValue):
+    def __init__(self):
         self.version_numbers = []
         self.adds = []
         self.removes = []
-
-        self.tailValue = tailValue
 
     def setVersionedAddsAndRemoves(self, version, adds, removes):
         assert not adds or not removes
@@ -120,9 +128,18 @@ class VersionedSet(VersionedBase):
         assert isinstance(adds, set)
         assert isinstance(removes, set)
 
+        if not self.version_numbers:
+            if removes:
+                adds = set(adds)
+                adds.difference_update(removes)
+                removes = set()
+
         self.adds.append(adds)
         self.removes.append(removes)
         self.version_numbers.append(version)
+
+    def needsToTrack(self):
+        return len(self.version_numbers) != 1 or not (len(self.adds[0]) or len(self.removes[0]))
 
     def updateVersionedAdds(self, version, adds):
         if not self.version_numbers or self.version_numbers[-1] != version:
@@ -132,26 +149,45 @@ class VersionedSet(VersionedBase):
             self.adds[-1].update(adds)
 
     def cleanup(self, version_number):
-        assert self.version_numbers[0] == version_numbers
+        if not self.version_numbers:
+            return True
 
-        self.tailValue.update(self.adds[0])
-        self.tailValue.difference_update(self.removes[0])
+        while self.version_numbers and self.version_numbers[0] < version_number:
+            if len(self.version_numbers) == 1:
+                if not self.adds[0] and not self.removes[0]:
+                    #this value was deleted and we can just remove this whole entry
+                    return True
+                else:
+                    self.version_numbers[0] = version_number
+            else:
+                if self.version_numbers[1] <= version_number:
+                    #merge slot 0 into slot 1
+                    #the new set should have no removes, and only adds
+                    assert not self.removes[0], (self.adds[0], self.removes[0])
 
-        self.version_numbers.pop(0)
-        self.values.pop(0)
-        self.adds.pop(0)
-        self.removes.pop(0)
+                    new_set = self.adds[0]
+                    new_set.update(self.adds[1])
+                    new_set.difference_update(self.removes[1])
 
-        print(self.tailValue)
+                    self.adds.pop(0)
+                    self.removes.pop(0)
+                    self.version_numbers.pop(0)
+
+                    self.adds[0] = new_set
+                    self.removes[0] = set()
+                else:
+                    self.version_numbers[0] = version_number
 
     def valueForVersion(self, version):
         ix = self._best_version_offset_for(version)
-        if ix is None:
-            ix = 0
-        else:
-            ix += 1
 
-        return SetWithEdits(self.tailValue, self.adds[:ix], self.removes[:ix])
+        if ix is None:
+            return None
+
+        return SetWithEdits(set(), self.adds[:ix+1], self.removes[:ix+1])
+
+    def __repr__(self):
+        return "VersionedSet(ids=%s, adds=%s, removes=%s)" % (self.version_numbers, self.adds, self.removes)
 
 class SetWithEdits:
     def __init__(self, s, adds, removes):
@@ -182,7 +218,7 @@ class SetWithEdits:
 class ManyVersionedObjects:
     def __init__(self):
         #for each version number we have outstanding
-        self._version_number_counts = {}
+        self._version_number_refcount = {}
 
         self._min_reffed_version_number = None
 
@@ -192,32 +228,35 @@ class ManyVersionedObjects:
         #for each key, a VersionedValue or VersionedSet
         self._versioned_objects = {}
 
+    def keycount(self):
+        return len(self._versioned_objects)
+
     def versionIncref(self, version_number):
-        if version_number not in self._version_number_counts:
-            self._version_number_counts[version_number] = 1
+        if version_number not in self._version_number_refcount:
+            self._version_number_refcount[version_number] = 1
             
             if self._min_reffed_version_number is None:
                 self._min_reffed_version_number = version_number
             else:
                 self._min_reffed_version_number = min(version_number, self._min_reffed_version_number)
         else:
-            self._version_number_counts[version_number] += 1
+            self._version_number_refcount[version_number] += 1
 
     def versionDecref(self, version_number):
-        assert version_number in self._version_number_counts
+        assert version_number in self._version_number_refcount
 
-        self._version_number_counts[version_number] -= 1
+        self._version_number_refcount[version_number] -= 1
 
-        assert self._version_number_counts[version_number] >= 0
+        assert self._version_number_refcount[version_number] >= 0
 
-        if self._version_number_counts[version_number] == 0:
-            del self._version_number_counts[version_number]
+        if self._version_number_refcount[version_number] == 0:
+            del self._version_number_refcount[version_number]
 
             if version_number == self._min_reffed_version_number:
-                if not self._version_number_counts:
+                if not self._version_number_refcount:
                     self._min_reffed_version_number = None
                 else:
-                    self._min_reffed_version_number = min(self._version_number_counts)
+                    self._min_reffed_version_number = min(self._version_number_refcount)
 
     def setForVersion(self, key, version_number):
         if key in self._versioned_objects:
@@ -231,9 +270,17 @@ class ManyVersionedObjects:
     def valueForVersion(self, key, version_number):
         return self._versioned_objects[key].valueForVersion(version_number)
 
+    def _object_has_version(self, key, version_number):
+        if version_number not in self._version_number_objects:
+            self._version_number_objects[version_number] = set()
+
+        self._version_number_objects[version_number].add(key)
+
     def setVersionedValue(self, key, version_number, json_val):
+        self._object_has_version(key, version_number)
+
         if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
+            self._versioned_objects[key] = VersionedValue()
 
         versioned = self._versioned_objects[key]
 
@@ -244,18 +291,26 @@ class ManyVersionedObjects:
         return initialValue
 
     def setVersionedAddsAndRemoves(self, key, version_number, adds, removes):
+        self._object_has_version(key, version_number)
+
         if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedSet(set())
+            self._versioned_objects[key] = VersionedSet()
+        
         if adds or removes:
             self._versioned_objects[key].setVersionedAddsAndRemoves(version_number, adds, removes)
 
     def setVersionedTailValueStringified(self, key, stringifiedVal):
         if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}, stringifiedVal))
+            self._object_has_version(key, -1)
+            self._versioned_objects[key] = VersionedValue()
+            self._versioned_objects[key].setVersionedValue(-1, JsonWithPyRep(None, {}, stringifiedVal))
 
     def setVersionedValueStringified(self, key, version_number, stringifiedVal):
+        self._object_has_version(key, version_number)
+        
         if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedValue(JsonWithPyRep(None, {}))
+            self._versioned_objects[key] = VersionedValue()
+
         self._versioned_objects[key].setVersionedValue(
             version_number,
             JsonWithPyRep(
@@ -266,32 +321,40 @@ class ManyVersionedObjects:
             )
 
     def updateVersionedAdds(self, key, version_number, adds):
+        self._object_has_version(key, version_number)
+
         if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedSet(set())
+            self._versioned_objects[key] = VersionedSet()
             self._versioned_objects[key].setVersionedAddsAndRemoves(version_number, adds, set())
         else:
             self._versioned_objects[key].updateVersionedAdds(version_number, adds)
 
-    def cleanup(self):
+    def cleanup(self, curTransactionId):
         """Get rid of old objects we don't need to keep around and increase the min_transaction_id"""
-        return
+        if self._min_reffed_version_number is not None:
+            lowestId = min(self._min_reffed_version_number, curTransactionId)
+        else:
+            lowestId = curTransactionId
 
-        while True:
-            self._version_number_objects
-            if self._min_reffed_version_number is not None and self._min_reffed_version_number < lowest:
-                #some transactions still refer to values before this version
-                return
+        t0 = time.time()
 
-            self._version_numbers.pop(0)
+        if self._version_number_objects:
+            while min(self._version_number_objects) < lowestId:
+                toCollapse = min(self._version_number_objects)
 
-            keys_touched = self._version_number_objects[lowest]
-            del self._version_number_objects[lowest]
+                t1 = time.time()
+                count = len(self._version_number_objects[toCollapse])
 
-            for key in keys_touched:
-                if self._versioned_objects[key].cleanup(lowest):
-                    del self._versioned_objects[key]
+                for key in self._version_number_objects[toCollapse]:
+                    if key not in self._versioned_objects:
+                        pass
+                    elif self._versioned_objects[key].cleanup(lowestId):
+                        del self._versioned_objects[key]
+                    else:
+                        if self._versioned_objects[key].needsToTrack():
+                            self._object_has_version(key, lowestId)
 
-        
+                del self._version_number_objects[toCollapse]
 
 class TransactionListener:
     def __init__(self, db, handler):
@@ -645,6 +708,9 @@ class DatabaseConnection:
         else:
             return identities.intersection(subscriptionSet)
 
+    def cleanup(self):
+        with self._lock:
+            self._versioned_data.cleanup(self._cur_transaction_num)
 
     def _onMessage(self, msg):
         with self._lock:
@@ -733,7 +799,7 @@ class DatabaseConnection:
                             traceback.format_exc()
                             )
 
-                self._versioned_data.cleanup()
+                self._versioned_data.cleanup(self._cur_transaction_num)
 
             elif msg.matches.SubscriptionIncrease:
                 subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())

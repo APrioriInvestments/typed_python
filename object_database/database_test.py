@@ -1218,7 +1218,56 @@ class ObjectDatabaseTests:
             #each database sees two transactions each pass
             for i in range(len(dbs)):
                 self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
-                
+
+    def test_transaction_time_constant(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(schema)
+        db2.subscribeToSchema(schema)
+
+        times = []
+        for i in range(1000):
+            t0 = time.time()
+            with db1.transaction():
+                x = schema.Root()
+            times.append(time.time() - t0)
+
+        m1 = numpy.mean(times[:100])
+        m2 = numpy.mean(times[-100:])
+        self.assertTrue(abs(m1/m2-1) < .25, (m1, m2))
+        
+
+    def test_memory_growth(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(schema)
+        db2.subscribeToSchema(schema)
+
+        for i in range(1000):
+            with db1.transaction():
+                x = schema.Root()
+
+            with db1.transaction():
+                x.delete()
+
+        db1.flush()
+        db2.flush()
+
+        with db2.view():
+            assert len(schema.Root.lookupAll()) == 0
+
+        self.assertLess(db1._versioned_data.keycount(), 10)
+        self.assertEqual(db1._versioned_data.keycount(), db2._versioned_data.keycount())
+
+        time.sleep(.1)
+
+        self.assertTrue(len(self.server._version_numbers) > 10)
+
+        self.server._garbage_collect(intervalOverride=.1)
+
+        self.assertTrue(len(self.server._version_numbers) < 10)
 
 class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
@@ -1239,6 +1288,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         redis.StrictRedis(db=0, decode_responses=True, port=1115).echo("hi")
         self.mem_store = RedisPersistence(port=1115)
         self.server = InMemServer(self.mem_store)
+        self.server._gc_interval = .1
         self.server.start()
 
     def createNewDb(self):
@@ -1268,6 +1318,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryPersistence()
         self.server = InMemServer(self.mem_store)
+        self.server._gc_interval = .1
         self.server.start()
 
     def createNewDb(self):
@@ -1312,6 +1363,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryPersistence()
         self.server = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
+        self.server._gc_interval = .1
         self.server.start()
 
     def createNewDb(self, useSecondaryLoop=False):

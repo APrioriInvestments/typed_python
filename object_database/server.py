@@ -31,6 +31,8 @@ import threading
 import traceback
 import json
 
+DEFAULT_GC_INTERVAL = 900.0
+
 class ConnectedChannel:
     def __init__(self, initial_tid, channel, connectionObject, identityRoot):
         self.channel = channel
@@ -92,6 +94,8 @@ class Server:
 
         self.verbose = False
 
+        self._gc_interval = DEFAULT_GC_INTERVAL
+
         self._removeOldDeadConnections()
 
         self._clientChannels = {}
@@ -101,6 +105,7 @@ class Server:
 
         #for each key, the last version number we committed
         self._version_numbers = {}
+        self._version_numbers_timestamps = {}
 
         #(schema,type) to set(subscribed channel)
         self._type_to_channel = {}
@@ -138,6 +143,8 @@ class Server:
         #fault injector to test this thing
         self._subscriptionBackgroundThreadCallback = None
         self._lazyLoadCallback = None
+
+        self._last_garbage_collect_timestamp = None
 
         self.identityProducer = IdentityProducer(self.allocateNewIdentityRoot())
 
@@ -734,6 +741,31 @@ class Server:
                 )
             )
 
+    def _garbage_collect(self, intervalOverride=None):
+        """Cleanup anything in '_version_numbers' where we have deleted the entry
+        and it's inactive for a long time."""
+        interval = intervalOverride or self._gc_interval
+        
+        if self._last_garbage_collect_timestamp is None or time.time() - self._last_garbage_collect_timestamp > interval:
+            threshold = time.time() - interval
+
+            new_ts = {}
+            for key,ts in self._version_numbers_timestamps.items():
+                if ts < threshold:
+                    if keymapping.isIndexKey(key):
+                        if not self._kvstore.getSetMembers(key):
+                            del self._version_numbers[key]
+                    else:
+                        if self._kvstore.get(key) is None:
+                            del self._version_numbers[key]
+                else:
+                    new_ts[key] = ts
+
+            self._version_numbers_timestamps = new_ts
+
+            self._last_garbage_collect_timestamp = time.time()
+
+
     def _handleNewTransaction(self, 
                 sourceChannel,
                 key_value, 
@@ -807,13 +839,15 @@ class Server:
                 if as_of_version < last_tid:
                     return (False, key)
 
+        t1 = time.time()
+
         for key in keysWritingTo:
             self._version_numbers[key] = transaction_id
+            self._version_numbers_timestamps[key] = t1
 
         for key in setsWritingTo:
             self._version_numbers[key] = transaction_id
-
-        t1 = time.time()
+            self._version_numbers_timestamps[key] = t1
 
         priorValues = self._kvstore.getSeveralAsDictionary(key_value)
 
@@ -913,5 +947,7 @@ class Server:
                 t1 - t0, t2 - t1, time.time() - t2,
                 len(key_value), len(set_adds) + len(set_removes), sorted(key_value)[:3]
                 )
+
+        self._garbage_collect()
 
         return (True, None)
