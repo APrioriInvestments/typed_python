@@ -1179,15 +1179,15 @@ class ObjectDatabaseTests:
         db2.subscribeToSchema(schema)
 
         times = []
-        for i in range(1000):
+        for i in range(10000):
             t0 = time.time()
             with db1.transaction():
                 x = schema.Root()
             times.append(time.time() - t0)
 
-        m1 = numpy.mean(times[:100])
-        m2 = numpy.mean(times[-100:])
-        self.assertTrue(abs(m1/m2-1) < .25, (m1, m2))
+        m1 = numpy.mean(times[:1000])
+        m2 = numpy.mean(times[-1000:])
+        self.assertTrue(abs(m2/m1-1) < 1, (m1, m2))
         
 
     def test_memory_growth(self):
