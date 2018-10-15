@@ -811,6 +811,7 @@ class Clickable(Cell):
                     return
             except:
                 logging.error("Exception in button logic:\n%s", traceback.format_exc())
+                return
 
 class Button(Clickable):
     def __init__(self, *args, small=False, **kwargs):
