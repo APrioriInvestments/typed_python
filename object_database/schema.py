@@ -41,6 +41,9 @@ class Schema:
                 if issubclass(t, DatabaseObject)
             })
 
+    def __repr__(self):
+        return "Schema(%s)" % self.name
+
     def lookupFullyQualifiedTypeByName(self, name):
         if not name.startswith(self.name + "."):
             return None
