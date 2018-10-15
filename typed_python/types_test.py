@@ -158,8 +158,8 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(NoneType() is NoneType())
 
     def test_object_bytecounts(self):
-        self.assertEqual(NoneType().bytecount(), 0)
-        self.assertEqual(Int8().bytecount(), 1)
+        self.assertEqual(_types.bytecount(NoneType()), 0)
+        self.assertEqual(_types.bytecount(Int8()), 1)
 
     def test_type_stringification(self):
         for t in ['Int8', 'NoneType']:
@@ -847,7 +847,7 @@ class NativeTypesTests(unittest.TestCase):
             def f(self):
                 return 10
 
-        self.assertEqual(A.bytecount(), 8)
+        self.assertEqual(_types.bytecount(A), 8)
         self.assertTrue(A.y is int)
 
         a = A()

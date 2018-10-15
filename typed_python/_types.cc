@@ -113,7 +113,6 @@ struct native_instance_wrapper {
     static PyMethodDef* typeMethods(const Type* t) {
         if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
             return new PyMethodDef [4] {
-                {"bytecount", (PyCFunction)native_instance_wrapper::bytecount, METH_CLASS | METH_NOARGS, NULL},
                 {"get", (PyCFunction)native_instance_wrapper::constDictGet, METH_VARARGS, NULL},
                 {"items", (PyCFunction)native_instance_wrapper::constDictItems, METH_NOARGS, NULL},
                 {NULL, NULL}
@@ -121,7 +120,6 @@ struct native_instance_wrapper {
         }
 
         return new PyMethodDef [2] {
-            {"bytecount", (PyCFunction)native_instance_wrapper::bytecount, METH_CLASS | METH_NOARGS, NULL},
             {NULL, NULL}
         };
     };
@@ -2485,7 +2483,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 
 PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "serialize takes 1 positional argument");
+        PyErr_SetString(PyExc_TypeError, "deserialize takes 1 positional argument");
         return NULL;
     }
     PyObject* a1 = PyTuple_GetItem(args, 0);
@@ -2514,6 +2512,23 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;        
     }
+}
+
+PyObject *bytecount(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "bytecount takes 1 positional argument");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+
+    const Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'bytecount' must be a native type object");
+        return NULL;
+    }
+
+    return PyLong_FromLong(t->bytecount());
 }
 
 PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -2593,6 +2608,7 @@ static PyMethodDef module_methods[] = {
     {"Function", (PyCFunction)MakeFunction, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
+    {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 
