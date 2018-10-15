@@ -633,7 +633,8 @@ class Server:
             assert isinstance(msg.definition, SchemaDefinition)
             connectedChannel.definedSchemas[msg.name] = msg.definition
         elif msg.matches.Subscribe:
-            self._handleSubscriptionInForeground(connectedChannel, msg)
+            with self._lock:
+                self._handleSubscriptionInForeground(connectedChannel, msg)
         elif msg.matches.TransactionData:
             connectedChannel.handleTransactionData(msg)
         elif msg.matches.CompleteTransaction:
