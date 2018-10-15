@@ -477,6 +477,26 @@ class NativeTypesTests(unittest.TestCase):
                         self.assertTrue(k in v)
 
 
+    def test_named_tuple_from_dict(self):
+        N = NamedTuple(x=int, y=str,z=OneOf(None,"hihi"))
+        self.assertEqual(N().x, 0)
+        self.assertEqual(N().y, "")
+        self.assertEqual(N().z, None)
+
+        self.assertEqual(N({}).x, 0)
+        self.assertEqual(N({}).y, "")
+        self.assertEqual(N({}).z, None)
+
+        self.assertEqual(N({'x': 20}).x, 20)
+        self.assertEqual(N({'x': 20, 'y': "30"}).y, "30")
+        self.assertEqual(N({'y': "30", 'x': 20}).y, "30")
+        self.assertEqual(N({'z': "hihi"}).z, "hihi")
+
+        with self.assertRaises(Exception):
+            N({'r': 'hi'})
+            N({'y': 'hi', 'z': "not hihi"})
+            N({'a': 0, 'b': 0, 'c': 0, 'd': 0})
+
     def test_const_dict_mixed(self):
         t = ConstDict(str,int)
         self.assertTrue(t({"a":10})["a"] == 10)

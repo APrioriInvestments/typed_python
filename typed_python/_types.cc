@@ -154,7 +154,7 @@ struct native_instance_wrapper {
                 t->getTypeCategory() == Type::TypeCategory::catTupleOf || 
                 t->getTypeCategory() == Type::TypeCategory::catTuple
                 ) {
-            return PyTuple_Check(pyRepresentation);
+            return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catFloat64 || 
@@ -478,6 +478,38 @@ struct native_instance_wrapper {
                         copy_initialize(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyList_GetItem(pyRepresentation,k));
                         }
                     );
+                return;
+            }
+        }
+
+        if (eltType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
+            if (PyDict_Check(pyRepresentation)) {
+                if (((NamedTuple*)eltType)->getTypes().size() < PyDict_Size(pyRepresentation)) {
+                    throw std::runtime_error("Couldn't initialize type of " + eltType->name() + " because supplied dictionary had too many items");
+                }
+                long actuallyUsed = 0;
+
+                ((NamedTuple*)eltType)->constructor(tgt, 
+                    [&](uint8_t* eltPtr, int64_t k) {
+                        const std::string& name = ((NamedTuple*)eltType)->getNames()[k];
+                        const Type* t = ((NamedTuple*)eltType)->getTypes()[k];
+
+                        PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
+                        if (o) {
+                            copy_initialize(t, eltPtr, o);
+                            actuallyUsed++;
+                        }
+                        else if (eltType->is_default_constructible()) {
+                            t->constructor(eltPtr);
+                        } else {
+                            throw std::logic_error("Can't default initialize argument " + name);
+                        }
+                    });
+
+                if (actuallyUsed != PyDict_Size(pyRepresentation)) {
+                    throw std::runtime_error("Couldn't initialize type of " + eltType->name() + " because supplied dictionary had unused arguments");
+                }
+
                 return;
             }
         }
