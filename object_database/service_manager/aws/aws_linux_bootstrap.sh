@@ -42,6 +42,7 @@ sudo chmod 777 /var/run/docker.sock
 
 sudo docker pull {image}
 sudo docker run --privileged --network=host -v $STORAGE:/storage {image} \
+    `hostname` \
     {db_hostname} \
     {db_port}
 
