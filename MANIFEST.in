@@ -1,2 +1,3 @@
 include object_database/web/content/*.css
 include object_database/web/content/*.html
+include object_database/service_manager/aws/*.sh
