@@ -32,7 +32,10 @@ from object_database.util import configureLogging
 from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
-def main(argv):
+def main(argv=None):
+    if argv is None:
+        argv = sys.argv
+
     parser = argparse.ArgumentParser("Run the main service manager and the object_database_service.")
 
     parser.add_argument("own_hostname")
@@ -146,5 +149,6 @@ def main(argv):
             except:
                 logging.error("Failed to stop the database server:\n%s", traceback.format_exc())
 
+
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    sys.exit(main())

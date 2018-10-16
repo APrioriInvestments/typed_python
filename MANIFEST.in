@@ -1,0 +1,2 @@
+include object_database/web/content/*.css
+include object_database/web/content/*.html

@@ -28,6 +28,7 @@ import datetime
 import os
 import json
 import gevent.socket
+
 from gevent import pywsgi
 from geventwebsocket.handler import WebSocketHandler
 
@@ -96,8 +97,8 @@ class ActiveWebService(ServiceBase):
     
     def configureApp(self):
         instanceName = self.serviceInstance.service.name
+        self.app.logger.setLevel(logging.DEBUG)
         self.app.route("/")(lambda: redirect("/services"))
-
         self.app.route('/content/<path:path>')(self.sendContent)
         self.app.route('/services')(self.sendPage)
         self.app.route('/services/<path:path>')(self.sendPage)

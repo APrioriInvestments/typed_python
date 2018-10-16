@@ -32,4 +32,12 @@ setuptools.setup(
     classifiers=[
         "Programming Language :: Python :: 3"
     	],
+    entry_points={
+        'console_scripts': [
+            'object_database_webtest=object_database.frontends.object_database_webtest:main',
+            'object_database_service_manager=object_database.frontends.service_manager:main',
+            ]
+        },
+    include_package_data=True,
+    zip_safe=False
     )

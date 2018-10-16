@@ -24,6 +24,7 @@ import time
 import asyncio
 import websockets
 import tempfile
+import argparse
 
 from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.ServiceManager import ServiceManager
@@ -34,14 +35,17 @@ from object_database import Schema, Indexed, Index, core_schema, TcpServer, conn
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
-if __name__ == '__main__':
+def main(argv=None):
+    if argv is not None:
+        argv = sys.argv
+
     with tempfile.TemporaryDirectory() as tf:
         try:
             server = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
                     'localhost', 'localhost', "8020", "--run_db",'--source', os.path.join(tf,'source'),
                     '--storage', os.path.join(tf,'storage'),
-                    '--logdir', os.path.join(tf,'logs'),
+                    #'--logdir', os.path.join(tf,'logs'),
                     '--shutdownTimeout', '.5'
                     ]
                 )
@@ -52,7 +56,7 @@ if __name__ == '__main__':
             with database.transaction():
                 service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
 
-            ActiveWebService.configureFromCommandline(database, service, ['--port', '8050', '--host', 'localhost'])
+            ActiveWebService.configureFromCommandline(database, service, ['--port', '80', '--host', '0.0.0.0'])
 
             with database.transaction():
                 ServiceManager.startService("ActiveWebService", 1)
@@ -70,3 +74,7 @@ if __name__ == '__main__':
             server.terminate()
             server.wait()
 
+    return 0
+
+if __name__ == '__main__':
+    sys.exit(main())

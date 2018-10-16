@@ -60,17 +60,20 @@ mkdir -p $INSTALL
 mkdir -p $INSTALL/logs
 mkdir -p $INSTALL/service_source
 
+git clone https://github.com/braxtonmckee/nativepython.git $STORAGE/nativepython
+
+cd $STORAGE/nativepython
+python3 setup.py install
+
 cd $INSTALL
 
 chmod 700 -R ~/.ssh
-
-git clone https://github.com/braxtonmckee/nativepython.git $STORAGE/nativepython
 
 export LD_PRELOAD=/usr/lib/libtcmalloc_minimal.so.4
 
 {extra_boot_script}
 
-$STORAGE/nativepython/object_database/frontends/service_manager.py \
+object_database_service_manager \
     `hostname`  \
     {db_hostname} \
     {db_port} \
