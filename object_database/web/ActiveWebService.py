@@ -91,13 +91,14 @@ class ActiveWebService(ServiceBase):
             assert config, "No configuration available."
             host,port = config.hostname, config.port
 
+        logging.info("ActiveWebService listening on %s:%s", host, port)
+
         server = pywsgi.WSGIServer((host, port), self.app, handler_class=WebSocketHandler)
 
         server.serve_forever()
     
     def configureApp(self):
         instanceName = self.serviceInstance.service.name
-        self.app.logger.setLevel(logging.DEBUG)
         self.app.route("/")(lambda: redirect("/services"))
         self.app.route('/content/<path:path>')(self.sendContent)
         self.app.route('/services')(self.sendPage)
