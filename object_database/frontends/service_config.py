@@ -58,6 +58,10 @@ def main(argv):
     install_parser.add_argument("--placement", required=False, default='Any', choices=['Any','Master','Worker'])
     install_parser.add_argument("--singleton", required=False, action='store_true')
 
+    reset_parser = subparsers.add_parser('reset', help='reset a service''s boot count')
+    reset_parser.set_defaults(command='reset')
+    reset_parser.add_argument("name")
+    
     configure_parser = subparsers.add_parser('configure', help='configure a service')
     configure_parser.set_defaults(command='configure')
     configure_parser.add_argument("name")
@@ -114,6 +118,11 @@ def main(argv):
         except Exception as e:
             traceback.print_exc()
             return 1
+
+    if parsedArgs.command == 'reset':
+        with db.transaction():
+            service = service_schema.Service.lookupAny(name=parsedArgs.name)
+            service.timesBootedUnsuccessfully = 0
 
     if parsedArgs.command == 'install':
         if parsedArgs.paths:

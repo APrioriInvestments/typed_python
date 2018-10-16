@@ -27,14 +27,6 @@ echo "Installing docker"
 sudo apt-get update
 sudo apt-get install -y docker.io
 
-log "Installing git"
-
-sudo apt-get install -y git
-
-log "Installing awscli"
-
-sudo apt-get install -y awscli
-
 echo "Moving docker directory to $STORAGE"
 sudo service docker stop
 
@@ -48,37 +40,8 @@ sudo service docker start
 
 sudo chmod 777 /var/run/docker.sock
 
-echo "Installing python dependencies"
-
-sudo apt-get install -y python3-pip libtcmalloc-minimal4
-sudo pip3 install boto3 psutil docker==2.6.1 pandas numpy pytz redis flask_sockets flask-cors websockets
-
-export PYTHONPATH=$STORAGE/nativepython
-export INSTALL=$STORAGE/install
-
-mkdir -p $INSTALL
-mkdir -p $INSTALL/logs
-mkdir -p $INSTALL/service_source
-
-git clone https://github.com/braxtonmckee/nativepython.git $STORAGE/nativepython
-
-cd $STORAGE/nativepython
-python3 setup.py install
-
-cd $INSTALL
-
-chmod 700 -R ~/.ssh
-
-export LD_PRELOAD=/usr/lib/libtcmalloc_minimal.so.4
-
-{extra_boot_script}
-
-object_database_service_manager \
-    `hostname`  \
+sudo docker pull {image}
+sudo docker run --privileged --network=host -v $STORAGE:/storage {image} \
     {db_hostname} \
-    {db_port} \
-    --source $INSTALL/service_source \
-    --storage $INSTALL/service_storage \
-    --logdir $INSTALL/logs &> $INSTALL/logs/db_server.log
-
+    {db_port}
 

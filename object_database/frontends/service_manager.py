@@ -63,6 +63,8 @@ def main(argv=None):
         parser.print_help()
         return 2
 
+    logging.info("ServiceManager on %s connecting to %s:%s", parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port)
+
     shouldStop = threading.Event()
 
     def shutdownCleanly(signalNumber, frame):

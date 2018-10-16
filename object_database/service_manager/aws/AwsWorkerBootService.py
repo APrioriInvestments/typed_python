@@ -191,11 +191,10 @@ class Configuration:
     keypair = str              #security keypair name to use
     worker_name = str          #name of workers. This should be unique to this install.
     worker_iam_role_name = str #AIM role to boot workers into
-    linux_ami = str            #default linux AMI to use when booting linux workers
+    docker_image = str            #default linux AMI to use when booting linux workers
     defaultStorageSize =  int  #gb of disk to mount on booted workers (if they need ebs)
     max_to_boot = int          #maximum number of workers we'll boot
-    extra_boot_script = str    #additional installation commands to run to configure the worker
-
+    
 @schema.define
 class State:
     instance_type = Indexed(str)
@@ -323,7 +322,6 @@ class AwsApi:
 
     def bootWorker(self, 
             instanceType,
-            extra_boot_script=None,
             clientToken=None,
             amiOverride=None,
             nameValueOverride=None,
@@ -335,7 +333,7 @@ class AwsApi:
             linux_bootstrap_script.format(
                 db_hostname=self.config.db_hostname,
                 db_port=self.config.db_port,
-                extra_boot_script=self.config.extra_boot_script or ""
+                image=self.config.docker_image or "nativepython/cloud:latest"
                 )
             )
 
@@ -345,7 +343,7 @@ class AwsApi:
         if amiOverride is not None:
             ami = amiOverride
         else:
-            ami = self.config.linux_ami
+            ami = "ami-759bc50a" #ubuntu 16.04 hvm-ssd
 
         def has_ephemeral_storage(instanceType):
             for t in ['m3', 'c3', 'x1', 'r3', 'f1', 'h1', 'i3', 'd2']:
@@ -469,10 +467,9 @@ class AwsWorkerBootService(ServiceBase):
             keypair,
             worker_name,
             worker_iam_role_name,
-            linux_ami,
+            docker_image,
             defaultStorageSize,
-            max_to_boot,
-            extra_boot_script
+            max_to_boot
             ):
         c = Configuration.lookupAny()
         if not c:
@@ -496,14 +493,12 @@ class AwsWorkerBootService(ServiceBase):
             c.worker_name = worker_name
         if worker_iam_role_name is not None:
             c.worker_iam_role_name = worker_iam_role_name
-        if linux_ami is not None:
-            c.linux_ami = linux_ami
+        if docker_image is not None:
+            c.docker_image = docker_image
         if defaultStorageSize is not None:
             c.defaultStorageSize = defaultStorageSize
         if max_to_boot is not None:
             c.max_to_boot = max_to_boot
-        if extra_boot_script is not None:
-            c.extra_boot_script = extra_boot_script
 
     def setBootCount(self, instance_type, count):
         state = State.lookupAny(instance_type=instType)
@@ -581,11 +576,9 @@ class AwsWorkerBootService(ServiceBase):
                 cells.Text("keypair = " + str(c.keypair)) + 
                 cells.Text("worker_name = " + str(c.worker_name)) + 
                 cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) + 
-                cells.Text("linux_ami = " + str(c.linux_ami)) + 
+                cells.Text("docker_image = " + str(c.docker_image)) + 
                 cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) + 
-                cells.Text("max_to_boot = " + str(c.max_to_boot)) + 
-                cells.Text("extra_boot_script = ") + 
-                cells.Code(c.extra_boot_script)
+                cells.Text("max_to_boot = " + str(c.max_to_boot))
                 )
 
     def pushTaskLoopForward(self):

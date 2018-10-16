@@ -49,10 +49,9 @@ def main(argv):
     config_parser.add_argument('--keypair', required=False)
     config_parser.add_argument('--worker_name', required=False)
     config_parser.add_argument('--worker_iam_role_name', required=False)
-    config_parser.add_argument('--linux_ami', required=False)
+    config_parser.add_argument('--docker_image', required=False)
     config_parser.add_argument('--defaultStorageSize', required=False, type=int)
     config_parser.add_argument('--max_to_boot', required=False, type=int)
-    config_parser.add_argument("--extra_boot_script", required=False)
 
     install_parser = subparsers.add_parser('install', help='install the service')
     install_parser.set_defaults(command='install')
@@ -96,10 +95,9 @@ def main(argv):
                 keypair=parsedArgs.keypair,
                 worker_name=parsedArgs.worker_name,
                 worker_iam_role_name=parsedArgs.worker_iam_role_name,
-                linux_ami=parsedArgs.linux_ami,
+                docker_image=parsedArgs.docker_image,
                 defaultStorageSize=parsedArgs.defaultStorageSize,
-                max_to_boot=parsedArgs.max_to_boot,
-                extra_boot_script=parsedArgs.extra_boot_script
+                max_to_boot=parsedArgs.max_to_boot
                 )
 
     if parsedArgs.command == 'install':
