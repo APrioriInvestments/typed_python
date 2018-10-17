@@ -190,7 +190,10 @@ class TcpServer(Server):
     def checkHeartbeatsCallback(self):
         if not self.stopped:
             _eventLoop.loop.call_later(getHeartbeatInterval(), self.checkHeartbeatsCallback)
-            self.checkForDeadConnections()
+            try:
+                self.checkForDeadConnections()
+            except:
+                logging.error("Caught exception in checkForDeadConnections:\n%s", traceback.format_exc())
         
     def stop(self):
         Server.stop(self)

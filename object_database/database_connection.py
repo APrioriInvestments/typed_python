@@ -179,7 +179,7 @@ class VersionedSet(VersionedBase):
         ix = self._best_version_offset_for(version)
 
         if ix is None:
-            return None
+            return SetWithEdits(set(), set(), set())
 
         return SetWithEdits(set(), self.adds[:ix+1], self.removes[:ix+1])
 

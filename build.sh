@@ -8,7 +8,7 @@ do
             ;;
         -w|--webtest )
             #run a dummy webframework
-            docker run -it --rm -p 80:80 nativepython/cloud:latest object_database_webtest
+            docker run -it --rm -p 80:80 --entrypoint object_database_webtest nativepython/cloud:latest
             ;;
         -t|--test )
             #run unit tests

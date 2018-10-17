@@ -16,7 +16,7 @@ from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member
 
 import typed_python._types as _types
-
+import psutil
 import unittest
 import traceback
 import time
@@ -883,4 +883,17 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(a.x, 10)
 
+    def test_serialize_doesnt_leak(self):
+        T = TupleOf(int)
 
+        def getMem():
+            return psutil.Process().memory_info().rss / 1024 ** 2
+
+        m0 = getMem()
+
+        for passIx in range(100):
+            for i in range(1000):
+                t = T(list(range(i)))
+                deserialize(T, serialize(T,t))
+
+            self.assertTrue(getMem() < m0 + 100)

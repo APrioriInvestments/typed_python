@@ -2198,6 +2198,14 @@ public:
         mLayout->refcount++;
     }
 
+    ~Instance() {
+        mLayout->refcount--;
+        if (mLayout->refcount == 0) {
+            mLayout->type->destroy(mLayout->data);
+            free(mLayout);
+        }
+    }
+
     Instance& operator=(const Instance& other) {
         other.mLayout->refcount++;
 

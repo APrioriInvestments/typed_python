@@ -32,7 +32,7 @@ import os
 import threading
 import random
 import time
-
+import psutil
 from object_database.util import configureLogging
 
 configureLogging("test", error=True)
@@ -1197,12 +1197,21 @@ class ObjectDatabaseTests:
         db1.subscribeToSchema(schema)
         db2.subscribeToSchema(schema)
 
-        for i in range(1000):
-            with db1.transaction():
-                x = schema.Root()
+        def getMem():
+            return psutil.Process().memory_info().rss / 1024 ** 2
+        m0 = getMem()
 
-            with db1.transaction():
-                x.delete()
+        for passIx in range(3):
+            for i in range(1000):
+                with db1.transaction():
+                    x = schema.Root()
+
+                with db1.transaction():
+                    x.delete()
+
+            self.server._garbage_collect(intervalOverride=.1)
+            print(passIx, getMem())
+            self.assertTrue(getMem() < m0 + 10.0)
 
         db1.flush()
         db2.flush()
