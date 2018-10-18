@@ -4,6 +4,8 @@ while test $# -gt 0
 do
     case "$1" in
         -b|--build ) 
+            rm -rf build
+            rm -rf nativepython.egg-info
             docker build . -t nativepython/cloud:latest
             ;;
         -w|--webtest )
@@ -11,11 +13,11 @@ do
             docker run -it --rm -p 80:80 --entrypoint object_database_webtest nativepython/cloud:latest
             ;;
         -t|--test )
-            #run unit tests
-            docker run -it --rm nativepython/cloud:latest ./test.py -v -s
+            #run unit tests in the debugger
+            docker run -it --rm --privileged --entrypoint bash nativepython/cloud:latest -c "gdb -ex run --args /usr/bin/python3 ./test.py -v -s"
             ;;
         -r|--run )
-            docker run -it --rm nativepython/cloud:latest bash
+            docker run -it --rm --entrypoint bash nativepython/cloud:latest
             ;;
         -p|--push )
             docker push nativepython/cloud:latest
