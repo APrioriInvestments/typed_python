@@ -897,3 +897,33 @@ class NativeTypesTests(unittest.TestCase):
                 deserialize(T, serialize(T,t))
 
             self.assertTrue(getMem() < m0 + 100)
+
+    def test_const_dict_of_tuple(self):
+        K = NamedTuple(a=OneOf(float, int), b=OneOf(float, int))
+        someKs = [K(a=0,b=0), K(a=1), K(a=10), K(b=10), K()]
+    
+        T = ConstDict(K, K)
+
+        
+        indexDict = {}
+        x = T()
+
+        numpy.random.seed(42)
+
+        for _ in range(100):
+            i1 = numpy.random.choice(len(someKs))
+            i2 = numpy.random.choice(len(someKs))
+            add = numpy.random.choice([False, True])
+
+            if add:
+                indexDict[i1] = i2
+                x = x + {someKs[i1]: someKs[i2]}
+            else:
+                if i1 in indexDict:
+                    del indexDict[i1]
+                    x = x - (someKs[i1],)
+
+            self.assertEqual(x, T({someKs[i]:someKs[v] for i,v in indexDict.items()}))
+            for k in x:
+                self.assertTrue(k in x)
+                x[k]

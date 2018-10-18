@@ -1228,6 +1228,8 @@ public:
             m_value->copy_constructor(kvPairPtrValue(output,k + rhsCount), keep[k] + m_bytes_per_key);
         }
         incKvPairCount(output, keep.size() + rhsCount);
+
+        sortKvPairs(output);
     }
 
     TupleOf* tupleOfKeysType() const {
