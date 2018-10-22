@@ -214,6 +214,44 @@ class ObjectDatabaseTests:
             self.assertEqual(t.i, 1)
             self.assertEqual(t.k, 0)
 
+    def test_subclassing(self):
+        schema = Schema("schema")
+
+        @schema.define
+        class Test:
+            i = int
+
+            def f(self):
+                return 1
+
+            def g(self):
+                return 2
+
+        @schema.define
+        class SubclassTesting(Test):
+            y = int
+
+            def g(self):
+                return 3
+
+            def h(self):
+                return 4
+
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            t = Test(i=1)
+            t2 = SubclassTesting(i=2,y=3)
+
+            self.assertEqual(t.f(), 1)
+            self.assertEqual(t.g(), 2)
+
+            self.assertEqual(t2.f(), 1)
+            self.assertEqual(t2.g(), 3)
+            self.assertEqual(t2.h(), 4)
+            self.assertEqual(t2.y, 3)
+
     def test_many_subscriptions(self):
         OK = []
         FINISHED = []

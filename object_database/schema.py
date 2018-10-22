@@ -34,6 +34,7 @@ class Schema:
         self._indices = {}
         self._indexTypes = {}
         self._frozen = False
+        self._types_to_original = {}
 
     def toDefinition(self):
         return SchemaDefinition({
@@ -90,7 +91,7 @@ class Schema:
                 raise AttributeError(typename)
 
             class cls(DatabaseObject):
-                pass
+                __object_database_source_class__ = None
 
             cls.__name__ = typename
             cls.__qualname__ = typename
@@ -125,31 +126,42 @@ class Schema:
         assert not self._frozen, "Schema is already frozen"
 
         t = getattr(self, cls.__name__)
-        
+        self._types_to_original[t] = cls
+
         types = {}
-        
-        for name, val in cls.__dict__.items():
-            if name[:2] != '__' and isinstance(val, type):
-                types[name] = val
-            elif name[:2] != '__' and isinstance(val, Indexed):
-                if isinstance(val.obj, type):
-                    types[name] = val.obj
+
+        baseClasses = list(cls.__mro__)
+        for i in range(len(baseClasses)):
+            if baseClasses[i] is DatabaseObject:
+                baseClasses = baseClasses[:i]
+                break
+
+        properClasses = [self._types_to_original.get(b, b) for b in baseClasses]
+
+        for base in reversed(properClasses):
+            for name, val in base.__dict__.items():
+                if name[:2] != '__' and isinstance(val, type):
+                    types[name] = val
+                elif name[:2] != '__' and isinstance(val, Indexed):
+                    if isinstance(val.obj, type):
+                        types[name] = val.obj
 
         t._define(**types)
 
-        for name, val in cls.__dict__.items():
-            if isinstance(val, Index):
-                self._addIndex(t, name, val, Tuple(*tuple(types[k] for k in val.names)))
+        for base in reversed(properClasses):
+            for name, val in base.__dict__.items():
+                if isinstance(val, Index):
+                    self._addIndex(t, name, val, Tuple(*tuple(types[k] for k in val.names)))
 
-            if name[:2] != '__' and isinstance(val, Indexed):
-                if isinstance(val.obj, FunctionType):
-                    self._addIndex(t, name, val.obj)
-                    setattr(t, name, val.obj)
-                else:
-                    self._addIndex(t, name)
-            elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
-                if isinstance(val, (FunctionType, staticmethod, property)):
-                    setattr(t, name, val)
+                if name[:2] != '__' and isinstance(val, Indexed):
+                    if isinstance(val.obj, FunctionType):
+                        self._addIndex(t, name, val.obj)
+                        setattr(t, name, val.obj)
+                    else:
+                        self._addIndex(t, name)
+                elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
+                    if isinstance(val, (FunctionType, staticmethod, property)):
+                        setattr(t, name, val)
 
         if hasattr(cls, '__object_database_lazy_subscription__'):
             t.__object_database_lazy_subscription__ = cls.__object_database_lazy_subscription__
