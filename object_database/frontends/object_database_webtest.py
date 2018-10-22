@@ -56,7 +56,7 @@ def main(argv=None):
             with database.transaction():
                 service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
 
-            ActiveWebService.configureFromCommandline(database, service, ['--port', '80', '--host', '0.0.0.0'])
+            ActiveWebService.configureFromCommandline(database, service, ['--port', '8000', '--host', '0.0.0.0'])
 
             with database.transaction():
                 ServiceManager.startService("ActiveWebService", 1)

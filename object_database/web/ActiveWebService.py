@@ -118,11 +118,10 @@ class ActiveWebService(ServiceBase):
 
         serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
 
-        return Grid(
+        return Table(
             colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Logs', 'Cores', 'RAM', 'Boot Status'],
             rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
             headerFun=lambda x: x,
-            rowLabelFun=None,
             rendererFun=lambda s,field: Subscribed(lambda: 
                 Clickable(s.name, "/services/" + s.name) if field == 'Service' else
                 (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
@@ -134,19 +133,18 @@ class ActiveWebService(ServiceBase):
                             for si in service_schema.ServiceInstance.lookupAll(service=s)
                             ]) 
                         if field == 'Logs' else 
-                Dropdown(str(s.target_count), [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
+                Dropdown(s.target_count, [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
                         if field == 'TargetCount' else 
                 str(s.coresUsed) if field == 'Cores' else 
                 str(s.gbRamUsed) if field == 'RAM' else 
                 (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                 ""
                 ),
-            enableDatatable=True
-            ) + Grid(
+            maxRowsPerPage=10
+            ) + Table(
             colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
             rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
             headerFun=lambda x: x,
-            rowLabelFun=None,
             rendererFun=lambda s,field: Subscribed(lambda: 
                 s.connection._identity if field == "Connection" else
                 str(s.isMaster) if field == "IsMaster" else
@@ -158,7 +156,7 @@ class ActiveWebService(ServiceBase):
                 ("%2.1f" % s.actualMemoryUseGB) + " GB" if field == "RAM USE" else
                 ""
                 ),
-            enableDatatable=True
+            maxRowsPerPage=10
             )
 
     def pageForServiceInstance(self, serviceInstanceObj):

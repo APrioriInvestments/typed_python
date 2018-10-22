@@ -50,8 +50,6 @@ class CellsTests(unittest.TestCase):
 
         expectedCells = [self.cells.root, pairCell, pair[0], pair[1]]
 
-        print(self.cells.cells.keys())
-
         self.assertTrue(self.cells.root.identity in self.cells.cells)
         self.assertTrue(pairCell.identity in self.cells.cells)
         self.assertTrue(pair[0].identity in self.cells.cells)

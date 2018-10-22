@@ -10,10 +10,6 @@ ENV LD_PRELOAD=libtcmalloc_minimal.so.4
 RUN apt-get -y install gdb python3-dbg
 ENV LD_PRELOAD=libtcmalloc_minimal.so.4
 
-COPY . /nativepython/
-WORKDIR /nativepython
-RUN python3 setup.py install
-
 #the gdb-for-python somehow gets confused and thinks that PyUnicodeObject is
 #a struct, instead of a typedef. This is probably related to how the shared
 #object we're building is exporting symbols in some funny way, but either way
@@ -28,7 +24,11 @@ RUN python3 setup.py install
 #it's a typedef)
 RUN sed -i 's/global _is_pep393/_is_pep393=True/' /usr/share/gdb/auto-load/usr/bin/python3.6m-gdb.py
 
-ENTRYPOINT ["object_database_service_manager", \
-    "--source", "/storage/service_source", \
-    "--storage", "/storage/service_storage", \
-    "--logdir", "/storage/logs"]
+# COPY . /nativepython/
+# WORKDIR /nativepython
+# RUN python3 setup.py install
+
+# ENTRYPOINT ["object_database_service_manager", \
+#    "--source", "/storage/service_source", \
+#    "--storage", "/storage/service_storage", \
+#    "--logdir", "/storage/logs"]

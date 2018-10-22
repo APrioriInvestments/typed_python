@@ -103,6 +103,16 @@ class UninitializableService(ServiceBase):
     def doWork(self, shouldStop):
         time.sleep(120)
 
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        return Table(
+            colFun=lambda: ['C1', "C2", "C3"],
+            rowFun=lambda: list(range(1000)),
+            headerFun=lambda x: x,
+            rendererFun=lambda s,field: Subscribed(lambda: field + "_" + str(s)),
+            maxRowsPerPage=10
+            )
+        
+
 happy = Schema("core.test.happy")
 @happy.define
 class Happy:

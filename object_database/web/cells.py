@@ -42,7 +42,7 @@ def multiReplace(msg, replacements):
         else:
             outChunks.append("____" + chunk)
 
-    assert not replacements, "Didn't use up replacement %s in %s" % (replacements.key(), msg)
+    assert not replacements, "Didn't use up replacement %s in %s" % (replacements.keys(), msg)
 
     return "".join(outChunks)
 
@@ -285,14 +285,50 @@ class Cell:
         self.postscript = None
         self.garbageCollected = False
         self._nowrap = False
+        self._width = None
+        self._color = None
+        self._height = None
+    
+    def sortsAs(self):
+        return None
 
-    def _divStyle(self):
+    def _divStyle(self, existing=None):
+        if existing:
+            res = [existing]
+        else:
+            res = []
+
         if self._nowrap:
-            return "style='display:inline-block'"
-        return ""
+            res.append("display:inline-block")
+
+        if self._width is not None:
+            res.append("width:%spx" % self._width)
+
+        if self._height is not None:
+            res.append("height:%spx" % self._height)
+
+        if self._color is not None:
+            res.append("color:%s" % self._color)
+
+        if not res:
+            return ""
+        else:
+            return "style='%s'" % ";".join(res)
 
     def nowrap(self):
         self._nowrap = True
+        return self
+
+    def width(self, width):
+        self._width = width
+        return self
+
+    def height(self, height):
+        self._height = height
+        return self
+
+    def color(self, color):
+        self._color = color
         return self
 
     def prepareForReuse(self):
@@ -324,7 +360,7 @@ class Cell:
     @staticmethod
     def makeCell(x):
         if isinstance(x,(str, float, int, bool)):
-            return Text(str(x))
+            return Text(str(x), x)
         if x is None:
             return Span("")
         if isinstance(x, Cell):
@@ -335,17 +371,26 @@ class Cell:
         return Sequence([self, Cell.makeCell(other)])
 
 class Card(Cell):
-    def __init__(self, inner):
+    def __init__(self, inner, padding=None):
         super().__init__()
 
         self.children = {"____contents__": Cell.makeCell(inner)}
+        
+        other = ""
+        if padding:
+            other += " p-" + str(padding)
+
         self.contents = """
         <div class='card'>
-          <div class="card-body">
+          <div class="card-body __other__">
             ____contents__
           </div>
         </div>
-        """
+        """.replace('__other__', other)
+
+    def sortsAs(self):
+        return self.inner.sortsAs()
+    
 
 class CardTitle(Cell):
     def __init__(self, inner):
@@ -357,16 +402,30 @@ class CardTitle(Cell):
           ____contents__
         </div>
         """
+    def sortsAs(self):
+        return self.inner.sortsAs()
 
 class Octicon(Cell):
     def __init__(self, which):
         super().__init__()
-        self.contents = '<span class="octicon octicon-%s" aria-hidden="true"></span>' % which
+        self.whichOcticon = which
+
+    def sortsAs(self):
+        return self.whichOcticon
+
+    def recalculate(self):
+        self.contents = (
+            '<span class="octicon octicon-%s" aria-hidden="true" __style__></span>' % self.whichOcticon
+            ).replace('__style__', self._divStyle())
 
 class Text(Cell):
-    def __init__(self, text):
+    def __init__(self, text, sortAs=None):
         super().__init__()
         self.text = text
+        self._sortAs = sortAs if sortAs is not None else text
+
+    def sortsAs(self):
+        return self._sortAs
 
     def recalculate(self):
         self.contents = "<div %s>%s</div>" % (
@@ -374,10 +433,21 @@ class Text(Cell):
             cgi.escape(str(self.text)) if self.text else "&nbsp;"
             )
 
+class Padding(Cell):
+    def __init__(self):
+        super().__init__()
+        self.contents = "<span class='px-2'>&nbsp</span>"
+
+    def sortsAs(self):
+        return " "
+
 class Span(Cell):
     def __init__(self, text):
         super().__init__()
         self.contents = "<span>%s</span>" % cgi.escape(str(text))
+
+    def sortsAs(self):
+        return self.contents
 
 class Sequence(Cell):
     def __init__(self, elements):
@@ -394,6 +464,11 @@ class Sequence(Cell):
             return Sequence(self.elements + other.elements)
         else:
             return Sequence(self.elements + [other])
+
+    def sortsAs(self):
+        if self.elements:
+            return self.elements[0].sortsAs()
+        return None
 
 class HeaderBar(Cell):
     def __init__(self, navbarItems):
@@ -425,11 +500,16 @@ class Dropdown(Cell):
         super().__init__()
 
         self.headersAndLambdas = headersAndLambdas
-        self.title = title
+        self.title = Cell.makeCell(title)
+
+    def sortsAs(self):
+        return self.title.sortsAs()
 
     def recalculate(self):
         items = []
         
+        self.children['____title__'] = self.title
+
         for i in range(len(self.headersAndLambdas)):
             header, onDropdown = self.headersAndLambdas[i]
             self.children["____child_%s__" % i] = Cell.makeCell(header)
@@ -451,7 +531,7 @@ class Dropdown(Cell):
 
         self.contents = """
             <div class="btn-group">
-                  <a role="button" class="btn btn-xs btn-outline-secondary" title="__title__">__title__</a>
+                  <a role="button" class="btn btn-xs btn-outline-secondary">____title__</a>
                   <button class="btn btn-xs btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" 
                         id="___identity__-dropdownMenuButton" data-toggle="dropdown">
                   </button>
@@ -459,7 +539,7 @@ class Dropdown(Cell):
                     __dropdown_items__
                   </div>
             </div>
-            """.replace("__title__", self.title).replace("__identity__", self.identity).replace("__dropdown_items__", "\n".join(items))
+            """.replace("__identity__", self.identity).replace("__dropdown_items__", "\n".join(items))
 
     def onMessage(self, msgFrame):
         t0 = time.time()
@@ -510,13 +590,21 @@ class Traceback(Cell):
     def __init__(self, traceback):
         super().__init__()
         self.contents = """<div class='alert alert-primary'><pre>____child__</pre></alert>"""
+        self.traceback = traceback
         self.children = {"____child__": Cell.makeCell(traceback)}
 
+    def sortsAs(self):
+        return self.traceback
+
 class Code(Cell):
-    def __init__(self, traceback):
+    def __init__(self, codeContents):
         super().__init__()
         self.contents = """<pre><code>____child__</code></pre>"""
-        self.children = {"____child__": Cell.makeCell(traceback)}
+        self.codeContents = codeContents
+        self.children = {"____child__": Cell.makeCell(codeContents)}
+
+    def sortsAs(self):
+        return self.codeContents
 
 class Subscribed(Cell):
     def __init__(self, f):
@@ -532,6 +620,12 @@ class Subscribed(Cell):
 
     def __repr__(self):
         return "Subscribed(%s)" % self.f
+
+    def sortsAs(self):
+        for c in self.children.values():
+            return c.sortsAs()
+
+        return Cell.makeCell(self.f()).sortsAs()
 
     def recalculate(self):
         with self.cells.db.view() as v:
@@ -570,6 +664,10 @@ class SubscribedSequence(Cell):
         self.existingItems = {}
         self.spine = []
         return super().prepareForReuse()
+
+    def sortsAs(self):
+        if '____child_0__' in self.children:
+            return self.children['____child_0__'].sortsAs()
 
     def recalculate(self):
         with self.cells.db.view() as v:
@@ -641,10 +739,14 @@ class Popover(Cell):
             </div>
             """.replace("__style__", self._divStyle()).replace("__identity__", self.identity).replace("__width__", str(self.width))
 
+    def sortsAs(self):
+        if '____title__' in self.children:
+            return self.children['____title__'].sortsAs()
+
+
 class Grid(Cell):
-    def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun, enableDatatable=False):
+    def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun):
         super().__init__()
-        self.enableDatatable = enableDatatable
         self.colFun = colFun
         self.rowFun = rowFun
         self.headerFun = headerFun
@@ -738,7 +840,7 @@ class Grid(Cell):
         for i in list(self.existingItems):
             if i not in seen:
                 del self.existingItems[i]
-                      
+        
         self.contents = """
             <table class="table-hscroll table-sm table-striped">
             <thead><tr>""" + ("<th></th>" if self.rowLabelFun is not None else "") + """__headers__</tr></thead>
@@ -761,25 +863,293 @@ class Grid(Cell):
                     )
                 )
 
-        if self.enableDatatable:
-            self.postscript = (
-                """
-                $('#__identity__').DataTable({'paging': false,'searching':false})
-                $('#__identity__').on( 'order.dt', function() {
-                    $('#__identity__').DataTable().rows().invalidate()
-                })
-                $('#__identity__').on( 'search.dt', function() {
-                    $('#__identity__').DataTable().rows().invalidate()
-                })
-                """
-                    .replace("__identity__", self._identity)
+class SortWrapper:
+    def __init__(self, x):
+        self.x = x
+
+    def __lt__(self, other):
+        try:
+            if type(self.x) is type(other.x):
+                return self.x < other.x
+            else:
+                return str(type(self.x)) < str(type(other.x))
+        except:
+            try:
+                return str(self.x) < str(self.other)
+            except:
+                return False
+
+    def __eq__(self, other):
+        try:
+            if type(self.x) is type(other.x):
+                return self.x == other.x
+            else:
+                return str(type(self.x)) == str(type(other.x))
+        except:
+            try:
+                return str(self.x) == str(self.other)
+            except:
+                return True
+
+class SingleLineTextBox(Cell):
+    def __init__(self, slot, pattern=None):
+        super().__init__()
+        self.children = {}
+        self.pattern = None
+        self.slot = slot
+
+    def recalculate(self):
+        self.contents = (
+            """
+            <input __style__ type="text" id="text___identity__" onchange="
+                websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__', 'text': this.value}))
+                " 
+                value="__contents__"
+                __pat__
+                __width__
+                >
+            """.replace("__style__", self._divStyle())
+               .replace("__identity__", self.identity)
+               .replace("__contents__", quoteForJs(self.slot.get(),'"'))
+               .replace("__pat__", "" if not self.pattern else quoteForJs(self.pattern, '"'))
+               .replace("__sytle__", self._divStyle())
+            )
+
+    def onMessage(self, msgFrame):
+        self.slot.set(msgFrame['text'])
+
+class Table(Cell):
+    """An active table with paging, filtering, sortable columns."""
+    def __init__(self, colFun, rowFun, headerFun, rendererFun, maxRowsPerPage=20):
+        super().__init__()
+        self.colFun = colFun
+        self.rowFun = rowFun
+        self.headerFun = headerFun
+        self.rendererFun = rendererFun
+
+        self.subscriptions  = set()
+
+        self.existingItems = {}
+        self.rows = []
+        self.cols = []
+
+        self.maxRowsPerPage = maxRowsPerPage
+
+        self.curPage = Slot("1")
+        self.sortColumn = Slot(None)
+        self.sortColumnAscending = Slot(True)
+        self.columnFilters = {}
+
+    def prepareForReuse(self):
+        self.subscriptions = set()
+        self.existingItems = {}
+        self.rows = []
+        self.cols = []
+        super().prepareForReuse()
+
+    def cachedRenderFun(self, row, col):
+        if (row, col) in self.existingItems:
+            return self.existingItems[row,col]
+        else:
+            return self.rendererFun(row, col)
+
+    def filterRows(self, rows):
+        for col in self.cols:
+            if col not in self.columnFilters:
+                self.columnFilters[col] = Slot(None)
+
+            filterString = self.columnFilters.get(col).get()
+
+            if filterString:
+                new_rows = []
+                for row in rows:
+                    filterAs = self.cachedRenderFun(row, col).sortsAs()
+                    
+                    if filterAs is None:
+                        filterAs = ""
+                    else:
+                        filterAs = str(filterAs)
+
+                    if filterString in filterAs:
+                        new_rows.append(row)
+                rows = new_rows
+
+        return rows
+
+    def sortRows(self, rows):
+        sc = self.sortColumn.get()
+        
+        if sc is not None and sc < len(self.cols):
+            col = self.cols[sc]
+
+            keymemo = {}
+            def key(row):
+                if row not in keymemo:
+                    try:
+                        r = self.cachedRenderFun(row, col)
+                        keymemo[row] = SortWrapper(r.sortsAs())
+                    except:
+                        logging.error(traceback.format_exc())
+                        keymemo[row] = SortWrapper(None)
+
+                return keymemo[row]
+
+            rows = sorted(rows,key=key)
+
+            if not self.sortColumnAscending.get():
+                rows = list(reversed(rows))
+
+        page = 0
+        try:
+            page = max(0, int(self.curPage.get())-1)
+            page = min(page, (len(rows) - 1) // self.maxRowsPerPage)
+        except:
+            logging.error("Failed to parse current page: %s", traceback.format_exc())
+
+        return rows[page * self.maxRowsPerPage:(page+1) * self.maxRowsPerPage]
+
+    def makeHeaderCell(self, col_ix):
+        col = self.cols[col_ix]
+
+        if col not in self.columnFilters:
+            self.columnFilters[col] = Slot(None)
+        
+        def icon():
+            if self.sortColumn.get() != col_ix:
+                return "" 
+            return Octicon("arrow-up" if not self.sortColumnAscending.get() else "arrow-down")
+
+        cell = Cell.makeCell(self.headerFun(col)).nowrap() + Padding() + Subscribed(icon).nowrap()
+        def onClick():
+            if self.sortColumn.get() == col_ix:
+                self.sortColumnAscending.set(not self.sortColumnAscending.get())
+            else:
+                self.sortColumn.set(col_ix)
+                self.sortColumnAscending.set(False)
+
+        res = Clickable(cell, onClick, makeBold=True)
+
+        if self.columnFilters[col].get() is None:
+            res = res.nowrap() + Clickable(Octicon("search"), lambda: self.columnFilters[col].set("")).nowrap()
+        else:
+            res = res + SingleLineTextBox(self.columnFilters[col]).nowrap() + \
+                Button(Octicon("x"), lambda: self.columnFilters[col].set(None), small=True)
+
+        return Card(res, padding=1)
+
+    def recalculate(self):
+        with self.cells.db.view() as v:
+            try:
+                self.cols = list(self.colFun())
+            except SubscribeAndRetry:
+                raise
+            except:
+                logging.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
+                self.cols = []
+
+            try:
+                self.unfilteredRows = list(self.rowFun())
+                self.filteredRows = self.filterRows(self.unfilteredRows)
+                self.rows = self.sortRows(self.filteredRows)
+
+            except SubscribeAndRetry:
+                raise
+            except:
+                logging.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
+                self.rows = []
+
+            new_subscriptions = set(v._reads).union(set(v._indexReads))
+
+            for k in new_subscriptions.difference(self.subscriptions):
+                self.cells.keysToCells.setdefault(k, set()).add(self)
+
+            for k in self.subscriptions.difference(new_subscriptions):
+                self.cells.keysToCells.setdefault(k, set()).discard(self)
+
+            self.subscriptions = new_subscriptions
+
+        new_children = {}
+        seen = set()
+
+        for col_ix, col in enumerate(self.cols):
+            seen.add((None, col))
+            if (None,col) in self.existingItems:
+                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None,col)]
+            else:
+                try:
+                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = self.makeHeaderCell(col_ix)
+                except SubscribeAndRetry:
+                    raise
+                except:
+                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
+        
+        seen = set()
+        for row_ix, row in enumerate(self.rows):
+            for col_ix, col in enumerate(self.cols):
+                seen.add((row,col))
+                if (row,col) in self.existingItems:
+                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row,col)]
+                else:
+                    try:
+                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
+                    except SubscribeAndRetry:
+                        raise
+                    except:
+                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
+            
+        self.children = new_children
+
+        for i in list(self.existingItems):
+            if i not in seen:
+                del self.existingItems[i]
+        
+        totalPages = ((len(self.filteredRows) - 1) // self.maxRowsPerPage + 1)
+
+        rowDisplay = "____left__ ____right__ Page ____page__ of " + str(totalPages)
+        if totalPages <= 1:
+            self.children['____page__'] = Cell.makeCell(totalPages).nowrap()
+        else:
+            self.children['____page__'] = SingleLineTextBox(self.curPage, pattern="[0-9]+").width(10 * len(str(totalPages)) + 6).height(20).nowrap()
+        if self.curPage.get() == "1":
+            self.children['____left__'] = Octicon("triangle-left").nowrap().color("lightgray")
+        else:
+            self.children['____left__'] = Clickable(Octicon("triangle-left"), lambda: self.curPage.set(str(int(self.curPage.get())-1))).nowrap()
+
+        if self.curPage.get() == str(totalPages):
+            self.children['____right__'] = Octicon("triangle-right").nowrap().color("lightgray")
+        else:
+            self.children['____right__'] = Clickable(Octicon("triangle-right"), lambda: self.curPage.set(str(int(self.curPage.get())+1))).nowrap()
+
+        self.contents = ("""
+            <table class="table-hscroll table-sm table-striped">
+            <thead style="border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;""><tr>""" + 
+                ('<th style="vertical-align:top"><div class="card"><div class="card-body p-1">%s</div></div></th>' % rowDisplay) + """__headers__</tr></thead>
+            <tbody>
+            __rows__
+            </tbody>
+            </table>
+            """.replace("__headers__",
+                "".join('<th style="vertical-align:top">____header_%s__</th>' % (col_ix)
+                            for col_ix in range(len(self.cols)))
+                ).replace("__rows__", 
+                "\n".join("<tr>" + 
+                    ("<td>%s</td>" % (row_ix+1)) + 
+                    "".join(
+                        "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
+                            for col_ix in range(len(self.cols))
+                        )
+                    + "</tr>"
+                        for row_ix in range(len(self.rows))
+                    )
+                )
             )
 
 class Clickable(Cell):
-    def __init__(self, content, f):
+    def __init__(self, content, f, makeBold=False, makeUnderling=False):
         super().__init__()
         self.f = f
-        self.content = content
+        self.content = Cell.makeCell(content)
+        self.bold = makeBold
 
     def calculatedOnClick(self):
         if isinstance(self.f, str):
@@ -788,12 +1158,20 @@ class Clickable(Cell):
             return "websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))".replace("__identity__", self.identity)
 
     def recalculate(self):
-        self.children = {'____contents__': Cell.makeCell(self.content)}
+        self.children = {'____contents__': self.content}
 
         self.contents = """
-            <div onclick="__onclick__">
+            <div onclick="__onclick__" __style__>
             ____contents__
-            </div>""".replace('__onclick__', self.calculatedOnClick())
+            </div>""".replace(
+                '__onclick__', self.calculatedOnClick()
+                ).replace(
+                '__style__', 
+                self._divStyle("cursor:pointer;*cursor: hand" + (";font-weight:bold" if self.bold else ""))
+                )
+
+    def sortsAs(self):
+        return self.content.sortsAs()
 
     def onMessage(self, msgFrame):
         t0 = time.time()
@@ -819,7 +1197,7 @@ class Button(Clickable):
         self.small = small
 
     def recalculate(self):
-        self.children = {'____contents__': Cell.makeCell(self.content)}
+        self.children = {'____contents__': self.content}
         self.contents = ("""
             <button 
                 class='btn btn-primary __size__' 
@@ -827,7 +1205,7 @@ class Button(Clickable):
                 >
             ____contents__
             </button>"""
-            .replace("__size__", "" if not self.small else "btn-sm")
+            .replace("__size__", "" if not self.small else "btn-xs")
             .replace('__identity__', self.identity)
             .replace("__onclick__", self.calculatedOnClick())
         )
@@ -873,27 +1251,37 @@ def ensureSubscribedSchema(t, lazy=False):
             )
 
 class Expands(Cell):
-    def __init__(self, closed, open):
+    def __init__(self, closed, open, closedIcon=Octicon("diff-added)"), openedIcon=Octicon("diff-removed"), initialState=False):
         super().__init__()
-        self.isExpanded = False
+        self.isExpanded = initialState
         self.closed = closed
         self.open = open
+        self.openedIcon = openedIcon
+        self.closedIcon = closedIcon
+
+    def sortsAs(self):
+        if self.isExpanded:
+            return self.open.sortsAs()
+        return self.closed.sortsAs()
 
     def recalculate(self):
         self.contents = """
-            <div>
+            <div __style__>
                 <div onclick="websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
                         style="display:inline-block;vertical-align:top">
-                    <span class="octicon octicon-diff-__which__" aria-hidden="true"></span>
+                    ____icon__
                 </div>
 
                 <div style="display:inline-block">
                     ____child__
                 </div>
-
             </div>
-            """.replace("__identity__", self.identity).replace("__which__", 'removed' if self.isExpanded else 'added')
-        self.children = {'____child__': self.open if self.isExpanded else self.closed}
+            """.replace("__identity__", self.identity)
+        self.contents = self.contents.replace("__style__", self._divStyle())
+        self.children = {
+            '____child__': self.open if self.isExpanded else self.closed,
+            '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
+            }
 
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded

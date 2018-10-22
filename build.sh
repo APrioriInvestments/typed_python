@@ -17,7 +17,7 @@ do
             docker run -it --rm --privileged --entrypoint bash nativepython/cloud:latest -c "gdb -ex run --args /usr/bin/python3 ./test.py -v -s"
             ;;
         -r|--run )
-            docker run -it --rm --entrypoint bash nativepython/cloud:latest
+            docker run -v `pwd`:/code -p 80:80 --workdir /code -it --rm --entrypoint bash nativepython/cloud:latest
             ;;
         -p|--push )
             docker push nativepython/cloud:latest
