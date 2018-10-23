@@ -452,6 +452,10 @@ class DatabaseConnection:
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
 
+    def disconnect(self):
+        self.disconnected.set()
+        self._channel.close()
+
     def addSchema(self, schema):
         schema.freeze()
 

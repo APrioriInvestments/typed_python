@@ -35,6 +35,12 @@ import time
 import psutil
 from object_database.util import configureLogging
 
+def currentMemUsageMb(residentOnly=True):
+    if residentOnly:
+        return psutil.Process().memory_info().rss / 1024 ** 2
+    else:
+        return psutil.Process().memory_info().vms / 1024 ** 2
+
 configureLogging("test", error=True)
 
 class BlockingCallback:
@@ -123,6 +129,35 @@ class ObjectDatabaseTests:
 
         with db.view():
             z = ThingWithDicts.lookupAll()
+
+    def test_disconnecting(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+        db.disconnect()
+
+        with self.assertRaises(DisconnectedException):
+            with db.view():
+                pass
+
+        usage = currentMemUsageMb(residentOnly=False)
+
+        for i in range(100):
+            db = self.createNewDb()
+            db.subscribeToSchema(schema)
+            db.flush()
+            db.disconnect()
+
+
+        usage = currentMemUsageMb(residentOnly=False)
+
+        for i in range(500):
+            db = self.createNewDb()
+            db.subscribeToSchema(schema)
+            db.flush()
+            db.disconnect()
+            assert currentMemUsageMb(residentOnly=False) < usage + 100
+
+            
 
     def test_lazy_subscriptions(self):
         db = self.createNewDb()
@@ -1235,9 +1270,7 @@ class ObjectDatabaseTests:
         db1.subscribeToSchema(schema)
         db2.subscribeToSchema(schema)
 
-        def getMem():
-            return psutil.Process().memory_info().rss / 1024 ** 2
-        m0 = getMem()
+        m0 = currentMemUsageMb()
 
         for passIx in range(3):
             for i in range(1000):
@@ -1248,8 +1281,8 @@ class ObjectDatabaseTests:
                     x.delete()
 
             self.server._garbage_collect(intervalOverride=.1)
-            print(passIx, getMem())
-            self.assertTrue(getMem() < m0 + 10.0)
+            print(passIx, currentMemUsageMb())
+            self.assertTrue(currentMemUsageMb() < m0 + 10.0)
 
         db1.flush()
         db2.flush()

@@ -94,6 +94,13 @@ class ClientToServerProtocol(AlgebraicProtocol):
             self.sendMessage(ClientToServer.Heartbeat())
             self.loop.call_later(getHeartbeatInterval(), self.heartbeat)
 
+    def close(self):
+        self.loop.call_soon_threadsafe(self._close)
+
+    def _close(self):
+        self.disconnected = True
+        self.transport.close()        
+
     def connection_lost(self, e):
         self.disconnected = True
         self.messageReceived(ServerToClient.Disconnected())
