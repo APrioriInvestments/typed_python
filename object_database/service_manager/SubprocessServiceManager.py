@@ -47,11 +47,13 @@ def parseLogfileToInstanceid(fname):
     return fname.split("-")[-1][:-8]
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None, shutdownTimeout=None):
+    def __init__(self, own_hostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4, 
+                        logfileDirectory=None, shutdownTimeout=None, errorLogsOnly=False):
         self.own_hostname = own_hostname
         self.host = host
         self.port = port
         self.logfileDirectory = logfileDirectory
+        self.errorLogsOnly = errorLogsOnly
         self.lock = threading.Lock()
         self.storageDir = storageDir
 
@@ -93,7 +95,7 @@ class SubprocessServiceManager(ServiceManager):
                     instanceIdentity, 
                     os.path.join(self.sourceDir, instanceIdentity), 
                     os.path.join(self.storageDir, instanceIdentity)
-                    ],
+                    ] + (["--error_logs_only"] if self.errorLogsOnly else []),
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT

@@ -35,10 +35,11 @@ def main(argv):
     parser.add_argument("instanceid")
     parser.add_argument("sourceDir")
     parser.add_argument("storageRoot")
+    parser.add_argument("--error_logs_only", action='store_true', default=False)
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    configureLogging(parsedArgs.instanceid[:8])
+    configureLogging(parsedArgs.instanceid[:8], error=parsedArgs.error_logs_only)
 
     logging.info("service_entrypoint.py connecting to %s:%s for %s", 
         parsedArgs.host, 
