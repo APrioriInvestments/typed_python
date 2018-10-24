@@ -155,9 +155,7 @@ class ObjectDatabaseTests:
             db.subscribeToSchema(schema)
             db.flush()
             db.disconnect()
-            assert currentMemUsageMb(residentOnly=False) < usage + 100
-
-            
+            assert currentMemUsageMb(residentOnly=False) < usage + 100            
 
     def test_lazy_subscriptions(self):
         db = self.createNewDb()

@@ -606,7 +606,7 @@ class DatabaseConnection:
                 except:
                     logging.error("Condition callback threw an exception:\n%s", traceback.format_exc())
 
-                time.sleep(timeout / 20)
+                time.sleep(min(timeout / 20, .25))
         return False
 
     def _data_key_to_object(self, key):

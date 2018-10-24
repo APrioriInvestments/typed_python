@@ -213,13 +213,14 @@ class Server:
                         )
 
                     c.close()
+                    self.dropConnection(c)
 
             logging.info("Connection heartbeat distribution is %s", heartbeatCount)
 
     def dropConnection(self, channel):
         with self._lock:
             if channel not in self._clientChannels:
-                logging.error('Tried to drop a nonexistant channel')
+                logging.warn('Tried to drop a nonexistant channel')
                 return
 
             connectedChannel = self._clientChannels[channel]
