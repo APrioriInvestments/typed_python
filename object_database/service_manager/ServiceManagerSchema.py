@@ -169,7 +169,6 @@ class LogRequest:
     response = OneOf(None, service_schema.LogResponse)
     timestamp = float #so we can clean up old requests that timed out
 
-
 @service_schema.define
 class ServiceHost:
     connection = Indexed(core_schema.Connection)

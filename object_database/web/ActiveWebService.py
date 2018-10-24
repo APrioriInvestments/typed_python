@@ -77,6 +77,7 @@ class ActiveWebService(ServiceBase):
 
     def initialize(self):
         self.db.subscribeToType(Configuration)
+        self.db.subscribeToSchema(service_schema)
 
         with self.db.transaction():
             self.app = Flask(__name__)

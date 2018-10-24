@@ -28,7 +28,14 @@ class ServiceWorker:
     def __init__(self, dbConnectionFactory, instance_id, sourceDir, storageRoot):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
-        self.db.subscribeToSchema(core_schema, service_schema)
+        self.db.subscribeToSchema(core_schema)
+
+        #explicitly don't subscribe to everyone else's service hosts!
+        self.db.subscribeToType(service_schema.Service)
+        self.db.subscribeToType(service_schema.LogRequest)
+        self.db.subscribeToType(service_schema.LogResponse)
+        self.db.subscribeToType(service_schema.Codebase, lazySubscription=True)
+
         self.sourceDir = sourceDir
         self.runtimeConfig = ServiceRuntimeConfig(sourceDir, storageRoot)
 
@@ -38,7 +45,12 @@ class ServiceWorker:
             os.makedirs(storageRoot)
 
         self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
-        
+        self.db.subscribeToObject(self.instance)
+
+        with self.db.view():
+            host = self.instance.host
+        self.db.subscribeToObject(host)
+
         self.serviceObject = None
         self.serviceName = None
 
