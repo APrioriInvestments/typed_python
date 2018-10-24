@@ -699,10 +699,10 @@ class DatabaseConnection:
             self._versioned_data.cleanup(self._cur_transaction_num)
 
     def _onMessage(self, msg):
-        with self._lock:
-            self._messages_received += 1
+        self._messages_received += 1
             
-            if msg.matches.Disconnected:
+        if msg.matches.Disconnected:
+            with self._lock:
                 self.disconnected.set()
                 self.connectionObject = None
                 
@@ -726,18 +726,21 @@ class DatabaseConnection:
 
                 self._transaction_callbacks = {}
                 self._flushEvents = {} 
-            elif msg.matches.FlushResponse:
+        elif msg.matches.FlushResponse:
+            with self._lock:
                 e = self._flushEvents.get(msg.guid)
                 if not e:
                     logging.error("Got an unrequested flush response: %s", msg.guid)
                 else:
                     e.set()
-            elif msg.matches.Initialize:
+        elif msg.matches.Initialize:
+            with self._lock:
                 self._cur_transaction_num = msg.transaction_num
                 self.identityProducer = IdentityProducer(msg.identity_root)
                 self.connectionObject = core_schema.Connection.fromIdentity(msg.connIdentity)
                 self.initialized.set()
-            elif msg.matches.TransactionResult:
+        elif msg.matches.TransactionResult:
+            with self._lock:
                 try:
                     self._transaction_callbacks.pop(msg.transaction_guid)(
                         TransactionResult.Success() if msg.success 
@@ -748,7 +751,8 @@ class DatabaseConnection:
                         "Transaction commit callback threw an exception:\n%s", 
                         traceback.format_exc()
                         )
-            elif msg.matches.Transaction:
+        elif msg.matches.Transaction:
+            with self._lock:
                 key_value = {}
                 priors = {}
 
@@ -776,25 +780,28 @@ class DatabaseConnection:
 
                 self._cur_transaction_num = msg.transaction_id
 
-                for handler in self._onTransaction:
-                    try:
-                        handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
-                    except:
-                        logging.error(
-                            "_onTransaction callback %s threw an exception:\n%s", 
-                            handler, 
-                            traceback.format_exc()
-                            )
-
                 self._versioned_data.cleanup(self._cur_transaction_num)
+            
+            for handler in self._onTransaction:
+                try:
+                    handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
+                except:
+                    logging.error(
+                        "_onTransaction callback %s threw an exception:\n%s", 
+                        handler, 
+                        traceback.format_exc()
+                        )
 
-            elif msg.matches.SubscriptionIncrease:
+
+        elif msg.matches.SubscriptionIncrease:
+            with self._lock:
                 subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
                 if subscribedIdentities is not Everything:
                     subscribedIdentities.update(
                         msg.identities
                         )
-            elif msg.matches.SubscriptionData:
+        elif msg.matches.SubscriptionData:
+            with self._lock:
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
 
                 if lookupTuple not in self._subscription_buildup:
@@ -809,10 +816,12 @@ class DatabaseConnection:
                     if self._subscription_buildup[lookupTuple]['identities'] is None:
                         self._subscription_buildup[lookupTuple]['identities'] = set()
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
-            elif msg.matches.LazyTransactionPriors:
+        elif msg.matches.LazyTransactionPriors:
+            with self._lock:
                 for k,v in msg.writes.items():
                     self._versioned_data.setVersionedTailValueStringified(k,bytes.fromhex(v) if v is not None else None)
-            elif msg.matches.LazyLoadResponse:
+        elif msg.matches.LazyLoadResponse:
+            with self._lock:
                 for k,v in msg.values.items():
                     self._versioned_data.setVersionedTailValueStringified(k,bytes.fromhex(v) if v is not None else None)
 
@@ -822,7 +831,8 @@ class DatabaseConnection:
                 if e:
                     e.set()
 
-            elif msg.matches.LazySubscriptionData:
+        elif msg.matches.LazySubscriptionData:
+            with self._lock:
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
 
                 assert lookupTuple not in self._subscription_buildup
@@ -834,7 +844,8 @@ class DatabaseConnection:
                     'markedLazy': True
                     }
 
-            elif msg.matches.SubscriptionComplete:
+        elif msg.matches.SubscriptionComplete:
+            with self._lock:
                 event = self._pendingSubscriptions.get((msg.schema, msg.typename, 
                     tuple(msg.fieldname_and_value) if msg.fieldname_and_value is not None else None))
 
@@ -921,8 +932,8 @@ class DatabaseConnection:
                 self._cur_transaction_num = msg.tid
 
                 event.set()
-            else:
-                assert False, "unknown message type " + msg._which
+        else:
+            assert False, "unknown message type " + msg._which
 
     def indexValuesToSetAdds(self, indexValues):
         #indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds 
