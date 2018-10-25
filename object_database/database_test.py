@@ -514,7 +514,33 @@ class ObjectDatabaseTests:
             with self.assertRaises(RevisionConflictException):
                 with t2:
                     root.obj.k = expr.Constant(value=root.obj.k.value + 1)
-    
+
+    def test_conflicts_dont_cause_view_leaks(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            root = Root()
+            root.obj = Object(k=expr.Constant(value=0))
+
+        t1 = db.transaction()
+        t2 = db.transaction()
+
+        with t1:
+            root.obj.k = expr.Constant(value=root.obj.k.value + 1)
+
+        try:
+            with t2:
+                root.obj.k = expr.Constant(value=root.obj.k.value + 1)
+        except RevisionConflictException as e:
+            pass
+
+        for i in range(100):
+            with db.transaction():
+                root.obj.k = expr.Constant(value=root.obj.k.value + 1)
+
+        self.assertTrue(db._noViewsOutstanding())
+
     def test_object_versions_robust(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)

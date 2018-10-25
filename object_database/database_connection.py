@@ -456,6 +456,10 @@ class DatabaseConnection:
         self.disconnected.set()
         self._channel.close()
 
+    def _noViewsOutstanding(self):
+        with self._lock:
+            return not self._versioned_data._version_number_refcount
+
     def addSchema(self, schema):
         schema.freeze()
 
@@ -781,7 +785,7 @@ class DatabaseConnection:
                 self._cur_transaction_num = msg.transaction_id
 
                 self._versioned_data.cleanup(self._cur_transaction_num)
-            
+
             for handler in self._onTransaction:
                 try:
                     handler(key_value, priors, set_adds, set_removes, msg.transaction_id)

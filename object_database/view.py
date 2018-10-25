@@ -442,10 +442,11 @@ class View(object):
 
     def __exit__(self, type, val, tb):
         del _cur_view.view
-        if type is None and self._writes:
-            self.commit()
-
-        self._db._releaseView(self)
+        try:
+            if type is None and self._writes:
+                self.commit()
+        finally:
+            self._db._releaseView(self)
 
 class Transaction(View):
     _writeable = True
