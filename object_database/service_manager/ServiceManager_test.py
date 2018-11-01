@@ -43,6 +43,12 @@ class TestServiceCounter:
     k = int
 
 @schema.define
+class PointsToShow:
+    timestamp = float
+    y = float
+
+
+@schema.define
 class TestServiceLastTimestamp:
     connection = Indexed(core_schema.Connection)
     lastPing = float
@@ -103,15 +109,72 @@ class UninitializableService(ServiceBase):
     def doWork(self, shouldStop):
         time.sleep(120)
 
+
+
+class GraphDisplayService(ServiceBase):
+    @staticmethod
+    def addAPoint():
+        PointsToShow(timestamp = time.time(), y = len(PointsToShow.lookupAll()) ** 2.2)
+
+    @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
-        return Table(
-            colFun=lambda: ['C1', "C2", "C3"],
-            rowFun=lambda: list(range(1000)),
-            headerFun=lambda x: x,
-            rendererFun=lambda s,field: Subscribed(lambda: field + "_" + str(s)),
-            maxRowsPerPage=10
+        ensureSubscribedType(PointsToShow)
+        depth = Slot(50)
+
+        return Tabs(
+            Overlay=
+                Card(Plot(lambda: {'single_array': [1,2,3,1,2,3], 
+                                'xy': {'x': [1,2,3,1,2,3], 'y': [4,5,6,7,8,9]},
+                                }
+                    ).width(600).height(400)
+                ),
+            Timestamps=
+                Button("Add a point!", GraphDisplayService.addAPoint) + 
+                Card(Plot(GraphDisplayService.chartData)).width(600).height(400),
+            feigenbaum=
+                Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
+                Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
             )
+
+
+    @staticmethod
+    def chartData():
+        points = sorted(PointsToShow.lookupAll(), key=lambda p: p.timestamp)
+
+        return {'PointsToShow': {'timestamp': [p.timestamp for p in points], 'y': [p.y for p in points]}}
+
+    @staticmethod
+    def feigenbaum(linePlot, depth):
+        if linePlot.curXYRanges.get() is None:
+            left,right = 0.0, 4.0
+        else:
+            left, right = linePlot.curXYRanges.get()[0]
+            left = max(0.0,left) if left is not None else 3
+            right = min(4.0, right) if right is not None else 4
+            left = min(left,right - 1e-6)
+            right = max(left + 1e-6,right)
         
+        values = numpy.linspace(left,right,1500,endpoint=True)
+
+        def feigenbaum(values):
+            x = numpy.ones(len(values)) * .5
+            for _ in range(10000):
+                x = values * x * (1-x)
+
+            its = []
+            for _ in range(depth):
+                x = values * x * (1-x)
+                its.append(x)
+
+            return numpy.concatenate(its)
+
+        fvals = feigenbaum(values)
+
+        return {"feigenbaum": {'x': numpy.concatenate([values]*(len(fvals)//len(values))), 'y': fvals, 'type':'scattergl',
+                'mode':'markers', 'opacity': .5, 'marker': {'size':2}}}
+
+
+
 
 happy = Schema("core.test.happy")
 @happy.define

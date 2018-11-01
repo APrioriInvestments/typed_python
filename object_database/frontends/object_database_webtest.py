@@ -28,10 +28,12 @@ import argparse
 
 from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.service_manager.ServiceManager_test import UninitializableService, HappyService
+from object_database.service_manager.ServiceManager_test import UninitializableService, \
+                                                        HappyService, GraphDisplayService
 from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema, current_transaction
+from object_database import Schema, Indexed, Index, core_schema, TcpServer,\
+                    connect, service_schema, current_transaction
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
@@ -66,6 +68,10 @@ def main(argv=None):
 
             with database.transaction():
                 service = ServiceManager.createService(HappyService, "HappyService", target_count=1)
+
+            with database.transaction():
+                service = ServiceManager.createService(GraphDisplayService, "GraphDisplayService", target_count=1)
+
 
 
             while True:

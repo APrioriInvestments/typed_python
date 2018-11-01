@@ -41,10 +41,6 @@ $('.popover-dismiss').popover({
   trigger: 'focus'
 });
 
-$('[data-table-enabled="true"]').DataTable({
-    paging: false
-    });
-
 $('[data-poload]').on('show.bs.dropdown', function (arg) {
   var target = arg.currentTarget;
 

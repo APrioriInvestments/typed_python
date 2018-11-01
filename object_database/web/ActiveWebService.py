@@ -118,45 +118,48 @@ class ActiveWebService(ServiceBase):
 
         serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
 
-        return Table(
-            colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Logs', 'Cores', 'RAM', 'Boot Status'],
-            rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
-            headerFun=lambda x: x,
-            rendererFun=lambda s,field: Subscribed(lambda: 
-                Clickable(s.name, "/services/" + s.name) if field == 'Service' else
-                (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
-                s.service_module_name if field == 'Module' else
-                s.service_class_name if field == 'Class' else 
-                s.placement if field == 'Placement' else 
-                Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
-                Dropdown("", [(si._identity + " on " + si.host.hostname, "/service_instances/" + si._identity)
-                            for si in service_schema.ServiceInstance.lookupAll(service=s)
-                            ]) 
-                        if field == 'Logs' else 
-                Dropdown(s.target_count, [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
-                        if field == 'TargetCount' else 
-                str(s.coresUsed) if field == 'Cores' else 
-                str(s.gbRamUsed) if field == 'RAM' else 
-                (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
-                ""
+        return Tabs(
+            Services=Table(
+                colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Logs', 'Cores', 'RAM', 'Boot Status'],
+                rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
+                headerFun=lambda x: x,
+                rendererFun=lambda s,field: Subscribed(lambda: 
+                    Clickable(s.name, "/services/" + s.name) if field == 'Service' else
+                    (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
+                    s.service_module_name if field == 'Module' else
+                    s.service_class_name if field == 'Class' else 
+                    s.placement if field == 'Placement' else 
+                    Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
+                    Dropdown("", [(si._identity + " on " + si.host.hostname, "/service_instances/" + si._identity)
+                                for si in service_schema.ServiceInstance.lookupAll(service=s)
+                                ]) 
+                            if field == 'Logs' else 
+                    Dropdown(s.target_count, [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
+                            if field == 'TargetCount' else 
+                    str(s.coresUsed) if field == 'Cores' else 
+                    str(s.gbRamUsed) if field == 'RAM' else 
+                    (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
+                    ""
+                    ),
+                maxRowsPerPage=10
                 ),
-            maxRowsPerPage=10
-            ) + Table(
-            colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
-            rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
-            headerFun=lambda x: x,
-            rendererFun=lambda s,field: Subscribed(lambda: 
-                s.connection._identity if field == "Connection" else
-                str(s.isMaster) if field == "IsMaster" else
-                s.hostname if field == "Hostname" else
-                "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM ALLOCATION" else
-                "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE ALLOCATION" else
-                str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
-                "%2.1f" % (s.cpuUse * 100) + "%" if field == "CPU USE" else
-                ("%2.1f" % s.actualMemoryUseGB) + " GB" if field == "RAM USE" else
-                ""
-                ),
-            maxRowsPerPage=10
+            Hosts=Table(
+                colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
+                rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
+                headerFun=lambda x: x,
+                rendererFun=lambda s,field: Subscribed(lambda: 
+                    s.connection._identity if field == "Connection" else
+                    str(s.isMaster) if field == "IsMaster" else
+                    s.hostname if field == "Hostname" else
+                    "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam) if field == "RAM ALLOCATION" else
+                    "%s / %s" % (s.coresUsed, s.maxCores) if field == "CORE ALLOCATION" else
+                    str(len(service_schema.ServiceInstance.lookupAll(host=s))) if field == "SERVICE COUNT" else
+                    "%2.1f" % (s.cpuUse * 100) + "%" if field == "CPU USE" else
+                    ("%2.1f" % s.actualMemoryUseGB) + " GB" if field == "RAM USE" else
+                    ""
+                    ),
+                maxRowsPerPage=10
+                )
             )
 
     def pageForServiceInstance(self, serviceInstanceObj):

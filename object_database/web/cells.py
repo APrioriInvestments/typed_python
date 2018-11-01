@@ -8,6 +8,9 @@ import logging
 import gevent
 import gevent.fileobject
 import threading
+import numpy
+
+from inspect import signature
 
 from object_database.view import RevisionConflictException 
 from object_database.view import current_transaction
@@ -81,6 +84,7 @@ class Cells:
         self.transactionQueue = queue.Queue()
         self.gEventHasTransactions = GeventPipe()
         self.keysToCells = {}
+
         self._id = 0
 
         self._addCell(self.root, None)
@@ -262,6 +266,9 @@ class Slot:
         self._value = value
         self._subscribedCells = set()
 
+    def setter(self, val):
+        return lambda: self.set(val)
+
     def get(self):
         if _cur_cell.cell:
             self._subscribedCells.add(_cur_cell.cell)
@@ -284,11 +291,23 @@ class Cell:
         self._identity = None
         self.postscript = None
         self.garbageCollected = False
+        self.subscriptions  = set()
         self._nowrap = False
         self._width = None
         self._color = None
         self._height = None
     
+    def _resetSubscriptionsToViewReads(self, view):
+        new_subscriptions = set(view._reads).union(set(view._indexReads))
+
+        for k in new_subscriptions.difference(self.subscriptions):
+            self.cells.keysToCells.setdefault(k, set()).add(self)
+
+        for k in self.subscriptions.difference(new_subscriptions):
+            self.cells.keysToCells.setdefault(k, set()).discard(self)
+
+        self.subscriptions = new_subscriptions
+
     def sortsAs(self):
         return None
 
@@ -495,6 +514,72 @@ class Main(Cell):
         """
         self.children = {'____child__': child}
 
+
+
+class _NavTab(Cell):
+    def __init__(self, slot, index, target, child):
+        super().__init__()
+
+        self.slot = slot
+        self.index = index
+        self.target = target
+        self.child = child
+
+    def recalculate(self):
+        self.contents = ("""
+            <li class="nav-item">
+                <a class="nav-link __active__" role="tab" 
+                    onclick="websocket.send(JSON.stringify({'event':'click', 'ix': __ix__, 'target_cell': '__identity__'}))"
+                    >
+                    ____child__
+                </a>
+            </li>
+            """.replace("__identity__", self.target)
+               .replace("__ix__", str(self.index))
+               .replace("__active__", "active" if self.index == self.slot.get() else "")
+            )
+
+        self.children['____child__'] = Cell.makeCell(self.child)
+
+class Tabs(Cell):
+    def __init__(self, headersAndChildren=(), **headersAndChildrenKwargs):
+        super().__init__()
+
+        self.whichSlot = Slot(0)
+        self.headersAndChildren = list(headersAndChildren)
+        self.headersAndChildren.extend(headersAndChildrenKwargs.items())
+
+    def sortsAs(self):
+        return None
+
+    def recalculate(self):
+        items = []
+        
+        self.children['____display__'] = Subscribed(lambda: self.headersAndChildren[self.whichSlot.get()][1])
+        
+        for i in range(len(self.headersAndChildren)):
+            self.children['____header_{ix}__'.format(ix=i)] = _NavTab(self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
+
+        self.contents = """
+                <div class="container-fluid mb-3">
+                     <ul class="nav nav-tabs" role="tablist">
+                      __items__
+                    </ul>
+                    <div class="tab-content">
+                      <div class="tab-pane fade show active" role="tabpanel">____display__
+                    </div>
+                </div>
+                """.replace(
+                    "__items__", 
+                    "".join(
+                        """ ____header___ix____ """.replace('__ix__', str(i))
+                            for i in range(len(self.headersAndChildren))
+                        )
+                    ).replace("__identity__", self._identity)
+
+    def onMessage(self, msgFrame):
+        self.whichSlot.set(int(msgFrame['ix']))
+
 class Dropdown(Cell):
     def __init__(self, title, headersAndLambdas):
         super().__init__()
@@ -612,8 +697,6 @@ class Subscribed(Cell):
 
         self.f = f
 
-        self.subscriptions  = set()
-
     def prepareForReuse(self):
         self.subscriptions = set()
         return super().prepareForReuse()
@@ -631,21 +714,16 @@ class Subscribed(Cell):
         with self.cells.db.view() as v:
             self.contents = """<div %s>____contents__</div>""" % self._divStyle()
             try:
-                self.children = {'____contents__': Cell.makeCell(self.f())}
+                c = Cell.makeCell(self.f())
+                if c.cells is not None:
+                    c.prepareForReuse()
+                self.children = {'____contents__': c}
             except SubscribeAndRetry:
                 raise
             except:
                 self.children = {'____contents__': Traceback(traceback.format_exc())}
 
-            new_subscriptions = set(v._reads).union(set(v._indexReads))
-
-            for k in new_subscriptions.difference(self.subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).add(self)
-
-            for k in self.subscriptions.difference(new_subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).discard(self)
-
-            self.subscriptions = new_subscriptions
+            self._resetSubscriptionsToViewReads(v)
 
 class SubscribedSequence(Cell):
     def __init__(self, itemsFun, rendererFun):
@@ -679,15 +757,7 @@ class SubscribedSequence(Cell):
                 logging.error("Spine calc threw an exception:\n%s", traceback.format_exc())
                 self.spine = []
 
-            new_subscriptions = set(v._reads).union(set(v._indexReads))
-
-            for k in new_subscriptions.difference(self.subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).add(self)
-
-            for k in self.subscriptions.difference(new_subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).discard(self)
-
-            self.subscriptions = new_subscriptions
+            self._resetSubscriptionsToViewReads(v)
 
             new_children = {}
             for ix, s in enumerate(self.spine):
@@ -783,15 +853,7 @@ class Grid(Cell):
                 logging.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
-            new_subscriptions = set(v._reads).union(set(v._indexReads))
-
-            for k in new_subscriptions.difference(self.subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).add(self)
-
-            for k in self.subscriptions.difference(new_subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).discard(self)
-
-            self.subscriptions = new_subscriptions
+            self._resetSubscriptionsToViewReads(v)
 
         new_children = {}
         seen = set()
@@ -1058,15 +1120,7 @@ class Table(Cell):
                 logging.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
 
-            new_subscriptions = set(v._reads).union(set(v._indexReads))
-
-            for k in new_subscriptions.difference(self.subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).add(self)
-
-            for k in self.subscriptions.difference(new_subscriptions):
-                self.cells.keysToCells.setdefault(k, set()).discard(self)
-
-            self.subscriptions = new_subscriptions
+            self._resetSubscriptionsToViewReads(v)
 
         new_children = {}
         seen = set()
@@ -1286,3 +1340,139 @@ class Expands(Cell):
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded
         self.markDirty()
+
+class Plot(Cell):
+    """Produce some reactive line plots."""
+    def __init__(self, namedDataSubscriptions):
+        """Initialize a line plot. 
+
+        namedDataSubscriptions: a map from plot name to a lambda function
+            producing either an array, or {x: array, y: array}
+        """
+        super().__init__()
+
+        self.namedDataSubscriptions = namedDataSubscriptions
+        self.curXYRanges = Slot(None)
+
+    def recalculate(self):
+        self.contents = """
+            <div __style__></div>
+            ____chart_updater__
+            
+            """.replace("__style__", self._divStyle())
+
+        self.children = {
+            '____chart_updater__': _PlotUpdater(self)
+            }
+
+        self.postscript = """
+            plotDiv = document.getElementById('__identity__');
+            Plotly.plot( 
+                plotDiv, 
+                [],
+                { margin: {t : 30, l: 30, r: 30, b:30 }
+                },
+                { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
+                    modeBarButtons: [ ['pan2d'], ['zoom2d'], ['zoomIn2d'], ['zoomOut2d'] ] } 
+                );
+            plotDiv.on('plotly_relayout',
+                function(eventdata){  
+                    websocket.send(JSON.stringify(
+                        {'event':'plot_layout', 
+                         'target_cell': '__identity__',
+                         'data': eventdata
+                         }
+                        )
+                    )
+                });
+
+            """.replace("__identity__", self._identity)
+
+    def onMessage(self, msgFrame):
+        d = msgFrame['data']
+        curVal = self.curXYRanges.get() or ((None, None), (None,None))
+
+        self.curXYRanges.set(
+            ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]',curVal[0][1])),
+             (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]',curVal[1][1])))
+            )
+
+class _PlotUpdater(Cell):
+    """Helper utility to push data into an existing line plot."""
+    def __init__(self, linePlot):
+        super().__init__()
+
+        self.linePlot = linePlot
+        self.namedDataSubscriptions = linePlot.namedDataSubscriptions
+        self.chartId = linePlot._identity
+
+    def calculatedDataJson(self):
+        series = self.callFun(self.namedDataSubscriptions)
+        
+        assert isinstance(series, (dict, list))
+
+        if isinstance(series, dict):
+            return [self.processSeries(callableOrData, name) for name, callableOrData in 
+                        series.items()]
+        else:
+            return [self.processSeries(callableOrData, None) for callableOrData in 
+                        series]
+
+    def callFun(self, fun):
+        if not callable(fun):
+            return fun
+
+        sig = signature(fun)
+        if len(sig.parameters) == 0:
+            return fun()
+        if len(sig.parameters) == 1:
+            return fun(self.linePlot)
+        assert False, "%s expects more than 1 argument" % fun
+
+    def processSeries(self, callableOrData, name):
+        data = self.callFun(callableOrData)
+
+        if isinstance(data, list):
+            res = {'x': [float(x) for x in range(len(data))], 'y': [float(d) for d in data]}
+        else:
+            assert isinstance(data, dict)
+            res = dict(data)
+
+            for k,v in res.items():
+                if isinstance(v, numpy.ndarray):
+                    res[k] = v.astype('float64').tostring().hex()
+
+        if name is not None:
+            res['name'] = name
+
+        return res
+
+    def recalculate(self):
+        with self.cells.db.view() as v:
+            #we only exist to run our postscript
+            self.contents = """<div style='display:none'>"""
+
+            try:
+                jsonDataToDraw = self.calculatedDataJson()
+
+                self.postscript = """
+                    plotDiv = document.getElementById('__identity__');
+                    data = __data__.map(mapPlotlyData)
+
+                    Plotly.react( 
+                        plotDiv, 
+                        data,
+                        plotDiv.layout,
+                        );
+
+                    """.replace("__identity__", self.chartId).replace("__data__",
+                        json.dumps(jsonDataToDraw)
+                        )
+            except SubscribeAndRetry:
+                raise
+            except:
+                logging.error(traceback.format_exc())
+                self.contents = """<div>____contents__</div>"""
+                self.children = {'____contents__': Traceback(traceback.format_exc())}
+
+            self._resetSubscriptionsToViewReads(v)

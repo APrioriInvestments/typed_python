@@ -553,10 +553,10 @@ class AwsWorkerBootService(ServiceBase):
             rendererFun=lambda s,field: cells.Subscribed(lambda: 
                 s.instance_type if field == 'Instance Type' else
                 s.booted  if field == 'Booted' else 
-                cells.Dropdown(str(s.desired), [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
+                cells.Dropdown(s.desired, [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
                         if field == 'Desired' else 
                 s.spot_booted if field == 'SpotBooted' else 
-                cells.Dropdown(str(s.spot_desired), [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
+                cells.Dropdown(s.spot_desired, [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
                         if field == 'SpotDesired' else 
                 ("" if s.observedLimit is None else s.observedLimit) if field == 'ObservedLimit' else 
                 ("Yes" if s.capacityConstrained else "") if field == 'CapacityConstrained' else 
