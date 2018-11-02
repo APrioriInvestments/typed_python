@@ -341,6 +341,25 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(t(a=1,b=2).a, 1)
         self.assertEqual(t(a=1,b=2).b, 2)
 
+
+    def test_named_tuple_construction(self):
+        t = NamedTuple(a=int, b=int)
+
+        self.assertEqual(t(a=10).a, 10)
+        self.assertEqual(t(a=10).b, 0)
+        self.assertEqual(t(a=10,b=2).a, 10)
+        self.assertEqual(t(a=10,b=2).b, 2)
+        self.assertEqual(t({'a': 10,'b':2}).a, 10)
+        self.assertEqual(t({'a': 10,'b':2}).b, 2)
+
+        self.assertEqual(t({'b':2}).a, 0)
+        self.assertEqual(t({'b':2}).b, 2)
+
+        with self.assertRaises(TypeError):
+            t({'c':10})
+        with self.assertRaises(TypeError):
+            t(c=10)
+
     def test_named_tuple_str(self):
         t = NamedTuple(a=str, b=str)
 

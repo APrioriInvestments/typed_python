@@ -594,6 +594,8 @@ struct native_instance_wrapper {
             throw std::logic_error("Can't initialize " + t->name() + " with these in-place arguments.");
         } else {
             if (cat == Type::TypeCategory::catNamedTuple) {
+                long actuallyUsed = 0;
+
                 CompositeType* compositeT = ((CompositeType*)t);
 
                 compositeT->constructor(
@@ -603,6 +605,7 @@ struct native_instance_wrapper {
                         PyObject* o = PyDict_GetItemString(kwargs, compositeT->getNames()[k].c_str());
                         if (o) {
                             copy_initialize(eltType, eltPtr, o);
+                            actuallyUsed++;
                         }
                         else if (eltType->is_default_constructible()) {
                             eltType->constructor(eltPtr);
@@ -610,6 +613,11 @@ struct native_instance_wrapper {
                             throw std::logic_error("Can't default initialize argument " + compositeT->getNames()[k]);
                         }
                     });
+
+                if (actuallyUsed != PyDict_Size(kwargs)) {
+                    throw std::runtime_error("Couldn't initialize type of " + t->name() + " because supplied dictionary had unused arguments");
+                }
+
                 return;
             }
 
