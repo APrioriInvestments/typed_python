@@ -24,7 +24,21 @@ struct native_instance_wrapper {
     bool mIsMatcher; //-1 if we're not an iterator
     char mIteratorFlag; //0 is keys, 1 is values, 2 is pairs
     int64_t mIteratorOffset; //-1 if we're not an iterator
-    uint8_t data[0];
+    
+    Instance mContainingInstance;
+    int64_t mOffset; //byte offset within the instance that we hold
+
+    template<class init_func>
+    void initialize(const init_func& i) {
+        mIsInitialized = false;
+        new (&mContainingInstance) Instance( extractTypeFrom(((PyObject*)this)->ob_type), i );
+        mIsInitialized = true;
+        mOffset = 0;
+    }
+
+    instance_ptr dataPtr() {
+        return mContainingInstance.data() + mOffset;
+    }
 
     static PyObject* bytecount(PyObject* o) {
         NativeTypeWrapper* w = (NativeTypeWrapper*)o;
@@ -40,10 +54,13 @@ struct native_instance_wrapper {
 
             self->mIteratorOffset = 0;
             self->mIteratorFlag = 2;
-            self_type->copy_constructor(self->data, w->data);
-            self->mIsInitialized = true;
             self->mIsMatcher = false;
 
+            self->initialize([&](instance_ptr data) {
+                self_type->copy_constructor(data, w->dataPtr());
+            });
+
+            
             return (PyObject*)self;
         }
 
@@ -60,9 +77,12 @@ struct native_instance_wrapper {
 
             self->mIteratorOffset = 0;
             self->mIteratorFlag = 0;
-            self_type->copy_constructor(self->data, w->data);
-            self->mIsInitialized = true;
             self->mIsMatcher = false;
+
+            self->initialize([&](instance_ptr data) {
+                self_type->copy_constructor(data, w->dataPtr());
+            });
+
 
             return (PyObject*)self;
         }
@@ -80,10 +100,13 @@ struct native_instance_wrapper {
 
             self->mIteratorOffset = 0;
             self->mIteratorFlag = 1;
-            self_type->copy_constructor(self->data, w->data);
-            self->mIsInitialized = true;
             self->mIsMatcher = false;
 
+            self->initialize([&](instance_ptr data) {
+                self_type->copy_constructor(data, w->dataPtr());
+            });
+
+            
             return (PyObject*)self;
         }
 
@@ -111,7 +134,7 @@ struct native_instance_wrapper {
             if (item_type == dict_t->keyType()) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)item;
 
-                instance_ptr i = dict_t->lookupValueByKey(self_w->data, item_w->data);
+                instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), item_w->dataPtr());
                 
                 if (!i) {
                     Py_INCREF(ifNotFound);
@@ -122,14 +145,14 @@ struct native_instance_wrapper {
             } else {
                 instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
                 try {
-                    copy_initialize(dict_t->keyType(), tempObj, item);
+                    copy_constructor(dict_t->keyType(), tempObj, item);
                 } catch(std::exception& e) {
                     free(tempObj);
                     PyErr_SetString(PyExc_TypeError, e.what());
                     return NULL;
                 }
 
-                instance_ptr i = dict_t->lookupValueByKey(self_w->data, tempObj);
+                instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), tempObj);
 
                 dict_t->keyType()->destroy(tempObj);
                 free(tempObj);
@@ -170,7 +193,7 @@ struct native_instance_wrapper {
         native_instance_wrapper* wrapper = (native_instance_wrapper*)self;
 
         if (wrapper->mIsInitialized) {
-            extractTypeFrom(self->ob_type)->destroy(wrapper->data);
+            wrapper->mContainingInstance.~Instance();
         }
 
         Py_TYPE(self)->tp_free((PyObject*)self);
@@ -231,19 +254,19 @@ struct native_instance_wrapper {
         return true;
     }
 
-    static void copy_initialize(const Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copy_constructor(const Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
         const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType && (argType->getBaseType() == eltType || argType == eltType || argType == eltType->getBaseType())) {
             //it's already the right kind of instance
-            eltType->copy_constructor(tgt, ((native_instance_wrapper*)pyRepresentation)->data);
+            eltType->copy_constructor(tgt, ((native_instance_wrapper*)pyRepresentation)->dataPtr());
             return;
         }
 
         Type::TypeCategory cat = eltType->getTypeCategory();
 
         if (cat == Type::TypeCategory::catPythonSubclass) {
-            copy_initialize((const Type*)eltType->getBaseType(), tgt, pyRepresentation);
+            copy_constructor((const Type*)eltType->getBaseType(), tgt, pyRepresentation);
             return;
         }
 
@@ -269,7 +292,7 @@ struct native_instance_wrapper {
 
                 if (pyValCouldBeOfType(subtype, pyRepresentation)) {
                     try {
-                        copy_initialize(subtype, tgt+1, pyRepresentation);
+                        copy_constructor(subtype, tgt+1, pyRepresentation);
                         *(uint8_t*)tgt = k;
                         return;
                     } catch(...) {
@@ -432,9 +455,9 @@ struct native_instance_wrapper {
                     int i = 0;
 
                     while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
-                        copy_initialize(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
+                        copy_constructor(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
                         try {
-                            copy_initialize(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
+                            copy_constructor(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
                         } catch(...) {
                             dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
                             throw;
@@ -459,7 +482,7 @@ struct native_instance_wrapper {
             if (PyTuple_Check(pyRepresentation)) {
                 ((TupleOf*)eltType)->constructor(tgt, PyTuple_Size(pyRepresentation), 
                     [&](uint8_t* eltPtr, int64_t k) {
-                        copy_initialize(((TupleOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                        copy_constructor(((TupleOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
                         }
                     );
                 return;
@@ -467,7 +490,7 @@ struct native_instance_wrapper {
             if (PyList_Check(pyRepresentation)) {
                 ((TupleOf*)eltType)->constructor(tgt, PyList_Size(pyRepresentation), 
                     [&](uint8_t* eltPtr, int64_t k) {
-                        copy_initialize(((TupleOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
+                        copy_constructor(((TupleOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
                         }
                     );
                 return;
@@ -483,7 +506,7 @@ struct native_instance_wrapper {
                 ((TupleOf*)eltType)->constructor(tgt, PySet_Size(pyRepresentation), 
                     [&](uint8_t* eltPtr, int64_t k) {
                         PyObject* item = PyIter_Next(iterator);
-                        copy_initialize(((TupleOf*)eltType)->getEltType(), eltPtr, item);
+                        copy_constructor(((TupleOf*)eltType)->getEltType(), eltPtr, item);
                         Py_DECREF(item);
                         }
                     );
@@ -505,7 +528,7 @@ struct native_instance_wrapper {
 
                 ((CompositeType*)eltType)->constructor(tgt, 
                     [&](uint8_t* eltPtr, int64_t k) {
-                        copy_initialize(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                        copy_constructor(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyTuple_GetItem(pyRepresentation,k));
                         }
                     );
                 return;
@@ -517,7 +540,7 @@ struct native_instance_wrapper {
 
                 ((CompositeType*)eltType)->constructor(tgt, 
                     [&](uint8_t* eltPtr, int64_t k) {
-                        copy_initialize(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyList_GetItem(pyRepresentation,k));
+                        copy_constructor(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyList_GetItem(pyRepresentation,k));
                         }
                     );
                 return;
@@ -538,7 +561,7 @@ struct native_instance_wrapper {
 
                         PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
                         if (o) {
-                            copy_initialize(t, eltPtr, o);
+                            copy_constructor(t, eltPtr, o);
                             actuallyUsed++;
                         }
                         else if (eltType->is_default_constructible()) {
@@ -586,7 +609,7 @@ struct native_instance_wrapper {
             if (PyTuple_Size(args) == 1) {
                 PyObject* argTuple = PyTuple_GetItem(args, 0);
 
-                copy_initialize(t, data, argTuple);
+                copy_constructor(t, data, argTuple);
 
                 return;
             }
@@ -604,7 +627,7 @@ struct native_instance_wrapper {
                         const Type* eltType = compositeT->getTypes()[k];
                         PyObject* o = PyDict_GetItemString(kwargs, compositeT->getNames()[k].c_str());
                         if (o) {
-                            copy_initialize(eltType, eltPtr, o);
+                            copy_constructor(eltType, eltPtr, o);
                             actuallyUsed++;
                         }
                         else if (eltType->is_default_constructible()) {
@@ -681,12 +704,11 @@ struct native_instance_wrapper {
 
         try {
             self->mIteratorOffset = -1;
-            self->mIsInitialized = false;
             self->mIsMatcher = false;
 
-            concreteT->copy_constructor(self->data, data);
-
-            self->mIsInitialized = true;
+            self->initialize([&](instance_ptr selfData) {
+                concreteT->copy_constructor(selfData, data);
+            });
 
             return (PyObject*)self;
         } catch(std::exception& e) {
@@ -705,12 +727,11 @@ struct native_instance_wrapper {
 
             try {
                 self->mIteratorOffset = -1;
-                self->mIsInitialized = false;
                 self->mIsMatcher = false;
 
-                initialize(self->data, eltType, args, kwds);
-
-                self->mIsInitialized = true;
+                self->initialize([&](instance_ptr data) {
+                    initialize(data, eltType, args, kwds);
+                });
 
                 return (PyObject*)self;
             } catch(std::exception& e) {
@@ -750,16 +771,16 @@ struct native_instance_wrapper {
         const Type* t = extractTypeFrom(o->ob_type);
 
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            return ((TupleOf*)t)->count(w->data);
+            return ((TupleOf*)t)->count(w->dataPtr());
         }
         if (t->isComposite()) {
             return ((CompositeType*)t)->getTypes().size();
         }
         if (t->getTypeCategory() == Type::TypeCategory::catString) {
-            return String().count(w->data);
+            return String().count(w->dataPtr());
         }
         if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
-            return Bytes().count(w->data);
+            return Bytes().count(w->dataPtr());
         }
 
         return 0;
@@ -783,7 +804,9 @@ struct native_instance_wrapper {
                     native_instance_wrapper* self = 
                         (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
 
-                    ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->data, w_rhs->data, self->data);
+                    self->initialize([&](instance_ptr data) {
+                        ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->dataPtr(), w_rhs->dataPtr(), data);
+                    });
 
                     return (PyObject*)self;
                 } else {
@@ -791,7 +814,7 @@ struct native_instance_wrapper {
                     instance_ptr tempObj = (instance_ptr)malloc(tupleOfKeysType->bytecount());
 
                     try {
-                        copy_initialize(tupleOfKeysType, tempObj, rhs);
+                        copy_constructor(tupleOfKeysType, tempObj, rhs);
                     } catch(std::exception& e) {
                         free(tempObj);
                         PyErr_SetString(PyExc_TypeError, e.what());
@@ -801,7 +824,9 @@ struct native_instance_wrapper {
                     native_instance_wrapper* self = 
                         (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
 
-                    ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->data, tempObj, self->data);
+                    self->initialize([&](instance_ptr data) {
+                        ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->dataPtr(), tempObj, data);
+                    });
 
                     tupleOfKeysType->destroy(tempObj);
 
@@ -834,7 +859,9 @@ struct native_instance_wrapper {
                     native_instance_wrapper* self = 
                         (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
 
-                    ((ConstDict*)lhs_type)->addDicts(w_lhs->data, w_rhs->data, self->data);
+                    self->initialize([&](instance_ptr data) {
+                        ((ConstDict*)lhs_type)->addDicts(w_lhs->dataPtr(), w_rhs->dataPtr(), data);
+                    });
 
                     return (PyObject*)self;
                 } else {
@@ -842,7 +869,7 @@ struct native_instance_wrapper {
                     instance_ptr tempObj = (instance_ptr)malloc(lhs_type->bytecount());
 
                     try {
-                        copy_initialize(lhs_type, tempObj, rhs);
+                        copy_constructor(lhs_type, tempObj, rhs);
                     } catch(std::exception& e) {
                         free(tempObj);
                         PyErr_SetString(PyExc_TypeError, e.what());
@@ -852,7 +879,9 @@ struct native_instance_wrapper {
                     native_instance_wrapper* self = 
                         (native_instance_wrapper*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
 
-                    ((ConstDict*)lhs_type)->addDicts(w_lhs->data, tempObj, self->data);
+                    self->initialize([&](instance_ptr data) {
+                        ((ConstDict*)lhs_type)->addDicts(w_lhs->dataPtr(), tempObj, data);
+                    });
 
                     lhs_type->destroy(tempObj);
 
@@ -872,18 +901,20 @@ struct native_instance_wrapper {
                         (native_instance_wrapper*)typeObj(tupT)
                             ->tp_alloc(typeObj(tupT), 0);
 
-                    int count_lhs = tupT->count(w_lhs->data);
-                    int count_rhs = tupT->count(w_rhs->data);
+                    int count_lhs = tupT->count(w_lhs->dataPtr());
+                    int count_rhs = tupT->count(w_rhs->dataPtr());
 
-                    tupT->constructor(self->data, count_lhs + count_rhs, 
-                        [&](uint8_t* eltPtr, int64_t k) {
-                            eltType->copy_constructor(
-                                eltPtr, 
-                                k < count_lhs ? tupT->eltPtr(w_lhs->data, k) : 
-                                    tupT->eltPtr(w_rhs->data, k - count_lhs)
-                                );
-                            }
-                        );
+                    self->initialize([&](instance_ptr data) {
+                        tupT->constructor(data, count_lhs + count_rhs, 
+                            [&](uint8_t* eltPtr, int64_t k) {
+                                eltType->copy_constructor(
+                                    eltPtr, 
+                                    k < count_lhs ? tupT->eltPtr(w_lhs->dataPtr(), k) : 
+                                        tupT->eltPtr(w_rhs->dataPtr(), k - count_lhs)
+                                    );
+                                }
+                            );
+                    });
 
                     return (PyObject*)self;
                 }
@@ -896,36 +927,38 @@ struct native_instance_wrapper {
                         (native_instance_wrapper*)typeObj(tupT)
                             ->tp_alloc(typeObj(tupT), 0);
 
-                    int count_lhs = tupT->count(w_lhs->data);
+                    int count_lhs = tupT->count(w_lhs->dataPtr());
                     int count_rhs = PyObject_Length(rhs);
 
                     try {
-                        tupT->constructor(self->data, count_lhs + count_rhs, 
-                            [&](uint8_t* eltPtr, int64_t k) {
-                                if (k < count_lhs) {
-                                    eltType->copy_constructor(
-                                        eltPtr, 
-                                        tupT->eltPtr(w_lhs->data, k)
-                                        );
-                                } else {
-                                    PyObject* kval = PyLong_FromLong(k - count_lhs);
-                                    PyObject* o = PyObject_GetItem(rhs, kval);
-                                    Py_DECREF(kval);
+                        self->initialize([&](instance_ptr data) {
+                            tupT->constructor(data, count_lhs + count_rhs, 
+                                [&](uint8_t* eltPtr, int64_t k) {
+                                    if (k < count_lhs) {
+                                        eltType->copy_constructor(
+                                            eltPtr, 
+                                            tupT->eltPtr(w_lhs->dataPtr(), k)
+                                            );
+                                    } else {
+                                        PyObject* kval = PyLong_FromLong(k - count_lhs);
+                                        PyObject* o = PyObject_GetItem(rhs, kval);
+                                        Py_DECREF(kval);
 
-                                    if (!o) {
-                                        throw InternalPyException();
-                                    }
-                                    
-                                    try {
-                                        copy_initialize(eltType, eltPtr, o);
-                                    } catch(...) {
+                                        if (!o) {
+                                            throw InternalPyException();
+                                        }
+                                        
+                                        try {
+                                            copy_constructor(eltType, eltPtr, o);
+                                        } catch(...) {
+                                            Py_DECREF(o);
+                                            throw;
+                                        }
+
                                         Py_DECREF(o);
-                                        throw;
                                     }
-
-                                    Py_DECREF(o);
-                                }
-                            });
+                                });
+                        });
                     } catch(std::exception& e) {
                         typeObj(tupT)->tp_dealloc((PyObject*)self);
                         PyErr_SetString(PyExc_TypeError, e.what());
@@ -950,7 +983,7 @@ struct native_instance_wrapper {
         const Type* t = extractTypeFrom(o->ob_type);
 
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            int64_t count = ((TupleOf*)t)->count(w->data);
+            int64_t count = ((TupleOf*)t)->count(w->dataPtr());
 
             if (ix < 0) {
                 ix += count;
@@ -963,7 +996,7 @@ struct native_instance_wrapper {
 
             const Type* eltType = (const Type*)((TupleOf*)t)->getEltType();
             return extractPythonObject(
-                ((TupleOf*)t)->eltPtr(w->data, ix), 
+                ((TupleOf*)t)->eltPtr(w->dataPtr(), ix), 
                 eltType
                 );
         }
@@ -979,35 +1012,35 @@ struct native_instance_wrapper {
             const Type* eltType = compType->getTypes()[ix];
 
             return extractPythonObject(
-                compType->eltPtr(w->data, ix), 
+                compType->eltPtr(w->dataPtr(), ix), 
                 eltType
                 );
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
-            if (ix < 0 || ix >= (int64_t)Bytes().count(w->data)) {
+            if (ix < 0 || ix >= (int64_t)Bytes().count(w->dataPtr())) {
                 PyErr_SetString(PyExc_IndexError, "index out of range");
                 return NULL;
             }
 
             return PyBytes_FromStringAndSize(
-                (const char*)Bytes().eltPtr(w->data, ix),
+                (const char*)Bytes().eltPtr(w->dataPtr(), ix),
                 1
                 );
         }
         if (t->getTypeCategory() == Type::TypeCategory::catString) {
-            if (ix < 0 || ix >= (int64_t)String().count(w->data)) {
+            if (ix < 0 || ix >= (int64_t)String().count(w->dataPtr())) {
                 PyErr_SetString(PyExc_IndexError, "index out of range");
                 return NULL;
             }
 
-            int bytes_per_codepoint = String().bytes_per_codepoint(w->data);
+            int bytes_per_codepoint = String().bytes_per_codepoint(w->dataPtr());
 
             return PyUnicode_FromKindAndData(
                 bytes_per_codepoint == 1 ? PyUnicode_1BYTE_KIND :
                 bytes_per_codepoint == 2 ? PyUnicode_2BYTE_KIND :
                                            PyUnicode_4BYTE_KIND,
-                String().eltPtr(w->data, ix),
+                String().eltPtr(w->dataPtr(), ix),
                 1
                 );
         }
@@ -1099,11 +1132,11 @@ struct native_instance_wrapper {
         const Type* t = extractTypeFrom(o->ob_type);
 
         if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
-            return ((ConstDict*)t)->size(w->data);
+            return ((ConstDict*)t)->size(w->dataPtr());
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            return ((TupleOf*)t)->count(w->data);
+            return ((TupleOf*)t)->count(w->dataPtr());
         }
 
         return 0;
@@ -1121,7 +1154,7 @@ struct native_instance_wrapper {
             if (item_type == dict_t->keyType()) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)item;
 
-                instance_ptr i = dict_t->lookupValueByKey(self_w->data, item_w->data);
+                instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), item_w->dataPtr());
                 
                 if (!i) {
                     return 0;
@@ -1131,14 +1164,14 @@ struct native_instance_wrapper {
             } else {
                 instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
                 try {
-                    copy_initialize(dict_t->keyType(), tempObj, item);
+                    copy_constructor(dict_t->keyType(), tempObj, item);
                 } catch(std::exception& e) {
                     free(tempObj);
                     PyErr_SetString(PyExc_TypeError, e.what());
                     return -1;
                 }
 
-                instance_ptr i = dict_t->lookupValueByKey(self_w->data, tempObj);
+                instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), tempObj);
 
                 dict_t->keyType()->destroy(tempObj);
                 free(tempObj);
@@ -1165,7 +1198,7 @@ struct native_instance_wrapper {
             if (item_type == dict_t->keyType()) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)item;
 
-                instance_ptr i = dict_t->lookupValueByKey(self_w->data, item_w->data);
+                instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), item_w->dataPtr());
                 
                 if (!i) {
                     PyErr_SetObject(PyExc_KeyError, item);
@@ -1176,14 +1209,14 @@ struct native_instance_wrapper {
             } else {
                 instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
                 try {
-                    copy_initialize(dict_t->keyType(), tempObj, item);
+                    copy_constructor(dict_t->keyType(), tempObj, item);
                 } catch(std::exception& e) {
                     free(tempObj);
                     PyErr_SetString(PyExc_TypeError, e.what());
                     return NULL;
                 }
 
-                instance_ptr i = dict_t->lookupValueByKey(self_w->data, tempObj);
+                instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), tempObj);
 
                 dict_t->keyType()->destroy(tempObj);
                 free(tempObj);
@@ -1205,7 +1238,7 @@ struct native_instance_wrapper {
                 TupleOf* tupType = (TupleOf*)self_type;
 
                 Py_ssize_t start,stop,step,slicelength;
-                if (PySlice_GetIndicesEx(item, tupType->count(self_w->data), &start,
+                if (PySlice_GetIndicesEx(item, tupType->count(self_w->dataPtr()), &start,
                             &stop, &step, &slicelength) == -1) {
                     return NULL;
                 }
@@ -1215,14 +1248,16 @@ struct native_instance_wrapper {
                 native_instance_wrapper* result = 
                     (native_instance_wrapper*)typeObj(tupType)->tp_alloc(typeObj(tupType), 0);
 
-                tupType->constructor(result->data, slicelength, 
-                    [&](uint8_t* eltPtr, int64_t k) {
-                        eltType->copy_constructor(
-                            eltPtr, 
-                            tupType->eltPtr(self_w->data, start + k * step)
-                            );
-                        }
-                    );
+                result->initialize([&](instance_ptr data) {
+                    tupType->constructor(data, slicelength, 
+                        [&](uint8_t* eltPtr, int64_t k) {
+                            eltType->copy_constructor(
+                                eltPtr, 
+                                tupType->eltPtr(self_w->dataPtr(), start + k * step)
+                                );
+                            }
+                        );
+                });
 
                 return (PyObject*)result;
             }
@@ -1305,20 +1340,20 @@ struct native_instance_wrapper {
             if (eltType == attrType) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)attrVal;
 
-                attrType->assign(nt->eltPtr(self_w->data, i), item_w->data);
+                attrType->assign(nt->eltPtr(self_w->dataPtr(), i), item_w->dataPtr());
 
                 return 0;
             } else {
                 instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
                 try {
-                    copy_initialize(eltType, tempObj, attrVal);
+                    copy_constructor(eltType, tempObj, attrVal);
                 } catch(std::exception& e) {
                     free(tempObj);
                     PyErr_SetString(PyExc_TypeError, e.what());
                     return -1;
                 }
 
-                eltType->assign(nt->eltPtr(self_w->data, i), tempObj);
+                eltType->assign(nt->eltPtr(self_w->dataPtr(), i), tempObj);
 
                 eltType->destroy(tempObj);
                 free(tempObj);
@@ -1350,7 +1385,7 @@ struct native_instance_wrapper {
             
             if (cat == Type::TypeCategory::catAlternative) {
                 Alternative* a = (Alternative*)t;
-                if (a->subtypes()[a->which(w->data)].first == attr_name) {
+                if (a->subtypes()[a->which(w->dataPtr())].first == attr_name) {
                     res = Py_True;
                 } else {
                     res = Py_False;
@@ -1374,15 +1409,17 @@ struct native_instance_wrapper {
                 native_instance_wrapper* self = (native_instance_wrapper*)o->ob_type->tp_alloc(o->ob_type, 0);
 
                 self->mIteratorOffset = -1;
-                t->copy_constructor(self->data, w->data);
-                self->mIsInitialized = true;
                 self->mIsMatcher = true;
-
+                
+                self->initialize([&](instance_ptr data) {
+                    t->copy_constructor(data, w->dataPtr());
+                });
+                
                 return (PyObject*)self;
             }
         }
 
-        PyObject* result = getattr(t, w->data, attr_name);
+        PyObject* result = getattr(t, w->dataPtr(), attr_name);
 
         if (result) {
             return result;
@@ -1442,7 +1479,7 @@ struct native_instance_wrapper {
         const Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
-        int32_t h = self_type->hash32(w->data);
+        int32_t h = self_type->hash32(w->dataPtr());
         if (h == -1) {
             h = -2;
         }
@@ -1465,7 +1502,7 @@ struct native_instance_wrapper {
             if (otherT > t) {
                 return -1;
             }
-            return t->cmp(self, ((native_instance_wrapper*)other)->data);
+            return t->cmp(self, ((native_instance_wrapper*)other)->dataPtr());
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catOneOf) {
@@ -1655,7 +1692,7 @@ struct native_instance_wrapper {
 
 
         if (!other) {
-            char cmp = compare_to_python(own, ((native_instance_wrapper*)a)->data, b, false);
+            char cmp = compare_to_python(own, ((native_instance_wrapper*)a)->dataPtr(), b, false);
 
             PyObject* res;
             if (op == Py_EQ) {
@@ -1674,7 +1711,7 @@ struct native_instance_wrapper {
             char cmp = 0;
 
             if (own == other) {
-                cmp = own->cmp(((native_instance_wrapper*)a)->data, ((native_instance_wrapper*)b)->data);
+                cmp = own->cmp(((native_instance_wrapper*)a)->dataPtr(), ((native_instance_wrapper*)b)->dataPtr());
             } else if (own < other) {
                 cmp = -1;
             } else {
@@ -1714,10 +1751,12 @@ struct native_instance_wrapper {
 
             self->mIteratorOffset = 0;
             self->mIteratorFlag = w->mIteratorFlag;
-            self_type->copy_constructor(self->data, w->data);
-            self->mIsInitialized = true;
             self->mIsMatcher = false;
 
+            self->initialize([&](instance_ptr data) {
+                self_type->copy_constructor(data, w->dataPtr());
+            });
+            
             return (PyObject*)self;
         }
 
@@ -1735,7 +1774,7 @@ struct native_instance_wrapper {
 
         ConstDict* dict_t = (ConstDict*)self_type;
 
-        if (w->mIteratorOffset >= dict_t->size(w->data)) {
+        if (w->mIteratorOffset >= dict_t->size(w->dataPtr())) {
             return NULL;
         }
 
@@ -1743,11 +1782,11 @@ struct native_instance_wrapper {
 
         if (w->mIteratorFlag == 2) {
             auto t1 = extractPythonObject(
-                    dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), 
+                    dict_t->kvPairPtrKey(w->dataPtr(), w->mIteratorOffset-1), 
                     dict_t->keyType()
                     );
             auto t2 = extractPythonObject(
-                    dict_t->kvPairPtrValue(w->data, w->mIteratorOffset-1), 
+                    dict_t->kvPairPtrValue(w->dataPtr(), w->mIteratorOffset-1), 
                     dict_t->valueType()
                     );
             
@@ -1759,12 +1798,12 @@ struct native_instance_wrapper {
             return res;
         } else if (w->mIteratorFlag == 1) {
             return extractPythonObject(
-                dict_t->kvPairPtrValue(w->data, w->mIteratorOffset-1), 
+                dict_t->kvPairPtrValue(w->dataPtr(), w->mIteratorOffset-1), 
                 dict_t->valueType()
                 );
         } else {
             return extractPythonObject(
-                dict_t->kvPairPtrKey(w->data, w->mIteratorOffset-1), 
+                dict_t->kvPairPtrKey(w->dataPtr(), w->mIteratorOffset-1), 
                 dict_t->keyType()
                 );
         }
@@ -1777,7 +1816,7 @@ struct native_instance_wrapper {
         std::ostringstream str;
         str << std::showpoint;
 
-        self_type->repr(w->data, str);
+        self_type->repr(w->dataPtr(), str);
 
         return PyUnicode_FromString(str.str().c_str());
     }
@@ -1805,7 +1844,7 @@ struct native_instance_wrapper {
         types[inType] = new NativeTypeWrapper { {
                 PyVarObject_HEAD_INIT(NULL, 0)
                 inType->name().c_str(),    /* tp_name */
-                sizeof(native_instance_wrapper) + inType->bytecount(),       /* tp_basicsize */
+                sizeof(native_instance_wrapper),       /* tp_basicsize */
                 0,                         // tp_itemsize
                 native_instance_wrapper::tp_dealloc,// tp_dealloc
                 0,                         // tp_print
@@ -1944,7 +1983,7 @@ struct native_instance_wrapper {
             return Value::Make(
                 Instance::create(
                     nativeType, 
-                    ((native_instance_wrapper*)typearg)->data
+                    ((native_instance_wrapper*)typearg)->dataPtr()
                     )
                 );
         }
@@ -2550,12 +2589,12 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     
     if (actualType == serializeType) {
         //the simple case
-        actualType->serialize(((native_instance_wrapper*)a2)->data, b);
+        actualType->serialize(((native_instance_wrapper*)a2)->dataPtr(), b);
     } else {
         //try to construct a 'serialize type' from the argument and then serialize that
         try{
             Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
-                native_instance_wrapper::copy_initialize(serializeType, p, a2);
+                native_instance_wrapper::copy_constructor(serializeType, p, a2);
             });
             
             i.type()->serialize(i.data(), b);

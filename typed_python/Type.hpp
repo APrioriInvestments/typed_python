@@ -2166,6 +2166,20 @@ private:
     {
     }
 
+    static layout* allocateNoneLayout() {
+        layout* result = (layout*)malloc(sizeof(layout));
+        result->refcount = 0;
+        result->type = None::Make();
+
+        return result;
+    }
+
+    static layout* noneLayout() {
+        static layout* noneLayout = allocateNoneLayout();
+
+        return noneLayout;
+    }
+
 public:
     static Instance deserialized(const Type* t, DeserializationBuffer& buf) {
         return createAndInitialize(t, [&](instance_ptr tgt) {
@@ -2196,8 +2210,47 @@ public:
         return Instance(l);
     }
 
+    Instance() {
+        //by default, None
+        mLayout = noneLayout();
+        mLayout->refcount++;
+    }
+
     Instance(const Instance& other) : mLayout(other.mLayout) {
         mLayout->refcount++;
+    }
+
+    Instance(instance_ptr p, const Type* t) : mLayout(nullptr) {
+        layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
+        
+        try {
+            t->copy_constructor(l->data, p);
+        } catch(...) {
+            free(l);
+            throw;
+        }
+
+        l->refcount = 1;
+        l->type = t;
+
+        mLayout = l;
+    }
+
+    template<class initializer_type>
+    Instance(const Type* t, const initializer_type& initFun) : mLayout(nullptr) {
+        layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
+        
+        try {
+            initFun(l->data);
+        } catch(...) {
+            free(l);
+            throw;
+        }
+
+        l->refcount = 1;
+        l->type = t;
+
+        mLayout = l;
     }
 
     ~Instance() {
