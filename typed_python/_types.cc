@@ -1603,6 +1603,16 @@ struct native_instance_wrapper {
                 
                 return (PyObject*)self;
             }
+
+            //see if its a method
+            Alternative* toCheck = 
+                (Alternative*)(cat == Type::TypeCategory::catConcreteAlternative ? t->getBaseType() : t)
+                ;
+
+            auto it = toCheck->getMethods().find(attr_name);
+            if (it != toCheck->getMethods().end()) {
+                return PyMethod_New((PyObject*)it->second->getOverloads()[0].getFunctionObj(), o);
+            }
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catClass) {
@@ -2029,6 +2039,28 @@ struct native_instance_wrapper {
         return PyUnicode_FromString(str.str().c_str());
     }
 
+    static PyObject* tp_str(PyObject *o) {
+        const Type* self_type = extractTypeFrom(o->ob_type);
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            self_type = self_type->getBaseType();
+        }
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
+            Alternative* a = (Alternative*)self_type;
+            auto it = a->getMethods().find("__str__");
+            if (it != a->getMethods().end()) {
+                return PyObject_CallFunctionObjArgs(
+                    (PyObject*)it->second->getOverloads()[0].getFunctionObj(), 
+                    o,
+                    NULL
+                    );
+            }
+        }
+
+        return tp_repr(o);
+    }
+
     static bool typeCanBeSubclassed(const Type* t) {
         return t->getTypeCategory() == Type::TypeCategory::catNamedTuple;
     }
@@ -2065,7 +2097,7 @@ struct native_instance_wrapper {
                 mappingMethods(inType),    // tp_as_mapping
                 tp_hash,                   // tp_hash
                 tp_call,                   // tp_call
-                0,                         // tp_str
+                tp_str,                    // tp_str
                 native_instance_wrapper::tp_getattro, // tp_getattro
                 native_instance_wrapper::tp_setattro, // tp_setattro
                 bufferProcs(),             // tp_as_buffer
@@ -2677,12 +2709,47 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
         resType = new Function(PyUnicode_AsUTF8(nameObj), overloads);
     }
 
-
-
     PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(resType);
     Py_INCREF(typeObj);
     return typeObj;
 }
+
+const Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
+    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+
+    if (!internalsModule) {
+        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals");
+        return nullptr;
+    }
+
+    static PyObject* makeFunction = PyObject_GetAttrString(internalsModule, "makeFunction");
+
+    if (!makeFunction) {
+        PyErr_SetString(PyExc_TypeError, "Internal error: couldn't find typed_python.internals.makeFunction");
+        return nullptr;
+    }
+
+    PyObject* fRes = PyObject_CallFunctionObjArgs(makeFunction, name, funcObj, NULL);
+
+    if (!fRes) {
+        return nullptr;
+    }
+
+
+    if (!PyType_Check(fRes)) {
+        PyErr_SetString(PyExc_TypeError, "Internal error: expected typed_python.internals.makeFunction to return a type");
+        return nullptr;
+    }
+
+    const Type* actualType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)fRes);
+
+    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_Format(PyExc_TypeError, "Internal error: expected makeFunction to return a Function. Got %S", fRes);
+        return nullptr;
+    }
+
+    return (const Function*)actualType;
+} 
 
 PyObject *Class(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 5) {
@@ -2889,6 +2956,8 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 
     std::vector<std::pair<std::string, NamedTuple*> > definitions;
 
+    std::map<std::string, const Function*> functions;
+
     PyObject *key, *value;
     Py_ssize_t pos = 0;
 
@@ -2899,21 +2968,30 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 
         std::string fieldName(PyUnicode_AsUTF8(key));
 
-        if (!PyDict_Check(value)) {
-            PyErr_SetString(PyExc_TypeError, "Alternative members must be initialized with dicts.");
-            return NULL;
+        if (PyFunction_Check(value)) {
+            functions[fieldName] = convertPythonObjectToFunction(key, value);
+            if (functions[fieldName] == nullptr) {
+                //error code is already set
+                return nullptr;
+            }
         }
+        else {
+            if (!PyDict_Check(value)) {
+                PyErr_SetString(PyExc_TypeError, "Alternative members must be initialized with dicts.");
+                return NULL;
+            }
 
-        PyObject* ntPyPtr = MakeNamedTupleType(nullptr, nullptr, value);
-        if (!ntPyPtr) {
-            return NULL;
+            PyObject* ntPyPtr = MakeNamedTupleType(nullptr, nullptr, value);
+            if (!ntPyPtr) {
+                return NULL;
+            }
+
+            NamedTuple* ntPtr = (NamedTuple*)native_instance_wrapper::extractTypeFrom((PyTypeObject*)ntPyPtr);
+            
+            assert(ntPtr);
+
+            definitions.push_back(std::make_pair(fieldName, ntPtr));
         }
-
-        NamedTuple* ntPtr = (NamedTuple*)native_instance_wrapper::extractTypeFrom((PyTypeObject*)ntPyPtr);
-        
-        assert(ntPtr);
-
-        definitions.push_back(std::make_pair(fieldName, ntPtr));
     };
 
     static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
@@ -2926,7 +3004,7 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     }
 
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(
-        ::Alternative::Make(name, definitions)
+        ::Alternative::Make(name, definitions, functions)
         );
 
     Py_INCREF(res);

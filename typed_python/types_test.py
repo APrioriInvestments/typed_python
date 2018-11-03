@@ -633,6 +633,27 @@ class NativeTypesTests(unittest.TestCase):
             )
         self.assertEqual(alt.x_0(a=b''), alt.x_0(a=b''))
 
+    def test_alternatives_with_str_func(self):
+        alt = Alternative(
+            "Alt",
+            x_0={'a':bytes},
+            f=lambda self: 1,
+            __str__=lambda self: "not_your_usual_str"
+            )
+
+        self.assertEqual(alt.x_0().f(), 1)
+        self.assertEqual(str(alt.x_0()), "not_your_usual_str")
+
+    def test_named_tuple_subclass_magic_methods(self):
+        class X(NamedTuple(x=int,y=int)):
+            def __str__(self):
+                return "str override"
+            def __repr__(self):
+                return "repr override"
+
+        self.assertEqual(repr(X()), "repr override")
+        self.assertEqual(str(X()), "str override")
+
     def test_empty_alternatives(self):
         a = Alternative(
             "Alt",

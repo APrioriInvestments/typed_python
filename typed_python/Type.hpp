@@ -2409,11 +2409,15 @@ public:
         uint8_t data[];
     };
 
-    Alternative(std::string name, const std::vector<std::pair<std::string, NamedTuple*> >& subtypes) :
+    Alternative(std::string name, 
+                const std::vector<std::pair<std::string, NamedTuple*> >& subtypes,
+                const std::map<std::string, const Function*>& methods
+                ) :
             Type(TypeCategory::catAlternative),
             m_default_construction_ix(0),
             m_default_construction_type(nullptr),
-            m_subtypes(subtypes)
+            m_subtypes(subtypes),
+            m_methods(methods)
     {
         m_name = name;
             
@@ -2577,8 +2581,13 @@ public:
     }
 
     static Alternative* Make(std::string name,
-                         const std::vector<std::pair<std::string, NamedTuple*> >& types
+                         const std::vector<std::pair<std::string, NamedTuple*> >& types,
+                         const std::map<std::string, const Function*>& methods //methods preclude us from being in the memo
                          ) {
+        if (methods.size()) {
+            return new Alternative(name, types, methods);
+        }
+        
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -2590,7 +2599,7 @@ public:
         auto it = m.find(keytype(name, types));
 
         if (it == m.end()) {
-            it = m.insert(std::make_pair(keytype(name, types), new Alternative(name, types))).first;
+            it = m.insert(std::make_pair(keytype(name, types), new Alternative(name, types, methods))).first;
         }
 
         return it->second;
@@ -2606,6 +2615,10 @@ public:
 
     const Type* pickConcreteSubclassConcrete(instance_ptr data) const;
 
+    const std::map<std::string, const Function*>& getMethods() const {
+        return m_methods;
+    }
+
 private:
     bool m_all_alternatives_empty;
 
@@ -2614,6 +2627,8 @@ private:
     mutable const Type* m_default_construction_type;
 
     std::vector<std::pair<std::string, NamedTuple*> > m_subtypes;
+
+    std::map<std::string, const Function*> m_methods;
 
     std::map<std::string, int> m_arg_positions;
 };
