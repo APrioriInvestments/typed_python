@@ -36,6 +36,7 @@ class Alternative;
 class ConcreteAlternative;
 class PythonSubclass;
 class Class;
+class HeldClass;
 class Function;
 class PackedArray;
 class Pointer;
@@ -231,6 +232,7 @@ public:
         catConcreteAlternative, //concrete Alternative subclass
         catPythonSubclass,
         catClass,
+        catHeldClass,
         catFunction,
         catPackedArray,
         catPointer
@@ -393,6 +395,8 @@ public:
                 return f(*(PythonSubclass*)this);
             case catClass:
                 return f(*(Class*)this);
+            case catHeldClass:
+                return f(*(HeldClass*)this);
             case catFunction:
                 return f(*(Function*)this);
             case catPackedArray:
@@ -2954,15 +2958,16 @@ private:
     std::vector<FunctionOverload> mOverloads;
 };
 
-class Class : public Type {
+//a class held directly inside of another object
+class HeldClass : public Type {
 public:
-    Class(std::string inName, 
+    HeldClass(std::string inName, 
           const std::vector<std::pair<std::string, const Type*> >& members,
           const std::map<std::string, const Function*>& memberFunctions,
           const std::map<std::string, const Function*>& staticFunctions,
           const std::map<std::string, PyObject*>& classMembers
           ) : 
-            Type(catClass),
+            Type(catHeldClass),
             m_members(members),
             m_memberFunctions(memberFunctions),
             m_staticFunctions(staticFunctions),
@@ -2983,7 +2988,7 @@ public:
         }
     }
 
-    static Class* Make(
+    static HeldClass* Make(
             std::string inName, 
             const std::vector<std::pair<std::string, const Type*> >& members,
             const std::map<std::string, const Function*>& memberFunctions,
@@ -2991,7 +2996,7 @@ public:
             const std::map<std::string, PyObject*>& classMembers
             )
     {
-        return new Class(inName, members, memberFunctions, staticFunctions, classMembers);
+        return new HeldClass(inName, members, memberFunctions, staticFunctions, classMembers);
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
@@ -3024,7 +3029,7 @@ public:
     }
 
     void repr(instance_ptr self, std::ostringstream& stream) const {
-        stream << "(";
+        stream << m_name << "(";
 
         for (long k = 0; k < m_members.size();k++) {
             if (k > 0) {
@@ -3133,6 +3138,151 @@ private:
     std::map<std::string, const Function*> m_memberFunctions;
     std::map<std::string, const Function*> m_staticFunctions;
     std::map<std::string, PyObject*> m_classMembers;
+};
+
+class Class : public Type {
+    class layout {
+    public:
+        std::atomic<int64_t> refcount;
+        unsigned char data[];
+    };
+
+public:
+    Class(HeldClass* inClass) : 
+            Type(catClass),
+            m_heldClass(inClass)
+    {
+        m_size = sizeof(layout*);
+        m_is_default_constructible = inClass->is_default_constructible();
+        m_name = m_heldClass->name();
+    }
+
+    static Class* Make(
+            std::string inName, 
+            const std::vector<std::pair<std::string, const Type*> >& members,
+            const std::map<std::string, const Function*>& memberFunctions,
+            const std::map<std::string, const Function*>& staticFunctions,
+            const std::map<std::string, PyObject*>& classMembers
+            )
+    {
+        return new Class(HeldClass::Make(inName, members, memberFunctions, staticFunctions, classMembers));
+    }
+
+    instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
+        layout& l = **(layout**)self;
+        return m_heldClass->eltPtr(l.data, ix);
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) const {
+        layout& l = **(layout**)left;
+        layout& r = **(layout**)right;
+
+        return m_heldClass->cmp(l.data,r.data);
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) const {
+        *(layout**)self = (layout*)malloc(
+            sizeof(layout) + m_heldClass->bytecount()
+            );
+
+        layout& record = **(layout**)self;
+        record.refcount = 1;
+
+        m_heldClass->deserialize(record.data, buffer);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) const {
+        layout& l = **(layout**)self;
+        m_heldClass->serialize(l.data, buffer);
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        layout& l = **(layout**)self;
+        m_heldClass->repr(l.data, stream);
+    }
+
+    int32_t hash32(instance_ptr left) const {
+        layout& l = **(layout**)left;
+        return m_heldClass->hash32(l.data);
+    }
+
+    template<class sub_constructor>
+    void constructor(instance_ptr self, const sub_constructor& initializer) const {
+        *(layout**)self = (layout*)malloc(sizeof(layout) + m_heldClass->bytecount());
+        layout& l = **(layout**)self;
+        l.refcount = 1;
+
+        try {
+            m_heldClass->constructor(l.data, initializer);
+        } catch (...) {
+            free(*(layout**)self);
+        }
+    }
+
+    void constructor(instance_ptr self) const {
+        if (!m_is_default_constructible) {
+            throw std::runtime_error(m_name + " is not default-constructible");
+        }
+
+        *(layout**)self = (layout*)malloc(sizeof(layout) + m_heldClass->bytecount());
+
+        layout& l = **(layout**)self;
+        l.refcount = 1;
+
+        m_heldClass->constructor(l.data);
+    }
+
+    void destroy(instance_ptr self) const {
+        layout& l = **(layout**)self;
+        l.refcount--;
+
+        if (l.refcount == 0) {
+            m_heldClass->destroy(l.data);
+            free(*(layout**)self);
+        }
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) const {
+        (*(layout**)self) = (*(layout**)other);
+        (*(layout**)self)->refcount++;
+    }
+
+    void assign(instance_ptr self, instance_ptr other) const {
+        layout* old = (*(layout**)self);
+
+        (*(layout**)self) = (*(layout**)other);
+
+        if (*(layout**)self) {
+            (*(layout**)self)->refcount++;
+        }
+
+        destroy((instance_ptr)&old);
+    }
+
+    const std::vector<std::pair<std::string, const Type*> >& getMembers() const {
+        return m_heldClass->getMembers();
+    }
+
+    const std::map<std::string, const Function*>& getMemberFunctions() const {
+        return m_heldClass->getMemberFunctions();
+    }
+
+    const std::map<std::string, const Function*>& getStaticFunctions() const {
+        return m_heldClass->getStaticFunctions();
+    }
+
+    const std::map<std::string, PyObject*>& getClassMembers() const {
+        return m_heldClass->getClassMembers();
+    }
+    
+    int memberNamed(const char* c) const {
+        return m_heldClass->memberNamed(c);
+    }
+
+private:
+    HeldClass* m_heldClass;
 };
 
 class PackedArray : public Type {

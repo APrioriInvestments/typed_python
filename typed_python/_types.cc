@@ -28,6 +28,12 @@ struct native_instance_wrapper {
     Instance mContainingInstance;
     int64_t mOffset; //byte offset within the instance that we hold
 
+    void initializeReference(native_instance_wrapper* other, size_t offset) {
+        new (&mContainingInstance) Instance(other->mContainingInstance);
+        mOffset = other->mOffset + offset;
+        mIsInitialized = true;
+    }
+
     template<class init_func>
     void initialize(const init_func& i) {
         mIsInitialized = false;
@@ -1419,6 +1425,20 @@ struct native_instance_wrapper {
             }
         }
 
+        if (t->getTypeCategory() == Type::TypeCategory::catClass) {
+            Class* nt = (Class*)t;
+            for (long k = 0; k < nt->getMembers().size();k++) {
+                if (nt->getMembers()[k].first == attr_name) {
+                    const Type* eltType = nt->getMembers()[k].second;
+
+                    return extractPythonObject(
+                        nt->eltPtr(w->dataPtr(), k), 
+                        nt->getMembers()[k].second
+                        );
+                }
+            }
+        }
+
         PyObject* result = getattr(t, w->dataPtr(), attr_name);
 
         if (result) {
@@ -1455,18 +1475,6 @@ struct native_instance_wrapper {
                     return extractPythonObject(
                         nt->eltPtr(data, k), 
                         nt->getTypes()[k]
-                        );
-                }
-            }
-        }
-
-        if (type->getTypeCategory() == Type::TypeCategory::catClass) {
-            Class* nt = (Class*)type;
-            for (long k = 0; k < nt->getMembers().size();k++) {
-                if (nt->getMembers()[k].first == attr_name) {
-                    return extractPythonObject(
-                        nt->eltPtr(data, k), 
-                        nt->getMembers()[k].second
                         );
                 }
             }

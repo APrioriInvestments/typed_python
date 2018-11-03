@@ -902,6 +902,39 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(a.x, 10)
 
+    def test_class_holding_class(self):
+        class Interior(Class):
+            x = Member(int)
+            y = Member(int)
+
+        class Exterior(Class):
+            x = Member(int)
+            i = Member(Interior)
+            iTup = Member(NamedTuple(x=Interior, y=Interior))
+
+        e = Exterior()
+
+        #'anI' is a reference to an internal element of 'e'. 'anI' will keep 'e' alive.
+        anI = e.i
+        anI.x = 10
+        self.assertEqual(e.i.x, 10)
+
+        anI2 = e.iTup.x
+        anI2.x = 10
+        self.assertEqual(e.iTup.x.x, 10)
+
+    def test_class_stringification(self):
+        class Interior(Class):
+            x = Member(int)
+            y = Member(int)
+
+        i = Interior()
+
+        self.assertEqual(Interior.__qualname__, "Interior")
+        self.assertEqual(str(Interior()), "Interior(x=0, y=0)")
+
+
+
     def test_serialize_doesnt_leak(self):
         T = TupleOf(int)
 
