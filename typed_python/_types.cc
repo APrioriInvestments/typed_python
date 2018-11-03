@@ -28,7 +28,23 @@ struct native_instance_wrapper {
     Instance mContainingInstance;
     int64_t mOffset; //byte offset within the instance that we hold
 
+    template<class init_func>
+    static PyObject* initialize(const Type* eltType, const init_func& f) {
+        native_instance_wrapper* self = 
+            (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
+
+        try {
+            self->initialize(f);
+
+            return (PyObject*)self;
+        } catch(...) {
+            typeObj(eltType)->tp_dealloc((PyObject*)self);
+            throw;
+        }
+    }
+
     void initializeReference(native_instance_wrapper* other, size_t offset) {
+        mIsInitialized = false;
         new (&mContainingInstance) Instance(other->mContainingInstance);
         mOffset = other->mOffset + offset;
         mIsInitialized = true;
@@ -706,20 +722,11 @@ struct native_instance_wrapper {
 
         const Type* concreteT = eltType->pickConcreteSubclass(data);
 
-        native_instance_wrapper* self = (native_instance_wrapper*)typeObj(concreteT)->tp_alloc(typeObj(concreteT), 0);
-
         try {
-            self->mIteratorOffset = -1;
-            self->mIsMatcher = false;
-
-            self->initialize([&](instance_ptr selfData) {
+            return native_instance_wrapper::initialize(concreteT, [&](instance_ptr selfData) {
                 concreteT->copy_constructor(selfData, data);
             });
-
-            return (PyObject*)self;
         } catch(std::exception& e) {
-            typeObj(concreteT)->tp_dealloc((PyObject*)self);
-
             PyErr_SetString(PyExc_TypeError, e.what());
             return NULL;
         }
@@ -1372,6 +1379,160 @@ struct native_instance_wrapper {
         return -1;
     }
 
+    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* o, PyObject* args, PyObject* kwargs) {
+        PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+1);
+        
+        Py_INCREF(o);
+        PyTuple_SetItem(targetArgTuple, 0, o);
+
+        Function::Matcher matcher(f);
+
+        //tell matcher about 'self'
+        matcher.requiredTypeForArg(nullptr);
+
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            PyObject* elt = PyTuple_GetItem(args, k);
+            
+            //what type would we need for this unnamed arg?
+            const Type* targetType = matcher.requiredTypeForArg(nullptr);
+
+            if (!matcher.stillMatches()) {
+                Py_DECREF(targetArgTuple);
+                return std::make_pair(false, nullptr);
+            }
+
+            if (!targetType) {
+                Py_INCREF(elt);
+                PyTuple_SetItem(targetArgTuple, k+1, elt);
+            } 
+            else {
+                try {
+                    PyTuple_SetItem(targetArgTuple, k+1, 
+                        native_instance_wrapper::initialize(targetType, [&](instance_ptr data) {
+                            copy_constructor(targetType, data, elt);
+                        })
+                    );
+                } catch(...) {
+                    //not a valid conversion, but keep going
+                    Py_DECREF(targetArgTuple);
+                    return std::make_pair(false, nullptr);
+                }
+            }
+        }
+
+        PyObject* newKwargs = nullptr;
+
+        if (kwargs) {
+            newKwargs = PyDict_New();
+
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            while (PyDict_Next(kwargs, &pos, &key, &value)) {
+                if (!PyUnicode_Check(key)) {
+                    Py_DECREF(targetArgTuple);
+                    Py_DECREF(newKwargs);
+                    PyErr_SetString(PyExc_TypeError, "Keywords arguments must be strings.");
+                    return std::make_pair(false, nullptr);
+                }
+
+                //what type would we need for this unnamed arg?
+                const Type* targetType = matcher.requiredTypeForArg(PyUnicode_AsUTF8(key));
+
+                if (!matcher.stillMatches()) {
+                    Py_DECREF(targetArgTuple);
+                    Py_DECREF(newKwargs);
+                    return std::make_pair(false, nullptr);
+                }
+
+                if (!targetType) {
+                    PyDict_SetItem(newKwargs, key, value);
+                } 
+                else {
+                    try {
+                        PyObject* convertedValue = native_instance_wrapper::initialize(targetType, [&](instance_ptr data) {
+                            copy_constructor(targetType, data, value);
+                        });
+
+                        PyDict_SetItem(newKwargs, key, convertedValue);
+                        Py_DECREF(convertedValue);
+                    } catch(...) {
+                        //not a valid conversion
+                        Py_DECREF(targetArgTuple);
+                        Py_DECREF(newKwargs);
+                        return std::make_pair(false, nullptr);
+                    }
+                }
+            }
+        }
+
+        if (!matcher.definitelyMatches()) {
+            Py_DECREF(targetArgTuple);
+            return std::make_pair(false, nullptr);
+        }
+
+        PyObject* result = PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs);
+
+        Py_DECREF(targetArgTuple);
+        if (newKwargs) {
+            Py_DECREF(newKwargs);
+        }
+
+        //exceptions pass through directly
+        if (!result) {
+            return std::make_pair(true, result);
+        }
+
+        //force ourselves to convert to the native type
+        if (f.getReturnType()) {
+            try {
+                return std::make_pair(
+                    true, 
+                    native_instance_wrapper::initialize(f.getReturnType(), [&](instance_ptr data) {
+                        copy_constructor(f.getReturnType(), data, result);
+                    }));
+
+            } catch (std::exception& e) {
+                Py_DECREF(result);
+                PyErr_SetString(PyExc_TypeError, e.what());
+                return std::make_pair(true, (PyObject*)nullptr);
+            }
+        }
+
+        return std::make_pair(true, result);
+    }
+
+    static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
+        const Type* self_type = extractTypeFrom(o->ob_type);
+        native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
+            BoundMethod* methodType = (BoundMethod*)self_type;
+
+            const Function* f = methodType->getFunction();
+            const Class* c = methodType->getClass();
+
+            PyObject* objectInstance = native_instance_wrapper::initialize(c, [&](instance_ptr d) {
+                c->copy_constructor(d, w->dataPtr());
+            });
+
+            for (const auto& overload: f->getOverloads()) {
+                std::pair<bool, PyObject*> res = tryToCallOverload(overload, objectInstance, args, kwargs);
+                if (res.first) {
+                    Py_DECREF(objectInstance);
+                    return res.second;
+                }
+            }
+
+            Py_DECREF(objectInstance);
+            PyErr_Format(PyExc_TypeError, "'%s' cannot find a valid overload with these arguments", o->ob_type->tp_name);
+            return 0;
+        }
+
+        PyErr_Format(PyExc_TypeError, "'%s' object is not callable", o->ob_type->tp_name);
+        return 0;
+    }
+
     static PyObject* tp_getattro(PyObject *o, PyObject* attrName) {
         if (!PyUnicode_Check(attrName)) {
             PyErr_SetString(PyExc_AttributeError, "attribute is not a string");
@@ -1435,6 +1596,17 @@ struct native_instance_wrapper {
                         nt->eltPtr(w->dataPtr(), k), 
                         nt->getMembers()[k].second
                         );
+                }
+            }
+
+            for (long k = 0; k < nt->getMemberFunctions().size(); k++) {
+                auto it = nt->getMemberFunctions().find(attr_name);
+                if (it != nt->getMemberFunctions().end()) {
+                    BoundMethod* bm = BoundMethod::Make(nt, it->second);
+
+                    return native_instance_wrapper::initialize(bm, [&](instance_ptr data) {
+                        bm->copy_constructor(data, w->dataPtr());
+                    });
                 }
             }
         }
@@ -1864,7 +2036,7 @@ struct native_instance_wrapper {
                 sequenceMethodsFor(inType),   // tp_as_sequence
                 mappingMethods(inType),    // tp_as_mapping
                 tp_hash,                   // tp_hash
-                0,                         // tp_call
+                tp_call,                   // tp_call
                 0,                         // tp_str
                 native_instance_wrapper::tp_getattro, // tp_getattro
                 native_instance_wrapper::tp_setattro, // tp_setattro
@@ -2443,8 +2615,13 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
                 }
 
                 val = PyTuple_GetItem(k2,0);
+            }
+
+
+            if (val) {
                 Py_INCREF(val);
             }
+            Py_INCREF(funcObj);
 
             argList.push_back(Function::FunctionArg(
                 PyUnicode_AsUTF8(k0),
@@ -2455,9 +2632,9 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
                 ));
         }
 
-        std::vector<Function::FunctionOverload> overloads;
+        std::vector<Function::Overload> overloads;
         overloads.push_back(
-            Function::FunctionOverload((PyFunctionObject*)funcObj, rType, argList) 
+            Function::Overload((PyFunctionObject*)funcObj, rType, argList) 
             );
 
         resType = new Function(PyUnicode_AsUTF8(nameObj), overloads);
@@ -2608,7 +2785,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
             i.type()->serialize(i.data(), b);
         } catch (std::exception& e) {
             PyErr_SetString(PyExc_TypeError, e.what());
-            return NULL;            
+            return NULL;
         }
     }
 

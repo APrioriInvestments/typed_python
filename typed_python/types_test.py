@@ -874,67 +874,7 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertTrue(type(v2) is type(v))
                 self.assertEqual(ser,ser2)
                 self.assertEqual(v, v2)
-        
-    def test_class(self):
-        with self.assertRaises(TypeError):
-            class A(Class):
-                x = Member((1,2,3))
-
-        class A(Class):
-            x = Member(int)
-
-            y = int #not a member. Just a value.
-
-            def f(self):
-                return 10
-
-        self.assertEqual(_types.bytecount(A), 8)
-        self.assertTrue(A.y is int)
-
-        a = A()
-
-        with self.assertRaises(AttributeError):
-            a.not_an_attribute
-
-        self.assertEqual(a.x, 0)
-
-        a.x = 10
-
-        self.assertEqual(a.x, 10)
-
-    def test_class_holding_class(self):
-        class Interior(Class):
-            x = Member(int)
-            y = Member(int)
-
-        class Exterior(Class):
-            x = Member(int)
-            i = Member(Interior)
-            iTup = Member(NamedTuple(x=Interior, y=Interior))
-
-        e = Exterior()
-
-        #'anI' is a reference to an internal element of 'e'. 'anI' will keep 'e' alive.
-        anI = e.i
-        anI.x = 10
-        self.assertEqual(e.i.x, 10)
-
-        anI2 = e.iTup.x
-        anI2.x = 10
-        self.assertEqual(e.iTup.x.x, 10)
-
-    def test_class_stringification(self):
-        class Interior(Class):
-            x = Member(int)
-            y = Member(int)
-
-        i = Interior()
-
-        self.assertEqual(Interior.__qualname__, "Interior")
-        self.assertEqual(str(Interior()), "Interior(x=0, y=0)")
-
-
-
+    
     def test_serialize_doesnt_leak(self):
         T = TupleOf(int)
 

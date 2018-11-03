@@ -38,6 +38,7 @@ class PythonSubclass;
 class Class;
 class HeldClass;
 class Function;
+class BoundMethod;
 class PackedArray;
 class Pointer;
 
@@ -231,6 +232,7 @@ public:
         catAlternative,
         catConcreteAlternative, //concrete Alternative subclass
         catPythonSubclass,
+        catBoundMethod,
         catClass,
         catHeldClass,
         catFunction,
@@ -399,6 +401,8 @@ public:
                 return f(*(HeldClass*)this);
             case catFunction:
                 return f(*(Function*)this);
+            case catBoundMethod:
+                return f(*(BoundMethod*)this);
             case catPackedArray:
                 return f(*(PackedArray*)this);
             case catPointer:
@@ -2846,6 +2850,10 @@ public:
             return m_name;
         }
 
+        PyObject* getDefaultValue() const {
+            return m_defaultValue;
+        }
+
         const Type* getTypeFilter() const {
             return m_typeFilter;
         }
@@ -2858,6 +2866,10 @@ public:
             return m_isKwarg;
         }
 
+        bool getIsNormalArg() const {
+            return !m_isKwarg && !m_isStarArg;
+        }
+
     private:
         std::string m_name;
         const Type* m_typeFilter;
@@ -2866,9 +2878,9 @@ public:
         bool m_isKwarg;
     };
 
-    class FunctionOverload {
+    class Overload {
     public:
-        FunctionOverload(
+        Overload(
             PyFunctionObject* functionObj, 
             const Type* returnType, 
             const std::vector<FunctionArg>& args
@@ -2891,15 +2903,95 @@ public:
             return mArgs;
         }
 
-
     private:
         PyFunctionObject* mFunctionObj;
         const Type* mReturnType;
         std::vector<FunctionArg> mArgs;
     };
 
+    class Matcher {
+    public:
+        Matcher(const Overload& overload) : 
+                mOverload(overload),
+                mArgs(overload.getArgs())
+        {
+            m_used.resize(overload.getArgs().size());
+            m_matches = true;
+        }
+
+        bool stillMatches() const {
+            return m_matches;
+        }
+
+        //called at the end to see if this was a valid match
+        bool definitelyMatches() const {
+            if (!m_matches) {
+                return false;
+            }
+
+            for (long k = 0; k < m_used.size(); k++) {
+                if (!m_used[k] && !mArgs[k].getDefaultValue() && mArgs[k].getIsNormalArg()) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        //push the state machine forward.
+        const Type* requiredTypeForArg(const char* name) {
+            if (!name) {
+                for (long k = 0; k < m_used.size(); k++) {
+                    if (!m_used[k]) {
+                        if (mArgs[k].getIsNormalArg()) {
+                            m_used[k] = true;
+                            return mArgs[k].getTypeFilter();
+                        } 
+                        else if (mArgs[k].getIsStarArg()) {
+                            //this doesn't consume the star arg
+                            return mArgs[k].getTypeFilter();
+                        } 
+                        else {
+                            //this is a kwarg, but we didn't give a name.
+                            m_matches = false;
+                            return nullptr;
+                        }
+                    }
+                }
+            }
+            else if (name) {
+                for (long k = 0; k < m_used.size(); k++) {
+                    if (!m_used[k]) {
+                        if (mArgs[k].getIsNormalArg() && mArgs[k].getName() == name) {
+                            m_used[k] = true;
+                            return mArgs[k].getTypeFilter();
+                        }
+                        else if (mArgs[k].getIsNormalArg()) {
+                            //just keep going
+                        } 
+                        else if (mArgs[k].getIsStarArg()) {
+                            //just keep going
+                        } else {
+                            //this is a kwarg
+                            return mArgs[k].getTypeFilter();
+                        }
+                    }
+                }
+            }
+
+            m_matches = false;
+            return nullptr;
+        }
+
+    private:
+        const Overload& mOverload;
+        const std::vector<FunctionArg>& mArgs;
+        std::vector<char> m_used;
+        bool m_matches;
+    };
+
     Function(std::string inName, 
-            const std::vector<FunctionOverload>& overloads
+            const std::vector<Overload>& overloads
             ) :
         Type(catFunction),
         mOverloads(overloads)
@@ -2910,7 +3002,7 @@ public:
     }
 
     static Function* merge(const Function* f1, const Function* f2) {
-        std::vector<FunctionOverload> overloads(f1->mOverloads);
+        std::vector<Overload> overloads(f1->mOverloads);
         for (auto o: f2->mOverloads) {
             overloads.push_back(o);
         }
@@ -2953,9 +3045,17 @@ public:
     void assign(instance_ptr self, instance_ptr other) const {
     }
 
+    const PyFunctionObject* getPyFunc() const {
+        return mPyFunc;
+    }
+
+    const std::vector<Overload>& getOverloads() const {
+        return mOverloads;
+    }
+
 private:
     PyFunctionObject* mPyFunc;
-    std::vector<FunctionOverload> mOverloads;
+    std::vector<Overload> mOverloads;
 };
 
 //a class held directly inside of another object
@@ -3281,14 +3381,64 @@ public:
         return m_heldClass->memberNamed(c);
     }
 
+    HeldClass* getHeldClass() const {
+        return m_heldClass;
+    }
+
 private:
     HeldClass* m_heldClass;
 };
 
+class BoundMethod : public Class {
+public:
+    BoundMethod(const Class* inClass, const Function* inFunc) : Class(inClass->getHeldClass())
+    {
+        m_typeCategory = TypeCategory::catBoundMethod;
+        m_function = inFunc;
+        m_class = inClass;
+        m_name = "BoundMethod(" + inClass->name() + "." + inFunc->name() + ")";
+    }
+
+    static BoundMethod* Make(const Class* c, const Function* f) {
+        static std::mutex guard;
+
+        std::lock_guard<std::mutex> lock(guard);
+
+        typedef std::pair<const Class*, const Function*> keytype;
+
+        static std::map<keytype, BoundMethod*> m;
+
+        auto it = m.find(keytype(c,f));
+
+        if (it == m.end()) {
+            it = m.insert(
+                std::make_pair(keytype(c,f), new BoundMethod(c, f))
+                ).first;
+        }
+
+        return it->second;
+    }
+
+    void repr(instance_ptr self, std::ostringstream& stream) const {
+        stream << m_name;
+    }
+
+    const Class* getClass() const {
+        return m_class;
+    }
+
+    const Function* getFunction() const {
+        return m_function;
+    }
+
+private:
+    const Function* m_function;
+    const Class* m_class;
+};
+
 class PackedArray : public Type {
 public:
-    void constructor(instance_ptr self) const {
-    
+    void constructor(instance_ptr self) const { 
     }
     
     template<class buf_t>
