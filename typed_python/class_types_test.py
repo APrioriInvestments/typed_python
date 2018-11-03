@@ -184,6 +184,51 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             C().f(1,"hi")
         self.assertEqual(C().f(x=(1,2)), "named tuple of ints")
-        
 
+    def test_class_members_accessible(self):
+        class C(Class):
+            x = 10
+            y = Member(int)
+
+        c = C()
         
+        self.assertEqual(c.x, 10)
+        self.assertEqual(c.y, 0)
+
+        with self.assertRaises(AttributeError):
+            c.x = 20
+
+        self.assertEqual(C.x, 10)
+        self.assertEqual(C.y, Member(int))
+
+    def test_static_methods(self):
+        class C(Class):
+            @staticmethod
+            def f(a: float):
+                return float
+
+            @staticmethod
+            def f(a):
+                return "any"
+
+            @staticmethod
+            def f(*args: int):
+                return "int list"
+
+            @staticmethod
+            def f(*args: str):
+                return "string list"
+
+            @staticmethod
+            def f(**kwargs: TupleOf(int)):
+                return "named tuple of ints"
+
+        for thing in [C(), C]:
+            self.assertEqual(thing.f(1), float)
+            self.assertEqual(thing.f("asdf"), "any")
+            self.assertEqual(thing.f("asdf", "asdf2"), "string list")
+            self.assertEqual(thing.f(1,2), "int list")
+            with self.assertRaises(TypeError):
+                thing.f(1,"hi")
+            self.assertEqual(thing.f(x=(1,2)), "named tuple of ints")
+

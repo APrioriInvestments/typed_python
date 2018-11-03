@@ -1379,16 +1379,20 @@ struct native_instance_wrapper {
         return -1;
     }
 
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* o, PyObject* args, PyObject* kwargs) {
-        PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+1);
-        
-        Py_INCREF(o);
-        PyTuple_SetItem(targetArgTuple, 0, o);
-
+    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
+        PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+(self?1:0));
         Function::Matcher matcher(f);
 
+        int write_slot = 0;        
+
+        if (self) {
+            Py_INCREF(self);
+            PyTuple_SetItem(targetArgTuple, write_slot++, self);
+            matcher.requiredTypeForArg(nullptr);
+        }
+
+        
         //tell matcher about 'self'
-        matcher.requiredTypeForArg(nullptr);
 
         for (long k = 0; k < PyTuple_Size(args); k++) {
             PyObject* elt = PyTuple_GetItem(args, k);
@@ -1403,11 +1407,11 @@ struct native_instance_wrapper {
 
             if (!targetType) {
                 Py_INCREF(elt);
-                PyTuple_SetItem(targetArgTuple, k+1, elt);
+                PyTuple_SetItem(targetArgTuple, write_slot++, elt);
             } 
             else {
                 try {
-                    PyTuple_SetItem(targetArgTuple, k+1, 
+                    PyTuple_SetItem(targetArgTuple, write_slot++, 
                         native_instance_wrapper::initialize(targetType, [&](instance_ptr data) {
                             copy_constructor(targetType, data, elt);
                         })
@@ -1505,6 +1509,21 @@ struct native_instance_wrapper {
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
         const Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
+
+        if (self_type->getTypeCategory() == Type::TypeCategory::catFunction) {
+            Function* methodType = (Function*)self_type;
+
+            for (const auto& overload: methodType->getOverloads()) {
+                std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, args, kwargs);
+                if (res.first) {
+                    return res.second;
+                }
+            }
+
+            PyErr_Format(PyExc_TypeError, "'%s' cannot find a valid overload with these arguments", o->ob_type->tp_name);
+            return 0;
+        }
+
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
             BoundMethod* methodType = (BoundMethod*)self_type;
@@ -1607,6 +1626,15 @@ struct native_instance_wrapper {
                     return native_instance_wrapper::initialize(bm, [&](instance_ptr data) {
                         bm->copy_constructor(data, w->dataPtr());
                     });
+                }
+            }
+
+            for (long k = 0; k < nt->getClassMembers().size(); k++) {
+                auto it = nt->getClassMembers().find(attr_name);
+                if (it != nt->getClassMembers().end()) {
+                    PyObject* res = it->second;
+                    Py_INCREF(res);
+                    return res;
                 }
             }
         }
@@ -2103,6 +2131,15 @@ struct native_instance_wrapper {
                     types[inType]->typeObj.tp_dict, 
                     nameAndObj.first.c_str(), 
                     nameAndObj.second
+                    );
+            }
+            for (auto nameAndObj: ((Class*)inType)->getStaticFunctions()) {
+                PyDict_SetItemString(
+                    types[inType]->typeObj.tp_dict, 
+                    nameAndObj.first.c_str(), 
+                    native_instance_wrapper::initialize(nameAndObj.second, [&](instance_ptr data){
+                        //nothing to do - functions like this are just types.
+                    })
                     );
             }
         }

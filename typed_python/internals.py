@@ -26,6 +26,11 @@ class Member:
     def __init__(self, t):
         self.t = t
 
+    def __eq__(self, other):
+        if not isinstance(other, Member):
+            return False
+        return self.t == other.t
+
 class ClassMetaNamespace:
     def __init__(self):
         self.ns = {}
@@ -99,6 +104,7 @@ class ClassMetaclass(type):
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
                 members.append((eltName, elt.t))
+                classMembers.append((eltName, elt))
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:
                     staticFunctions[eltName] = makeFunction(eltName, elt.__func__)
