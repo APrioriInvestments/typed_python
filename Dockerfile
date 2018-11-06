@@ -24,11 +24,11 @@ ENV LD_PRELOAD=libtcmalloc_minimal.so.4
 #it's a typedef)
 RUN sed -i 's/global _is_pep393/_is_pep393=True/' /usr/share/gdb/auto-load/usr/bin/python3.6m-gdb.py
 
-# COPY . /nativepython/
-# WORKDIR /nativepython
-# RUN python3 setup.py install
+COPY . /nativepython/
+WORKDIR /nativepython
+RUN python3 setup.py install
 
-# ENTRYPOINT ["object_database_service_manager", \
-#    "--source", "/storage/service_source", \
-#    "--storage", "/storage/service_storage", \
-#    "--logdir", "/storage/logs"]
+ENTRYPOINT ["object_database_service_manager", \
+   "--source", "/storage/service_source", \
+   "--storage", "/storage/service_storage", \
+   "--logdir", "/storage/logs"]
