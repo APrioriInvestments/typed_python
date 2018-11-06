@@ -581,10 +581,32 @@ class Tabs(Cell):
         self.whichSlot.set(int(msgFrame['ix']))
 
 class Dropdown(Cell):
-    def __init__(self, title, headersAndLambdas):
+    def __init__(self, title, headersAndLambdas, singleLambda=None):
+        """
+        Initialize a Dropdown menu. 
+
+            title - a cell containing the current value.
+            headersAndLambdas - a list of pairs containing (cell, callback) for each menu item.
+
+        OR
+
+            title - a cell containing the current value.
+            headersAndLambdas - a list of pairs containing cells for each item
+            callback - a primary callback to call with the selected cell
+
+        """
         super().__init__()
 
-        self.headersAndLambdas = headersAndLambdas
+        if singleLambda is not None:
+            def makeCallback(cell):
+                def callback():
+                    singleLambda(cell)
+                return callback
+
+            self.headersAndLambdas = [(header, makeCallback(header)) for header in headersAndLambdas]
+        else:
+            self.headersAndLambdas = headersAndLambdas
+
         self.title = Cell.makeCell(title)
 
     def sortsAs(self):

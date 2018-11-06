@@ -49,6 +49,11 @@ class PointsToShow:
 
 
 @schema.define
+class Feigenbaum:
+    y = float
+
+
+@schema.define
 class TestServiceLastTimestamp:
     connection = Indexed(core_schema.Connection)
     lastPing = float
@@ -112,6 +117,12 @@ class UninitializableService(ServiceBase):
 
 
 class GraphDisplayService(ServiceBase):
+    def initialize(self):
+        self.db.subscribeToSchema(core_schema, service_schema, schema)
+        with self.db.transaction():
+            if not Feigenbaum.lookupAny():
+                Feigenbaum(y=2.0)
+        
     @staticmethod
     def addAPoint():
         PointsToShow(timestamp = time.time(), y = len(PointsToShow.lookupAll()) ** 2.2)
@@ -119,6 +130,7 @@ class GraphDisplayService(ServiceBase):
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         ensureSubscribedType(PointsToShow)
+        ensureSubscribedType(Feigenbaum)
         depth = Slot(50)
 
         return Tabs(
@@ -133,6 +145,7 @@ class GraphDisplayService(ServiceBase):
                 Card(Plot(GraphDisplayService.chartData)).width(600).height(400),
             feigenbaum=
                 Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
+                Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
                 Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
             )
 
@@ -159,11 +172,11 @@ class GraphDisplayService(ServiceBase):
         def feigenbaum(values):
             x = numpy.ones(len(values)) * .5
             for _ in range(10000):
-                x = values * x * (1-x)
+                x = (values * x * (1-x)) ** ((Feigenbaum.lookupAny().y) ** .5)
 
             its = []
             for _ in range(depth):
-                x = values * x * (1-x)
+                x = (values * x * (1-x)) ** ((Feigenbaum.lookupAny().y) ** .5)
                 its.append(x)
 
             return numpy.concatenate(its)
