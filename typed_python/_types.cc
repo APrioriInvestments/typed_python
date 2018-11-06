@@ -12,7 +12,7 @@ static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
 //extension of PyTypeObject that stashes a Type* on the end.
 struct NativeTypeWrapper {
     PyTypeObject typeObj;
-    const Type* mType;
+    Type* mType;
 };
 
 class InternalPyException {};
@@ -29,7 +29,7 @@ struct native_instance_wrapper {
     int64_t mOffset; //byte offset within the instance that we hold
 
     template<class init_func>
-    static PyObject* initialize(const Type* eltType, const init_func& f) {
+    static PyObject* initialize(Type* eltType, const init_func& f) {
         native_instance_wrapper* self = 
             (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
@@ -68,7 +68,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* constDictItems(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
@@ -91,7 +91,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* constDictKeys(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
@@ -114,7 +114,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* constDictValues(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
@@ -147,8 +147,8 @@ struct native_instance_wrapper {
         PyObject* item = PyTuple_GetItem(args,0);
         PyObject* ifNotFound = (PyTuple_Size(args) == 2 ? PyTuple_GetItem(args,1) : Py_None);
 
-        const Type* self_type = extractTypeFrom(o->ob_type);
-        const Type* item_type = extractTypeFrom(item->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
+        Type* item_type = extractTypeFrom(item->ob_type);
         
         if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
             ConstDict* dict_t = (ConstDict*)self_type;
@@ -195,7 +195,7 @@ struct native_instance_wrapper {
         return NULL;
     }
 
-    static PyMethodDef* typeMethods(const Type* t) {
+    static PyMethodDef* typeMethods(Type* t) {
         if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
             return new PyMethodDef [5] {
                 {"get", (PyCFunction)native_instance_wrapper::constDictGet, METH_VARARGS, NULL},
@@ -221,7 +221,7 @@ struct native_instance_wrapper {
         Py_TYPE(self)->tp_free((PyObject*)self);
     }
 
-    static bool pyValCouldBeOfType(const Type* t, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
         if (t->getTypeCategory() == Type::TypeCategory::catValue) {
             Value* valType = (Value*)t;
             if (compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true) == 0) {
@@ -231,7 +231,7 @@ struct native_instance_wrapper {
             }
         }
 
-        const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType) {
             return argType == t || argType->getBaseType() == t || argType == t->getBaseType();
@@ -276,8 +276,8 @@ struct native_instance_wrapper {
         return true;
     }
 
-    static void copy_constructor(const Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
-        const Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+    static void copy_constructor(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType && (argType->getBaseType() == eltType || argType == eltType || argType == eltType->getBaseType())) {
             //it's already the right kind of instance
@@ -288,7 +288,7 @@ struct native_instance_wrapper {
         Type::TypeCategory cat = eltType->getTypeCategory();
 
         if (cat == Type::TypeCategory::catPythonSubclass) {
-            copy_constructor((const Type*)eltType->getBaseType(), tgt, pyRepresentation);
+            copy_constructor((Type*)eltType->getBaseType(), tgt, pyRepresentation);
             return;
         }
 
@@ -310,7 +310,7 @@ struct native_instance_wrapper {
             OneOf* oneOf = (OneOf*)eltType;
 
             for (long k = 0; k < oneOf->getTypes().size(); k++) {
-                const Type* subtype = oneOf->getTypes()[k];
+                Type* subtype = oneOf->getTypes()[k];
 
                 if (pyValCouldBeOfType(subtype, pyRepresentation)) {
                     try {
@@ -579,7 +579,7 @@ struct native_instance_wrapper {
                 ((NamedTuple*)eltType)->constructor(tgt, 
                     [&](uint8_t* eltPtr, int64_t k) {
                         const std::string& name = ((NamedTuple*)eltType)->getNames()[k];
-                        const Type* t = ((NamedTuple*)eltType)->getTypes()[k];
+                        Type* t = ((NamedTuple*)eltType)->getTypes()[k];
 
                         PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
                         if (o) {
@@ -604,11 +604,11 @@ struct native_instance_wrapper {
         throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
     }
 
-    static void initialize(uint8_t* data, const Type* t, PyObject* args, PyObject* kwargs) {
+    static void initialize(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
         Type::TypeCategory cat = t->getTypeCategory();
 
         if (cat == Type::TypeCategory::catPythonSubclass) {
-            initialize(data, (const Type*)t->getBaseType(), args, kwargs);
+            initialize(data, (Type*)t->getBaseType(), args, kwargs);
             return;
         }
 
@@ -646,7 +646,7 @@ struct native_instance_wrapper {
                 compositeT->constructor(
                     data, 
                     [&](uint8_t* eltPtr, int64_t k) {
-                        const Type* eltType = compositeT->getTypes()[k];
+                        Type* eltType = compositeT->getTypes()[k];
                         PyObject* o = PyDict_GetItemString(kwargs, compositeT->getNames()[k].c_str());
                         if (o) {
                             copy_constructor(eltType, eltPtr, o);
@@ -674,7 +674,7 @@ struct native_instance_wrapper {
     //produce the pythonic representation of this object. for things like integers, string, etc,
     //convert them back to their python-native form. otherwise, a pointer back into a native python
     //structure
-    static PyObject* extractPythonObject(instance_ptr data, const Type* eltType) {
+    static PyObject* extractPythonObject(instance_ptr data, Type* eltType) {
         if (eltType->getTypeCategory() == Type::TypeCategory::catValue) {
             Value* valueType = (Value*)eltType;
             return extractPythonObject(valueType->value().data(), valueType->value().type());
@@ -716,11 +716,11 @@ struct native_instance_wrapper {
         }
 
         if (eltType->getTypeCategory() == Type::TypeCategory::catOneOf) {
-            std::pair<const Type*, instance_ptr> child = ((OneOf*)eltType)->unwrap(data);
+            std::pair<Type*, instance_ptr> child = ((OneOf*)eltType)->unwrap(data);
             return extractPythonObject(child.second, child.first);
         }
 
-        const Type* concreteT = eltType->pickConcreteSubclass(data);
+        Type* concreteT = eltType->pickConcreteSubclass(data);
 
         try {
             return native_instance_wrapper::initialize(concreteT, [&](instance_ptr selfData) {
@@ -733,7 +733,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
-        const Type* eltType = extractTypeFrom(subtype);
+        Type* eltType = extractTypeFrom(subtype);
 
         if (isSubclassOfNativeType(subtype)) {
             native_instance_wrapper* self = (native_instance_wrapper*)subtype->tp_alloc(subtype, 0);
@@ -781,7 +781,7 @@ struct native_instance_wrapper {
     static Py_ssize_t sq_length(PyObject* o) {
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
-        const Type* t = extractTypeFrom(o->ob_type);
+        Type* t = extractTypeFrom(o->ob_type);
 
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
             return ((TupleOf*)t)->count(w->dataPtr());
@@ -800,8 +800,8 @@ struct native_instance_wrapper {
     }
 
     static PyObject* nb_subtract(PyObject* lhs, PyObject* rhs) {
-        const Type* lhs_type = extractTypeFrom(lhs->ob_type);
-        const Type* rhs_type = extractTypeFrom(rhs->ob_type);
+        Type* lhs_type = extractTypeFrom(lhs->ob_type);
+        Type* rhs_type = extractTypeFrom(rhs->ob_type);
 
         if (lhs_type) {
             native_instance_wrapper* w_lhs = (native_instance_wrapper*)lhs;
@@ -809,7 +809,7 @@ struct native_instance_wrapper {
             if (lhs_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
                 ConstDict* dict_t = (ConstDict*)lhs_type;
 
-                const Type* tupleOfKeysType = dict_t->tupleOfKeysType();
+                Type* tupleOfKeysType = dict_t->tupleOfKeysType();
 
                 if (lhs_type == tupleOfKeysType) {
                     native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
@@ -859,8 +859,8 @@ struct native_instance_wrapper {
     }
 
     static PyObject* sq_concat(PyObject* lhs, PyObject* rhs) {
-        const Type* lhs_type = extractTypeFrom(lhs->ob_type);
-        const Type* rhs_type = extractTypeFrom(rhs->ob_type);
+        Type* lhs_type = extractTypeFrom(lhs->ob_type);
+        Type* rhs_type = extractTypeFrom(rhs->ob_type);
 
         if (lhs_type) {
             native_instance_wrapper* w_lhs = (native_instance_wrapper*)lhs;
@@ -909,7 +909,7 @@ struct native_instance_wrapper {
                     native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
 
                     TupleOf* tupT = (TupleOf*)lhs_type;
-                    const Type* eltType = tupT->getEltType();
+                    Type* eltType = tupT->getEltType();
                     native_instance_wrapper* self = 
                         (native_instance_wrapper*)typeObj(tupT)
                             ->tp_alloc(typeObj(tupT), 0);
@@ -934,7 +934,7 @@ struct native_instance_wrapper {
                 //generic path to add any kind of iterable.
                 if (PyObject_Length(rhs) != -1) {
                     TupleOf* tupT = (TupleOf*)lhs_type;
-                    const Type* eltType = tupT->getEltType();
+                    Type* eltType = tupT->getEltType();
 
                     native_instance_wrapper* self = 
                         (native_instance_wrapper*)typeObj(tupT)
@@ -993,7 +993,7 @@ struct native_instance_wrapper {
 
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix) {
         native_instance_wrapper* w = (native_instance_wrapper*)o;
-        const Type* t = extractTypeFrom(o->ob_type);
+        Type* t = extractTypeFrom(o->ob_type);
 
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
             int64_t count = ((TupleOf*)t)->count(w->dataPtr());
@@ -1007,7 +1007,7 @@ struct native_instance_wrapper {
                 return NULL;
             }
 
-            const Type* eltType = (const Type*)((TupleOf*)t)->getEltType();
+            Type* eltType = (Type*)((TupleOf*)t)->getEltType();
             return extractPythonObject(
                 ((TupleOf*)t)->eltPtr(w->dataPtr(), ix), 
                 eltType
@@ -1022,7 +1022,7 @@ struct native_instance_wrapper {
                 return NULL;
             }
 
-            const Type* eltType = compType->getTypes()[ix];
+            Type* eltType = compType->getTypes()[ix];
 
             return extractPythonObject(
                 compType->eltPtr(w->dataPtr(), ix), 
@@ -1062,7 +1062,7 @@ struct native_instance_wrapper {
         return NULL;
     }
 
-    static PyTypeObject* typeObj(const Type* inType) {
+    static PyTypeObject* typeObj(Type* inType) {
         if (!inType->getTypeRep()) {
             inType->setTypeRep(typeObjInternal(inType));
         }
@@ -1070,7 +1070,7 @@ struct native_instance_wrapper {
         return inType->getTypeRep();
     }
 
-    static PySequenceMethods* sequenceMethodsFor(const Type* t) {
+    static PySequenceMethods* sequenceMethodsFor(Type* t) {
         if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || 
                 t->getTypeCategory() == Type::TypeCategory::catTuple || 
                 t->getTypeCategory() == Type::TypeCategory::catNamedTuple || 
@@ -1095,7 +1095,7 @@ struct native_instance_wrapper {
         return 0;
     }
 
-    static PyNumberMethods* numberMethods(const Type* t) {
+    static PyNumberMethods* numberMethods(Type* t) {
         static PyNumberMethods* res = 
             new PyNumberMethods {
                 0, //binaryfunc nb_add
@@ -1142,7 +1142,7 @@ struct native_instance_wrapper {
     static Py_ssize_t mp_length(PyObject* o) {
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
-        const Type* t = extractTypeFrom(o->ob_type);
+        Type* t = extractTypeFrom(o->ob_type);
 
         if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
             return ((ConstDict*)t)->size(w->dataPtr());
@@ -1158,8 +1158,8 @@ struct native_instance_wrapper {
     static int sq_contains(PyObject* o, PyObject* item) {
         native_instance_wrapper* self_w = (native_instance_wrapper*)o;
 
-        const Type* self_type = extractTypeFrom(o->ob_type);
-        const Type* item_type = extractTypeFrom(item->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
+        Type* item_type = extractTypeFrom(item->ob_type);
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
             ConstDict* dict_t = (ConstDict*)self_type;
@@ -1202,8 +1202,8 @@ struct native_instance_wrapper {
     static PyObject* mp_subscript(PyObject* o, PyObject* item) {
         native_instance_wrapper* self_w = (native_instance_wrapper*)o;
 
-        const Type* self_type = extractTypeFrom(o->ob_type);
-        const Type* item_type = extractTypeFrom(item->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
+        Type* item_type = extractTypeFrom(item->ob_type);
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
             ConstDict* dict_t = (ConstDict*)self_type;
@@ -1256,7 +1256,7 @@ struct native_instance_wrapper {
                     return NULL;
                 }
 
-                const Type* eltType = tupType->getEltType();
+                Type* eltType = tupType->getEltType();
 
                 native_instance_wrapper* result = 
                     (native_instance_wrapper*)typeObj(tupType)->tp_alloc(typeObj(tupType), 0);
@@ -1284,7 +1284,7 @@ struct native_instance_wrapper {
         return NULL;
     }
 
-    static PyMappingMethods* mappingMethods(const Type* t) {
+    static PyMappingMethods* mappingMethods(Type* t) {
         static PyMappingMethods* res = 
             new PyMappingMethods {
                 native_instance_wrapper::mp_length, //mp_length
@@ -1315,7 +1315,7 @@ struct native_instance_wrapper {
         return false;
     }
 
-    static const Type* extractTypeFrom(PyTypeObject* typeObj) {
+    static Type* extractTypeFrom(PyTypeObject* typeObj) {
         while (typeObj->tp_base && typeObj->tp_as_buffer != bufferProcs()) {
             typeObj = typeObj->tp_base;
         }
@@ -1333,7 +1333,7 @@ struct native_instance_wrapper {
             return -1;
         }
 
-        const Type* type = extractTypeFrom(o->ob_type);
+        Type* type = extractTypeFrom(o->ob_type);
 
         if (type->getTypeCategory() == Type::TypeCategory::catClass) {
             native_instance_wrapper* self_w = (native_instance_wrapper*)o;
@@ -1346,9 +1346,9 @@ struct native_instance_wrapper {
                 return -1;
             }
 
-            const Type* eltType = nt->getMembers()[i].second;
+            Type* eltType = nt->getMembers()[i].second;
 
-            const Type* attrType = extractTypeFrom(attrVal->ob_type);
+            Type* attrType = extractTypeFrom(attrVal->ob_type);
 
             if (eltType == attrType) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)attrVal;
@@ -1398,7 +1398,7 @@ struct native_instance_wrapper {
             PyObject* elt = PyTuple_GetItem(args, k);
             
             //what type would we need for this unnamed arg?
-            const Type* targetType = matcher.requiredTypeForArg(nullptr);
+            Type* targetType = matcher.requiredTypeForArg(nullptr);
 
             if (!matcher.stillMatches()) {
                 Py_DECREF(targetArgTuple);
@@ -1441,7 +1441,7 @@ struct native_instance_wrapper {
                 }
 
                 //what type would we need for this unnamed arg?
-                const Type* targetType = matcher.requiredTypeForArg(PyUnicode_AsUTF8(key));
+                Type* targetType = matcher.requiredTypeForArg(PyUnicode_AsUTF8(key));
 
                 if (!matcher.stillMatches()) {
                     Py_DECREF(targetArgTuple);
@@ -1507,7 +1507,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catFunction) {
@@ -1528,8 +1528,8 @@ struct native_instance_wrapper {
         if (self_type->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
             BoundMethod* methodType = (BoundMethod*)self_type;
 
-            const Function* f = methodType->getFunction();
-            const Class* c = methodType->getClass();
+            Function* f = methodType->getFunction();
+            Class* c = methodType->getClass();
 
             PyObject* objectInstance = native_instance_wrapper::initialize(c, [&](instance_ptr d) {
                 c->copy_constructor(d, w->dataPtr());
@@ -1560,7 +1560,7 @@ struct native_instance_wrapper {
 
         char *attr_name = PyUnicode_AsUTF8(attrName);
 
-        const Type* t = extractTypeFrom(o->ob_type);
+        Type* t = extractTypeFrom(o->ob_type);
         
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
@@ -1619,7 +1619,7 @@ struct native_instance_wrapper {
             Class* nt = (Class*)t;
             for (long k = 0; k < nt->getMembers().size();k++) {
                 if (nt->getMembers()[k].first == attr_name) {
-                    const Type* eltType = nt->getMembers()[k].second;
+                    Type* eltType = nt->getMembers()[k].second;
 
                     return extractPythonObject(
                         nt->eltPtr(w->dataPtr(), k), 
@@ -1658,7 +1658,7 @@ struct native_instance_wrapper {
         return PyObject_GenericGetAttr(o, attrName);
     }
 
-    static PyObject* getattr(const Type* type, instance_ptr data, char* attr_name) {
+    static PyObject* getattr(Type* type, instance_ptr data, char* attr_name) {
         if (type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
             ConcreteAlternative* t = (ConcreteAlternative*)type;
            
@@ -1694,7 +1694,7 @@ struct native_instance_wrapper {
     }
     
     static Py_hash_t tp_hash(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         int32_t h = self_type->hash32(w->dataPtr());
@@ -1705,13 +1705,13 @@ struct native_instance_wrapper {
         return h;
     }
 
-    static char compare_to_python(const Type* t, instance_ptr self, PyObject* other, bool exact) {
+    static char compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact) {
         if (t->getTypeCategory() == Type::TypeCategory::catValue) {
             Value* valType = (Value*)t;
             return compare_to_python(valType->value().type(), valType->value().data(), other, exact);
         }
 
-        const Type* otherT = extractTypeFrom(other->ob_type);
+        Type* otherT = extractTypeFrom(other->ob_type);
 
         if (otherT) {
             if (otherT < t) {
@@ -1724,7 +1724,7 @@ struct native_instance_wrapper {
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catOneOf) {
-            std::pair<const Type*, instance_ptr> child = ((OneOf*)t)->unwrap(self);
+            std::pair<Type*, instance_ptr> child = ((OneOf*)t)->unwrap(self);
             return compare_to_python(child.first, child.second, other, exact);
         }
 
@@ -1905,8 +1905,8 @@ struct native_instance_wrapper {
     }
 
     static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op) {
-        const Type* own = extractTypeFrom(a->ob_type);
-        const Type* other = extractTypeFrom(b->ob_type);
+        Type* own = extractTypeFrom(a->ob_type);
+        Type* other = extractTypeFrom(b->ob_type);
 
 
         if (!other) {
@@ -1961,7 +1961,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* tp_iter(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
@@ -1983,7 +1983,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* tp_iternext(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type->getTypeCategory() != Type::TypeCategory::catConstDict) {
@@ -2028,7 +2028,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* tp_repr(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         std::ostringstream str;
@@ -2040,7 +2040,7 @@ struct native_instance_wrapper {
     }
 
     static PyObject* tp_str(PyObject *o) {
-        const Type* self_type = extractTypeFrom(o->ob_type);
+        Type* self_type = extractTypeFrom(o->ob_type);
 
         if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
             self_type = self_type->getBaseType();
@@ -2061,7 +2061,7 @@ struct native_instance_wrapper {
         return tp_repr(o);
     }
 
-    static bool typeCanBeSubclassed(const Type* t) {
+    static bool typeCanBeSubclassed(Type* t) {
         return t->getTypeCategory() == Type::TypeCategory::catNamedTuple;
     }
 
@@ -2070,9 +2070,9 @@ struct native_instance_wrapper {
         return procs;
     }
 
-    static PyTypeObject* typeObjInternal(const Type* inType) {
+    static PyTypeObject* typeObjInternal(Type* inType) {
         static std::recursive_mutex mutex;
-        static std::map<const Type*, NativeTypeWrapper*> types;
+        static std::map<Type*, NativeTypeWrapper*> types;
 
         std::lock_guard<std::recursive_mutex> lock(mutex);
 
@@ -2140,7 +2140,7 @@ struct native_instance_wrapper {
         //at this point, the dictionary has an entry, so if we recurse back to this function
         //we will return the correct entry.
         if (inType->getBaseType()) {
-            types[inType]->typeObj.tp_base = typeObjInternal((const Type*)inType->getBaseType());
+            types[inType]->typeObj.tp_base = typeObjInternal((Type*)inType->getBaseType());
             Py_INCREF(types[inType]->typeObj.tp_base);
         }
 
@@ -2179,9 +2179,9 @@ struct native_instance_wrapper {
         return (PyTypeObject*)types[inType];
     }
 
-    static const Type* tryUnwrapPyInstanceToType(PyObject* arg) {
+    static Type* tryUnwrapPyInstanceToType(PyObject* arg) {
         if (PyType_Check(arg)) {
-            const Type* possibleType = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
+            Type* possibleType = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
             if (!possibleType) {
                 return NULL;
             }
@@ -2195,7 +2195,7 @@ struct native_instance_wrapper {
         return  native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
     }        
 
-    static const Type* tryUnwrapPyInstanceToValueType(PyObject* typearg) {
+    static Type* tryUnwrapPyInstanceToValueType(PyObject* typearg) {
         if (PyBool_Check(typearg)) {
             return Value::MakeBool(typearg == Py_True);
         }
@@ -2227,7 +2227,7 @@ struct native_instance_wrapper {
                 );
         }
 
-        const Type* nativeType = native_instance_wrapper::extractTypeFrom(typearg->ob_type);
+        Type* nativeType = native_instance_wrapper::extractTypeFrom(typearg->ob_type);
         if (nativeType) {
             return Value::Make(
                 Instance::create(
@@ -2240,7 +2240,7 @@ struct native_instance_wrapper {
         return nullptr;
     }
 
-    static const Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
+    static Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
         if (PyType_Check(typearg)) {
             PyTypeObject* pyType = (PyTypeObject*)typearg;
 
@@ -2264,7 +2264,7 @@ struct native_instance_wrapper {
             }
 
             if (native_instance_wrapper::isSubclassOfNativeType(pyType)) {
-                const Type* nativeT = native_instance_wrapper::extractTypeFrom(pyType);
+                Type* nativeT = native_instance_wrapper::extractTypeFrom(pyType);
 
                 if (!nativeT) {
                     PyErr_SetString(PyExc_TypeError, 
@@ -2279,7 +2279,7 @@ struct native_instance_wrapper {
                 return PythonSubclass::Make(nativeT, pyType);
             }
 
-            const Type* res = native_instance_wrapper::extractTypeFrom(pyType);
+            Type* res = native_instance_wrapper::extractTypeFrom(pyType);
             if (res) {
                 return res;
             }
@@ -2290,7 +2290,7 @@ struct native_instance_wrapper {
             return NULL;
         }
 
-        const Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
+        Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
 
         if (valueType) {
             return valueType;
@@ -2302,7 +2302,7 @@ struct native_instance_wrapper {
 };
 
 PyObject *TupleOf(PyObject* nullValue, PyObject* args) {
-    std::vector<const Type*> types;
+    std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
         if (not types.back()) {
@@ -2322,7 +2322,7 @@ PyObject *TupleOf(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *Tuple(PyObject* nullValue, PyObject* args) {
-    std::vector<const Type*> types;
+    std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
         if (not types.back()) {
@@ -2337,7 +2337,7 @@ PyObject *Tuple(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *ConstDict(PyObject* nullValue, PyObject* args) {
-    std::vector<const Type*> types;
+    std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
         if (not types.back()) {
@@ -2359,11 +2359,11 @@ PyObject *ConstDict(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *OneOf(PyObject* nullValue, PyObject* args) {
-    std::vector<const Type*> types;
+    std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         PyObject* arg = PyTuple_GetItem(args,k);
 
-        const Type* t = native_instance_wrapper::tryUnwrapPyInstanceToType(arg);
+        Type* t = native_instance_wrapper::tryUnwrapPyInstanceToType(arg);
 
         if (t) {
             types.push_back(t);
@@ -2385,7 +2385,7 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
         return NULL;
     }
 
-    std::vector<std::pair<std::string, const Type*> > namesAndTypes;
+    std::vector<std::pair<std::string, Type*> > namesAndTypes;
 
     if (kwargs) {
         PyObject *key, *value;
@@ -2418,7 +2418,7 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
     }
 
     std::vector<std::string> names;
-    std::vector<const Type*> types;
+    std::vector<Type*> types;
 
     for (auto p: namesAndTypes) {
         names.push_back(p.first);
@@ -2502,7 +2502,7 @@ PyObject *Value(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    const Type* type = native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
+    Type* type = native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
     
     if (type) {
         PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(type);
@@ -2514,12 +2514,12 @@ PyObject *Value(PyObject* nullValue, PyObject* args) {
     return NULL;    
 }
 
-bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::string, const Type*> >& out) {
+bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::string, Type*> >& out) {
     std::set<std::string> memberNames;
 
     for (int i = 0; i < PyTuple_Size(tuple); ++i) {
         PyObject* entry = PyTuple_GetItem(tuple, i);
-        const Type* targetType = NULL;
+        Type* targetType = NULL;
 
         if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2 
                 || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
@@ -2555,7 +2555,7 @@ bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::s
 
     for (int i = 0; i < PyTuple_Size(tuple); ++i) {
         PyObject* entry = PyTuple_GetItem(tuple, i);
-        const Type* targetType = NULL;
+        Type* targetType = NULL;
 
         if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2 
                 || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
@@ -2591,14 +2591,14 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    const Function* resType;
+    Function* resType;
 
     if (PyTuple_Size(args) == 2) {
         PyObject* a0 = PyTuple_GetItem(args,0);
         PyObject* a1 = PyTuple_GetItem(args,1);
 
-        const Type* t0 = native_instance_wrapper::unwrapTypeArgToTypePtr(a0);
-        const Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+        Type* t0 = native_instance_wrapper::unwrapTypeArgToTypePtr(a0);
+        Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
         if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catFunction) {
             PyErr_SetString(PyExc_TypeError, "Expected first argument to be a function");
@@ -2609,7 +2609,7 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
             return NULL;
         }
 
-        resType = Function::merge((const Function*)t0, (const Function*)t1);
+        resType = Function::merge((Function*)t0, (Function*)t1);
     } else {
         PyObject* nameObj = PyTuple_GetItem(args,0);
         if (!PyUnicode_Check(nameObj)) {
@@ -2626,7 +2626,7 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
             return NULL;
         }
 
-        const Type* rType = 0;
+        Type* rType = 0;
 
         if (retType != Py_None) {
             rType = native_instance_wrapper::unwrapTypeArgToTypePtr(retType);
@@ -2661,7 +2661,7 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
                 return NULL;
             }
             
-            const Type* argT = nullptr;
+            Type* argT = nullptr;
             if (k1 != Py_None) {
                 argT = native_instance_wrapper::unwrapTypeArgToTypePtr(k1);
                 if (!argT) {
@@ -2714,7 +2714,7 @@ PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
     return typeObj;
 }
 
-const Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
+Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
     static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
 
     if (!internalsModule) {
@@ -2741,14 +2741,14 @@ const Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj)
         return nullptr;
     }
 
-    const Type* actualType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)fRes);
+    Type* actualType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)fRes);
 
     if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catFunction) {
         PyErr_Format(PyExc_TypeError, "Internal error: expected makeFunction to return a Function. Got %S", fRes);
         return nullptr;
     }
 
-    return (const Function*)actualType;
+    return (Function*)actualType;
 } 
 
 PyObject *Class(PyObject* nullValue, PyObject* args) {
@@ -2791,9 +2791,9 @@ PyObject *Class(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    std::vector<std::pair<std::string, const Type*> > members;
-    std::vector<std::pair<std::string, const Type*> > memberFunctions;
-    std::vector<std::pair<std::string, const Type*> > staticFunctions;
+    std::vector<std::pair<std::string, Type*> > members;
+    std::vector<std::pair<std::string, Type*> > memberFunctions;
+    std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;
     
     if (!unpackTupleToStringAndTypes(memberTuple, members)) {
@@ -2809,8 +2809,8 @@ PyObject *Class(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
     
-    std::map<std::string, const Function*> memberFuncs;
-    std::map<std::string, const Function*> staticFuncs;
+    std::map<std::string, Function*> memberFuncs;
+    std::map<std::string, Function*> staticFuncs;
     
     for (auto mf: memberFunctions) {
         if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
@@ -2822,7 +2822,7 @@ PyObject *Class(PyObject* nullValue, PyObject* args) {
                                     " been compressed as an overload.", mf.first.c_str());
             return NULL;
         }
-        memberFuncs[mf.first] = (const Function*)mf.second;
+        memberFuncs[mf.first] = (Function*)mf.second;
     }
 
     for (auto mf: staticFunctions) {
@@ -2835,7 +2835,7 @@ PyObject *Class(PyObject* nullValue, PyObject* args) {
                                     " been compressed as an overload.", mf.first.c_str());
             return NULL;
         }
-        staticFuncs[mf.first] = (const Function*)mf.second;
+        staticFuncs[mf.first] = (Function*)mf.second;
     }
 
     std::map<std::string, PyObject*> clsMembers;
@@ -2861,7 +2861,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     PyObject* a1 = PyTuple_GetItem(args, 0);
     PyObject* a2 = PyTuple_GetItem(args, 1);
 
-    const Type* serializeType = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+    Type* serializeType = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
         PyErr_Format(
@@ -2872,7 +2872,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    const Type* actualType = native_instance_wrapper::extractTypeFrom(a2->ob_type);
+    Type* actualType = native_instance_wrapper::extractTypeFrom(a2->ob_type);
 
     SerializationBuffer b;
     
@@ -2904,7 +2904,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     PyObject* a1 = PyTuple_GetItem(args, 0);
     PyObject* a2 = PyTuple_GetItem(args, 1);
 
-    const Type* serializeType = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+    Type* serializeType = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
         PyErr_SetString(PyExc_TypeError, "first argument to serialize must be a native type object");
@@ -2936,7 +2936,7 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     }
     PyObject* a1 = PyTuple_GetItem(args, 0);
 
-    const Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+    Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
     if (!t) {
         PyErr_SetString(PyExc_TypeError, "first argument to 'bytecount' must be a native type object");
@@ -2956,7 +2956,7 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 
     std::vector<std::pair<std::string, NamedTuple*> > definitions;
 
-    std::map<std::string, const Function*> functions;
+    std::map<std::string, Function*> functions;
 
     PyObject *key, *value;
     Py_ssize_t pos = 0;

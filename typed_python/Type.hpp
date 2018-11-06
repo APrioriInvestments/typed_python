@@ -41,6 +41,7 @@ class Function;
 class BoundMethod;
 class PackedArray;
 class Pointer;
+class Forward;
 
 typedef uint8_t* instance_ptr;
 
@@ -237,7 +238,8 @@ public:
         catHeldClass,
         catFunction,
         catPackedArray,
-        catPointer
+        catPointer,
+        catForward
     };
 
     TypeCategory getTypeCategory() const { 
@@ -259,49 +261,49 @@ public:
         return m_size;
     }
 
-    const Type* pickConcreteSubclass(instance_ptr data) const {
+    Type* pickConcreteSubclass(instance_ptr data) {
         return this->check([&](auto& subtype) {
             return subtype.pickConcreteSubclassConcrete(data);
         });
     }
 
-    const Type* pickConcreteSubclassConcrete(instance_ptr data) const {
+    Type* pickConcreteSubclassConcrete(instance_ptr data) {
         return this;
     }
 
-    void repr(instance_ptr self, std::ostringstream& out) const {
+    void repr(instance_ptr self, std::ostringstream& out) {
         this->check([&](auto& subtype) {
             subtype.repr(self, out);
         });
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         return this->check([&](auto& subtype) {
             return subtype.cmp(left, right);
         });
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         return this->check([&](auto& subtype) {
             return subtype.hash32(left);
         });
     }
 
     template<class buf_t>
-    void serialize(instance_ptr left, buf_t& buffer) const {
+    void serialize(instance_ptr left, buf_t& buffer) {
         return this->check([&](auto& subtype) {
             return subtype.serialize(left, buffer);
         });
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr left, buf_t& buffer) const {
+    void deserialize(instance_ptr left, buf_t& buffer) {
         return this->check([&](auto& subtype) {
             return subtype.deserialize(left, buffer);
         });
     }
 
-    void swap(instance_ptr left, instance_ptr right) const {
+    void swap(instance_ptr left, instance_ptr right) {
         if (left == right) {
             return;
         }
@@ -347,7 +349,7 @@ public:
     }
 
     template<class T>
-    auto check(const T& f) const -> decltype(f(*this)) {
+    auto check(const T& f) -> decltype(f(*this)) {
         switch (m_typeCategory) {
             case catNone:
                 return f(*(None*)this);
@@ -412,20 +414,36 @@ public:
         }
     }
 
-    const Type* getBaseType() const {
+
+    Type* getBaseType() const {
         return m_base;
     }
 
-    void constructor(instance_ptr self) const {
+    void assertConcrete() const {
+        if (m_references_unresolved_forwards || m_contains_unresolved_forwards_directly) {
+            throw std::runtime_error("Type contains unresolved forward definitions.");
+        }
+    }
+
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
+
+
+    void constructor(instance_ptr self) {
         this->check([&](auto& subtype) { subtype.constructor(self); } );
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         this->check([&](auto& subtype) { subtype.destroy(self); } );
     }
 
     template<class ptr_func>
-    void destroy(int64_t count, const ptr_func& ptrToChild) const {
+    void destroy(int64_t count, const ptr_func& ptrToChild) {
         this->check([&](auto& subtype) { 
             for (long k = 0; k < count; k++) {
                 subtype.destroy(ptrToChild(k)); 
@@ -433,11 +451,46 @@ public:
         });
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    template<class visitor_type>
+    void visitContainedTypes(const visitor_type& v) {
+        this->check([&](auto& subtype) {
+            subtype._visitContainedTypes(v);
+        });
+    }
+
+    template<class visitor_type>
+    void visitReferencedTypes(const visitor_type& v) {
+        this->check([&](auto& subtype) {
+            subtype._visitReferencedTypes(v);
+        });
+    }
+
+    void forwardTypesMayHaveChanged() {
+        m_references_unresolved_forwards = false;
+        m_contains_unresolved_forwards_directly = false;
+        
+        visitContainedTypes([&](Type* t) {
+            if (t->contains_unresolved_forwards_directly()) {
+                m_contains_unresolved_forwards_directly = true;
+            }
+        });
+
+        visitReferencedTypes([&](Type* t) {
+            if (t->references_unresolved_forwards()) {
+                m_references_unresolved_forwards = true;
+            }
+        });
+
+        this->check([&](auto& subtype) {
+            subtype._forwardTypesMayHaveChanged();
+        });
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         this->check([&](auto& subtype) { subtype.copy_constructor(self, other); } );
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         this->check([&](auto& subtype) { subtype.assign(self, other); } );
     }
 
@@ -445,12 +498,24 @@ public:
         return mTypeRep;
     }
 
-    void setTypeRep(PyTypeObject* o) const {
+    void setTypeRep(PyTypeObject* o) {
         mTypeRep = o;
     }
 
     bool is_default_constructible() const {
         return m_is_default_constructible;
+    }
+
+    bool contains_unresolved_forwards_directly() const {
+        return m_contains_unresolved_forwards_directly;
+    }
+
+    bool references_unresolved_forwards() const {
+        return m_references_unresolved_forwards;
+    }
+
+    void addUse(Type* inTarget) {
+        mUses.insert(inTarget);
     }
 
 protected:
@@ -460,7 +525,9 @@ protected:
             m_is_default_constructible(false),
             m_name("Undefined"),
             mTypeRep(nullptr),
-            m_base(nullptr)
+            m_base(nullptr),
+            m_contains_unresolved_forwards_directly(false),
+            m_references_unresolved_forwards(false)
         {}
 
     TypeCategory m_typeCategory;
@@ -471,14 +538,67 @@ protected:
 
     std::string m_name;
 
-    mutable PyTypeObject* mTypeRep;
+    PyTypeObject* mTypeRep;
 
-    const Type* m_base;
+    Type* m_base;
+
+    bool m_contains_unresolved_forwards_directly;
+
+    bool m_references_unresolved_forwards;
+
+    std::set<Type*> mUses;
+
+};
+
+//forward types are never actually used - they must be removed from the graph before
+//any types that contain them can be used.
+class Forward : public Type {
+public:
+    Forward() : 
+        Type(TypeCategory::catForward), 
+        mTarget(nullptr) 
+    {
+        m_name = "<fwd>";
+        m_contains_unresolved_forwards_directly = true;
+        m_references_unresolved_forwards = true;
+    }
+
+    Type* getTarget() const {
+        return mTarget;
+    }
+
+    void setTarget(Type* inTarget) {
+        if (mTarget) {
+            if (inTarget == mTarget) {
+                return;
+            }
+
+            throw std::runtime_error("Can't redefine a forward type.");
+        }
+
+        mTarget = inTarget;
+    }
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {
+        v(mTarget);
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {
+        v(mTarget);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+    }
+
+private:
+    Type* mTarget;
 };
 
 class OneOf : public Type {
 public:
-    OneOf(const std::vector<const Type*>& types) : 
+    OneOf(const std::vector<Type*>& types) : 
                     Type(TypeCategory::catOneOf),
                     m_types(types)
     {   
@@ -486,25 +606,30 @@ public:
             throw std::runtime_error("Cant make a OneOf with more than 255 types.");
         }
 
-        m_size = computeBytecount();
-        
-        m_name = "OneOf(";
-        bool first = true;
-        for (auto t: types) {
-            if (first) { 
-                first = false;
-            } else {
-                m_name += ", ";
-            }
+        _forwardTypesMayHaveChanged();
+    }
 
-            m_name += t->name();
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        for (auto& typePtr: m_types) {
+            visitor(typePtr);
         }
+    }
 
-        m_name += ")";
-        
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        _visitContainedTypes(visitor);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_size = computeBytecount();
+        m_name = computeName();
+
         m_is_default_constructible = false;
 
         for (auto typePtr: m_types) {
+            typePtr->addUse(this);
+
             if (typePtr->is_default_constructible()) {
                 m_is_default_constructible = true;
                 break;
@@ -512,8 +637,26 @@ public:
         }
     }
 
+    std::string computeName() const {
+        std::string res = "OneOf(";
+        bool first = true;
+        for (auto t: m_types) {
+            if (first) { 
+                first = false;
+            } else {
+                res += ", ";
+            }
+
+            res += t->name();
+        }
+
+        res += ")";
+
+        return res;
+    }
+
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         uint8_t which = buffer.read_uint8();
         if (which >= m_types.size()) {
             throw std::runtime_error("Corrupt OneOf");
@@ -523,16 +666,16 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write_uint8(*(uint8_t*)self);
         m_types[*((uint8_t*)self)]->serialize(self+1, buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         m_types[*((uint8_t*)self)]->repr(self+1, stream);
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)getTypeCategory());
 
         acc.add(*(uint8_t*)left);
@@ -541,7 +684,7 @@ public:
         return acc.get();
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         if (((uint8_t*)left)[0] < ((uint8_t*)right)[0]) {
             return -1;
         }
@@ -552,7 +695,7 @@ public:
         return m_types[*((uint8_t*)left)]->cmp(left+1,right+1);
     }
 
-    std::pair<const Type*, instance_ptr> unwrap(instance_ptr self) const {
+    std::pair<Type*, instance_ptr> unwrap(instance_ptr self) {
         return std::make_pair(m_types[*(uint8_t*)self], self+1);
     }
 
@@ -565,7 +708,7 @@ public:
         return res + 1;
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         if (!m_is_default_constructible) {
             throw std::runtime_error(m_name + " is not default-constructible");
         }
@@ -579,17 +722,17 @@ public:
         }
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         uint8_t which = *(uint8_t*)(self);
         m_types[which]->destroy(self+1);
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         uint8_t which = *(uint8_t*)self = *(uint8_t*)other;
         m_types[which]->copy_constructor(self+1, other+1);
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         uint8_t which = *(uint8_t*)self;
         if (which == *(uint8_t*)other) {
             m_types[which]->assign(self+1,other+1);
@@ -602,16 +745,16 @@ public:
         }
     }
     
-    const std::vector<const Type*>& getTypes() const {
+    const std::vector<Type*>& getTypes() const {
         return m_types;
     }
 
-    static OneOf* Make(const std::vector<const Type*>& types) {
-        std::vector<const Type*> flat_typelist;
-        std::set<const Type*> seen;
+    static OneOf* Make(const std::vector<Type*>& types) {
+        std::vector<Type*> flat_typelist;
+        std::set<Type*> seen;
 
         //make sure we only get each type once and don't have any other 'OneOf' in there...
-        std::function<void (const std::vector<const Type*>)> visit = [&](const std::vector<const Type*>& subvec) {
+        std::function<void (const std::vector<Type*>)> visit = [&](const std::vector<Type*>& subvec) {
             for (auto t: subvec) {
                 if (t->getTypeCategory() == catOneOf) {
                     visit( ((OneOf*)t)->getTypes() );
@@ -628,7 +771,7 @@ public:
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef const std::vector<const Type*> keytype;
+        typedef const std::vector<Type*> keytype;
 
         static std::map<keytype, OneOf*> m;
 
@@ -641,24 +784,42 @@ public:
     }
 
 private:
-    std::vector<const Type*> m_types;
+    std::vector<Type*> m_types;
 };
 
 class CompositeType : public Type {
 public:
     CompositeType(
                 TypeCategory in_typeCategory,
-                const std::vector<const Type*>& types,
+                const std::vector<Type*>& types,
                 const std::vector<std::string>& names
                 ) : 
             Type(in_typeCategory),
             m_types(types),
             m_names(names)
     {
-        m_is_default_constructible = true;
+        _forwardTypesMayHaveChanged();
+    }
 
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        for (auto& typePtr: m_types) {
+            visitor(typePtr);
+        }
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        _visitContainedTypes(visitor);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_is_default_constructible = true;
         m_size = 0;
+        m_byte_offsets.clear();
+
         for (auto t: m_types) {
+            t->addUse(this);
             m_byte_offsets.push_back(m_size);
             m_size += t->bytecount();
         }
@@ -674,7 +835,7 @@ public:
         return self + m_byte_offsets[ix];
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         for (long k = 0; k < m_types.size(); k++) {
             char res = m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
             if (res != 0) {
@@ -686,20 +847,20 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < getTypes().size();k++) {
             getTypes()[k]->deserialize(eltPtr(self,k),buffer);
         }
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < getTypes().size();k++) {
             getTypes()[k]->serialize(eltPtr(self,k),buffer);
         }
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "(";
 
         for (long k = 0; k < getTypes().size();k++) {
@@ -720,7 +881,7 @@ public:
         stream << ")";
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)getTypeCategory());
 
         for (long k = 0; k < getTypes().size();k++) {
@@ -733,7 +894,7 @@ public:
     }
 
     template<class sub_constructor>
-    void constructor(instance_ptr self, const sub_constructor& initializer) const {
+    void constructor(instance_ptr self, const sub_constructor& initializer) {
         for (int64_t k = 0; k < getTypes().size(); k++) {
             try {
                 initializer(eltPtr(self, k), k);
@@ -746,7 +907,7 @@ public:
         }
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         if (!m_is_default_constructible) {
             throw std::runtime_error(m_name + " is not default-constructible");
         }
@@ -756,25 +917,25 @@ public:
         }
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         for (long k = (long)m_types.size() - 1; k >= 0; k--) {
             m_types[k]->destroy(self+m_byte_offsets[k]);
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         for (long k = (long)m_types.size() - 1; k >= 0; k--) {
             m_types[k]->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         for (long k = (long)m_types.size() - 1; k >= 0; k--) {
             m_types[k]->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
     }
     
-    const std::vector<const Type*>& getTypes() const {
+    const std::vector<Type*>& getTypes() const {
         return m_types;
     }
     const std::vector<size_t>& getOffsets() const {
@@ -785,12 +946,12 @@ public:
     }
 protected:
     template<class subtype>
-    static subtype* MakeSubtype(const std::vector<const Type*>& types, const std::vector<std::string>& names) {
+    static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<const std::vector<const Type*>, const std::vector<std::string> > keytype;
+        typedef std::pair<const std::vector<Type*>, const std::vector<std::string> > keytype;
 
         static std::map<keytype, subtype*> m;
 
@@ -802,14 +963,14 @@ protected:
         return it->second;
     }
 
-    std::vector<const Type*> m_types;
+    std::vector<Type*> m_types;
     std::vector<size_t> m_byte_offsets;
     std::vector<std::string> m_names;
 };
 
 class NamedTuple : public CompositeType {
 public:
-    NamedTuple(const std::vector<const Type*>& types, const std::vector<std::string>& names) : 
+    NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
@@ -824,14 +985,14 @@ public:
         m_name += ")";
     }
 
-    static NamedTuple* Make(const std::vector<const Type*>& types, const std::vector<std::string>& names) {
+    static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         return MakeSubtype<NamedTuple>(types,names);
     }
 };
 
 class Tuple : public CompositeType {
 public:
-    Tuple(const std::vector<const Type*>& types, const std::vector<std::string>& names) : 
+    Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catTuple, types, names)
     {
         m_name = "Tuple(";
@@ -844,7 +1005,7 @@ public:
         m_name += ")";
     }
 
-    static Tuple* Make(const std::vector<const Type*>& types) {
+    static Tuple* Make(const std::vector<Type*>& types) {
         return MakeSubtype<Tuple>(types, std::vector<std::string>());
     }
 };
@@ -859,17 +1020,33 @@ class TupleOf : public Type {
     };
 
 public:
-    TupleOf(const Type* type) : 
+    TupleOf(Type* type) : 
             Type(TypeCategory::catTupleOf),
             m_element_type(type)
     {
-        m_name = "TupleOf(" + type->name() + ")";
         m_size = sizeof(void*);
         m_is_default_constructible = true;
+
+        _forwardTypesMayHaveChanged();
+    }
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_element_type);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_element_type->addUse(this);
+        m_name = "TupleOf(" + m_element_type->name() + ")";
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = count(self);
         buffer.write_uint32(ct);
         for (long k = 0; k < ct;k++) {
@@ -878,7 +1055,7 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
         
         if (ct > buffer.remaining() && m_element_type->bytecount()) {
@@ -890,7 +1067,7 @@ public:
         });
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "(";
 
         int32_t ct = count(self);
@@ -906,7 +1083,7 @@ public:
         stream << ")";
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         if (!(*(layout**)left)) {
             return 0x123;
         }
@@ -930,7 +1107,7 @@ public:
         return (*(layout**)left)->hash_cache;
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         if (!(*(layout**)left) && (*(layout**)right)) {
             return -1;
         }
@@ -965,16 +1142,16 @@ public:
         return 0;
     }
 
-    const Type* getEltType() const {
+    Type* getEltType() const {
         return m_element_type;
     }
 
-    static TupleOf* Make(const Type* elt) {
+    static TupleOf* Make(Type* elt) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        static std::map<const Type*, TupleOf*> m;
+        static std::map<Type*, TupleOf*> m;
 
         auto it = m.find(elt);
         if (it == m.end()) {
@@ -1001,7 +1178,7 @@ public:
     }
 
     template<class sub_constructor>
-    void constructor(instance_ptr self, int64_t count, const sub_constructor& allocator) const {
+    void constructor(instance_ptr self, int64_t count, const sub_constructor& allocator) {
         if (count == 0) {
             (*(layout**)self) = nullptr;
             return;
@@ -1026,11 +1203,11 @@ public:
         }
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         constructor(self, 0, [](instance_ptr i, int64_t k) {});
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         if (!(*(layout**)self)) {
             return;
         }
@@ -1042,14 +1219,14 @@ public:
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         (*(layout**)self) = (*(layout**)other);
         if (*(layout**)self) {
             (*(layout**)self)->refcount++;
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
@@ -1062,7 +1239,7 @@ public:
     }
 
 private:
-    const Type* m_element_type;
+    Type* m_element_type;
 };
 
 
@@ -1079,26 +1256,44 @@ class ConstDict : public Type {
     };
 
 public:
-    ConstDict(const Type* key, const Type* value) : 
+    ConstDict(Type* key, Type* value) : 
             Type(TypeCategory::catConstDict),
             m_key(key),
             m_value(value)
     {
-        m_name = "ConstDict(" + key->name() + "->" + value->name() + ")";
+        _forwardTypesMayHaveChanged();
+    }
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_key);
+        visitor(m_value);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_name = "ConstDict(" + m_key->name() + "->" + m_value->name() + ")";
         m_size = sizeof(void*);
         m_is_default_constructible = true;
         m_bytes_per_key = m_key->bytecount();
         m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
         m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
         m_key_value_pair_type = Tuple::Make({m_key, m_value});
+
+        m_key->addUse(this);
+        m_value->addUse(this);
     }
 
-    static ConstDict* Make(const Type* key, const Type* value) {
+
+    static ConstDict* Make(Type* key, Type* value) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        static std::map<std::pair<const Type*, const Type*>, ConstDict*> m;
+        static std::map<std::pair<Type*, Type*>, ConstDict*> m;
 
         auto lookup_key = std::make_pair(key,value);
 
@@ -1111,7 +1306,7 @@ public:
     };
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = count(self);
         buffer.write_uint32(ct);
         for (long k = 0; k < ct;k++) {
@@ -1121,7 +1316,7 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
 
         if (ct > buffer.remaining() && m_bytes_per_key_value_pair) {
@@ -1138,7 +1333,7 @@ public:
         incKvPairCount(self, ct);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "{";
 
         int32_t ct = count(self);
@@ -1156,7 +1351,7 @@ public:
         stream << "}";
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         if (size(left) == 0) {
             return 0x123456;
         }
@@ -1181,7 +1376,7 @@ public:
     }
 
     //to make this fast(er), we do dict size comparison first, then keys, then values    
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         if (size(left) < size(right)) {
             return -1;
         }
@@ -1446,11 +1641,11 @@ public:
         record.hash_cache = -1;
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         (*(layout**)self) = nullptr;
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         if (!(*(layout**)self)) {
             return;
         }
@@ -1470,7 +1665,7 @@ public:
                 m_key->destroy(record.subpointers, [&](long ix) { 
                     return record.data + m_bytes_per_key_subtree_pair * ix; 
                 });
-                ((const Type*)this)->destroy(record.subpointers, [&](long ix) { 
+                ((Type*)this)->destroy(record.subpointers, [&](long ix) { 
                     return record.data + m_bytes_per_key_subtree_pair * ix + m_bytes_per_key; 
                 });
             }
@@ -1479,14 +1674,14 @@ public:
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         (*(layout**)self) = (*(layout**)other);
         if (*(layout**)self) {
             (*(layout**)self)->refcount++;
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
@@ -1499,14 +1694,14 @@ public:
     }
     
     
-    const Type* keyValuePairType() const { return m_key_value_pair_type; }
-    const Type* keyType() const { return m_key; }
-    const Type* valueType() const { return m_value; }
+    Type* keyValuePairType() const { return m_key_value_pair_type; }
+    Type* keyType() const { return m_key; }
+    Type* valueType() const { return m_value; }
 
 private:
-    const Type* m_key;
-    const Type* m_value;
-    const Type* m_key_value_pair_type;
+    Type* m_key;
+    Type* m_value;
+    Type* m_key_value_pair_type;
     size_t m_bytes_per_key;
     size_t m_bytes_per_key_value_pair;
     size_t m_bytes_per_key_subtree_pair;
@@ -1521,33 +1716,42 @@ public:
         m_is_default_constructible = true;
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
+
+
+    char cmp(instance_ptr left, instance_ptr right) {
         return 0;
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         return (int)getTypeCategory();
     }
 
-    void constructor(instance_ptr self) const {}
+    void constructor(instance_ptr self) {}
 
-    void destroy(instance_ptr self) const {}
+    void destroy(instance_ptr self) {}
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {}
+    void copy_constructor(instance_ptr self, instance_ptr other) {}
 
-    void assign(instance_ptr self, instance_ptr other) const {}
+    void assign(instance_ptr self, instance_ptr other) {}
 
     static None* Make() { static None res; return &res; }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "None";
     }
 };
@@ -1561,7 +1765,15 @@ public:
         m_is_default_constructible = true;
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
+
+    char cmp(instance_ptr left, instance_ptr right) {
         if ( (*(T*)left) < (*(T*)right) ) {
             return -1;
         }
@@ -1572,7 +1784,7 @@ public:
         return 0;
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)getTypeCategory());
 
         acc.addRegister(*(T*)left);
@@ -1580,27 +1792,27 @@ public:
         return acc.get();
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         new ((T*)self) T();
     }
 
-    void destroy(instance_ptr self) const {}
+    void destroy(instance_ptr self) {}
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         *((T*)self) = *((T*)other);
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         *((T*)self) = *((T*)other);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         buffer.read_bytes(self, m_size);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write_bytes(self, m_size);
     }
 };
@@ -1612,7 +1824,7 @@ public:
         m_name = "Bool";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (*(bool*)self ? "True":"False");
     }
 
@@ -1626,7 +1838,7 @@ public:
         m_name = "UInt8";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (uint64_t)*(uint8_t*)self << "u8";
     }
 
@@ -1640,7 +1852,7 @@ public:
         m_name = "UInt16";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (uint64_t)*(uint16_t*)self << "u16";
     }
 
@@ -1654,7 +1866,7 @@ public:
         m_name = "UInt32";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (uint64_t)*(uint32_t*)self << "u32";
     }
 
@@ -1668,7 +1880,7 @@ public:
         m_name = "UInt64";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << *(uint64_t*)self << "u64";
     }
 
@@ -1683,7 +1895,7 @@ public:
         m_size = 1;
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (int64_t)*(int8_t*)self << "i8";
     }
 
@@ -1697,7 +1909,7 @@ public:
         m_name = "Int16";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (int64_t)*(int16_t*)self << "i16";
     }
 
@@ -1711,7 +1923,7 @@ public:
         m_name = "Int32";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << (int64_t)*(int32_t*)self << "i32";
     }
 
@@ -1725,7 +1937,7 @@ public:
         m_name = "Int64";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << *(int64_t*)self;
     }
 
@@ -1739,7 +1951,7 @@ public:
         m_name = "Float32";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << *(float*)self << "f32";
     }
 
@@ -1753,7 +1965,7 @@ public:
         m_name = "Float64";
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << *(double*)self;
     }
 
@@ -1782,17 +1994,26 @@ public:
         m_size = sizeof(void*);
     }
 
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
+
+
     static String* Make() { static String res; return &res; }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write_uint32(count(self));
         buffer.write_uint8(bytes_per_codepoint(self));
         buffer.write_bytes(eltPtr(self,0), bytes_per_codepoint(self) * count(self));
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
         uint8_t bytes_per = buffer.read_uint8();
 
@@ -1812,7 +2033,7 @@ public:
         }
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         if (!(*(layout**)left)) {
             return 0x12345;
         }
@@ -1829,7 +2050,7 @@ public:
         return (*(layout**)left)->hash_cache;
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         if ( !(*(layout**)left) && !(*(layout**)right) ) {
             return 0;
         }
@@ -1889,7 +2110,7 @@ public:
         }
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         //as if it were bytes, which is totally wrong...
         stream << "\"";
         long bytes = count(self);
@@ -1938,11 +2159,11 @@ public:
         return (*(layout**)self)->pointcount;
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         *(layout**)self = 0;
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         if (!*(layout**)self) {
             return;
         }
@@ -1954,14 +2175,14 @@ public:
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         (*(layout**)self) = (*(layout**)other);
         if (*(layout**)self) {
             (*(layout**)self)->refcount++;
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
@@ -1984,7 +2205,7 @@ public:
         uint8_t data[];
     };
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "b" << "'";
         long bytes = count(self);
         uint8_t* base = eltPtr(self,0);
@@ -2013,13 +2234,13 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write_uint32(count(self));
         buffer.write_bytes(eltPtr(self, 0), count(self));
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
         
         if (ct > buffer.remaining()) {
@@ -2033,7 +2254,15 @@ public:
         }
     }
     
-    int32_t hash32(instance_ptr left) const {
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
+
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)getTypeCategory());
 
         if (!(*(layout**)left)) {
@@ -2054,7 +2283,7 @@ public:
         return (*(layout**)left)->hash_cache;
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         if ( !(*(layout**)left) && !(*(layout**)right) ) {
             return 0;
         }
@@ -2124,11 +2353,11 @@ public:
         return (*(layout**)self)->bytecount;
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         *(layout**)self = 0;
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         if (!*(layout**)self) {
             return;
         }
@@ -2140,14 +2369,14 @@ public:
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         (*(layout**)self) = (*(layout**)other);
         if (*(layout**)self) {
             (*(layout**)self)->refcount++;
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
@@ -2165,7 +2394,7 @@ private:
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        const Type* type;
+        Type* type;
         uint8_t data[];
     };
 
@@ -2189,20 +2418,26 @@ private:
     }
 
 public:
-    static Instance deserialized(const Type* t, DeserializationBuffer& buf) {
+    static Instance deserialized(Type* t, DeserializationBuffer& buf) {
+        t->assertConcrete();
+
         return createAndInitialize(t, [&](instance_ptr tgt) {
             t->deserialize(tgt, buf);
         });
     }
 
-    static Instance create(const Type*t, instance_ptr data) {
+    static Instance create(Type*t, instance_ptr data) {
+        t->assertConcrete();
+
         return createAndInitialize(t, [&](instance_ptr tgt) {
             t->copy_constructor(tgt, data);
         });
     }
 
     template<class initializer_type>
-    static Instance createAndInitialize(const Type*t, const initializer_type& initFun) {
+    static Instance createAndInitialize(Type*t, const initializer_type& initFun) {
+        t->assertConcrete();
+
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
         
         try {
@@ -2228,7 +2463,9 @@ public:
         mLayout->refcount++;
     }
 
-    Instance(instance_ptr p, const Type* t) : mLayout(nullptr) {
+    Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
+        t->assertConcrete();
+
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
         
         try {
@@ -2245,7 +2482,9 @@ public:
     }
 
     template<class initializer_type>
-    Instance(const Type* t, const initializer_type& initFun) : mLayout(nullptr) {
+    Instance(Type* t, const initializer_type& initFun) : mLayout(nullptr) {
+        t->assertConcrete();
+
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
         
         try {
@@ -2303,7 +2542,7 @@ public:
         return mLayout->type->hash32(mLayout->data);
     }
 
-    const Type* type() const {
+    Type* type() const {
         return mLayout->type;
     }
 
@@ -2326,39 +2565,50 @@ public:
         m_name = mInstance.repr();
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+    }
+
+    void _forwardTypesMayHaveChanged() {
+    }
+    
+    char cmp(instance_ptr left, instance_ptr right) {
         return 0;
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         return mInstance.hash32();
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         mInstance.type()->repr(mInstance.data(), stream);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void constructor(instance_ptr self) const {}
+    void constructor(instance_ptr self) {}
 
-    void destroy(instance_ptr self) const {}
+    void destroy(instance_ptr self) {}
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {}
+    void copy_constructor(instance_ptr self, instance_ptr other) {}
 
-    void assign(instance_ptr self, instance_ptr other) const {}
+    void assign(instance_ptr self, instance_ptr other) {}
 
     const Instance& value() const {
         return mInstance;
     }
 
-    static const Type* Make(Instance i) { 
+    static Type* Make(Instance i) { 
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -2374,23 +2624,23 @@ public:
         return it->second;
     }
 
-    static const Type* MakeInt64(int64_t i) { 
+    static Type* MakeInt64(int64_t i) { 
         return Make(Instance::create(Int64::Make(), (instance_ptr)&i));
     }
-    static const Type* MakeFloat64(double i) { 
+    static Type* MakeFloat64(double i) { 
         return Make(Instance::create(Float64::Make(), (instance_ptr)&i));
     }
-    static const Type* MakeBool(bool i) { 
+    static Type* MakeBool(bool i) { 
         return Make(Instance::create(Bool::Make(), (instance_ptr)&i));
     }
 
-    static const Type* MakeBytes(char* data, size_t count) { 
+    static Type* MakeBytes(char* data, size_t count) { 
         return Make(Instance::createAndInitialize(Bytes::Make(), [&](instance_ptr i) {
             Bytes::Make()->constructor(i, count, data);
         }));
     }
 
-    static const Type* MakeString(size_t bytesPerCodepoint, size_t count, char* data) { 
+    static Type* MakeString(size_t bytesPerCodepoint, size_t count, char* data) { 
         return Make(Instance::createAndInitialize(String::Make(), [&](instance_ptr i) {
             String::Make()->constructor(i, bytesPerCodepoint, count, data);
         }));
@@ -2411,7 +2661,7 @@ public:
 
     Alternative(std::string name, 
                 const std::vector<std::pair<std::string, NamedTuple*> >& subtypes,
-                const std::map<std::string, const Function*>& methods
+                const std::map<std::string, Function*>& methods
                 ) :
             Type(TypeCategory::catAlternative),
             m_default_construction_ix(0),
@@ -2425,12 +2675,35 @@ public:
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
 
+        _forwardTypesMayHaveChanged();
+    }
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        for (auto& subtype_pair: m_subtypes) {
+            visitor(subtype_pair.second);
+        }
+        for (auto& method_pair: m_methods) {
+            visitor(method_pair.second);
+        }
+    }
+
+    void _forwardTypesMayHaveChanged() {
         m_size = sizeof(void*);
 
         m_is_default_constructible = false;
         m_all_alternatives_empty = true;
+        m_arg_positions.clear();
+        m_default_construction_ix = 0;
+        m_default_construction_type = nullptr;
 
         for (auto& subtype_pair: m_subtypes) {
+            subtype_pair.second->addUse(this);
+
             if (subtype_pair.second->bytecount() > 0) {
                 m_all_alternatives_empty = false;
             }
@@ -2448,10 +2721,14 @@ public:
             }
         }
 
+        for (auto& subtype_pair: m_methods) {
+            ((Type*)subtype_pair.second)->addUse(this);
+        }
+
         m_size = (m_all_alternatives_empty ? 1 : sizeof(void*));
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         if (m_all_alternatives_empty) {
             if (*(uint8_t*)left < *(uint8_t*)right) {
                 return -1;
@@ -2476,13 +2753,13 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write_uint8(which(self));
         m_subtypes[which(self)].second->serialize(eltPtr(self), buffer);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         uint8_t w = buffer.read_uint8();
         if (w >= m_subtypes.size()) {
             throw std::runtime_error("Corrupt data (alt which)");
@@ -2505,12 +2782,12 @@ public:
         m_subtypes[w].second->deserialize(record.data, buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << m_subtypes[which(self)].first;
         m_subtypes[which(self)].second->repr(eltPtr(self), stream);
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)TypeCategory::catAlternative);
 
         acc.add(which(left));
@@ -2539,9 +2816,9 @@ public:
         return record.which;
     }
 
-    void constructor(instance_ptr self) const;
+    void constructor(instance_ptr self);
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         if (m_all_alternatives_empty) {
             return;
         }
@@ -2555,7 +2832,7 @@ public:
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         if (m_all_alternatives_empty) {
             *(uint8_t*)self = *(uint8_t*)other;
             return;
@@ -2568,7 +2845,7 @@ public:
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
@@ -2582,12 +2859,12 @@ public:
 
     static Alternative* Make(std::string name,
                          const std::vector<std::pair<std::string, NamedTuple*> >& types,
-                         const std::map<std::string, const Function*>& methods //methods preclude us from being in the memo
+                         const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
                          ) {
         if (methods.size()) {
             return new Alternative(name, types, methods);
         }
-        
+
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -2613,9 +2890,9 @@ public:
         return m_all_alternatives_empty;
     }
 
-    const Type* pickConcreteSubclassConcrete(instance_ptr data) const;
+    Type* pickConcreteSubclassConcrete(instance_ptr data);
 
-    const std::map<std::string, const Function*>& getMethods() const {
+    const std::map<std::string, Function*>& getMethods() const {
         return m_methods;
     }
 
@@ -2624,11 +2901,11 @@ private:
 
     int m_default_construction_ix;
 
-    mutable const Type* m_default_construction_type;
+    Type* m_default_construction_type;
 
     std::vector<std::pair<std::string, NamedTuple*> > m_subtypes;
 
-    std::map<std::string, const Function*> m_methods;
+    std::map<std::string, Function*> m_methods;
 
     std::map<std::string, int> m_arg_positions;
 };
@@ -2637,40 +2914,56 @@ class ConcreteAlternative : public Type {
 public:
     typedef Alternative::layout layout;
 
-    ConcreteAlternative(const Alternative* m_alternative, int64_t which) :
+    ConcreteAlternative(Alternative* m_alternative, int64_t which) :
             Type(TypeCategory::catConcreteAlternative),
             m_alternative(m_alternative),
             m_which(which)
     {   
-        m_base = m_alternative;
-        m_name = m_alternative->name() + "." + m_alternative->subtypes()[which].first;
-        m_size = m_alternative->bytecount();
-        m_is_default_constructible = m_alternative->subtypes()[which].second->is_default_constructible();
+        _forwardTypesMayHaveChanged();
     }
 
-    int32_t hash32(instance_ptr left) const {
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        visitor(m_alternative);
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_alternative);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_base = m_alternative;
+        m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
+        m_size = m_alternative->bytecount();
+        m_is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
+
+        m_base->addUse(this);
+    }
+
+    int32_t hash32(instance_ptr left) {
         return m_alternative->hash32(left);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         m_alternative->repr(self,stream);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         m_alternative->deserialize(self,buffer);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         m_alternative->serialize(self,buffer);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         return m_alternative->cmp(left,right);
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         if (m_alternative->all_alternatives_empty()) {
             *(uint8_t*)self = m_which;
         } else {
@@ -2704,24 +2997,24 @@ public:
         }
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         m_alternative->destroy(self);
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         m_alternative->copy_constructor(self, other);
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         m_alternative->assign(self, other);
     }
 
-    static ConcreteAlternative* Make(const Alternative* alt, int64_t which) {
+    static ConcreteAlternative* Make(Alternative* alt, int64_t which) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<const Alternative*, int64_t> keytype;
+        typedef std::pair<Alternative*, int64_t> keytype;
 
         static std::map<keytype, ConcreteAlternative*> m;
 
@@ -2736,11 +3029,11 @@ public:
         return it->second;
     }
 
-    const Type* elementType() const {
+    Type* elementType() const {
         return m_alternative->subtypes()[m_which].second;
     }
 
-    const Alternative* getAlternative() const {
+    Alternative* getAlternative() const {
         return m_alternative;
     }
 
@@ -2749,18 +3042,18 @@ public:
     }
 
 private:
-    const Alternative* m_alternative;
+    Alternative* m_alternative;
 
     int64_t m_which;
 };
 
-inline const Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) const {
+inline Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) {
     uint8_t i = which(data);
 
     return ConcreteAlternative::Make(this, i);
 }
 
-inline void Alternative::constructor(instance_ptr self) const {
+inline void Alternative::constructor(instance_ptr self) {
     if (!m_default_construction_type) {
         m_default_construction_type = ConcreteAlternative::Make(this, m_default_construction_ix);
     }
@@ -2770,60 +3063,77 @@ inline void Alternative::constructor(instance_ptr self) const {
 
 class PythonSubclass : public Type {
 public:
-    PythonSubclass(const Type* base, PyTypeObject* typePtr) :
+    PythonSubclass(Type* base, PyTypeObject* typePtr) :
             Type(TypeCategory::catPythonSubclass)
     {   
         m_base = base;
-        m_name = typePtr->tp_name;
-        m_size = m_base->bytecount();
         mTypeRep = typePtr;
-        m_is_default_constructible = m_base->is_default_constructible();
+        m_name = typePtr->tp_name;
+
+        _forwardTypesMayHaveChanged();
     }
 
-    int32_t hash32(instance_ptr left) const {
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        visitor(m_base);
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_base);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_size = m_base->bytecount();
+        m_is_default_constructible = m_base->is_default_constructible();
+
+        m_base->addUse(this);
+    }
+
+    int32_t hash32(instance_ptr left) {
         return m_base->hash32(left);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         m_base->serialize(self,buffer);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         m_base->deserialize(self,buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         m_base->repr(self,stream);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         return m_base->cmp(left,right);
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         m_base->constructor(self);
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         m_base->destroy(self);
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         m_base->copy_constructor(self, other);
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         m_base->assign(self, other);
     }
 
-    static PythonSubclass* Make(const Type* base, PyTypeObject* pyType) {
+    static PythonSubclass* Make(Type* base, PyTypeObject* pyType) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<const Type*, PyTypeObject*> keytype;
+        typedef std::pair<Type*, PyTypeObject*> keytype;
 
         static std::map<keytype, PythonSubclass*> m;
 
@@ -2838,7 +3148,7 @@ public:
         return it->second;
     }
 
-    const Type* baseType() const {
+    Type* baseType() const {
         return m_base;
     }
 
@@ -2851,7 +3161,7 @@ class Function : public Type {
 public:
     class FunctionArg {
     public:
-        FunctionArg(std::string name, const Type* typeFilterOrNull, PyObject* defaultValue, bool isStarArg, bool isKwarg) : 
+        FunctionArg(std::string name, Type* typeFilterOrNull, PyObject* defaultValue, bool isStarArg, bool isKwarg) : 
             m_name(name),
             m_typeFilter(typeFilterOrNull),
             m_defaultValue(defaultValue),
@@ -2869,7 +3179,7 @@ public:
             return m_defaultValue;
         }
 
-        const Type* getTypeFilter() const {
+        Type* getTypeFilter() const {
             return m_typeFilter;
         }
 
@@ -2885,9 +3195,16 @@ public:
             return !m_isKwarg && !m_isStarArg;
         }
 
+        template<class visitor_type>
+        void _visitReferencedTypes(const visitor_type& visitor) {
+            if (m_typeFilter) {
+                visitor(m_typeFilter);
+            }
+        }
+
     private:
         std::string m_name;
-        const Type* m_typeFilter;
+        Type* m_typeFilter;
         PyObject* m_defaultValue;
         bool m_isStarArg;
         bool m_isKwarg;
@@ -2897,7 +3214,7 @@ public:
     public:
         Overload(
             PyFunctionObject* functionObj, 
-            const Type* returnType, 
+            Type* returnType, 
             const std::vector<FunctionArg>& args
             ) : 
                 mFunctionObj(functionObj),
@@ -2910,7 +3227,7 @@ public:
             return mFunctionObj;
         }
 
-        const Type* getReturnType() const {
+        Type* getReturnType() const {
             return mReturnType;
         }
 
@@ -2918,9 +3235,19 @@ public:
             return mArgs;
         }
 
+        template<class visitor_type>
+        void _visitReferencedTypes(const visitor_type& visitor) {
+            if (mReturnType) {
+                visitor(mReturnType);
+            }
+            for (auto& a: mArgs) {
+                a._visitReferencedTypes(visitor);
+            }
+        }
+
     private:
         PyFunctionObject* mFunctionObj;
-        const Type* mReturnType;
+        Type* mReturnType;
         std::vector<FunctionArg> mArgs;
     };
 
@@ -2954,7 +3281,7 @@ public:
         }
 
         //push the state machine forward.
-        const Type* requiredTypeForArg(const char* name) {
+        Type* requiredTypeForArg(const char* name) {
             if (!name) {
                 for (long k = 0; k < m_used.size(); k++) {
                     if (!m_used[k]) {
@@ -3014,9 +3341,28 @@ public:
         m_name = inName;
         m_is_default_constructible = true;
         m_size = 0;
+
+        _forwardTypesMayHaveChanged();
     }
 
-    static Function* merge(const Function* f1, const Function* f2) {
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        for (auto& o: mOverloads) {
+            o._visitReferencedTypes(visitor);
+        }
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        _visitReferencedTypes([&](Type* type_ptr) {
+            type_ptr->addUse(this);
+        });
+    }
+
+    static Function* merge(Function* f1, Function* f2) {
         std::vector<Overload> overloads(f1->mOverloads);
         for (auto o: f2->mOverloads) {
             overloads.push_back(o);
@@ -3024,23 +3370,23 @@ public:
         return new Function(f1->m_name, overloads);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         return 0;
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "<function " << m_name << ">";
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)getTypeCategory());
 
         acc.addRegister((uint64_t)mPyFunc);
@@ -3048,16 +3394,16 @@ public:
         return acc.get();
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
     }
 
     const PyFunctionObject* getPyFunc() const {
@@ -3077,9 +3423,9 @@ private:
 class HeldClass : public Type {
 public:
     HeldClass(std::string inName, 
-          const std::vector<std::pair<std::string, const Type*> >& members,
-          const std::map<std::string, const Function*>& memberFunctions,
-          const std::map<std::string, const Function*>& staticFunctions,
+          const std::vector<std::pair<std::string, Type*> >& members,
+          const std::map<std::string, Function*>& memberFunctions,
+          const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, PyObject*>& classMembers
           ) : 
             Type(catHeldClass),
@@ -3089,11 +3435,37 @@ public:
             m_classMembers(classMembers)
     {
         m_name = inName;
+        _forwardTypesMayHaveChanged();
+    }
 
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        for (auto& o: m_members) {
+            visitor(o.second);
+        }
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        for (auto& o: m_members) {
+            visitor(o.second);
+        }
+        for (auto& o: m_memberFunctions) {
+            visitor(o.second);
+        }
+        for (auto& o: m_staticFunctions) {
+            visitor(o.second);
+        }
+    }
+
+    void _forwardTypesMayHaveChanged() {
         m_is_default_constructible = true;
-
+        m_byte_offsets.clear();
         m_size = 0;
+
         for (auto t: m_members) {
+            t.second->addUse(this);
+
             m_byte_offsets.push_back(m_size);
             m_size += t.second->bytecount();
 
@@ -3105,9 +3477,9 @@ public:
 
     static HeldClass* Make(
             std::string inName, 
-            const std::vector<std::pair<std::string, const Type*> >& members,
-            const std::map<std::string, const Function*>& memberFunctions,
-            const std::map<std::string, const Function*>& staticFunctions,
+            const std::vector<std::pair<std::string, Type*> >& members,
+            const std::map<std::string, Function*>& memberFunctions,
+            const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, PyObject*>& classMembers
             )
     {
@@ -3118,7 +3490,7 @@ public:
         return self + m_byte_offsets[ix];
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         for (long k = 0; k < m_members.size(); k++) {
             char res = m_members[k].second->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
             if (res != 0) {
@@ -3130,20 +3502,20 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < m_members.size();k++) {
             m_members[k].second->deserialize(eltPtr(self,k),buffer);
         }
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < m_members.size();k++) {
             m_members[k].second->serialize(eltPtr(self,k),buffer);
         }
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << m_name << "(";
 
         for (long k = 0; k < m_members.size();k++) {
@@ -3162,7 +3534,7 @@ public:
         stream << ")";
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         Hash32Accumulator acc((int)getTypeCategory());
 
         for (long k = 0; k < m_members.size();k++) {
@@ -3188,7 +3560,7 @@ public:
         }
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         if (!m_is_default_constructible) {
             throw std::runtime_error(m_name + " is not default-constructible");
         }
@@ -3198,32 +3570,32 @@ public:
         }
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         for (long k = (long)m_members.size() - 1; k >= 0; k--) {
             m_members[k].second->destroy(self+m_byte_offsets[k]);
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         for (long k = (long)m_members.size() - 1; k >= 0; k--) {
             m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         for (long k = (long)m_members.size() - 1; k >= 0; k--) {
             m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
     }
-    const std::vector<std::pair<std::string, const Type*> >& getMembers() const {
+    const std::vector<std::pair<std::string, Type*> >& getMembers() const {
         return m_members;
     }
 
-    const std::map<std::string, const Function*>& getMemberFunctions() const {
+    const std::map<std::string, Function*>& getMemberFunctions() const {
         return m_memberFunctions;
     }
 
-    const std::map<std::string, const Function*>& getStaticFunctions() const {
+    const std::map<std::string, Function*>& getStaticFunctions() const {
         return m_staticFunctions;
     }
 
@@ -3248,10 +3620,10 @@ public:
 private:
     std::vector<size_t> m_byte_offsets;
 
-    std::vector<std::pair<std::string, const Type*> > m_members;
+    std::vector<std::pair<std::string, Type*> > m_members;
 
-    std::map<std::string, const Function*> m_memberFunctions;
-    std::map<std::string, const Function*> m_staticFunctions;
+    std::map<std::string, Function*> m_memberFunctions;
+    std::map<std::string, Function*> m_staticFunctions;
     std::map<std::string, PyObject*> m_classMembers;
 };
 
@@ -3270,13 +3642,32 @@ public:
         m_size = sizeof(layout*);
         m_is_default_constructible = inClass->is_default_constructible();
         m_name = m_heldClass->name();
+
+        _forwardTypesMayHaveChanged();
+    }
+
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_heldClass);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_is_default_constructible = m_heldClass->is_default_constructible();
+        m_name = m_heldClass->name();
+
+        m_heldClass->addUse(this);
     }
 
     static Class* Make(
             std::string inName, 
-            const std::vector<std::pair<std::string, const Type*> >& members,
-            const std::map<std::string, const Function*>& memberFunctions,
-            const std::map<std::string, const Function*>& staticFunctions,
+            const std::vector<std::pair<std::string, Type*> >& members,
+            const std::map<std::string, Function*>& memberFunctions,
+            const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, PyObject*>& classMembers
             )
     {
@@ -3288,7 +3679,7 @@ public:
         return m_heldClass->eltPtr(l.data, ix);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) const {
+    char cmp(instance_ptr left, instance_ptr right) {
         layout& l = **(layout**)left;
         layout& r = **(layout**)right;
 
@@ -3296,7 +3687,7 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
         *(layout**)self = (layout*)malloc(
             sizeof(layout) + m_heldClass->bytecount()
             );
@@ -3308,17 +3699,17 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
         layout& l = **(layout**)self;
         m_heldClass->serialize(l.data, buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         layout& l = **(layout**)self;
         m_heldClass->repr(l.data, stream);
     }
 
-    int32_t hash32(instance_ptr left) const {
+    int32_t hash32(instance_ptr left) {
         layout& l = **(layout**)left;
         return m_heldClass->hash32(l.data);
     }
@@ -3336,7 +3727,7 @@ public:
         }
     }
 
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
         if (!m_is_default_constructible) {
             throw std::runtime_error(m_name + " is not default-constructible");
         }
@@ -3349,7 +3740,7 @@ public:
         m_heldClass->constructor(l.data);
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
         layout& l = **(layout**)self;
         l.refcount--;
 
@@ -3359,12 +3750,12 @@ public:
         }
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
         (*(layout**)self) = (*(layout**)other);
         (*(layout**)self)->refcount++;
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
@@ -3376,15 +3767,15 @@ public:
         destroy((instance_ptr)&old);
     }
 
-    const std::vector<std::pair<std::string, const Type*> >& getMembers() const {
+    const std::vector<std::pair<std::string, Type*> >& getMembers() const {
         return m_heldClass->getMembers();
     }
 
-    const std::map<std::string, const Function*>& getMemberFunctions() const {
+    const std::map<std::string, Function*>& getMemberFunctions() const {
         return m_heldClass->getMemberFunctions();
     }
 
-    const std::map<std::string, const Function*>& getStaticFunctions() const {
+    const std::map<std::string, Function*>& getStaticFunctions() const {
         return m_heldClass->getStaticFunctions();
     }
 
@@ -3406,20 +3797,38 @@ private:
 
 class BoundMethod : public Class {
 public:
-    BoundMethod(const Class* inClass, const Function* inFunc) : Class(inClass->getHeldClass())
+    BoundMethod(Class* inClass, Function* inFunc) : Class(inClass->getHeldClass())
     {
         m_typeCategory = TypeCategory::catBoundMethod;
         m_function = inFunc;
         m_class = inClass;
-        m_name = "BoundMethod(" + inClass->name() + "." + inFunc->name() + ")";
+        _forwardTypesMayHaveChanged();
     }
 
-    static BoundMethod* Make(const Class* c, const Function* f) {
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& visitor) {
+        visitor(m_class);
+    }
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_class);
+        visitor(m_function);
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        m_name = "BoundMethod(" + m_class->name() + "." + m_function->name() + ")";
+
+        m_class->addUse(this);
+        m_function->addUse(this);
+    }
+
+    static BoundMethod* Make(Class* c, Function* f) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<const Class*, const Function*> keytype;
+        typedef std::pair<Class*, Function*> keytype;
 
         static std::map<keytype, BoundMethod*> m;
 
@@ -3434,72 +3843,88 @@ public:
         return it->second;
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) const {
+    void repr(instance_ptr self, std::ostringstream& stream) {
         stream << m_name;
     }
 
-    const Class* getClass() const {
+    Class* getClass() const {
         return m_class;
     }
 
-    const Function* getFunction() const {
+    Function* getFunction() const {
         return m_function;
     }
 
 private:
-    const Function* m_function;
-    const Class* m_class;
+    Function* m_function;
+    Class* m_class;
 };
 
 class PackedArray : public Type {
 public:
-    void constructor(instance_ptr self) const { 
+    void constructor(instance_ptr self) { 
     }
     
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
-    }
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void serialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void destroy(instance_ptr self) const {
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) {
+    }
+
+    void destroy(instance_ptr self) {
 
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
 
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
 
     }
 };
 
 class Pointer : public Type {
 public:
-    void constructor(instance_ptr self) const {
+    void constructor(instance_ptr self) {
     
+    }
+    
+    void _forwardTypesMayHaveChanged() {}
+
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& v) {}
+
+    template<class visitor_type>
+    void _visitContainedTypes(const visitor_type& v) {}
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) {
     }
     
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) const {
-    }
-    
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) const {
+    void deserialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void destroy(instance_ptr self) const {
+    void destroy(instance_ptr self) {
 
     }
 
-    void copy_constructor(instance_ptr self, instance_ptr other) const {
+    void copy_constructor(instance_ptr self, instance_ptr other) {
 
     }
 
-    void assign(instance_ptr self, instance_ptr other) const {
+    void assign(instance_ptr self, instance_ptr other) {
 
     }
 };
