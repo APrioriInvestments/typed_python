@@ -12,28 +12,17 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.algebraic import Alternative
-from typed_python.types import Tuple, TupleOf, OneOf
+from typed_python import *
+import textwrap
 
-from nativepython.python.string_util import indent
-
-Type = Alternative("native_ast.Type")
-Type.define(
-    Void={},
-    Float={'bits': int},
-    Int={'bits': int, 'signed': bool},
-    Struct={'element_types': TupleOf(Tuple(str, Type))},
-    Function={'output': Type, 'args': TupleOf(Type), 'varargs': bool, 'can_throw': bool},
-    Pointer={'value_type': Type}
-    )
+def indent(x):
+    return texwrap.indent(x, "    ")
 
 def type_attr_ix(t,attr):
     for i in range(len(t.element_types)):
         if t.element_types[i][0] == attr:
             return i
     return None
-
-Type.attr_ix = type_attr_ix
 
 def type_str(c):
     if c.matches.Function:
@@ -53,24 +42,22 @@ def type_str(c):
     if c.matches.Void:
         return "void"
 
-Type.__str__ = type_str
-
-Constant = Alternative("Constant")
-Constant.define(
+Type = Alternative("Type",
     Void={},
-    Float={'val': float, 'bits': int},
-    Int={'val': int, 'bits': int, 'signed': bool},
-    Struct={'elements': TupleOf(Tuple(str, Constant))},
-    ByteArray={'val': bytes},
-    NullPointer={'value_type': Type},
+    Float={'bits': int},
+    Int={'bits': int, 'signed': bool},
+    Struct={'element_types': TupleOf(Tuple(str, lambda: Type))},
+    Function={'output': lambda: Type, 'args': TupleOf(lambda: Type), 'varargs': bool, 'can_throw': bool},
+    Pointer={'value_type': lambda: Type},
+    attr_ix = type_attr_ix,
+    __str__ = type_str
     )
+
 
 def const_truth_value(c):
     if c.matches.Int:
         return c.val != 0
     return False
-
-Constant.truth_value = const_truth_value
 
 def const_str(c):
     if c.matches.Float:
@@ -92,105 +79,85 @@ def const_str(c):
     if c.matches.Void:
         return "void"
 
-Constant.__str__ = const_str
+Constant = Alternative("Constant",
+    Void={},
+    Float={'val': float, 'bits': int},
+    Int={'val': int, 'bits': int, 'signed': bool},
+    Struct={'elements': TupleOf(Tuple(str, lambda: Constant))},
+    ByteArray={'val': bytes},
+    NullPointer={'value_type': Type},
+    truth_value = const_truth_value,
+    __str__ = const_str
+    )
 
-UnaryOp = Alternative("UnaryOp", Add={}, Negate={}, LogicalNot={}, BitwiseNot={})
+UnaryOp = Alternative(
+    "UnaryOp", 
+    Add={}, 
+    Negate={}, 
+    LogicalNot={}, 
+    BitwiseNot={},
+    __str__ = lambda o:
+        "+" if o.matches.Add else
+        "-" if o.matches.Negate else 
+        "!" if o.matches.LogicalNot else 
+        "~" if o.matches.BitwiseNot else None
+    )
+
 BinaryOp = Alternative("BinaryOp", 
-                       Add={}, Sub={}, Mul={}, Div={}, Eq={}, 
-                       NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
-                       Mod={}, Pow={}, LShift={}, RShift={},
-                       BitOr={}, BitAnd={}, BitXor={}
-                       )
+    Add={}, Sub={}, Mul={}, Div={}, Eq={}, 
+    NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
+    Mod={}, Pow={}, LShift={}, RShift={},
+    BitOr={}, BitAnd={}, BitXor={},
+    __str__ = lambda o:
+        "+" if o.matches.Add else
+        "-" if o.matches.Sub else 
+        "*" if o.matches.Mul else 
+        "/" if o.matches.Div else 
+        "==" if o.matches.Eq else 
+        "!=" if o.matches.NotEq else 
+        "<" if o.matches.Lt else 
+        "<=" if o.matches.LtE else 
+        ">" if o.matches.Gt else 
+        ">=" if o.matches.GtE else 
+        "<<" if o.matches.LShift else 
+        ">>" if o.matches.RShift else 
+        "|" if o.matches.BitOr else 
+        "&" if o.matches.BitAnd else 
+        "^" if o.matches.BitXor else
+        None
+    )
 
-UnaryOp.__str__ = (lambda o:
-    "+" if o.matches.Add else
-    "-" if o.matches.Negate else 
-    "!" if o.matches.LogicalNot else 
-    "~" if o.matches.BitwiseNot else None)
-BinaryOp.__str__ = (lambda o:
-    "+" if o.matches.Add else
-    "-" if o.matches.Sub else 
-    "*" if o.matches.Mul else 
-    "/" if o.matches.Div else 
-    "==" if o.matches.Eq else 
-    "!=" if o.matches.NotEq else 
-    "<" if o.matches.Lt else 
-    "<=" if o.matches.LtE else 
-    ">" if o.matches.Gt else 
-    ">=" if o.matches.GtE else 
-    "<<" if o.matches.LShift else 
-    ">>" if o.matches.RShift else 
-    "|" if o.matches.BitOr else 
-    "&" if o.matches.BitAnd else 
-    "^" if o.matches.BitXor else
-    None)
 
 #loads and stores - no assignments
-Expression = Alternative("Expression")
-Teardown = Alternative("Teardown")
-CallTarget = Alternative("CallTarget")
+Expression = lambda: Expression
+Teardown = lambda: Teardown
+CallTarget = lambda: CallTarget
 
-NamedCallTarget = Alternative("NamedCallTarget", Item ={
-                'name': str, 
-                'arg_types': TupleOf(Type), 
-                'output_type': Type, 
-                'external': bool, 
-                'varargs': bool,
-                'intrinsic': bool,
-                'can_throw': bool
-                })
-CallTarget.define(
+NamedCallTarget = NamedTuple(
+                name = str, 
+                arg_types = TupleOf(Type), 
+                output_type = Type, 
+                external = bool, 
+                varargs = bool,
+                intrinsic = bool,
+                can_throw = bool
+                )
+
+CallTarget = Alternative("CallTarget",
     Named = {'target': NamedCallTarget},
     Pointer = {'expr': Expression},
     )
 
-Teardown.define(
+def teardown_str(self):
+    if self.matches.Always:
+        return str(self.expr)
+    if self.matches.ByTag:
+        return "if slot_initialized(name=%s):\n" % self.tag + indent(str(self.expr), "    ")
+
+Teardown = Alternative("Teardown",
     ByTag = {'tag': str, 'expr': Expression},
-    Always = {'expr': Expression}
-    )
-
-Expression.define(
-    Constant = {'val': Constant},
-    Comment = {'comment': str, 'expr': Expression},
-    Load = {'ptr': Expression},
-    Store = {'ptr': Expression, 'val': Expression},
-    Alloca = {'type': Type},
-    Cast = {'left': Expression, 'to_type': Type},
-    Binop = {'op': BinaryOp, 'l': Expression, 'r': Expression},
-    Unaryop = {'op': UnaryOp, 'operand': Expression},
-    Variable = {'name': str},
-    Attribute = {'left': Expression, 'attr': str},
-    StructElementByIndex = {'left': Expression, 'index': int},
-    ElementPtr = {'left': Expression, 'offsets': TupleOf(Expression)},
-    Call = {'target': CallTarget, 'args': TupleOf(Expression)},
-    FunctionPointer = {'target': NamedCallTarget},
-    MakeStruct = {'args': TupleOf(Tuple(str,Expression))},
-    Branch = {'cond': Expression, 
-                         'true': Expression, 
-                         'false': Expression
-                         },
-
-    Throw = {'expr': Expression }, #throw a pointer.
-
-    TryCatch = {'expr': Expression,
-                           'varname': str, #varname is bound to a int8*
-                           'handler': Expression
-                           },
-
-    While = {'cond': Expression, 
-                        'while_true': Expression, 
-                        'orelse': Expression
-                        },
-    Return = {'arg': OneOf(Expression, None)},
-    Let = {'var': str, 'val': Expression, 'within': Expression},
-
-    #evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
-    #clause
-    Finally = {'expr': Expression, 'teardowns': TupleOf(Teardown)},
-    Sequence = {'vals': TupleOf(Expression)},
-
-    ActivatesTeardown = {'name': str},
-    StackSlot = {'name': str, 'type': Type}
+    Always = {'expr': Expression},
+    __str__ = teardown_str
     )
 
 def expr_add(self, other):
@@ -205,23 +172,13 @@ def expr_add(self, other):
         return Expression.Sequence((self,) + other.vals)
     return Expression.Sequence((self,other))
 
-def teardown_str(self):
-    if self.matches.Always:
-        return str(self.expr)
-    if self.matches.ByTag:
-        return "if slot_initialized(name=%s):\n" % self.tag + indent(str(self.expr))
-Teardown.__str__ = teardown_str
-
-def catch_handler_str(self):
-    if self.matches.Any:
-        return "catch Exception:\n" + indent(str(self.expr)).rstrip() + "\n"
 
 def expr_str(self):
     if self.matches.Comment:
         e = str(self.expr)
         if "\n" in self.comment or "\n" in e:
             return "\n\t/*" + self.comment + "*/\n"\
-                    + indent(str(self.expr).rstrip()) + "\n"
+                    + indent(str(self.expr).rstrip(), "    ") + "\n"
         else:
             return "/*" + str(self.comment) + "*/" + str(self.expr)
     if self.matches.Constant:
@@ -327,14 +284,51 @@ def expr_with_comment(self, c):
     return Expression.Comment(comment=c, expr=self)
 
 def expr_load(self):
-    return Expression.Load(self)
+    return Expression.Load(ptr=self)
 
-Expression.load = expr_load
-Expression.__add__ = expr_add
-Expression.__str__ = expr_str
-Expression.with_comment = expr_with_comment
-Expression.define(
-    ElementPtrIntegers = (lambda self, *offsets: 
+Expression = Alternative("Teardown",
+    Constant = {'val': Constant},
+    Comment = {'comment': str, 'expr': Expression},
+    Load = {'ptr': Expression},
+    Store = {'ptr': Expression, 'val': Expression},
+    Alloca = {'type': Type},
+    Cast = {'left': Expression, 'to_type': Type},
+    Binop = {'op': BinaryOp, 'l': Expression, 'r': Expression},
+    Unaryop = {'op': UnaryOp, 'operand': Expression},
+    Variable = {'name': str},
+    Attribute = {'left': Expression, 'attr': str},
+    StructElementByIndex = {'left': Expression, 'index': int},
+    ElementPtr = {'left': Expression, 'offsets': TupleOf(Expression)},
+    Call = {'target': CallTarget, 'args': TupleOf(Expression)},
+    FunctionPointer = {'target': NamedCallTarget},
+    MakeStruct = {'args': TupleOf(Tuple(str,Expression))},
+    Branch = {'cond': Expression, 
+                         'true': Expression, 
+                         'false': Expression
+                         },
+
+    Throw = {'expr': Expression }, #throw a pointer.
+
+    TryCatch = {'expr': Expression,
+                           'varname': str, #varname is bound to a int8*
+                           'handler': Expression
+                           },
+
+    While = {'cond': Expression, 
+                        'while_true': Expression, 
+                        'orelse': Expression
+                        },
+    Return = {'arg': OneOf(Expression, None)},
+    Let = {'var': str, 'val': Expression, 'within': Expression},
+
+    #evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
+    #clause
+    Finally = {'expr': Expression, 'teardowns': TupleOf(Teardown)},
+    Sequence = {'vals': TupleOf(Expression)},
+
+    ActivatesTeardown = {'name': str},
+    StackSlot = {'name': str, 'type': Type},
+    ElementPtrIntegers = lambda self, *offsets: 
         Expression.ElementPtr(
         left=self,
         offsets=tuple(
@@ -344,13 +338,17 @@ Expression.define(
                 for index in offsets
                 )
             )
-        )
+        ,
+    __add__ = expr_add,
+    __str__ = expr_str,
+    load = expr_load,
+    with_comment = expr_with_comment
     )
 
-nullExpr = Expression.Constant(Constant.Void())
-emptyStructExpr = Expression.Constant(Constant.Struct([]))
-trueExpr = Expression.Constant(Constant.Int(bits=1,val=1,signed=False))
-falseExpr = Expression.Constant(Constant.Int(bits=1,val=0,signed=False))
+nullExpr = Expression.Constant(val=Constant.Void())
+emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
+trueExpr = Expression.Constant(val=Constant.Int(bits=1,val=1,signed=False))
+falseExpr = Expression.Constant(val=Constant.Int(bits=1,val=0,signed=False))
 
 def const_int_expr(i):
     return Expression.Constant(
@@ -362,12 +360,13 @@ FunctionBody = Alternative("FunctionBody",
     External = {'name': str}
     )
 
-Function = Alternative("Function")
-Function.define(
-    Definition = {'args': TupleOf(Tuple(str, Type)), 'body': FunctionBody, 'output_type': Type}
+Function = NamedTuple(
+    args=TupleOf(Tuple(str, Type)),
+    body=FunctionBody, 
+    output_type=Type
     )
 
 Void = Type.Void()
 Bool = Type.Int(bits=1, signed=False)
-Int8Ptr = Type.Pointer(Type.Int(bits=8, signed=True))
+Int8Ptr = Type.Pointer(value_type=Type.Int(bits=8, signed=True))
 

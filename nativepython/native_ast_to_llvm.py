@@ -513,7 +513,7 @@ class FunctionConverter:
                     self.stack_slots[expr.name] = \
                         TypedLLVMValue(
                             self.builder.alloca(llvm_type,name=expr.name), 
-                            native_ast.Type.Pointer(expr.type)
+                            native_ast.Type.Pointer(value_type=expr.type)
                             )
 
             assert self.stack_slots[expr.name].native_type.value_type == expr.type, \

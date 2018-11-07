@@ -12,10 +12,24 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__version__="0.2"
+from typed_python import *
+from nativepython.python_to_native_ast import Converter
+import unittest
 
-from typed_python.internals import Class, Function, Member
-from typed_python.hash import sha_hash
-from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
-                                Alternative, Value, serialize, deserialize, Int8, \
-                                Bool, Int16, Int32, Int64, UInt8, UInt32, UInt64, Float32, Float64, NoneType
+
+class TestPythonToNativeAst(unittest.TestCase):
+    def test_convert_self_add_function(self):
+        converter = Converter()
+
+        def f(x):
+            return x+x
+
+        callTarget = converter.convert(f, (int,))
+
+        self.assertEqual(callTarget.input_types, [Int64()])
+        self.assertEqual(callTarget.output_type, Int64())
+
+        targets = converter.extract_new_function_definitions()
+        assert callTarget.name in targets
+
+        print(targets[callTarget.name])

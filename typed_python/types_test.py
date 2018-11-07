@@ -293,7 +293,8 @@ class NativeTypesTests(unittest.TestCase):
             a = OneOf(vals[0], vals[1], type(vals[2]))
 
             for v in vals:
-                self.assertEqual(a(v), v)
+                print(a,vals[0],vals[1])
+                self.assertEqual(a(v), v, (a(v),v))
 
             tup = TupleOf(a)
             tupInst = tup(vals)

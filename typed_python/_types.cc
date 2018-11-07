@@ -28,8 +28,48 @@ struct native_instance_wrapper {
     Instance mContainingInstance;
     int64_t mOffset; //byte offset within the instance that we hold
 
+    static bool guaranteeForwardsResolved(Type* t) {
+        try {
+            guaranteeForwardsResolvedOrThrow(t);
+            return true;
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return false;
+        }
+    }
+
+    static void guaranteeForwardsResolvedOrThrow(Type* t) {
+        t->guaranteeForwardsResolved([&](PyObject* o) {
+            PyObject* result = PyObject_CallFunctionObjArgs(o, NULL);
+            if (!result) {
+                PyErr_Clear();
+                throw std::runtime_error("Python type callback threw an exception.");
+            }
+
+            if (!PyType_Check(result)) {
+                Py_DECREF(result);
+                throw std::runtime_error("Python type callback didn't return a type: got " + 
+                    std::string(result->ob_type->tp_name));
+            }
+
+            Type* resType = unwrapTypeArgToTypePtr(result);
+            Py_DECREF(result);
+
+            if (!resType) {
+                throw std::runtime_error("Python type callback didn't return a native type: got " +
+                    std::string(result->ob_type->tp_name));
+            }
+
+            return resType;
+        });
+    }
+
     template<class init_func>
     static PyObject* initialize(Type* eltType, const init_func& f) {
+        if (!guaranteeForwardsResolved(eltType)) {
+            return nullptr;
+        }
+
         native_instance_wrapper* self = 
             (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
@@ -52,8 +92,11 @@ struct native_instance_wrapper {
 
     template<class init_func>
     void initialize(const init_func& i) {
+        Type* type = extractTypeFrom(((PyObject*)this)->ob_type);
+        guaranteeForwardsResolvedOrThrow(type);
+        
         mIsInitialized = false;
-        new (&mContainingInstance) Instance( extractTypeFrom(((PyObject*)this)->ob_type), i );
+        new (&mContainingInstance) Instance( type, i );
         mIsInitialized = true;
         mOffset = 0;
     }
@@ -64,11 +107,15 @@ struct native_instance_wrapper {
 
     static PyObject* bytecount(PyObject* o) {
         NativeTypeWrapper* w = (NativeTypeWrapper*)o;
+        
+        if (!guaranteeForwardsResolved(w->mType)) { return nullptr; }
+
         return PyLong_FromLong(w->mType->bytecount());
     }
 
     static PyObject* constDictItems(PyObject *o) {
         Type* self_type = extractTypeFrom(o->ob_type);
+
         native_instance_wrapper* w = (native_instance_wrapper*)o;
 
         if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
@@ -222,6 +269,8 @@ struct native_instance_wrapper {
     }
 
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
+        guaranteeForwardsResolvedOrThrow(t);
+        
         if (t->getTypeCategory() == Type::TypeCategory::catValue) {
             Value* valType = (Value*)t;
             if (compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true) == 0) {
@@ -277,6 +326,8 @@ struct native_instance_wrapper {
     }
 
     static void copy_constructor(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+        guaranteeForwardsResolvedOrThrow(eltType);
+        
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType && (argType->getBaseType() == eltType || argType == eltType || argType == eltType->getBaseType())) {
@@ -605,6 +656,8 @@ struct native_instance_wrapper {
     }
 
     static void initialize(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
+        guaranteeForwardsResolvedOrThrow(t);
+        
         Type::TypeCategory cat = t->getTypeCategory();
 
         if (cat == Type::TypeCategory::catPythonSubclass) {
@@ -735,6 +788,8 @@ struct native_instance_wrapper {
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
         Type* eltType = extractTypeFrom(subtype);
 
+        if (!guaranteeForwardsResolved(eltType)) { return nullptr; }
+        
         if (isSubclassOfNativeType(subtype)) {
             native_instance_wrapper* self = (native_instance_wrapper*)subtype->tp_alloc(subtype, 0);
 
@@ -2146,6 +2201,12 @@ struct native_instance_wrapper {
 
         PyType_Ready((PyTypeObject*)types[inType]);
 
+        PyDict_SetItemString(
+            types[inType]->typeObj.tp_dict, 
+            "__typed_python_category__",
+            categoryToPyString(inType->getTypeCategory())
+            );
+
         if (inType->getTypeCategory() == Type::TypeCategory::catAlternative) {
             Alternative* alt = (Alternative*)inType;
             for (long k = 0; k < alt->subtypes().size(); k++) {
@@ -2192,8 +2253,49 @@ struct native_instance_wrapper {
             return None::Make();
         }
 
+        if (PyFunction_Check(arg)) {
+            Py_INCREF(arg);
+            return new Forward(arg);
+        }
+
         return  native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
     }        
+
+    static PyObject* categoryToPyString(Type::TypeCategory cat) {
+        if (cat == Type::TypeCategory::catNone) { static PyObject* res = PyUnicode_FromString("None"); return res; }
+        if (cat == Type::TypeCategory::catBool) { static PyObject* res = PyUnicode_FromString("Bool"); return res; }
+        if (cat == Type::TypeCategory::catUInt8) { static PyObject* res = PyUnicode_FromString("UInt8"); return res; }
+        if (cat == Type::TypeCategory::catUInt16) { static PyObject* res = PyUnicode_FromString("UInt16"); return res; }
+        if (cat == Type::TypeCategory::catUInt32) { static PyObject* res = PyUnicode_FromString("UInt32"); return res; }
+        if (cat == Type::TypeCategory::catUInt64) { static PyObject* res = PyUnicode_FromString("UInt64"); return res; }
+        if (cat == Type::TypeCategory::catInt8) { static PyObject* res = PyUnicode_FromString("Int8"); return res; }
+        if (cat == Type::TypeCategory::catInt16) { static PyObject* res = PyUnicode_FromString("Int16"); return res; }
+        if (cat == Type::TypeCategory::catInt32) { static PyObject* res = PyUnicode_FromString("Int32"); return res; }
+        if (cat == Type::TypeCategory::catInt64) { static PyObject* res = PyUnicode_FromString("Int64"); return res; }
+        if (cat == Type::TypeCategory::catString) { static PyObject* res = PyUnicode_FromString("String"); return res; }
+        if (cat == Type::TypeCategory::catBytes) { static PyObject* res = PyUnicode_FromString("Bytes"); return res; }
+        if (cat == Type::TypeCategory::catFloat32) { static PyObject* res = PyUnicode_FromString("Float32"); return res; }
+        if (cat == Type::TypeCategory::catFloat64) { static PyObject* res = PyUnicode_FromString("Float64"); return res; }
+        if (cat == Type::TypeCategory::catValue) { static PyObject* res = PyUnicode_FromString("Value"); return res; }
+        if (cat == Type::TypeCategory::catOneOf) { static PyObject* res = PyUnicode_FromString("OneOf"); return res; }
+        if (cat == Type::TypeCategory::catTupleOf) { static PyObject* res = PyUnicode_FromString("TupleOf"); return res; }
+        if (cat == Type::TypeCategory::catNamedTuple) { static PyObject* res = PyUnicode_FromString("NamedTuple"); return res; }
+        if (cat == Type::TypeCategory::catTuple) { static PyObject* res = PyUnicode_FromString("Tuple"); return res; }
+        if (cat == Type::TypeCategory::catConstDict) { static PyObject* res = PyUnicode_FromString("ConstDict"); return res; }
+        if (cat == Type::TypeCategory::catAlternative) { static PyObject* res = PyUnicode_FromString("Alternative"); return res; }
+        if (cat == Type::TypeCategory::catConcreteAlternative) { static PyObject* res = PyUnicode_FromString("ConcreteAlternative"); return res; }
+        if (cat == Type::TypeCategory::catPythonSubclass) { static PyObject* res = PyUnicode_FromString("PythonSubclass"); return res; }
+        if (cat == Type::TypeCategory::catBoundMethod) { static PyObject* res = PyUnicode_FromString("BoundMethod"); return res; }
+        if (cat == Type::TypeCategory::catClass) { static PyObject* res = PyUnicode_FromString("Class"); return res; }
+        if (cat == Type::TypeCategory::catHeldClass) { static PyObject* res = PyUnicode_FromString("HeldClass"); return res; }
+        if (cat == Type::TypeCategory::catFunction) { static PyObject* res = PyUnicode_FromString("Function"); return res; }
+        if (cat == Type::TypeCategory::catPackedArray) { static PyObject* res = PyUnicode_FromString("PackedArray"); return res; }
+        if (cat == Type::TypeCategory::catPointer) { static PyObject* res = PyUnicode_FromString("Pointer"); return res; }
+        if (cat == Type::TypeCategory::catForward) { static PyObject* res = PyUnicode_FromString("Forward"); return res; }
+
+        static PyObject* res = PyUnicode_FromString("Unknown"); 
+        return res;
+    }
 
     static Type* tryUnwrapPyInstanceToValueType(PyObject* typearg) {
         if (PyBool_Check(typearg)) {
@@ -2296,7 +2398,13 @@ struct native_instance_wrapper {
             return valueType;
         }
 
-        PyErr_SetString(PyExc_TypeError, "Cannot convert argument to a native type because is't not a type.");
+        if (PyFunction_Check(typearg)) {
+            Py_INCREF(typearg);
+            return new Forward(typearg);
+        }
+
+
+        PyErr_Format(PyExc_TypeError, "Cannot convert %S to a native type.", typearg);
         return NULL;
     }
 };
@@ -2432,6 +2540,11 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
 }
 
 
+PyObject *Bool(PyObject* nullValue, PyObject* args) {
+    PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Bool::Make());
+    Py_INCREF(res);
+    return res;
+}
 PyObject *Int8(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Int8::Make());
     Py_INCREF(res);
@@ -2449,6 +2562,16 @@ PyObject *Int32(PyObject* nullValue, PyObject* args) {
 }
 PyObject *Int64(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Int64::Make());
+    Py_INCREF(res);
+    return res;
+}
+PyObject *Float32(PyObject* nullValue, PyObject* args) {
+    PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Float32::Make());
+    Py_INCREF(res);
+    return res;
+}
+PyObject *Float64(PyObject* nullValue, PyObject* args) {
+    PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Float64::Make());
     Py_INCREF(res);
     return res;
 }
@@ -3013,6 +3136,7 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 
 static PyMethodDef module_methods[] = {
     {"NoneType", (PyCFunction)NoneType, METH_VARARGS, NULL},
+    {"Bool", (PyCFunction)Bool, METH_VARARGS, NULL},
     {"Int8", (PyCFunction)Int8, METH_VARARGS, NULL},
     {"Int16", (PyCFunction)Int16, METH_VARARGS, NULL},
     {"Int32", (PyCFunction)Int32, METH_VARARGS, NULL},
@@ -3021,6 +3145,8 @@ static PyMethodDef module_methods[] = {
     {"UInt16", (PyCFunction)UInt16, METH_VARARGS, NULL},
     {"UInt32", (PyCFunction)UInt32, METH_VARARGS, NULL},
     {"UInt64", (PyCFunction)UInt64, METH_VARARGS, NULL},
+    {"Float32", (PyCFunction)Float32, METH_VARARGS, NULL},
+    {"Float64", (PyCFunction)Float64, METH_VARARGS, NULL},
     {"String", (PyCFunction)String, METH_VARARGS, NULL},
     {"Bytes", (PyCFunction)Bytes, METH_VARARGS, NULL},
     {"TupleOf", (PyCFunction)TupleOf, METH_VARARGS, NULL},

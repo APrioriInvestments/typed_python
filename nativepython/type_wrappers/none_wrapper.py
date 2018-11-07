@@ -12,10 +12,29 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__version__="0.2"
+from nativepython.type_wrappers.wrapper import Wrapper
 
-from typed_python.internals import Class, Function, Member
-from typed_python.hash import sha_hash
-from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
-                                Alternative, Value, serialize, deserialize, Int8, \
-                                Bool, Int16, Int32, Int64, UInt8, UInt32, UInt64, Float32, Float64, NoneType
+import nativepython.native_ast as native_ast
+
+class NoneWrapper(Wrapper):
+    is_pod = True
+
+    def __init__(self, t):
+        super().__init__(t)
+
+    def lower_as_function_arg(self):
+        return self.lower()
+
+    def lower(self):
+        return native_ast.Type.Void()
+
+    def asNonref(self, e):
+        return self.unwrap(e)
+
+    def unwrap(self, e):
+        return e
+
+    def convert_bin_op(self, context, left, op, right):
+        raise ConversionException("Not convertible")
+
+

@@ -1,4 +1,4 @@
-#   Copyright 2018 Braxton Mckee
+#   Copyright 2017 Braxton Mckee
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,10 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__version__="0.2"
+class Wrapper(object):
+    is_pod = False
 
-from typed_python.internals import Class, Function, Member
-from typed_python.hash import sha_hash
-from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
-                                Alternative, Value, serialize, deserialize, Int8, \
-                                Bool, Int16, Int32, Int64, UInt8, UInt32, UInt64, Float32, Float64, NoneType
+    def __init__(self, t):
+        super().__init__()
+
+        self.t = t
+
+    def __eq__(self, other):
+        return self.t == other.t
+
+    def __hash__(self):
+        return hash(self.t)

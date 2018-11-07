@@ -1,4 +1,4 @@
-#   Copyright 2017 Braxton Mckee
+#   Copyright 2018 Braxton Mckee
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -15,37 +15,59 @@
 import nativepython
 import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
-import nativepython.util as util
 import nativepython.native_ast as native_ast
-import nativepython.exceptions as exceptions
 
-from nativepython.type_model import *
+from nativepython.type_wrappers.none_wrapper import NoneWrapper
+from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper
+from nativepython.typed_expression import TypedExpression
+from nativepython.conversion_exception import ConversionException
 
-from typed_python.types import Class
+from typed_python import *
+
+class TypedCallTarget(object):
+    def __init__(self, named_call_target, input_types, output_type):
+        super().__init__()
+        
+        self.named_call_target = named_call_target
+        self.input_types = input_types
+        self.output_type = output_type
+
+    @property
+    def name(self):
+        return self.named_call_target.name
+
+    def __str__(self):
+        return "TypedCallTarget(name=%s,inputs=%s,outputs=%s)" % (
+            self.name, 
+            [str(x) for x in self.input_types],
+            str(self.output_type)
+            )
 
 class FunctionOutput:
     pass
 
 def typedPythonTypeToTypeWrapper(t):
-    if isinstance(t, Type):
+    if t is int:
+        return Int64Wrapper()
+
+    if t is float:
+        return Float64Wrapper()
+
+    assert False, t
+
+    if hasattr(t, '__typed_python_category__'):
         return t
 
-    if isinstance(t, Class):
-        return ClassType(t)
+    if t is int:
+        return Int64
+    if t is float:
+        return Float64
+    if t is bool:
+        return Bool
+    if t is type(None):
+        return Void
 
-    if t in (int,float,bool,type(None),bytes,str):
-        if t is int:
-            return Int64
-        if t is float:
-            return Float64
-        if t is bool:
-            return Bool
-        if t is type(None):
-            return Void
-    
     assert False, "Can't handle %s yet" % t
-
-
 
 class InitFields:
     def __init__(self, first_var_name, fields_and_types):
@@ -63,8 +85,7 @@ class InitFields:
         for f in self.uninitialized_fields:
             self.initialization_expressions[f] = (
                 context.named_var_expr(self.first_var_name)
-                    .drop_double_references()
-                    .convert_attribute(context, f, allow_double_refs=True)
+                    .convert_attribute(context, f)
                     .convert_initialize(context, ())
                 )
 
@@ -90,16 +111,13 @@ class ExceptionHandlingHelper:
     def __init__(self, conversion_context):
         self.context = conversion_context
 
-        import nativepython.lib.exception
-        self.InFlightException = nativepython.lib.exception.InFlightException
-
     def exception_pointer(self):
         return TypedExpression(
             native_ast.Expression.Cast(
                 left=native_ast.Expression.Variable(".unnamed.exception.var"),
-                to_type=self.InFlightException.pointer.lower()
+                to_type=self.InFlightException.lower()
                 ),
-            self.InFlightException.pointer
+            InFlightException
             )
 
     def convert_tryexcept(self, ast):
@@ -173,8 +191,6 @@ class ExceptionHandlingHelper:
             )
 
     def generate_exception_teardown(self):
-        import nativepython.lib.exception
-
         return self.context.consume_temporaries(
             self.context.call_py_function(
                 nativepython.lib.exception.exception_teardown,
@@ -297,7 +313,8 @@ class ConversionContext(object):
                 name=name_to_use,
                 type=slot_type.lower()
                 ),
-            slot_type.reference
+            slot_type,
+            isSlotRef=True
             )
 
     def call_typed_function(self, native_call_target, output_type, input_types, varargs, args):
@@ -442,15 +459,7 @@ class ConversionContext(object):
 
 
     def convert_expression_ast(self, ast):
-        try:
-            return self.convert_expression_ast_(ast)
-        except ConversionException as e:
-            e.add_scope(
-                exceptions.ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type)
-                )
-            raise
-
-
+        return self.convert_expression_ast_(ast)
 
 
     def convert_expression_ast_(self, ast):
@@ -462,7 +471,7 @@ class ConversionContext(object):
         if ast.matches.Name:
             assert ast.ctx.matches.Load
             if ast.id in self._varname_to_type:
-                return self.named_var_expr(ast.id).drop_double_references()
+                return self.named_var_expr(ast.id)
 
             if ast.id in self._free_variable_lookup:
                 return pythonObjectRepresentation(self._free_variable_lookup[ast.id])
@@ -553,7 +562,7 @@ class ConversionContext(object):
             l = self.convert_expression_ast(ast.left)
             r = self.convert_expression_ast(ast.right)
             
-            return l.convert_bin_op(ast.op, r)
+            return l.convert_bin_op(self, ast.op, r)
 
         if ast.matches.UnaryOp:
             operand = self.convert_expression_ast(ast.operand)
@@ -602,7 +611,7 @@ class ConversionContext(object):
             l = self.convert_expression_ast(ast.left)
             r = self.convert_expression_ast(ast.comparators[0])
 
-            return l.convert_bin_op(ast.ops[0], r)
+            return l.convert_bin_op(self, ast.ops[0], r)
 
         if ast.matches.Tuple:
             elts = [self.convert_expression_ast(e) for e in ast.elts]
@@ -702,15 +711,8 @@ class ConversionContext(object):
             )
 
     def convert_statement_ast(self, ast):
-        try:
-            return self.convert_statement_ast_(ast)
-        except ConversionException as e:
-            e.add_scope(
-                exceptions.ConversionScopeInfo.CreateFromAst(ast, self._varname_to_type)
-                )
-
-            raise
-
+        return self.convert_statement_ast_(ast)
+        
     def check_statement_is_field_initializer(self, ast):
         if not ast.matches.Expr:
             return None
@@ -756,8 +758,7 @@ class ConversionContext(object):
 
             expr = (
                 self.named_var_expr(self._init_fields.first_var_name)
-                    .drop_double_references()
-                    .convert_attribute(self, field, allow_double_refs=True)
+                    .convert_attribute(self, field)
                     .convert_initialize(self, args)
                 )
 
@@ -806,10 +807,10 @@ class ConversionContext(object):
                         ) + TypedExpression.Void(native_ast.Expression.ActivatesTeardown(varname))
                 else:
                     #this is an existing variable.
-                    slot_ref = self.named_var_expr(varname).drop_double_references()
+                    slot_ref = self.named_var_expr(varname)
 
                     if op is not None:
-                        val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+                        val_to_store = slot_ref.convert_bin_op(self, op, val_to_store)
 
                     return slot_ref.convert_assign(self, val_to_store)
 
@@ -821,7 +822,7 @@ class ConversionContext(object):
                 val_to_store = self.convert_expression_ast(ast.value)
 
                 if op is not None:
-                    val_to_store = slicing.convert_getitem(self, index).convert_bin_op(op, val_to_store)
+                    val_to_store = slicing.convert_getitem(self, index).convert_bin_op(self, op, val_to_store)
 
                 return slicing.convert_setitem(self, index, val_to_store)
         
@@ -831,7 +832,7 @@ class ConversionContext(object):
                 val_to_store = self.convert_expression_ast(ast.value)
 
                 if op is not None:
-                    val_to_store = slicing.convert_attribute(self, attr).convert_bin_op(op, val_to_store)
+                    val_to_store = slicing.convert_attribute(self, attr).convert_bin_op(self, op, val_to_store)
 
                 return slicing.convert_set_attribute(self, attr, val_to_store)
 
@@ -845,7 +846,7 @@ class ConversionContext(object):
                 e = self.convert_expression_ast(ast.value)
 
             if self._varname_to_type[FunctionOutput] is not None:
-                if self._varname_to_type[FunctionOutput] != e.expr_type.variable_storage_type:
+                if self._varname_to_type[FunctionOutput] != e.expr_type:
                     raise ConversionException(
                         "Function returning multiple types:\n\t%s\n\t%s" % (
                                 e.expr_type.variable_storage_type, 
@@ -853,38 +854,11 @@ class ConversionContext(object):
                                 )
                         )
             else:
-                self._varname_to_type[FunctionOutput] = e.expr_type.variable_storage_type
+                self._varname_to_type[FunctionOutput] = e.expr_type
 
             output_type = self._varname_to_type[FunctionOutput]
 
-            if output_type.is_pod:
-                if e.expr_type == Void:
-                    return e + TypedExpression(native_ast.Expression.Return(arg=None), None)
-
-                if e.expr_type.is_ref:
-                    if output_type.is_ref:
-                        return TypedExpression(native_ast.Expression.Return(e.expr), None)
-                    else:
-                        return TypedExpression(native_ast.Expression.Return(e.expr.load()), None)
-                else:
-                    assert not output_type.is_ref
-                    return TypedExpression(native_ast.Expression.Return(e.expr), None)
-            else:
-                assert not output_type.is_ref
-
-                return TypedExpression(
-                    output_type
-                        .convert_initialize_copy(
-                            self,
-                            TypedExpression(
-                                native_ast.Expression.Variable(".return"),
-                                output_type.reference
-                                ),
-                            e
-                            ).expr + 
-                        native_ast.Expression.Return(None),
-                    None
-                    )
+            return TypedExpression(native_ast.Expression.Return(arg=e.asNonref().expr), None, False)
 
         if ast.matches.Expr:
             return TypedExpression(
@@ -1097,7 +1071,7 @@ class ConversionContext(object):
                 teardowns=teardowns
                 )
 
-        return TypedExpression(seq_expr, Void if flows_off_end else None)
+        return TypedExpression(seq_expr, Void if flows_off_end else None, False)
 
     def named_variable_teardown(self, v):
         return native_ast.Teardown.ByTag(
@@ -1142,7 +1116,7 @@ class ConversionContext(object):
             name,
             typelist,
             expr.expr_type,
-            native_ast.Function.Definition(
+            native_ast.Function(
                 args=[(varlist[i].name, typelist[i].lower_as_function_arg()) 
                             for i in range(len(varlist))],
                 body=native_ast.FunctionBody.Internal(expr.expr),
@@ -1173,7 +1147,7 @@ class ConversionContext(object):
                         to_add.append(
                             native_ast.Expression.Store(
                                 ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.lower()),
-                                val=native_ast.Expression.Variable(name)
+                                val=native_ast.Expression.Variable(name=name)
                                 )
                             )
                     else:
@@ -1203,9 +1177,10 @@ class ConversionContext(object):
         if to_add:
             expr = TypedExpression(
                 native_ast.Expression.Sequence(
-                    to_add + [expr.expr]
+                    vals=to_add + [expr.expr]
                     ),
-                expr.expr_type
+                expr.expr_type,
+                expr.isSlotRef
                 )
 
         if destructors:
@@ -1214,7 +1189,8 @@ class ConversionContext(object):
                     teardowns=destructors,
                     expr=expr.expr
                     ),
-                expr.expr_type
+                expr.expr_type,
+                expr.isSlotRef
                 )
         
         return expr
@@ -1234,24 +1210,6 @@ class ConversionContext(object):
                     for i in range(len(args_type.element_types))]
             ).with_comment("initialize *args slot") + res
 
-
-class TypedCallTarget(object):
-    def __init__(self, named_call_target, input_types, output_type):
-        object.__init__(self)
-        self.named_call_target = named_call_target
-        self.input_types = input_types
-        self.output_type = output_type
-
-    @property
-    def name(self):
-        return self.named_call_target.name
-
-    def __str__(self):
-        return "TypedCallTarget(name=%s,inputs=%s,outputs=%s)" % (
-            self.name, 
-            [str(x) for x in self.input_types],
-            str(self.output_type)
-            )
 
 class Converter(object):
     def __init__(self):
@@ -1370,15 +1328,14 @@ class Converter(object):
         return_type = subconverter._varname_to_type[FunctionOutput] or Void
 
         return (
-            native_ast.Function.Definition(
+            native_ast.Function(
                 args=args, 
-                body=native_ast.FunctionBody.Internal(res.expr),
+                body=native_ast.FunctionBody.Internal(body=res.expr),
                 output_type=return_type.lower()
                 ),
             return_type
             )
                   
-
     def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup):
         return self.convert_function_ast(
             ast.args, 
@@ -1393,7 +1350,6 @@ class Converter(object):
             free_variable_lookup,
             ()
             )
-
 
     def define(self, identifier, name, input_types, output_type, native_function_definition):
         identifier = ("defined", identifier)
@@ -1466,57 +1422,51 @@ class Converter(object):
 
         pyast, freevars = self.callable_to_ast_and_vars(f)
 
-        try:
-            if isinstance(pyast, python_ast.Statement.FunctionDef):
-                definition,output_type = \
-                    self.convert_function_ast(
-                        pyast.args, 
-                        pyast.body, 
-                        input_types, 
-                        f.__code__.co_varnames, 
-                        freevars,
-                        fields_and_types_for_initializing
-                        )
-            else:
-                assert pyast.matches.Lambda
-                if fields_and_types_for_initializing:
-                    raise ConversionException("initializers can't be lambdas")
-                definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars)
-
-            assert definition is not None
-
-            new_name = self.new_name(name_override or f.__name__)
-
-            self._names_for_identifier[identifier] = new_name
-
-            if not output_type.is_pod:
-                definition = native_ast.Function.Definition(
-                    args=(('.return', output_type.pointer.lower()),) + definition.args,
-                    body=definition.body,
-                    output_type=native_ast.Type.Void()
+        if isinstance(pyast, python_ast.Statement.FunctionDef):
+            definition,output_type = \
+                self.convert_function_ast(
+                    pyast.args, 
+                    pyast.body, 
+                    input_types, 
+                    f.__code__.co_varnames, 
+                    freevars,
+                    fields_and_types_for_initializing
                     )
+        else:
+            assert pyast.matches.Lambda
+            if fields_and_types_for_initializing:
+                raise ConversionException("initializers can't be lambdas")
+            definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars)
 
-            self._targets[new_name] = TypedCallTarget(
-                native_ast.NamedCallTarget.Item(
-                    name=new_name, 
-                    arg_types=[x[1] for x in definition.args],
-                    output_type=definition.output_type,
-                    external=False,
-                    varargs=False,
-                    intrinsic=False,
-                    can_throw=True
-                    ),
-                input_types,
-                output_type
+        assert definition is not None
+
+        new_name = self.new_name(name_override or f.__name__)
+
+        self._names_for_identifier[identifier] = new_name
+
+        if not output_type.is_pod:
+            definition = native_ast.Function(
+                args=(('.return', output_type.pointer.lower()),) + definition.args,
+                body=definition.body,
+                output_type=native_ast.Type.Void()
                 )
 
-            self._definitions[new_name] = definition
-            self._unconverted.add(new_name)
+        self._targets[new_name] = TypedCallTarget(
+            native_ast.NamedCallTarget(
+                name=new_name, 
+                arg_types=[x[1] for x in definition.args],
+                output_type=definition.output_type,
+                external=False,
+                varargs=False,
+                intrinsic=False,
+                can_throw=True
+                ),
+            [x.t for x in input_types],
+            output_type.t
+            )
 
-            return self._targets[new_name]
-        except ConversionException as e:
-            e.add_scope(
-                exceptions.ConversionScopeInfo.CreateFromAst(pyast, {})
-                )
-            raise
+        self._definitions[new_name] = definition
+        self._unconverted.add(new_name)
+
+        return self._targets[new_name]
 

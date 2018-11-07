@@ -254,6 +254,11 @@ public:
     }
 
     const std::string& name() const {
+        if (m_checking_for_references_unresolved_forwards) {
+            static std::string recursive = "RECURSIVE";
+            return recursive;
+        }
+
         return m_name;
     }
 
@@ -262,6 +267,8 @@ public:
     }
 
     Type* pickConcreteSubclass(instance_ptr data) {
+        assertForwardsResolved();
+
         return this->check([&](auto& subtype) {
             return subtype.pickConcreteSubclassConcrete(data);
         });
@@ -272,18 +279,24 @@ public:
     }
 
     void repr(instance_ptr self, std::ostringstream& out) {
+        assertForwardsResolved();
+
         this->check([&](auto& subtype) {
             subtype.repr(self, out);
         });
     }
 
     char cmp(instance_ptr left, instance_ptr right) {
+        assertForwardsResolved();
+
         return this->check([&](auto& subtype) {
             return subtype.cmp(left, right);
         });
     }
 
     int32_t hash32(instance_ptr left) {
+        assertForwardsResolved();
+
         return this->check([&](auto& subtype) {
             return subtype.hash32(left);
         });
@@ -291,6 +304,8 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr left, buf_t& buffer) {
+        assertForwardsResolved();
+
         return this->check([&](auto& subtype) {
             return subtype.serialize(left, buffer);
         });
@@ -298,12 +313,16 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr left, buf_t& buffer) {
+        assertForwardsResolved();
+
         return this->check([&](auto& subtype) {
             return subtype.deserialize(left, buffer);
         });
     }
 
     void swap(instance_ptr left, instance_ptr right) {
+        assertForwardsResolved();
+
         if (left == right) {
             return;
         }
@@ -409,6 +428,8 @@ public:
                 return f(*(PackedArray*)this);
             case catPointer:
                 return f(*(Pointer*)this);
+            case catForward:
+                return f(*(Forward*)this);
             default:
                 throw std::runtime_error("Invalid type found");
         }
@@ -419,10 +440,69 @@ public:
         return m_base;
     }
 
-    void assertConcrete() const {
-        if (m_references_unresolved_forwards || m_contains_unresolved_forwards_directly) {
-            throw std::runtime_error("Type contains unresolved forward definitions.");
+    void assertForwardsResolved() const {
+        if (m_references_unresolved_forwards || m_failed_resolution) {
+            throw std::logic_error("Type has unresolved forwards.");
         }
+    }
+
+    //this MUST be called while holding the GIL
+    template<class resolve_py_callable_to_type>
+    Type* guaranteeForwardsResolved(const resolve_py_callable_to_type& resolver) {
+        if (m_failed_resolution) {
+            throw std::runtime_error("Type failed to resolve the first time it was triggered.");
+        }
+
+        if (m_checking_for_references_unresolved_forwards) {
+            //it's ok to bail early. the call stack will recurse
+            //back to this point, and during the unwind will ensure
+            //that we check that any forwards are resolved.
+            return this;
+        }
+
+        if (m_references_unresolved_forwards) {
+            m_checking_for_references_unresolved_forwards = true;
+            m_references_unresolved_forwards = false;
+
+            Type* res;
+
+            try {
+                res = this->check([&](auto& subtype) { 
+                    return subtype.guaranteeForwardsResolvedConcrete(resolver); 
+                });
+            } catch(...) {
+                m_checking_for_references_unresolved_forwards = false;
+                m_failed_resolution = true;
+                throw;
+            }
+
+            m_checking_for_references_unresolved_forwards = false;
+
+            forwardTypesMayHaveChanged();
+
+            if (res != this) {
+                return res->guaranteeForwardsResolved(resolver);
+            }
+
+            return res;
+        }
+
+        return this;
+    }
+
+    template<class resolve_py_callable_to_type>
+    Type* guaranteeForwardsResolvedConcrete(resolve_py_callable_to_type& resolver) {
+        typedef Type* type_ptr;
+
+        bool didSomething = false;
+
+        visitReferencedTypes([&](type_ptr& t) {
+            t = t->guaranteeForwardsResolved(resolver);
+        });
+
+        forwardTypesMayHaveChanged();
+
+        return this;
     }
 
     void _forwardTypesMayHaveChanged() {}
@@ -435,15 +515,21 @@ public:
 
 
     void constructor(instance_ptr self) {
+        assertForwardsResolved();
+        
         this->check([&](auto& subtype) { subtype.constructor(self); } );
     }
 
     void destroy(instance_ptr self) {
+        assertForwardsResolved();
+        
         this->check([&](auto& subtype) { subtype.destroy(self); } );
     }
 
     template<class ptr_func>
     void destroy(int64_t count, const ptr_func& ptrToChild) {
+        assertForwardsResolved();
+        
         this->check([&](auto& subtype) { 
             for (long k = 0; k < count; k++) {
                 subtype.destroy(ptrToChild(k)); 
@@ -467,14 +553,7 @@ public:
 
     void forwardTypesMayHaveChanged() {
         m_references_unresolved_forwards = false;
-        m_contains_unresolved_forwards_directly = false;
         
-        visitContainedTypes([&](Type* t) {
-            if (t->contains_unresolved_forwards_directly()) {
-                m_contains_unresolved_forwards_directly = true;
-            }
-        });
-
         visitReferencedTypes([&](Type* t) {
             if (t->references_unresolved_forwards()) {
                 m_references_unresolved_forwards = true;
@@ -484,13 +563,21 @@ public:
         this->check([&](auto& subtype) {
             subtype._forwardTypesMayHaveChanged();
         });
+
+        if (mTypeRep) {
+            mTypeRep->tp_name = m_name.c_str();
+        }
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) {
+        assertForwardsResolved();
+        
         this->check([&](auto& subtype) { subtype.copy_constructor(self, other); } );
     }
 
     void assign(instance_ptr self, instance_ptr other) {
+        assertForwardsResolved();
+        
         this->check([&](auto& subtype) { subtype.assign(self, other); } );
     }
 
@@ -506,16 +593,8 @@ public:
         return m_is_default_constructible;
     }
 
-    bool contains_unresolved_forwards_directly() const {
-        return m_contains_unresolved_forwards_directly;
-    }
-
     bool references_unresolved_forwards() const {
         return m_references_unresolved_forwards;
-    }
-
-    void addUse(Type* inTarget) {
-        mUses.insert(inTarget);
     }
 
 protected:
@@ -526,8 +605,9 @@ protected:
             m_name("Undefined"),
             mTypeRep(nullptr),
             m_base(nullptr),
-            m_contains_unresolved_forwards_directly(false),
-            m_references_unresolved_forwards(false)
+            m_references_unresolved_forwards(false),
+            m_checking_for_references_unresolved_forwards(false),
+            m_failed_resolution(false)
         {}
 
     TypeCategory m_typeCategory;
@@ -542,9 +622,11 @@ protected:
 
     Type* m_base;
 
-    bool m_contains_unresolved_forwards_directly;
-
     bool m_references_unresolved_forwards;
+
+    bool m_checking_for_references_unresolved_forwards;
+
+    bool m_failed_resolution;
 
     std::set<Type*> mUses;
 
@@ -554,12 +636,11 @@ protected:
 //any types that contain them can be used.
 class Forward : public Type {
 public:
-    Forward() : 
-        Type(TypeCategory::catForward), 
-        mTarget(nullptr) 
+    Forward(PyObject* deferredDefinition) : 
+        Type(TypeCategory::catForward)
     {
-        m_name = "<fwd>";
-        m_contains_unresolved_forwards_directly = true;
+        m_name = "UnresolvedForwardType";
+        mDefinition = deferredDefinition;
         m_references_unresolved_forwards = true;
     }
 
@@ -567,16 +648,21 @@ public:
         return mTarget;
     }
 
-    void setTarget(Type* inTarget) {
-        if (mTarget) {
-            if (inTarget == mTarget) {
-                return;
-            }
+    template<class resolve_py_callable_to_type>
+    Type* guaranteeForwardsResolvedConcrete(resolve_py_callable_to_type& resolver) {
+        Type* t = resolver(mDefinition);
 
-            throw std::runtime_error("Can't redefine a forward type.");
+        if (!t) {
+            m_failed_resolution = true;
         }
 
-        mTarget = inTarget;
+        mTarget = t;
+
+        if (mTarget) {
+            return mTarget;
+        }
+
+        return this;
     }
 
     template<class visitor_type>
@@ -594,6 +680,7 @@ public:
 
 private:
     Type* mTarget;
+    PyObject* mDefinition;
 };
 
 class OneOf : public Type {
@@ -603,10 +690,10 @@ public:
                     m_types(types)
     {   
         if (m_types.size() > 255) {
-            throw std::runtime_error("Cant make a OneOf with more than 255 types.");
+            throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
         }
 
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -628,8 +715,6 @@ public:
         m_is_default_constructible = false;
 
         for (auto typePtr: m_types) {
-            typePtr->addUse(this);
-
             if (typePtr->is_default_constructible()) {
                 m_is_default_constructible = true;
                 break;
@@ -798,7 +883,6 @@ public:
             m_types(types),
             m_names(names)
     {
-        _forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -819,7 +903,6 @@ public:
         m_byte_offsets.clear();
 
         for (auto t: m_types) {
-            t->addUse(this);
             m_byte_offsets.push_back(m_size);
             m_size += t->bytecount();
         }
@@ -974,13 +1057,20 @@ public:
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
+        forwardTypesMayHaveChanged();
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        ((CompositeType*)this)->_forwardTypesMayHaveChanged();
+
+        std::string oldName = m_name;
 
         m_name = "NamedTuple(";
-        for (long k = 0; k < types.size();k++) {
+        for (long k = 0; k < m_types.size();k++) {
             if (k) {
                 m_name += ", ";
             }
-            m_name += names[k] + "=" + types[k]->name();
+            m_name += m_names[k] + "=" + m_types[k]->name();
         }
         m_name += ")";
     }
@@ -995,12 +1085,18 @@ public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
             CompositeType(TypeCategory::catTuple, types, names)
     {
+        forwardTypesMayHaveChanged();
+    }
+
+    void _forwardTypesMayHaveChanged() {
+        ((CompositeType*)this)->_forwardTypesMayHaveChanged();
+        
         m_name = "Tuple(";
-        for (long k = 0; k < types.size();k++) {
+        for (long k = 0; k < m_types.size();k++) {
             if (k) {
                 m_name += ", ";
             }
-            m_name += types[k]->name();
+            m_name += m_types[k]->name();
         }
         m_name += ")";
     }
@@ -1027,7 +1123,7 @@ public:
         m_size = sizeof(void*);
         m_is_default_constructible = true;
 
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -1041,7 +1137,6 @@ public:
     }
 
     void _forwardTypesMayHaveChanged() {
-        m_element_type->addUse(this);
         m_name = "TupleOf(" + m_element_type->name() + ")";
     }
 
@@ -1119,6 +1214,10 @@ public:
         }
         layout& left_layout = **(layout**)left;
         layout& right_layout = **(layout**)right;
+
+        if (&left_layout == &right_layout) {
+            return 0;
+        }
 
         size_t bytesPer = m_element_type->bytecount();
 
@@ -1261,7 +1360,7 @@ public:
             m_key(key),
             m_value(value)
     {
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -1282,9 +1381,6 @@ public:
         m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
         m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
         m_key_value_pair_type = Tuple::Make({m_key, m_value});
-
-        m_key->addUse(this);
-        m_value->addUse(this);
     }
 
 
@@ -1382,6 +1478,10 @@ public:
         }
         if (size(left) > size(right)) {
             return 1;
+        }
+
+        if (*(layout**)left == *(layout**)right) {
+            return 0;
         }
 
         int ct = count(left);
@@ -2293,6 +2393,9 @@ public:
         if ( (*(layout**)left) && !(*(layout**)right) ) {
             return 1;
         }
+        if ( (*(layout**)left) == (*(layout**)right) ) {
+            return 0;
+        }
 
         char res = byteCompare(eltPtr(left, 0), eltPtr(right, 0), std::min(count(left), count(right)));
 
@@ -2419,15 +2522,15 @@ private:
 
 public:
     static Instance deserialized(Type* t, DeserializationBuffer& buf) {
-        t->assertConcrete();
-
+        t->assertForwardsResolved();
+        
         return createAndInitialize(t, [&](instance_ptr tgt) {
             t->deserialize(tgt, buf);
         });
     }
 
     static Instance create(Type*t, instance_ptr data) {
-        t->assertConcrete();
+        t->assertForwardsResolved();
 
         return createAndInitialize(t, [&](instance_ptr tgt) {
             t->copy_constructor(tgt, data);
@@ -2435,8 +2538,8 @@ public:
     }
 
     template<class initializer_type>
-    static Instance createAndInitialize(Type*t, const initializer_type& initFun) {
-        t->assertConcrete();
+    static Instance createAndInitialize(Type* t, const initializer_type& initFun) {
+        t->assertForwardsResolved();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
         
@@ -2464,7 +2567,7 @@ public:
     }
 
     Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
-        t->assertConcrete();
+        t->assertForwardsResolved();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
         
@@ -2483,7 +2586,7 @@ public:
 
     template<class initializer_type>
     Instance(Type* t, const initializer_type& initFun) : mLayout(nullptr) {
-        t->assertConcrete();
+        t->assertForwardsResolved();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
         
@@ -2675,7 +2778,7 @@ public:
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
 
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -2685,10 +2788,14 @@ public:
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         for (auto& subtype_pair: m_subtypes) {
-            visitor(subtype_pair.second);
+            Type* t = subtype_pair.second;
+            visitor(t);
+            assert(t == subtype_pair.second);
         }
         for (auto& method_pair: m_methods) {
-            visitor(method_pair.second);
+            Type* t = method_pair.second;
+            visitor(t);
+            assert(t == method_pair.second);
         }
     }
 
@@ -2702,8 +2809,6 @@ public:
         m_default_construction_type = nullptr;
 
         for (auto& subtype_pair: m_subtypes) {
-            subtype_pair.second->addUse(this);
-
             if (subtype_pair.second->bytecount() > 0) {
                 m_all_alternatives_empty = false;
             }
@@ -2719,10 +2824,6 @@ public:
                 m_is_default_constructible = true;
                 m_default_construction_ix = m_arg_positions[subtype_pair.first];
             }
-        }
-
-        for (auto& subtype_pair: m_methods) {
-            ((Type*)subtype_pair.second)->addUse(this);
         }
 
         m_size = (m_all_alternatives_empty ? 1 : sizeof(void*));
@@ -2741,6 +2842,10 @@ public:
 
         layout& record_l = **(layout**)left;
         layout& record_r = **(layout**)right;
+
+        if ( &record_l == &record_r ) {
+            return 0;
+        }
 
         if (record_l.which < record_r.which) {
             return -1;
@@ -2919,17 +3024,21 @@ public:
             m_alternative(m_alternative),
             m_which(which)
     {   
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
-        visitor(m_alternative);
+        Type* t = m_alternative;
+        visitor(t);
+        assert(t == m_alternative);
     }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        visitor(m_alternative);
+        Type* t = m_alternative;
+        visitor(t);
+        assert(t == m_alternative);
     }
 
     void _forwardTypesMayHaveChanged() {
@@ -2937,8 +3046,6 @@ public:
         m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
         m_size = m_alternative->bytecount();
         m_is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
-
-        m_base->addUse(this);
     }
 
     int32_t hash32(instance_ptr left) {
@@ -3070,7 +3177,7 @@ public:
         mTypeRep = typePtr;
         m_name = typePtr->tp_name;
 
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -3086,8 +3193,6 @@ public:
     void _forwardTypesMayHaveChanged() {
         m_size = m_base->bytecount();
         m_is_default_constructible = m_base->is_default_constructible();
-
-        m_base->addUse(this);
     }
 
     int32_t hash32(instance_ptr left) {
@@ -3342,7 +3447,7 @@ public:
         m_is_default_constructible = true;
         m_size = 0;
 
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -3357,9 +3462,6 @@ public:
     }
 
     void _forwardTypesMayHaveChanged() {
-        _visitReferencedTypes([&](Type* type_ptr) {
-            type_ptr->addUse(this);
-        });
     }
 
     static Function* merge(Function* f1, Function* f2) {
@@ -3435,7 +3537,7 @@ public:
             m_classMembers(classMembers)
     {
         m_name = inName;
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -3451,10 +3553,14 @@ public:
             visitor(o.second);
         }
         for (auto& o: m_memberFunctions) {
-            visitor(o.second);
+            Type* t = o.second;
+            visitor(t);
+            assert(t == o.second);
         }
         for (auto& o: m_staticFunctions) {
-            visitor(o.second);
+            Type* t = o.second;
+            visitor(t);
+            assert(t == o.second);
         }
     }
 
@@ -3464,8 +3570,6 @@ public:
         m_size = 0;
 
         for (auto t: m_members) {
-            t.second->addUse(this);
-
             m_byte_offsets.push_back(m_size);
             m_size += t.second->bytecount();
 
@@ -3643,7 +3747,7 @@ public:
         m_is_default_constructible = inClass->is_default_constructible();
         m_name = m_heldClass->name();
 
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
 
@@ -3653,14 +3757,14 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        visitor(m_heldClass);
+        Type* t = m_heldClass;
+        visitor(t);
+        assert(t == m_heldClass);
     }
 
     void _forwardTypesMayHaveChanged() {
         m_is_default_constructible = m_heldClass->is_default_constructible();
         m_name = m_heldClass->name();
-
-        m_heldClass->addUse(this);
     }
 
     static Class* Make(
@@ -3682,6 +3786,10 @@ public:
     char cmp(instance_ptr left, instance_ptr right) {
         layout& l = **(layout**)left;
         layout& r = **(layout**)right;
+
+        if ( &l == &r ) {
+            return 0;
+        }
 
         return m_heldClass->cmp(l.data,r.data);
     }
@@ -3802,7 +3910,7 @@ public:
         m_typeCategory = TypeCategory::catBoundMethod;
         m_function = inFunc;
         m_class = inClass;
-        _forwardTypesMayHaveChanged();
+        forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
@@ -3812,15 +3920,18 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        visitor(m_class);
-        visitor(m_function);
+        Type* c = m_class;
+        Type* f = m_function;
+
+        visitor(c);
+        visitor(f);
+
+        assert(c == m_class);
+        assert(f == m_function);
     }
 
     void _forwardTypesMayHaveChanged() {
         m_name = "BoundMethod(" + m_class->name() + "." + m_function->name() + ")";
-
-        m_class->addUse(this);
-        m_function->addUse(this);
     }
 
     static BoundMethod* Make(Class* c, Function* f) {
