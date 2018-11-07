@@ -57,15 +57,23 @@ class GeventPipe:
     """
     def __init__(self):
         self.read_fd, self.write_fd = os.pipe()
-        self.write_f = os.fdopen(self.write_fd, "w")
-        self.fileobj = gevent.fileobject.FileObjectPosix(self.read_fd, bufsize=0)
+        self.fileobj = gevent.fileobject.FileObjectPosix(self.read_fd, bufsize=2)
+        self.netChange = 0
 
     def wait(self):
-        self.fileobj.readline()
+        self.fileobj.read(1)
+        self.netChange -= 1
 
     def trigger(self):
-        self.write_f.write("\n")
-        self.write_f.flush()
+        #it's OK that we don't check if the bytes are written because we're just
+        #trying to wake up the other side. If the operating system's buffer is full, 
+        #then that means the other side hasn't been clearing the bytes anyways,
+        #and that it will come back around and read our data.
+        if self.netChange > 2:
+            return
+
+        self.netChange += 1
+        os.write(self.write_fd, b"\n")
 
 class Cells:
     def __init__(self, db):
