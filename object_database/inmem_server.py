@@ -106,7 +106,7 @@ class InMemServer(Server):
     def __init__(self, kvstore=None):
         Server.__init__(self, kvstore or InMemoryPersistence())
         self.channels = []
-        self.stopped = False
+        self.stopped = threading.Event()
         self.checkForDeadConnectionsLoopThread = threading.Thread(target=self.checkForDeadConnectionsLoop)
         self.checkForDeadConnectionsLoopThread.daemon = True
         self.checkForDeadConnectionsLoopThread.start()
@@ -125,12 +125,12 @@ class InMemServer(Server):
 
     def checkForDeadConnectionsLoop(self):
         lastCheck = time.time()
-        while not self.stopped:
+        while not self.stopped.is_set():
             if time.time() - lastCheck > getHeartbeatInterval():
                 self.checkForDeadConnections()
                 lastCheck = time.time()
             else:
-                time.sleep(0.1)
+                self.stopped.wait(0.1)
 
     def start(self):
         Server.start(self)
@@ -138,7 +138,8 @@ class InMemServer(Server):
     def stop(self):
         Server.stop(self)
 
-        self.stopped = True
+        self.stopped.set()
+        
         for c in self.channels:
             c.stop()
         self.checkForDeadConnectionsLoopThread.join()
