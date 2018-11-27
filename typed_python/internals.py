@@ -22,6 +22,16 @@ from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
                                 Alternative, Value, serialize, deserialize, Int8, \
                                 Int16, Int32, UInt8, UInt32, UInt64, NoneType, Function
 
+def forwardToName(fwdLambda):
+    if hasattr(fwdLambda, "__code__"):
+        if fwdLambda.__code__.co_code == b't\x00S\x00':
+            return fwdLambda.__code__.co_names[0]
+        if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
+            return fwdLambda.__code__.co_freevars[0]
+            
+
+    return "UnknownForward"
+
 class Member:
     def __init__(self, t):
         self.t = t

@@ -12,10 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
+from typed_python.internals import forwardToName
 from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types
 
 class NativeForwardTypesTests(unittest.TestCase):
+    def test_forwardToName(self):
+        X = 10
+        self.assertEqual(forwardToName(lambda: X), "X")
+        self.assertEqual(forwardToName(lambda: X+X), "UnknownForward")
+        
     def test_recursive_alternative(self):
         List = Alternative("List",
                 Node={'head': int, 'tail': lambda: List },

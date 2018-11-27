@@ -2240,6 +2240,40 @@ struct native_instance_wrapper {
         return (PyTypeObject*)types[inType];
     }
 
+    static Type* pyFunctionToForward(PyObject* arg) {
+        static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+
+       if (!internalsModule) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.internals");
+        }
+
+        static PyObject* forwardToName = PyObject_GetAttrString(internalsModule, "forwardToName");
+
+        if (!forwardToName) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.internals.makeFunction");
+        }
+
+        PyObject* fRes = PyObject_CallFunctionObjArgs(forwardToName, arg, NULL);
+
+        std::string fwdName;
+
+        if (!fRes) {
+            fwdName = "<Internal Error>";
+            PyErr_Clear();
+        } else {
+            if (!PyUnicode_Check(fRes)) {
+                fwdName = "<Internal Error>";
+                Py_DECREF(fRes);
+            } else {
+                fwdName = PyUnicode_AsUTF8(fRes);
+                Py_DECREF(fRes);
+            }
+        }
+
+        Py_INCREF(arg);
+        return new Forward(arg, fwdName);
+    }
+
     static Type* tryUnwrapPyInstanceToType(PyObject* arg) {
         if (PyType_Check(arg)) {
             Type* possibleType = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
@@ -2254,8 +2288,7 @@ struct native_instance_wrapper {
         }
 
         if (PyFunction_Check(arg)) {
-            Py_INCREF(arg);
-            return new Forward(arg);
+            return pyFunctionToForward(arg);
         }
 
         return  native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
@@ -2399,8 +2432,7 @@ struct native_instance_wrapper {
         }
 
         if (PyFunction_Check(typearg)) {
-            Py_INCREF(typearg);
-            return new Forward(typearg);
+            return pyFunctionToForward(typearg);
         }
 
 
@@ -2857,7 +2889,6 @@ Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
     if (!fRes) {
         return nullptr;
     }
-
 
     if (!PyType_Check(fRes)) {
         PyErr_SetString(PyExc_TypeError, "Internal error: expected typed_python.internals.makeFunction to return a type");

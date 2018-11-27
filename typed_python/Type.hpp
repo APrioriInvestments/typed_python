@@ -254,11 +254,6 @@ public:
     }
 
     const std::string& name() const {
-        if (m_checking_for_references_unresolved_forwards) {
-            static std::string recursive = "RECURSIVE";
-            return recursive;
-        }
-
         return m_name;
     }
 
@@ -636,10 +631,10 @@ protected:
 //any types that contain them can be used.
 class Forward : public Type {
 public:
-    Forward(PyObject* deferredDefinition) : 
+    Forward(PyObject* deferredDefinition, std::string name) : 
         Type(TypeCategory::catForward)
     {
-        m_name = "UnresolvedForwardType";
+        m_name = name;
         mDefinition = deferredDefinition;
         m_references_unresolved_forwards = true;
     }
