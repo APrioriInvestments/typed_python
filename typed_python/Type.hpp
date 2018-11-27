@@ -592,6 +592,40 @@ public:
         return m_references_unresolved_forwards;
     }
 
+    bool isBinaryCompatibleWith(Type* other) {
+        if (other == this) {
+            return true;
+        }
+
+        while (other->getTypeCategory() == TypeCategory::catPythonSubclass) {
+            other = other->getBaseType();
+        }
+
+        auto it = mIsBinaryCompatible.find(other);
+        if (it != mIsBinaryCompatible.end()) {
+            return it->second != BinaryCompatibilityCategory::Incompatible;
+        }
+
+        //mark that we are recursing through this datastructure. we don't want to 
+        //loop indefinitely.
+        mIsBinaryCompatible[other] = BinaryCompatibilityCategory::Checking;
+
+        bool isCompatible = this->check([&](auto& subtype) {
+            return subtype.isBinaryCompatibleWithConcrete(other);
+        });
+
+        mIsBinaryCompatible[other] = isCompatible ? 
+            BinaryCompatibilityCategory::Compatible :
+            BinaryCompatibilityCategory::Incompatible
+            ;
+
+        return isCompatible;            
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        return false;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) : 
             m_typeCategory(in_typeCategory),
@@ -624,6 +658,10 @@ protected:
     bool m_failed_resolution;
 
     std::set<Type*> mUses;
+
+    enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
+
+    std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
 
 };
 
@@ -689,6 +727,26 @@ public:
         }
 
         forwardTypesMayHaveChanged();
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != TypeCategory::catOneOf) {
+            return false;
+        }
+
+        OneOf* otherO = (OneOf*)other;
+
+        if (m_types.size() != otherO->m_types.size()) {
+            return false;
+        }
+
+        for (long k = 0; k < m_types.size(); k++) {
+            if (!m_types[k]->isBinaryCompatibleWith(otherO->m_types[k])) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     template<class visitor_type>
@@ -878,6 +936,26 @@ public:
             m_types(types),
             m_names(names)
     {
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        CompositeType* otherO = (CompositeType*)other;
+
+        if (m_types.size() != otherO->m_types.size()) {
+            return false;
+        }
+
+        for (long k = 0; k < m_types.size(); k++) {
+            if (!m_types[k]->isBinaryCompatibleWith(otherO->m_types[k])) {
+                return false;
+            }
+        }
+        
+        return true;
     }
 
     template<class visitor_type>
@@ -1119,6 +1197,16 @@ public:
         m_is_default_constructible = true;
 
         forwardTypesMayHaveChanged();
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        TupleOf* otherO = (TupleOf*)other;
+
+        return m_element_type->isBinaryCompatibleWith(otherO->m_element_type);
     }
 
     template<class visitor_type>
@@ -1378,6 +1466,16 @@ public:
         m_key_value_pair_type = Tuple::Make({m_key, m_value});
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        ConstDict* otherO = (ConstDict*)other;
+
+        return m_key->isBinaryCompatibleWith(otherO->m_key) && 
+            m_value->isBinaryCompatibleWith(otherO->m_value);
+    }
 
     static ConstDict* Make(Type* key, Type* value) {
         static std::mutex guard;
@@ -1811,6 +1909,14 @@ public:
         m_is_default_constructible = true;
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        return true;
+    }
+
     void _forwardTypesMayHaveChanged() {}
 
     template<class visitor_type>
@@ -1858,6 +1964,14 @@ public:
     {
         m_size = sizeof(T);
         m_is_default_constructible = true;
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        return true;
     }
 
     void _forwardTypesMayHaveChanged() {}
@@ -2089,6 +2203,14 @@ public:
         m_size = sizeof(void*);
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        return true;
+    }
+
     void _forwardTypesMayHaveChanged() {}
 
     template<class visitor_type>
@@ -2299,6 +2421,14 @@ public:
         int32_t bytecount;
         uint8_t data[];
     };
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        return true;
+    }
 
     void repr(instance_ptr self, std::ostringstream& stream) {
         stream << "b" << "'";
@@ -2663,6 +2793,10 @@ public:
         m_name = mInstance.repr();
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        return this == other;
+    }
+
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
     }
@@ -2774,6 +2908,33 @@ public:
         }
 
         forwardTypesMayHaveChanged();
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() == TypeCategory::catConcreteAlternative) {
+            other = other->getBaseType();
+        }
+
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        Alternative* otherO = (Alternative*)other;
+
+        if (m_subtypes.size() != otherO->m_subtypes.size()) {
+            return false;
+        }
+
+        for (long k = 0; k < m_subtypes.size(); k++) {
+            if (m_subtypes[k].first != otherO->m_subtypes[k].first) {
+                return false;
+            }
+            if (!m_subtypes[k].second->isBinaryCompatibleWith(otherO->m_subtypes[k].second)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     template<class visitor_type>
@@ -3022,6 +3183,21 @@ public:
         forwardTypesMayHaveChanged();
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() == TypeCategory::catConcreteAlternative) {
+            ConcreteAlternative* otherO = (ConcreteAlternative*)other;
+
+            return otherO->m_alternative->isBinaryCompatibleWith(m_alternative) && 
+                m_which == otherO->m_which;
+        }
+
+        if (other->getTypeCategory() == TypeCategory::catAlternative) {
+            return m_alternative->isBinaryCompatibleWith(other);
+        }
+
+        return false;
+    }
+
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         Type* t = m_alternative;
@@ -3173,6 +3349,20 @@ public:
         m_name = typePtr->tp_name;
 
         forwardTypesMayHaveChanged();
+    }
+
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        Type* nonPyBase = m_base;
+        while (nonPyBase->getTypeCategory() == TypeCategory::catPythonSubclass) {
+            nonPyBase = nonPyBase->getBaseType();
+        }
+
+        Type* otherNonPyBase = other;
+        while (otherNonPyBase->getTypeCategory() == TypeCategory::catPythonSubclass) {
+            otherNonPyBase = otherNonPyBase->getBaseType();
+        }
+
+        return nonPyBase->isBinaryCompatibleWith(otherNonPyBase);
     }
 
     template<class visitor_type>
@@ -3535,6 +3725,27 @@ public:
         forwardTypesMayHaveChanged();
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        HeldClass* otherO = (HeldClass*)other;
+
+        if (m_members.size() != otherO->m_members.size()) {
+            return false;
+        }
+
+        for (long k = 0; k < m_members.size(); k++) {
+            if (m_members[k].first != otherO->m_members[k].first ||
+                    !m_members[k].second->isBinaryCompatibleWith(otherO->m_members[k].second)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+    
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         for (auto& o: m_members) {
@@ -3745,6 +3956,15 @@ public:
         forwardTypesMayHaveChanged();
     }
 
+    bool isBinaryCompatibleWithConcrete(Type* other) {
+        if (other->getTypeCategory() != m_typeCategory) {
+            return false;
+        }
+
+        Class* otherO = (Class*)other;
+
+        return m_heldClass->isBinaryCompatibleWith(otherO->m_heldClass);
+    }
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {

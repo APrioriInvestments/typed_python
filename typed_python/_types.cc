@@ -105,14 +105,6 @@ struct native_instance_wrapper {
         return mContainingInstance.data() + mOffset;
     }
 
-    static PyObject* bytecount(PyObject* o) {
-        NativeTypeWrapper* w = (NativeTypeWrapper*)o;
-        
-        if (!guaranteeForwardsResolved(w->mType)) { return nullptr; }
-
-        return PyLong_FromLong(w->mType->bytecount());
-    }
-
     static PyObject* constDictItems(PyObject *o) {
         Type* self_type = extractTypeFrom(o->ob_type);
 
@@ -330,7 +322,7 @@ struct native_instance_wrapper {
         
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-        if (argType && (argType->getBaseType() == eltType || argType == eltType || argType == eltType->getBaseType())) {
+        if (argType && argType->isBinaryCompatibleWith(eltType)) {
             //it's already the right kind of instance
             eltType->copy_constructor(tgt, ((native_instance_wrapper*)pyRepresentation)->dataPtr());
             return;
@@ -3100,6 +3092,31 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(t->bytecount());
 }
 
+PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+    PyObject* a2 = PyTuple_GetItem(args, 1);
+
+    Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+    Type* t2 = native_instance_wrapper::unwrapTypeArgToTypePtr(a2);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'isBinaryCompatible' must be a native type object");
+        return NULL;
+    }
+    if (!t2) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'isBinaryCompatible' must be a native type object");
+        return NULL;
+    }
+
+    PyObject* res = t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False;
+    Py_INCREF(res);
+    return res;
+}
+
 PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
         PyErr_SetString(PyExc_TypeError, "Alternative takes a single string positional argument.");
@@ -3192,6 +3209,7 @@ static PyMethodDef module_methods[] = {
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
+    {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 

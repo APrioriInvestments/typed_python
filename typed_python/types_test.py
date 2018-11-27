@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
+from typed_python import Int8, Int64, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member
 
 import typed_python._types as _types
@@ -157,9 +157,62 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(Int8() is Int8())
         self.assertTrue(NoneType() is NoneType())
 
+    def test_object_binary_compatibility(self):
+        ibc = _types.isBinaryCompatible
+
+        self.assertTrue(ibc(NoneType(), NoneType()))
+        self.assertTrue(ibc(Int8(), Int8()))
+
+        NT = NamedTuple(a=int,b=int)
+
+        class X(NamedTuple(a=int,b=int)):
+            pass
+
+        class Y(NamedTuple(a=int,b=int)):
+            pass
+        
+        self.assertTrue(ibc(X, X))
+        self.assertTrue(ibc(X, Y))
+        self.assertTrue(ibc(X, NT))
+        self.assertTrue(ibc(Y, NT))
+        self.assertTrue(ibc(NT, Y))
+
+        self.assertFalse(ibc(OneOf(int, float), OneOf(float, int)))
+        self.assertTrue(ibc(OneOf(int, X), OneOf(int, Y)))
+
+    def test_binary_compatibility_incompatible_alternatives(self):
+        ibc = _types.isBinaryCompatible
+
+        A1 = Alternative("A1", X={'a': int}, Y={'b': float})
+        A2 = Alternative("A2", X={'a': int}, Y={'b': str})
+
+        self.assertTrue(ibc(A1, A1.X))
+        self.assertTrue(ibc(A1, A1.Y))
+        self.assertTrue(ibc(A1.Y, A1.Y))
+        self.assertTrue(ibc(A1.Y, A1))
+        self.assertTrue(ibc(A1.X, A1))
+        self.assertFalse(ibc(A1.X, A1.Y))
+
+        self.assertFalse(ibc(A1, A2))
+        self.assertFalse(ibc(A1.X, A2.X))
+        self.assertFalse(ibc(A1.Y, A2.Y))
+
+    def test_binary_compatibility_compatible_alternatives(self):
+        ibc = _types.isBinaryCompatible
+
+        A1 = Alternative("A1", X={'a': int}, Y={'b': float})
+        A2 = Alternative("A2", X={'a': int}, Y={'b': float})
+
+        self.assertTrue(ibc(A1.X, A2.X))
+        self.assertTrue(ibc(A1.Y, A2.Y))
+
+        self.assertFalse(ibc(A1.X, A2.Y))
+        self.assertFalse(ibc(A1.Y, A2.X))
+
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(NoneType()), 0)
         self.assertEqual(_types.bytecount(Int8()), 1)
+        self.assertEqual(_types.bytecount(Int64()), 8)
 
     def test_type_stringification(self):
         for t in ['Int8', 'NoneType']:
@@ -941,3 +994,15 @@ class NativeTypesTests(unittest.TestCase):
             for k in x:
                 self.assertTrue(k in x)
                 x[k]
+
+    def test_conversion_of_binary_compatible(self):
+        class T1(NamedTuple(a=int)):
+            pass
+
+        class T2(NamedTuple(a=int)):
+            pass
+
+        T1D = ConstDict(str, T1)
+        T2D = ConstDict(str, T2)
+
+        self.assertTrue(T2D(T1D({'a': T1(a=10)}))['a'].a, 10)
