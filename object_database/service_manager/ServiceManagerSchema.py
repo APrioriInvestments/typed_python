@@ -29,7 +29,8 @@ import threading
 service_schema = Schema("core.service")
 
 codebase_lock = threading.Lock()
-codebase_cache = {}
+codebase_module_cache = {}
+codebase_is_imported = set()
 
 MAX_BAD_BOOTS = 5
 
@@ -42,7 +43,7 @@ class Codebase:
     files = ConstDict(str, str) 
 
     @staticmethod
-    def create(root_paths, extensions=('.py',), maxTotalBytes = 1024 * 1024):
+    def create(root_paths, extensions=('.py',), maxTotalBytes = 100 * 1024 * 1024):
         files = {}
         total_bytes = [0]
 
@@ -114,46 +115,66 @@ class Codebase:
     def instantiate(self, root_path, service_module_name):
         """Instantiate a codebase on disk and load it."""
         with codebase_lock:
-            if (self.hash, service_module_name) in codebase_cache:
-                return codebase_cache[self.hash, service_module_name]
+            if (self.hash, service_module_name) in codebase_module_cache:
+                return codebase_module_cache[self.hash, service_module_name]
 
-            root_path = os.path.abspath(root_path)
+            if self.hash not in codebase_is_imported:
+                root_path = os.path.abspath(root_path)
 
-            importlib.invalidate_caches()
+                importlib.invalidate_caches()
 
-            try:
-                if not os.path.exists(root_path):
-                    os.makedirs(root_path)
-            except:
-                logging.warn("Exception trying to make directory %s", root_path)
+                try:
+                    if not os.path.exists(root_path):
+                        os.makedirs(root_path)
+                except:
+                    logging.warn("Exception trying to make directory %s", root_path)
 
-            disk_path = os.path.join(root_path, self.hash)
+                disk_path = os.path.join(root_path, self.hash)
 
-            for fpath, fcontents in self.files.items():
-                path, name = os.path.split(fpath)
+                for fpath, fcontents in self.files.items():
+                    path, name = os.path.split(fpath)
 
-                fullpath = os.path.join(disk_path, path)
+                    fullpath = os.path.join(disk_path, path)
 
-                if not os.path.exists(fullpath):
-                    try:
-                        os.makedirs(fullpath)
-                    except:
-                        logging.warn("Exception trying to make directory %s", root_path)
-                
-                with open(os.path.join(fullpath, name), "wb") as f:
-                    f.write(fcontents.encode("utf-8"))
+                    if not os.path.exists(fullpath):
+                        try:
+                            os.makedirs(fullpath)
+                        except:
+                            logging.warn("Exception trying to make directory %s", root_path)
+                    
+                    with open(os.path.join(fullpath, name), "wb") as f:
+                        f.write(fcontents.encode("utf-8"))
 
-            sys.path = [disk_path] + sys.path
+                sys.path = [disk_path] + sys.path
 
-            try:
-                module = importlib.import_module(service_module_name)
-            finally:
-                sys.path.pop(0)
-                self.removeUserModules([disk_path])
+                #get a list of all modules and import each one
+                modules_by_name = set()
+                for fpath in self.files:
+                    if fpath.endswith(".py"):
+                        module_parts = fpath.split("/")
+                        if module_parts[-1] == "__init__.py":
+                            module_parts = module_parts[:-1]
+                        else:
+                            module_parts[-1] = module_parts[-1][:-3]
 
-            codebase_cache[self.hash, service_module_name] = module
+                        modules_by_name.add(".".join(module_parts))
 
-            return codebase_cache[self.hash, service_module_name]
+                try:
+                    for mname in modules_by_name:
+                        try:
+                            codebase_module_cache[self.hash, mname] = importlib.import_module(mname)
+                        except Exception as e:
+                            logging.warn("Error importing module %s from codebase %s: %s", mname, self, e)
+                finally:
+                    sys.path.pop(0)
+                    self.removeUserModules([disk_path])
+
+                codebase_is_imported.add(self.hash)
+
+            if (self.hash, service_module_name) not in codebase_module_cache:
+                raise Exception("Imported codebase doesn't have module %s" % service_module_name)
+
+            return codebase_module_cache[self.hash, service_module_name]
 
 @service_schema.define
 @SubscribeLazilyByDefault

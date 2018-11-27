@@ -1002,7 +1002,14 @@ class NativeTypesTests(unittest.TestCase):
         class T2(NamedTuple(a=int)):
             pass
 
-        T1D = ConstDict(str, T1)
-        T2D = ConstDict(str, T2)
+        class T1Comp(NamedTuple(d=ConstDict(str, T1))):
+            pass
 
-        self.assertTrue(T2D(T1D({'a': T1(a=10)}))['a'].a, 10)
+        class T2Comp(NamedTuple(d=ConstDict(str, T1))):
+            pass
+        
+        aT1C = T1Comp(d={'a': T1(a=10)})
+        
+        self.assertEqual(T2Comp(aT1C).d['a'].a, 10)
+
+        self.assertEqual(aT1C, deserialize(T1Comp, serialize(T2Comp, aT1C)))

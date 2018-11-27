@@ -96,6 +96,7 @@ class SubprocessServiceManager(ServiceManager):
                     os.path.join(self.sourceDir, instanceIdentity), 
                     os.path.join(self.storageDir, instanceIdentity)
                     ] + (["--error_logs_only"] if self.errorLogsOnly else []),
+                cwd=self.storageDir,
                 stdin=subprocess.DEVNULL,
                 stdout=output_file,
                 stderr=subprocess.STDOUT

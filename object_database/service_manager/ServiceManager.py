@@ -17,11 +17,13 @@ from object_database.view import revisionConflictRetry
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceManagerSchema import service_schema
 
+import os.path
 import psutil
 import logging
 import traceback
 import threading
 import time
+import sys
 
 class ServiceManager(object):
     DEFAULT_SHUTDOWN_TIMEOUT = 10.0
@@ -60,6 +62,17 @@ class ServiceManager(object):
             service = service_schema.Service(name=serviceName, placement=placement or "Any")
             service.service_module_name = serviceClass.__module__
             service.service_class_name = serviceClass.__qualname__
+
+            if not service.service_module_name.startswith("object_database."):
+                #find the root of the codebase
+                module = sys.modules[serviceClass.__module__]
+
+                module_path = os.path.abspath(module.__file__)
+
+                for _ in module.__name__.split("."):
+                    module_path = os.path.dirname(module_path)
+
+                service.codebase = service_schema.Codebase.create([module_path])
 
         if target_count is not None:
             service.target_count = target_count
