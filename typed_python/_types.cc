@@ -7,6 +7,8 @@
 #include <iostream>
 
 static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
+static_assert(PY_MINOR_VERSION >= 6, "nativepython is a python3.6 project only");
+static_assert(PY_MICRO_VERSION >= 7, "nativepython is a python3.6.7 project only");
 
 
 //extension of PyTypeObject that stashes a Type* on the end.
