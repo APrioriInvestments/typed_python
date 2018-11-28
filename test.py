@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 
 #   Copyright 2017 Braxton Mckee
 #
@@ -38,6 +38,7 @@ import subprocess
 import pickle
 import hashlib
 
+
 class DirectoryScope(object):
     def __init__(self, directory):
         self.directory = directory
@@ -49,15 +50,17 @@ class DirectoryScope(object):
     def __exit__(self, exc_type, exc_value, traceback):
         os.chdir(self.originalWorkingDir)
 
+
 def sortedBy(elts, sortFun):
-    return [x[1] for x in sorted([(sortFun(y),y) for y in elts])]
+    return [x[1] for x in sorted([(sortFun(y), y) for y in elts])]
+
 
 def loadTestModules(testFiles, rootDir):
     modules = set()
     for f in testFiles:
         try:
             with DirectoryScope(rootDir):
-                moduleName  = fileNameToModuleName(f, rootDir)
+                moduleName = fileNameToModuleName(f, rootDir)
                 logging.info('importing module %s', moduleName)
                 __import__(moduleName)
                 modules.add(sys.modules[moduleName])
@@ -67,6 +70,7 @@ def loadTestModules(testFiles, rootDir):
             raise
 
     return modules
+
 
 def fileNameToModuleName(fileName, rootDir):
     tr = (
@@ -79,17 +83,19 @@ def fileNameToModuleName(fileName, rootDir):
         return tr[1:]
     return tr
 
+
 class OrderedFilterAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
-        if not 'ordered_actions' in namespace:
+        if 'ordered_actions' not in namespace:
             setattr(namespace, 'ordered_actions', [])
         previous = namespace.ordered_actions
         previous.append((self.dest, values))
         setattr(namespace, 'ordered_actions', previous)
 
+
 class PythonTestArgumentParser(argparse.ArgumentParser):
     def __init__(self):
-        super(PythonTestArgumentParser,self).__init__(add_help = False)
+        super(PythonTestArgumentParser, self).__init__(add_help=False)
         self.add_argument(
             '-v',
             dest='testHarnessVerbose',
@@ -116,25 +122,25 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             )
         self.add_argument(
             '--filter',
-            nargs = 1,
-            help = 'restrict tests to a subset matching FILTER',
-            action = OrderedFilterAction,
-            default = None
+            nargs=1,
+            help='restrict tests to a subset matching FILTER',
+            action=OrderedFilterAction,
+            default=None
             )
         self.add_argument(
             '--add',
-            nargs = 1,
-            help = 'add back tests matching ADD',
-            action = OrderedFilterAction,
-            default = None
+            nargs=1,
+            help='add back tests matching ADD',
+            action=OrderedFilterAction,
+            default=None
             )
         self.add_argument(
             '--exclude',
-            nargs = 1,
-            help = "exclude python unittests matching 'regex'. "
-                  +"These go in a second pass after -filter",
-            action = OrderedFilterAction,
-            default = None
+            nargs=1,
+            help="exclude python unittests matching 'regex'. "
+                 + "These go in a second pass after -filter",
+            action=OrderedFilterAction,
+            default=None
             )
 
     def parse_args(self,toParse):
@@ -148,10 +154,12 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
 
         return argholder, args
 
+
 def regexMatchesSubstring(pattern, toMatch):
     for _ in re.finditer(pattern, toMatch):
         return True
     return False
+
 
 def applyFilterActions(filterActions, tests):
     filtered = [] if filterActions[0][0] == 'add' else list(tests)
@@ -171,9 +179,11 @@ def applyFilterActions(filterActions, tests):
 
     return filtered
 
+
 def printTests(testCases):
     for test in testCases:
         print(test.id())
+
 
 def runPyTestSuite(config, testFiles, testCasesToRun, testArgs):
     testProgram = nose.core.TestProgram(
@@ -186,6 +196,7 @@ def runPyTestSuite(config, testFiles, testCasesToRun, testArgs):
 
     return not testProgram.success
 
+
 def loadTestsFromModules(config, modules):
     loader = nose.loader.TestLoader(config = config)
     allSuites = []
@@ -195,6 +206,7 @@ def loadTestsFromModules(config, modules):
 
     return allSuites
 
+
 def extractTestCases(suites):
     testCases = flattenToTestCases(suites)
     #make sure the tests are sorted in a sensible way.
@@ -202,10 +214,12 @@ def extractTestCases(suites):
 
     return [x for x in sortedTestCases if not testCaseHasAttribute(x, 'disabled')]
 
+
 def flattenToTestCases(suite):
     if isinstance(suite, list) or isinstance(suite, unittest.TestSuite):
         return sum([flattenToTestCases(x) for x in suite], [])
     return [suite]
+
 
 def testCaseHasAttribute(testCase, attributeName):
     """Determine whether a unittest.TestCase has a given attribute."""
@@ -215,10 +229,12 @@ def testCaseHasAttribute(testCase, attributeName):
         return True
     return False
 
+
 def loadTestCases(config, testFiles, rootDir):
     modules = sortedBy(loadTestModules(testFiles, rootDir), lambda module: module.__name__)
     allSuites = loadTestsFromModules(config, modules)
     return extractTestCases(allSuites)
+
 
 def findTestFiles(rootDir, testRegex):
     logging.info('finding files from root %s', rootDir)
@@ -229,16 +245,19 @@ def findTestFiles(rootDir, testRegex):
 
     return testFiles
 
+
 def logAsInfo(*args):
     if len(args) == 1:
         print(time.asctime(), " | ", args)
     else:
         print(time.asctime(), " | ", args[0] % args[1:])
 
+
 def setLoggingLevel(level):
     logging.getLogger().setLevel(level)
     for handler in logging.getLogger().handlers:
         handler.setLevel(level)
+
 
 class OutputCapturePlugin(nose.plugins.base.Plugin):
     """
@@ -256,7 +275,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         self.stdoutFD = None
         self.stderrFD = None
         self.fname = None
-        self.hadError=False
+        self.hadError = False
         self.outfile = None
         self.testStartTime = None
         self.nocaptureall = False
@@ -388,6 +407,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         """Restore stdout.
         """
 
+
 def runPythonUnitTests(args, filterActions, modules):
     testArgs = ["dummy"]
 
@@ -406,10 +426,11 @@ def runPythonUnitTests(args, filterActions, modules):
     testCases = []
     for module in modules:
         dir = os.path.dirname(module.__file__)
-        testCases += loadTestCases(config,
+        testCases += loadTestCases(
+            config,
             findTestFiles(dir, '.*_test.py$'),
             os.path.dirname(dir)
-            )
+        )
 
     if filterActions:
         testCases = applyFilterActions(filterActions, testCases)
@@ -423,6 +444,7 @@ def runPythonUnitTests(args, filterActions, modules):
         os._exit(0)
 
     return runPyTestSuite(config, None, testCasesToRun, testArgs)
+
 
 def executeTests(args, filter_actions):
     if not args.list:
@@ -444,6 +466,7 @@ def executeTests(args, filter_actions):
     if anyFailed:
         return 1
     return 0
+
 
 def hashSource(rootPath):
     contents = []
@@ -471,7 +494,7 @@ def buildModule(args):
     contentHash = hashSource(".")
 
     if os.path.exists("./build/hash.txt"):
-        existing_hash = open("./build/hash.txt","r").read().strip()
+        existing_hash = open("./build/hash.txt", "r").read().strip()
 
         if contentHash == existing_hash:
             print("Build and hash contents are the same. Skipping build.")
@@ -486,10 +509,10 @@ def buildModule(args):
     sys.path.append(install_dir)
 
     t0 = time.time()
-    print("Building nativepython...",end='')
+    print("Building nativepython...", end='')
 
     result = subprocess.run(
-        ['python3', 'setup.py', 'clean', 'build'],
+        [sys.executable, 'setup.py', 'clean', 'build'],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
         )
@@ -500,10 +523,10 @@ def buildModule(args):
         return 1
 
     result = subprocess.run(
-        ['python3', 'setup.py', 'develop', '--install-dir', './build/install'],
+        [sys.executable, 'setup.py', 'develop', '--install-dir', './build/install'],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        env={'PYTHONPATH': (os.environ.get('PYTHONPATH','') + ":") + os.path.abspath("./build/install")}
+        env={'PYTHONPATH': (os.environ.get('PYTHONPATH', '') + ":") + os.path.abspath("./build/install")}
         )
 
     if result.returncode != 0:
@@ -514,12 +537,12 @@ def buildModule(args):
     print(". Finished in %.2f seconds" % (time.time() - t0))
     print()
 
-    with open("./build/hash.txt","w") as f:
+    with open("./build/hash.txt", "w") as f:
         f.write(contentHash)
 
 
 def main(args):
-    #parse args, return zero and exit if help string was printed
+    # parse args, return zero and exit if help string was printed
     parser = PythonTestArgumentParser()
     args, filter_actions = parser.parse_args(args[1:])
 
@@ -529,14 +552,15 @@ def main(args):
             if result:
                 return result
 
-        #set the python path so that we load the right version of the library.
-        os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH','') + ":" + os.path.abspath("./build/install")
+        # set the python path so that we load the right version of the library.
+        os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH', '') + ":" + os.path.abspath("./build/install")
 
         return executeTests(args, filter_actions)
     except:
         import traceback
         logging.error("executeTests() threw an exception: \n%s", traceback.format_exc())
         return 1
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv))
