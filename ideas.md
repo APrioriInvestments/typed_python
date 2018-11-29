@@ -5,7 +5,7 @@ and therefore native compilation, but that's executable using the normal
 python interpreter, and looks 'normal', so that we can incrementally compile
 portions of the code using an alternative runtime, but still
 think of it as a python program that executes under the normal python
-interpreter as well. We'll call this subset 'NativePython'. 
+interpreter as well. We'll call this subset 'NativePython'.
 
 NativePython code can seamlessly interoperate with normal python code,
 and because it has some typing, admits various optimizations. This means
@@ -34,7 +34,7 @@ because that hash table has a limited size.
 # Types
 
 Basic types from builtin python:
-    
+
 * str, int, bool, float, long, type(None), bytes
 * numpy.float64 etc.
 
@@ -52,15 +52,15 @@ We can introduce an algebraic type as
     T = Union("T")
 
 and define its subtypes either using this syntax
-    
+
     T.A = Alternative(x=int, y=T)
     T.B = Alternative(z=float)
 
-or 
+or
 
     T.A = {'x': int, 'y': T}
 
-for some subset of values. Once we 'use' a type (do anything with it 
+for some subset of values. Once we 'use' a type (do anything with it
 other than define something) that type gets 'frozen' and becomes value-like.
 
 We can then construct instances of 'T' as T.A(x=0, y=...) or T.B(z=1.0) etc.
@@ -71,7 +71,7 @@ We may optionally support a syntax like
 
 We support 'isinstance' on both T and T.A (T.A is a subclass of T) and issubtype.
 
-We allow the creation of 'multiple' types for field types by writing 
+We allow the creation of 'multiple' types for field types by writing
 
     OneOf(int, float)
 
@@ -112,7 +112,7 @@ We may construct 'classes' (code plus a specific set of named fields) by explici
 adding code and data to them:
 
     T = TypedClass("T")
-    
+
     #add some members
     T.x = int #by default, this is 'uninitialized' and will throw an attribute error
               #until it gets set.
@@ -143,7 +143,7 @@ We can create a template-factory using
 which memoizes based on the input types.
 
 We may define the same member function more than once:
-    
+
     @TypedClass.Method(T)
     def f(self, z):
         ...
@@ -160,7 +160,7 @@ We may also add type-checking:
     def f(self, x: int, y: OneOf(str, None)):
         ...
 
-in which case we'll get dispatch based on types as well. 
+in which case we'll get dispatch based on types as well.
 
 Type dispatch is linear: we check each overload in sequence to see if it
 matches, and we then check each argument sequentially to see if it matches.
@@ -171,7 +171,7 @@ If no function matches at call time, you get a TypeError. If you attempt to retu
 of the incorrect type, at return time you'll also get a TypeError.
 
 At runtime you may check that a value has a particular type:
-    
+
     assert isinstance(x, T)
 
     if not isinstance(x, T):
@@ -252,26 +252,26 @@ We may define an Interface as follows:
             return self.f(0.0)
 
 A TypedClass may implement a TypedInterface, by specifying it as a base class,
-in which case it will always match the typed interface in any type expression, 
-and we may consider the class to be a subclass of the TypedInterface. 
-At type-creation time we'll check that the definition is precise by looking 
+in which case it will always match the typed interface in any type expression,
+and we may consider the class to be a subclass of the TypedInterface.
+At type-creation time we'll check that the definition is precise by looking
 for a function in the implementation that covers the definition.
 
-The only constructor for an object of type TypedInterface is an instance of a 
+The only constructor for an object of type TypedInterface is an instance of a
 concrete type that implements that interface. E.g. if T implements I, and `t` is
-an instance of `T`, then `I(t)` is an instance of 'I'. We may attempt to go 
+an instance of `T`, then `I(t)` is an instance of 'I'. We may attempt to go
 the other direction by calling `Cast(i,T)`. `Cast(I(t), T)` is a no-op.
 
-# static methods 
+# static methods
 
-Both classes and interfaces may define @staticmethod methods, which has the 
+Both classes and interfaces may define @staticmethod methods, which has the
 obvious intended effect. These methods may not overload with normal methods or
 member names.
 
 # compile-time methods
 
 Some methods may be marked @TypeFunction which means that they are functions
-that accept and return Type objects. Calling them with anything else is a 
+that accept and return Type objects. Calling them with anything else is a
 type error. They are assumed to be deterministic and may be cached across
 program invocations.
 
@@ -307,19 +307,19 @@ start executing code.
 
 # Interfacing with normal python code
 
-You may specify that the compiler shouldn't try to look into code it can't understand using the 
+You may specify that the compiler shouldn't try to look into code it can't understand using the
 `Python` decorator
 
     @Python
     def f(x: int) -> int:
         #something that takes an int and produces an int but that's not convertible
 
-This will prevent the type-checker from looking inside (this implies it's a TypedFunction, 
-but will also prevent the compiler from looking inside. 
+This will prevent the type-checker from looking inside (this implies it's a TypedFunction,
+but will also prevent the compiler from looking inside.
 
 # Decoration and hints
 
-If the function is pure (and can therefore be optimized away if not used, or will allow 
+If the function is pure (and can therefore be optimized away if not used, or will allow
 true multithreading), you may decorate it with @Const.
 
 This can be a hint to the compiler to parallelize etc.
@@ -328,9 +328,9 @@ This can be a hint to the compiler to parallelize etc.
 
 The standard types we're creating so far (TypedClass, Union, etc) are all held as smart-pointers
 to objects that are allocated on the heap when we compile them, (except for things like integers
-which can be allocated to registers). 
+which can be allocated to registers).
 
-Implicitly, we actually have two types: the "held type" and the "reference type". By default, the 
+Implicitly, we actually have two types: the "held type" and the "reference type". By default, the
 held type and the reference type for primitive types are the same. However, for user-defined class types,
 we have some additional constructs that allow us to control how the objects are laid out in memory:
 
@@ -339,17 +339,17 @@ we have some additional constructs that allow us to control how the objects are 
     PackedStruct(...) - a Type that holds its internal types directly and which packs them
         in unaligned fashion in the order given.
     Owned(T) - a Type that holds its single internal type directly
-    InlinePackedArray(T, N) - a fixed number of packed objects 
+    InlinePackedArray(T, N) - a fixed number of packed objects
 
 We also provide the following high-level type
 
-    PackedArray(T) - indicates that we hold an array of objects packed in memory - knows the type 
+    PackedArray(T) - indicates that we hold an array of objects packed in memory - knows the type
         but the count is held in the object itself, and provides safe indexing.
-    
+
 By default, when we hold a 'T' for some user class, it's implemented as a smart-reference.
 But we also support the following reference types:
 
-    GuardedReference(T, G) - a reference to a T held within a 'G'. The reference to the 'G' 
+    GuardedReference(T, G) - a reference to a T held within a 'G'. The reference to the 'G'
         is a smart-reference. This is the 'safe' pathway to accessing object internals.
     GuardedArrayReference(T, G) - a reference to a slice of a sized array of type T held inside of a G.
     Pointer(T) - a naked pointer to a 'T'. Member accesses result in StridedPointer objects
@@ -394,9 +394,9 @@ We also provide low-level types Int8, Int16, Int32, Int64, Int128 (and UInt vari
 which allow us to explicitly model memory and pointers. Pointer objects support casts, offsets, etc.
 
 Our python implementation supports explicit checking of memory validity since everything is modeled as
-numpy arrays, and eventually the compiler will support a model for leaving runtime checks 
+numpy arrays, and eventually the compiler will support a model for leaving runtime checks
 in place on all pointer accesses, or on specific types to try to diagnose failures. The goal here
-is to insist on folks using PackedArray[UInt8] and then typecasting with pointer arithmetic so we 
+is to insist on folks using PackedArray[UInt8] and then typecasting with pointer arithmetic so we
 can ensure that behavior is correct.
 
 # Native functions
@@ -411,7 +411,7 @@ or typecheck code that uses 'xrange', we need a model for xrange. So we provide 
 implementation of xrange.
 
 Todo:
-    * how does this play with the distributed-transactional model? 
+    * how does this play with the distributed-transactional model?
     * do we have a story around getting the type-object of something at runtime?
     * Threads?
     * What would an auto-parallel framework look like?
@@ -422,7 +422,7 @@ Todo:
 
 
 
-    
+
 
 
 

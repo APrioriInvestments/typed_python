@@ -16,10 +16,10 @@ ENV LD_PRELOAD=libtcmalloc_minimal.so.4
 #gdb blows up whenever we do anything after loading typed_python, even if we
 #remove all of the content from it. So probably a compiler problem. This
 #hack ensures that it will work, instead of giving us
-# 
+#
 # <class 'RuntimeError'> Type does not have a target.:
 #
-#everywhere in the gdb stacktraces, which is what happens when you try to 
+#everywhere in the gdb stacktraces, which is what happens when you try to
 #ask for .target() on the PyUnicodeObject 'struct' (without importing the module
 #it's a typedef)
 RUN sed -i 's/global _is_pep393/_is_pep393=True/' /usr/share/gdb/auto-load/usr/bin/python3.6m-gdb.py

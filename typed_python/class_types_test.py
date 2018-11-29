@@ -116,7 +116,7 @@ class NativeClassTypesTests(unittest.TestCase):
                 return 2 + len(args)
             def f(self, i, i2, *args):
                 return 2 + len(args)
-        
+
         c = C()
 
         self.assertEqual(c.f(), 0)
@@ -139,7 +139,7 @@ class NativeClassTypesTests(unittest.TestCase):
     def test_class_function_sends_args_to_right_place(self):
         def g(a,b,c=10, *args, d=20, **kwargs):
             return (a,b,args,kwargs)
-        
+
         class C(Class):
             def g(self, a,b, c=10, *args, d=20, **kwargs):
                 return (a,b,args,kwargs)
@@ -161,7 +161,7 @@ class NativeClassTypesTests(unittest.TestCase):
         assertSame(lambda formOfG: formOfG(1,2,3,4))
         assertSame(lambda formOfG: formOfG(1,2,3,4,5,6))
         assertSame(lambda formOfG: formOfG(1,2,3,4,5,6,d=10,q=20))
-        
+
 
     def test_class_function_type_dispatch(self):
         class C(Class):
@@ -191,7 +191,7 @@ class NativeClassTypesTests(unittest.TestCase):
             y = Member(int)
 
         c = C()
-        
+
         self.assertEqual(c.x, 10)
         self.assertEqual(c.y, 0)
 
@@ -263,14 +263,14 @@ class NativeClassTypesTests(unittest.TestCase):
 
             def f(self, x):
                 return "object"
-        
+
         x = X()
         x.anything = 10
         self.assertEqual(x.anything, 10)
 
         x.anything = NormalPyClass()
         self.assertIsInstance(x.anything, NormalPyClass)
-        
+
         x.pyclass = NormalPyClass()
         self.assertIsInstance(x.pyclass, NormalPyClass)
 
@@ -293,5 +293,5 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(x.f(NormalPySubclass()), "NormalPySubclass")
         self.assertEqual(x.f(NormalPyClass()), "NormalPyClass")
         self.assertEqual(x.f(10), "object")
-        
+
 
