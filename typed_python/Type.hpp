@@ -39,8 +39,6 @@ class Class;
 class HeldClass;
 class Function;
 class BoundMethod;
-class PackedArray;
-class Pointer;
 class Forward;
 
 typedef uint8_t* instance_ptr;
@@ -237,8 +235,6 @@ public:
         catClass,
         catHeldClass,
         catFunction,
-        catPackedArray,
-        catPointer,
         catForward
     };
 
@@ -419,10 +415,6 @@ public:
                 return f(*(Function*)this);
             case catBoundMethod:
                 return f(*(BoundMethod*)this);
-            case catPackedArray:
-                return f(*(PackedArray*)this);
-            case catPointer:
-                return f(*(Pointer*)this);
             case catForward:
                 return f(*(Forward*)this);
             default:
@@ -4186,73 +4178,5 @@ private:
     Class* m_class;
 };
 
-class PackedArray : public Type {
-public:
-    void constructor(instance_ptr self) { 
-    }
-    
-    void _forwardTypesMayHaveChanged() {}
-
-    template<class visitor_type>
-    void _visitReferencedTypes(const visitor_type& v) {}
-
-    template<class visitor_type>
-    void _visitContainedTypes(const visitor_type& v) {}
-
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-    }
-
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-    }
-
-    void destroy(instance_ptr self) {
-
-    }
-
-    void copy_constructor(instance_ptr self, instance_ptr other) {
-
-    }
-
-    void assign(instance_ptr self, instance_ptr other) {
-
-    }
-};
-
-class Pointer : public Type {
-public:
-    void constructor(instance_ptr self) {
-    
-    }
-    
-    void _forwardTypesMayHaveChanged() {}
-
-    template<class visitor_type>
-    void _visitReferencedTypes(const visitor_type& v) {}
-
-    template<class visitor_type>
-    void _visitContainedTypes(const visitor_type& v) {}
-
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-    }
-    
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-    }
-
-    void destroy(instance_ptr self) {
-
-    }
-
-    void copy_constructor(instance_ptr self, instance_ptr other) {
-
-    }
-
-    void assign(instance_ptr self, instance_ptr other) {
-
-    }
-};
 
 

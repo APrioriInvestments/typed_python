@@ -2314,8 +2314,6 @@ struct native_instance_wrapper {
         if (cat == Type::TypeCategory::catClass) { static PyObject* res = PyUnicode_FromString("Class"); return res; }
         if (cat == Type::TypeCategory::catHeldClass) { static PyObject* res = PyUnicode_FromString("HeldClass"); return res; }
         if (cat == Type::TypeCategory::catFunction) { static PyObject* res = PyUnicode_FromString("Function"); return res; }
-        if (cat == Type::TypeCategory::catPackedArray) { static PyObject* res = PyUnicode_FromString("PackedArray"); return res; }
-        if (cat == Type::TypeCategory::catPointer) { static PyObject* res = PyUnicode_FromString("Pointer"); return res; }
         if (cat == Type::TypeCategory::catForward) { static PyObject* res = PyUnicode_FromString("Forward"); return res; }
 
         static PyObject* res = PyUnicode_FromString("Unknown"); 
