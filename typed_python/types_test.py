@@ -17,6 +17,7 @@ from typed_python import Int8, Int64, NoneType, TupleOf, OneOf, Tuple, NamedTupl
 
 import typed_python._types as _types
 import psutil
+import numpy
 import unittest
 import traceback
 import time
@@ -1013,3 +1014,17 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(T2Comp(aT1C).d['a'].a, 10)
 
         self.assertEqual(aT1C, deserialize(T1Comp, serialize(T2Comp, aT1C)))
+
+    def test_python_objects_in_tuples(self):
+        class NormalPyClass(object):
+            pass
+
+        class NormalPySubclass(NormalPyClass):
+            pass
+
+        NT = NamedTuple(x=NormalPyClass, y=NormalPySubclass)
+
+        nt = NT(x=NormalPyClass(),y=NormalPySubclass())
+        self.assertIsInstance(nt.x, NormalPyClass)
+        self.assertIsInstance(nt.y, NormalPySubclass)
+

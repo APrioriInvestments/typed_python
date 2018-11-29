@@ -232,3 +232,66 @@ class NativeClassTypesTests(unittest.TestCase):
                 thing.f(1,"hi")
             self.assertEqual(thing.f(x=(1,2)), "named tuple of ints")
 
+    def test_python_objects_in_classes(self):
+        class NormalPyClass(object):
+            pass
+
+        class NormalPySubclass(NormalPyClass):
+            pass
+
+        NT = NamedTuple(x=int, y=int)
+
+        class NTSubclass(NT):
+            def fun(self):
+                return self.x + self.y
+
+        class X(Class):
+            anything = Member(object)
+            pyclass = Member(OneOf(None, NormalPyClass))
+            pysubclass = Member(OneOf(None, NormalPySubclass))
+            holdsNT = Member(NT)
+            holdsNTSubclass = Member(NTSubclass)
+
+            def f(self, x: NTSubclass):
+                return "NTSubclass"
+
+            def f(self, x: NormalPySubclass):
+                return "NormalPySubclass"
+
+            def f(self, x: NormalPyClass):
+                return "NormalPyClass"
+
+            def f(self, x):
+                return "object"
+        
+        x = X()
+        x.anything = 10
+        self.assertEqual(x.anything, 10)
+
+        x.anything = NormalPyClass()
+        self.assertIsInstance(x.anything, NormalPyClass)
+        
+        x.pyclass = NormalPyClass()
+        self.assertIsInstance(x.pyclass, NormalPyClass)
+
+        x.pyclass = NormalPySubclass()
+        self.assertIsInstance(x.pyclass, NormalPyClass)
+        self.assertIsInstance(x.pyclass, NormalPySubclass)
+
+        x.pysubclass = NormalPySubclass()
+        self.assertIsInstance(x.pyclass, NormalPySubclass)
+
+        with self.assertRaises(TypeError):
+            x.pyclass = 10
+
+        with self.assertRaises(TypeError):
+            x.pysubclass = NormalPyClass()
+
+
+        self.assertEqual(x.f(NT()), "NTSubclass")
+        self.assertEqual(x.f(NTSubclass()), "NTSubclass")
+        self.assertEqual(x.f(NormalPySubclass()), "NormalPySubclass")
+        self.assertEqual(x.f(NormalPyClass()), "NormalPyClass")
+        self.assertEqual(x.f(10), "object")
+        
+

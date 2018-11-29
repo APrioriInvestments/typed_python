@@ -64,6 +64,21 @@ struct native_instance_wrapper {
         });
     }
 
+    //return the standard python representation of an object of type 'eltType'
+    template<class init_func>
+    static PyObject* initializePythonRepresentation(Type* eltType, const init_func& f) {
+        if (!guaranteeForwardsResolved(eltType)) {
+            return nullptr;
+        }
+
+        Instance instance(eltType, f);
+
+        return extractPythonObject(instance.data(), instance.type());
+    }
+
+    //initialize a native_instance_wrapper for 'eltType'. For ints, floats, etc, with
+    //actual native representations, this will produce a wrapper object (maybe not what you want)
+    //rather than the standard python representation.
     template<class init_func>
     static PyObject* initialize(Type* eltType, const init_func& f) {
         if (!guaranteeForwardsResolved(eltType)) {
@@ -263,6 +278,17 @@ struct native_instance_wrapper {
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
         guaranteeForwardsResolvedOrThrow(t);
         
+        if (t->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
+            int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)((PythonObjectOfType*)t)->pyType());
+
+            if (isinst == -1) {
+                isinst = 0;
+                PyErr_Clear();
+            }
+
+            return isinst > 0;
+        }
+
         if (t->getTypeCategory() == Type::TypeCategory::catValue) {
             Value* valType = (Value*)t;
             if (compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true) == 0) {
@@ -332,6 +358,23 @@ struct native_instance_wrapper {
 
         if (cat == Type::TypeCategory::catPythonSubclass) {
             copy_constructor((Type*)eltType->getBaseType(), tgt, pyRepresentation);
+            return;
+        }
+
+        if (cat == Type::TypeCategory::catPythonObjectOfType) {
+            int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)((PythonObjectOfType*)eltType)->pyType());
+            if (isinst == -1) {
+                isinst = 0;
+                PyErr_Clear();
+            }
+
+            if (!isinst) {
+                throw std::logic_error("Object of type " + std::string(pyRepresentation->ob_type->tp_name) + 
+                        " is not an instance of " + ((PythonObjectOfType*)eltType)->pyType()->tp_name);
+            }
+
+            Py_INCREF(pyRepresentation);
+            ((PyObject**)tgt)[0] = pyRepresentation;
             return;
         }
 
@@ -720,6 +763,11 @@ struct native_instance_wrapper {
     //convert them back to their python-native form. otherwise, a pointer back into a native python
     //structure
     static PyObject* extractPythonObject(instance_ptr data, Type* eltType) {
+        if (eltType->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
+            PyObject* res = *(PyObject**)data;
+            Py_INCREF(res);
+            return res;
+        }
         if (eltType->getTypeCategory() == Type::TypeCategory::catValue) {
             Value* valueType = (Value*)eltType;
             return extractPythonObject(valueType->value().data(), valueType->value().type());
@@ -1458,11 +1506,12 @@ struct native_instance_wrapper {
             } 
             else {
                 try {
-                    PyTuple_SetItem(targetArgTuple, write_slot++, 
-                        native_instance_wrapper::initialize(targetType, [&](instance_ptr data) {
+                    PyObject* targetObj =
+                        native_instance_wrapper::initializePythonRepresentation(targetType, [&](instance_ptr data) {
                             copy_constructor(targetType, data, elt);
-                        })
-                    );
+                        });
+
+                    PyTuple_SetItem(targetArgTuple, write_slot++, targetObj);
                 } catch(...) {
                     //not a valid conversion, but keep going
                     Py_DECREF(targetArgTuple);
@@ -1501,7 +1550,7 @@ struct native_instance_wrapper {
                 } 
                 else {
                     try {
-                        PyObject* convertedValue = native_instance_wrapper::initialize(targetType, [&](instance_ptr data) {
+                        PyObject* convertedValue = native_instance_wrapper::initializePythonRepresentation(targetType, [&](instance_ptr data) {
                             copy_constructor(targetType, data, value);
                         });
 
@@ -1539,7 +1588,7 @@ struct native_instance_wrapper {
             try {
                 return std::make_pair(
                     true, 
-                    native_instance_wrapper::initialize(f.getReturnType(), [&](instance_ptr data) {
+                    native_instance_wrapper::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
                         copy_constructor(f.getReturnType(), data, result);
                     }));
 
@@ -1578,7 +1627,7 @@ struct native_instance_wrapper {
             Function* f = methodType->getFunction();
             Class* c = methodType->getClass();
 
-            PyObject* objectInstance = native_instance_wrapper::initialize(c, [&](instance_ptr d) {
+            PyObject* objectInstance = native_instance_wrapper::initializePythonRepresentation(c, [&](instance_ptr d) {
                 c->copy_constructor(d, w->dataPtr());
             });
 
@@ -1680,7 +1729,7 @@ struct native_instance_wrapper {
                 if (it != nt->getMemberFunctions().end()) {
                     BoundMethod* bm = BoundMethod::Make(nt, it->second);
 
-                    return native_instance_wrapper::initialize(bm, [&](instance_ptr data) {
+                    return native_instance_wrapper::initializePythonRepresentation(bm, [&](instance_ptr data) {
                         bm->copy_constructor(data, w->dataPtr());
                     });
                 }
@@ -2222,7 +2271,7 @@ struct native_instance_wrapper {
                 PyDict_SetItemString(
                     types[inType]->typeObj.tp_dict, 
                     nameAndObj.first.c_str(), 
-                    native_instance_wrapper::initialize(nameAndObj.second, [&](instance_ptr data){
+                    native_instance_wrapper::initializePythonRepresentation(nameAndObj.second, [&](instance_ptr data){
                         //nothing to do - functions like this are just types.
                     })
                     );
@@ -2409,10 +2458,7 @@ struct native_instance_wrapper {
                 return res;
             }
 
-            PyErr_SetString(PyExc_TypeError, 
-                ("Cannot convert " + std::string(pyType->tp_name) + " to a native type.").c_str()
-                );
-            return NULL;
+            return PythonObjectOfType::Make(pyType);
         }
 
         Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
