@@ -21,7 +21,7 @@ class NativeForwardTypesTests(unittest.TestCase):
         X = 10
         self.assertEqual(forwardToName(lambda: X), "X")
         self.assertEqual(forwardToName(lambda: X+X), "UnknownForward")
-        
+
     def test_recursive_alternative(self):
         List = Alternative("List",
                 Node={'head': int, 'tail': lambda: List },

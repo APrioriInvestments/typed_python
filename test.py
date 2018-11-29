@@ -37,7 +37,7 @@ import traceback
 import subprocess
 import pickle
 import hashlib
-    
+
 class DirectoryScope(object):
     def __init__(self, directory):
         self.directory = directory
@@ -402,11 +402,11 @@ def runPythonUnitTests(args, filterActions, modules):
 
     config = nose.config.Config(plugins=plugins)
     config.configure(testArgs)
-    
+
     testCases = []
     for module in modules:
         dir = os.path.dirname(module.__file__)
-        testCases += loadTestCases(config, 
+        testCases += loadTestCases(config,
             findTestFiles(dir, '.*_test.py$'),
             os.path.dirname(dir)
             )
@@ -452,10 +452,10 @@ def hashSource(rootPath):
             path = os.path.join(root, f)
 
             if "/.git/" not in path and "/build/" not in path and (
-                    path.endswith(".cc") or 
-                    path.endswith(".hpp") or 
-                    path.endswith(".cpp") or 
-                    path.endswith(".c") or 
+                    path.endswith(".cc") or
+                    path.endswith(".hpp") or
+                    path.endswith(".cpp") or
+                    path.endswith(".c") or
                     "setup.py" in path
                     ):
                 with open(path, "rb") as f:
@@ -472,7 +472,7 @@ def buildModule(args):
 
     if os.path.exists("./build/hash.txt"):
         existing_hash = open("./build/hash.txt","r").read().strip()
-        
+
         if contentHash == existing_hash:
             print("Build and hash contents are the same. Skipping build.")
             return
@@ -489,8 +489,8 @@ def buildModule(args):
     print("Building nativepython...",end='')
 
     result = subprocess.run(
-        ['python3', 'setup.py', 'clean', 'build'], 
-        stdout=subprocess.PIPE, 
+        ['python3', 'setup.py', 'clean', 'build'],
+        stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
         )
 
@@ -500,9 +500,9 @@ def buildModule(args):
         return 1
 
     result = subprocess.run(
-        ['python3', 'setup.py', 'develop', '--install-dir', './build/install'], 
-        stdout=subprocess.PIPE, 
-        stderr=subprocess.STDOUT, 
+        ['python3', 'setup.py', 'develop', '--install-dir', './build/install'],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         env={'PYTHONPATH': (os.environ.get('PYTHONPATH','') + ":") + os.path.abspath("./build/install")}
         )
 
@@ -531,7 +531,7 @@ def main(args):
 
         #set the python path so that we load the right version of the library.
         os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH','') + ":" + os.path.abspath("./build/install")
-        
+
         return executeTests(args, filter_actions)
     except:
         import traceback

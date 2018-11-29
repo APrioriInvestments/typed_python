@@ -28,7 +28,7 @@ def forwardToName(fwdLambda):
             return fwdLambda.__code__.co_names[0]
         if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
             return fwdLambda.__code__.co_freevars[0]
-            
+
 
     return "UnknownForward"
 
@@ -129,10 +129,10 @@ class ClassMetaclass(type):
                 classMembers.append((eltName, elt))
 
         return typed_python._types.Class(
-            name, 
-            tuple(members), 
-            tuple(memberFunctions.items()), 
-            tuple(staticFunctions.items()), 
+            name,
+            tuple(members),
+            tuple(memberFunctions.items()),
+            tuple(staticFunctions.items()),
             tuple(classMembers)
             )
 

@@ -104,7 +104,7 @@ class RandomValueProducer:
         res = []
         for valueList in self.levels.values():
             res.extend(valueList)
-        return res 
+        return res
 
     def addValues(self, level, count, sublevels = None):
         assert level > 0
@@ -126,7 +126,7 @@ class RandomValueProducer:
         for _ in range(count):
             val = self.randomValue(picker)
             if not isinstance(val,list):
-                val = [val]    
+                val = [val]
             self.levels.setdefault(level, []).extend(val)
 
     def randomValue(self, picker):
@@ -171,7 +171,7 @@ class NativeTypesTests(unittest.TestCase):
 
         class Y(NamedTuple(a=int,b=int)):
             pass
-        
+
         self.assertTrue(ibc(X, X))
         self.assertTrue(ibc(X, Y))
         self.assertTrue(ibc(X, NT))
@@ -274,7 +274,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(x() is None, repr(x()))
 
     def test_tuple_of_various_things(self):
-        for thing, typeOfThing in [("hi", str), (b"somebytes", bytes), 
+        for thing, typeOfThing in [("hi", str), (b"somebytes", bytes),
                                    (1.0, float), (2, int),
                                    (None, type(None))
                                    ]:
@@ -317,7 +317,7 @@ class NativeTypesTests(unittest.TestCase):
         t = TupleOf(OneOf(0,1,2,3,4))
 
         ints = tuple([x % 5 for x in range(1000000)])
-        
+
         typedInts = t(ints)
 
         self.assertEqual(len(serialize(t, typedInts)), len(ints) + 4)
@@ -327,11 +327,11 @@ class NativeTypesTests(unittest.TestCase):
         t = TupleOf(OneOf(int, bool))
 
         someThings = tuple([100 + x % 5 if x % 17 != 0 else bool(x%19) for x in range(1000000)])
-        
+
         typedThings = t(someThings)
 
         self.assertEqual(
-            len(serialize(t, typedThings)), 
+            len(serialize(t, typedThings)),
             sum(2 if isinstance(t,bool) else 9 for t in someThings) + 4
             )
 
@@ -361,7 +361,7 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaises(Exception):
             o(b"bytes")
-        
+
     def test_one_of_in_tuple(self):
         t = Tuple(OneOf(None, str), str)
 
@@ -373,7 +373,7 @@ class NativeTypesTests(unittest.TestCase):
             t((None,None))
         with self.assertRaises(IndexError):
             t((None,"hi2"))[2]
-        
+
     def test_one_of_composite(self):
         t = OneOf(TupleOf(str), TupleOf(float))
 
@@ -438,20 +438,20 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_comparisons_in_one_of(self):
         t = OneOf(None, float)
-        
+
         def map(x):
             if x is None:
                 return -1000000.0
             else:
                 return x
 
-        lt = lambda a,b: map(a) < map(b)    
-        le = lambda a,b: map(a) <= map(b)   
-        eq = lambda a,b: map(a) == map(b)   
+        lt = lambda a,b: map(a) < map(b)
+        le = lambda a,b: map(a) <= map(b)
+        eq = lambda a,b: map(a) == map(b)
         ne = lambda a,b: map(a) != map(b)
-        gt = lambda a,b: map(a) > map(b)    
+        gt = lambda a,b: map(a) > map(b)
         ge = lambda a,b: map(a) >= map(b)
-        
+
         funcs = [lt,le,eq,ne,gt,ge]
         ts = [None,1.0,2.0,3.0]
 
@@ -459,17 +459,17 @@ class NativeTypesTests(unittest.TestCase):
             for t1 in ts:
                 for t2 in ts:
                     self.assertTrue(f(t1,t2) is f(t(t1),t(t2)))
-        
+
     def test_comparisons_equivalence(self):
         t = TupleOf(OneOf(None, str, bytes, float, int, bool, TupleOf(int)),)
 
-        def lt(a,b): return a < b    
-        def le(a,b): return a <= b   
-        def eq(a,b): return a == b   
+        def lt(a,b): return a < b
+        def le(a,b): return a <= b
+        def eq(a,b): return a == b
         def ne(a,b): return a != b
-        def gt(a,b): return a > b    
+        def gt(a,b): return a > b
         def ge(a,b): return a >= b
-        
+
         funcs = [lt,le,eq,ne,gt,ge]
 
         tgroups = [
@@ -486,7 +486,7 @@ class NativeTypesTests(unittest.TestCase):
             for f in funcs:
                 for t1 in ts:
                     for t2 in ts:
-                        self.assertTrue(f(t1,t2) is f(t((t1,)),t((t2,))), 
+                        self.assertTrue(f(t1,t2) is f(t((t1,)),t((t2,))),
                             (f, t1,t2, f(t1,t2), f(t((t1,)),t((t2,))))
                             )
 
@@ -534,7 +534,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(a['b'], "ABCDEF")
 
         self.assertEqual(a, deserialize(t,serialize(t,a)))
-        
+
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
         self.assertTrue(isinstance(x,str))
@@ -588,7 +588,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_const_dict_lookup(self):
         for type_to_use, vals in [
-                    (int, list(range(20))), 
+                    (int, list(range(20))),
                     (bytes, [b'1', b'2', b'3', b'4', b'5'])
                     ]:
             t = ConstDict(type_to_use, type_to_use)
@@ -769,7 +769,7 @@ class NativeTypesTests(unittest.TestCase):
             )
 
         t0 = time.time()
-        
+
         for i in range(1000000):
             a = alt.child_ints(x=10,y=20)
             a.matches.child_ints
@@ -918,7 +918,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertTrue(OneOf(None, NTSubclass)(None) is None)
         self.assertTrue(OneOf(None, NTSubclass)(inst) == inst)
-        
+
 
     def test_serialization(self):
         ints = TupleOf(int)((1,2,3,4))
@@ -933,7 +933,7 @@ class NativeTypesTests(unittest.TestCase):
             t0 = time.time()
             self.assertEqual(len(serialize(TupleOf(int), ints)), len(ints) * 8 + 4)
             print(time.time() - t0, " for ", len(ints))
-        
+
     def test_serialization_roundtrip(self):
         badlen = None
 
@@ -950,7 +950,7 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertTrue(type(v2) is type(v))
                 self.assertEqual(ser,ser2)
                 self.assertEqual(v, v2)
-    
+
     def test_serialize_doesnt_leak(self):
         T = TupleOf(int)
 
@@ -969,10 +969,10 @@ class NativeTypesTests(unittest.TestCase):
     def test_const_dict_of_tuple(self):
         K = NamedTuple(a=OneOf(float, int), b=OneOf(float, int))
         someKs = [K(a=0,b=0), K(a=1), K(a=10), K(b=10), K()]
-    
+
         T = ConstDict(K, K)
 
-        
+
         indexDict = {}
         x = T()
 
@@ -1008,9 +1008,9 @@ class NativeTypesTests(unittest.TestCase):
 
         class T2Comp(NamedTuple(d=ConstDict(str, T1))):
             pass
-        
+
         aT1C = T1Comp(d={'a': T1(a=10)})
-        
+
         self.assertEqual(T2Comp(aT1C).d['a'].a, 10)
 
         self.assertEqual(aT1C, deserialize(T1Comp, serialize(T2Comp, aT1C)))

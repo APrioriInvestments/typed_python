@@ -46,8 +46,8 @@ typedef uint8_t* instance_ptr;
 
 class Hash32Accumulator {
 public:
-    Hash32Accumulator(int32_t init) : 
-        m_state(init) 
+    Hash32Accumulator(int32_t init) :
+        m_state(init)
     {
     }
 
@@ -166,7 +166,7 @@ public:
 
         m_size -= sizeof(uint8_t);
         m_buffer += sizeof(uint8_t);
-        
+
         return *ptr;
     }
 
@@ -178,7 +178,7 @@ public:
 
         m_size -= sizeof(uint32_t);
         m_buffer += sizeof(uint32_t);
-        
+
         return *ptr;
     }
 
@@ -240,13 +240,13 @@ public:
         catForward
     };
 
-    TypeCategory getTypeCategory() const { 
-        return m_typeCategory; 
+    TypeCategory getTypeCategory() const {
+        return m_typeCategory;
     }
 
     bool isComposite() const {
         return (
-            m_typeCategory == catTuple || 
+            m_typeCategory == catTuple ||
             m_typeCategory == catNamedTuple
             );
     }
@@ -458,8 +458,8 @@ public:
             Type* res;
 
             try {
-                res = this->check([&](auto& subtype) { 
-                    return subtype.guaranteeForwardsResolvedConcrete(resolver); 
+                res = this->check([&](auto& subtype) {
+                    return subtype.guaranteeForwardsResolvedConcrete(resolver);
                 });
             } catch(...) {
                 m_checking_for_references_unresolved_forwards = false;
@@ -507,23 +507,23 @@ public:
 
     void constructor(instance_ptr self) {
         assertForwardsResolved();
-        
+
         this->check([&](auto& subtype) { subtype.constructor(self); } );
     }
 
     void destroy(instance_ptr self) {
         assertForwardsResolved();
-        
+
         this->check([&](auto& subtype) { subtype.destroy(self); } );
     }
 
     template<class ptr_func>
     void destroy(int64_t count, const ptr_func& ptrToChild) {
         assertForwardsResolved();
-        
-        this->check([&](auto& subtype) { 
+
+        this->check([&](auto& subtype) {
             for (long k = 0; k < count; k++) {
-                subtype.destroy(ptrToChild(k)); 
+                subtype.destroy(ptrToChild(k));
             }
         });
     }
@@ -544,7 +544,7 @@ public:
 
     void forwardTypesMayHaveChanged() {
         m_references_unresolved_forwards = false;
-        
+
         visitReferencedTypes([&](Type* t) {
             if (t->references_unresolved_forwards()) {
                 m_references_unresolved_forwards = true;
@@ -562,13 +562,13 @@ public:
 
     void copy_constructor(instance_ptr self, instance_ptr other) {
         assertForwardsResolved();
-        
+
         this->check([&](auto& subtype) { subtype.copy_constructor(self, other); } );
     }
 
     void assign(instance_ptr self, instance_ptr other) {
         assertForwardsResolved();
-        
+
         this->check([&](auto& subtype) { subtype.assign(self, other); } );
     }
 
@@ -602,7 +602,7 @@ public:
             return it->second != BinaryCompatibilityCategory::Incompatible;
         }
 
-        //mark that we are recursing through this datastructure. we don't want to 
+        //mark that we are recursing through this datastructure. we don't want to
         //loop indefinitely.
         mIsBinaryCompatible[other] = BinaryCompatibilityCategory::Checking;
 
@@ -610,12 +610,12 @@ public:
             return subtype.isBinaryCompatibleWithConcrete(other);
         });
 
-        mIsBinaryCompatible[other] = isCompatible ? 
+        mIsBinaryCompatible[other] = isCompatible ?
             BinaryCompatibilityCategory::Compatible :
             BinaryCompatibilityCategory::Incompatible
             ;
 
-        return isCompatible;            
+        return isCompatible;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
@@ -623,7 +623,7 @@ public:
     }
 
 protected:
-    Type(TypeCategory in_typeCategory) : 
+    Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
             m_size(0),
             m_is_default_constructible(false),
@@ -636,7 +636,7 @@ protected:
         {}
 
     TypeCategory m_typeCategory;
-    
+
     size_t m_size;
 
     bool m_is_default_constructible;
@@ -665,7 +665,7 @@ protected:
 //any types that contain them can be used.
 class Forward : public Type {
 public:
-    Forward(PyObject* deferredDefinition, std::string name) : 
+    Forward(PyObject* deferredDefinition, std::string name) :
         Type(TypeCategory::catForward)
     {
         m_name = name;
@@ -714,10 +714,10 @@ private:
 
 class OneOf : public Type {
 public:
-    OneOf(const std::vector<Type*>& types) : 
+    OneOf(const std::vector<Type*>& types) :
                     Type(TypeCategory::catOneOf),
                     m_types(types)
-    {   
+    {
         if (m_types.size() > 255) {
             throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
         }
@@ -775,7 +775,7 @@ public:
         std::string res = "OneOf(";
         bool first = true;
         for (auto t: m_types) {
-            if (first) { 
+            if (first) {
                 first = false;
             } else {
                 res += ", ";
@@ -833,9 +833,9 @@ public:
         return std::make_pair(m_types[*(uint8_t*)self], self+1);
     }
 
-    size_t computeBytecount() const { 
+    size_t computeBytecount() const {
         size_t res = 0;
-        
+
         for (auto t: m_types)
             res = std::max(res, t->bytecount());
 
@@ -878,7 +878,7 @@ public:
             m_types[otherWhich]->copy_constructor(self+1,other+1);
         }
     }
-    
+
     const std::vector<Type*>& getTypes() const {
         return m_types;
     }
@@ -927,7 +927,7 @@ public:
                 TypeCategory in_typeCategory,
                 const std::vector<Type*>& types,
                 const std::vector<std::string>& names
-                ) : 
+                ) :
             Type(in_typeCategory),
             m_types(types),
             m_names(names)
@@ -950,7 +950,7 @@ public:
                 return false;
             }
         }
-        
+
         return true;
     }
 
@@ -1086,7 +1086,7 @@ public:
             m_types[k]->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
     }
-    
+
     const std::vector<Type*>& getTypes() const {
         return m_types;
     }
@@ -1122,7 +1122,7 @@ protected:
 
 class NamedTuple : public CompositeType {
 public:
-    NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
+    NamedTuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
@@ -1151,7 +1151,7 @@ public:
 
 class Tuple : public CompositeType {
 public:
-    Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) : 
+    Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
         forwardTypesMayHaveChanged();
@@ -1159,7 +1159,7 @@ public:
 
     void _forwardTypesMayHaveChanged() {
         ((CompositeType*)this)->_forwardTypesMayHaveChanged();
-        
+
         m_name = "Tuple(";
         for (long k = 0; k < m_types.size();k++) {
             if (k) {
@@ -1185,7 +1185,7 @@ class TupleOf : public Type {
     };
 
 public:
-    TupleOf(Type* type) : 
+    TupleOf(Type* type) :
             Type(TypeCategory::catTupleOf),
             m_element_type(type)
     {
@@ -1207,7 +1207,7 @@ public:
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
-        
+
     }
 
     template<class visitor_type>
@@ -1231,7 +1231,7 @@ public:
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
-        
+
         if (ct > buffer.remaining() && m_element_type->bytecount()) {
             throw std::runtime_error("Corrupt data (tuplecount)");
         }
@@ -1264,7 +1264,7 @@ public:
 
         if ((*(layout**)left)->hash_cache == -1) {
             Hash32Accumulator acc((int)getTypeCategory());
-            
+
             int32_t ct = count(left);
             acc.add(ct);
 
@@ -1301,7 +1301,7 @@ public:
         size_t bytesPer = m_element_type->bytecount();
 
         for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
-            char res = m_element_type->cmp(left_layout.data + bytesPer * k, 
+            char res = m_element_type->cmp(left_layout.data + bytesPer * k,
                                            right_layout.data + bytesPer * k);
 
             if (res != 0) {
@@ -1367,7 +1367,7 @@ public:
         (*(layout**)self)->count = count;
         (*(layout**)self)->refcount = 1;
         (*(layout**)self)->hash_cache = -1;
-        
+
         for (int64_t k = 0; k < count; k++) {
             try {
                 allocator(eltPtr(self, k), k);
@@ -1434,7 +1434,7 @@ class ConstDict : public Type {
     };
 
 public:
-    ConstDict(Type* key, Type* value) : 
+    ConstDict(Type* key, Type* value) :
             Type(TypeCategory::catConstDict),
             m_key(key),
             m_value(value)
@@ -1469,7 +1469,7 @@ public:
 
         ConstDict* otherO = (ConstDict*)other;
 
-        return m_key->isBinaryCompatibleWith(otherO->m_key) && 
+        return m_key->isBinaryCompatibleWith(otherO->m_key) &&
             m_value->isBinaryCompatibleWith(otherO->m_value);
     }
 
@@ -1560,7 +1560,7 @@ public:
         return (*(layout**)left)->hash_cache;
     }
 
-    //to make this fast(er), we do dict size comparison first, then keys, then values    
+    //to make this fast(er), we do dict size comparison first, then keys, then values
     char cmp(instance_ptr left, instance_ptr right) {
         if (size(left) < size(right)) {
             return -1;
@@ -1576,18 +1576,18 @@ public:
         int ct = count(left);
         for (long k = 0; k < ct; k++) {
             char res = m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k));
-            if (res) { 
+            if (res) {
                 return res;
             }
         }
 
         for (long k = 0; k < ct; k++) {
             char res = m_value->cmp(
-                kvPairPtrValue(left,k), 
+                kvPairPtrValue(left,k),
                 kvPairPtrValue(right,k)
                 );
 
-            if (res) { 
+            if (res) {
                 return res;
             }
         }
@@ -1597,10 +1597,10 @@ public:
 
     void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
         std::vector<instance_ptr> keep;
-        
+
         int64_t lhsCount = count(lhs);
         int64_t rhsCount = count(rhs);
-        
+
         for (long k = 0; k < lhsCount; k++) {
             instance_ptr lhsVal = kvPairPtrKey(lhs, k);
 
@@ -1630,12 +1630,12 @@ public:
 
     void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
         TupleOf* tupleType = tupleOfKeysType();
-        
+
         int64_t lhsCount = count(lhs);
         int64_t rhsCount = tupleType->count(rhs);
 
         std::set<int> remove;
-            
+
         for (long k = 0; k < rhsCount; k++) {
             int64_t index = lookupIndexByKey(lhs, tupleType->eltPtr(rhs, k));
             if (index != -1) {
@@ -1696,8 +1696,8 @@ public:
 
         assert(!record.subpointers);
 
-        if (record.count <= 1) { 
-            return; 
+        if (record.count <= 1) {
+            return;
         }
         else if (record.count == 2) {
             if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1)) > 0) {
@@ -1791,7 +1791,7 @@ public:
         while (low < high) {
             long mid = (low+high)/2;
             char res = m_key->cmp(kvPairPtrKey(self, mid), key);
-            
+
             if (res == 0) {
                 return mid;
             } else if (res < 0) {
@@ -1844,18 +1844,18 @@ public:
         record.refcount--;
         if (record.refcount == 0) {
             if (record.subpointers == 0) {
-                m_key->destroy(record.count, [&](long ix) { 
-                    return record.data + m_bytes_per_key_value_pair * ix; 
+                m_key->destroy(record.count, [&](long ix) {
+                    return record.data + m_bytes_per_key_value_pair * ix;
                 });
-                m_value->destroy(record.count, [&](long ix) { 
-                    return record.data + m_bytes_per_key_value_pair * ix + m_bytes_per_key; 
+                m_value->destroy(record.count, [&](long ix) {
+                    return record.data + m_bytes_per_key_value_pair * ix + m_bytes_per_key;
                 });
             } else {
-                m_key->destroy(record.subpointers, [&](long ix) { 
-                    return record.data + m_bytes_per_key_subtree_pair * ix; 
+                m_key->destroy(record.subpointers, [&](long ix) {
+                    return record.data + m_bytes_per_key_subtree_pair * ix;
                 });
-                ((Type*)this)->destroy(record.subpointers, [&](long ix) { 
-                    return record.data + m_bytes_per_key_subtree_pair * ix + m_bytes_per_key; 
+                ((Type*)this)->destroy(record.subpointers, [&](long ix) {
+                    return record.data + m_bytes_per_key_subtree_pair * ix + m_bytes_per_key;
                 });
             }
 
@@ -1881,8 +1881,8 @@ public:
 
         destroy((instance_ptr)&old);
     }
-    
-    
+
+
     Type* keyValuePairType() const { return m_key_value_pair_type; }
     Type* keyType() const { return m_key; }
     Type* valueType() const { return m_value; }
@@ -1956,7 +1956,7 @@ public:
 template<class T>
 class RegisterType : public Type {
 public:
-    RegisterType(TypeCategory kind) : Type(kind) 
+    RegisterType(TypeCategory kind) : Type(kind)
     {
         m_size = sizeof(T);
         m_is_default_constructible = true;
@@ -2184,10 +2184,10 @@ public:
         std::atomic<int64_t> refcount;
         int32_t hash_cache;
         int32_t pointcount;
-        int32_t bytes_per_codepoint; //1 implies 
+        int32_t bytes_per_codepoint; //1 implies
         uint8_t data[];
 
-        uint8_t* eltPtr(int64_t i) { 
+        uint8_t* eltPtr(int64_t i) {
             return data + i * bytes_per_codepoint;
         }
     };
@@ -2231,7 +2231,7 @@ public:
         uint8_t bytes_per = buffer.read_uint8();
 
         if (bytes_per != 1 && bytes_per != 2 && bytes_per != 4) {
-            throw std::runtime_error("Corrupt data (bytes per unicode character): " 
+            throw std::runtime_error("Corrupt data (bytes per unicode character): "
                 + std::to_string(bytes_per) + " " + std::to_string(ct) + ". pos is " + std::to_string(buffer.pos()));
         }
 
@@ -2285,8 +2285,8 @@ public:
         int bytesPer = bytes_per_codepoint(right);
 
         char res = byteCompare(
-            eltPtr(left, 0), 
-            eltPtr(right, 0), 
+            eltPtr(left, 0),
+            eltPtr(right, 0),
             bytesPer * std::min(count(left), count(right))
             );
 
@@ -2294,12 +2294,12 @@ public:
             return res;
         }
 
-        if (count(left) < count(right)) { 
-            return -1; 
+        if (count(left) < count(right)) {
+            return -1;
         }
 
-        if (count(left) > count(right)) { 
-            return 1; 
+        if (count(left) > count(right)) {
+            return 1;
         }
 
         return 0;
@@ -2317,7 +2317,7 @@ public:
         (*(layout**)self)->pointcount = count;
         (*(layout**)self)->hash_cache = -1;
         (*(layout**)self)->refcount = 1;
-        
+
         if (data) {
             ::memcpy((*(layout**)self)->data, data, count * bytes_per_codepoint);
         }
@@ -2330,7 +2330,7 @@ public:
         uint8_t* base = eltPtr(self,0);
 
         static char hexDigits[] = "0123456789abcdef";
-        
+
         for (long k = 0; k < bytes;k++) {
             if (base[k] == '"') {
                 stream << "\\\"";
@@ -2349,7 +2349,7 @@ public:
     instance_ptr eltPtr(instance_ptr self, int64_t i) const {
         const static char* emptyPtr = "";
 
-        if (*(layout**)self == nullptr) { 
+        if (*(layout**)self == nullptr) {
             return (instance_ptr)emptyPtr;
         }
 
@@ -2357,16 +2357,16 @@ public:
     }
 
     int64_t bytes_per_codepoint(instance_ptr self) const {
-        if (*(layout**)self == nullptr) { 
-            return 1; 
+        if (*(layout**)self == nullptr) {
+            return 1;
         }
 
         return (*(layout**)self)->bytes_per_codepoint;
     }
 
     int64_t count(instance_ptr self) const {
-        if (*(layout**)self == nullptr) { 
-            return 0; 
+        if (*(layout**)self == nullptr) {
+            return 0;
         }
 
         return (*(layout**)self)->pointcount;
@@ -2432,7 +2432,7 @@ public:
         uint8_t* base = eltPtr(self,0);
 
         static char hexDigits[] = "0123456789abcdef";
-        
+
         for (long k = 0; k < bytes;k++) {
             if (base[k] == '\'') {
                 stream << "\\'";
@@ -2450,7 +2450,7 @@ public:
                 stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
             }
         }
-        
+
         stream << "'";
     }
 
@@ -2463,7 +2463,7 @@ public:
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
-        
+
         if (ct > buffer.remaining()) {
             throw std::runtime_error("Corrupt data (bytes)");
         }
@@ -2474,7 +2474,7 @@ public:
             buffer.read_bytes(eltPtr(self,0), ct);
         }
     }
-    
+
     void _forwardTypesMayHaveChanged() {}
 
     template<class visitor_type>
@@ -2492,7 +2492,7 @@ public:
 
         if ((*(layout**)left)->hash_cache == -1) {
             Hash32Accumulator acc((int)getTypeCategory());
-            
+
             acc.addBytes(eltPtr(left, 0), count(left));
 
             (*(layout**)left)->hash_cache = acc.get();
@@ -2524,12 +2524,12 @@ public:
             return res;
         }
 
-        if (count(left) < count(right)) { 
-            return -1; 
+        if (count(left) < count(right)) {
+            return -1;
         }
 
-        if (count(left) > count(right)) { 
-            return 1; 
+        if (count(left) > count(right)) {
+            return 1;
         }
 
         return 0;
@@ -2554,7 +2554,7 @@ public:
         (*(layout**)self)->bytecount = count;
         (*(layout**)self)->refcount = 1;
         (*(layout**)self)->hash_cache = -1;
-        
+
         if (data) {
             ::memcpy((*(layout**)self)->data, data, count);
         }
@@ -2570,8 +2570,8 @@ public:
     }
 
     int64_t count(instance_ptr self) const {
-        if (*(layout**)self == nullptr) { 
-            return 0; 
+        if (*(layout**)self == nullptr) {
+            return 0;
         }
 
         return (*(layout**)self)->bytecount;
@@ -2604,7 +2604,7 @@ public:
         layout* old = (*(layout**)self);
 
         (*(layout**)self) = (*(layout**)other);
-        
+
         if (*(layout**)self) {
             (*(layout**)self)->refcount++;
         }
@@ -2622,8 +2622,8 @@ private:
         uint8_t data[];
     };
 
-    Instance(layout* l) : 
-        mLayout(l) 
+    Instance(layout* l) :
+        mLayout(l)
     {
     }
 
@@ -2644,7 +2644,7 @@ private:
 public:
     static Instance deserialized(Type* t, DeserializationBuffer& buf) {
         t->assertForwardsResolved();
-        
+
         return createAndInitialize(t, [&](instance_ptr tgt) {
             t->deserialize(tgt, buf);
         });
@@ -2663,7 +2663,7 @@ public:
         t->assertForwardsResolved();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
-        
+
         try {
             initFun(l->data);
         } catch(...) {
@@ -2691,7 +2691,7 @@ public:
         t->assertForwardsResolved();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
-        
+
         try {
             t->copy_constructor(l->data, p);
         } catch(...) {
@@ -2710,7 +2710,7 @@ public:
         t->assertForwardsResolved();
 
         layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
-        
+
         try {
             initFun(l->data);
         } catch(...) {
@@ -2780,7 +2780,7 @@ private:
 
 class Value : public Type {
 public:
-    Value(Instance instance) : 
+    Value(Instance instance) :
             Type(TypeCategory::catValue),
             mInstance(instance)
     {
@@ -2803,7 +2803,7 @@ public:
 
     void _forwardTypesMayHaveChanged() {
     }
-    
+
     char cmp(instance_ptr left, instance_ptr right) {
         return 0;
     }
@@ -2836,7 +2836,7 @@ public:
         return mInstance;
     }
 
-    static Type* Make(Instance i) { 
+    static Type* Make(Instance i) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
@@ -2852,23 +2852,23 @@ public:
         return it->second;
     }
 
-    static Type* MakeInt64(int64_t i) { 
+    static Type* MakeInt64(int64_t i) {
         return Make(Instance::create(Int64::Make(), (instance_ptr)&i));
     }
-    static Type* MakeFloat64(double i) { 
+    static Type* MakeFloat64(double i) {
         return Make(Instance::create(Float64::Make(), (instance_ptr)&i));
     }
-    static Type* MakeBool(bool i) { 
+    static Type* MakeBool(bool i) {
         return Make(Instance::create(Bool::Make(), (instance_ptr)&i));
     }
 
-    static Type* MakeBytes(char* data, size_t count) { 
+    static Type* MakeBytes(char* data, size_t count) {
         return Make(Instance::createAndInitialize(Bytes::Make(), [&](instance_ptr i) {
             Bytes::Make()->constructor(i, count, data);
         }));
     }
 
-    static Type* MakeString(size_t bytesPerCodepoint, size_t count, char* data) { 
+    static Type* MakeString(size_t bytesPerCodepoint, size_t count, char* data) {
         return Make(Instance::createAndInitialize(String::Make(), [&](instance_ptr i) {
             String::Make()->constructor(i, bytesPerCodepoint, count, data);
         }));
@@ -2887,7 +2887,7 @@ public:
         uint8_t data[];
     };
 
-    Alternative(std::string name, 
+    Alternative(std::string name,
                 const std::vector<std::pair<std::string, NamedTuple*> >& subtypes,
                 const std::map<std::string, Function*>& methods
                 ) :
@@ -2898,7 +2898,7 @@ public:
             m_methods(methods)
     {
         m_name = name;
-            
+
         if (m_subtypes.size() > 255) {
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
@@ -2966,7 +2966,7 @@ public:
             }
 
             if (m_arg_positions.find(subtype_pair.first) != m_arg_positions.end()) {
-                throw std::runtime_error("Can't create an alternative with " + 
+                throw std::runtime_error("Can't create an alternative with " +
                         subtype_pair.first + " defined twice.");
             }
 
@@ -3028,7 +3028,7 @@ public:
         }
 
         *(layout**)self = (layout*)malloc(
-            sizeof(layout) + 
+            sizeof(layout) +
             m_subtypes[w].second->bytecount()
             );
 
@@ -3059,7 +3059,7 @@ public:
         }
 
         layout& record = **(layout**)self;
-        
+
         return record.data;
     }
 
@@ -3069,7 +3069,7 @@ public:
         }
 
         layout& record = **(layout**)self;
-        
+
         return record.which;
     }
 
@@ -3081,7 +3081,7 @@ public:
         }
 
         layout& record = **(layout**)self;
-        
+
         record.refcount--;
         if (record.refcount == 0) {
             m_subtypes[record.which].second->destroy(record.data);
@@ -3175,7 +3175,7 @@ public:
             Type(TypeCategory::catConcreteAlternative),
             m_alternative(m_alternative),
             m_which(which)
-    {   
+    {
         forwardTypesMayHaveChanged();
     }
 
@@ -3183,7 +3183,7 @@ public:
         if (other->getTypeCategory() == TypeCategory::catConcreteAlternative) {
             ConcreteAlternative* otherO = (ConcreteAlternative*)other;
 
-            return otherO->m_alternative->isBinaryCompatibleWith(m_alternative) && 
+            return otherO->m_alternative->isBinaryCompatibleWith(m_alternative) &&
                 m_which == otherO->m_which;
         }
 
@@ -3255,7 +3255,7 @@ public:
             s(self);
         } else {
             *(layout**)self = (layout*)malloc(
-                sizeof(layout) + 
+                sizeof(layout) +
                 elementType()->bytecount()
                 );
 
@@ -3339,7 +3339,7 @@ class PythonSubclass : public Type {
 public:
     PythonSubclass(Type* base, PyTypeObject* typePtr) :
             Type(TypeCategory::catPythonSubclass)
-    {   
+    {
         m_base = base;
         mTypeRep = typePtr;
         m_name = typePtr->tp_name;
@@ -3450,7 +3450,7 @@ class PythonObjectOfType : public Type {
 public:
     PythonObjectOfType(PyTypeObject* typePtr) :
             Type(TypeCategory::catPythonObjectOfType)
-    {   
+    {
         mPyTypePtr = typePtr;
         m_name = typePtr->tp_name;
 
@@ -3501,7 +3501,7 @@ public:
         PyObject* p = *(PyObject**)self;
 
         PyObject* o = PyObject_Repr(p);
-        
+
         if (!o) {
             stream << "<EXCEPTION>";
             PyErr_Clear();
@@ -3584,7 +3584,7 @@ class Function : public Type {
 public:
     class FunctionArg {
     public:
-        FunctionArg(std::string name, Type* typeFilterOrNull, PyObject* defaultValue, bool isStarArg, bool isKwarg) : 
+        FunctionArg(std::string name, Type* typeFilterOrNull, PyObject* defaultValue, bool isStarArg, bool isKwarg) :
             m_name(name),
             m_typeFilter(typeFilterOrNull),
             m_defaultValue(defaultValue),
@@ -3636,10 +3636,10 @@ public:
     class Overload {
     public:
         Overload(
-            PyFunctionObject* functionObj, 
-            Type* returnType, 
+            PyFunctionObject* functionObj,
+            Type* returnType,
             const std::vector<FunctionArg>& args
-            ) : 
+            ) :
                 mFunctionObj(functionObj),
                 mReturnType(returnType),
                 mArgs(args)
@@ -3676,7 +3676,7 @@ public:
 
     class Matcher {
     public:
-        Matcher(const Overload& overload) : 
+        Matcher(const Overload& overload) :
                 mOverload(overload),
                 mArgs(overload.getArgs())
         {
@@ -3711,11 +3711,11 @@ public:
                         if (mArgs[k].getIsNormalArg()) {
                             m_used[k] = true;
                             return mArgs[k].getTypeFilter();
-                        } 
+                        }
                         else if (mArgs[k].getIsStarArg()) {
                             //this doesn't consume the star arg
                             return mArgs[k].getTypeFilter();
-                        } 
+                        }
                         else {
                             //this is a kwarg, but we didn't give a name.
                             m_matches = false;
@@ -3733,7 +3733,7 @@ public:
                         }
                         else if (mArgs[k].getIsNormalArg()) {
                             //just keep going
-                        } 
+                        }
                         else if (mArgs[k].getIsStarArg()) {
                             //just keep going
                         } else {
@@ -3755,7 +3755,7 @@ public:
         bool m_matches;
     };
 
-    Function(std::string inName, 
+    Function(std::string inName,
             const std::vector<Overload>& overloads
             ) :
         Type(catFunction),
@@ -3842,12 +3842,12 @@ private:
 //a class held directly inside of another object
 class HeldClass : public Type {
 public:
-    HeldClass(std::string inName, 
+    HeldClass(std::string inName,
           const std::vector<std::pair<std::string, Type*> >& members,
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, PyObject*>& classMembers
-          ) : 
+          ) :
             Type(catHeldClass),
             m_members(members),
             m_memberFunctions(memberFunctions),
@@ -3878,7 +3878,7 @@ public:
 
         return true;
     }
-    
+
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         for (auto& o: m_members) {
@@ -3919,7 +3919,7 @@ public:
     }
 
     static HeldClass* Make(
-            std::string inName, 
+            std::string inName,
             const std::vector<std::pair<std::string, Type*> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
@@ -4045,7 +4045,7 @@ public:
     const std::map<std::string, PyObject*>& getClassMembers() const {
         return m_classMembers;
     }
-    
+
     const std::vector<size_t>& getOffsets() const {
         return m_byte_offsets;
     }
@@ -4078,7 +4078,7 @@ class Class : public Type {
     };
 
 public:
-    Class(HeldClass* inClass) : 
+    Class(HeldClass* inClass) :
             Type(catClass),
             m_heldClass(inClass)
     {
@@ -4116,7 +4116,7 @@ public:
     }
 
     static Class* Make(
-            std::string inName, 
+            std::string inName,
             const std::vector<std::pair<std::string, Type*> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
@@ -4238,7 +4238,7 @@ public:
     const std::map<std::string, PyObject*>& getClassMembers() const {
         return m_heldClass->getClassMembers();
     }
-    
+
     int memberNamed(const char* c) const {
         return m_heldClass->memberNamed(c);
     }

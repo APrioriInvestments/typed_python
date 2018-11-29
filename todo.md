@@ -9,7 +9,7 @@
     * typing model for specifying that something is a numpy array
     * forward types, so we can declare recursive unions
         * alternatives already do this, but it would be good to generalize
-        * otherwise, you can't define 
+        * otherwise, you can't define
             class List:
                 head = int
                 tail = OneOf(List | None)

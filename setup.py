@@ -24,7 +24,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     ext_modules=[
         setuptools.Extension(
-            'typed_python._types', 
+            'typed_python._types',
             ['typed_python/_types.cc'],
             extra_compile_args=['-std=c++14', '-Wno-sign-compare', '-Wno-narrowing', '-Wno-unused-variable']
             )

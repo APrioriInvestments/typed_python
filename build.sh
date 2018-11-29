@@ -3,7 +3,7 @@
 while test $# -gt 0
 do
     case "$1" in
-        -b|--build ) 
+        -b|--build )
             rm -rf build
             rm -rf nativepython.egg-info
             docker build . -t nativepython/cloud:latest
