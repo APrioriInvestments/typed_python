@@ -2,7 +2,6 @@ FROM ubuntu:18.04
 
 RUN apt-get -y update
 RUN apt-get -y install python3 python3-pip redis nano
-RUN pip3 install redis nose gevent numpy psutil flask-sockets flask-cors requests websockets
 
 RUN apt-get -y install libtcmalloc-minimal4
 ENV LD_PRELOAD=libtcmalloc_minimal.so.4
@@ -24,9 +23,25 @@ ENV LD_PRELOAD=libtcmalloc_minimal.so.4
 #it's a typedef)
 RUN sed -i 's/global _is_pep393/_is_pep393=True/' /usr/share/gdb/auto-load/usr/bin/python3.6m-gdb.py
 
-COPY . /nativepython/
-WORKDIR /nativepython
-RUN python3 setup.py install
+ENV APP_PATH /nativepython
+WORKDIR $APP_PATH
+COPY . .
+
+# install virtualenv
+RUN pip3 install --user virtualenv
+ENV PATH ${PATH}:/root/.local/bin
+
+# set-up virtualenv
+RUN virtualenv --python $(which python3) .venv
+ENV PATH $APP_PATH/.venv/bin:$PATH
+
+# pipenv needs these which are normally provided by apt-get locales
+ENV LC_ALL C.UTF-8
+ENV LANG C.UTF-8
+
+# install pipenv and use it to install our dependencies (and the library itself)
+RUN pip install pipenv
+RUN pipenv install --deploy --system
 
 ENTRYPOINT ["object_database_service_manager", \
    "--source", "/storage/service_source", \
