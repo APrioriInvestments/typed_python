@@ -146,23 +146,33 @@ class View(object):
         return o
 
     def _get(self, obj, identity, field_name, field_type):
-        if not self._db._isTypeSubscribed(type(obj)):
-            raise Exception("No subscriptions exist for type %s" % obj)
-
-        if not obj.exists():
-            raise ObjectDoesntExistException(obj)
-
         key = data_key(type(obj), identity, field_name)
 
         self._reads.add(key)
 
         if key in self._writes:
+            if self._writes[key] is None:
+                if not self._db._isTypeSubscribed(type(obj)):
+                    raise Exception("No subscriptions exist for type %s" % obj)
+
+                if not obj.exists():
+                    raise ObjectDoesntExistException(obj)
+
             res = self._writes[key][1]
+
             if isinstance(res, (tuple, list)):
                 return res[1]
+
             return res
 
         dbValWithPyrep = self._db._get_versioned_object_data(key, self._transaction_num)
+
+        if dbValWithPyrep is None:
+            if not self._db._isTypeSubscribed(type(obj)):
+                raise Exception("No subscriptions exist for type %s" % obj)
+
+            if not obj.exists():
+                raise ObjectDoesntExistException(obj)
 
         return self.unwrapSerializedDatabaseValue(dbValWithPyrep, field_type)
 
