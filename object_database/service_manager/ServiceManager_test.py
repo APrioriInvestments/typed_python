@@ -82,7 +82,7 @@ class TestService(ServiceBase):
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
-        
+
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
             time.sleep(0.01)
@@ -99,7 +99,7 @@ class TestService(ServiceBase):
 class HangingService(ServiceBase):
     def initialize(self):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
-        
+
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
@@ -122,7 +122,7 @@ class GraphDisplayService(ServiceBase):
         with self.db.transaction():
             if not Feigenbaum.lookupAny():
                 Feigenbaum(y=2.0)
-        
+
     @staticmethod
     def addAPoint():
         PointsToShow(timestamp = time.time(), y = len(PointsToShow.lookupAll()) ** 2.2)
@@ -135,13 +135,13 @@ class GraphDisplayService(ServiceBase):
 
         return Tabs(
             Overlay=
-                Card(Plot(lambda: {'single_array': [1,2,3,1,2,3], 
+                Card(Plot(lambda: {'single_array': [1,2,3,1,2,3],
                                 'xy': {'x': [1,2,3,1,2,3], 'y': [4,5,6,7,8,9]},
                                 }
                     ).width(600).height(400)
                 ),
             Timestamps=
-                Button("Add a point!", GraphDisplayService.addAPoint) + 
+                Button("Add a point!", GraphDisplayService.addAPoint) +
                 Card(Plot(GraphDisplayService.chartData)).width(600).height(400),
             feigenbaum=
                 Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
@@ -166,7 +166,7 @@ class GraphDisplayService(ServiceBase):
             right = min(4.0, right) if right is not None else 4
             left = min(left,right - 1e-6)
             right = max(left + 1e-6,right)
-        
+
         values = numpy.linspace(left,right,1500,endpoint=True)
 
         def feigenbaum(values):
@@ -209,9 +209,9 @@ class HappyService(ServiceBase):
 
         if instance:
             return instance.display(queryArgs)
-        
+
         return Card(
-            Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) + 
+            Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) +
             Expands(Text("Closed"),Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
             ) + Button("go to google", "http://google.com/") + SubscribedSequence(
                 lambda: Happy.lookupAll(),
@@ -231,7 +231,7 @@ class HappyService(ServiceBase):
                 h = Happy()
             time.sleep(.5)
             with self.db.transaction():
-                h.delete()            
+                h.delete()
 
 class StorageTest(ServiceBase):
     def initialize(self):
@@ -246,11 +246,11 @@ class StorageTest(ServiceBase):
 
     def doWork(self, shouldStop):
         shouldStop.wait()
-    
+
 class CrashingService(ServiceBase):
     def initialize(self):
         assert False
-        
+
     def doWork(self, shouldStop):
         time.sleep(.5)
         assert False
@@ -343,19 +343,19 @@ class ServiceManagerTest(unittest.TestCase):
                 )
             )
 
-    def test_starting_services(self):        
+    def test_starting_services(self):
         with self.database.transaction():
             ServiceManager.createService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
-    def test_service_storage(self):        
+    def test_service_storage(self):
         with self.database.transaction():
             ServiceManager.createService(StorageTest, "StorageTest", target_count=1)
 
         self.waitForCount(1)
 
-    def test_starting_uninitializable_services(self):        
+    def test_starting_uninitializable_services(self):
         with self.database.transaction():
             svc = ServiceManager.createService(UninitializableService, "UninitializableService", target_count=1)
 
@@ -400,7 +400,7 @@ class ServiceManagerTest(unittest.TestCase):
         with self.database.transaction():
             ServiceManager.startService("TestService", 0)
 
-        self.waitForCount(0)        
+        self.waitForCount(0)
 
         #make sure we don't have a bunch of zombie processes hanging underneath the service manager
         self.assertEqual(len(psutil.Process().children()[0].children()), 0)
@@ -412,7 +412,7 @@ class ServiceManagerTest(unittest.TestCase):
         self.waitForCount(10)
 
         t0 = time.time()
-        
+
         with self.database.transaction():
             ServiceManager.startService("HangingService", 0)
 
@@ -447,10 +447,10 @@ class ServiceManagerTest(unittest.TestCase):
                 """)
                 })
 
-            i1 = v1.instantiate(self.tempDirectoryName, "test_service.service")
-            i2 = v2.instantiate(self.tempDirectoryName, "test_service.service")
-            i12 = v1.instantiate(self.tempDirectoryName, "test_service.service")
-            i22 = v2.instantiate(self.tempDirectoryName, "test_service.service")
+            i1 = v1.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
+            i2 = v2.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
+            i12 = v1.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
+            i22 = v2.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
 
             self.assertTrue(i1.f() == 1)
             self.assertTrue(i2.f() == 2)
@@ -467,7 +467,7 @@ class ServiceManagerTest(unittest.TestCase):
             ServiceManager.createService(HangingService, "HangingService", target_count=10)
 
         self.waitForCount(10)
-        
+
         with self.database.view():
             instances = service_schema.ServiceInstance.lookupAll()
             orig_codebase = instances[0].codebase
@@ -480,14 +480,14 @@ class ServiceManagerTest(unittest.TestCase):
                 10
                 )
 
-        #this should force a redeploy. 
+        #this should force a redeploy.
         maxProcessesEver = 0
         for i in range(40):
             maxProcessesEver = max(maxProcessesEver, len(psutil.Process().children()[0].children()))
             time.sleep(.1)
 
         self.database.flush()
-        
+
         #after 2 seconds, we should be redeployed
         with self.database.view():
             instances_redeployed = service_schema.ServiceInstance.lookupAll()
@@ -500,7 +500,7 @@ class ServiceManagerTest(unittest.TestCase):
 
         #and we never became too big!
         self.assertLess(maxProcessesEver, 11)
-    
+
     def measureThroughput(self, seconds):
         t0 = time.time()
 
@@ -525,7 +525,7 @@ class ServiceManagerTest(unittest.TestCase):
         for i in range(2):
             with self.database.transaction():
                 ServiceManager.startService("TestService", 20)
-            
+
             self.waitForCount(20)
 
             fullThroughputs.append(self.measureThroughput(1.0))
@@ -554,7 +554,7 @@ class ServiceManagerTest(unittest.TestCase):
         for ct in [16,18,20,22,24,26,28,30,32,34,0]:
             with self.database.transaction():
                 ServiceManager.startService("TestService", ct)
-            
+
             self.waitForCount(ct)
 
             throughputs.append(self.measureThroughput(5.0))
@@ -574,7 +574,7 @@ class ServiceManagerTest(unittest.TestCase):
         self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
 
         self.waitForCount(1)
-    
+
     def test_service_restarts_after_killing(self):
         with self.database.transaction():
             ServiceManager.createService(TestService, "TestService", target_count=1)

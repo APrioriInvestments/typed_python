@@ -61,13 +61,13 @@ def main(argv):
     reset_parser = subparsers.add_parser('reset', help='reset a service''s boot count')
     reset_parser.set_defaults(command='reset')
     reset_parser.add_argument("name")
-    
+
     configure_parser = subparsers.add_parser('configure', help='configure a service')
     configure_parser.set_defaults(command='configure')
     configure_parser.add_argument("name")
     configure_parser.add_argument("-l", "--local", action='store_true', help='use the local codebase, not the remote')
     configure_parser.add_argument("args", nargs=argparse.REMAINDER)
-    
+
     list_parser = subparsers.add_parser('list', help='list installed services')
     list_parser.set_defaults(command='list')
 
@@ -85,7 +85,7 @@ def main(argv):
     stop_parser = subparsers.add_parser('stop', help='Stop a service')
     stop_parser.set_defaults(command='stop')
     stop_parser.add_argument("name")
-    
+
     parsedArgs = parser.parse_args(argv[1:])
 
     db = connect(parsedArgs.hostname, parsedArgs.port)
@@ -108,11 +108,11 @@ def main(argv):
 
                     if parsedArgs.local:
                         svcClass = getattr(
-                            service_schema.Codebase.instantiateFromLocalSource([findGitParent(os.getcwd())], s.service_module_name), 
+                            service_schema.Codebase.instantiateFromLocalSource([findGitParent(os.getcwd())], s.service_module_name),
                             s.service_class_name
                             )
                     else:
-                        svcClass = s.instantiateServiceObject(tf)
+                        svcClass = s.instantiateServiceType(tf)
 
                 svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
@@ -136,7 +136,7 @@ def main(argv):
         with db.transaction():
             fullClassname = getattr(parsedArgs, 'class')
             modulename, classname = fullClassname.rsplit(".",1)
-            
+
             if modulename.startswith("object_database"):
                 def _getobject(modname, attribute):
                     mod = __import__(modname, fromlist=[attribute])
@@ -187,7 +187,7 @@ def main(argv):
                 else:
                     name = parsedArgs.name
 
-                ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None, 
+                ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None,
                         placement=parsedArgs.placement, coresUsed=coresUsed, gbRamUsed=gbRamUsed)
 
     if parsedArgs.command == 'list':

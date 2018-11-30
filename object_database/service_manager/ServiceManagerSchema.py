@@ -22,6 +22,8 @@ import time
 import os
 import tempfile
 import urllib.parse
+import object_database
+
 from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
 from typed_python import *
 import threading
@@ -40,7 +42,7 @@ class Codebase:
     hash = Indexed(str)
 
     #filename (at root of project import) to contents
-    files = ConstDict(str, str) 
+    files = ConstDict(str, str)
 
     @staticmethod
     def create(root_paths, extensions=('.py',), maxTotalBytes = 100 * 1024 * 1024):
@@ -59,7 +61,7 @@ class Codebase:
                             contents = f.read()
 
                         total_bytes[0] += len(contents)
-                        
+
                         assert total_bytes[0] < maxTotalBytes, "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
 
                         files[so_far_with_name] = contents
@@ -112,8 +114,13 @@ class Codebase:
                 if any(any(pathElt.startswith(p) for p in paths) for pathElt in sysmodule.__path__._path):
                     del sys.modules[m]
 
-    def instantiate(self, root_path, service_module_name):
+    def instantiate(self, service_module_name, root_path_override=None):
         """Instantiate a codebase on disk and load it."""
+        if root_path_override is not None:
+            root_path = root_path_override
+        else:
+            root_path = object_database.service_manager.ServiceBase.ServiceBase.currentServiceSourceRootImpliedByDbTransaction()
+
         with codebase_lock:
             if (self.hash, service_module_name) in codebase_module_cache:
                 return codebase_module_cache[self.hash, service_module_name]
@@ -141,7 +148,7 @@ class Codebase:
                             os.makedirs(fullpath)
                         except:
                             logging.warn("Exception trying to make directory %s", root_path)
-                    
+
                     with open(os.path.join(fullpath, name), "wb") as f:
                         f.write(fcontents.encode("utf-8"))
 
@@ -186,7 +193,7 @@ class LogRequest:
     host = Indexed(service_schema.ServiceHost)
     serviceInstance = service_schema.ServiceInstance
     maxBytes = int
-    
+
     response = OneOf(None, service_schema.LogResponse)
     timestamp = float #so we can clean up old requests that timed out
 
@@ -253,12 +260,12 @@ class Service:
         else:
             return max(self.target_count, 0)
 
-    def instantiateType(self, diskPath, typename):
+    def instantiateType(self, typename, root_path_override=None):
         modulename = ".".join(typename.split(".")[:-1])
         typename = typename.split(".")[-1]
 
         if self.codebase:
-            module = self.codebase.instantiate(diskPath, modulename)
+            module = self.codebase.instantiate(modulename, root_path_override=root_path_override)
 
             if typename not in module.__dict__:
                 return None
@@ -277,11 +284,11 @@ class Service:
             type(obj).__schema__.name + "." + type(obj).__qualname__,
             obj._identity
             ) + ("" if not queryParams else "?" + urllib.parse.urlencode({k:str(v) for k,v in queryParams.items()}))
-    
-    def findModuleSchemas(self, diskPath):
+
+    def findModuleSchemas(self):
         """Find all Schema objects in the same module as our type object."""
         if self.codebase:
-            module = self.codebase.instantiate(diskPath, self.service_module_name)
+            module = self.codebase.instantiate(self.service_module_name)
         else:
             module = importlib.import_module(self.service_module_name)
 
@@ -290,12 +297,18 @@ class Service:
         for o in dir(module):
             if isinstance(getattr(module, o), Schema):
                 res.append(getattr(module, o))
-        
+
         return res
 
-    def instantiateServiceObject(self, diskPath):
+    def instantiateServiceType(self, root_path_override=None):
+        """Instantiate the codebase and return the instance of the Service type.
+
+        root_path_override - set the path where we instantiate codebases. If not given,
+            we assume we're already running in a service context and can look up the current
+            service (and its instantiation path).
+        """
         if self.codebase:
-            module = self.codebase.instantiate(diskPath, self.service_module_name)
+            module = self.codebase.instantiate(self.service_module_name, root_path_override=root_path_override)
 
             if self.service_class_name not in module.__dict__:
                 raise Exception("Provided module %s at %s has no class %s. Options are:\n%s" % (
@@ -312,7 +325,7 @@ class Service:
                 return mod.__dict__[attribute]
 
             service_type = _getobject(
-                self.service_module_name, 
+                self.service_module_name,
                 self.service_class_name
                 )
 
@@ -346,8 +359,8 @@ class ServiceInstance:
     def isActive(self):
         """Is this service instance up and intended to be up?"""
         return (
-            self.state in ("Running", "Initializing", "Booting") 
-                and not self.shouldShutdown 
+            self.state in ("Running", "Initializing", "Booting")
+                and not self.shouldShutdown
                 and (self.connection is None or self.connection.exists())
             )
 

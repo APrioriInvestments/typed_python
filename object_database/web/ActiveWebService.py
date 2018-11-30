@@ -97,7 +97,7 @@ class ActiveWebService(ServiceBase):
         server = pywsgi.WSGIServer((host, port), self.app, handler_class=WebSocketHandler)
 
         server.serve_forever()
-    
+
     def configureApp(self):
         instanceName = self.serviceInstance.service.name
         self.app.route("/")(lambda: redirect("/services"))
@@ -123,21 +123,21 @@ class ActiveWebService(ServiceBase):
                 colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Logs', 'Cores', 'RAM', 'Boot Status'],
                 rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
                 headerFun=lambda x: x,
-                rendererFun=lambda s,field: Subscribed(lambda: 
+                rendererFun=lambda s,field: Subscribed(lambda:
                     Clickable(s.name, "/services/" + s.name) if field == 'Service' else
                     (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
                     s.service_module_name if field == 'Module' else
-                    s.service_class_name if field == 'Class' else 
-                    s.placement if field == 'Placement' else 
+                    s.service_class_name if field == 'Class' else
+                    s.placement if field == 'Placement' else
                     Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
                     Dropdown("", [(si._identity + " on " + si.host.hostname, "/service_instances/" + si._identity)
                                 for si in service_schema.ServiceInstance.lookupAll(service=s)
-                                ]) 
-                            if field == 'Logs' else 
-                    Dropdown(s.target_count, [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]) 
-                            if field == 'TargetCount' else 
-                    str(s.coresUsed) if field == 'Cores' else 
-                    str(s.gbRamUsed) if field == 'RAM' else 
+                                ])
+                            if field == 'Logs' else
+                    Dropdown(s.target_count, [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts])
+                            if field == 'TargetCount' else
+                    str(s.coresUsed) if field == 'Cores' else
+                    str(s.gbRamUsed) if field == 'RAM' else
                     (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                     ""
                     ),
@@ -147,7 +147,7 @@ class ActiveWebService(ServiceBase):
                 colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
                 rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
                 headerFun=lambda x: x,
-                rendererFun=lambda s,field: Subscribed(lambda: 
+                rendererFun=lambda s,field: Subscribed(lambda:
                     s.connection._identity if field == "Connection" else
                     str(s.isMaster) if field == "IsMaster" else
                     s.hostname if field == "Hostname" else
@@ -170,7 +170,7 @@ class ActiveWebService(ServiceBase):
                 logSubscription.get().delete()
 
             sub = service_schema.LogRequest(
-                serviceInstance=serviceInstanceObj, 
+                serviceInstance=serviceInstanceObj,
                 host=serviceInstanceObj.host,
                 maxBytes = 100 * 1024,
                 timestamp = time.time()
@@ -190,7 +190,7 @@ class ActiveWebService(ServiceBase):
                 return ""
 
         return Card(
-            Button(Octicon("sync"), update) + 
+            Button(Octicon("sync"), update) +
             Subscribed(readLogSubscription)
             )
 
@@ -199,18 +199,18 @@ class ActiveWebService(ServiceBase):
             if len(path) == 1:
                 return self.mainDisplay()
             serviceObj = service_schema.Service.lookupAny(name=path[1])
-            
+
             if serviceObj is None:
                 return Traceback("Unknown service %s" % path[1])
-            
-            serviceInst = serviceObj.instantiateServiceObject(self.runtimeConfig.serviceSourceRoot)
-            
+
+            serviceType = serviceObj.instantiateServiceType()
+
             if len(path) == 2:
-                return Subscribed(lambda: serviceInst.serviceDisplay(serviceObj, queryArgs=queryArgs))
+                return Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
 
             typename = path[2]
 
-            schemas = serviceObj.findModuleSchemas(self.runtimeConfig.serviceSourceRoot)
+            schemas = serviceObj.findModuleSchemas()
             typeObj = None
             for s in schemas:
                 typeObj = s.lookupFullyQualifiedTypeByName(typename)
@@ -221,11 +221,11 @@ class ActiveWebService(ServiceBase):
                 return Traceback("Can't find fully-qualified type %s" % typename)
 
             if len(path) == 3:
-                return serviceInst.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
+                return serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
 
             instance = typeObj.fromIdentity(path[3])
 
-            return serviceInst.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
+            return serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
 
         if len(path) == 2 and path[0] == "service_instances":
             serviceInstanceObj = service_schema.ServiceInstance.fromIdentity(path[1])
@@ -238,11 +238,11 @@ class ActiveWebService(ServiceBase):
     def addMainBar(self, display):
         return (
             HeaderBar(
-                [Subscribed(lambda: 
+                [Subscribed(lambda:
                     Dropdown(
                         "Service",
-                            [("All", "/services")] + 
-                            [(s.name, "/services/" + s.name) for 
+                            [("All", "/services")] +
+                            [(s.name, "/services/" + s.name) for
                                 s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
                     )
@@ -313,10 +313,10 @@ class ActiveWebService(ServiceBase):
                     lastDumpFrames = 0
                     lastDumpMessages = 0
                     lastDumpTimeSpentCalculating = 0
-                    lastDumpTimestamp = time.time() 
+                    lastDumpTimestamp = time.time()
 
                 ws.send(json.dumps("postscripts"))
-                
+
                 cells.gEventHasTransactions.wait()
 
                 timestamps.append(time.time())
@@ -337,7 +337,7 @@ class ActiveWebService(ServiceBase):
             message = ws.receive()
             if message is not None:
                 ws.send(message)
-            
+
     def sendContent(self, path):
         own_dir = os.path.dirname(__file__)
         return send_from_directory(os.path.join(own_dir, "content"), path)

@@ -83,7 +83,7 @@ class ServiceWorker:
             self.serviceObject.initialize()
         except:
             logging.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
-            
+
             self.serviceObject = None
 
             with self.db.transaction():
@@ -113,12 +113,12 @@ class ServiceWorker:
             logging.info("Starting runloop for service object %s", self.instance._identity)
             self.serviceObject.doWork(self.shouldStop)
         except:
-            logging.error("Service %s/%s failed: %s", 
-                self.serviceName, 
-                self.instance._identity, 
+            logging.error("Service %s/%s failed: %s",
+                self.serviceName,
+                self.instance._identity,
                 traceback.format_exc()
                 )
-            
+
             with self.db.transaction():
                 self.instance.state = "Crashed"
                 self.instance.end_timestamp = time.time()
@@ -127,11 +127,11 @@ class ServiceWorker:
         else:
             with self.db.transaction():
                 logging.info(
-                    "Service %s/%s exited gracefully. Setting stopped flag.", 
-                    self.serviceName, 
+                    "Service %s/%s exited gracefully. Setting stopped flag.",
+                    self.serviceName,
                     self.instance._identity
                     )
-                
+
                 self.instance.state = "Stopped"
                 self.instance.end_timestamp = time.time()
 
@@ -151,8 +151,8 @@ class ServiceWorker:
             self.shutdownPollThread.join()
 
     def _instantiateServiceObject(self):
-        service_type = self.instance.service.instantiateServiceObject(self.sourceDir)
-            
+        service_type = self.instance.service.instantiateServiceType(self.sourceDir)
+
         assert isinstance(service_type, type), service_type
         assert issubclass(service_type, ServiceBase), service_type
 

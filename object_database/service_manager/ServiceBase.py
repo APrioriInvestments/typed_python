@@ -18,6 +18,8 @@ import traceback
 import logging
 import time
 import os
+import weakref
+import object_database
 
 from object_database.web.cells import Card
 from object_database.core_schema import core_schema
@@ -28,16 +30,28 @@ class ServiceRuntimeConfig:
         self.serviceSourceRoot = serviceSourceRoot
         self.serviceTemporaryStorageRoot = serviceTemporaryStorageRoot
 
+_connectionToServiceSourceRoot = weakref.WeakKeyDictionary()
+
 class ServiceBase:
     coresUsed = 1
     gbRamUsed = 1
-    
+
     def __init__(self, db, serviceInstance, runtimeConfig):
         self.db = db
         self.serviceInstance = serviceInstance
         self.runtimeConfig = runtimeConfig
 
+        _connectionToServiceSourceRoot[self.db] = runtimeConfig.serviceSourceRoot
+
         assert self.runtimeConfig.serviceSourceRoot is not None
+
+    @staticmethod
+    def currentServiceSourceRootImpliedByDbTransaction():
+        return _connectionToServiceSourceRoot[object_database.current_transaction().db()]
+
+    @staticmethod
+    def associateServiceSourceRootWithDb(db, ssr):
+        _connectionToServiceSourceRoot[db] = ssr
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):
@@ -54,3 +68,4 @@ class ServiceBase:
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         return Card("No details provided for service '%s'" % serviceObject.name)
+
