@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "526028f06acc4e46f77b05199184d99b7f7dc3a547a44735c0f1d40e656e3d5c"
+            "sha256": "5bd628eab7c5b858e9573afb6a4f8ed290500d7a4ec1bdee26ad45380bb0946e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -18,10 +18,10 @@
     "default": {
         "certifi": {
             "hashes": [
-                "sha256:339dc09518b07e2fa7eda5450740925974815557727d6bd35d319c1524a04a4c",
-                "sha256:6d58c986d22b038c8c0df30d639f23a3e6d172a05c3583e766f4c0b785c0986a"
+                "sha256:47f9c83ef4c0c621eaef743f133f09fa8a74a9b75f037e8624f83bd1b6626cb7",
+                "sha256:993f830721089fef441cdfeb4b2c8c9df86f0c63239f06bd025a76a7daddb033"
             ],
-            "version": "==2018.10.15"
+            "version": "==2018.11.29"
         },
         "chardet": {
             "hashes": [
@@ -201,6 +201,9 @@
                 "sha256:fb7c206e01ad85ce57feeaaa0bf784b97fa3cad0d4a5737bc5295785f5c613a1"
             ],
             "version": "==1.1.0"
+        },
+        "nativepython": {
+            "path": "."
         },
         "nose": {
             "hashes": [
