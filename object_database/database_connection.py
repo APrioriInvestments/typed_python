@@ -165,7 +165,7 @@ class VersionedSet(VersionedBase):
                     #the new set should have no removes, and only adds
                     assert not self.removes[0], (self.adds[0], self.removes[0])
 
-                    new_set = self.adds[0]
+                    new_set = set(self.adds[0])
                     new_set.update(self.adds[1])
                     new_set.difference_update(self.removes[1])
 
@@ -190,6 +190,8 @@ class VersionedSet(VersionedBase):
         return "VersionedSet(ids=%s, adds=%s, removes=%s)" % (self.version_numbers, self.adds, self.removes)
 
 class SetWithEdits:
+    AGRESSIVELY_CHECK_SET_ADDS = False
+
     def __init__(self, s, adds, removes):
         self.s = s
         self.adds = adds
@@ -206,9 +208,17 @@ class SetWithEdits:
         removed = set()
 
         for i in reversed(range(len(self.adds))):
+            if SetWithEdits.AGRESSIVELY_CHECK_SET_ADDS:
+                adds = set(self.adds[i])
+
             for a in self.adds[i]:
                 if a not in removed and a not in toAvoid:
                     return a
+
+            if SetWithEdits.AGRESSIVELY_CHECK_SET_ADDS:
+                time.sleep(0.0001)
+                assert self.adds[i] == adds
+
             removed.update(self.removes[i])
 
         for a in self.s:

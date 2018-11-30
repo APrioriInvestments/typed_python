@@ -17,7 +17,7 @@ from typed_python import Alternative, TupleOf, OneOf, ConstDict
 from object_database.schema import Indexed, Index, Schema
 from object_database.core_schema import core_schema
 from object_database.view import RevisionConflictException, DisconnectedException, ObjectDoesntExistException
-from object_database.database_connection import TransactionListener, DatabaseConnection
+from object_database.database_connection import TransactionListener, DatabaseConnection, SetWithEdits
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
@@ -1281,7 +1281,6 @@ class ObjectDatabaseTests:
         self.assertEqual(lastSeen[0], testSize)
         self.assertTrue(isOK[0])
 
-
     def test_subscription_matching_is_linear(self):
         schemas = []
         dbs = []
@@ -1467,6 +1466,59 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
                     pass
         finally:
             messages.setHeartbeatInterval(old_interval)
+
+    def test_multithreading_and_cleanup(self):
+        """Verify that if one thread is subscribing and the other is repeatedly looking
+        at indices, that everything works correctly."""
+
+        try:
+            #inject some behavior to slow down the checks so we can see if we're
+            #failing this test.
+            SetWithEdits.AGRESSIVELY_CHECK_SET_ADDS_NOT_CHANGING = True
+
+            db1 = self.createNewDb()
+            db1.subscribeToType(Counter)
+
+            db2 = self.createNewDb()
+            db2.subscribeToType(Counter)
+
+            shouldStop = [False]
+            isOK = []
+
+            threadcount = 4
+
+            def readerthread(db):
+                c = None
+                while not shouldStop[0]:
+                    if numpy.random.uniform() < .5:
+                        if c is None:
+                            with db.transaction():
+                                c = Counter(k = 0)
+                        else:
+                            with db.transaction():
+                                c.delete()
+                                c = None
+                    else:
+                        with db.view():
+                            Counter.lookupAny(k=0)
+
+                isOK.append(True)
+
+            threads = [threading.Thread(target=readerthread,args=(db1 if threadcount % 2 else db2,)) for _ in range(threadcount)]
+            for t in threads:
+                t.start()
+
+            time.sleep(1.0)
+
+            shouldStop[0] = True
+
+            for t in threads:
+                t.join()
+
+            self.assertTrue(len(isOK) == threadcount)
+        finally:
+            SetWithEdits.AGRESSIVELY_CHECK_SET_ADDS_NOT_CHANGING = False
+
 
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
