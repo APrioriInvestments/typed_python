@@ -33,7 +33,7 @@ class Everything:
     """Singleton to mark subscription to everything in a slice."""
 
 TransactionResult = Alternative(
-    "TransactionResult", 
+    "TransactionResult",
     Success = {},
     RevisionConflict = {'key': str},
     Disconnected = {}
@@ -143,7 +143,10 @@ class VersionedSet(VersionedBase):
             assert not self.version_numbers or self.version_numbers[-1] < version
             self.setVersionedAddsAndRemoves(version, adds, set())
         else:
-            self.adds[-1].update(adds)
+            #someone could be iterating over this set in another thread
+            new_last_adds = set(self.adds[-1])
+            new_last_adds.update(adds)
+            self.adds[-1] = new_last_adds
 
     def cleanup(self, version_number):
         if not self.version_numbers:
@@ -231,7 +234,7 @@ class ManyVersionedObjects:
     def versionIncref(self, version_number):
         if version_number not in self._version_number_refcount:
             self._version_number_refcount[version_number] = 1
-            
+
             if self._min_reffed_version_number is None:
                 self._min_reffed_version_number = version_number
             else:
@@ -258,7 +261,7 @@ class ManyVersionedObjects:
     def setForVersion(self, key, version_number):
         if key in self._versioned_objects:
             return self._versioned_objects[key].valueForVersion(version_number)
-        
+
         return SetWithEdits(set(),set(),set())
 
     def hasValueForVersion(self, key, version_number):
@@ -292,7 +295,7 @@ class ManyVersionedObjects:
 
         if key not in self._versioned_objects:
             self._versioned_objects[key] = VersionedSet()
-        
+
         if adds or removes:
             self._versioned_objects[key].setVersionedAddsAndRemoves(version_number, adds, removes)
 
@@ -351,7 +354,7 @@ class TransactionListener:
 
     def start(self):
         self._thread.start()
-        
+
     def stop(self):
         self._shouldStop = True
         self._thread.join()
@@ -404,7 +407,7 @@ class DatabaseConnection:
     def __init__(self, channel):
         self._channel = channel
         self._transaction_callbacks = {}
-        
+
         self._lock = threading.Lock()
 
         #transaction of what's in the KV store
@@ -517,9 +520,9 @@ class DatabaseConnection:
         toSubscribe = []
         for fieldname,fieldvalue in kwarg.items():
             toSubscribe.append((
-                t.__schema__.name, 
-                t.__qualname__, 
-                (fieldname, keymapping.index_value_to_hash(fieldvalue)), 
+                t.__schema__.name,
+                t.__qualname__,
+                (fieldname, keymapping.index_value_to_hash(fieldvalue)),
                 self._lazinessForType(t, lazySubscription)
                 )
             )
@@ -531,7 +534,7 @@ class DatabaseConnection:
 
         if self._isTypeSubscribedAll(t):
             return ()
-        
+
         return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None, self._lazinessForType(t, lazySubscription))], block)
 
     def subscribeToNone(self, t, block=True):
@@ -615,13 +618,13 @@ class DatabaseConnection:
 
     def _data_key_to_object(self, key):
         schema_name, typename, identity, fieldname = keymapping.split_data_key(key)
-        
+
         schema = self._schemas.get(schema_name)
         if not schema:
             return None,None
 
         cls = schema._types.get(typename)
-        
+
         if cls:
             return cls.fromIdentity(identity), fieldname
 
@@ -647,7 +650,7 @@ class DatabaseConnection:
                 transaction_id = self._cur_transaction_num
 
             assert transaction_id <= self._cur_transaction_num
-            
+
             view = View(self, transaction_id)
 
             self._versioned_data.versionIncref(transaction_id)
@@ -677,9 +680,9 @@ class DatabaseConnection:
 
     def _suppressKey(self, k):
         keyname = schema, typename, ident, fieldname = keymapping.split_data_key(k)
-        
+
         subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema,typename))
-        
+
         if subscriptionSet is Everything:
             return False
         if isinstance(subscriptionSet, set) and ident in subscriptionSet:
@@ -690,7 +693,7 @@ class DatabaseConnection:
         schema, typename, fieldname, valhash = keymapping.split_index_key_full(index_key)
 
         subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema,typename))
-        
+
         if subscriptionSet is Everything:
             return identities
         elif subscriptionSet is None:
@@ -704,12 +707,12 @@ class DatabaseConnection:
 
     def _onMessage(self, msg):
         self._messages_received += 1
-            
+
         if msg.matches.Disconnected:
             with self._lock:
                 self.disconnected.set()
                 self.connectionObject = None
-                
+
                 for e in self._lazy_object_read_blocks.values():
                     e.set()
 
@@ -724,12 +727,12 @@ class DatabaseConnection:
                         q(TransactionResult.Disconnected())
                     except:
                         logging.error(
-                            "Transaction commit callback threw an exception:\n%s", 
+                            "Transaction commit callback threw an exception:\n%s",
                             traceback.format_exc()
                             )
 
                 self._transaction_callbacks = {}
-                self._flushEvents = {} 
+                self._flushEvents = {}
         elif msg.matches.FlushResponse:
             with self._lock:
                 e = self._flushEvents.get(msg.guid)
@@ -747,12 +750,12 @@ class DatabaseConnection:
             with self._lock:
                 try:
                     self._transaction_callbacks.pop(msg.transaction_guid)(
-                        TransactionResult.Success() if msg.success 
+                        TransactionResult.Success() if msg.success
                             else TransactionResult.RevisionConflict(key=msg.badKey)
                         )
                 except:
                     logging.error(
-                        "Transaction commit callback threw an exception:\n%s", 
+                        "Transaction commit callback threw an exception:\n%s",
                         traceback.format_exc()
                         )
         elif msg.matches.Transaction:
@@ -768,14 +771,14 @@ class DatabaseConnection:
                     if not self._suppressKey(k):
                         key_value[k] = val_serialized
 
-                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id, 
+                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id,
                             bytes.fromhex(val_serialized)
                                     if val_serialized is not None else None
                             )
 
                 for k,a in set_adds.items():
                     a = self._suppressIdentities(k, set(a))
-                    
+
                     self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, a, set())
 
                 for k,r in set_removes.items():
@@ -791,8 +794,8 @@ class DatabaseConnection:
                     handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
                 except:
                     logging.error(
-                        "_onTransaction callback %s threw an exception:\n%s", 
-                        handler, 
+                        "_onTransaction callback %s threw an exception:\n%s",
+                        handler,
                         traceback.format_exc()
                         )
 
@@ -842,19 +845,19 @@ class DatabaseConnection:
                 assert lookupTuple not in self._subscription_buildup
 
                 self._subscription_buildup[lookupTuple] = {
-                    'values': {}, 
-                    'index_values': msg.index_values, 
-                    'identities': msg.identities, 
+                    'values': {},
+                    'index_values': msg.index_values,
+                    'identities': msg.identities,
                     'markedLazy': True
                     }
 
         elif msg.matches.SubscriptionComplete:
             with self._lock:
-                event = self._pendingSubscriptions.get((msg.schema, msg.typename, 
+                event = self._pendingSubscriptions.get((msg.schema, msg.typename,
                     tuple(msg.fieldname_and_value) if msg.fieldname_and_value is not None else None))
 
                 if not event:
-                    logging.error("Received unrequested subscription to schema %s / %s / %s. have %s", 
+                    logging.error("Received unrequested subscription to schema %s / %s / %s. have %s",
                         msg.schema, msg.typename, msg.fieldname_and_value, self._pendingSubscriptions)
                     return
 
@@ -940,7 +943,7 @@ class DatabaseConnection:
             assert False, "unknown message type " + msg._which
 
     def indexValuesToSetAdds(self, indexValues):
-        #indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds 
+        #indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds
         #up the indices we need. We need to transpose to a dictionary ordered by the hash values,
         #not the identities
 
@@ -980,7 +983,7 @@ class DatabaseConnection:
         with self._lock:
             if self._versioned_data.hasValueForVersion(key, transaction_id):
                 return self._versioned_data.valueForVersion(key, transaction_id)
-            
+
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
@@ -1003,7 +1006,7 @@ class DatabaseConnection:
 
     def _loadLazyObject(self, identity):
         e = self._lazy_object_read_blocks.get(identity)
-        
+
         if e:
             return e
 
@@ -1019,17 +1022,17 @@ class DatabaseConnection:
 
         return e
 
-    def _set_versioned_object_data(self, 
-                key_value, 
-                set_adds, 
-                set_removes, 
-                keys_to_check_versions, 
-                indices_to_check_versions, 
+    def _set_versioned_object_data(self,
+                key_value,
+                set_adds,
+                set_removes,
+                keys_to_check_versions,
+                indices_to_check_versions,
                 as_of_version,
                 confirmCallback
                 ):
         assert confirmCallback is not None
-        
+
         transaction_guid = self.identityProducer.createIdentity()
 
         self._transaction_callbacks[transaction_guid] = confirmCallback
@@ -1095,8 +1098,8 @@ class DatabaseConnection:
 
         self._channel.write(
             ClientToServer.TransactionData(
-                writes=out_writes, 
-                set_adds=out_set_adds, 
+                writes=out_writes,
+                set_adds=out_set_adds,
                 set_removes=out_set_removes,
                 key_versions=keys_to_check_versions,
                 index_versions=indices_to_check_versions,
