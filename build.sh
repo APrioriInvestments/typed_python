@@ -23,7 +23,7 @@ do
             ;;
         -t|--test )
             #run unit tests in the debugger
-            docker run -it --rm --privileged --entrypoint bash nativepython/cloud:latest -c "gdb -ex run --args /usr/bin/python3 ./test.py -v -s"
+            docker run -it --rm --privileged --entrypoint bash nativepython/cloud:latest -c "gdb -ex run --args python ./test.py -v -s"
             ;;
         -r|--run )
             docker run -v $(pwd):/code -p 8000:8000 --workdir /code -it --rm --entrypoint bash nativepython/cloud:latest

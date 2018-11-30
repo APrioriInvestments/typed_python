@@ -76,7 +76,7 @@ def fileNameToModuleName(fileName, rootDir):
     tr = (
         fileName
             .replace('.py', '')
-            .replace(rootDir, '')
+            .replace(rootDir, '', 1)  # only replace the first occurrence
             .replace(os.sep, '.')
             )
     if tr.startswith('.'):
