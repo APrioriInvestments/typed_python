@@ -110,7 +110,7 @@ class View(object):
         writes = {}
 
         kwds = dict(kwds)
-        
+
         if not hasattr(cls, '__types__') or cls.__types__ is None:
             raise Exception("Please initialize the type object for %s" % str(cls.__qualname__))
 
@@ -143,7 +143,7 @@ class View(object):
 
                     self._add_to_index(ik, identity)
 
-        return o        
+        return o
 
     def _get(self, obj, identity, field_name, field_type):
         if not self._db._isTypeSubscribed(type(obj)):
@@ -179,7 +179,7 @@ class View(object):
 
         if dbValWithPyrep.pyRep.get(field_type) is None:
             dbValWithPyrep.pyRep[field_type] = deserialize(field_type, dbValWithPyrep.serializedByteRep)
-            
+
         return dbValWithPyrep.pyRep[field_type]
 
     def _exists(self, obj, identity):
@@ -226,13 +226,16 @@ class View(object):
 
         key = data_key(type(obj), identity, field_name)
 
-        existing_index_vals = self._compute_index_vals(obj)
+        if field_name not in obj.__schema__._indexed_fields[type(obj)]:
+            self._writes[key] = (field_type, val)
+        else:
+            existing_index_vals = self._compute_index_vals(obj)
 
-        self._writes[key] = (field_type, val)
-        
-        new_index_vals = self._compute_index_vals(obj)
+            self._writes[key] = (field_type, val)
 
-        self._update_indices(obj, identity, existing_index_vals, new_index_vals)
+            new_index_vals = self._compute_index_vals(obj)
+
+            self._update_indices(obj, identity, existing_index_vals, new_index_vals)
 
     def _compute_index_vals(self, obj):
         existing_index_vals = {}
@@ -271,7 +274,7 @@ class View(object):
         if index_key not in self._set_adds:
             self._set_adds[index_key] = set()
             self._set_removes[index_key] = set()
-            
+
         if identity in self._set_removes[index_key]:
             self._set_removes[index_key].discard(identity)
         else:
@@ -283,7 +286,7 @@ class View(object):
         if index_key not in self._set_adds:
             self._set_adds[index_key] = set()
             self._set_removes[index_key] = set()
-        
+
         if identity in self._set_adds[index_key]:
             self._set_adds[index_key].discard(identity)
         else:
@@ -382,7 +385,7 @@ class View(object):
             if (self._set_adds or self._set_removes) and not self._insistReadsConsistent:
                 raise Exception("You can't update an indexed value without read and write consistency.")
 
-            
+
 
             if self._confirmCommitCallback is None:
                 result_queue = queue.Queue()
@@ -392,11 +395,11 @@ class View(object):
                 confirmCallback = self._confirmCommitCallback
 
             self._db._set_versioned_object_data(
-                writes, 
-                {k:v for k,v in self._set_adds.items() if v}, 
-                {k:v for k,v in self._set_removes.items() if v}, 
-                self._reads.union(set(writes)) if self._insistReadsConsistent 
-                    else set(writes) if self._insistWritesConsistent 
+                writes,
+                {k:v for k,v in self._set_adds.items() if v},
+                {k:v for k,v in self._set_removes.items() if v},
+                self._reads.union(set(writes)) if self._insistReadsConsistent
+                    else set(writes) if self._insistWritesConsistent
                     else set(),
                 self._indexReads if self._insistIndexReadsConsistent else set(),
                 tid,
@@ -408,9 +411,9 @@ class View(object):
                 t0 = time.time()
 
                 res = result_queue.get()
-                
+
                 if time.time() - t0 > LOG_SLOW_COMMIT_THRESHOLD:
-                    logging.info("Committing %s writes and %s set changes took %.1f seconds", 
+                    logging.info("Committing %s writes and %s set changes took %.1f seconds",
                         len(self._writes), len(self._set_adds) + len(self._set_removes), time.time() - t0
                         )
 
@@ -453,7 +456,7 @@ class Transaction(View):
 
     def consistency(self, writes=False, reads=False, full=False, none=False):
         """Set the consistency model for the Transaction.
-        
+
         if 'none', then the transaction always succeeds
         if 'writes', then we insist that any key you write to has not been updated, but
             allow read keys to have been updated.

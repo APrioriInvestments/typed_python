@@ -181,6 +181,9 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(ibc(OneOf(int, float), OneOf(float, int)))
         self.assertTrue(ibc(OneOf(int, X), OneOf(int, Y)))
 
+        self.assertIsInstance(OneOf(None, X)(Y()), X)
+        self.assertIsInstance(NamedTuple(x=OneOf(None, X))(x=Y()).x, X)
+
     def test_binary_compatibility_incompatible_alternatives(self):
         ibc = _types.isBinaryCompatible
 

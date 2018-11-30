@@ -25,10 +25,10 @@ _base = NamedTuple(_identity=str)
 class DatabaseObject(_base):
     __types__ = None
     __schema__ = None
-    
+
     def __ne__(self, other):
         return not (self==other)
-        
+
     def __eq__(self, other):
         if not isinstance(other, DatabaseObject):
             return False
@@ -55,7 +55,7 @@ class DatabaseObject(_base):
 
         if args:
             raise Exception("%s cannot be created with positional arguments." % cls)
-            
+
         return _cur_view.view._new(cls, kwds)
 
     def __repr__(self):
@@ -123,7 +123,7 @@ class DatabaseObject(_base):
         assert isinstance(types, dict)
 
         cls.__types__ = types
-        
+
         return cls
 
     @classmethod
@@ -141,7 +141,7 @@ class DatabaseObject(_base):
 
 class Indexed:
     def __init__(self, obj):
-        assert isinstance(obj, (type, FunctionType))
+        assert isinstance(obj, type)
         self.obj = obj
 
 class Index:

@@ -32,6 +32,8 @@ class Schema:
         self._supportingTypes = {}
         #class -> indexname -> fun(object->value)
         self._indices = {}
+        #class -> set(fieldname)
+        self._indexed_fields = {}
         self._indexTypes = {}
         self._frozen = False
         self._types_to_original = {}
@@ -69,7 +71,7 @@ class Schema:
         if typename[:1] == "_":
             self.__dict__[typename] = val
             return
-        
+
         assert not self._frozen, "Schema is already frozen."
 
         assert isinstance(val, type)
@@ -100,26 +102,38 @@ class Schema:
             self._types[typename] = cls
             self._indices[cls] = {" exists": lambda e: True}
             self._indexTypes[cls] = {" exists": bool}
+            self._indexed_fields[cls] = set([' exists'])
 
         return self._types[typename]
 
-    def _addIndex(self, type, prop, fun = None, index_type = None):
+    def _addIndex(self, type, prop):
         assert issubclass(type, DatabaseObject)
 
         if type not in self._indices:
             self._indices[type] = {}
             self._indexTypes[type] = {}
+            self._indexed_fields[type] = set()
 
-        if fun is None:
-            fun = lambda o: getattr(o, prop)
-            index_type = type.__types__[prop]
-        else:
-            if index_type is None:
-                spec = inspect.getfullargspec(fun)
-                index_type = spec.annotations.get('return', None)
+        fun = lambda o: getattr(o, prop)
+        index_type = type.__types__[prop]
 
         self._indices[type][prop] = fun
         self._indexTypes[type][prop] = index_type
+        self._indexed_fields[type].add(prop)
+
+    def _addTupleIndex(self, type, name, props, indexType):
+        assert issubclass(type, DatabaseObject)
+
+        if type not in self._indices:
+            self._indices[type] = {}
+            self._indexTypes[type] = {}
+            self._indexed_fields[type] = set()
+
+        fun = lambda o: indexType(tuple(getattr(o, prop) for prop in props))
+
+        self._indices[type][name] = fun
+        self._indexTypes[type][name] = indexType
+        self._indexed_fields[type].update(props)
 
     def define(self, cls):
         assert cls.__name__[:1] != "_", "Illegal to use _ for first character in database classnames."
@@ -151,14 +165,9 @@ class Schema:
         for base in reversed(properClasses):
             for name, val in base.__dict__.items():
                 if isinstance(val, Index):
-                    self._addIndex(t, name, val, Tuple(*tuple(types[k] for k in val.names)))
-
+                    self._addTupleIndex(t, name, val.names, Tuple(*tuple(types[k] for k in val.names)))
                 if name[:2] != '__' and isinstance(val, Indexed):
-                    if isinstance(val.obj, FunctionType):
-                        self._addIndex(t, name, val.obj)
-                        setattr(t, name, val.obj)
-                    else:
-                        self._addIndex(t, name)
+                    self._addIndex(t, name)
                 elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
                     if isinstance(val, (FunctionType, staticmethod, property)):
                         setattr(t, name, val)
