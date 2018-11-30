@@ -17,8 +17,6 @@
 """
 This is the primary unit-test entrypoint for nativepython.
 
-It assumes you've run 'python3 setup.py develop' or 'python3 setup.py install' so that
-it can find nativepython.
 """
 import sys
 import shutil
