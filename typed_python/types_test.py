@@ -1018,6 +1018,21 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(aT1C, deserialize(T1Comp, serialize(T2Comp, aT1C)))
 
+    def test_conversion_of_binary_compatible_nested(self):
+        def make():
+            class Interior(NamedTuple(a=int)):
+                pass
+
+            class Exterior(NamedTuple(a=Interior)):
+                pass
+
+            return Exterior
+
+        E1 = make()
+        E2 = make()
+
+        OneOf(None, E2)(E1())
+
     def test_python_objects_in_tuples(self):
         class NormalPyClass(object):
             pass

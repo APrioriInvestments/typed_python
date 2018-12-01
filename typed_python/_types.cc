@@ -302,7 +302,7 @@ struct native_instance_wrapper {
         Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
         if (argType) {
-            return argType == t || argType->getBaseType() == t || argType == t->getBaseType();
+            return argType->isBinaryCompatibleWith(argType);
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catNamedTuple ||
