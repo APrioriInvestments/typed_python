@@ -44,6 +44,8 @@ class Forward;
 
 typedef uint8_t* instance_ptr;
 
+typedef void (*compiled_code_entrypoint)(instance_ptr*, instance_ptr*);
+
 class Hash32Accumulator {
 public:
     Hash32Accumulator(int32_t init) :
@@ -3642,7 +3644,8 @@ public:
             ) :
                 mFunctionObj(functionObj),
                 mReturnType(returnType),
-                mArgs(args)
+                mArgs(args),
+                mCompiledCodePtr(nullptr)
         {
         }
 
@@ -3668,10 +3671,23 @@ public:
             }
         }
 
+        compiled_code_entrypoint getEntrypoint() const {
+            return mCompiledCodePtr;
+        }
+
+        void setEntrypoint(compiled_code_entrypoint e) {
+            if (mCompiledCodePtr) {
+                throw std::runtime_error("Can't redefine a function entrypoint");
+            }
+
+            mCompiledCodePtr = e;
+        }
+
     private:
         PyFunctionObject* mFunctionObj;
         Type* mReturnType;
         std::vector<FunctionArg> mArgs;
+        compiled_code_entrypoint mCompiledCodePtr; //accepts a pointer to packed arguments and another pointer with the return value
     };
 
     class Matcher {
@@ -3832,6 +3848,14 @@ public:
 
     const std::vector<Overload>& getOverloads() const {
         return mOverloads;
+    }
+
+    void setEntrypoint(long whichOverload, compiled_code_entrypoint entrypoint) {
+        if (whichOverload < 0 || whichOverload >= mOverloads.size()) {
+            throw std::runtime_error("Invalid overload index.");
+        }
+    
+        mOverloads[whichOverload].setEntrypoint(entrypoint);
     }
 
 private:
