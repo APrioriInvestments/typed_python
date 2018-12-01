@@ -22,13 +22,12 @@ struct native_instance_wrapper {
     PyObject_HEAD
 
     bool mIsInitialized;
-    bool mIsMatcher; //-1 if we're not an iterator
+    bool mIsMatcher;
     char mIteratorFlag; //0 is keys, 1 is values, 2 is pairs
     int64_t mIteratorOffset; //-1 if we're not an iterator
 
     Instance mContainingInstance;
-    int64_t mOffset; //byte offset within the instance that we hold
-
+    
     static bool guaranteeForwardsResolved(Type* t) {
         try {
             guaranteeForwardsResolvedOrThrow(t);
@@ -99,13 +98,6 @@ struct native_instance_wrapper {
         }
     }
 
-    void initializeReference(native_instance_wrapper* other, size_t offset) {
-        mIsInitialized = false;
-        new (&mContainingInstance) Instance(other->mContainingInstance);
-        mOffset = other->mOffset + offset;
-        mIsInitialized = true;
-    }
-
     template<class init_func>
     void initialize(const init_func& i) {
         Type* type = extractTypeFrom(((PyObject*)this)->ob_type);
@@ -114,11 +106,10 @@ struct native_instance_wrapper {
         mIsInitialized = false;
         new (&mContainingInstance) Instance( type, i );
         mIsInitialized = true;
-        mOffset = 0;
     }
 
     instance_ptr dataPtr() {
-        return mContainingInstance.data() + mOffset;
+        return mContainingInstance.data();
     }
 
     static PyObject* constDictItems(PyObject *o) {
