@@ -142,3 +142,23 @@ class Class(metaclass=ClassMetaclass):
 
 def TypedFunction(f):
     return makeFunction(f.__name__, f)()
+
+class FunctionOverloadArg:
+    def __init__(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
+        self.name = name
+        self.defaultValue = defaultVal
+        self.typeFilter = typeFilter
+        self.isStarArg = isStarArg
+        self.isKwarg = isKwarg
+
+class FunctionOverload:
+    def __init__(self, f, returnType, *huh):
+        self.functionObj = f
+        self.returnType = returnType
+        self.args = ()
+
+    def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
+        self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
+
+    def __str__(self):
+        return "FunctionOverload(%s->%s, %s)" % (self.f, self.returnType, self.args)

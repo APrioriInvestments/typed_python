@@ -9,7 +9,12 @@
 static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
 static_assert(PY_MINOR_VERSION >= 6, "nativepython is a python3.6 project only");
 
+inline PyObject* incref(PyObject* o) {
+    Py_INCREF(o);
+    return o;
+}
 
+    
 //extension of PyTypeObject that stashes a Type* on the end.
 struct NativeTypeWrapper {
     PyTypeObject typeObj;
@@ -2240,28 +2245,73 @@ struct native_instance_wrapper {
             categoryToPyString(inType->getTypeCategory())
             );
 
+        PyDict_SetItemString(
+            types[inType]->typeObj.tp_dict,
+            "__typed_python_basetype__",
+            inType->getBaseType() ? 
+                (PyObject*)typeObjInternal(inType->getBaseType())
+            :   Py_None
+            );
+
+        mirrorTypeInformationIntoPyType(inType, &types[inType]->typeObj);
+
+        return (PyTypeObject*)types[inType];
+    }
+
+    static void mirrorTypeInformationIntoPyType(Type* inType, PyTypeObject* pyType) {
         if (inType->getTypeCategory() == Type::TypeCategory::catAlternative) {
             Alternative* alt = (Alternative*)inType;
+
+            PyObject* alternatives = PyTuple_New(alt->subtypes().size());
+
             for (long k = 0; k < alt->subtypes().size(); k++) {
+                ConcreteAlternative* concrete = ConcreteAlternative::Make(alt, k);
+
                 PyDict_SetItemString(
-                    types[inType]->typeObj.tp_dict,
+                    pyType->tp_dict,
                     alt->subtypes()[k].first.c_str(),
-                    (PyObject*)typeObjInternal(ConcreteAlternative::Make(alt, k))
+                    (PyObject*)typeObjInternal(concrete)
                     );
+
+                PyTuple_SetItem(alternatives, k, incref((PyObject*)typeObjInternal(concrete)));
             }
+
+            PyDict_SetItemString(
+                pyType->tp_dict,
+                "__typed_python_alternatives__",
+                alternatives
+                );
+
+            Py_DECREF(alternatives);
+        }
+
+        if (inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            ConcreteAlternative* alt = (ConcreteAlternative*)inType;
+
+            PyDict_SetItemString(
+                pyType->tp_dict,
+                "Index",
+                PyLong_FromLong(alt->which())
+                );
+
+            PyDict_SetItemString(
+                pyType->tp_dict,
+                "ElementType",
+                (PyObject*)typeObjInternal(alt->elementType())
+                );
         }
 
         if (inType->getTypeCategory() == Type::TypeCategory::catClass) {
             for (auto nameAndObj: ((Class*)inType)->getClassMembers()) {
                 PyDict_SetItemString(
-                    types[inType]->typeObj.tp_dict,
+                    pyType->tp_dict,
                     nameAndObj.first.c_str(),
                     nameAndObj.second
                     );
             }
             for (auto nameAndObj: ((Class*)inType)->getStaticFunctions()) {
                 PyDict_SetItemString(
-                    types[inType]->typeObj.tp_dict,
+                    pyType->tp_dict,
                     nameAndObj.first.c_str(),
                     native_instance_wrapper::initializePythonRepresentation(nameAndObj.second, [&](instance_ptr data){
                         //nothing to do - functions like this are just types.
@@ -2270,13 +2320,133 @@ struct native_instance_wrapper {
             }
         }
 
-        return (PyTypeObject*)types[inType];
+        if (inType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+            TupleOf* tupleOfType = (TupleOf*)inType;
+
+            //expose 'ElementType' as a member of the type object
+            PyDict_SetItemString(
+                    pyType->tp_dict,
+                    "ElementType",
+                    typePtrToPyTypeRepresentation(tupleOfType->getEltType())
+                    );
+        }
+
+        if (inType->getTypeCategory() == Type::TypeCategory::catConstDict) {
+            ConstDict* constDictT = (ConstDict*)inType;
+
+            //expose 'ElementType' as a member of the type object
+            PyDict_SetItemString(pyType->tp_dict, "KeyType",
+                    typePtrToPyTypeRepresentation(constDictT->keyType())
+                    );
+            PyDict_SetItemString(pyType->tp_dict, "ValueType",
+                    typePtrToPyTypeRepresentation(constDictT->valueType())
+                    );
+        }
+
+        if (inType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
+            NamedTuple* tupleT = (NamedTuple*)inType;
+
+            PyObject* types = PyTuple_New(tupleT->getTypes().size());
+            for (long k = 0; k < tupleT->getTypes().size(); k++) {
+                PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(tupleT->getTypes()[k])));
+            }
+            
+            PyObject* names = PyTuple_New(tupleT->getNames().size());
+            for (long k = 0; k < tupleT->getNames().size(); k++) {
+                PyObject* namePtr = PyUnicode_FromString(tupleT->getNames()[k].c_str());
+                PyTuple_SetItem(names, k, namePtr);
+            }
+
+            //expose 'ElementType' as a member of the type object
+            PyDict_SetItemString(pyType->tp_dict, "ElementTypes", types);
+            PyDict_SetItemString(pyType->tp_dict, "ElementNames", names);
+            
+            Py_DECREF(names);
+            Py_DECREF(types);
+        }
+
+        if (inType->getTypeCategory() == Type::TypeCategory::catTuple) {
+            Tuple* tupleT = (Tuple*)inType;
+
+            PyObject* res = PyTuple_New(tupleT->getTypes().size());
+            for (long k = 0; k < tupleT->getTypes().size(); k++) {
+                PyTuple_SetItem(res, k, incref(typePtrToPyTypeRepresentation(tupleT->getTypes()[k])));
+            }
+            //expose 'ElementType' as a member of the type object
+            PyDict_SetItemString(pyType->tp_dict, "ElementTypes", res);
+        }
+
+        if (inType->getTypeCategory() == Type::TypeCategory::catFunction) {
+            //expose a list of overloads
+            PyObject* overloads = createOverloadPyRepresentation((Function*)inType);
+
+            PyDict_SetItemString(
+                    pyType->tp_dict,
+                    "overloads",
+                    overloads        
+                    );
+
+            Py_DECREF(overloads);
+        }
+    }
+
+    static PyObject* createOverloadPyRepresentation(Function* f) {
+        static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
+
+        if (!internalsModule) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.internals");
+        }
+
+        static PyObject* funcOverload = PyObject_GetAttrString(internalsModule, "FunctionOverload");
+
+        if (!funcOverload) {
+            throw std::runtime_error("Internal error: couldn't find typed_python.internals.FunctionOverload");
+        }
+
+        PyObject* overloadTuple = PyTuple_New(f->getOverloads().size());
+
+        for (long k = 0; k < f->getOverloads().size(); k++) {
+            auto& overload = f->getOverloads()[k];
+
+            PyObject* pyOverloadInst = PyObject_CallFunctionObjArgs(
+                funcOverload, 
+                (PyObject*)overload.getFunctionObj(), 
+                overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None,
+                NULL
+                );
+
+            if (pyOverloadInst) {
+                for (auto arg: f->getOverloads()[k].getArgs()) {
+                    PyObject* res = PyObject_CallMethod(pyOverloadInst, "addArg", "sOOOO", 
+                        arg.getName().c_str(),
+                        arg.getDefaultValue() ? PyTuple_Pack(1, arg.getDefaultValue()) : Py_None,
+                        arg.getTypeFilter() ? (PyObject*)typePtrToPyTypeRepresentation(arg.getTypeFilter()) : Py_None,
+                        arg.getIsStarArg() ? Py_True : Py_False,
+                        arg.getIsKwarg() ? Py_True : Py_False
+                        );
+
+                    if (!res) {
+                        PyErr_PrintEx(0);
+                    } else {
+                        Py_DECREF(res);
+                    }
+                }
+
+                PyTuple_SetItem(overloadTuple, k, pyOverloadInst);
+            } else {
+                PyErr_PrintEx(0);
+                Py_INCREF(Py_None);
+                PyTuple_SetItem(overloadTuple, k, Py_None);
+            }
+        }
+
+        return overloadTuple;
     }
 
     static Type* pyFunctionToForward(PyObject* arg) {
         static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
 
-       if (!internalsModule) {
+        if (!internalsModule) {
             throw std::runtime_error("Internal error: couldn't find typed_python.internals");
         }
 
@@ -2356,6 +2526,7 @@ struct native_instance_wrapper {
         if (cat == Type::TypeCategory::catHeldClass) { static PyObject* res = PyUnicode_FromString("HeldClass"); return res; }
         if (cat == Type::TypeCategory::catFunction) { static PyObject* res = PyUnicode_FromString("Function"); return res; }
         if (cat == Type::TypeCategory::catForward) { static PyObject* res = PyUnicode_FromString("Forward"); return res; }
+        if (cat == Type::TypeCategory::catPythonObjectOfType) { static PyObject* res = PyUnicode_FromString("PythonObjectOfType"); return res; }
 
         static PyObject* res = PyUnicode_FromString("Unknown");
         return res;
@@ -2404,6 +2575,10 @@ struct native_instance_wrapper {
         }
 
         return nullptr;
+    }
+
+    static PyObject* typePtrToPyTypeRepresentation(Type* t) {
+        return (PyObject*)typeObjInternal(t);
     }
 
     static Type* unwrapTypeArgToTypePtr(PyObject* typearg) {
@@ -3128,6 +3303,28 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(t->bytecount());
 }
 
+PyObject *resolveForwards(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "resolveForwards takes 1 positional argument");
+        return NULL;
+    }
+
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+    
+    Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'resolveForwards' must be a native type object");
+        return NULL;
+    }
+
+    if (native_instance_wrapper::guaranteeForwardsResolved(t1)) {
+        return incref(Py_True);
+    }
+
+    return NULL;
+}
+
 PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
@@ -3246,6 +3443,7 @@ static PyMethodDef module_methods[] = {
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
+    {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 
@@ -3260,6 +3458,14 @@ static struct PyModuleDef moduledef = {
     NULL,
     NULL
 };
+
+void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
+    //deliberately leak the name.
+    pyType->tp_name = (new std::string(type->name()))->c_str();
+
+    native_instance_wrapper::mirrorTypeInformationIntoPyType(type, pyType);
+}
+
 
 PyMODINIT_FUNC
 PyInit__types(void)

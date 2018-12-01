@@ -12,6 +12,8 @@
 #include <iostream>
 #include <sstream>
 
+class Type;
+
 class None;
 class Bool;
 class UInt8;
@@ -45,6 +47,8 @@ class Forward;
 typedef uint8_t* instance_ptr;
 
 typedef void (*compiled_code_entrypoint)(instance_ptr*, instance_ptr*);
+
+void updateTypeRepForType(Type* t, PyTypeObject* pyType);
 
 class Hash32Accumulator {
 public:
@@ -558,7 +562,7 @@ public:
         });
 
         if (mTypeRep) {
-            mTypeRep->tp_name = m_name.c_str();
+            updateTypeRepForType(this, mTypeRep);
         }
     }
 
@@ -3854,7 +3858,7 @@ public:
         if (whichOverload < 0 || whichOverload >= mOverloads.size()) {
             throw std::runtime_error("Invalid overload index.");
         }
-    
+
         mOverloads[whichOverload].setEntrypoint(entrypoint);
     }
 
