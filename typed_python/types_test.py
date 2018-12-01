@@ -764,6 +764,17 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(a.matches.child_ints)
         self.assertFalse(a.matches.child_strings)
 
+    def test_alternatives_add_operator(self):
+        alt = Alternative(
+            "Alt",
+            child_ints={'x': int, 'y': int},
+            __add__=lambda l,r: (l,r)
+            )
+
+        a = alt.child_ints(x=0,y=2)
+
+        self.assertEqual(a+a,(a,a))
+
     def test_alternatives_perf(self):
         alt = Alternative(
             "Alt",

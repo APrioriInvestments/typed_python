@@ -16,6 +16,8 @@ import nativepython.python_to_native_ast as python_to_native_ast
 import nativepython.native_ast as native_ast
 import nativepython.llvm_compiler as llvm_compiler
 import nativepython
+from typed_python import TypedFunction
+from typed_python.internals import FunctionOverload
 
 _singleton = [None]
 
@@ -30,11 +32,37 @@ class Runtime:
         self.compiler = llvm_compiler.Compiler()
         self.converter = python_to_native_ast.Converter()
 
-    def compile(self, f, input_types):
-        callTarget = self.converter.convert(f, input_types)
+    def compile(self, f):
+        """Compile a single FunctionOverload and install the pointer"""
+        if isinstance(f, FunctionOverload):
+            for a in f.args:
+                assert a.typeFilter is not None, 'cant compile partially typed functions yet'
+                assert not a.isStarArg, 'dont support star args yet'
+                assert not a.isKwarg, 'dont support keyword yet'
 
-        targets = self.converter.extract_new_function_definitions()
-        
-        function_pointers = self.compiler.add_functions(targets)
+            assert f.returnType is not None, "cant compile partially typed functions yet"
 
-        return function_pointers[callTarget.name]
+            callTarget = self.converter.convert(f.functionObj, [a.typeFilter for a in f.args])
+
+            wrappingCallTargetName = self.converter.generateCallConverter(callTarget, f.returnType)
+
+            targets = self.converter.extract_new_function_definitions()
+            
+            function_pointers = self.compiler.add_functions(targets)
+
+            fp = function_pointers[wrappingCallTargetName]
+
+            f._installNativePointer(fp.fp)
+            return f
+            
+        if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+            for o in f.overloads:
+                self.compile(o)
+            return f
+
+        if callable(f):
+            result = TypedFunction(f)
+            self.compile(result)
+            return result
+
+        assert False, f

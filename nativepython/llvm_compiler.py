@@ -15,7 +15,6 @@
 import llvmlite.binding as llvm
 import llvmlite.ir
 import nativepython.native_ast_to_llvm as native_ast_to_llvm
-import ctypes
 import sys
 
 llvm.initialize()
@@ -58,57 +57,12 @@ def create_execution_engine():
 
     return engine, pass_manager
 
-def native_to_ctype(native_type):
-    if native_type.matches.Int:
-        if native_type.bits == 64:
-            return ctypes.c_long if native_type.signed else ctypes.c_ulong
-        if native_type.bits == 32:
-            return ctypes.c_int if native_type.signed else ctypes.c_uint
-        if native_type.bits == 16:
-            return ctypes.c_short if native_type.signed else ctypes.c_ushort
-        if native_type.bits == 8:
-            return ctypes.c_char if native_type.signed else ctypes.c_uchar
-        if native_type.bits == 1:
-            return ctypes.c_bool
-    if native_type.matches.Float:        
-        if native_type.bits == 64:
-            return ctypes.c_double       
-        if native_type.bits == 32:
-            return ctypes.c_float
-
-    if native_type.matches.Pointer:
-        return ctypes.c_void_p
-    
-    if native_type.matches.Void:
-        return None
-    
-    if native_type.matches.Struct and len(native_type.element_types) == 0:
-        return None
-    
-    assert False, "Can't convert %s to a ctype" % native_type
-
 class NativeFunctionPointer:
     def __init__(self, fname, fp, input_types, output_type):
         self.fp = fp
         self.fname = fname
         self.input_types = input_types
         self.output_type = output_type
-        self._ctypes_cache = None
-
-    def __call__(self, *args):
-        if self._ctypes_cache is None:
-            argtypes = [native_to_ctype(x) for x in 
-                                [self.output_type] + self.input_types]
-
-            argtypes = argtypes[:1] + [x for x in argtypes[1:] if x is not None]
-
-            self._ctypes_cache = ctypes.CFUNCTYPE(*argtypes)(self.fp)
-        
-        try:
-            return self._ctypes_cache(*[a for a in args if a is not None])
-        except:
-            print("can't call ", self, " with ", args)
-            raise
 
     def __repr__(self):
         return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" \

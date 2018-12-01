@@ -465,16 +465,13 @@ class FunctionConverter:
 
         return TypedLLVMValue(
             func,
-            native_ast.Type.Pointer(
-                native_ast.Type.Function(
-                    args=target.arg_types,
-                    output=target.output_type,
-                    varargs=target.varargs,
-                    can_throw=target.can_throw
-                    )
-                )
+            native_ast.Type.Function(
+                args=target.arg_types,
+                output=target.output_type,
+                varargs=target.varargs,
+                can_throw=target.can_throw
+                ).pointer()
             )
-
 
     def generate_throw_expression(self, llvm_pointer_val):
         exception_ptr = self.generate_exception_and_store_value(llvm_pointer_val)

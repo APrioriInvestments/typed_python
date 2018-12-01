@@ -18,7 +18,7 @@ import nativepython.python.ast_util as ast_util
 import nativepython.native_ast as native_ast
 
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
-from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper
+from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
 
@@ -47,27 +47,18 @@ class FunctionOutput:
     pass
 
 def typedPythonTypeToTypeWrapper(t):
-    if t is int:
+    assert hasattr(t, '__typed_python_category__'), t
+
+    if t is Int64():
         return Int64Wrapper()
 
-    if t is float:
+    if t is Float64():
         return Float64Wrapper()
 
+    if t is Bool():
+        return BoolWrapper()
+
     assert False, t
-
-    if hasattr(t, '__typed_python_category__'):
-        return t
-
-    if t is int:
-        return Int64
-    if t is float:
-        return Float64
-    if t is bool:
-        return Bool
-    if t is type(None):
-        return Void
-
-    assert False, "Can't handle %s yet" % t
 
 class InitFields:
     def __init__(self, first_var_name, fields_and_types):
@@ -1410,6 +1401,68 @@ class Converter(object):
     
     def convert_initializer_function(self, f, input_types, name_override, fields_and_types):
         return self.convert(f, input_types, name_override, fields_and_types)
+
+    def generateCallConverter(self, callTarget, returnType):
+        """Given a call target that's optimized for C-style dispatch, produce a (native) call-target that 
+        we can dispatch to from our C extension.
+
+        we are given 
+            T f(A1, A2, A3 ...)
+        and want to produce 
+            f(T*, X**)
+        where X is the union of A1, A2, etc.
+
+        returns the name of the defined native function
+        """
+        assert callTarget.output_type == returnType, (callTarget.output_type, returnType)
+
+        identifier = ("call_converter", callTarget.name)
+
+        if identifier in self._names_for_identifier:
+            return self._names_for_identifier[identifier]
+
+
+        underlyingDefinition = self._definitions[callTarget.name]
+
+        if underlyingDefinition.args and underlyingDefinition.args[0][0] == '.return':
+            assert False, 'not handled yet.'
+        else:
+            args = []
+            for i in range(len(underlyingDefinition.args)):
+                argname, argtype = underlyingDefinition.args[i]
+
+                untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
+
+                args.append(untypedPtr.cast(argtype.pointer()).load())
+
+            body = native_ast.Expression.Call(
+                target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
+                args=args
+                )
+
+            if not underlyingDefinition.output_type.matches.Void:
+                assert typedPythonTypeToTypeWrapper(callTarget.output_type).is_pod
+
+                body = native_ast.var('return').cast(underlyingDefinition.output_type.pointer()).store(body)
+
+        body = native_ast.FunctionBody.Internal(body=body)
+
+        definition = native_ast.Function(
+            args=(
+                ('return', native_ast.Type.Void().pointer()),
+                ('input', native_ast.Type.Void().pointer().pointer())
+                ),
+            body=body,
+            output_type=native_ast.Type.Void()
+            )
+
+        new_name = self.new_name(callTarget.name + ".dispatch")
+        self._names_for_identifier[identifier] = new_name
+
+        self._definitions[new_name] = definition
+        self._unconverted.add(new_name)
+
+        return new_name
 
     def convert(self, f, input_types, name_override=None, fields_and_types_for_initializing=None):
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])

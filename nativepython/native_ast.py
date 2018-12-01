@@ -50,7 +50,8 @@ Type = Alternative("Type",
     Function={'output': lambda: Type, 'args': TupleOf(lambda: Type), 'varargs': bool, 'can_throw': bool},
     Pointer={'value_type': lambda: Type},
     attr_ix = type_attr_ix,
-    __str__ = type_str
+    __str__ = type_str,
+    pointer = lambda self: Type.Pointer(value_type=self)
     )
 
 
@@ -165,12 +166,12 @@ def expr_add(self, other):
         return other
 
     if self.matches.Sequence and other.matches.Sequence:
-        return Expression.Sequence(self.vals + other.vals)
+        return Expression.Sequence(vals=self.vals + other.vals)
     if self.matches.Sequence:
-        return Expression.Sequence(self.vals + (other,))
+        return Expression.Sequence(vals=self.vals + (other,))
     if other.matches.Sequence:
-        return Expression.Sequence((self,) + other.vals)
-    return Expression.Sequence((self,other))
+        return Expression.Sequence(vals=(self,) + other.vals)
+    return Expression.Sequence(vals=(self,other))
 
 
 def expr_str(self):
@@ -280,12 +281,6 @@ def expr_str(self):
 
     assert False
 
-def expr_with_comment(self, c):
-    return Expression.Comment(comment=c, expr=self)
-
-def expr_load(self):
-    return Expression.Load(ptr=self)
-
 Expression = Alternative("Teardown",
     Constant = {'val': Constant},
     Comment = {'comment': str, 'expr': Expression},
@@ -330,19 +325,21 @@ Expression = Alternative("Teardown",
     StackSlot = {'name': str, 'type': Type},
     ElementPtrIntegers = lambda self, *offsets: 
         Expression.ElementPtr(
-        left=self,
-        offsets=tuple(
-            Expression.Constant(
-                    Constant.Int(bits=32,signed=True,val=index)
-                    )
-                for index in offsets
+            left=self,
+            offsets=tuple(
+                Expression.Constant(
+                        val=Constant.Int(bits=32,signed=True,val=index)
+                        )
+                    for index in offsets
                 )
             )
         ,
     __add__ = expr_add,
     __str__ = expr_str,
-    load = expr_load,
-    with_comment = expr_with_comment
+    load = lambda self: Expression.Load(ptr=self),
+    store = lambda self, val: Expression.Store(ptr=self, val=val),
+    cast = lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
+    with_comment = lambda self, c: Expression.Comment(comment=c, expr=self)
     )
 
 nullExpr = Expression.Constant(val=Constant.Void())
@@ -370,3 +367,5 @@ Void = Type.Void()
 Bool = Type.Int(bits=1, signed=False)
 Int8Ptr = Type.Pointer(value_type=Type.Int(bits=8, signed=True))
 
+def var(name):
+    return Expression.Variable(name=name)

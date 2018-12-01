@@ -46,7 +46,7 @@ class Forward;
 
 typedef uint8_t* instance_ptr;
 
-typedef void (*compiled_code_entrypoint)(instance_ptr*, instance_ptr*);
+typedef void (*compiled_code_entrypoint)(instance_ptr, instance_ptr*);
 
 void updateTypeRepForType(Type* t, PyTypeObject* pyType);
 

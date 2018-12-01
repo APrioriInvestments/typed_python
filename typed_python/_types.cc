@@ -9,6 +9,10 @@
 static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
 static_assert(PY_MINOR_VERSION >= 6, "nativepython is a python3.6 project only");
 
+//thread-local counter for how many times we've disabled native dispatch
+thread_local int64_t native_dispatch_disabled = false;
+
+
 inline PyObject* incref(PyObject* o) {
     Py_INCREF(o);
     return o;
@@ -891,6 +895,40 @@ struct native_instance_wrapper {
         return 0;
     }
 
+    static PyObject* nb_add(PyObject* lhs, PyObject* rhs) {
+        Type* lhs_type = extractTypeFrom(lhs->ob_type);
+            
+        if (lhs_type && lhs_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            Alternative* base = ((ConcreteAlternative*)lhs_type)->getAlternative();
+            auto it = base->getMethods().find("__add__");
+            if (it != base->getMethods().end()) {
+                Function* f = it->second;
+
+                PyObject* argTuple = PyTuple_Pack(2, lhs, rhs);
+
+                for (const auto& overload: f->getOverloads()) {
+                    std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, argTuple, nullptr);
+                    if (res.first) {
+                        Py_DECREF(argTuple);
+                        return res.second;
+                    }
+                
+                Py_DECREF(argTuple);
+                }
+            }
+        }
+
+        PyErr_Format(
+            PyExc_TypeError,
+            "Unsupported operand type(s) for +: %S and %S", 
+            lhs->ob_type,
+            rhs->ob_type,
+            NULL
+            );
+
+        return NULL;
+    }
+
     static PyObject* nb_subtract(PyObject* lhs, PyObject* rhs) {
         Type* lhs_type = extractTypeFrom(lhs->ob_type);
         Type* rhs_type = extractTypeFrom(rhs->ob_type);
@@ -1188,9 +1226,12 @@ struct native_instance_wrapper {
     }
 
     static PyNumberMethods* numberMethods(Type* t) {
-        static PyNumberMethods* res =
-            new PyNumberMethods {
-                0, //binaryfunc nb_add
+        return new PyNumberMethods {
+                //only enable this for the types that it operates on. Otherwise it disables the concatenation functions
+                //we should probably just unify them
+                t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
+                    t->getTypeCategory() == Type::TypeCategory::catAlternative
+                    ? nb_add : 0, //binaryfunc nb_add
                 nb_subtract, //binaryfunc nb_subtract
                 0, //binaryfunc nb_multiply
                 0, //binaryfunc nb_remainder
@@ -1227,8 +1268,6 @@ struct native_instance_wrapper {
                 0, //binaryfunc nb_matrix_multiply
                 0  //binaryfunc nb_inplace_matrix_multiply
                 };
-
-        return res;
     }
 
     static Py_ssize_t mp_length(PyObject* o) {
@@ -1483,9 +1522,6 @@ struct native_instance_wrapper {
             matcher.requiredTypeForArg(nullptr);
         }
 
-
-        //tell matcher about 'self'
-
         for (long k = 0; k < PyTuple_Size(args); k++) {
             PyObject* elt = PyTuple_GetItem(args, k);
 
@@ -1568,7 +1604,13 @@ struct native_instance_wrapper {
             return std::make_pair(false, nullptr);
         }
 
-        PyObject* result = PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs);
+        PyObject* result;
+
+        if (f.getEntrypoint() && !native_dispatch_disabled) {
+            result = dispatchFunctionCallToNative(f, targetArgTuple, newKwargs);
+        } else {
+            result = PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs);
+        }
 
         Py_DECREF(targetArgTuple);
         if (newKwargs) {
@@ -1597,6 +1639,57 @@ struct native_instance_wrapper {
         }
 
         return std::make_pair(true, result);
+    }
+
+    static PyObject* dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs) {
+        Type* returnType = overload.getReturnType();
+
+        if (!returnType) {
+            PyErr_Format(PyExc_TypeError, "Can't call %S natively because it doesn't have a return type and we cant handle PyObject* yet", overload.getFunctionObj());
+            return NULL;
+        }
+
+        if (PyTuple_Size(argTuple) != overload.getArgs().size()) {
+            PyErr_Format(PyExc_TypeError, "Can't call %S natively with %d arguments", PyTuple_Size(argTuple));
+            return NULL;
+        }
+
+        if (kwargs && PyDict_Size(kwargs)) {
+            PyErr_Format(PyExc_TypeError, "Can't call %S natively with keyword arguments", PyTuple_Size(argTuple));
+            return NULL;
+        }
+
+        std::vector<Instance> instances;
+
+        for (long k = 0; k < overload.getArgs().size(); k++) {
+            auto arg = overload.getArgs()[k];
+
+            if (arg.getIsKwarg() || arg.getIsStarArg()) {
+                PyErr_Format(PyExc_TypeError, "Can't call %S natively because we don't support *args and **kwargs yet", overload.getFunctionObj());
+                return NULL;
+            }
+            if (!arg.getTypeFilter()) {
+                PyErr_Format(PyExc_TypeError, "Can't call %S natively not all arguments have types and we don't handle PyObject* yet", overload.getFunctionObj());
+                return NULL;
+            }
+
+            instances.push_back(
+                Instance::createAndInitialize(arg.getTypeFilter(), [&](instance_ptr p) {
+                    copy_constructor(arg.getTypeFilter(), p, PyTuple_GetItem(argTuple, k));
+                })
+                );
+        }
+
+        Instance result = Instance::createAndInitialize(returnType, [&](instance_ptr returnData) {
+            std::vector<instance_ptr> args;
+            for (auto& i: instances) {
+                args.push_back(i.data());
+            }
+
+            overload.getEntrypoint()(returnData, &args[0]);
+        });
+
+        return extractPythonObject(result.data(), result.type());
     }
 
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
@@ -2408,12 +2501,18 @@ struct native_instance_wrapper {
         for (long k = 0; k < f->getOverloads().size(); k++) {
             auto& overload = f->getOverloads()[k];
 
+            PyObject* pyIndex = PyLong_FromLong(k);
+
             PyObject* pyOverloadInst = PyObject_CallFunctionObjArgs(
                 funcOverload, 
+                typePtrToPyTypeRepresentation(f),
+                pyIndex,
                 (PyObject*)overload.getFunctionObj(), 
                 overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None,
                 NULL
                 );
+
+            Py_DECREF(pyIndex);
 
             if (pyOverloadInst) {
                 for (auto arg: f->getOverloads()[k].getArgs()) {
@@ -3325,6 +3424,58 @@ PyObject *resolveForwards(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
+PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
+    native_dispatch_disabled++;
+    return incref(Py_None);
+}
+
+PyObject *enableNativeDispatch(PyObject* nullValue, PyObject* args) {
+    native_dispatch_disabled++;
+    return incref(Py_None);
+}
+
+
+PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "installNativeFunctionPointer takes 3 positional arguments");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+    PyObject* a2 = PyTuple_GetItem(args, 1);
+    PyObject* a3 = PyTuple_GetItem(args, 2);
+
+    Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+    
+    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'installNativeFunctionPointer' must be a Function");
+        return NULL;
+    }
+
+    if (!PyLong_Check(a2)) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'installNativeFunctionPointer' must be an integer 'index'");
+        return NULL;
+    }
+
+    if (!PyLong_Check(a3)) {
+        PyErr_SetString(PyExc_TypeError, "third argument to 'installNativeFunctionPointer' must be an integer function pointer");
+        return NULL;
+    }
+
+    Function* f = (Function*)t1;
+
+    int index = PyLong_AsLong(a2);
+    size_t ptr = PyLong_AsSize_t(a3);
+
+    if (index < 0 || index >= f->getOverloads().size()) {
+        PyErr_SetString(PyExc_TypeError, "index is out of bounds");
+        return NULL;
+    }
+
+    f->setEntrypoint(index,(compiled_code_entrypoint)ptr);
+
+    return incref(Py_None);
+}
+
 PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
@@ -3444,6 +3595,9 @@ static PyMethodDef module_methods[] = {
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
+    {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},
+    {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
+    {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 

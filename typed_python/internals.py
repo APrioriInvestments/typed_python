@@ -14,6 +14,8 @@
 
 from types import FunctionType
 
+import threading
+
 import typed_python._types
 import nativepython.python.inspect_override as inspect
 
@@ -152,7 +154,10 @@ class FunctionOverloadArg:
         self.isKwarg = isKwarg
 
 class FunctionOverload:
-    def __init__(self, f, returnType, *huh):
+    def __init__(self, functionTypeObject, index, f, returnType, *huh):
+        self.functionTypeObject = functionTypeObject
+        self.index = index
+
         self.functionObj = f
         self.returnType = returnType
         self.args = ()
@@ -162,3 +167,17 @@ class FunctionOverload:
 
     def __str__(self):
         return "FunctionOverload(%s->%s, %s)" % (self.f, self.returnType, self.args)
+
+    def _installNativePointer(self, fp):
+        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp)
+
+
+class DisableCompiledCode:
+    def __init__(self):
+        pass
+
+    def __enter__(self):
+        typed_python._types.disableNativeDispatch()
+
+    def __exit__(self, *args):
+        typed_python._types.enableNativeDispatch()

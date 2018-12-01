@@ -17,39 +17,39 @@ from nativepython.runtime import Runtime
 import unittest
 
 
-def add(x,y):
+def add(x:int,y:int)->int:
     return x+y
-def sub(x,y):
+def sub(x:int,y:int)->int:
     return x-y
-def mul(x,y):
+def mul(x:int,y:int)->int:
     return x*y
-def div(x,y):
+def div(x:int,y:int)->float:
     return x/y
-def mod(x,y):
+def mod(x:int,y:int)->int:
     return x%y
-def lshift(x,y):
+def lshift(x:int,y:int)->int:
     return x << y
-def rshift(x,y):
+def rshift(x:int,y:int)->int:
     return x >> y
-def pow(x,y):
+def pow(x:int,y:int)->int:
     return x ** y
-def bitxor(x,y):
+def bitxor(x:int,y:int)->int:
     return x ^ y
-def bitand(x,y):
+def bitand(x:int,y:int)->int:
     return x&y
-def bitor(x,y):
+def bitor(x:int,y:int)->int:
     return x|y
-def less(x,y):
+def less(x:int,y:int)->bool:
     return x<y
-def greater(x,y):
+def greater(x:int,y:int)->bool:
     return x>y
-def lessEq(x,y):
+def lessEq(x:int,y:int)->bool:
     return x<=y
-def greaterEq(x,y):
+def greaterEq(x:int,y:int)->bool:
     return x>=y
-def eq(x,y):
+def eq(x:int,y:int)->bool:
     return x == y
-def neq(x,y):
+def neq(x:int,y:int)->bool:
     return x != y
 
 class TestRuntime(unittest.TestCase):
@@ -57,14 +57,15 @@ class TestRuntime(unittest.TestCase):
         self.assertTrue(Runtime.singleton() is Runtime.singleton())
 
     def test_compile_simple(self):
-        def f(x):
+        @TypedFunction
+        def f(x: int) -> int:
             return x+x+x
 
         r = Runtime.singleton()
+        r.compile(f.overloads[0])
 
-        f_fast = r.compile(f, (int,))
-
-        self.assertEqual(f_fast(10), 30)
+        self.assertEqual(f(20), 60)
+        self.assertEqual(f(10), 30)
 
     def test_binary_operators_int(self):
         r  = Runtime.singleton()
@@ -87,7 +88,8 @@ class TestRuntime(unittest.TestCase):
                 lvals = [-1,0,1,10,100]
                 rvals = [-1,0,1,10,100]
 
-            f_fast = r.compile(f, (int,int))
+            f_fast = r.compile(f)
+
             for val1 in lvals:
                 for val2 in rvals:
                     try:
