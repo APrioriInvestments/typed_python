@@ -11,11 +11,17 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+import unittest
+from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
+    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction
 
-__version__="0.2"
+class NativeFunctionTypesTests(unittest.TestCase):
+    def test_create_simple_function(self):
+        @TypedFunction
+        def f(x: int) -> int:
+            return x + 1
 
-from typed_python.internals import Class, Member, TypedFunction
-from typed_python.hash import sha_hash
-from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
-                                Alternative, Value, serialize, deserialize, Int8, \
-                                Bool, Int16, Int32, Int64, UInt8, UInt32, UInt64, Float32, Float64, NoneType
+        self.assertEqual(f(2), 3)
+
+        with self.assertRaises(TypeError):
+            f(3.5)

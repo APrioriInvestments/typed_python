@@ -139,3 +139,6 @@ class ClassMetaclass(type):
 class Class(metaclass=ClassMetaclass):
     """Base class for all typed python Class objects."""
     pass
+
+def TypedFunction(f):
+    return makeFunction(f.__name__, f)()
