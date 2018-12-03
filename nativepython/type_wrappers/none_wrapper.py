@@ -13,14 +13,14 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-
+from typed_python import NoneType
 import nativepython.native_ast as native_ast
 
 class NoneWrapper(Wrapper):
     is_pod = True
 
-    def __init__(self, t):
-        super().__init__(t)
+    def __init__(self):
+        super().__init__(NoneType())
 
     def lower_as_function_arg(self):
         return self.lower()

@@ -487,10 +487,10 @@ Alias = Alternative("Alias",
   )
 
 numericConverters = {
-    int: NumericConstant.Int,
-    bool: NumericConstant.Boolean,
+    int: lambda x: NumericConstant.Int(value=x),
+    bool: lambda x: NumericConstant.Boolean(value=x),
     type(None): lambda x: NumericConstant.None_(),
-    float: NumericConstant.Float
+    float: lambda x: NumericConstant.Float(value=x)
     }
 
 def createPythonAstConstant(n, **kwds):

@@ -274,7 +274,8 @@ class ConversionContext(object):
         return TypedExpression(
             native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
             slot_type.reference_to_temporary if type_is_temp_ref else
-                slot_type.reference
+                slot_type.reference,
+            isReference=True
             )
 
     def named_var_expr(self, name):
@@ -305,7 +306,7 @@ class ConversionContext(object):
                 type=slot_type.lower()
                 ),
             slot_type,
-            isSlotRef=True
+            isReference=True
             )
 
     def call_typed_function(self, native_call_target, output_type, input_types, varargs, args):
@@ -478,30 +479,34 @@ class ConversionContext(object):
             if ast.n.matches.None_:
                 return TypedExpression(
                     native_ast.Expression.Constant(
-                        native_ast.Constant.Void()
+                        val=native_ast.Constant.Void()
                         ), 
-                    Void
+                    NoneWrapper(),
+                    False
                     )
             if ast.n.matches.Boolean:
                 return TypedExpression(
                     native_ast.Expression.Constant(
-                        native_ast.Constant.Int(val=ast.n.value,bits=1,signed=False)
+                        val=native_ast.Constant.Int(val=ast.n.value,bits=1,signed=False)
                         ), 
-                    Bool
+                    BoolWrapper(),
+                    False
                     )
             if ast.n.matches.Int:
                 return TypedExpression(
                     native_ast.Expression.Constant(
-                        native_ast.Constant.Int(val=ast.n.value,bits=64,signed=True)
+                        val=native_ast.Constant.Int(val=ast.n.value,bits=64,signed=True)
                         ), 
-                    Int64
+                    Int64Wrapper(),
+                    False
                     )
             if ast.n.matches.Float:
                 return TypedExpression(
                     native_ast.Expression.Constant(
-                        native_ast.Constant.Float(val=ast.n.value,bits=64)
+                        val=native_ast.Constant.Float(val=ast.n.value,bits=64)
                         ), 
-                    Float64
+                    Float64Wrapper(),
+                    False
                     )
 
         if ast.matches.Str:
@@ -607,7 +612,7 @@ class ConversionContext(object):
         if ast.matches.Tuple:
             elts = [self.convert_expression_ast(e) for e in ast.elts]
 
-            struct_type = Struct([("f%s"%i,e.expr_type.variable_storage_type) for i,e in enumerate(elts)])
+            struct_type = Struct([("f%s"%i,e.expr_type.variable_storage_type_wrapper) for i,e in enumerate(elts)])
 
             tmp_ref = self.allocate_temporary(struct_type)
 
@@ -644,10 +649,8 @@ class ConversionContext(object):
         raise ConversionException("can't handle python expression type %s" % ast._which)
 
     def ensure_bool(self, expr):
-        t = expr.expr_type.nonref_type
-
-        if t == Bool:
-            return expr.dereference()
+        if isinstance(expr.expr_type, BoolWrapper):
+            return expr.unwrap()
 
         if not (t.is_primitive_numeric or t.is_pointer):
             if expr.expr.matches.Constant:
@@ -680,7 +683,8 @@ class ConversionContext(object):
                             name=tname,
                             type=self._temporaries[tname].lower()
                             ),
-                        self._temporaries[tname].reference
+                        self._temporaries[tname].reference,
+                        isReference=True
                         )
                     ).expr
                 )
@@ -782,10 +786,8 @@ class ConversionContext(object):
                 if self._varname_to_type[varname] is None:
                     self._new_variables.add(varname)
 
-                    new_variable_type = val_to_store.expr_type.variable_storage_type
+                    new_variable_type = val_to_store.expr_type.variable_storage_type_wrapper
 
-                    assert new_variable_type.is_valid_as_variable()
-                    
                     self._varname_to_type[varname] = new_variable_type
 
                     slot_ref = self.named_var_expr(varname)
@@ -795,7 +797,7 @@ class ConversionContext(object):
                         self,
                         slot_ref,
                         val_to_store
-                        ) + TypedExpression.Void(native_ast.Expression.ActivatesTeardown(varname))
+                        ) + TypedExpression.Void(native_ast.Expression.ActivatesTeardown(name=varname))
                 else:
                     #this is an existing variable.
                     slot_ref = self.named_var_expr(varname)
@@ -840,7 +842,7 @@ class ConversionContext(object):
                 if self._varname_to_type[FunctionOutput] != e.expr_type:
                     raise ConversionException(
                         "Function returning multiple types:\n\t%s\n\t%s" % (
-                                e.expr_type.variable_storage_type, 
+                                e.expr_type.variable_storage_type_wrapper, 
                                 self._varname_to_type[FunctionOutput]
                                 )
                         )
@@ -897,13 +899,14 @@ class ConversionContext(object):
             false = self.convert_statement_list_ast(ast.orelse)
 
             if true.expr_type or false.expr_type:
-                ret_type = Void
+                ret_type = NoneWrapper()
             else:
                 ret_type = None
 
             return TypedExpression(
                 native_ast.Expression.While(cond=cond.expr,while_true=true.expr,orelse=false.expr),
-                ret_type
+                ret_type,
+                False
                 )
 
         if ast.matches.Try:
@@ -1018,7 +1021,7 @@ class ConversionContext(object):
             if toplevel:
                 return TypedExpression(native_ast.Expression.Return(None), None)
 
-            return TypedExpression(native_ast.nullExpr, Void)
+            return TypedExpression.Void(native_ast.nullExpr)
 
         exprs = []
         for s in statements:
@@ -1028,7 +1031,7 @@ class ConversionContext(object):
                 break
 
         if exprs[-1].expr_type is not None:
-            assert exprs[-1].expr_type == Void
+            assert isinstance(exprs[-1].expr_type, NoneWrapper)
             flows_off_end = True
         else:
             flows_off_end = False
@@ -1062,7 +1065,7 @@ class ConversionContext(object):
                 teardowns=teardowns
                 )
 
-        return TypedExpression(seq_expr, Void if flows_off_end else None, False)
+        return TypedExpression(seq_expr, NoneWrapper() if flows_off_end else None, False)
 
     def named_variable_teardown(self, v):
         return native_ast.Teardown.ByTag(
@@ -1074,7 +1077,8 @@ class ConversionContext(object):
                             name=v,
                             type=self._varname_to_type[v].lower()
                             ),
-                        self._varname_to_type[v].reference
+                        self._varname_to_type[v],
+                        isReference=True
                         )
                     ).expr
                 )
@@ -1151,7 +1155,8 @@ class ConversionContext(object):
                         
                         slot_expr = TypedExpression(
                             native_ast.Expression.StackSlot(name=name,type=slot_type.lower()),
-                            slot_type.reference
+                            slot_type.reference,
+                            isReference=True
                             )
 
                         to_add.append(
@@ -1171,7 +1176,7 @@ class ConversionContext(object):
                     vals=to_add + [expr.expr]
                     ),
                 expr.expr_type,
-                expr.isSlotRef
+                expr.isReference
                 )
 
         if destructors:
@@ -1181,7 +1186,7 @@ class ConversionContext(object):
                     expr=expr.expr
                     ),
                 expr.expr_type,
-                expr.isSlotRef
+                expr.isReference
                 )
         
         return expr

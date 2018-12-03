@@ -44,25 +44,41 @@ pyCompOp = {
     python_ast.ComparisonOp.GtE(): native_ast.BinaryOp.GtE()
     }
 
-class Int64Wrapper(Wrapper):
-    is_pod = True
+class ArithmeticTypeWrapper(Wrapper):
+    @property
+    def variable_storage_type_wrapper(self):
+        return self
 
-    def __init__(self):
-        super().__init__(Int64())
+    is_pod = True
 
     def lower_as_function_arg(self):
         return self.lower()
-
-    def lower(self):
-        return native_ast.Type.Int(bits=64,signed=True)
 
     def asNonref(self, e):
         return self.unwrap(e)
 
     def unwrap(self, e):
-        if e.isSlotRef:
+        if e.isReference:
             return TypedExpression(e.expr.load(), e.expr_type, False)
         return e
+
+    def convert_assign(self, context, target, toStore):
+        assert target.isReference
+        return TypedExpression.Void(target.expr.store(toStore.unwrap().expr))
+
+    def convert_initialize_copy(self, context, target, toStore):
+        assert target.isReference
+        return TypedExpression.Void(target.expr.store(toStore.unwrap().expr))
+
+    def convert_destroy(self, context, instance):
+        return TypedExpression.Void()
+
+class Int64Wrapper(ArithmeticTypeWrapper):
+    def __init__(self):
+        super().__init__(Int64())
+
+    def lower(self):
+        return native_ast.Type.Int(bits=64,signed=True)
 
     def toFloat64(self, e):
         return TypedExpression(
@@ -114,25 +130,12 @@ class Int64Wrapper(Wrapper):
 
         raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
 
-class BoolWrapper(Wrapper):
-    is_pod = True
-
+class BoolWrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Bool())
 
-    def lower_as_function_arg(self):
-        return self.lower()
-
     def lower(self):
         return native_ast.Type.Int(bits=1,signed=False)
-
-    def asNonref(self, e):
-        return self.unwrap(e)
-
-    def unwrap(self, e):
-        if e.isSlotRef:
-            return TypedExpression(e.expr.load(), e.expr_type, False)
-        return e
 
     def toFloat64(self, e):
         return TypedExpression(
@@ -158,25 +161,12 @@ class BoolWrapper(Wrapper):
         raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
 
 
-class Float64Wrapper(Wrapper):
-    is_pod = True
-
+class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Float64())
 
-    def lower_as_function_arg(self):
-        return self.lower()
-
     def lower(self):
         return native_ast.Type.Float(bits=64)
-
-    def asNonref(self, e):
-        return self.unwrap(e)
-
-    def unwrap(self, e):
-        if e.isSlotRef:
-            return TypedExpression(e.expr.load(), e.expr_type, False)
-        return e
 
     def toFloat64(self, e):
         return e

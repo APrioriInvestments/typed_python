@@ -15,7 +15,7 @@
 from typed_python import *
 from nativepython.runtime import Runtime
 import unittest
-
+import time
 
 def add(x:int,y:int)->int:
     return x+y
@@ -104,3 +104,32 @@ class TestRuntime(unittest.TestCase):
                         failures += 1
 
         self.assertEqual(failures, 0)
+
+    def test_assignment_of_pod(self):
+        r  = Runtime.singleton()
+
+        def f(x: int) -> int:
+            y = x
+            return y
+
+        f_fast = r.compile(f)
+
+        for i in range(100):
+            self.assertEqual(f_fast(i), f(i))
+
+    def test_simple_loop(self):
+        r  = Runtime.singleton()
+
+        def f(x: int) -> int:
+            y = 0
+            while x > 0:
+                x = x - 1
+                y = y + x
+            return y
+
+        f_fast = r.compile(f)
+
+        for i in range(100):
+            fastVal = f_fast(i)
+            slowVal = f(i)
+            self.assertEqual(fastVal, slowVal)
