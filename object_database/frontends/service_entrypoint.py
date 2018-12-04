@@ -26,6 +26,7 @@ from object_database import connect
 from object_database.util import configureLogging
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
+
 def main(argv):
     parser = argparse.ArgumentParser("Run a specific service.")
 

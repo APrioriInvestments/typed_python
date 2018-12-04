@@ -53,7 +53,6 @@ class AlgebraicProtocol(asyncio.Protocol):
 
     def connection_made(self, transport):
         self.transport = transport
-        self.transport._sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, True)
         self.onConnected()
 
     def data_received(self, data):

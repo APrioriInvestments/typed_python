@@ -4,4 +4,8 @@
 __pycache__
 build/
 nativepython.egg-info
-.python-version
+
+# leading slash means only match at repo-root level
+/.python-version
+/testcert.key
+/testcert.cert

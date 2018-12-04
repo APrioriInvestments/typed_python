@@ -21,6 +21,8 @@ from object_database.database_connection import TransactionListener, DatabaseCon
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
+from object_database.util import configureLogging
+
 import object_database.messages as messages
 import queue
 import unittest
@@ -33,7 +35,8 @@ import threading
 import random
 import time
 import psutil
-from object_database.util import configureLogging
+import ssl
+
 
 def currentMemUsageMb(residentOnly=True):
     if residentOnly:
@@ -1523,7 +1526,10 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryPersistence()
-        self.server = TcpServer(host="localhost", port=8888, mem_store=self.mem_store)
+        sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        sc.load_cert_chain('testcert.cert', 'testcert.key')
+
+        self.server = TcpServer(host="localhost", port=8888, mem_store=self.mem_store, ssl_context=sc)
         self.server._gc_interval = .1
         self.server.start()
 

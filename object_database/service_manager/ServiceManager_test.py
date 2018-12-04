@@ -315,13 +315,25 @@ class ServiceManagerTest(unittest.TestCase):
         try:
             self.server = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', "8023", "--run_db",
+                    'localhost', 'localhost', "8023",
+                    os.path.join(ownDir, '..', '..', 'testcert.cert'),
+                    "--run_db",
                     '--source',os.path.join(self.tempDirectoryName,'source'),
                     '--storage',os.path.join(self.tempDirectoryName,'storage'),
                     '--shutdownTimeout', '1.0'
-                    ],
+                ],
                 **kwargs
-                )
+            )
+            # this should throw a subprocess.TimeoutExpired exception if the service did not crash
+            self.server.wait(1.3)
+        except subprocess.TimeoutExpired:
+            pass
+        else:
+            raise Exception("Failed to start service_manager (retcode:{})"
+                .format(self.server.returncode)
+            )
+
+        try:
             self.database = connect("localhost", 8023, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, schema)
         except:
@@ -389,7 +401,7 @@ class ServiceManagerTest(unittest.TestCase):
 
         numpy.random.seed(42)
 
-        for count in numpy.random.choice(6,size=20):
+        for count in numpy.random.choice(6, size=20):
             logging.info("Setting count for TestService to %s and waiting for it to be alive.", count)
 
             with self.database.transaction():
