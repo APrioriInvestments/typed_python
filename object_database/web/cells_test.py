@@ -157,7 +157,7 @@ class CellsTests(unittest.TestCase):
         #subscribes to the set of cells with k=0 and displays something
         self.cells.root.setChild(
             SubscribedSequence(
-                lambda: Thing.lookupAll(k=0), 
+                lambda: Thing.lookupAll(k=0),
                 lambda thing: Subscribed(
                     lambda: Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
                     )

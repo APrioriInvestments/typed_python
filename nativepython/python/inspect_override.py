@@ -77,7 +77,7 @@ def _try_getfile_class(pyObject):
         func = elt0
 
     return inspect.getfile(func)
-        
+
 def getsourcefile(pyObject):
     """Return the filename that can be used to locate an object's source.
     Return None if no way can be identified to get the source.
@@ -145,7 +145,7 @@ def findsource(pyObject):
         if not candidates:
             raise IOError('could not find class definition for %s' % pyObject)
         elif len(candidates) > 1:
-            raise InspectError('could not find class unequivocally: class ' 
+            raise InspectError('could not find class unequivocally: class '
                                + name)
         else:
             # classes may have decorators and the decorator is considered part

@@ -31,7 +31,7 @@ def distance(s1, s2):
         for j, c2 in enumerate(s2):
             cur.append(min(prev[j+1]+1, cur[j]+1, prev[j] + (1 if c1 != c2 else 0)))
         prev = cur
-    
+
     return prev[-1]
 
 def closest_in(name, names):

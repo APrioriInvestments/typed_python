@@ -163,8 +163,8 @@ valid_instance_types = {
     }
 
 
-instance_types_to_show = set([x for x in valid_instance_types if 
-    ('xlarge' in x and '.xlarge' not in x) and 
+instance_types_to_show = set([x for x in valid_instance_types if
+    ('xlarge' in x and '.xlarge' not in x) and
      x.split(".")[0] in ['m4','m5','c4','c5','r4','r5','i3', 'g2', 'x1']
     ])
 
@@ -194,7 +194,7 @@ class Configuration:
     docker_image = str            #default linux AMI to use when booting linux workers
     defaultStorageSize =  int  #gb of disk to mount on booted workers (if they need ebs)
     max_to_boot = int          #maximum number of workers we'll boot
-    
+
 @schema.define
 class State:
     instance_type = Indexed(str)
@@ -223,7 +223,7 @@ class AwsApi:
         self.s3_client = boto3.client('s3',region_name=self.config.region)
 
     def allRunningInstances(self, includePending=True, spot=False):
-        filters = [{  
+        filters = [{
             'Name': 'tag:Name',
             'Values': [self.config.worker_name]
             }]
@@ -239,7 +239,7 @@ class AwsApi:
         return res
 
     def allSpotRequests(self, allRequests=False):
-        filters = [{  
+        filters = [{
             'Name': 'tag:Name',
             'Values': [self.config.worker_name]
             }]
@@ -280,7 +280,7 @@ class AwsApi:
 
         if instance.key_pair.name != self.config.keypair:
             return False
-        
+
         return True
 
     def terminateSpotRequestById(self, id):
@@ -320,7 +320,7 @@ class AwsApi:
             to_return.append((instance_type, az, results[instance_type,az][1]))
         return to_return
 
-    def bootWorker(self, 
+    def bootWorker(self,
             instanceType,
             clientToken=None,
             amiOverride=None,
@@ -398,8 +398,8 @@ class AwsApi:
             TagSpecifications=[
                 {
                     'ResourceType': 'instance',
-                    'Tags': [{ 
-                        "Key": 'Name', 
+                    'Tags': [{
+                        "Key": 'Name',
                         "Value": nameValue
                         }] + [{ "Key": k, "Value": v} for (k,v) in (extraTags or {}).items()]
                 }]
@@ -529,7 +529,7 @@ class AwsWorkerBootService(ServiceBase):
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         cells.ensureSubscribedType(Configuration)
         cells.ensureSubscribedType(State)
-        
+
         c = Configuration.lookupAny()
 
         if not c:
@@ -550,34 +550,34 @@ class AwsWorkerBootService(ServiceBase):
             rowFun=lambda: sorted([x for x in State.lookupAll() if x.instance_type in instance_types_to_show], key=lambda s:s.instance_type),
             headerFun=lambda x: x,
             rowLabelFun=None,
-            rendererFun=lambda s,field: cells.Subscribed(lambda: 
+            rendererFun=lambda s,field: cells.Subscribed(lambda:
                 s.instance_type if field == 'Instance Type' else
-                s.booted  if field == 'Booted' else 
-                cells.Dropdown(s.desired, [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
-                        if field == 'Desired' else 
-                s.spot_booted if field == 'SpotBooted' else 
-                cells.Dropdown(s.spot_desired, [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10,101,10))]) 
-                        if field == 'SpotDesired' else 
-                ("" if s.observedLimit is None else s.observedLimit) if field == 'ObservedLimit' else 
-                ("Yes" if s.capacityConstrained else "") if field == 'CapacityConstrained' else 
-                valid_instance_types[s.instance_type]['COST'] if field == 'COST' else 
-                valid_instance_types[s.instance_type]['RAM'] if field == 'RAM' else 
-                valid_instance_types[s.instance_type]['CPU'] if field == 'CPU' else 
+                s.booted  if field == 'Booted' else
+                cells.Dropdown(s.desired, [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10,101,10))])
+                        if field == 'Desired' else
+                s.spot_booted if field == 'SpotBooted' else
+                cells.Dropdown(s.spot_desired, [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10,101,10))])
+                        if field == 'SpotDesired' else
+                ("" if s.observedLimit is None else s.observedLimit) if field == 'ObservedLimit' else
+                ("Yes" if s.capacityConstrained else "") if field == 'CapacityConstrained' else
+                valid_instance_types[s.instance_type]['COST'] if field == 'COST' else
+                valid_instance_types[s.instance_type]['RAM'] if field == 'RAM' else
+                valid_instance_types[s.instance_type]['CPU'] if field == 'CPU' else
                 s.spotPrices.get('us-east-1' + field, "") if field in 'abcdef' else
                 ""
                 )
             ) + cells.Card(
-                cells.Text("db_hostname = " + str(c.db_hostname)) + 
-                cells.Text("db_port = " + str(c.db_port)) + 
-                cells.Text("region = " + str(c.region)) + 
-                cells.Text("vpc_id = " + str(c.vpc_id)) + 
-                cells.Text("subnet = " + str(c.subnet)) + 
-                cells.Text("security_group = " + str(c.security_group)) + 
-                cells.Text("keypair = " + str(c.keypair)) + 
-                cells.Text("worker_name = " + str(c.worker_name)) + 
-                cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) + 
-                cells.Text("docker_image = " + str(c.docker_image)) + 
-                cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) + 
+                cells.Text("db_hostname = " + str(c.db_hostname)) +
+                cells.Text("db_port = " + str(c.db_port)) +
+                cells.Text("region = " + str(c.region)) +
+                cells.Text("vpc_id = " + str(c.vpc_id)) +
+                cells.Text("subnet = " + str(c.subnet)) +
+                cells.Text("security_group = " + str(c.security_group)) +
+                cells.Text("keypair = " + str(c.keypair)) +
+                cells.Text("worker_name = " + str(c.worker_name)) +
+                cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) +
+                cells.Text("docker_image = " + str(c.docker_image)) +
+                cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) +
                 cells.Text("max_to_boot = " + str(c.max_to_boot))
                 )
 
@@ -630,7 +630,7 @@ class AwsWorkerBootService(ServiceBase):
 
             for state in State.lookupAll():
                 while state.booted > state.desired:
-                    logging.info("We have %s instances of type %s booted vs %s desired. Shutting one down.", 
+                    logging.info("We have %s instances of type %s booted vs %s desired. Shutting one down.",
                         state.booted,
                         state.instance_type,
                         state.desired
@@ -641,7 +641,7 @@ class AwsWorkerBootService(ServiceBase):
                     state.booted -= 1
 
                 while state.spot_booted > state.spot_desired:
-                    logging.info("We have %s spot instances of type %s requested vs %s desired. Terminating one down.", 
+                    logging.info("We have %s spot instances of type %s requested vs %s desired. Terminating one down.",
                         state.spot_booted,
                         state.instance_type,
                         state.spot_desired
@@ -652,7 +652,7 @@ class AwsWorkerBootService(ServiceBase):
                     state.spot_booted -= 1
 
                 while state.booted < state.desired:
-                    logging.info("We have %s instances of type %s booted vs %s desired. Booting one.", 
+                    logging.info("We have %s instances of type %s booted vs %s desired. Booting one.",
                         state.booted,
                         state.instance_type,
                         state.desired
@@ -678,7 +678,7 @@ class AwsWorkerBootService(ServiceBase):
                             break
 
                 while state.spot_booted < state.spot_desired:
-                    logging.info("We have %s spot instances of type %s booted vs %s desired. Booting one.", 
+                    logging.info("We have %s spot instances of type %s booted vs %s desired. Booting one.",
                         state.spot_booted,
                         state.instance_type,
                         state.spot_desired
@@ -700,6 +700,6 @@ class AwsWorkerBootService(ServiceBase):
                             break
 
         time.sleep(self.SLEEP_INTERVAL)
-        
 
-                        
+
+

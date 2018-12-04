@@ -53,7 +53,7 @@ class Wrapper(object):
             return self.getNativeLayoutType().pointer()
         else:
             return self.getNativeLayoutType()
-    
+
     def convert_destroy(self, context, target):
         raise NotImplementedError()
 

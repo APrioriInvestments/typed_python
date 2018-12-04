@@ -20,7 +20,7 @@ class InMemoryChannel:
 
         self._pumpThreadServer = threading.Thread(target=self.pumpMessagesFromServer)
         self._pumpThreadServer.daemon = True
-        
+
         self._pumpThreadClient = threading.Thread(target=self.pumpMessagesFromClient)
         self._pumpThreadClient.daemon = True
 
@@ -47,7 +47,7 @@ class InMemoryChannel:
                 except:
                     logging.error("Pump thread failed for %s: %s", self, traceback.format_exc())
                     return
-        
+
     def pumpMessagesFromClient(self):
         lastHeartbeat = time.time()
         while not self._shouldStop:
@@ -92,7 +92,7 @@ class InMemoryChannel:
 
     def setServerToClientHandler(self, callback):
         assert not self._shouldStop
-        
+
         self._clientCallback = callback
         self._pumpThreadServer.start()
 
@@ -139,7 +139,7 @@ class InMemServer(Server):
         Server.stop(self)
 
         self.stopped.set()
-        
+
         for c in self.channels:
             c.stop()
         self.checkForDeadConnectionsLoopThread.join()

@@ -179,7 +179,7 @@ class TestRuntime(unittest.TestCase):
         def f(x: TupleOf(float), y:TupleOf(float)) -> float:
             j = 0
             res = 0.0
-            
+
             while j < len(y):
                 i = 0
                 while i < len(x):

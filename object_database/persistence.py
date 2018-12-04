@@ -48,7 +48,7 @@ class InMemoryPersistence(object):
     def _setAdd(self, key, values):
         if not values:
             return
-        
+
         with self.lock:
             if key not in self.values:
                 self.values[key] = set()
@@ -128,7 +128,7 @@ class RedisPersistence(object):
     def __init__(self, db=0, port=None):
         self.lock = threading.RLock()
         kwds = {}
-        
+
         if port is not None:
             kwds['port'] = port
 
@@ -231,7 +231,7 @@ class RedisPersistence(object):
             for key, to_remove in (setRemoves or {}).items():
                 if key not in self.cache:
                     self.getSetMembers(key)
-                
+
                 for to_remove_val in to_remove:
                     pipe.srem(key, to_remove_val)
 
@@ -289,4 +289,3 @@ class RedisPersistence(object):
                 del self.cache[key]
             self.redis.delete(key)
 
-    

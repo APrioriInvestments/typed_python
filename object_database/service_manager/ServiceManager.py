@@ -90,9 +90,9 @@ class ServiceManager(object):
 
         if not service:
             service = service_schema.Service(name=serviceName, placement="Any")
-            
+
         service.setCodebase(codebase, ".".join(className.split(".")[:-1]), className.split(".")[-1])
-        
+
         if isSingleton is not None:
             service.isSingleton = isSingleton
 
@@ -189,7 +189,7 @@ class ServiceManager(object):
 
 
             instances = self.instanceRecordsToBoot()
-                
+
             bad_instances = {}
 
             for i in instances:
@@ -212,7 +212,7 @@ class ServiceManager(object):
             self.serviceHostObject.cpuUse = psutil.cpu_percent() / 100.0
             self.serviceHostObject.actualMemoryUseGB = psutil.virtual_memory().used / 1024**3
             self.serviceHostObject.statsLastUpdateTime = time.time()
-    
+
     @revisionConflictRetry
     def collectDeadHosts(self):
         #reset the state
@@ -265,7 +265,7 @@ class ServiceManager(object):
             if needRedeploy:
                 logging.info(
                     "The following services need to be stopped because their codebases are out of date:\n%s",
-                    "\n".join(["  " + i.service.name + "." + i._identity + ". " 
+                    "\n".join(["  " + i.service.name + "." + i._identity + ". "
                             + str(i.service.codebase) + " != " + str(i.codebase) for i in needRedeploy])
                     )
 
@@ -281,7 +281,7 @@ class ServiceManager(object):
 
         #wait for them to be down before proceeding
         self.db.waitForCondition(
-            lambda: not [x for x in needRedeploy if x.exists()], 
+            lambda: not [x for x in needRedeploy if x.exists()],
             self.shutdownTimeout * 2.0
             )
 
@@ -300,7 +300,7 @@ class ServiceManager(object):
             with self.db.transaction():
                 if service.effectiveTargetCount() != len(actual_records):
                     self._updateService(service, actual_records)
-        
+
     def _pickHost(self, service):
         for h in service_schema.ServiceHost.lookupAll():
             if h.connection.exists():
@@ -325,14 +325,14 @@ class ServiceManager(object):
                 host.coresUsed = host.coresUsed + service.coresUsed
 
             instance = service_schema.ServiceInstance(
-                service=service, 
+                service=service,
                 host=host,
                 state="Booting",
                 start_timestamp=time.time()
                 )
 
             actual_records.append(instance)
-            
+
         while service.effectiveTargetCount() < len(actual_records):
             sInst = actual_records.pop()
             sInst.triggerShutdown()

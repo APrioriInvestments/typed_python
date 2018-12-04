@@ -46,7 +46,7 @@ assert pointer_size == native_ast_to_llvm.pointer_size
 def sizeof_native_type(native_type):
     if native_type.matches.Void:
         return 0
-    
+
     return (
         native_ast_to_llvm.type_to_llvm_type(native_type)
             .get_abi_size(target_machine.target_data)
@@ -130,7 +130,7 @@ class Compiler:
             input_types = [x[1] for x in functions[fname].args]
             output_type = functions[fname].output_type
 
-            result[fname] = NativeFunctionPointer(fname, func_ptr, 
+            result[fname] = NativeFunctionPointer(fname, func_ptr,
                                                   input_types, output_type)
 
             self.functions_by_name[fname] = result[fname]

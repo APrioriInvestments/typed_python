@@ -22,12 +22,12 @@ class InProcessServiceManager(ServiceManager):
     def __init__(self, dbConnectionFactory):
         self.storageRoot = tempfile.TemporaryDirectory()
         self.sourceRoot = tempfile.TemporaryDirectory()
-        
+
         ServiceManager.__init__(self, dbConnectionFactory, self.sourceRoot.name, isMaster=True, ownHostname="localhost")
 
         self.serviceWorkers = {}
 
-        
+
     def _startServiceWorker(self, service, instanceIdentity):
         if instanceIdentity in self.serviceWorkers:
             return
@@ -52,4 +52,4 @@ class InProcessServiceManager(ServiceManager):
     def cleanup(self):
         self.storageRoot.cleanup()
         self.sourceRoot.cleanup()
-        
+

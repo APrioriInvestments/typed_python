@@ -60,7 +60,7 @@ def main(argv):
         t.start()
     for t in threads:
         t.join()
-    
+
     print(sum(transactionCount) / parsedArgs.seconds, " transactions per second")
 
     return 0

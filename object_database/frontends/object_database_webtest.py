@@ -51,7 +51,7 @@ def main(argv=None):
                     '--shutdownTimeout', '.5'
                     ]
                 )
-            
+
             database = connect("localhost", 8020, retry=True)
             database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
