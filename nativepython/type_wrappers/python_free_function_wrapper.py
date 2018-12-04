@@ -16,11 +16,11 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
 import nativepython.native_ast as native_ast
 
-class NoneWrapper(Wrapper):
+class PythonFreeFunctionWrapper(Wrapper):
     is_pod = True
 
-    def __init__(self):
-        super().__init__(NoneType())
+    def __init__(self, f):
+        super().__init__(f)
 
     def lower_as_function_arg(self):
         return self.lower()
@@ -34,4 +34,5 @@ class NoneWrapper(Wrapper):
     def convert_bin_op(self, context, left, op, right):
         raise ConversionException("Not convertible")
 
-
+    def convert_call(self, context, left, args):
+        return context.call_py_function(self.typeRepresentation, args)

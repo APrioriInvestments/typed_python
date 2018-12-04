@@ -16,6 +16,7 @@ import llvmlite.binding as llvm
 import llvmlite.ir
 import nativepython.native_ast_to_llvm as native_ast_to_llvm
 import sys
+import ctypes
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -24,6 +25,13 @@ llvm.initialize_native_asmprinter()  # yes, even this one
 target_triple = llvm.get_process_triple()
 target = llvm.Target.from_triple(target_triple)
 target_machine = target.create_target_machine()
+
+#we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
+if sys.platform == "darwin":
+    ctypes.CDLL("libstdc++.dylib",mode=ctypes.RTLD_GLOBAL)
+else:
+    ctypes.CDLL("libstdc++.so.6",mode=ctypes.RTLD_GLOBAL)
+
 
 pointer_size = (
     llvmlite.ir.PointerType(llvmlite.ir.DoubleType())

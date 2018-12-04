@@ -105,21 +105,23 @@ class TestRuntime(unittest.TestCase):
 
         self.assertEqual(failures, 0)
 
-    def test_assignment_of_pod(self):
+    def checkFunctionOfIntegers(self, f):
         r  = Runtime.singleton()
-
-        def f(x: int) -> int:
-            y = x
-            return y
 
         f_fast = r.compile(f)
 
         for i in range(100):
             self.assertEqual(f_fast(i), f(i))
 
-    def test_simple_loop(self):
-        r  = Runtime.singleton()
 
+    def test_assignment_of_pod(self):
+        def f(x: int) -> int:
+            y = x
+            return y
+
+        self.checkFunctionOfIntegers(f)
+
+    def test_simple_loop(self):
         def f(x: int) -> int:
             y = 0
             while x > 0:
@@ -127,9 +129,21 @@ class TestRuntime(unittest.TestCase):
                 y = y + x
             return y
 
-        f_fast = r.compile(f)
+        self.checkFunctionOfIntegers(f)
 
-        for i in range(100):
-            fastVal = f_fast(i)
-            slowVal = f(i)
-            self.assertEqual(fastVal, slowVal)
+    def test_call_other_typed_function(self):
+        def g(x: int) -> int:
+            return x+1
+
+        def f(x: int) -> int:
+            return g(x+2)
+
+        self.checkFunctionOfIntegers(f)
+
+    def test_basic_type_conversion(self):
+        def f(x: int) -> int:
+            y = 1.5
+            return int(y)
+
+        self.checkFunctionOfIntegers(f)
+

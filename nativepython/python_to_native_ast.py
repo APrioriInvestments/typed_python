@@ -17,7 +17,10 @@ import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
 import nativepython.native_ast as native_ast
 
+from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
+from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrapper
+from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
@@ -47,6 +50,9 @@ class FunctionOutput:
     pass
 
 def typedPythonTypeToTypeWrapper(t):
+    if isinstance(t, Wrapper):
+        return t
+
     assert hasattr(t, '__typed_python_category__'), t
 
     if t is Int64():
@@ -59,6 +65,51 @@ def typedPythonTypeToTypeWrapper(t):
         return BoolWrapper()
 
     assert False, t
+
+def pythonObjectRepresentation(f):
+    if f in (int,bool,float,str,type(None)):
+        return TypedExpression(native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
+
+    if f is None:
+        return TypedExpression(
+            native_ast.Expression.Constant(
+                val=native_ast.Constant.Void()
+                ), 
+            NoneWrapper(),
+            False
+            )
+    if isinstance(f, bool):
+        return TypedExpression(
+            native_ast.Expression.Constant(
+                val=native_ast.Constant.Int(val=f,bits=1,signed=False)
+                ), 
+            BoolWrapper(),
+            False
+            )
+    if isinstance(f, int):
+        return TypedExpression(
+            native_ast.Expression.Constant(
+                val=native_ast.Constant.Int(val=f,bits=64,signed=True)
+                ), 
+            Int64Wrapper(),
+            False
+            )
+    if isinstance(f, float):
+        return TypedExpression(
+            native_ast.Expression.Constant(
+                val=native_ast.Constant.Float(val=f,bits=64)
+                ), 
+            Float64Wrapper(),
+            False
+            )
+    if isinstance(f, type(pythonObjectRepresentation)):
+        return TypedExpression(
+            native_ast.nullExpr,
+            PythonFreeFunctionWrapper(f),
+            False
+            )
+
+    assert False, f
 
 class InitFields:
     def __init__(self, first_var_name, fields_and_types):
@@ -314,8 +365,7 @@ class ConversionContext(object):
             if i >= len(input_types):
                 if not varargs:
                     raise ConversionException("Calling with too many arguments and func is not varargs")
-                #never pass references - always unpack
-                return args[i].unwrap_reference(completely=True)
+                return args[i].unwrap()
 
             to_type = input_types[i]
 
@@ -363,7 +413,6 @@ class ConversionContext(object):
 
     def call_py_function(self, f, args, name_override=None):
         #force arguments to a type appropriate for argpassing
-        #e.g. drop out "CreateReference", ensure we pass by ref, etc
         args = [a.as_call_arg(self) for a in args]
         native_args = [a.expr for a in args]
 
@@ -397,7 +446,8 @@ class ConversionContext(object):
                     target=call_target.named_call_target,
                     args=native_args
                     ),
-                call_target.output_type
+                call_target.output_type,
+                False
                 )
 
     def generate_call_expr(self, target, args):
@@ -428,12 +478,12 @@ class ConversionContext(object):
             if not is_simple(a):
                 name = self.let_varname()
                 lets.append((name, a))
-                actual_args.append(native_ast.Expression.Variable(name))
+                actual_args.append(native_ast.Expression.Variable(name=name))
             else:
                 actual_args.append(a)
 
         e = native_ast.Expression.Call(
-            target=native_ast.CallTarget.Named(target),
+            target=native_ast.CallTarget.Named(target=target),
             args=actual_args
             )
 
@@ -467,6 +517,7 @@ class ConversionContext(object):
 
             if ast.id in self._free_variable_lookup:
                 return pythonObjectRepresentation(self._free_variable_lookup[ast.id])
+
             elif ast.id in __builtins__:
                 return pythonObjectRepresentation(__builtins__[ast.id])
 
@@ -477,38 +528,14 @@ class ConversionContext(object):
 
         if ast.matches.Num:
             if ast.n.matches.None_:
-                return TypedExpression(
-                    native_ast.Expression.Constant(
-                        val=native_ast.Constant.Void()
-                        ), 
-                    NoneWrapper(),
-                    False
-                    )
+                return pythonObjectRepresentation(None)
             if ast.n.matches.Boolean:
-                return TypedExpression(
-                    native_ast.Expression.Constant(
-                        val=native_ast.Constant.Int(val=ast.n.value,bits=1,signed=False)
-                        ), 
-                    BoolWrapper(),
-                    False
-                    )
+                return pythonObjectRepresentation(bool(ast.n.value))
             if ast.n.matches.Int:
-                return TypedExpression(
-                    native_ast.Expression.Constant(
-                        val=native_ast.Constant.Int(val=ast.n.value,bits=64,signed=True)
-                        ), 
-                    Int64Wrapper(),
-                    False
-                    )
+                return pythonObjectRepresentation(int(ast.n.value))
             if ast.n.matches.Float:
-                return TypedExpression(
-                    native_ast.Expression.Constant(
-                        val=native_ast.Constant.Float(val=ast.n.value,bits=64)
-                        ), 
-                    Float64Wrapper(),
-                    False
-                    )
-
+                return pythonObjectRepresentation(float(ast.n.value))
+            
         if ast.matches.Str:
             return pythonObjectRepresentation(ast.s)
 
@@ -579,26 +606,12 @@ class ConversionContext(object):
             ast_args = ast.args
             stararg = None
 
-            if ast_args and ast_args[-1].matches.Starred:
-                stararg = ast_args[-1].value
-                ast_args = ast_args[:-1]
+            for a in ast_args:
+                assert not a.matches.Starred, "not implemented yet"
 
             args = [self.convert_expression_ast(a) for a in ast_args]
 
-            init = native_ast.nullExpr
-
-            if stararg is not None:
-                starargs = self.convert_expression_ast(stararg)
-
-                #starargs is now a reference to a tuple
-                #now we want to take each element and turn into a reference.
-
-                for attr, t in starargs.expr_type.nonref_type.element_types:
-                    args.append(
-                        starargs.convert_attribute(self, attr)
-                        )
-
-            return init + l.convert_call(self, args)
+            return l.convert_call(self, args)
 
         if ast.matches.Compare:
             assert len(ast.comparators) == 1, "multi-comparison not implemented yet"
@@ -851,7 +864,9 @@ class ConversionContext(object):
 
             output_type = self._varname_to_type[FunctionOutput]
 
-            return TypedExpression(native_ast.Expression.Return(arg=e.asNonref().expr), None, False)
+            assert output_type.is_pod, "for non pod, we should be copying this object"
+
+            return TypedExpression(native_ast.Expression.Return(arg=e.unwrap().expr), None, False)
 
         if ast.matches.Expr:
             return TypedExpression(
@@ -1446,7 +1461,7 @@ class Converter(object):
                 )
 
             if not underlyingDefinition.output_type.matches.Void:
-                assert typedPythonTypeToTypeWrapper(callTarget.output_type).is_pod
+                assert callTarget.output_type.is_pod
 
                 body = native_ast.var('return').cast(underlyingDefinition.output_type.pointer()).store(body)
 
@@ -1519,8 +1534,8 @@ class Converter(object):
                 intrinsic=False,
                 can_throw=True
                 ),
-            [x.t for x in input_types],
-            output_type.t
+            input_types,
+            output_type
             )
 
         self._definitions[new_name] = definition

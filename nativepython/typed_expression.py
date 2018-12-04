@@ -32,6 +32,16 @@ class TypedExpression(object):
         self.expr_type = t
         self.isReference = isReference
 
+    def as_call_arg(self, context):
+        """Convert this expression to a call-argument form."""
+        if self.expr_type.is_pod:
+            return self.unwrap()
+        else:
+            if self.isReference:
+                return self
+
+            assert False, "we should be jamming this rvalue object into a temporary that we can pass"
+
     def convert_assign(self, context, toStore):
         return self.expr_type.convert_assign(context, self, toStore)
 
@@ -41,17 +51,20 @@ class TypedExpression(object):
     def convert_bin_op(self, context, op, rhs):
         return self.expr_type.convert_bin_op(context, self, op, rhs)
 
+    def convert_call(self, context, args):
+        return self.expr_type.convert_call(context, self, args)
+
     def unwrap(self):
         return self.expr_type.unwrap(self)
 
-    def asNonref(self):
-        return self.expr_type.asNonref(self)
+    def toFloat64(self, context):
+        return self.expr_type.toFloat64(context, self)
 
-    def toFloat64(self):
-        return self.expr_type.toFloat64(self)
+    def toInt64(self, context):
+        return self.expr_type.toInt64(context, self)
 
-    def toInt64(self):
-        return self.expr_type.toInt64(self)
+    def toBool(self, context):
+        return self.expr_type.toBool(context, self)
 
     def __str__(self):
         return "Expression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")

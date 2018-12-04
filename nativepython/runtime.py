@@ -44,7 +44,10 @@ class Runtime:
 
             callTarget = self.converter.convert(f.functionObj, [a.typeFilter for a in f.args])
 
-            wrappingCallTargetName = self.converter.generateCallConverter(callTarget, f.returnType)
+            wrappingCallTargetName = self.converter.generateCallConverter(
+                callTarget, 
+                python_to_native_ast.typedPythonTypeToTypeWrapper(f.returnType)
+                )
 
             targets = self.converter.extract_new_function_definitions()
             
@@ -54,7 +57,7 @@ class Runtime:
 
             f._installNativePointer(fp.fp)
             return f
-            
+
         if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
             for o in f.overloads:
                 self.compile(o)

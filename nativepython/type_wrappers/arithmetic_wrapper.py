@@ -54,9 +54,6 @@ class ArithmeticTypeWrapper(Wrapper):
     def lower_as_function_arg(self):
         return self.lower()
 
-    def asNonref(self, e):
-        return self.unwrap(e)
-
     def unwrap(self, e):
         if e.isReference:
             return TypedExpression(e.expr.load(), e.expr_type, False)
@@ -80,7 +77,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
     def lower(self):
         return native_ast.Type.Int(bits=64,signed=True)
 
-    def toFloat64(self, e):
+    def toFloat64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
                 left=e.unwrap().expr,
@@ -90,17 +87,17 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             False
             )
 
-    def toInt64(self, e):
+    def toInt64(self, context, e):
         return e
 
     def convert_bin_op(self, context, left, op, right):
         if op.matches.Div:
             if right.expr_type == self:
-                return left.toFloat64().convert_bin_op(context, op, right)
+                return left.toFloat64(context).convert_bin_op(context, op, right)
 
         if op.matches.Pow:
             if right.expr_type == self:
-                return left.toFloat64().convert_bin_op(context, op, right).toInt64()
+                return left.toFloat64(context).convert_bin_op(context, op, right).toInt64(context)
 
 
         if right.expr_type == left.expr_type:
@@ -126,7 +123,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     )
 
         if isinstance(right.expr_type, Float64Wrapper):
-            return left.toFloat64().convert_bin_op(context, op, right)
+            return left.toFloat64(context).convert_bin_op(context, op, right)
 
         raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
 
@@ -137,7 +134,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def lower(self):
         return native_ast.Type.Int(bits=1,signed=False)
 
-    def toFloat64(self, e):
+    def toFloat64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
                 left=e.unwrap().expr,
@@ -147,7 +144,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
             False
             )
 
-    def toInt64(self, e):
+    def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
                 left=e.unwrap().expr,
@@ -168,10 +165,10 @@ class Float64Wrapper(ArithmeticTypeWrapper):
     def lower(self):
         return native_ast.Type.Float(bits=64)
 
-    def toFloat64(self, e):
+    def toFloat64(self, context, e):
         return e
 
-    def toInt64(self, e):
+    def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
                 left=e.unwrap().expr,
@@ -183,7 +180,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
 
     def convert_bin_op(self, context, left, op, right):
         if isinstance(right.expr_type, Int64Wrapper):
-            right = right.toFloat64()
+            right = right.toFloat64(context)
 
         if right.expr_type == left.expr_type:
             if op in pyOpToNative:

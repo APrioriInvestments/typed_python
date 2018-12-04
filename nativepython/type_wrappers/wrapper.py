@@ -15,13 +15,37 @@
 class Wrapper(object):
     is_pod = False
 
-    def __init__(self, t):
+    def __init__(self, typeRepresentation):
         super().__init__()
 
-        self.t = t
+        self.typeRepresentation = typeRepresentation
 
     def __eq__(self, other):
-        return self.t == other.t
+        if type(self) != type(other):
+            return False
+
+        return self.typeRepresentation == other.typeRepresentation
 
     def __hash__(self):
-        return hash(self.t)
+        return hash(self.typeRepresentation)
+
+    def convert_assign(self, context, target, toStore):
+        raise NotImplementedError()
+
+    def convert_initialize_copy(self, context, target, toStore):
+        raise NotImplementedError()
+
+    def convert_destroy(self, context, instance):
+        raise NotImplementedError()
+
+    def convert_call(self, context, left, args):
+        raise NotImplementedError()
+
+    def toInt64(self, e):
+        raise NotImplementedError()
+
+    def toFloat64(self, e):
+        raise NotImplementedError()
+
+    def tooBool(self, e):
+        raise NotImplementedError()
