@@ -16,7 +16,7 @@ flask-cors = "*"
 requests = "*"
 websockets = "*"
 llvmlite = "*"
-nativepython = {path = "."}
+nativepython = {editable = true,path = "."}
 
 [requires]
 python_version = "3.6.7"

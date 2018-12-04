@@ -21,3 +21,4 @@ clean:
 	rm -rf build/
 	rm -rf nativepython.egg-info/
 	rm -f nose.*.log
+	rm -f typed_python/_types.cpython-*.so
