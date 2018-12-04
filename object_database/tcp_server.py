@@ -51,6 +51,7 @@ class ServerToClientProtocol(AlgebraicProtocol):
         self.connectionIsDead = True
         self.transport.close()
 
+
 class ClientToServerProtocol(AlgebraicProtocol):
     def __init__(self, host, port, eventLoop):
         AlgebraicProtocol.__init__(self, ServerToClient, ClientToServer)
@@ -108,6 +109,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
     def write(self, msg):
         self.loop.call_soon_threadsafe(self.sendMessage, msg)
 
+
 class EventLoopInThread:
     def __init__(self):
         self.loop = asyncio.new_event_loop()
@@ -125,27 +127,29 @@ class EventLoopInThread:
             self.started = True
             self.thread.start()
 
-    def create_connection(self, callback, host, port):
+    def create_connection(self, protocol_factory, host, port, ssl=None):
         self.start()
 
         async def doit():
-            return await self.loop.create_connection(callback, host, port, family=socket.AF_INET)
+            return await self.loop.create_connection(protocol_factory, host=host, port=port, family=socket.AF_INET, ssl=ssl)
 
         return asyncio.run_coroutine_threadsafe(doit(), self.loop).result(10)
 
-    def create_server(self, callback, host, port):
+    def create_server(self, protocol_factory, host, port, ssl=None):
         self.start()
 
         async def doit():
-            return await self.loop.create_server(callback, host, port, family=socket.AF_INET)
+            return await self.loop.create_server(protocol_factory, host=host, port=port, family=socket.AF_INET, ssl=ssl)
 
         res = asyncio.run_coroutine_threadsafe(doit(), self.loop)
 
         return res.result(10)
 
+
 _eventLoop = EventLoopInThread()
 
-def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
+
+def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop, ssl=None):
     t0 = time.time()
 
     proto = None
@@ -153,8 +157,9 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
         try:
             _, proto = eventLoop.create_connection(
                 lambda: ClientToServerProtocol(host, port, eventLoop.loop),
-                host,
-                port
+                host=host,
+                port=port,
+                ssl=ssl
                 )
         except:
             if not retry or time.time() - t0 > timeout * .8:
@@ -174,13 +179,15 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
 
 _eventLoop2 = []
 
+
 class TcpServer(Server):
-    def __init__(self, host, port, mem_store = None):
+    def __init__(self, host, port, mem_store = None, ssl_context=None):
         Server.__init__(self, mem_store or InMemoryPersistence())
 
         self.mem_store = mem_store
         self.host = host
         self.port = port
+        self.ssl_ctx = ssl_context
         self.socket_server = None
         self.stopped = False
 
@@ -189,9 +196,10 @@ class TcpServer(Server):
 
         self.socket_server = _eventLoop.create_server(
             lambda: ServerToClientProtocol(self, _eventLoop.loop),
-            self.host,
-            self.port
-            )
+            host=self.host,
+            port=self.port,
+            ssl=self.ssl_ctx
+        )
         _eventLoop.loop.call_soon_threadsafe(self.checkHeartbeatsCallback)
 
     def checkHeartbeatsCallback(self):
@@ -217,11 +225,13 @@ class TcpServer(Server):
         else:
             loop = _eventLoop
 
-        return connect(self.host, self.port, eventLoop=loop)
+        # Here we're passing the ssl context of the server to use it with loop.create_connection
+        # for the client connection. Hopefully, that's fine.
+        return connect(self.host, self.port, eventLoop=loop, ssl=self.ssl_ctx)
 
     def __enter__(self):
         self.start()
         return self
 
-    def __exit__(self, t,v,traceback):
+    def __exit__(self, t, v, traceback):
         self.stop()

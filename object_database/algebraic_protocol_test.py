@@ -103,7 +103,6 @@ class AlgebraicProtocolTests(unittest.TestCase):
         serverCoro = loop.create_server(
             PingPongProtocol, host, port,
             ssl=srv_ssl_ctx,
-            #ssl_handshake_timeout=2
         )
 
         server = loop.run_until_complete(serverCoro)
