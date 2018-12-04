@@ -23,22 +23,22 @@ import nativepython.python.ast_util as ast_util
 from typed_python import *
 
 #forward declarations.
-Module = lambda: Module 
-Statement = lambda: Statement 
-Expr = lambda: Expr 
-Arg = lambda: Arg 
-NumericConstant = lambda: NumericConstant 
-ExprContext = lambda: ExprContext 
-Slice = lambda: Slice 
-BooleanOp = lambda: BooleanOp 
-BinaryOp = lambda: BinaryOp 
-UnaryOp = lambda: UnaryOp 
-ComparisonOp = lambda: ComparisonOp 
-Comprehension = lambda: Comprehension 
-ExceptionHandler = lambda: ExceptionHandler 
-Arguments = lambda: Arguments 
-Keyword = lambda: Keyword 
-Alias = lambda: Alias 
+Module = lambda: Module
+Statement = lambda: Statement
+Expr = lambda: Expr
+Arg = lambda: Arg
+NumericConstant = lambda: NumericConstant
+ExprContext = lambda: ExprContext
+Slice = lambda: Slice
+BooleanOp = lambda: BooleanOp
+BinaryOp = lambda: BinaryOp
+UnaryOp = lambda: UnaryOp
+ComparisonOp = lambda: ComparisonOp
+Comprehension = lambda: Comprehension
+ExceptionHandler = lambda: ExceptionHandler
+Arguments = lambda: Arguments
+Keyword = lambda: Keyword
+Alias = lambda: Alias
 
 Module = Alternative("Module",
   Module = {"body": TupleOf(Statement)},
@@ -69,7 +69,7 @@ Statement = Alternative("Statement",
      'filename': str
      },
 
-  Return = { 
+  Return = {
     "value": OneOf(Expr, None) ,
     'line_number': int,
     'col_offset': int,
@@ -509,7 +509,7 @@ def createPythonAstString(s, **kwds):
         return Expr.Str(s=str(s), **kwds)
     except:
         return Expr.Num(
-            n=NumericConstant.Unknown(), 
+            n=NumericConstant.Unknown(),
             **kwds
             )
 
@@ -632,8 +632,8 @@ def convertPyAstToAlgebraic(tree,fname):
             import traceback
             raise UserWarning(
                 "Failed to construct %s from %s with arguments\n%s\n\n%s"
-                % (converter, type(tree), 
-                   "\n".join(["\t%s:%s" % (k,repr(v)[:50]) for k,v in args.items()]), 
+                % (converter, type(tree),
+                   "\n".join(["\t%s:%s" % (k,repr(v)[:50]) for k,v in args.items()]),
                    traceback.format_exc()
                    )
                 )

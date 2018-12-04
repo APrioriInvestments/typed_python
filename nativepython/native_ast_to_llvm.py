@@ -37,7 +37,7 @@ def type_to_llvm_type(t):
 
     if t.matches.Struct:
         return llvmlite.ir.LiteralStructType(type_to_llvm_type(t[1]) for t in t.element_types)
-        
+
     if t.matches.Pointer:
         #llvm won't allow a void*, so we model it as a pointer to an empty struct instead
         if t.value_type.matches.Void:
@@ -53,13 +53,13 @@ def type_to_llvm_type(t):
                 )
 
         return llvmlite.ir.PointerType(type_to_llvm_type(t.value_type))
-        
+
     if t.matches.Float and t.bits == 64:
         return llvmlite.ir.DoubleType()
 
     if t.matches.Float and t.bits == 32:
         return llvmlite.ir.FloatType()
-    
+
     if t.matches.Int:
         return llvmlite.ir.IntType(t.bits)
 
@@ -82,7 +82,7 @@ def constant_to_typed_llvm_value(module, builder, c):
             llvmlite.ir.Constant(llvmlite.ir.IntType(c.bits), c.val),
             native_ast.Type.Int(bits=c.bits, signed=c.signed)
             )
-    
+
     if c.matches.NullPointer:
         nt = native_ast.Type.Pointer(c.value_type)
         t = type_to_llvm_type(nt)
@@ -116,7 +116,7 @@ def constant_to_typed_llvm_value(module, builder, c):
         nt = native_ast.Type.Pointer(native_ast.Type.Int(bits=8,signed=False))
 
         return TypedLLVMValue(
-            builder.bitcast(value, llvm_i8ptr), 
+            builder.bitcast(value, llvm_i8ptr),
             nt
             )
 
@@ -142,12 +142,12 @@ class TeardownOnScopeExit:
         self.converter = converter
         self.builder = converter.builder
 
-        self.incoming_tags = {} #dict from block->name->(True or llvm_value)    
+        self.incoming_tags = {} #dict from block->name->(True or llvm_value)
 
         #is the incoming block from a scope trying to return (True)
         #or propagate an exception (False)
         self.incoming_is_return = {} #dict from block->(True/False or llvm_value)
-        
+
         self._block = None
 
         self.incoming_blocks = set()
@@ -164,7 +164,7 @@ class TeardownOnScopeExit:
 
         assert not self.return_is_generated
         self.return_is_generated = True
-        
+
         if len(self.incoming_is_return) == 1:
             return list(self.incoming_is_return.values())[0]
 
@@ -253,8 +253,8 @@ class TeardownOnScopeExit:
 
             if self.parent_scope is not None:
                 block = self.parent_scope.accept_incoming(
-                    self.builder.block, 
-                    tags, 
+                    self.builder.block,
+                    tags,
                     is_return
                     )
                 self.builder.branch(block)
@@ -294,8 +294,8 @@ class TeardownOnScopeExit:
 
             if is_return is True:
                 block = self.parent_scope.accept_incoming(
-                    self.builder.block, 
-                    tags, 
+                    self.builder.block,
+                    tags,
                     is_return
                     )
                 self.builder.branch(block)
@@ -308,8 +308,8 @@ class TeardownOnScopeExit:
             assert isinstance(is_return, llvmlite.ir.Value)
             with self.builder.if_then(is_return):
                 block = self.parent_scope.accept_incoming(
-                    self.builder.block, 
-                    tags, 
+                    self.builder.block,
+                    tags,
                     is_return
                     )
                 self.builder.branch(block)
@@ -317,13 +317,13 @@ class TeardownOnScopeExit:
             generator(tags, target_resume_block)
 
 class FunctionConverter:
-    def __init__(self, 
-                module, 
+    def __init__(self,
+                module,
                 function,
-                converter, 
-                builder, 
-                arg_assignments, 
-                output_type, 
+                converter,
+                builder,
+                arg_assignments,
+                output_type,
                 external_function_references
                 ):
         self.function = function
@@ -395,13 +395,13 @@ class FunctionConverter:
                 self.external_function_references["__cxa_end_catch"],
                 [self.builder.extract_value(res, 0)]
                 )
-            
+
             block = self.teardown_handler.accept_incoming(
-                self.builder.block, 
-                self.tags_initialized, 
+                self.builder.block,
+                self.tags_initialized,
                 is_return=False
                 )
-            
+
             self.builder.branch(block)
 
     def convert_teardown(self, teardown, remove_from_tags=False):
@@ -434,7 +434,7 @@ class FunctionConverter:
             llvm_i8ptr.as_pointer()
             )
         self.builder.store(
-            self.builder.bitcast(llvm_pointer_val, llvm_i8ptr), 
+            self.builder.bitcast(llvm_pointer_val, llvm_i8ptr),
             exception_ptr
             )
         return self.builder.bitcast(exception_ptr, llvm_i8ptr)
@@ -484,7 +484,7 @@ class FunctionConverter:
             )
 
         self.builder.unreachable()
-            
+
     def convert(self, expr):
         if expr.matches.Let:
             l = self.convert(expr.val)
@@ -511,7 +511,7 @@ class FunctionConverter:
                 with self.builder.goto_entry_block():
                     self.stack_slots[expr.name] = \
                         TypedLLVMValue(
-                            self.builder.alloca(llvm_type,name=expr.name), 
+                            self.builder.alloca(llvm_type,name=expr.name),
                             native_ast.Type.Pointer(value_type=expr.type)
                             )
 
@@ -552,7 +552,7 @@ class FunctionConverter:
                 for i in range(len(val.native_type.element_types)):
                     if val.native_type.element_types[i][0] == attr:
                         return TypedLLVMValue(
-                            self.builder.extract_value(val.llvm_value, i), 
+                            self.builder.extract_value(val.llvm_value, i),
                             val.native_type.element_types[i][1]
                             )
                 assert False, "Type %s doesn't have attribute %s" % (val.native_type, attr)
@@ -586,7 +586,7 @@ class FunctionConverter:
                 return TypedLLVMValue(None, ptr.native_type.value_type)
 
             return TypedLLVMValue(self.builder.load(ptr.llvm_value), ptr.native_type.value_type)
-        
+
         if expr.matches.Constant:
             return constant_to_typed_llvm_value(self.module, self.builder, expr.val)
 
@@ -650,8 +650,8 @@ class FunctionConverter:
                     self.builder.store(l.llvm_value, self.return_slot)
 
             block = self.teardown_handler.accept_incoming(
-                self.builder.block, 
-                self.tags_initialized, 
+                self.builder.block,
+                self.tags_initialized,
                 is_return=True
                 )
 
@@ -676,7 +676,7 @@ class FunctionConverter:
                 cond_llvm = self.builder.fcmp_unordered("!=", cond_llvm, zero_like)
             else:
                 return self.convert(expr.false)
-            
+
             orig_tags = dict(self.tags_initialized)
             true_tags = dict(orig_tags)
             false_tags = dict(orig_tags)
@@ -726,7 +726,7 @@ class FunctionConverter:
                     tag_llvm_value.add_incoming(true_val, true_block)
                     tag_llvm_value.add_incoming(false_val, false_block)
                     final_tags[tag] = tag_llvm_value
-                
+
             self.tags_initialized = final_tags
 
             assert true.native_type == false.native_type, (true,false)
@@ -744,7 +744,7 @@ class FunctionConverter:
             tags = dict(self.tags_initialized)
 
             loop_block = self.builder.append_basic_block()
-            
+
             self.builder.branch(loop_block)
             self.builder.position_at_start(loop_block)
 
@@ -754,7 +754,7 @@ class FunctionConverter:
                 with then:
                     true = self.convert(expr.while_true)
                     self.builder.branch(loop_block)
-                    
+
                 with otherwise:
                     false = self.convert(expr.orelse)
 
@@ -791,7 +791,7 @@ class FunctionConverter:
         if expr.matches.Variable:
             assert expr.name in self.arg_assignments, (expr.name, list(self.arg_assignments.keys()))
             return self.arg_assignments[expr.name]
-            
+
         if expr.matches.Unaryop:
             operand = self.convert(expr.operand)
             if operand.native_type == native_ast.Bool:
@@ -819,13 +819,13 @@ class FunctionConverter:
 
                 if expr.op.matches.BitwiseNot and operand.native_type.matches.Int:
                     return TypedLLVMValue(self.builder.not_(operand.llvm_value), operand.native_type)
-                                        
+
                 if expr.op.matches.Negate:
                     if operand.native_type.matches.Int:
                         return TypedLLVMValue(self.builder.neg(operand.llvm_value), operand.native_type)
                     if operand.native_type.matches.Float:
                         return TypedLLVMValue(
-                            self.builder.fmul(operand.llvm_value, llvmlite.ir.DoubleType()(-1.0)), 
+                            self.builder.fmul(operand.llvm_value, llvmlite.ir.DoubleType()(-1.0)),
                             operand.native_type
                             )
 
@@ -844,20 +844,20 @@ class FunctionConverter:
                 if getattr(expr.op.matches, which):
                     if l.native_type.matches.Float:
                         return TypedLLVMValue(
-                            self.builder.fcmp_ordered(rep, l.llvm_value, r.llvm_value), 
+                            self.builder.fcmp_ordered(rep, l.llvm_value, r.llvm_value),
                             native_ast.Bool
                             )
                     elif l.native_type.matches.Int:
                         return TypedLLVMValue(
-                            self.builder.icmp_signed(rep, l.llvm_value, r.llvm_value), 
+                            self.builder.icmp_signed(rep, l.llvm_value, r.llvm_value),
                             native_ast.Bool
                             )
 
             for py_op, floatop, intop_s, intop_u in [
-                        ('Add','fadd','add','add'), 
-                        ('Mul','fmul','mul','mul'), 
-                        ('Div','fdiv','sdiv', 'udiv'), 
-                        ('Mod','frem','srem', 'urem'), 
+                        ('Add','fadd','add','add'),
+                        ('Mul','fmul','mul','mul'),
+                        ('Div','fdiv','sdiv', 'udiv'),
+                        ('Mod','frem','srem', 'urem'),
                         ('Sub','fsub','sub','sub'),
                         ('LShift',None,'shl','shl'),
                         ('RShift',None,'ashr','lshr'),
@@ -871,7 +871,7 @@ class FunctionConverter:
                             % (py_op, l.native_type, r.native_type, expr)
                     if l.native_type.matches.Float and floatop is not None:
                         return TypedLLVMValue(
-                            getattr(self.builder, floatop)(l.llvm_value, r.llvm_value), 
+                            getattr(self.builder, floatop)(l.llvm_value, r.llvm_value),
                             l.native_type
                             )
                     elif l.native_type.matches.Int:
@@ -879,7 +879,7 @@ class FunctionConverter:
 
                         if llvm_op is not None:
                             return TypedLLVMValue(
-                                getattr(self.builder, llvm_op)(l.llvm_value, r.llvm_value), 
+                                getattr(self.builder, llvm_op)(l.llvm_value, r.llvm_value),
                                 l.native_type
                                 )
 
@@ -903,14 +903,14 @@ class FunctionConverter:
                 assert target.native_type.value_type.matches.Function
 
                 func = target
-            try: 
+            try:
                 if func.native_type.value_type.can_throw:
                     normal_target = self.builder.append_basic_block()
                     exception_target = self.builder.append_basic_block()
 
                     llvm_call_result = self.builder.invoke(
-                        func.llvm_value, 
-                        [a.llvm_value for a in args], 
+                        func.llvm_value,
+                        [a.llvm_value for a in args],
                         normal_target,
                         exception_target
                         )
@@ -961,8 +961,8 @@ class FunctionConverter:
                 )
 
             block = self.teardown_handler.accept_incoming(
-                    self.builder.block, 
-                    self.tags_initialized, 
+                    self.builder.block,
+                    self.tags_initialized,
                     False
                     )
 
@@ -993,7 +993,7 @@ class FunctionConverter:
                             )
 
                     handler_res = self.convert(expr.handler)
-                    
+
                     if prior is None:
                         del self.arg_assignments[expr.varname]
                     else:
@@ -1047,12 +1047,12 @@ def populate_needed_externals(external_function_references, module):
     def define(fname, output, inputs, vararg=False):
         external_function_references[fname] = \
             llvmlite.ir.Function(
-                module, 
+                module,
                 llvmlite.ir.FunctionType(
                     output,
                     inputs,
                     var_arg=vararg
-                    ), 
+                    ),
                 fname
                 )
     define("__cxa_allocate_exception", llvm_i8ptr, [llvm_i64])
@@ -1097,7 +1097,7 @@ class Converter(object):
 
                 print()
                 print("*************")
-                print("def %s(%s): #->%s" % (name, 
+                print("def %s(%s): #->%s" % (name,
                             ",".join(["%s=%s" % (k,str(t)) for k,t in definition.args]),
                             str(definition.output_type)
                             )
@@ -1121,11 +1121,11 @@ class Converter(object):
 
             try:
                 func_converter = FunctionConverter(
-                    module, 
+                    module,
                     func,
-                    self, 
-                    builder, 
-                    arg_assignments, 
+                    self,
+                    builder,
+                    arg_assignments,
                     definition.output_type,
                     external_function_references
                     )
@@ -1138,7 +1138,7 @@ class Converter(object):
 
                 if res is not None:
                     assert res.llvm_value is None
-                    assert definition.output_type == native_ast.Void 
+                    assert definition.output_type == native_ast.Void
                     builder.ret_void()
                 else:
                     if not builder.block.is_terminated:

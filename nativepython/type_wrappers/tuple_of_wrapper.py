@@ -64,7 +64,7 @@ class TupleOfWrapper(Wrapper):
             native_ast.Expression.Branch(
                 cond=other.expr,
                 false=expr.expr.store(other.expr),
-                true=expr.expr.store(other.expr) + 
+                true=expr.expr.store(other.expr) +
                     expr.expr.load().ElementPtrIntegers(0,0).store(
                         native_ast.Expression.Binop(
                             l=expr.expr.load().ElementPtrIntegers(0,0).load(),
@@ -92,7 +92,7 @@ class TupleOfWrapper(Wrapper):
                             r=native_ast.const_int_expr(1)
                         )
                     )
-                    + 
+                    +
                     native_ast.Expression.Branch(
                         cond=target.expr.ElementPtrIntegers(0,0).load(),
                         true=native_ast.nullExpr,
@@ -111,6 +111,6 @@ class TupleOfWrapper(Wrapper):
             nativepython.python_object_representation.typedPythonTypeToTypeWrapper(Int64()),
             False
             )
-        
+
 
 

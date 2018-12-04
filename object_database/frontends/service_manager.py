@@ -45,7 +45,7 @@ def main(argv=None):
     parser.add_argument("--storage", help="path for local storage used by services", required=True)
 
     parser.add_argument("--run_db", default=False, action='store_true')
-    
+
     #if populated, run a db_server as well
     parser.add_argument("--redis_port", type=int, default=None, required=False)
 
@@ -84,8 +84,8 @@ def main(argv=None):
     try:
         if parsedArgs.run_db:
             databaseServer = TcpServer(
-                parsedArgs.own_hostname, 
-                object_database_port, 
+                parsedArgs.own_hostname,
+                object_database_port,
                 RedisPersistence(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None else
                     InMemoryPersistence()
                 )
@@ -93,7 +93,7 @@ def main(argv=None):
             databaseServer.start()
 
             logging.info("Started a database server on %s:%s", parsedArgs.own_hostname, object_database_port)
-    
+
         serviceManager = None
 
         logging.info("Started object_database")
@@ -103,8 +103,8 @@ def main(argv=None):
                 if serviceManager is None:
                     try:
                         serviceManager = SubprocessServiceManager(
-                            parsedArgs.own_hostname, 
-                            parsedArgs.db_hostname, 
+                            parsedArgs.own_hostname,
+                            parsedArgs.db_hostname,
                             parsedArgs.port,
                             parsedArgs.source,
                             parsedArgs.storage,

@@ -35,8 +35,8 @@ def formatTable(rows):
 def configureLogging(preamble="", error=False):
     logging.getLogger('botocore.vendored.requests.packages.urllib3.connectionpool').setLevel(logging.CRITICAL)
     logging.getLogger('asyncio').setLevel(logging.CRITICAL)
-    logging.basicConfig(format='[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s' 
-        + ("|" + preamble if preamble else '') 
+    logging.basicConfig(format='[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s'
+        + ("|" + preamble if preamble else '')
         + '| %(message)s', level=logging.INFO if not error else logging.ERROR
         )
 
@@ -110,7 +110,7 @@ def distance(s1, s2):
         for j, c2 in enumerate(s2):
             cur.append(min(prev[j+1]+1, cur[j]+1, prev[j] + (1 if c1 != c2 else 0)))
         prev = cur
-    
+
     return prev[-1]
 
 def closest_in(name, names):

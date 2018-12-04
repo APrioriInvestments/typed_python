@@ -52,4 +52,3 @@ class NativeFunctionTypesTests(unittest.TestCase):
         self.assertEqual([a.defaultValue for a in o.args], [None, (30,), (None,), None, None])
         self.assertEqual([a.isStarArg for a in o.args], [False, False, False, True, False])
         self.assertEqual([a.isKwarg for a in o.args], [False, False, False, False, True])
-    

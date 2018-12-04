@@ -58,7 +58,7 @@ def main(argv):
 
     list_parser = subparsers.add_parser('list', help='list machines')
     list_parser.set_defaults(command='list')
-    
+
     boot_parser = subparsers.add_parser('boot', help='set the number of desired boxes')
     boot_parser.set_defaults(command='boot')
     boot_parser.add_argument("instance_type")
@@ -133,8 +133,8 @@ def main(argv):
             for instanceId, instance in api.allRunningInstances(spot=None).items():
                 table.append([
                     instance['InstanceId'],
-                    instance['InstanceType'], 
-                    instance['PrivateIpAddress'], 
+                    instance['InstanceType'],
+                    instance['PrivateIpAddress'],
                     secondsToHumanReadable(time.time() - instance['LaunchTime'].timestamp())
                     ])
             print(formatTable(table))

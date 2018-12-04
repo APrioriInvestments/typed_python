@@ -45,7 +45,7 @@ class Ring:
 
     def insert(self, k):
         r = Ring(k=k)
-        
+
         r.left = self
         r.right = self.right
         self.right = r
@@ -127,7 +127,7 @@ class RingInvariantTest(unittest.TestCase):
 
         for i in range(100):
             writeSome()
-            
+
             isLazy = (i%2) == 0
 
             k = None if i % 5 != 3 or not isLazy else numpy.random.choice(10)
@@ -137,4 +137,4 @@ class RingInvariantTest(unittest.TestCase):
             count, sum = checkSome(isLazy, k)
             self.assertEqual(count, i+2)
             self.assertEqual(sum, 0)
-            
+

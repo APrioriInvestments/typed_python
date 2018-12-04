@@ -47,7 +47,7 @@ def parseLogfileToInstanceid(fname):
     return fname.split("-")[-1][:-8]
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4, 
+    def __init__(self, own_hostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4,
                         logfileDirectory=None, shutdownTimeout=None, errorLogsOnly=False):
         self.own_hostname = own_hostname
         self.host = host
@@ -86,14 +86,14 @@ class SubprocessServiceManager(ServiceManager):
                 output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
             else:
                 output_file = None
-            
+
             process = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
                     service.name,
-                    self.host, 
-                    str(self.port), 
-                    instanceIdentity, 
-                    os.path.join(self.sourceDir, instanceIdentity), 
+                    self.host,
+                    str(self.port),
+                    instanceIdentity,
+                    os.path.join(self.sourceDir, instanceIdentity),
                     os.path.join(self.storageDir, instanceIdentity)
                     ] + (["--error_logs_only"] if self.errorLogsOnly else []),
                 cwd=self.storageDir,

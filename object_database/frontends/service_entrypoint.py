@@ -41,9 +41,9 @@ def main(argv):
 
     configureLogging(parsedArgs.instanceid[:8], error=parsedArgs.error_logs_only)
 
-    logging.info("service_entrypoint.py connecting to %s:%s for %s", 
-        parsedArgs.host, 
-        parsedArgs.port, 
+    logging.info("service_entrypoint.py connecting to %s:%s for %s",
+        parsedArgs.host,
+        parsedArgs.port,
         parsedArgs.instanceid
         )
 
@@ -52,7 +52,7 @@ def main(argv):
 
     try:
         manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.sourceDir, parsedArgs.storageRoot)
-    
+
         manager.runAndWaitForShutdown()
 
         return 0

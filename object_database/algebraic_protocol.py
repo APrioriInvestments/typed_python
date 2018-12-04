@@ -32,7 +32,7 @@ class AlgebraicProtocol(asyncio.Protocol):
 
             dataToSend = serialize(self.sendType, msg)
             dataToSend = longToString(len(dataToSend)) + dataToSend
-            
+
             with self.writelock:
                 #for some insane reason, sending a 5 byte message causes the socket to disconnect on the other
                 #side. Sending the 5 bytes in multiple messages does not, nor does sending an extra packet

@@ -65,7 +65,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
 
     def _stopHeartbeating(self):
         self._stopHeartbeatingSet = True
-    
+
     def setServerToClientHandler(self, handler):
         with self.lock:
             def callHandler(*args):
@@ -85,7 +85,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
                 self.msgs.append(msg)
             else:
                 self.loop.call_soon_threadsafe(self.handler, msg)
-        
+
     def onConnected(self):
         self.loop.call_later(getHeartbeatInterval(), self.heartbeat)
 
@@ -99,7 +99,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
 
     def _close(self):
         self.disconnected = True
-        self.transport.close()        
+        self.transport.close()
 
     def connection_lost(self, e):
         self.disconnected = True
@@ -166,7 +166,7 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
 
     conn = DatabaseConnection(proto)
     conn.initialized.wait(timeout=max(timeout - (time.time() - t0), 0.0))
-    
+
     assert conn.initialized.is_set()
 
     return conn
@@ -188,8 +188,8 @@ class TcpServer(Server):
         Server.start(self)
 
         self.socket_server = _eventLoop.create_server(
-            lambda: ServerToClientProtocol(self, _eventLoop.loop), 
-            self.host, 
+            lambda: ServerToClientProtocol(self, _eventLoop.loop),
+            self.host,
             self.port
             )
         _eventLoop.loop.call_soon_threadsafe(self.checkHeartbeatsCallback)
@@ -201,7 +201,7 @@ class TcpServer(Server):
                 self.checkForDeadConnections()
             except:
                 logging.error("Caught exception in checkForDeadConnections:\n%s", traceback.format_exc())
-        
+
     def stop(self):
         Server.stop(self)
 

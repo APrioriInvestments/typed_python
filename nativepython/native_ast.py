@@ -27,7 +27,7 @@ def type_attr_ix(t,attr):
 def type_str(c):
     if c.matches.Function:
         return "func((%s)->%s%s)" % (
-            ",".join([str(x) for x in (c.args + tuple(["..."] if c.varargs else []))]), 
+            ",".join([str(x) for x in (c.args + tuple(["..."] if c.varargs else []))]),
             str(c.output),
             ",nothrow" if not c.can_throw else ""
             )
@@ -98,38 +98,38 @@ Constant = Alternative("Constant",
     )
 
 UnaryOp = Alternative(
-    "UnaryOp", 
-    Add={}, 
-    Negate={}, 
-    LogicalNot={}, 
+    "UnaryOp",
+    Add={},
+    Negate={},
+    LogicalNot={},
     BitwiseNot={},
     __str__ = lambda o:
         "+" if o.matches.Add else
-        "-" if o.matches.Negate else 
-        "!" if o.matches.LogicalNot else 
+        "-" if o.matches.Negate else
+        "!" if o.matches.LogicalNot else
         "~" if o.matches.BitwiseNot else "unknown unary op"
     )
 
-BinaryOp = Alternative("BinaryOp", 
-    Add={}, Sub={}, Mul={}, Div={}, Eq={}, 
+BinaryOp = Alternative("BinaryOp",
+    Add={}, Sub={}, Mul={}, Div={}, Eq={},
     NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
     Mod={}, Pow={}, LShift={}, RShift={},
     BitOr={}, BitAnd={}, BitXor={},
     __str__ = lambda o:
         "+" if o.matches.Add else
-        "-" if o.matches.Sub else 
-        "*" if o.matches.Mul else 
-        "/" if o.matches.Div else 
-        "==" if o.matches.Eq else 
-        "!=" if o.matches.NotEq else 
-        "<" if o.matches.Lt else 
-        "<=" if o.matches.LtE else 
-        ">" if o.matches.Gt else 
-        ">=" if o.matches.GtE else 
-        "<<" if o.matches.LShift else 
-        ">>" if o.matches.RShift else 
-        "|" if o.matches.BitOr else 
-        "&" if o.matches.BitAnd else 
+        "-" if o.matches.Sub else
+        "*" if o.matches.Mul else
+        "/" if o.matches.Div else
+        "==" if o.matches.Eq else
+        "!=" if o.matches.NotEq else
+        "<" if o.matches.Lt else
+        "<=" if o.matches.LtE else
+        ">" if o.matches.Gt else
+        ">=" if o.matches.GtE else
+        "<<" if o.matches.LShift else
+        ">>" if o.matches.RShift else
+        "|" if o.matches.BitOr else
+        "&" if o.matches.BitAnd else
         "^" if o.matches.BitXor else
         "unknown binary op"
     )
@@ -140,10 +140,10 @@ Expression = lambda: Expression
 Teardown = lambda: Teardown
 
 NamedCallTarget = NamedTuple(
-                name = str, 
-                arg_types = TupleOf(Type), 
-                output_type = Type, 
-                external = bool, 
+                name = str,
+                arg_types = TupleOf(Type),
+                output_type = Type,
+                external = bool,
                 varargs = bool,
                 intrinsic = bool,
                 can_throw = bool
@@ -246,7 +246,7 @@ def expr_str(self):
         if self.val.matches.Sequence and len(self.val.vals) > 1:
             return str(
                 Expression.Sequence(
-                    self.val.vals[:-1] + 
+                    self.val.vals[:-1] +
                     (Expression.Let(
                         var=self.var,
                         val=self.val.vals[-1],
@@ -274,7 +274,7 @@ def expr_str(self):
     if self.matches.FunctionPointer:
         return "&func(name=%s,(%s)->%s%s%s)" % (
             self.target.name,
-            ",".join([str(x) for x in (self.target.arg_types + tuple(["..."] if self.target.varargs else []))]), 
+            ",".join([str(x) for x in (self.target.arg_types + tuple(["..."] if self.target.varargs else []))]),
             str(self.target.output_type),
             ",nothrow" if not self.target.can_throw else "",
             ",intrinsic" if self.target.intrinsic else ""
@@ -305,8 +305,8 @@ Expression = Alternative("Expression",
     Call = {'target': CallTarget, 'args': TupleOf(Expression)},
     FunctionPointer = {'target': NamedCallTarget},
     MakeStruct = {'args': TupleOf(Tuple(str,Expression))},
-    Branch = {'cond': Expression, 
-                         'true': Expression, 
+    Branch = {'cond': Expression,
+                         'true': Expression,
                          'false': Expression
                          },
 
@@ -317,8 +317,8 @@ Expression = Alternative("Expression",
                            'handler': Expression
                            },
 
-    While = {'cond': Expression, 
-                        'while_true': Expression, 
+    While = {'cond': Expression,
+                        'while_true': Expression,
                         'orelse': Expression
                         },
     Return = {'arg': OneOf(Expression, None)},
@@ -331,7 +331,7 @@ Expression = Alternative("Expression",
 
     ActivatesTeardown = {'name': str},
     StackSlot = {'name': str, 'type': Type},
-    ElementPtrIntegers = lambda self, *offsets: 
+    ElementPtrIntegers = lambda self, *offsets:
         Expression.ElementPtr(
             left=self,
             offsets=tuple(
@@ -368,7 +368,7 @@ FunctionBody = Alternative("FunctionBody",
 
 Function = NamedTuple(
     args=TupleOf(Tuple(str, Type)),
-    body=FunctionBody, 
+    body=FunctionBody,
     output_type=Type
     )
 

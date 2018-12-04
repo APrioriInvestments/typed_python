@@ -12,7 +12,7 @@ import numpy
 
 from inspect import signature
 
-from object_database.view import RevisionConflictException 
+from object_database.view import RevisionConflictException
 from object_database.view import current_transaction
 from object_database.util import Timer
 
@@ -66,7 +66,7 @@ class GeventPipe:
 
     def trigger(self):
         #it's OK that we don't check if the bytes are written because we're just
-        #trying to wake up the other side. If the operating system's buffer is full, 
+        #trying to wake up the other side. If the operating system's buffer is full,
         #then that means the other side hasn't been clearing the bytes anyways,
         #and that it will come back around and read our data.
         if self.netChange > 2:
@@ -139,7 +139,7 @@ class Cells:
         self.cells[cell.identity] = cell
 
         self.dirtyNodes.add(cell)
-        
+
         self.markForBroadcast(cell)
 
     def _cellOutOfScope(self, cell):
@@ -150,7 +150,7 @@ class Cells:
         if cell.cells is not None:
             del self.cells[cell.identity]
             del self.cellsKnownChildren[cell.identity]
-        
+
         cell.garbageCollected = True
 
     def markForBroadcast(self, node):
@@ -197,7 +197,7 @@ class Cells:
 
         while self.dirtyNodes:
             n = self.dirtyNodes.pop()
-            
+
             if not n.garbageCollected:
                 self.markForBroadcast(n)
 
@@ -230,7 +230,7 @@ class Cells:
                                 c = n.children[k] = Traceback("Cell %s being used twice in the tree" % c)
 
                     self._addCell(c, n)
-                    
+
                 for c in origChildren.difference(newChildren):
                     self._cellOutOfScope(c)
 
@@ -304,7 +304,7 @@ class Cell:
         self._width = None
         self._color = None
         self._height = None
-    
+
     def _resetSubscriptionsToViewReads(self, view):
         new_subscriptions = set(view._reads).union(set(view._indexReads))
 
@@ -402,7 +402,7 @@ class Card(Cell):
         super().__init__()
 
         self.children = {"____contents__": Cell.makeCell(inner)}
-        
+
         other = ""
         if padding:
             other += " p-" + str(padding)
@@ -417,7 +417,7 @@ class Card(Cell):
 
     def sortsAs(self):
         return self.inner.sortsAs()
-    
+
 
 class CardTitle(Cell):
     def __init__(self, inner):
@@ -536,7 +536,7 @@ class _NavTab(Cell):
     def recalculate(self):
         self.contents = ("""
             <li class="nav-item">
-                <a class="nav-link __active__" role="tab" 
+                <a class="nav-link __active__" role="tab"
                     onclick="websocket.send(JSON.stringify({'event':'click', 'ix': __ix__, 'target_cell': '__identity__'}))"
                     >
                     ____child__
@@ -562,9 +562,9 @@ class Tabs(Cell):
 
     def recalculate(self):
         items = []
-        
+
         self.children['____display__'] = Subscribed(lambda: self.headersAndChildren[self.whichSlot.get()][1])
-        
+
         for i in range(len(self.headersAndChildren)):
             self.children['____header_{ix}__'.format(ix=i)] = _NavTab(self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
 
@@ -578,7 +578,7 @@ class Tabs(Cell):
                     </div>
                 </div>
                 """.replace(
-                    "__items__", 
+                    "__items__",
                     "".join(
                         """ ____header___ix____ """.replace('__ix__', str(i))
                             for i in range(len(self.headersAndChildren))
@@ -591,7 +591,7 @@ class Tabs(Cell):
 class Dropdown(Cell):
     def __init__(self, title, headersAndLambdas, singleLambda=None):
         """
-        Initialize a Dropdown menu. 
+        Initialize a Dropdown menu.
 
             title - a cell containing the current value.
             headersAndLambdas - a list of pairs containing (cell, callback) for each menu item.
@@ -622,7 +622,7 @@ class Dropdown(Cell):
 
     def recalculate(self):
         items = []
-        
+
         self.children['____title__'] = self.title
 
         for i in range(len(self.headersAndLambdas)):
@@ -631,7 +631,7 @@ class Dropdown(Cell):
 
             items.append(
                 """
-                    <a class='dropdown-item' 
+                    <a class='dropdown-item'
                         onclick="__onclick__"
                         >
                     ____child___ix____
@@ -647,7 +647,7 @@ class Dropdown(Cell):
         self.contents = """
             <div class="btn-group">
                   <a role="button" class="btn btn-xs btn-outline-secondary">____title__</a>
-                  <button class="btn btn-xs btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" 
+                  <button class="btn btn-xs btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button"
                         id="___identity__-dropdownMenuButton" data-toggle="dropdown">
                   </button>
                   <div class="dropdown-menu">
@@ -800,7 +800,7 @@ class SubscribedSequence(Cell):
                         raise
                     except:
                         self.existingItems[s] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
-        
+
         self.children = new_children
 
         spineAsSet = set(self.spine)
@@ -899,7 +899,7 @@ class Grid(Cell):
                     raise
                 except:
                     self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
-        
+
         if self.rowLabelFun is not None:
             for row_ix, row in enumerate(self.rows):
                 seen.add((None, row))
@@ -912,7 +912,7 @@ class Grid(Cell):
                         raise
                     except:
                         self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
-        
+
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
@@ -926,13 +926,13 @@ class Grid(Cell):
                         raise
                     except:
                         self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
-            
+
         self.children = new_children
 
         for i in list(self.existingItems):
             if i not in seen:
                 del self.existingItems[i]
-        
+
         self.contents = """
             <table class="table-hscroll table-sm table-striped">
             <thead><tr>""" + ("<th></th>" if self.rowLabelFun is not None else "") + """__headers__</tr></thead>
@@ -943,9 +943,9 @@ class Grid(Cell):
             """.replace("__headers__",
                 "".join("<th>____header_%s__</th>" % (col_ix)
                             for col_ix in range(len(self.cols)))
-                ).replace("__rows__", 
-                "\n".join("<tr>" + 
-                    ("<td>____rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") + 
+                ).replace("__rows__",
+                "\n".join("<tr>" +
+                    ("<td>____rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") +
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
@@ -995,7 +995,7 @@ class SingleLineTextBox(Cell):
             """
             <input __style__ type="text" id="text___identity__" onchange="
                 websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__', 'text': this.value}))
-                " 
+                "
                 value="__contents__"
                 __pat__
                 __width__
@@ -1056,7 +1056,7 @@ class Table(Cell):
                 new_rows = []
                 for row in rows:
                     filterAs = self.cachedRenderFun(row, col).sortsAs()
-                    
+
                     if filterAs is None:
                         filterAs = ""
                     else:
@@ -1070,7 +1070,7 @@ class Table(Cell):
 
     def sortRows(self, rows):
         sc = self.sortColumn.get()
-        
+
         if sc is not None and sc < len(self.cols):
             col = self.cols[sc]
 
@@ -1105,10 +1105,10 @@ class Table(Cell):
 
         if col not in self.columnFilters:
             self.columnFilters[col] = Slot(None)
-        
+
         def icon():
             if self.sortColumn.get() != col_ix:
-                return "" 
+                return ""
             return Octicon("arrow-up" if not self.sortColumnAscending.get() else "arrow-down")
 
         cell = Cell.makeCell(self.headerFun(col)).nowrap() + Padding() + Subscribed(icon).nowrap()
@@ -1166,7 +1166,7 @@ class Table(Cell):
                     raise
                 except:
                     self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
-        
+
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
@@ -1180,13 +1180,13 @@ class Table(Cell):
                         raise
                     except:
                         self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
-            
+
         self.children = new_children
 
         for i in list(self.existingItems):
             if i not in seen:
                 del self.existingItems[i]
-        
+
         totalPages = ((len(self.filteredRows) - 1) // self.maxRowsPerPage + 1)
 
         rowDisplay = "____left__ ____right__ Page ____page__ of " + str(totalPages)
@@ -1206,7 +1206,7 @@ class Table(Cell):
 
         self.contents = ("""
             <table class="table-hscroll table-sm table-striped">
-            <thead style="border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;""><tr>""" + 
+            <thead style="border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;""><tr>""" +
                 ('<th style="vertical-align:top"><div class="card"><div class="card-body p-1">%s</div></div></th>' % rowDisplay) + """__headers__</tr></thead>
             <tbody>
             __rows__
@@ -1215,9 +1215,9 @@ class Table(Cell):
             """.replace("__headers__",
                 "".join('<th style="vertical-align:top">____header_%s__</th>' % (col_ix)
                             for col_ix in range(len(self.cols)))
-                ).replace("__rows__", 
-                "\n".join("<tr>" + 
-                    ("<td>%s</td>" % (row_ix+1)) + 
+                ).replace("__rows__",
+                "\n".join("<tr>" +
+                    ("<td>%s</td>" % (row_ix+1)) +
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
@@ -1250,7 +1250,7 @@ class Clickable(Cell):
             </div>""".replace(
                 '__onclick__', self.calculatedOnClick()
                 ).replace(
-                '__style__', 
+                '__style__',
                 self._divStyle("cursor:pointer;*cursor: hand" + (";font-weight:bold" if self.bold else ""))
                 )
 
@@ -1283,8 +1283,8 @@ class Button(Clickable):
     def recalculate(self):
         self.children = {'____contents__': self.content}
         self.contents = ("""
-            <button 
-                class='btn btn-primary __size__' 
+            <button
+                class='btn btn-primary __size__'
                 onclick="__onclick__"
                 >
             ____contents__
@@ -1374,7 +1374,7 @@ class Expands(Cell):
 class Plot(Cell):
     """Produce some reactive line plots."""
     def __init__(self, namedDataSubscriptions):
-        """Initialize a line plot. 
+        """Initialize a line plot.
 
         namedDataSubscriptions: a map from plot name to a lambda function
             producing either an array, or {x: array, y: array}
@@ -1388,7 +1388,7 @@ class Plot(Cell):
         self.contents = """
             <div __style__></div>
             ____chart_updater__
-            
+
             """.replace("__style__", self._divStyle())
 
         self.children = {
@@ -1397,18 +1397,18 @@ class Plot(Cell):
 
         self.postscript = """
             plotDiv = document.getElementById('__identity__');
-            Plotly.plot( 
-                plotDiv, 
+            Plotly.plot(
+                plotDiv,
                 [],
                 { margin: {t : 30, l: 30, r: 30, b:30 }
                 },
                 { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
-                    modeBarButtons: [ ['pan2d'], ['zoom2d'], ['zoomIn2d'], ['zoomOut2d'] ] } 
+                    modeBarButtons: [ ['pan2d'], ['zoom2d'], ['zoomIn2d'], ['zoomOut2d'] ] }
                 );
             plotDiv.on('plotly_relayout',
-                function(eventdata){  
+                function(eventdata){
                     websocket.send(JSON.stringify(
-                        {'event':'plot_layout', 
+                        {'event':'plot_layout',
                          'target_cell': '__identity__',
                          'data': eventdata
                          }
@@ -1438,14 +1438,14 @@ class _PlotUpdater(Cell):
 
     def calculatedDataJson(self):
         series = self.callFun(self.namedDataSubscriptions)
-        
+
         assert isinstance(series, (dict, list))
 
         if isinstance(series, dict):
-            return [self.processSeries(callableOrData, name) for name, callableOrData in 
+            return [self.processSeries(callableOrData, name) for name, callableOrData in
                         series.items()]
         else:
-            return [self.processSeries(callableOrData, None) for callableOrData in 
+            return [self.processSeries(callableOrData, None) for callableOrData in
                         series]
 
     def callFun(self, fun):
@@ -1489,8 +1489,8 @@ class _PlotUpdater(Cell):
                     plotDiv = document.getElementById('__identity__');
                     data = __data__.map(mapPlotlyData)
 
-                    Plotly.react( 
-                        plotDiv, 
+                    Plotly.react(
+                        plotDiv,
                         data,
                         plotDiv.layout,
                         );

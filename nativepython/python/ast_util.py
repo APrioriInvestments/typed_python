@@ -25,7 +25,7 @@ class CantGetSourceTextError(Exception):
     pass
 
 class VisitDone(Exception):
-    """Raise this exception to short-circuit the visitor once we're done 
+    """Raise this exception to short-circuit the visitor once we're done
     searching."""
     pass
 
@@ -45,7 +45,7 @@ def CachedByArgs(f):
 
 def getSourceText(pyObject):
     source, lineno = getSourceLines(pyObject)
-    # Create a prefix of (lineno - 1) blank lines to keep track of line numbers 
+    # Create a prefix of (lineno - 1) blank lines to keep track of line numbers
     # for error reporting
     blankLines = os.linesep * (lineno - 1)
     # We don't know how to avoid the use of `textwrap.dedent to get the code
@@ -163,7 +163,7 @@ def functionDefOrLambdaAtLineNumber(sourceAst, lineNumber):
     visitor.visit(sourceAst)
 
     subnodesAtLineNumber = (
-          visitor.funcDefSubnodesAtLineNumber 
+          visitor.funcDefSubnodesAtLineNumber
         + visitor.lambdaSubnodesAtLineNumber
         )
 
@@ -173,7 +173,7 @@ def functionDefOrLambdaAtLineNumber(sourceAst, lineNumber):
             )
     if len(subnodesAtLineNumber) > 1:
         raise CantGetSourceTextError(
-            "can't find a unique function definition at line %s. Do you " + 
+            "can't find a unique function definition at line %s. Do you " +
             "have two lambdas on the same line?" % lineNumber
             )
 

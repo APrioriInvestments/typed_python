@@ -44,7 +44,7 @@ def pythonObjectRepresentation(f):
         return TypedExpression(
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Void()
-                ), 
+                ),
             NoneWrapper(),
             False
             )
@@ -52,7 +52,7 @@ def pythonObjectRepresentation(f):
         return TypedExpression(
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f,bits=1,signed=False)
-                ), 
+                ),
             BoolWrapper(),
             False
             )
@@ -60,7 +60,7 @@ def pythonObjectRepresentation(f):
         return TypedExpression(
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f,bits=64,signed=True)
-                ), 
+                ),
             Int64Wrapper(),
             False
             )
@@ -68,7 +68,7 @@ def pythonObjectRepresentation(f):
         return TypedExpression(
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Float(val=f,bits=64)
-                ), 
+                ),
             Float64Wrapper(),
             False
             )

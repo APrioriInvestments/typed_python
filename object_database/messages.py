@@ -25,9 +25,9 @@ ClientToServer = Alternative(
     Heartbeat = {},
     DefineSchema = { 'name': str, 'definition': SchemaDefinition },
     LoadLazyObject = { 'schema': str, 'typename': str, 'identity': str },
-    Subscribe = { 
-        'schema': str, 
-        'typename': OneOf(None, str), 
+    Subscribe = {
+        'schema': str,
+        'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'isLazy': bool #load values when we first request them, instead of blocking on all the data.
         },
@@ -40,7 +40,7 @@ ServerToClient = Alternative(
     TransactionResult = {'transaction_guid': str, 'success': bool, 'badKey': OneOf(None, str) },
     FlushResponse = {'guid': str},
     SubscriptionData = {
-        'schema': str, 
+        'schema': str,
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'values': ConstDict(str, OneOf(None, str)), #value
@@ -50,20 +50,20 @@ ServerToClient = Alternative(
     LazyTransactionPriors = { 'writes': ConstDict(str, OneOf(None, str)) },
     LazyLoadResponse = { 'identity': str, 'values': ConstDict(str, OneOf(None, str)) },
     LazySubscriptionData = {
-        'schema': str, 
+        'schema': str,
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'identities': TupleOf(str),
         'index_values': ConstDict(str, OneOf(None, str))
         },
     SubscriptionComplete = {
-        'schema': str, 
+        'schema': str,
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'tid': int #marker transaction id
         },
     SubscriptionIncrease = {
-        'schema': str, 
+        'schema': str,
         'typename': str,
         'fieldname_and_value': Tuple(str,str),
         'identities': TupleOf(str)

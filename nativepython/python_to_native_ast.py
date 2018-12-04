@@ -25,7 +25,7 @@ from typed_python import *
 class TypedCallTarget(object):
     def __init__(self, named_call_target, input_types, output_type):
         super().__init__()
-        
+
         self.named_call_target = named_call_target
         self.input_types = input_types
         self.output_type = output_type
@@ -36,7 +36,7 @@ class TypedCallTarget(object):
 
     def __str__(self):
         return "TypedCallTarget(name=%s,inputs=%s,outputs=%s)" % (
-            self.name, 
+            self.name,
             [str(x) for x in self.input_types],
             str(self.output_type)
             )
@@ -142,7 +142,7 @@ class ExceptionHandlingHelper:
                     true=handler.expr,
                     false=expr.expr
                     ),
-                Void if (handler.expr_type is not None or expr.expr_type is not None) else 
+                Void if (handler.expr_type is not None or expr.expr_type is not None) else
                     None
                 )
 
@@ -174,7 +174,7 @@ class ExceptionHandlingHelper:
             )
 
     def generate_exception_handler_expr(self, val_type, binding_name, body):
-        """Generate an expression that tests the current exception against 
+        """Generate an expression that tests the current exception against
             'val_type', and if so, binds it into 'binding_name' and evaluates 'body'
         """
         if binding_name is not None and self.context._varname_to_type.get(binding_name, None) is not None:
@@ -191,7 +191,7 @@ class ExceptionHandlingHelper:
             cond_expr = self.context.consume_temporaries(
                 self.context.call_py_function(
                     nativepython.lib.exception.exception_matches,
-                    [pythonObjectRepresentation(val_type), 
+                    [pythonObjectRepresentation(val_type),
                      self.exception_pointer()
                      ]
                     )
@@ -307,12 +307,12 @@ class ConversionContext(object):
 
             if not to_type.is_ref and arg.expr_type.is_ref:
                 arg=arg.dereference()
-        
+
             if arg.expr_type != to_type:
                 raise ConversionException(
                     "Can't convert arg #%s from %s to %s" % (
-                        i+1, 
-                        args[i].expr_type, 
+                        i+1,
+                        args[i].expr_type,
                         to_type
                         )
                     )
@@ -351,8 +351,8 @@ class ConversionContext(object):
 
         call_target = \
             self.converter.convert(
-                f, 
-                [a.expr_type for a in args], 
+                f,
+                [a.expr_type for a in args],
                 name_override=name_override
                 )
 
@@ -365,7 +365,7 @@ class ConversionContext(object):
                 self.generate_call_expr(
                     target=call_target.named_call_target,
                     args=[slot.expr] + native_args
-                    ) 
+                    )
                     + self.activates_temporary(slot)
                     + slot.expr
                     ,
@@ -429,7 +429,7 @@ class ConversionContext(object):
                     )
             else:
                 e = v + e
-        
+
         return e
 
 
@@ -468,7 +468,7 @@ class ConversionContext(object):
                 return pythonObjectRepresentation(int(ast.n.value))
             if ast.n.matches.Float:
                 return pythonObjectRepresentation(float(ast.n.value))
-            
+
         if ast.matches.Str:
             return pythonObjectRepresentation(ast.s)
 
@@ -481,7 +481,7 @@ class ConversionContext(object):
             for i in range(len(values)):
                 expr_so_far.append(self.ensure_bool(self.convert_expression_ast(values[i])).expr)
                 if expr_so_far[-1].matches.Constant:
-                    if (expr_so_far[-1].val.val and op.matches.Or or 
+                    if (expr_so_far[-1].val.val and op.matches.Or or
                             (not expr_so_far[-1].val.val) and op.matches.And):
                         #this is a short-circuit
                         if len(expr_so_far) == 1:
@@ -517,12 +517,12 @@ class ConversionContext(object):
         if ast.matches.BinOp:
             l = self.convert_expression_ast(ast.left)
             r = self.convert_expression_ast(ast.right)
-            
+
             return l.convert_bin_op(self, ast.op, r)
 
         if ast.matches.UnaryOp:
             operand = self.convert_expression_ast(ast.operand)
-            
+
             return operand.convert_unary_op(ast.op)
 
         if ast.matches.Subscript:
@@ -563,8 +563,8 @@ class ConversionContext(object):
             tmp_ref = self.allocate_temporary(struct_type)
 
             return TypedExpression(
-                struct_type.convert_initialize(self, tmp_ref, elts).expr + 
-                    self.activates_temporary(tmp_ref) + 
+                struct_type.convert_initialize(self, tmp_ref, elts).expr +
+                    self.activates_temporary(tmp_ref) +
                     tmp_ref.expr,
                 tmp_ref.expr_type
                 )
@@ -580,13 +580,13 @@ class ConversionContext(object):
                     body = body.dereference()
                     orelse = orelse.dereference()
                 else:
-                    raise ConversionException("Expected IfExpr to have the same type, but got " + 
+                    raise ConversionException("Expected IfExpr to have the same type, but got " +
                         "%s and %s" % (body.expr_type, orelse.expr_type))
 
             return TypedExpression(
                 native_ast.Expression.Branch(
-                    cond=test.expr, 
-                    true=body.expr, 
+                    cond=test.expr,
+                    true=body.expr,
                     false=orelse.expr
                     ),
                 body.expr_type
@@ -599,10 +599,10 @@ class ConversionContext(object):
 
     def convert_statement_ast_and_teardown_tmps(self, ast):
         if self._new_temporaries:
-            raise ConversionException("Expected no temporaries on %s. instead have of types %s" % 
+            raise ConversionException("Expected no temporaries on %s. instead have of types %s" %
                 (ast._which, [str(self._temporaries[x]) for x in self._new_temporaries])
                 )
-        
+
         expr = self.convert_statement_ast(ast)
 
         return self.consume_temporaries(expr)
@@ -628,7 +628,7 @@ class ConversionContext(object):
 
             if not teardown.expr.matches.Constant:
                 teardowns.append(teardown)
-        
+
         self._new_temporaries = set()
 
         if expr is None:
@@ -638,13 +638,13 @@ class ConversionContext(object):
             return expr
 
         return TypedExpression(
-            native_ast.Expression.Finally(expr=expr.expr, teardowns=teardowns), 
+            native_ast.Expression.Finally(expr=expr.expr, teardowns=teardowns),
             expr.expr_type
             )
 
     def convert_statement_ast(self, ast):
         return self.convert_statement_ast_(ast)
-        
+
     def check_statement_is_field_initializer(self, ast):
         if not ast.matches.Expr:
             return None
@@ -728,7 +728,7 @@ class ConversionContext(object):
                     self._varname_to_type[varname] = new_variable_type
 
                     slot_ref = self.named_var_expr(varname)
-                    
+
                     #this is a new variable which we are constructing
                     return self._varname_to_type[varname].convert_initialize_copy(
                         self,
@@ -755,7 +755,7 @@ class ConversionContext(object):
                     val_to_store = slicing.convert_getitem(self, index).convert_bin_op(self, op, val_to_store)
 
                 return slicing.convert_setitem(self, index, val_to_store)
-        
+
             if target.matches.Attribute and target.ctx.matches.Store:
                 slicing = self.convert_expression_ast(target.value)
                 attr = target.attr
@@ -769,7 +769,7 @@ class ConversionContext(object):
         if ast.matches.Return:
             if self._init_fields is not None:
                 self._init_fields.finalize(self)
-            
+
             if ast.value is None:
                 e = TypedExpression(native_ast.nullExpr, Void)
             else:
@@ -779,7 +779,7 @@ class ConversionContext(object):
                 if self._varname_to_type[FunctionOutput] != e.expr_type:
                     raise ConversionException(
                         "Function returning multiple types:\n\t%s\n\t%s" % (
-                                e.expr_type.variable_storage_type_wrapper, 
+                                e.expr_type.variable_storage_type_wrapper,
                                 self._varname_to_type[FunctionOutput]
                                 )
                         )
@@ -794,7 +794,7 @@ class ConversionContext(object):
 
         if ast.matches.Expr:
             return TypedExpression(
-                self.convert_expression_ast(ast.value).expr + native_ast.nullExpr, 
+                self.convert_expression_ast(ast.value).expr + native_ast.nullExpr,
                 Void
                 )
 
@@ -805,7 +805,7 @@ class ConversionContext(object):
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
                 branch = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
-                
+
                 return cond + branch
 
             if self._init_fields is not None:
@@ -813,7 +813,7 @@ class ConversionContext(object):
 
             true = self.convert_statement_list_ast(ast.body)
             false = self.convert_statement_list_ast(ast.orelse)
-            
+
             if true.expr_type is None and false.expr_type is None:
                 ret_type = None
             else:
@@ -870,10 +870,10 @@ class ConversionContext(object):
             iter_expr = self.allocate_temporary(iter_type)
 
             iter_setup_expr = (
-                iter_type.convert_initialize_copy(self, iter_expr, iter_create_expr).expr + 
+                iter_type.convert_initialize_copy(self, iter_expr, iter_create_expr).expr +
                 self.activates_temporary(iter_expr)
                 )
-                
+
             teardowns_for_iter = self.consume_temporaries(None)
 
             #now we need to generate a while loop
@@ -886,7 +886,7 @@ class ConversionContext(object):
             while_cond_expr = self.consume_temporaries(while_cond_expr)
 
             next_val_expr = iter_expr.convert_attribute(self, "next").convert_call(self, [])
-            
+
             if self._varname_to_type.get(ast.target.id, None) is not None:
                 raise ConversionException(
                     "iterator target %s already bound to a variable of type %s" % (
@@ -906,9 +906,9 @@ class ConversionContext(object):
             next_val_teardowns.append(
                 self.named_variable_teardown(ast.target.id)
                 )
-            
+
             body_native_expr = native_ast.Expression.Finally(
-                    expr =  next_val_setup_native_expr 
+                    expr =  next_val_setup_native_expr
                           + self.convert_statement_list_ast(ast.body).expr,
                     teardowns=next_val_teardowns
                     )
@@ -919,7 +919,7 @@ class ConversionContext(object):
 
             res = TypedExpression(
                 native_ast.Expression.Finally(
-                    expr=iter_setup_expr + 
+                    expr=iter_setup_expr +
                         native_ast.Expression.While(
                             cond=while_cond_expr.expr,
                             while_true=body_native_expr,
@@ -938,14 +938,14 @@ class ConversionContext(object):
                 raise ConversionException(
                     "We don't handle re-raise yet"
                     )
-                
+
             if ast.exc is not None and ast.cause is None:
                 expr = self.convert_expression_ast(ast.exc.val)
 
                 import nativepython.lib.exception
 
                 return self.call_py_function(
-                    nativepython.lib.exception.throw, 
+                    nativepython.lib.exception.throw,
                     [expr]
                     )
             else:
@@ -983,7 +983,7 @@ class ConversionContext(object):
                 flows_off_end = False
             else:
                 raise ConversionException(
-                    "Not all control flow paths return a value and the function returns %s" % 
+                    "Not all control flow paths return a value and the function returns %s" %
                         self._varname_to_type[FunctionOutput]
                     )
 
@@ -991,7 +991,7 @@ class ConversionContext(object):
         for v in list(self._varname_to_type.keys()):
             if v not in orig_vars_in_scope:
                 teardowns.append(self.named_variable_teardown(v))
-                    
+
                 del self._varname_to_type[v]
 
         seq_expr = native_ast.Expression.Sequence(
@@ -1020,7 +1020,7 @@ class ConversionContext(object):
                         )
                     ).expr
                 )
-                    
+
     def call_expression_in_function(self, identity, name, args, expr_producer):
         args = [a.as_call_arg(self) for a in args]
 
@@ -1050,7 +1050,7 @@ class ConversionContext(object):
             typelist,
             expr.expr_type,
             native_ast.Function(
-                args=[(varlist[i].name, typelist[i].getNativePassingType()) 
+                args=[(varlist[i].name, typelist[i].getNativePassingType())
                             for i in range(len(varlist))],
                 body=native_ast.FunctionBody.Internal(expr.expr),
                 output_type=expr.expr_type.getNativeLayoutType()
@@ -1091,7 +1091,7 @@ class ConversionContext(object):
                             slot_type,
                             isReference=True
                             )
-                        
+
                         slot_expr = TypedExpression(
                             native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
                             slot_type,
@@ -1127,7 +1127,7 @@ class ConversionContext(object):
                 expr.expr_type,
                 expr.isReference
                 )
-        
+
         return expr
 
     def construct_starargs_around(self, res, star_args_name):
@@ -1141,7 +1141,7 @@ class ConversionContext(object):
                 [TypedExpression(
                         native_ast.Expression.Variable(".star_args.%s" % i),
                         args_type.element_types[i][1]
-                        ) 
+                        )
                     for i in range(len(args_type.element_types))]
             ).with_comment("initialize *args slot") + res
 
@@ -1174,7 +1174,7 @@ class Converter(object):
 
             if self.verbose:
                 print(self._targets[u])
-        
+
         self._unconverted = set()
 
         return res
@@ -1187,11 +1187,11 @@ class Converter(object):
         return getname()
 
     def convert_function_ast(
-                self, 
-                ast_arg, 
-                statements, 
-                input_types, 
-                local_variables, 
+                self,
+                ast_arg,
+                statements,
+                input_types,
+                local_variables,
                 free_variable_lookup,
                 members_of_arg0_to_initialize
                 ):
@@ -1208,7 +1208,7 @@ class Converter(object):
         else:
             if len(input_types) < len(ast_arg.args):
                 raise ConversionException(
-                    "Expected at least %s arguments but got %s" % 
+                    "Expected at least %s arguments but got %s" %
                         (len(ast_arg.args), len(input_types))
                     )
 
@@ -1227,7 +1227,7 @@ class Converter(object):
             starargs_elts = []
             for i in range(len(ast_arg.args), len(input_types)):
                 args.append(
-                    ('.star_args.%s' % (i - len(ast_arg.args)), 
+                    ('.star_args.%s' % (i - len(ast_arg.args)),
                         input_types[i].getNativePassingType())
                     )
 
@@ -1264,16 +1264,16 @@ class Converter(object):
 
         return (
             native_ast.Function(
-                args=args, 
+                args=args,
                 body=native_ast.FunctionBody.Internal(body=res.expr),
                 output_type=return_type.getNativeLayoutType()
                 ),
             return_type
             )
-                  
+
     def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup):
         return self.convert_function_ast(
-            ast.args, 
+            ast.args,
             [python_ast.Statement.Return(
                 value=ast.body,
                 line_number=ast.body.line_number,
@@ -1299,7 +1299,7 @@ class Converter(object):
 
         self._targets[new_name] = TypedCallTarget(
             native_ast.NamedCallTarget(
-                name=new_name, 
+                name=new_name,
                 arg_types=[x[1] for x in native_function_definition.args],
                 output_type=native_function_definition.output_type,
                 external=False,
@@ -1315,7 +1315,7 @@ class Converter(object):
         self._unconverted.add(new_name)
 
         return self._targets[new_name]
-      
+
     def convert_lambda_as_expression(self, lambda_func):
         ast, free_variable_lookup = self.callable_to_ast_and_vars(lambda_func)
 
@@ -1342,17 +1342,17 @@ class Converter(object):
                 freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
 
         return pyast, freevars
-    
+
     def convert_initializer_function(self, f, input_types, name_override, fields_and_types):
         return self.convert(f, input_types, name_override, fields_and_types)
 
     def generateCallConverter(self, callTarget, returnType):
-        """Given a call target that's optimized for C-style dispatch, produce a (native) call-target that 
+        """Given a call target that's optimized for C-style dispatch, produce a (native) call-target that
         we can dispatch to from our C extension.
 
-        we are given 
+        we are given
             T f(A1, A2, A3 ...)
-        and want to produce 
+        and want to produce
             f(T*, X**)
         where X is the union of A1, A2, etc.
 
@@ -1426,10 +1426,10 @@ class Converter(object):
         if isinstance(pyast, python_ast.Statement.FunctionDef):
             definition,output_type = \
                 self.convert_function_ast(
-                    pyast.args, 
-                    pyast.body, 
-                    input_types, 
-                    f.__code__.co_varnames, 
+                    pyast.args,
+                    pyast.body,
+                    input_types,
+                    f.__code__.co_varnames,
                     freevars,
                     fields_and_types_for_initializing
                     )
@@ -1454,7 +1454,7 @@ class Converter(object):
 
         self._targets[new_name] = TypedCallTarget(
             native_ast.NamedCallTarget(
-                name=new_name, 
+                name=new_name,
                 arg_types=[x[1] for x in definition.args],
                 output_type=definition.output_type,
                 external=False,

@@ -21,7 +21,7 @@ import threading
 import queue
 
 Message = Alternative(
-    "Message", 
+    "Message",
     Ping = {},
     Pong = {}
     )
@@ -50,7 +50,7 @@ class SendAndReturn(AlgebraicProtocol):
 class AlgebraicProtocolTests(unittest.TestCase):
     def test_basic_send_and_receive(self):
         loop = asyncio.get_event_loop()
-        
+
         # Each client connection will create a new protocol instance
         serverCoro = loop.create_server(PingPongProtocol, '127.0.0.1', 8888)
 
@@ -60,7 +60,7 @@ class AlgebraicProtocolTests(unittest.TestCase):
 
         clientCoro = loop.create_connection(
             lambda: SendAndReturn(Message.Ping(), q),
-            '127.0.0.1', 
+            '127.0.0.1',
             8888
             )
         loop.run_until_complete(clientCoro)

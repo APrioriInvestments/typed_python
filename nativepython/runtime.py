@@ -48,12 +48,12 @@ class Runtime:
             callTarget = self.converter.convert(f.functionObj, [a.typeFilter for a in f.args])
 
             wrappingCallTargetName = self.converter.generateCallConverter(
-                callTarget, 
+                callTarget,
                 python_to_native_ast.typedPythonTypeToTypeWrapper(f.returnType)
                 )
 
             targets = self.converter.extract_new_function_definitions()
-            
+
             function_pointers = self.compiler.add_functions(targets)
 
             fp = function_pointers[wrappingCallTargetName]

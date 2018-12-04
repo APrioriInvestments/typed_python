@@ -24,10 +24,10 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
     def test_can_run_throughput_test(self):
         try:
             server = subprocess.Popen([
-                sys.executable, 
-                os.path.join(own_dir, "frontends", "database_server.py"), 
+                sys.executable,
+                os.path.join(own_dir, "frontends", "database_server.py"),
                 "localhost", "8888",
-                "--inmem"], 
+                "--inmem"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
                 )
@@ -35,8 +35,8 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
             time.sleep(.5)
 
             client = subprocess.run([
-                sys.executable, 
-                os.path.join(own_dir, "frontends", "database_throughput_test.py"), 
+                sys.executable,
+                os.path.join(own_dir, "frontends", "database_throughput_test.py"),
                 "localhost", "8888", "1"
                 ],
                 stdout=subprocess.DEVNULL,
