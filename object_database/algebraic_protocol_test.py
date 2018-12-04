@@ -92,7 +92,7 @@ class AlgebraicProtocolTests(unittest.TestCase):
         #     openssl req -x509 -newkey rsa:2048 -keyout testcert.key -nodes \
         #                 -out testcert.cert -sha256 -days 1000
         #
-        # use 'localhost' as Common Name
+        # use 'localhost' as Common Name (CN)
         loop = self.loop
         host = 'localhost'
         port = 8888
