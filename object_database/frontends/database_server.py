@@ -19,13 +19,17 @@ import sys
 import time
 import typed_python
 import object_database.tcp_server as tcp_server
+from object_database.util import sslContextFromCertPath
+
 from object_database.persistence import InMemoryPersistence, RedisPersistence
+
 
 def main(argv):
     parser = argparse.ArgumentParser("Run an object_database server")
 
     parser.add_argument("host")
     parser.add_argument("port", type=int)
+    parser.add_argument("ssl_path", help="path to (self-signed) SSL certificate")
     parser.add_argument("--redis_port", type=int, default=None)
     parser.add_argument("--inmem", default=False, action='store_true')
 
@@ -36,7 +40,13 @@ def main(argv):
     else:
         mem_store = RedisPersistence(port=parsedArgs.redis_port)
 
-    databaseServer = tcp_server.TcpServer(parsedArgs.host, parsedArgs.port, mem_store)
+    ssl_ctx = sslContextFromCertPath(parsedArgs.ssl_path)
+    databaseServer = tcp_server.TcpServer(
+        parsedArgs.host,
+        parsedArgs.port,
+        mem_store,
+        ssl_context=ssl_ctx
+    )
 
     databaseServer.start()
 

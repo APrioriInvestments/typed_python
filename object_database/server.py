@@ -33,6 +33,7 @@ import json
 
 DEFAULT_GC_INTERVAL = 900.0
 
+
 class ConnectedChannel:
     def __init__(self, initial_tid, channel, connectionObject, identityRoot):
         self.channel = channel
@@ -86,6 +87,7 @@ class ConnectedChannel:
 
     def extractTransactionData(self, guid):
         return self.pendingTransactions.pop(guid)
+
 
 class Server:
     def __init__(self, kvstore):

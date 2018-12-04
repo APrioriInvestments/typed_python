@@ -27,9 +27,8 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
                 sys.executable,
                 os.path.join(own_dir, "frontends", "database_server.py"),
                 "localhost", "8888",
-                "--inmem"],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                os.path.join(own_dir, "..", "testcert.cert"),
+                "--inmem"]
                 )
 
             time.sleep(.5)

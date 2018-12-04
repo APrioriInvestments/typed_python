@@ -27,6 +27,7 @@ from object_database.util import configureLogging
 from object_database.service_manager.Codebase import setCodebaseInstantiationDirectory
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
+
 def main(argv):
     parser = argparse.ArgumentParser("Run a specific service.")
 
