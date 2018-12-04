@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "5bd628eab7c5b858e9573afb6a4f8ed290500d7a4ec1bdee26ad45380bb0946e"
+            "sha256": "5e0be4272609cb24e95e0b024a652dfddd88148e74940cde5431175813e25c07"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -203,6 +203,7 @@
             "version": "==1.1.0"
         },
         "nativepython": {
+            "editable": true,
             "path": "."
         },
         "nose": {
