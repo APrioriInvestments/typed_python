@@ -103,6 +103,14 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             help="run test harness verbosely"
             )
         self.add_argument(
+            '--dump_native',
+            dest='dump_native',
+            action='store_true',
+            default=False,
+            required=False,
+            help="show all the llvm IR we're dumping as we go"
+            )
+        self.add_argument(
             '-s',
             dest='skip_build',
             action='store_true',
@@ -408,6 +416,10 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
 
 def runPythonUnitTests(args, filterActions, modules):
     testArgs = ["dummy"]
+
+    if args.dump_native:
+        import nativepython.runtime as runtime
+        runtime.Runtime.singleton().verboselyDisplayNativeCode()
 
     if args.testHarnessVerbose or args.list:
         testArgs.append('--nocapture')

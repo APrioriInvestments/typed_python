@@ -16,19 +16,20 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
 import nativepython.native_ast as native_ast
 
-class PythonFreeFunctionWrapper(Wrapper):
+class LenWrapper(Wrapper):
     is_pod = True
     is_empty = False
-    is_pass_by_ref = False
+    is_pass_by_ref = True
 
-    def __init__(self, f):
-        super().__init__(f)
+    def __init__(self):
+        super().__init__(len)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_bin_op(self, context, left, op, right):
-        raise ConversionException("Not convertible")
+    def convert_call(self, context, expr, args):
+        if len(args) == 1:
+            return args[0].convert_len(context)
 
-    def convert_call(self, context, left, args):
-        return context.call_py_function(self.typeRepresentation, args)
+        assert False, "we should be raising a python exception here but we dont know how yet"
+

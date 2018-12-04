@@ -16,12 +16,7 @@ import nativepython
 import nativepython.python_ast as python_ast
 import nativepython.python.ast_util as ast_util
 import nativepython.native_ast as native_ast
-
-from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.type_wrappers.none_wrapper import NoneWrapper
-from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrapper
-from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
-from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
+from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
 
@@ -48,68 +43,6 @@ class TypedCallTarget(object):
 
 class FunctionOutput:
     pass
-
-def typedPythonTypeToTypeWrapper(t):
-    if isinstance(t, Wrapper):
-        return t
-
-    assert hasattr(t, '__typed_python_category__'), t
-
-    if t is Int64():
-        return Int64Wrapper()
-
-    if t is Float64():
-        return Float64Wrapper()
-
-    if t is Bool():
-        return BoolWrapper()
-
-    assert False, t
-
-def pythonObjectRepresentation(f):
-    if f in (int,bool,float,str,type(None)):
-        return TypedExpression(native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
-
-    if f is None:
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Void()
-                ), 
-            NoneWrapper(),
-            False
-            )
-    if isinstance(f, bool):
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Int(val=f,bits=1,signed=False)
-                ), 
-            BoolWrapper(),
-            False
-            )
-    if isinstance(f, int):
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Int(val=f,bits=64,signed=True)
-                ), 
-            Int64Wrapper(),
-            False
-            )
-    if isinstance(f, float):
-        return TypedExpression(
-            native_ast.Expression.Constant(
-                val=native_ast.Constant.Float(val=f,bits=64)
-                ), 
-            Float64Wrapper(),
-            False
-            )
-    if isinstance(f, type(pythonObjectRepresentation)):
-        return TypedExpression(
-            native_ast.nullExpr,
-            PythonFreeFunctionWrapper(f),
-            False
-            )
-
-    assert False, f
 
 class InitFields:
     def __init__(self, first_var_name, fields_and_types):
@@ -157,7 +90,7 @@ class ExceptionHandlingHelper:
         return TypedExpression(
             native_ast.Expression.Cast(
                 left=native_ast.Expression.Variable(".unnamed.exception.var"),
-                to_type=self.InFlightException.lower()
+                to_type=self.InFlightException.getNativeLayoutType()
                 ),
             InFlightException
             )
@@ -323,7 +256,7 @@ class ConversionContext(object):
         self._temporaries[tname] = slot_type
 
         return TypedExpression(
-            native_ast.Expression.StackSlot(name=tname,type=slot_type.lower()),
+            native_ast.Expression.StackSlot(name=tname,type=slot_type.getNativeLayoutType()),
             slot_type.reference_to_temporary if type_is_temp_ref else
                 slot_type.reference,
             isReference=True
@@ -354,7 +287,7 @@ class ConversionContext(object):
         return TypedExpression(
             native_ast.Expression.StackSlot(
                 name=name_to_use,
-                type=slot_type.lower()
+                type=slot_type.getNativeLayoutType()
                 ),
             slot_type,
             isReference=True
@@ -365,7 +298,7 @@ class ConversionContext(object):
             if i >= len(input_types):
                 if not varargs:
                     raise ConversionException("Calling with too many arguments and func is not varargs")
-                return args[i].unwrap()
+                return args[i].ensureNonReference()
 
             to_type = input_types[i]
 
@@ -662,16 +595,7 @@ class ConversionContext(object):
         raise ConversionException("can't handle python expression type %s" % ast._which)
 
     def ensure_bool(self, expr):
-        if isinstance(expr.expr_type, BoolWrapper):
-            return expr.unwrap()
-
-        if not (t.is_primitive_numeric or t.is_pointer):
-            if expr.expr.matches.Constant:
-                return TypedExpression(native_ast.falseExpr, Bool)
-            else:
-                return expr + TypedExpression(native_ast.falseExpr, Bool)
-
-        return expr.dereference()
+        return expr.toBool(self)
 
     def convert_statement_ast_and_teardown_tmps(self, ast):
         if self._new_temporaries:
@@ -694,7 +618,7 @@ class ConversionContext(object):
                     TypedExpression(
                         native_ast.Expression.StackSlot(
                             name=tname,
-                            type=self._temporaries[tname].lower()
+                            type=self._temporaries[tname].getNativeLayoutType()
                             ),
                         self._temporaries[tname].reference,
                         isReference=True
@@ -866,7 +790,7 @@ class ConversionContext(object):
 
             assert output_type.is_pod, "for non pod, we should be copying this object"
 
-            return TypedExpression(native_ast.Expression.Return(arg=e.unwrap().expr), None, False)
+            return TypedExpression(native_ast.Expression.Return(arg=e.ensureNonReference().expr), None, False)
 
         if ast.matches.Expr:
             return TypedExpression(
@@ -914,7 +838,7 @@ class ConversionContext(object):
             false = self.convert_statement_list_ast(ast.orelse)
 
             if true.expr_type or false.expr_type:
-                ret_type = NoneWrapper()
+                ret_type = typedPythonTypeToTypeWrapper(NoneType())
             else:
                 ret_type = None
 
@@ -941,7 +865,7 @@ class ConversionContext(object):
                     .convert_attribute(self, "__iter__")
                     .convert_call(self, [])
                 )
-            iter_type = iter_create_expr.expr_type.unwrap_reference()
+            iter_type = iter_create_expr.expr_type.ensureNonReference_reference()
 
             iter_expr = self.allocate_temporary(iter_type)
 
@@ -1046,7 +970,6 @@ class ConversionContext(object):
                 break
 
         if exprs[-1].expr_type is not None:
-            assert isinstance(exprs[-1].expr_type, NoneWrapper)
             flows_off_end = True
         else:
             flows_off_end = False
@@ -1080,7 +1003,7 @@ class ConversionContext(object):
                 teardowns=teardowns
                 )
 
-        return TypedExpression(seq_expr, NoneWrapper() if flows_off_end else None, False)
+        return TypedExpression(seq_expr, typedPythonTypeToTypeWrapper(NoneType()) if flows_off_end else None, False)
 
     def named_variable_teardown(self, v):
         return native_ast.Teardown.ByTag(
@@ -1090,7 +1013,7 @@ class ConversionContext(object):
                     TypedExpression(
                         native_ast.Expression.StackSlot(
                             name=v,
-                            type=self._varname_to_type[v].lower()
+                            type=self._varname_to_type[v].getNativeLayoutType()
                             ),
                         self._varname_to_type[v],
                         isReference=True
@@ -1127,10 +1050,10 @@ class ConversionContext(object):
             typelist,
             expr.expr_type,
             native_ast.Function(
-                args=[(varlist[i].name, typelist[i].lower_as_function_arg()) 
+                args=[(varlist[i].name, typelist[i].getNativePassingType()) 
                             for i in range(len(varlist))],
                 body=native_ast.FunctionBody.Internal(expr.expr),
-                output_type=expr.expr_type.lower()
+                output_type=expr.expr_type.getNativeLayoutType()
                 )
             )
 
@@ -1156,7 +1079,7 @@ class ConversionContext(object):
                         #we can just copy this into the stackslot directly. no destructor needed
                         to_add.append(
                             native_ast.Expression.Store(
-                                ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.lower()),
+                                ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
                                 val=native_ast.Expression.Variable(name=name)
                                 )
                             )
@@ -1164,13 +1087,14 @@ class ConversionContext(object):
                         #need to make a stackslot for this variable
                         #the argument will be a pointer because it's POD
                         var_expr = TypedExpression(
-                            native_ast.Expression.Variable(name),
-                            slot_type.reference
+                            native_ast.Expression.Variable(name=name),
+                            slot_type,
+                            isReference=True
                             )
                         
                         slot_expr = TypedExpression(
-                            native_ast.Expression.StackSlot(name=name,type=slot_type.lower()),
-                            slot_type.reference,
+                            native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
+                            slot_type,
                             isReference=True
                             )
 
@@ -1181,7 +1105,7 @@ class ConversionContext(object):
 
                         destructors.append(
                             native_ast.Teardown.Always(
-                                slot_type.convert_destroy(self, slot_expr).expr
+                                expr=slot_type.convert_destroy(self, slot_expr).expr
                                 )
                             )
 
@@ -1293,7 +1217,7 @@ class Converter(object):
         args = []
         for i in range(len(ast_arg.args)):
             varname_to_type[ast_arg.args[i].arg] = input_types[i]
-            args.append((ast_arg.args[i].arg, input_types[i].lower_as_function_arg()))
+            args.append((ast_arg.args[i].arg, input_types[i].getNativePassingType()))
 
         argnames = [a[0] for a in args]
 
@@ -1304,7 +1228,7 @@ class Converter(object):
             for i in range(len(ast_arg.args), len(input_types)):
                 args.append(
                     ('.star_args.%s' % (i - len(ast_arg.args)), 
-                        input_types[i].lower_as_function_arg())
+                        input_types[i].getNativePassingType())
                     )
 
             starargs_type = Struct(
@@ -1342,7 +1266,7 @@ class Converter(object):
             native_ast.Function(
                 args=args, 
                 body=native_ast.FunctionBody.Internal(body=res.expr),
-                output_type=return_type.lower()
+                output_type=return_type.getNativeLayoutType()
                 ),
             return_type
             )
@@ -1453,7 +1377,11 @@ class Converter(object):
 
                 untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
 
-                args.append(untypedPtr.cast(argtype.pointer()).load())
+                if callTarget.input_types[i].is_pass_by_ref:
+                    #we've been handed a pointer, and it's already a pointer
+                    args.append(untypedPtr.cast(argtype))
+                else:
+                    args.append(untypedPtr.cast(argtype.pointer()).load())
 
             body = native_ast.Expression.Call(
                 target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
@@ -1519,7 +1447,7 @@ class Converter(object):
 
         if not output_type.is_pod:
             definition = native_ast.Function(
-                args=(('.return', output_type.pointer.lower()),) + definition.args,
+                args=(('.return', output_type.pointer.getNativeLayoutType()),) + definition.args,
                 body=definition.body,
                 output_type=native_ast.Type.Void()
                 )

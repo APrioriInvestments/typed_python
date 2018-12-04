@@ -50,22 +50,15 @@ class ArithmeticTypeWrapper(Wrapper):
         return self
 
     is_pod = True
-
-    def lower_as_function_arg(self):
-        return self.lower()
-
-    def unwrap(self, e):
-        if e.isReference:
-            return TypedExpression(e.expr.load(), e.expr_type, False)
-        return e
+    is_pass_by_ref = False
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
-        return TypedExpression.Void(target.expr.store(toStore.unwrap().expr))
+        return TypedExpression.Void(target.expr.store(toStore.ensureNonReference().expr))
 
     def convert_initialize_copy(self, context, target, toStore):
         assert target.isReference
-        return TypedExpression.Void(target.expr.store(toStore.unwrap().expr))
+        return TypedExpression.Void(target.expr.store(toStore.ensureNonReference().expr))
 
     def convert_destroy(self, context, instance):
         return TypedExpression.Void()
@@ -74,13 +67,13 @@ class Int64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Int64())
 
-    def lower(self):
+    def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=64,signed=True)
 
     def toFloat64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.unwrap().expr,
+                left=e.ensureNonReference().expr,
                 to_type=native_ast.Type.Float(bits=64)
                 ),
             Float64Wrapper(),
@@ -104,8 +97,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op in pyOpToNative:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.unwrap().expr,
-                        r=right.unwrap().expr,
+                        l=left.ensureNonReference().expr,
+                        r=right.ensureNonReference().expr,
                         op=pyOpToNative[op]
                         ),
                     self,
@@ -114,8 +107,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op in pyCompOp:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.unwrap().expr,
-                        r=right.unwrap().expr,
+                        l=left.ensureNonReference().expr,
+                        r=right.ensureNonReference().expr,
                         op=pyCompOp[op]
                         ),
                     BoolWrapper(),
@@ -131,13 +124,13 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Bool())
 
-    def lower(self):
+    def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=1,signed=False)
 
     def toFloat64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.unwrap().expr,
+                left=e.ensureNonReference().expr,
                 to_type=native_ast.Type.Float(bits=64)
                 ),
             Float64Wrapper(),
@@ -147,7 +140,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.unwrap().expr,
+                left=e.ensureNonReference().expr,
                 to_type=native_ast.Type.Int(bits=64, signed=True)
                 ),
             Int64Wrapper(),
@@ -157,12 +150,14 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def convert_bin_op(self, context, left, op, right):
         raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
 
+    def toBool(self, context, expr):
+        return expr
 
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Float64())
 
-    def lower(self):
+    def getNativeLayoutType(self):
         return native_ast.Type.Float(bits=64)
 
     def toFloat64(self, context, e):
@@ -171,7 +166,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
     def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.unwrap().expr,
+                left=e.ensureNonReference().expr,
                 to_type=native_ast.Type.Int(bits=64, signed=True)
                 ),
             Int64Wrapper(),
@@ -186,8 +181,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             if op in pyOpToNative:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.unwrap().expr,
-                        r=right.unwrap().expr,
+                        l=left.ensureNonReference().expr,
+                        r=right.ensureNonReference().expr,
                         op=pyOpToNative[op]
                         ),
                     self,
@@ -196,8 +191,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             if op in pyCompOp:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.unwrap().expr,
-                        r=right.unwrap().expr,
+                        l=left.ensureNonReference().expr,
+                        r=right.ensureNonReference().expr,
                         op=pyCompOp[op]
                         ),
                     BoolWrapper(),

@@ -2743,7 +2743,7 @@ struct native_instance_wrapper {
     }
 };
 
-PyObject *TupleOf(PyObject* nullValue, PyObject* args) {
+PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
@@ -2763,7 +2763,7 @@ PyObject *TupleOf(PyObject* nullValue, PyObject* args) {
     return typeObj;
 }
 
-PyObject *Tuple(PyObject* nullValue, PyObject* args) {
+PyObject *MakeTupleType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
@@ -2778,7 +2778,7 @@ PyObject *Tuple(PyObject* nullValue, PyObject* args) {
     return typeObj;
 }
 
-PyObject *ConstDict(PyObject* nullValue, PyObject* args) {
+PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
@@ -2800,7 +2800,7 @@ PyObject *ConstDict(PyObject* nullValue, PyObject* args) {
     return typeObj;
 }
 
-PyObject *OneOf(PyObject* nullValue, PyObject* args) {
+PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         PyObject* arg = PyTuple_GetItem(args,k);
@@ -2874,79 +2874,79 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
 }
 
 
-PyObject *Bool(PyObject* nullValue, PyObject* args) {
+PyObject *MakeBoolType(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Bool::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Int8(PyObject* nullValue, PyObject* args) {
+PyObject *MakeInt8Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Int8::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Int16(PyObject* nullValue, PyObject* args) {
+PyObject *MakeInt16Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Int16::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Int32(PyObject* nullValue, PyObject* args) {
+PyObject *MakeInt32Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Int32::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Int64(PyObject* nullValue, PyObject* args) {
+PyObject *MakeInt64Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Int64::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Float32(PyObject* nullValue, PyObject* args) {
+PyObject *MakeFloat32Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Float32::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Float64(PyObject* nullValue, PyObject* args) {
+PyObject *MakeFloat64Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Float64::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *UInt8(PyObject* nullValue, PyObject* args) {
+PyObject *MakeUInt8Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::UInt8::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *UInt16(PyObject* nullValue, PyObject* args) {
+PyObject *MakeUInt16Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::UInt16::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *UInt32(PyObject* nullValue, PyObject* args) {
+PyObject *MakeUInt32Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::UInt32::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *UInt64(PyObject* nullValue, PyObject* args) {
+PyObject *MakeUInt64Type(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::UInt64::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *String(PyObject* nullValue, PyObject* args) {
+PyObject *MakeStringType(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::String::Make());
     Py_INCREF(res);
     return res;
 }
-PyObject *Bytes(PyObject* nullValue, PyObject* args) {
+PyObject *MakeBytesType(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::Bytes::Make());
     Py_INCREF(res);
     return res;
 }
 
-PyObject *NoneType(PyObject* nullValue, PyObject* args) {
+PyObject *MakeNoneTypeType(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::None::Make());
     Py_INCREF(res);
     return res;
 }
 
-PyObject *Value(PyObject* nullValue, PyObject* args) {
+PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "Value takes 1 positional argument");
         return NULL;
@@ -3042,7 +3042,7 @@ bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::s
     return true;
 }
 
-PyObject *MakeFunction(PyObject* nullValue, PyObject* args) {
+PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 4 && PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "Function takes 2 or 4 arguments");
         return NULL;
@@ -3207,7 +3207,7 @@ Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
     return (Function*)actualType;
 }
 
-PyObject *Class(PyObject* nullValue, PyObject* args) {
+PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 5) {
         PyErr_SetString(PyExc_TypeError, "Class takes 2 arguments (name and a list of class members)");
         return NULL;
@@ -3306,6 +3306,39 @@ PyObject *Class(PyObject* nullValue, PyObject* args) {
 
     Py_INCREF(typeObj);
     return typeObj;
+}
+
+PyObject *refcount(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "refcount takes 1 positional argument");
+        return NULL;
+    }
+
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+
+    Type* actualType = native_instance_wrapper::extractTypeFrom(a1->ob_type);
+
+    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catTupleOf) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "first argument to serialize must be one of ConstDict, TupleOf, or Class, not %S",
+            a1
+            );
+        return NULL;        
+    }
+
+    if (actualType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+        return PyLong_FromLong(
+            ((::TupleOf*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
+            );
+    }
+
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "this code should be unreachable"
+        );
+    return NULL;        
 }
 
 PyObject *serialize(PyObject* nullValue, PyObject* args) {
@@ -3501,7 +3534,7 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     return res;
 }
 
-PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
+PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
     if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
         PyErr_SetString(PyExc_TypeError, "Alternative takes a single string positional argument.");
         return NULL;
@@ -3567,29 +3600,29 @@ PyObject *Alternative(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
 }
 
 static PyMethodDef module_methods[] = {
-    {"NoneType", (PyCFunction)NoneType, METH_VARARGS, NULL},
-    {"Bool", (PyCFunction)Bool, METH_VARARGS, NULL},
-    {"Int8", (PyCFunction)Int8, METH_VARARGS, NULL},
-    {"Int16", (PyCFunction)Int16, METH_VARARGS, NULL},
-    {"Int32", (PyCFunction)Int32, METH_VARARGS, NULL},
-    {"Int64", (PyCFunction)Int64, METH_VARARGS, NULL},
-    {"UInt8", (PyCFunction)UInt8, METH_VARARGS, NULL},
-    {"UInt16", (PyCFunction)UInt16, METH_VARARGS, NULL},
-    {"UInt32", (PyCFunction)UInt32, METH_VARARGS, NULL},
-    {"UInt64", (PyCFunction)UInt64, METH_VARARGS, NULL},
-    {"Float32", (PyCFunction)Float32, METH_VARARGS, NULL},
-    {"Float64", (PyCFunction)Float64, METH_VARARGS, NULL},
-    {"String", (PyCFunction)String, METH_VARARGS, NULL},
-    {"Bytes", (PyCFunction)Bytes, METH_VARARGS, NULL},
-    {"TupleOf", (PyCFunction)TupleOf, METH_VARARGS, NULL},
-    {"Tuple", (PyCFunction)Tuple, METH_VARARGS, NULL},
+    {"NoneType", (PyCFunction)MakeNoneTypeType, METH_VARARGS, NULL},
+    {"Bool", (PyCFunction)MakeBoolType, METH_VARARGS, NULL},
+    {"Int8", (PyCFunction)MakeInt8Type, METH_VARARGS, NULL},
+    {"Int16", (PyCFunction)MakeInt16Type, METH_VARARGS, NULL},
+    {"Int32", (PyCFunction)MakeInt32Type, METH_VARARGS, NULL},
+    {"Int64", (PyCFunction)MakeInt64Type, METH_VARARGS, NULL},
+    {"UInt8", (PyCFunction)MakeUInt8Type, METH_VARARGS, NULL},
+    {"UInt16", (PyCFunction)MakeUInt16Type, METH_VARARGS, NULL},
+    {"UInt32", (PyCFunction)MakeUInt32Type, METH_VARARGS, NULL},
+    {"UInt64", (PyCFunction)MakeUInt64Type, METH_VARARGS, NULL},
+    {"Float32", (PyCFunction)MakeFloat32Type, METH_VARARGS, NULL},
+    {"Float64", (PyCFunction)MakeFloat64Type, METH_VARARGS, NULL},
+    {"String", (PyCFunction)MakeStringType, METH_VARARGS, NULL},
+    {"Bytes", (PyCFunction)MakeBytesType, METH_VARARGS, NULL},
+    {"TupleOf", (PyCFunction)MakeTupleOfType, METH_VARARGS, NULL},
+    {"Tuple", (PyCFunction)MakeTupleType, METH_VARARGS, NULL},
     {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"OneOf", (PyCFunction)OneOf, METH_VARARGS, NULL},
-    {"ConstDict", (PyCFunction)ConstDict, METH_VARARGS, NULL},
-    {"Alternative", (PyCFunction)Alternative, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"Value", (PyCFunction)Value, METH_VARARGS, NULL},
-    {"Class", (PyCFunction)Class, METH_VARARGS, NULL},
-    {"Function", (PyCFunction)MakeFunction, METH_VARARGS, NULL},
+    {"OneOf", (PyCFunction)MakeOneOfType, METH_VARARGS, NULL},
+    {"ConstDict", (PyCFunction)MakeConstDictType, METH_VARARGS, NULL},
+    {"Alternative", (PyCFunction)MakeAlternativeType, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"Value", (PyCFunction)MakeValueType, METH_VARARGS, NULL},
+    {"Class", (PyCFunction)MakeClassType, METH_VARARGS, NULL},
+    {"Function", (PyCFunction)MakeFunctionType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
@@ -3598,6 +3631,7 @@ static PyMethodDef module_methods[] = {
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
+    {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 
@@ -3631,3 +3665,4 @@ PyInit__types(void)
 
     return module;
 }
+

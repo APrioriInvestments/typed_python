@@ -1361,6 +1361,14 @@ public:
         return (*(layout**)self)->count;
     }
 
+    int64_t refcount(instance_ptr self) const {
+        if (!(*(layout**)self)) {
+            return 0;
+        }
+
+        return (*(layout**)self)->refcount;
+    }
+
     template<class sub_constructor>
     void constructor(instance_ptr self, int64_t count, const sub_constructor& allocator) {
         if (count == 0) {
@@ -2978,7 +2986,7 @@ public:
 
             m_arg_positions[subtype_pair.first] = m_arg_positions.size();
 
-            if (subtype_pair.second->is_default_constructible()) {
+            if (subtype_pair.second->is_default_constructible() && !m_is_default_constructible) {
                 m_is_default_constructible = true;
                 m_default_construction_ix = m_arg_positions[subtype_pair.first];
             }

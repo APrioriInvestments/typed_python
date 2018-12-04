@@ -15,8 +15,8 @@
 from typed_python import *
 import textwrap
 
-def indent(x):
-    return texwrap.indent(x, "    ")
+def indent(x, indentBy="    "):
+    return textwrap.indent(str(x), indentBy)
 
 def type_attr_ix(t,attr):
     for i in range(len(t.element_types)):
@@ -36,17 +36,21 @@ def type_str(c):
     if c.matches.Int:
         return ("int" if c.signed else "uint") + str(c.bits)
     if c.matches.Struct:
+        if c.name:
+            return c.name
         return "(" + ",".join("%s=%s"%(k,v) for k,v in c.element_types) + ")"
     if c.matches.Pointer:
         return "*" + str(c.value_type)
     if c.matches.Void:
         return "void"
 
+    assert False, type(c)
+
 Type = Alternative("Type",
     Void={},
     Float={'bits': int},
     Int={'bits': int, 'signed': bool},
-    Struct={'element_types': TupleOf(Tuple(str, lambda: Type))},
+    Struct={'element_types': TupleOf(Tuple(str, lambda: Type)), 'name': str},
     Function={'output': lambda: Type, 'args': TupleOf(lambda: Type), 'varargs': bool, 'can_throw': bool},
     Pointer={'value_type': lambda: Type},
     attr_ix = type_attr_ix,
@@ -80,6 +84,8 @@ def const_str(c):
     if c.matches.Void:
         return "void"
 
+    assert False, type(c)
+
 Constant = Alternative("Constant",
     Void={},
     Float={'val': float, 'bits': int},
@@ -101,7 +107,7 @@ UnaryOp = Alternative(
         "+" if o.matches.Add else
         "-" if o.matches.Negate else 
         "!" if o.matches.LogicalNot else 
-        "~" if o.matches.BitwiseNot else None
+        "~" if o.matches.BitwiseNot else "unknown unary op"
     )
 
 BinaryOp = Alternative("BinaryOp", 
@@ -125,14 +131,13 @@ BinaryOp = Alternative("BinaryOp",
         "|" if o.matches.BitOr else 
         "&" if o.matches.BitAnd else 
         "^" if o.matches.BitXor else
-        None
+        "unknown binary op"
     )
 
 
 #loads and stores - no assignments
 Expression = lambda: Expression
 Teardown = lambda: Teardown
-CallTarget = lambda: CallTarget
 
 NamedCallTarget = NamedTuple(
                 name = str, 
@@ -154,6 +159,7 @@ def teardown_str(self):
         return str(self.expr)
     if self.matches.ByTag:
         return "if slot_initialized(name=%s):\n" % self.tag + indent(str(self.expr), "    ")
+    assert False, type(self)
 
 Teardown = Alternative("Teardown",
     ByTag = {'tag': str, 'expr': Expression},
@@ -256,8 +262,10 @@ def expr_str(self):
     if self.matches.Sequence:
         return "\n".join(str(x) for x in self.vals)
     if self.matches.Finally:
-        return "try:\n" + indent(str(self.expr)) + "\nfinally:\n"\
-        + indent("\n".join(str(x) for x in self.teardowns))
+        return (
+            "try:\n" + indent(str(self.expr)) + "\nfinally:\n"
+                + indent("\n".join(str(x) for x in self.teardowns))
+            )
     if self.matches.TryCatch:
         return (
               "try:\n" + indent(str(self.expr)) + "\n"
@@ -281,7 +289,7 @@ def expr_str(self):
 
     assert False
 
-Expression = Alternative("Teardown",
+Expression = Alternative("Expression",
     Constant = {'val': Constant},
     Comment = {'comment': str, 'expr': Expression},
     Load = {'ptr': Expression},
@@ -339,7 +347,8 @@ Expression = Alternative("Teardown",
     load = lambda self: Expression.Load(ptr=self),
     store = lambda self, val: Expression.Store(ptr=self, val=val),
     cast = lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
-    with_comment = lambda self, c: Expression.Comment(comment=c, expr=self)
+    with_comment = lambda self, c: Expression.Comment(comment=c, expr=self),
+    elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=exprs)
     )
 
 nullExpr = Expression.Constant(val=Constant.Void())
@@ -349,7 +358,7 @@ falseExpr = Expression.Constant(val=Constant.Int(bits=1,val=0,signed=False))
 
 def const_int_expr(i):
     return Expression.Constant(
-        Constant.Int(bits=64,val=i,signed=True)
+        val=Constant.Int(bits=64,val=i,signed=True)
         )
 
 FunctionBody = Alternative("FunctionBody",
@@ -365,7 +374,27 @@ Function = NamedTuple(
 
 Void = Type.Void()
 Bool = Type.Int(bits=1, signed=False)
+UInt8 = Type.Int(bits=8, signed=False)
+UInt8Ptr = UInt8.pointer()
 Int8Ptr = Type.Pointer(value_type=Type.Int(bits=8, signed=True))
+Int64 = Type.Int(bits=64, signed=True)
+Int32 = Type.Int(bits=32, signed=True)
 
 def var(name):
     return Expression.Variable(name=name)
+
+def callFree(argExpr):
+    return Expression.Call(
+        target=CallTarget.Named(
+            target=NamedCallTarget(
+                name = "free",
+                arg_types = [UInt8Ptr],
+                output_type = Void,
+                external=True,
+                varargs=False,
+                intrinsic=False,
+                can_throw=False
+                )
+            ),
+        args=(argExpr.cast(UInt8Ptr),)
+        )

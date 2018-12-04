@@ -32,6 +32,9 @@ class Runtime:
         self.compiler = llvm_compiler.Compiler()
         self.converter = python_to_native_ast.Converter()
 
+    def verboselyDisplayNativeCode(self):
+        self.compiler.mark_converter_verbose()
+
     def compile(self, f):
         """Compile a single FunctionOverload and install the pointer"""
         if isinstance(f, FunctionOverload):

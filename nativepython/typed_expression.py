@@ -27,6 +27,7 @@ class TypedExpression(object):
         """
         super().__init__()
         assert isinstance(t, Wrapper) or t is None, t
+        assert isinstance(expr, native_ast.Expression), expr
 
         self.expr = expr
         self.expr_type = t
@@ -35,7 +36,7 @@ class TypedExpression(object):
     def as_call_arg(self, context):
         """Convert this expression to a call-argument form."""
         if self.expr_type.is_pod:
-            return self.unwrap()
+            return self.ensureNonReference()
         else:
             if self.isReference:
                 return self
@@ -45,8 +46,17 @@ class TypedExpression(object):
     def convert_assign(self, context, toStore):
         return self.expr_type.convert_assign(context, self, toStore)
 
+    def convert_destroy(self, context):
+        return self.expr_type.convert_destroy(context, self)
+
     def convert_copy_initialize(self, context, target, toStore):
         return self.expr_type.convert_copy_initialize(context, self, toStore)
+
+    def convert_getitem(self, context, item):
+        return self.expr_type.convert_getitem(context, self, item)
+
+    def convert_len(self, context):
+        return self.expr_type.convert_len(context, self)
 
     def convert_bin_op(self, context, op, rhs):
         return self.expr_type.convert_bin_op(context, self, op, rhs)
@@ -54,8 +64,8 @@ class TypedExpression(object):
     def convert_call(self, context, args):
         return self.expr_type.convert_call(context, self, args)
 
-    def unwrap(self):
-        return self.expr_type.unwrap(self)
+    def ensureNonReference(self):
+        return self.expr_type.ensureNonReference(self)
 
     def toFloat64(self, context):
         return self.expr_type.toFloat64(context, self)

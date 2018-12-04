@@ -131,6 +131,8 @@ class TypedLLVMValue(object):
 
         if native_type.matches.Void:
             assert llvm_value is None, llvm_value
+        else:
+            assert llvm_value is not None
 
         self.llvm_value = llvm_value
         self.native_type = native_type
@@ -779,7 +781,7 @@ class FunctionConverter:
                         return native_type.element_types[i][1]
                 else:
                     assert native_type.matches.Pointer
-                    return native_ast.Type.Pointer(gep_type(native_type.value_type, offsets[1:]))
+                    return gep_type(native_type.value_type, offsets[1:]).pointer()
 
             return TypedLLVMValue(
                 self.builder.gep(arg.llvm_value, [o.llvm_value for o in offsets]),

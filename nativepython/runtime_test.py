@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python import *
+import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
 import time
@@ -105,6 +106,26 @@ class TestRuntime(unittest.TestCase):
 
         self.assertEqual(failures, 0)
 
+    def checkFunction(self, f, argsToCheck):
+        r  = Runtime.singleton()
+
+        f_fast = r.compile(f)
+
+        t_py = 0.0
+        t_fast = 0.0
+        for a in argsToCheck:
+            t0 = time.time()
+            fastval = f_fast(*a)
+            t1 = time.time()
+            slowval = f(*a)
+            t2 = time.time()
+
+            t_py += t2-t1
+            t_fast += t1-t0
+
+            self.assertEqual(fastval, slowval)
+        return t_py, t_fast
+
     def checkFunctionOfIntegers(self, f):
         r  = Runtime.singleton()
 
@@ -147,3 +168,37 @@ class TestRuntime(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    def test_integers_in_closures(self):
+        y = 2
+        def f(x: int) -> int:
+            return x+y
+
+        self.checkFunctionOfIntegers(f)
+
+    def test_tuple_of_float(self):
+        def f(x: TupleOf(float), y:TupleOf(float)) -> float:
+            j = 0
+            res = 0.0
+            
+            while j < len(y):
+                i = 0
+                while i < len(x):
+                    res = res + x[i] * y[j]
+                    i = i + 1
+                j = j + 1
+
+            return res
+
+        aTupleOfFloat = TupleOf(float)(list(range(1000)))
+        aTupleOfFloat2 = TupleOf(float)(list(range(1000)))
+
+        self.assertEqual(_types.refcount(aTupleOfFloat),1)
+
+        t_py, t_fast = self.checkFunction(f, [(aTupleOfFloat,aTupleOfFloat2)])
+
+        self.assertEqual(_types.refcount(aTupleOfFloat),1)
+
+        #I get around 150x
+        self.assertTrue(t_py / t_fast > 50.0)
+
+        print(t_py / t_fast, " speedup")

@@ -17,6 +17,7 @@ import llvmlite.ir
 import nativepython.native_ast_to_llvm as native_ast_to_llvm
 import sys
 import ctypes
+from typed_python import _types
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -31,6 +32,8 @@ if sys.platform == "darwin":
     ctypes.CDLL("libstdc++.dylib",mode=ctypes.RTLD_GLOBAL)
 else:
     ctypes.CDLL("libstdc++.so.6",mode=ctypes.RTLD_GLOBAL)
+
+ctypes.CDLL(_types.__file__,mode=ctypes.RTLD_GLOBAL)
 
 
 pointer_size = (

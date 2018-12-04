@@ -18,18 +18,14 @@ import nativepython.native_ast as native_ast
 
 class NoneWrapper(Wrapper):
     is_pod = True
+    is_empty = True
+    is_pass_by_ref = False
 
     def __init__(self):
         super().__init__(NoneType())
 
-    def lower_as_function_arg(self):
-        return self.lower()
-
-    def lower(self):
+    def getNativeLayoutType(self):
         return native_ast.Type.Void()
-
-    def unwrap(self, e):
-        return e
 
     def convert_bin_op(self, context, left, op, right):
         raise ConversionException("Not convertible")
