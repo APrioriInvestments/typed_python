@@ -45,7 +45,6 @@ class SendAndReturn(AlgebraicProtocol):
         self.responseQueue = responseQueue
 
     def onConnected(self):
-        print("SEND")
         self.sendMessage(self.messageToSend)
 
     def messageReceived(self, msg):
@@ -56,6 +55,7 @@ class SendAndReturn(AlgebraicProtocol):
 class AlgebraicProtocolTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # use common eventloop for all tests in class
         cls.loop = asyncio.get_event_loop()
 
     @classmethod
