@@ -19,7 +19,7 @@ import sys
 import time
 import typed_python
 import object_database.tcp_server as tcp_server
-from util import sslContextFromCertPath
+from object_database.util import sslContextFromCertPath
 
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 
