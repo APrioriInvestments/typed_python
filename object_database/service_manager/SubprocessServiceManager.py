@@ -15,7 +15,7 @@
 
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
-from object_database.service_manager.ServiceManagerSchema import service_schema
+from object_database.service_manager.ServiceSchema import service_schema
 from object_database import connect
 
 import threading
@@ -170,8 +170,6 @@ class SubprocessServiceManager(ServiceManager):
                             return f.read()
 
         return "<logfile not found>"
-
-
 
     def cleanupOldLogfiles(self):
         if self.logfileDirectory:

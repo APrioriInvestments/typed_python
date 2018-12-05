@@ -407,8 +407,8 @@ class AwsApi:
 
 
 class AwsWorkerBootService(ServiceBase):
-    def __init__(self, db, serviceInstance, serviceRuntimeConfig):
-        ServiceBase.__init__(self, db, serviceInstance, serviceRuntimeConfig)
+    def __init__(self, db, service, serviceRuntimeConfig):
+        ServiceBase.__init__(self, db, service, serviceRuntimeConfig)
 
         self.SLEEP_INTERVAL = 10.0
         self.lastSpotPriceRequest = 0.0

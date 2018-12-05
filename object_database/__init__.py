@@ -17,7 +17,8 @@ from object_database.persistence import RedisPersistence, InMemoryPersistence
 from object_database.schema import Schema, Indexed, Index, SubscribeLazilyByDefault
 from object_database.core_schema import core_schema
 from object_database.object import DatabaseObject
-from object_database.service_manager.ServiceManagerSchema import service_schema
+from object_database.service_manager.ServiceSchema import service_schema
+from object_database.service_manager.Codebase import Codebase
 from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.view import revisionConflictRetry, RevisionConflictException, DisconnectedException, current_transaction
 from object_database.inmem_server import InMemServer

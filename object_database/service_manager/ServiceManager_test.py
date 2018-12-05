@@ -15,10 +15,10 @@
 
 import unittest
 
+import object_database
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
-
-import object_database.service_manager.ServiceManagerSchema as ServiceManagerSchema
+import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import *
 
 from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema, current_transaction
@@ -303,6 +303,7 @@ class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
+        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(self.tempDirectoryName, forceReset=True)
 
         os.makedirs(os.path.join(self.tempDirectoryName,'source'))
         os.makedirs(os.path.join(self.tempDirectoryName,'storage'))
@@ -361,7 +362,7 @@ class ServiceManagerTest(unittest.TestCase):
 
         self.assertTrue(
             self.database.waitForCondition(
-                lambda: svc.timesBootedUnsuccessfully == ServiceManagerSchema.MAX_BAD_BOOTS,
+                lambda: svc.timesBootedUnsuccessfully == ServiceInstance.MAX_BAD_BOOTS,
                 10
                 )
             )
@@ -377,7 +378,7 @@ class ServiceManagerTest(unittest.TestCase):
 
         self.assertTrue(
             self.database.waitForCondition(
-                lambda: svc.timesBootedUnsuccessfully == ServiceManagerSchema.MAX_BAD_BOOTS,
+                lambda: svc.timesBootedUnsuccessfully == ServiceInstance.MAX_BAD_BOOTS,
                 10
                 )
             )
@@ -447,10 +448,10 @@ class ServiceManagerTest(unittest.TestCase):
                 """)
                 })
 
-            i1 = v1.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
-            i2 = v2.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
-            i12 = v1.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
-            i22 = v2.instantiate("test_service.service", root_path_override=self.tempDirectoryName)
+            i1 = v1.instantiate("test_service.service")
+            i2 = v2.instantiate("test_service.service")
+            i12 = v1.instantiate("test_service.service")
+            i22 = v2.instantiate("test_service.service")
 
             self.assertTrue(i1.f() == 1)
             self.assertTrue(i2.f() == 2)

@@ -15,7 +15,7 @@
 
 from object_database.view import revisionConflictRetry
 from object_database.core_schema import core_schema
-from object_database.service_manager.ServiceManagerSchema import service_schema
+from object_database.service_manager.ServiceSchema import service_schema
 
 import os.path
 import psutil
@@ -141,27 +141,6 @@ class ServiceManager(object):
 
         self.db.waitForCondition(allStopped, timeout)
 
-    @revisionConflictRetry
-    def updateLogRequests(self):
-        with self.db.view():
-            requests = service_schema.LogRequest.lookupAll(host=self.serviceHostObject)
-
-        for r in requests:
-            with self.db.transaction():
-                if time.time() - r.timestamp > 30:
-                    if r.response:
-                        r.response.delete()
-                    r.delete()
-                elif r.response is None:
-                    #try to fill this request
-                    try:
-                        r.response = service_schema.LogResponse(data=self.extractLogData(r.serviceInstance._identity, r.maxBytes))
-                    except:
-                        r.response = service_schema.LogResponse(data="FAILED TO PULL LOGS:\n" + traceback.format_exc())
-
-    def extractLogData(self, instanceId, maxBytes):
-        raise Exception("This type of ServiceManager (%s) can't give you logs." % type(self))
-
     def doWork(self):
         with self.db.transaction():
             self.serviceHostObject = service_schema.ServiceHost(
@@ -175,7 +154,6 @@ class ServiceManager(object):
         logging.info("ServiceManager starting work loop.")
 
         while not self.shouldStop.is_set():
-            self.updateLogRequests()
             self.updateServiceHostStats()
 
             #redeploy our own services
@@ -244,16 +222,6 @@ class ServiceManager(object):
                         serviceInstance.service.timesCrashed += 1
                         serviceInstance.service.lastFailureReason = serviceInstance.failureReason
                     serviceInstance.delete()
-
-        with self.db.view():
-            logRequests = service_schema.LogRequest.lookupAll()
-
-        for req in logRequests:
-            with self.db.transaction():
-                if not req.host.exists() or not req.serviceInstance.exists():
-                    if req.response:
-                        req.response.delete()
-                    req.delete()
 
     def redeployServicesIfNecessary(self):
         needRedeploy = []

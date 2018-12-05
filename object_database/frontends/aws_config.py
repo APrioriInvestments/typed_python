@@ -27,7 +27,7 @@ import logging.config
 from object_database import connect, InMemServer
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.service_manager.ServiceManagerSchema import service_schema
+from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.aws.AwsWorkerBootService import AwsWorkerBootService, AwsApi
 from object_database.service_manager.aws.AwsWorkerBootService import schema as aws_worker_boot_schema
 

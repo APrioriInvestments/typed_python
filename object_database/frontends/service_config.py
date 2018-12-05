@@ -25,8 +25,9 @@ import traceback
 import logging.config
 import tempfile
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database import connect, service_schema, core_schema, ServiceBase
+from object_database import connect, service_schema, core_schema, ServiceBase, Codebase
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
+import object_database
 
 def findGitParent(p_root):
     p = os.path.abspath(p_root)
@@ -38,6 +39,11 @@ def findGitParent(p_root):
             raise Exception("Can't find a git worktree at " + p_root)
 
 def main(argv):
+    with tempfile.TemporaryDirectory() as tf:
+        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(tf.name)
+        return main(argv)
+
+def _main(argv):
     configureLogging()
 
     parser = argparse.ArgumentParser("Install and configure services.")
@@ -65,7 +71,6 @@ def main(argv):
     configure_parser = subparsers.add_parser('configure', help='configure a service')
     configure_parser.set_defaults(command='configure')
     configure_parser.add_argument("name")
-    configure_parser.add_argument("-l", "--local", action='store_true', help='use the local codebase, not the remote')
     configure_parser.add_argument("args", nargs=argparse.REMAINDER)
 
     list_parser = subparsers.add_parser('list', help='list installed services')
@@ -102,19 +107,11 @@ def main(argv):
 
     if parsedArgs.command == 'configure':
         try:
-            with tempfile.TemporaryDirectory() as tf:
-                with db.transaction():
-                    s = service_schema.Service.lookupAny(name=parsedArgs.name)
+            with db.transaction():
+                s = service_schema.Service.lookupAny(name=parsedArgs.name)
+                svcClass = s.instantiateServiceType()
 
-                    if parsedArgs.local:
-                        svcClass = getattr(
-                            service_schema.Codebase.instantiateFromLocalSource([findGitParent(os.getcwd())], s.service_module_name),
-                            s.service_class_name
-                            )
-                    else:
-                        svcClass = s.instantiateServiceType(tf)
-
-                svcClass.configureFromCommandline(db, s, parsedArgs.args)
+            svcClass.configureFromCommandline(db, s, parsedArgs.args)
         except Exception as e:
             traceback.print_exc()
             return 1

@@ -14,7 +14,7 @@
 
 
 from object_database.core_schema import core_schema
-from object_database.service_manager.ServiceManagerSchema import service_schema
+from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase, ServiceRuntimeConfig
 
 import traceback
@@ -25,21 +25,17 @@ import tempfile
 import os
 
 class ServiceWorker:
-    def __init__(self, dbConnectionFactory, instance_id, sourceDir, storageRoot):
+    def __init__(self, dbConnectionFactory, instance_id, storageRoot):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema)
 
         #explicitly don't subscribe to everyone else's service hosts!
         self.db.subscribeToType(service_schema.Service)
-        self.db.subscribeToType(service_schema.LogRequest)
-        self.db.subscribeToType(service_schema.LogResponse)
         self.db.subscribeToType(service_schema.Codebase, lazySubscription=True)
+        self.db.subscribeToType(service_schema.File, lazySubscription=True)
 
-        self.sourceDir = sourceDir
-        self.runtimeConfig = ServiceRuntimeConfig(sourceDir, storageRoot)
-
-        assert self.sourceDir is not None
+        self.runtimeConfig = ServiceRuntimeConfig(storageRoot)
 
         if not os.path.exists(storageRoot):
             os.makedirs(storageRoot)
@@ -151,12 +147,12 @@ class ServiceWorker:
             self.shutdownPollThread.join()
 
     def _instantiateServiceObject(self):
-        service_type = self.instance.service.instantiateServiceType(self.sourceDir)
+        service_type = self.instance.service.instantiateServiceType()
 
         assert isinstance(service_type, type), service_type
         assert issubclass(service_type, ServiceBase), service_type
 
-        service = service_type(self.db, self.instance, self.runtimeConfig)
+        service = service_type(self.db, self.instance.service, self.runtimeConfig)
 
         return service
 

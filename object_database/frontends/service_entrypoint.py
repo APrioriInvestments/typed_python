@@ -24,6 +24,7 @@ import logging
 import logging.config
 from object_database import connect
 from object_database.util import configureLogging
+from object_database.service_manager.Codebase import setCodebaseInstantiationDirectory
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
 def main(argv):
@@ -50,8 +51,10 @@ def main(argv):
     def dbConnectionFactory():
         return connect(parsedArgs.host, parsedArgs.port)
 
+    setCodebaseInstantiationDirectory(parsedArgs.sourceDir)
+
     try:
-        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.sourceDir, parsedArgs.storageRoot)
+        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.storageRoot)
 
         manager.runAndWaitForShutdown()
 

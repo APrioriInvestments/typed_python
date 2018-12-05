@@ -23,35 +23,20 @@ import object_database
 
 from object_database.web.cells import Card
 from object_database.core_schema import core_schema
-from object_database.service_manager.ServiceManagerSchema import service_schema
+from object_database.service_manager.ServiceSchema import service_schema
 
 class ServiceRuntimeConfig:
-    def __init__(self, serviceSourceRoot, serviceTemporaryStorageRoot):
-        self.serviceSourceRoot = serviceSourceRoot
+    def __init__(self, serviceTemporaryStorageRoot):
         self.serviceTemporaryStorageRoot = serviceTemporaryStorageRoot
-
-_connectionToServiceSourceRoot = weakref.WeakKeyDictionary()
 
 class ServiceBase:
     coresUsed = 1
     gbRamUsed = 1
 
-    def __init__(self, db, serviceInstance, runtimeConfig):
+    def __init__(self, db, serviceObject, runtimeConfig):
         self.db = db
-        self.serviceInstance = serviceInstance
+        self.serviceObject = serviceObject
         self.runtimeConfig = runtimeConfig
-
-        _connectionToServiceSourceRoot[self.db] = runtimeConfig.serviceSourceRoot
-
-        assert self.runtimeConfig.serviceSourceRoot is not None
-
-    @staticmethod
-    def currentServiceSourceRootImpliedByDbTransaction():
-        return _connectionToServiceSourceRoot[object_database.current_transaction().db()]
-
-    @staticmethod
-    def associateServiceSourceRootWithDb(db, ssr):
-        _connectionToServiceSourceRoot[db] = ssr
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):

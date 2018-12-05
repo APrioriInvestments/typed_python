@@ -274,7 +274,7 @@ class ManyVersionedObjects:
 
         return SetWithEdits(set(),set(),set())
 
-    def hasValueForVersion(self, key, version_number):
+    def hasDataForKey(self, key):
         return key in self._versioned_objects
 
     def valueForVersion(self, key, version_number):
@@ -991,7 +991,7 @@ class DatabaseConnection:
 
     def _get_versioned_object_data(self, key, transaction_id):
         with self._lock:
-            if self._versioned_data.hasValueForVersion(key, transaction_id):
+            if self._versioned_data.hasDataForKey(key):
                 return self._versioned_data.valueForVersion(key, transaction_id)
 
             if self.disconnected.is_set():
@@ -1009,10 +1009,18 @@ class DatabaseConnection:
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
-            if self._versioned_data.hasValueForVersion(key, transaction_id):
+            if self._versioned_data.hasDataForKey(key):
                 return self._versioned_data.valueForVersion(key, transaction_id)
 
             return None
+
+    def requestLazyObjects(self, objects):
+        with self._lock:
+            for o in objects:
+                k = keymapping.data_key(type(o), o._identity, " exists")
+
+                if o._identity in self._lazy_objects and not self._versioned_data.hasDataForKey(k):
+                    self._loadLazyObject(o._identity)
 
     def _loadLazyObject(self, identity):
         e = self._lazy_object_read_blocks.get(identity)
