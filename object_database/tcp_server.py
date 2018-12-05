@@ -128,15 +128,17 @@ class EventLoopInThread:
             self.started = True
             self.thread.start()
 
-    def create_connection(self, protocol_factory, host, port, ssl=None):
+    def create_connection(self, protocol_factory, host, port, ssl):
         self.start()
 
         async def doit():
             return await self.loop.create_connection(protocol_factory, host=host, port=port, family=socket.AF_INET, ssl=ssl)
 
-        return asyncio.run_coroutine_threadsafe(doit(), self.loop).result(10)
+        res = asyncio.run_coroutine_threadsafe(doit(), self.loop)
 
-    def create_server(self, protocol_factory, host, port, ssl=None):
+        return res.result(10)
+
+    def create_server(self, protocol_factory, host, port, ssl):
         self.start()
 
         async def doit():
@@ -155,6 +157,7 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
     # With CLIENT_AUTH we are setting up the SSL to use encryption only, which is what we want.
     # If we also wanted authentication, we would use SERVER_AUTH.
     ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+
     proto = None
     while proto is None:
         try:
@@ -164,7 +167,7 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
                 port=port,
                 ssl=ssl_ctx
                 )
-        except:
+        except Exception as e:
             if not retry or time.time() - t0 > timeout * .8:
                 raise
             time.sleep(min(timeout, max(timeout / 100.0, 0.01)))

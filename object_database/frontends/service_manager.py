@@ -27,10 +27,11 @@ import psutil
 import multiprocessing
 import logging.config
 import concurrent.futures
-from object_database.util import configureLogging
+from object_database.util import configureLogging, sslContextFromCertPath
 
 from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
+
 
 def main(argv=None):
     if argv is None:
@@ -41,6 +42,7 @@ def main(argv=None):
     parser.add_argument("own_hostname")
     parser.add_argument("db_hostname")
     parser.add_argument("port", type=int)
+    parser.add_argument("ssl_path", help="path to (self-signed) SSL certificate")
     parser.add_argument("--source", help="path for the source trees used by services", required=True)
     parser.add_argument("--storage", help="path for local storage used by services", required=True)
 
@@ -83,12 +85,14 @@ def main(argv=None):
 
     try:
         if parsedArgs.run_db:
+            ssl_ctx = sslContextFromCertPath(parsedArgs.ssl_path)
             databaseServer = TcpServer(
                 parsedArgs.own_hostname,
                 object_database_port,
-                RedisPersistence(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None else
-                    InMemoryPersistence()
-                )
+                RedisPersistence(port=parsedArgs.redis_port) or InMemoryPersistence(),
+                ssl_context=ssl_ctx
+            )
+
 
             databaseServer.start()
 
@@ -113,7 +117,7 @@ def main(argv=None):
                             maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),
                             logfileDirectory=parsedArgs.logdir,
                             shutdownTimeout=parsedArgs.shutdownTimeout
-                            )
+                        )
                         logging.info("Connected the service-manager")
                     except (ConnectionRefusedError, DisconnectedException):
                         serviceManager = None

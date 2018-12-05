@@ -13,8 +13,11 @@
 #   limitations under the License.
 
 import logging
+import os
+import ssl
 import time
 import types
+
 
 def formatTable(rows):
     rows = [[str(r) for r in row] for row in rows]
@@ -32,6 +35,7 @@ def formatTable(rows):
 
     return "\n".join(formattedRows)
 
+
 def configureLogging(preamble="", error=False):
     logging.getLogger('botocore.vendored.requests.packages.urllib3.connectionpool').setLevel(logging.CRITICAL)
     logging.getLogger('asyncio').setLevel(logging.CRITICAL)
@@ -39,6 +43,7 @@ def configureLogging(preamble="", error=False):
         + ("|" + preamble if preamble else '')
         + '| %(message)s', level=logging.INFO if not error else logging.ERROR
         )
+
 
 def secondsToHumanReadable(seconds):
     if seconds < 120:
@@ -48,6 +53,7 @@ def secondsToHumanReadable(seconds):
     if seconds < 120 * 60 * 24:
         return "%.2f hours" % (seconds / 60 / 60)
     return "%.2f days" % (seconds / 60 / 60 / 24)
+
 
 class Timer:
     granularity = .1
@@ -91,9 +97,11 @@ class Timer:
         inner.__name__ = f.__name__
         return inner
 
+
 def indent(text, amount=4, ch=' '):
     padding = amount * ch
     return ''.join(padding+line for line in text.splitlines(True))
+
 
 def distance(s1, s2):
     """Compute the edit distance between s1 and s2"""
@@ -113,8 +121,21 @@ def distance(s1, s2):
 
     return prev[-1]
 
+
 def closest_in(name, names):
     return sorted((distance(name, x), x) for x in names)[0][1]
 
+
 def closest_N_in(name, names, count):
     return [x[1] for x in sorted((distance(name, x), x) for x in names)[:count]]
+
+
+def sslContextFromCertPath(cert_path):
+    assert os.path.isfile(cert_path), "Expected path to existing SSL certificate ({})".format(cert_path)
+    key_path = os.path.splitext(cert_path)[0] + '.key'
+    assert os.path.isfile(key_path), "Expected to find .key file along SSL certificate ({})".format(cert_path)
+
+    ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_ctx.load_cert_chain(cert_path, key_path)
+
+    return ssl_ctx
