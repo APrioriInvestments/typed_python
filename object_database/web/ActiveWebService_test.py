@@ -25,7 +25,7 @@ import tempfile
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema
+from object_database import core_schema, connect, service_schema
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
@@ -37,12 +37,24 @@ class ActiveWebServiceTest(unittest.TestCase):
 
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8023", "--run_db",
+                'localhost', 'localhost', "8023",
+                os.path.join(ownDir, '..', '..', 'testcert.cert'),
+                '--run_db',
                 '--source',os.path.join(self.tempDirectoryName,'source'),
                 '--storage',os.path.join(self.tempDirectoryName,'storage'),
                 '--shutdownTimeout', '.5'
-                ]
+            ]
+        )
+        try:
+            # this should throw a subprocess.TimeoutExpired exception if the service did not crash
+            self.server.wait(0.7)
+        except subprocess.TimeoutExpired:
+            pass
+        else:
+            raise Exception("Failed to start service_manager (retcode:{})"
+                .format(self.server.returncode)
             )
+
         try:
             self.database = connect("localhost", 8023, retry=True)
 

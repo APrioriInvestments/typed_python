@@ -45,7 +45,10 @@ def main(argv=None):
         try:
             server = subprocess.Popen(
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', "8020", "--run_db",'--source', os.path.join(tf,'source'),
+                    'localhost', 'localhost', "8020",
+                    os.path.join(ownDir, '..', '..', 'testcert.cert'),
+                    "--run_db",
+                    '--source', os.path.join(tf,'source'),
                     '--storage', os.path.join(tf,'storage'),
                     #'--logdir', os.path.join(tf,'logs'),
                     '--shutdownTimeout', '.5'

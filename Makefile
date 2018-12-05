@@ -1,4 +1,4 @@
-install:
+install: testcert.cert testcert.key
 	pipenv install --system --deploy
 
 test: testcert.cert testcert.key
