@@ -297,7 +297,7 @@ def getTestServiceModule(version):
             """.format(version=version))
     }
 
-VERBOSE = False
+VERBOSE = True
 
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):

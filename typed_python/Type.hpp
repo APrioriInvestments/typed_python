@@ -11,6 +11,10 @@
 #include <atomic>
 #include <iostream>
 #include <sstream>
+#include "SerializationContext.hpp"
+#include "HashAccumulator.hpp"
+#include "SerializationBuffer.hpp"
+#include "DeserializationBuffer.hpp"
 
 class Type;
 
@@ -49,168 +53,6 @@ typedef uint8_t* instance_ptr;
 typedef void (*compiled_code_entrypoint)(instance_ptr, instance_ptr*);
 
 void updateTypeRepForType(Type* t, PyTypeObject* pyType);
-
-class Hash32Accumulator {
-public:
-    Hash32Accumulator(int32_t init) :
-        m_state(init)
-    {
-    }
-
-    void add(int32_t i) {
-        m_state = (m_state * 1000003) ^ i;
-    }
-
-    void addBytes(uint8_t* bytes, int64_t count) {
-        while (count >= 4) {
-            add(*(int32_t*)bytes);
-            bytes += 4;
-            count -= 4;
-        }
-        while (count) {
-            add((uint8_t)*bytes);
-            bytes++;
-            count--;
-        }
-    }
-
-    int32_t get() const {
-        return m_state;
-    }
-
-    void addRegister(bool i) { add(i ? 1:0); }
-    void addRegister(uint8_t i) { add(i); }
-    void addRegister(uint16_t i) { add(i); }
-    void addRegister(uint32_t i) { add(i); }
-    void addRegister(uint64_t i) { addBytes((uint8_t*)&i, sizeof(i)); }
-
-    void addRegister(int8_t i) { add(i); }
-    void addRegister(int16_t i) { add(i); }
-    void addRegister(int32_t i) { add(i); }
-    void addRegister(int64_t i) { addBytes((uint8_t*)&i, sizeof(i)); }
-
-    void addRegister(float i) { addBytes((uint8_t*)&i, sizeof(i)); }
-    void addRegister(double i) { addBytes((uint8_t*)&i, sizeof(i)); }
-
-private:
-    int32_t m_state;
-};
-
-class SerializationBuffer {
-public:
-    SerializationBuffer() :
-            m_buffer(nullptr),
-            m_size(0),
-            m_reserved(0)
-    {
-    }
-
-    ~SerializationBuffer() {
-        if (m_buffer) {
-            free(m_buffer);
-        }
-    }
-
-    SerializationBuffer(const SerializationBuffer&) = delete;
-    SerializationBuffer& operator=(const SerializationBuffer&) = delete;
-
-    void write_uint8(uint8_t i) {
-        ensure(sizeof(i));
-        m_buffer[m_size++] = i;
-    }
-
-    void write_uint32(uint32_t i) {
-        ensure(sizeof(i));
-        *(uint32_t*)(m_buffer+m_size) = i;
-        m_size += sizeof(i);
-    }
-
-    void write_bytes(uint8_t* ptr, size_t bytecount) {
-        ensure(bytecount);
-        memcpy(m_buffer+m_size,ptr,bytecount);
-        m_size += bytecount;
-    }
-
-    uint8_t* buffer() const {
-        return m_buffer;
-    }
-
-    size_t size() const {
-        return m_size;
-    }
-
-    void ensure(size_t t) {
-        if (m_size + t > m_reserved) {
-            m_reserved = m_size + t + 1024 * 128;
-            m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
-        }
-    }
-
-private:
-    uint8_t* m_buffer;
-    size_t m_size;
-    size_t m_reserved;
-};
-
-class DeserializationBuffer {
-public:
-    DeserializationBuffer(uint8_t* ptr, size_t sz) :
-            m_buffer(ptr),
-            m_size(sz),
-            m_orig_size(sz)
-    {
-    }
-
-    DeserializationBuffer(const SerializationBuffer&) = delete;
-    DeserializationBuffer& operator=(const SerializationBuffer&) = delete;
-
-    uint8_t read_uint8() {
-        if (m_size < sizeof(uint8_t)) {
-            throw std::runtime_error("out of data");
-        }
-        uint8_t* ptr = (uint8_t*)m_buffer;
-
-        m_size -= sizeof(uint8_t);
-        m_buffer += sizeof(uint8_t);
-
-        return *ptr;
-    }
-
-    uint32_t read_uint32() {
-        if (m_size < sizeof(uint32_t)) {
-            throw std::runtime_error("out of data");
-        }
-        uint32_t* ptr = (uint32_t*)m_buffer;
-
-        m_size -= sizeof(uint32_t);
-        m_buffer += sizeof(uint32_t);
-
-        return *ptr;
-    }
-
-    void read_bytes(uint8_t* ptr, size_t bytecount) {
-        if (m_size < bytecount) {
-            throw std::runtime_error("out of data");
-        }
-        memcpy(ptr,m_buffer,bytecount);
-
-        m_size -= bytecount;
-        m_buffer += bytecount;
-    }
-
-    size_t remaining() const {
-        return m_size;
-    }
-
-    size_t pos() const {
-        return m_orig_size - m_size;
-    }
-
-private:
-    uint8_t* m_buffer;
-    size_t m_size;
-    size_t m_orig_size;
-};
 
 class Type {
 public:
@@ -431,7 +273,6 @@ public:
                 throw std::runtime_error("Invalid type found");
         }
     }
-
 
     Type* getBaseType() const {
         return m_base;
@@ -3503,12 +3344,13 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
-        throw std::logic_error("Cannot serialize interpreter python objects");
+        PyObject* p = *(PyObject**)self;
+        buffer.getContext().serializePythonObject(p, buffer);
     }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        throw std::logic_error("Cannot deserialize interpreter python objects");
+         *(PyObject**)self = buffer.getContext().deserializePythonObject(buffer);
     }
 
     void repr(instance_ptr self, std::ostringstream& stream) {
