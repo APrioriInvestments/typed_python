@@ -27,7 +27,6 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
                 sys.executable,
                 os.path.join(own_dir, "frontends", "database_server.py"),
                 "localhost", "8888",
-                os.path.join(own_dir, "..", "testcert.cert"),
                 "--inmem"]
                 )
 

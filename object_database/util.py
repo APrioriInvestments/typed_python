@@ -15,6 +15,8 @@
 import logging
 import os
 import ssl
+import subprocess
+import tempfile
 import time
 import types
 
@@ -139,3 +141,38 @@ def sslContextFromCertPath(cert_path):
     ssl_ctx.load_cert_chain(cert_path, key_path)
 
     return ssl_ctx
+
+
+def generateSslContext():
+    with tempfile.TemporaryDirectory() as tempDir:
+        # openssl
+        cert_path = os.path.join(tempDir, 'selfsigned.cert')
+        key_path = os.path.join(tempDir, 'selfsigned.key')
+        try:
+            proc = subprocess.run(
+                ['openssl',
+                'req', '-x509', '-newkey', 'rsa:2048',
+                '-keyout', key_path, '-nodes',
+                '-out', cert_path,
+                '-sha256', '-days', '1000',
+                '-subj', '/C=US/ST=New York/L=New York/CN=localhost'
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+        except subprocess.CalledProcessError as e:
+            logging.error(
+                "Failed while executing 'openssl':\n" +
+                e.stderr.decode('utf-8')
+            )
+            raise
+
+        # ssl_ctx
+        ssl_ctx = sslContextFromCertPath(cert_path)
+
+    return ssl_ctx
+
+
+def sslContextFromCertPathOrNone(cert_path=None):
+    return  sslContextFromCertPath(cert_path) if cert_path else generateSslContext()

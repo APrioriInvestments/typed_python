@@ -27,7 +27,7 @@ import psutil
 import multiprocessing
 import logging.config
 import concurrent.futures
-from object_database.util import configureLogging, sslContextFromCertPath
+from object_database.util import configureLogging, sslContextFromCertPathOrNone
 
 from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
@@ -42,13 +42,13 @@ def main(argv=None):
     parser.add_argument("own_hostname")
     parser.add_argument("db_hostname")
     parser.add_argument("port", type=int)
-    parser.add_argument("ssl_path", help="path to (self-signed) SSL certificate")
     parser.add_argument("--source", help="path for the source trees used by services", required=True)
     parser.add_argument("--storage", help="path for local storage used by services", required=True)
 
     parser.add_argument("--run_db", default=False, action='store_true')
 
     #if populated, run a db_server as well
+    parser.add_argument("--ssl-path", default=None, required=False, help="path to (self-signed) SSL certificate")
     parser.add_argument("--redis_port", type=int, default=None, required=False)
 
     parser.add_argument("--max_gb_ram", type=float, default=None, required=False)
@@ -85,7 +85,7 @@ def main(argv=None):
 
     try:
         if parsedArgs.run_db:
-            ssl_ctx = sslContextFromCertPath(parsedArgs.ssl_path)
+            ssl_ctx = sslContextFromCertPathOrNone(parsedArgs.ssl_path)
             databaseServer = TcpServer(
                 parsedArgs.own_hostname,
                 object_database_port,
