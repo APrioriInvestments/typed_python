@@ -38,7 +38,6 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
                 'localhost', 'localhost', "8023",
-                os.path.join(ownDir, '..', '..', 'testcert.cert'),
                 '--run_db',
                 '--source',os.path.join(self.tempDirectoryName,'source'),
                 '--storage',os.path.join(self.tempDirectoryName,'storage'),
