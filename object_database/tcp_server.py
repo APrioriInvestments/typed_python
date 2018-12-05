@@ -8,6 +8,7 @@ import asyncio
 import json
 import queue
 import logging
+import ssl
 import time
 import threading
 import socket
@@ -149,9 +150,11 @@ class EventLoopInThread:
 _eventLoop = EventLoopInThread()
 
 
-def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop, ssl=None):
+def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
     t0 = time.time()
-
+    # With CLIENT_AUTH we are setting up the SSL to use encryption only, which is what we want.
+    # If we also wanted authentication, we would use SERVER_AUTH.
+    ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
     proto = None
     while proto is None:
         try:
@@ -159,7 +162,7 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop, ssl=Non
                 lambda: ClientToServerProtocol(host, port, eventLoop.loop),
                 host=host,
                 port=port,
-                ssl=ssl
+                ssl=ssl_ctx
                 )
         except:
             if not retry or time.time() - t0 > timeout * .8:
@@ -181,7 +184,7 @@ _eventLoop2 = []
 
 
 class TcpServer(Server):
-    def __init__(self, host, port, mem_store = None, ssl_context=None):
+    def __init__(self, host, port, mem_store, ssl_context):
         Server.__init__(self, mem_store or InMemoryPersistence())
 
         self.mem_store = mem_store
@@ -225,9 +228,7 @@ class TcpServer(Server):
         else:
             loop = _eventLoop
 
-        # Here we're passing the ssl context of the server to use it with loop.create_connection
-        # for the client connection. Hopefully, that's fine.
-        return connect(self.host, self.port, eventLoop=loop, ssl=self.ssl_ctx)
+        return connect(self.host, self.port, eventLoop=loop)
 
     def __enter__(self):
         self.start()
