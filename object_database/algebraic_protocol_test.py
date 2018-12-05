@@ -107,26 +107,32 @@ class AlgebraicProtocolTests(unittest.TestCase):
 
         server = loop.run_until_complete(serverCoro)
 
+        q = queue.Queue()
+
+        def pingServer(ssl_ctx):
+            clientCoro = loop.create_connection(
+                lambda: SendAndReturn(Message.Ping(), q),
+                host,
+                port,
+                ssl=ssl_ctx
+            )
+            try:
+                loop.run_until_complete(clientCoro)
+            finally:
+                self.assertEqual(q.get(timeout=1.0), Message.Pong())
+
+        # This is how to use SSL for encryption AND auth
+        # In this scenario, the client NEEDS to have the self-signed cert
         cli_ssl_ctx = ssl.create_default_context(
             ssl.Purpose.SERVER_AUTH,
             cafile='testcert.cert'
         )
+        pingServer(cli_ssl_ctx)
 
-        q = queue.Queue()
-
-        clientCoro = loop.create_connection(
-            lambda: SendAndReturn(Message.Ping(), q),
-            host,
-            port,
-            ssl=cli_ssl_ctx
-        )
-        try:
-            loop.run_until_complete(clientCoro)
-        except Exception as e:
-            import pdb; pdb.set_trace()
-            print(e)
-        finally:
-            self.assertEqual(q.get(timeout=1.0), Message.Pong())
+        # This is how to use SSL for encryption ONLY.
+        # In this scenario, the client does NOT NEED to have the self-signed cert
+        cli_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        pingServer(cli_ssl_ctx)
 
         server.close()
         loop.run_until_complete(server.wait_closed())
