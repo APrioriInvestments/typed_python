@@ -12,23 +12,26 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
+import tempfile
+
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
-import tempfile
-import os
 
 class InProcessServiceManager(ServiceManager):
     def __init__(self, dbConnectionFactory):
         self.storageRoot = tempfile.TemporaryDirectory()
         self.sourceRoot = tempfile.TemporaryDirectory()
 
-        ServiceManager.__init__(self, dbConnectionFactory, self.sourceRoot.name, isMaster=True, ownHostname="localhost")
+        super(InProcessServiceManager, self).__init__(
+            self, dbConnectionFactory, self.sourceRoot.name, isMaster=True, ownHostname="localhost"
+        )
 
         self.serviceWorkers = {}
 
-
     def startServiceWorker(self, service, instanceIdentity):
+
         if instanceIdentity in self.serviceWorkers:
             return
 
@@ -52,4 +55,3 @@ class InProcessServiceManager(ServiceManager):
     def cleanup(self):
         self.storageRoot.cleanup()
         self.sourceRoot.cleanup()
-

@@ -19,12 +19,14 @@ from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase, ServiceRuntimeConfig
 
 import object_database
-import traceback
+
+import logging
+import os
+import tempfile
 import threading
 import time
-import logging
-import tempfile
-import os
+import traceback
+
 
 class ServiceWorker:
     def __init__(self, dbConnectionFactory, instance_id, storageRoot):

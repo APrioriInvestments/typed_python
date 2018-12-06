@@ -14,4 +14,5 @@
 
 from object_database import Schema
 
+
 service_schema = Schema("core.service")

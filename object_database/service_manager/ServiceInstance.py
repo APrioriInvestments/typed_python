@@ -12,25 +12,26 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import importlib
 import logging
-import importlib
 import os
-import sys
 import six
-import importlib
-import time
-import os
+import sys
 import tempfile
+import threading
+import time
 import urllib.parse
+
 import object_database
+
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.Codebase import Codebase
 from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
 from typed_python.Codebase import Codebase as TypedPythonCodebase
-from typed_python import *
-import threading
+from typed_python import OneOf
 
 MAX_BAD_BOOTS = 5
+
 
 @service_schema.define
 class ServiceHost:
@@ -46,6 +47,7 @@ class ServiceHost:
     cpuUse = float
     actualMemoryUseGB = float
     statsLastUpdateTime = float
+
 
 @service_schema.define
 class Service:
@@ -168,6 +170,7 @@ class Service:
 
         return service_type
 
+
 @service_schema.define
 class ServiceInstance:
     host = Indexed(ServiceHost)
@@ -206,4 +209,3 @@ class ServiceInstance:
     start_timestamp = OneOf(None, float)
     end_timestamp = OneOf(None, float)
     failureReason = str
-

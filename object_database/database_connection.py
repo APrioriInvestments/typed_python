@@ -20,7 +20,7 @@ from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
 from typed_python.hash import sha_hash
 from typed_python.Codebase import Codebase as TypedPythonCodebase
-from typed_python import *
+from typed_python import Alternative
 
 import queue
 import threading
@@ -29,6 +29,7 @@ import traceback
 import time
 
 from object_database.view import RevisionConflictException, DisconnectedException
+
 
 class Everything:
     """Singleton to mark subscription to everything in a slice."""
@@ -39,6 +40,7 @@ TransactionResult = Alternative(
     RevisionConflict = {'key': str},
     Disconnected = {}
     )
+
 
 class VersionedBase:
     def _best_version_offset_for(self, version):
@@ -71,6 +73,7 @@ class VersionedBase:
             return self.valueForVersion(self.version_numbers[-1])
         else:
             return self.valueForVersion(None)
+
 
 class VersionedValue(VersionedBase):
     def __init__(self):
@@ -112,6 +115,7 @@ class VersionedValue(VersionedBase):
 
     def __repr__(self):
         return "VersionedValue(ids=%s)" % (self.version_numbers,)
+
 
 class VersionedSet(VersionedBase):
     #values in sets are always strings
@@ -190,6 +194,7 @@ class VersionedSet(VersionedBase):
     def __repr__(self):
         return "VersionedSet(ids=%s, adds=%s, removes=%s)" % (self.version_numbers, self.adds, self.removes)
 
+
 class SetWithEdits:
     AGRESSIVELY_CHECK_SET_ADDS = False
 
@@ -225,6 +230,7 @@ class SetWithEdits:
         for a in self.s:
             if a not in removed and a not in toAvoid:
                 return a
+
 
 class ManyVersionedObjects:
     def __init__(self):
@@ -352,6 +358,7 @@ class ManyVersionedObjects:
 
                 del self._version_number_objects[toCollapse]
 
+
 class TransactionListener:
     def __init__(self, db, handler):
         self._thread = threading.Thread(target=self._doWork)
@@ -417,6 +424,7 @@ class TransactionListener:
 
         self._queue.put(changed)
 
+
 class DatabaseConnection:
     def __init__(self, channel):
         self._channel = channel
@@ -424,14 +432,14 @@ class DatabaseConnection:
 
         self._lock = threading.Lock()
 
-        #transaction of what's in the KV store
+        # transaction of what's in the KV store
         self._cur_transaction_num = 0
 
-        #a datastructure that keeps track of all the different versions of the objects
-        #we have mapped in.
+        # a datastructure that keeps track of all the different versions of the objects
+        # we have mapped in.
         self._versioned_data = ManyVersionedObjects()
 
-        #a map from lazy object id to (schema, typename)
+        # a map from lazy object id to (schema, typename)
         self._lazy_objects = {}
         self._lazy_object_read_blocks = {}
 
@@ -440,11 +448,12 @@ class DatabaseConnection:
 
         self.connectionObject = None
 
-        #transaction handlers. These must be nonblocking since we call them under lock
+        # transaction handlers. These must be nonblocking since we call them under lock
         self._onTransaction = []
 
         self._flushEvents = {}
 
+        # Map: schema.name -> schema
         self._schemas = {}
 
         self._messages_received = 0
@@ -505,8 +514,8 @@ class DatabaseConnection:
                 ClientToServer.DefineSchema(
                     name=schema.name,
                     definition=schemaDesc
-                    )
                 )
+            )
 
     def flush(self):
         """Make sure we know all transactions that have happened up to this point."""

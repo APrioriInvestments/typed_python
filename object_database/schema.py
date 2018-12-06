@@ -12,17 +12,21 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import inspect
+
 from object_database.object import DatabaseObject, Index, Indexed
 from types import FunctionType
-from typed_python import *
-import inspect
+from typed_python import ConstDict, NamedTuple, Tuple, TupleOf
+
 
 TypeDefinition = NamedTuple(fields=TupleOf(str), indices=TupleOf(str))
 SchemaDefinition = ConstDict(str, TypeDefinition)
 
+
 def SubscribeLazilyByDefault(t):
     t.__object_database_lazy_subscription__ = True
     return t
+
 
 class Schema:
     """A collection of types that can be used to access data in a database."""
@@ -30,9 +34,9 @@ class Schema:
         self._name = name
         self._types = {}
         self._supportingTypes = {}
-        #class -> indexname -> fun(object->value)
+        # class -> indexname -> fun(object->value)
         self._indices = {}
-        #class -> set(fieldname)
+        # class -> set(fieldname)
         self._indexed_fields = {}
         self._indexTypes = {}
         self._frozen = False

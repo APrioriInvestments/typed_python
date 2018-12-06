@@ -45,7 +45,9 @@ def currentMemUsageMb(residentOnly=True):
     else:
         return psutil.Process().memory_info().vms / 1024 ** 2
 
+
 configureLogging("test", error=True)
+
 
 class BlockingCallback:
     def __init__(self):
@@ -72,10 +74,12 @@ expr = Alternative("Expr",
 schema = Schema("test_schema")
 schema.expr = expr
 
+
 @schema.define
 class Root:
     obj=OneOf(None, schema.Object)
     k = int
+
 
 @schema.define
 class Object:
@@ -87,9 +91,11 @@ class Object:
         if self.other is not None:
             return self.other.k
 
+
 @schema.define
 class ThingWithDicts:
     x = ConstDict(str, bytes)
+
 
 @schema.define
 class Counter:
@@ -102,9 +108,11 @@ class Counter:
     def __str__(self):
         return "Counter(k=%s)" % self.k
 
+
 @schema.define
 class StringIndexed:
     name = Indexed(str)
+
 
 class ObjectDatabaseTests:
     def test_assigning_dicts(self):
@@ -1432,6 +1440,7 @@ class ObjectDatabaseTests:
 
         self.assertTrue(len(self.server._version_numbers) < 10)
 
+
 class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.tempDir = tempfile.TemporaryDirectory()
@@ -1474,7 +1483,6 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
 
     def test_flush_db_works(self):
         pass
-
 
 
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
@@ -1655,8 +1663,3 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
 
         finally:
             messages.setHeartbeatInterval(old_interval)
-
-
-
-
-
