@@ -17,7 +17,7 @@ from types import FunctionType
 import threading
 
 import typed_python._types
-import nativepython.python.inspect_override as inspect
+import typed_python.inspect_override as inspect
 
 from typed_python.hash import sha_hash
 from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \

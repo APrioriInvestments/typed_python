@@ -13,9 +13,18 @@
 #   limitations under the License.
 
 from typed_python._types import serialize, deserialize
+from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
+from types import FunctionType
 
-_builtin_value_to_name = {id(v):k for k,v in __builtins__.items() if isinstance(v,type)}
-_builtin_name_to_value = {k:v for k,v in __builtins__.items() if isinstance(v,type)}
+def createEmptyFunction(ast):
+    return evaluateFunctionPyAst(ast)
+
+_builtin_name_to_value = {".builtin." + k:v for k,v in __builtins__.items() if isinstance(v,type)}
+_builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
+_builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
+_builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
+
+_builtin_value_to_name = {id(v):k for k,v in _builtin_name_to_value.items()}
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
@@ -57,11 +66,40 @@ class SerializationContext(object):
 
     def representationFor(self, inst):
         if self.plugin:
-            return self.plugin.representationFor(inst)
+            rep = self.plugin.representationFor(inst)
+            if rep is not None:
+                return rep
+
+        if isinstance(inst, FunctionType):
+            representation = {}
+            representation["qualname"] = inst.__qualname__
+            representation["name"] = inst.__name__
+            representation["module"] = inst.__module__
+            representation["freevars"] = {k:v for k,v in inst.__globals__.items() if k in inst.__code__.co_names}
+
+            for ix, x in enumerate(inst.__code__.co_freevars):
+                representation["freevars"][x] = inst.__closure__[ix].cell_contents
+
+            args = (convertFunctionToAlgebraicPyAst(inst),)
+
+            return (createEmptyFunction, args, representation)
+
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
-        self.plugin.setInstanceStateFromRepresentation(instance, representation)
+        if self.plugin:
+            if self.plugin.setInstanceStateFromRepresentation(instance, representation):
+                return True
+
+        if isinstance(instance, FunctionType):
+            instance.__globals__.update(representation['freevars'])
+            instance.__name__ = representation['name']
+            instance.__qualname__ = representation['qualname']
+
+            return True
+
+        return False
+
 
 class SerializationPlugin(object):
     def representationFor(self, inst):
@@ -78,4 +116,4 @@ class SerializationPlugin(object):
 
     def setInstanceStateFromRepresentation(self, instance, representation):
         """Fill out an instance from its representation. """
-        raise NotImplemented()
+        return False

@@ -12,12 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from nativepython.type_wrappers.wrapper import Wrapper
+import typed_python.python_ast as python_ast
 
+from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.conversion_exception import ConversionException
 from nativepython.typed_expression import TypedExpression
+
 import nativepython.native_ast as native_ast
-import nativepython.python_ast as python_ast
 
 from typed_python import *
 

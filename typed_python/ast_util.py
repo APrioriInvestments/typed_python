@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.python.inspect_override as inspect
+import typed_python.inspect_override as inspect
 
 import ast
 import os

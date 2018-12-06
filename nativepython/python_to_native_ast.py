@@ -12,9 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import typed_python.python_ast as python_ast
+import typed_python.ast_util as ast_util
+
 import nativepython
-import nativepython.python_ast as python_ast
-import nativepython.python.ast_util as ast_util
 import nativepython.native_ast as native_ast
 from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
 from nativepython.typed_expression import TypedExpression

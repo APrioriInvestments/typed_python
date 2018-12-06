@@ -121,12 +121,13 @@ class TypesSerializationTest(unittest.TestCase):
         class Plugin:
             def representationFor(self, inst):
                 if isinstance(inst, A):
-                    return (A, inst.z)
+                    return (A, (), inst.z)
                 return None
 
             def setInstanceStateFromRepresentation(self, instance, representation):
                 """Fill out an instance from its representation. """
                 instance.z = representation + 1
+                return True
 
         ts = SerializationContext({'A': A}).withPlugin(Plugin())
         self.assertEqual(ts.deserialize(ts.serialize(A(20))).z, 21)
@@ -137,3 +138,22 @@ class TypesSerializationTest(unittest.TestCase):
 
         ts = SerializationContext({'f': f})
         self.assertIs(ts.deserialize(ts.serialize(f)), f)
+
+    def test_serialize_lambdas(self):
+        ts = SerializationContext()
+
+        def check(f, args):
+            self.assertEqual(f(*args), ts.deserialize(ts.serialize(f))(*args))
+
+        y = 20
+
+        def f(x):
+            return x + 1
+
+        def f2(x):
+            return x + y
+
+        check(f, (10,))
+        check(f2, (10,))
+        check(lambda x:x+1, (10,))
+        check(lambda x:x+y, (10,))
