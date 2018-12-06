@@ -13,11 +13,11 @@
 #   limitations under the License.
 import unittest
 from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction, TypeSet
+    Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction, SerializationContext
 
 class TypesSerializationTest(unittest.TestCase):
     def test_serialize_core_python_objects(self):
-        ts = TypeSet()
+        ts = SerializationContext()
 
         self.assertEqual(ts.deserialize(ts.serialize(10)), 10)
         self.assertEqual(ts.deserialize(ts.serialize(10.5)), 10.5)
@@ -35,7 +35,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(ts.deserialize(ts.serialize(type)), type)
 
     def test_serialize_recursive_list(self):
-        ts = TypeSet()
+        ts = SerializationContext()
 
         l = []
         l.append(l)
@@ -44,7 +44,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(l_alt[0], l_alt)
 
     def test_serialize_recursive_dict(self):
-        ts = TypeSet()
+        ts = SerializationContext()
 
         d = {}
         d[0] = d
@@ -53,7 +53,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(d_alt[0], d_alt)
 
     def test_serialize_memoizes_tuples(self):
-        ts = TypeSet()
+        ts = SerializationContext()
 
         l = (1,2,3)
         for i in range(100):
@@ -65,7 +65,7 @@ class TypesSerializationTest(unittest.TestCase):
             def __init__(self, o):
                 self.o = o
 
-        ts = TypeSet({'O': AnObject})
+        ts = SerializationContext({'O': AnObject})
 
         o = AnObject(123)
 
@@ -79,16 +79,16 @@ class TypesSerializationTest(unittest.TestCase):
             def __init__(self, o):
                 self.o = o
 
-        ts = TypeSet({'O': AnObject})
+        ts = SerializationContext({'O': AnObject})
 
         o = AnObject(None)
         o.o = o
 
         o2 = ts.deserialize(ts.serialize(o))
-        self.assertIs(o2.o.o, o2.o)
+        self.assertIs(o2.o, o2)
 
     def test_serialize_primitive_native_types(self):
-        ts = TypeSet()
+        ts = SerializationContext()
         for t in [Int64, Float64, Bool, NoneType, String, Bytes]:
             self.assertIs(ts.deserialize(ts.serialize(t())), t())
 
@@ -98,11 +98,11 @@ class TypesSerializationTest(unittest.TestCase):
 
         B = Alternative("B", X={'a': A})
 
-        ts = TypeSet({'A': A, 'B': B})
+        ts = SerializationContext({'A': A, 'B': B})
 
-        for t in [  ConstDict(int, float), 
-                    NamedTuple(x=int, y=str), 
-                    TupleOf(bool), 
+        for t in [  ConstDict(int, float),
+                    NamedTuple(x=int, y=str),
+                    TupleOf(bool),
                     Tuple(int,int,bool),
                     OneOf(int,float),
                     OneOf(1,2,3,"hi",b"goodbye"),
@@ -113,5 +113,27 @@ class TypesSerializationTest(unittest.TestCase):
                     ]:
             self.assertIs(ts.deserialize(ts.serialize(t)), t)
 
+    def test_serialize_with_plugins(self):
+        class A:
+            def __init__(self, z = 20):
+                self.z = z
 
+        class Plugin:
+            def representationFor(self, inst):
+                if isinstance(inst, A):
+                    return (A, inst.z)
+                return None
 
+            def setInstanceStateFromRepresentation(self, instance, representation):
+                """Fill out an instance from its representation. """
+                instance.z = representation + 1
+
+        ts = SerializationContext({'A': A}).withPlugin(Plugin())
+        self.assertEqual(ts.deserialize(ts.serialize(A(20))).z, 21)
+
+    def test_serialize_functions(self):
+        def f():
+            return 10
+
+        ts = SerializationContext({'f': f})
+        self.assertIs(ts.deserialize(ts.serialize(f)), f)

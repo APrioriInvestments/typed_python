@@ -83,13 +83,13 @@ public:
         return m_context;
     }
 
-    std::pair<int32_t, bool> cachePointer(void* t) {
+    std::pair<uint32_t, bool> cachePointer(void* t) {
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
             m_idToPointerCache[t] = m_idToPointerCache.size();
-            return std::pair<int32_t, bool>(m_idToPointerCache.size() - 1, true);
+            return std::pair<uint32_t, bool>(m_idToPointerCache.size() - 1, true);
         }
-        return std::pair<int32_t, bool>(it->second, false);
+        return std::pair<uint32_t, bool>(it->second, false);
     }
 
 private:

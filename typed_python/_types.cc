@@ -3343,25 +3343,26 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
-class TypeSetSerializationContext : public SerializationContext {
+class PythonSerializationContext : public SerializationContext {
 public:
+    //enums in our protocol (serialized as uint8_t)
     enum {
+        T_NAMED,    //a named object
+        T_OBJECT,   //an object written either with a representation, or as a type and a dict
         T_LIST,
         T_TUPLE,
         T_DICT,
-        T_OBJECT,
-        T_TYPE,
         T_NONE,
         T_TRUE,
         T_FALSE,
         T_UNICODE,
         T_BYTES,
         T_FLOAT,
-        T_LONG
+        T_LONG      //currently serialized as an int64_t which is completely wrong.
     };
 
-    TypeSetSerializationContext(PyObject* typeSetObj) :
-            mTypeSet(typeSetObj)
+    PythonSerializationContext(PyObject* typeSetObj) :
+            mContextObj(typeSetObj)
     {
     }
 
@@ -3371,7 +3372,7 @@ public:
         if (t) {
             b.write_uint8(0);
             //we have a natural serialization mechanism already
-            serializePythonType(o->ob_type, b);
+            serializedNamedObject((PyObject*)o->ob_type, b);
             t->serialize(((native_instance_wrapper*)o)->dataPtr(), b);
         } else {
             b.write_uint8(1);
@@ -3388,9 +3389,9 @@ public:
                 b.write_uint8(T_TUPLE);
                 serializePyTuple(o, b);
             } else
-            if (PyType_Check(o)) {
-                b.write_uint8(T_TYPE);
-                serializePythonType((PyTypeObject*)o, b);
+            if (PyType_Check(o) || PyFunction_Check(o)) {
+                b.write_uint8(T_NAMED);
+                serializedNamedObject(o, b);
             } else
             if (PyBytes_Check(o)) {
                 b.write_uint8(T_BYTES);
@@ -3423,31 +3424,48 @@ public:
             } else {
                 b.write_uint8(T_OBJECT);
 
+                std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+                b.write_uint32(idAndIsNew.first);
+
+                if (!idAndIsNew.second) {
+                    return;
+                }
+
                 //give the plugin a chance to convert the instance to something else
-                PyObject* representation = PyObject_CallMethod(mTypeSet, "representationFor", "O", o);
+                PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", o);
                 if (!representation) {
                     PyErr_PrintEx(1);
                     throw std::runtime_error("representationFor threw an exception.");
                 }
 
-                if (representation == o) {
+                if (representation == Py_None) {
                     //we did nothing interesting
                     b.write_uint8(0);
-                    serializePythonType(o->ob_type, b);
+                    serializedNamedObject((PyObject*)o->ob_type, b);
+
                     PyObject* d = PyObject_GenericGetDict(o, nullptr);
                     serializePyDict(d, b);
                     Py_DECREF(d);
                 } else {
+                    //we're writing a pair
                     b.write_uint8(1);
-                    serializePythonType(o->ob_type, b);
-                    serializePythonObject(representation, b);
+
+                    if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 2) {
+                        Py_DECREF(representation);
+                        throw std::runtime_error("representationFor should return None or a tuple");
+                    }
+
+                    serializePythonObject(PyTuple_GetItem(representation, 0), b);
+                    serializePythonObject(PyTuple_GetItem(representation, 1), b);
                 }
+
+                Py_DECREF(representation);
             }
         }
     }
 
     void serializePyDict(PyObject* o, SerializationBuffer& b) const {
-        std::pair<int32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
@@ -3496,7 +3514,7 @@ public:
     }
 
     void serializePyList(PyObject* o, SerializationBuffer& b) const {
-        std::pair<int32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
@@ -3536,7 +3554,7 @@ public:
     }
 
     void serializePyTuple(PyObject* o, SerializationBuffer& b) const {
-        std::pair<int32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
@@ -3574,33 +3592,43 @@ public:
         return res;
     }
 
-    void serializePythonType(PyTypeObject* pt, SerializationBuffer& b) const {
-        std::pair<int32_t, bool> idAndIsNew = b.cachePointer((void*)pt);
+    void serializedNamedObject(PyObject* pt, SerializationBuffer& b) const {
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)pt);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
             //now, get the type object representing this
-            PyObject* typeName = PyObject_CallMethod(mTypeSet, "nameForType", "O", (PyObject*)pt);
+            PyObject* typeName = PyObject_CallMethod(mContextObj, "nameForObject", "O", pt);
             if (!typeName) {
                 PyErr_PrintEx(1);
-                throw std::runtime_error("Python threw an exception internally when we called 'nameForType'.");
+                throw std::runtime_error("Python threw an exception internally when we called 'nameForObject'.");
             }
             if (typeName == Py_None) {
                 Py_DECREF(typeName);
-                Type* nativeType = native_instance_wrapper::extractTypeFrom(pt);
-                
+
+                //let's see if its a NativeType
+                Type* nativeType = nullptr;
+
+                if (PyType_Check(pt)) {
+                    nativeType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)pt);
+                }
+
                 if (nativeType) {
                     b.write_uint8(1);
                     serializeNativeType(nativeType, b);
                     return;
                 }
 
-                throw std::runtime_error(std::string("Couldn't find a type object for type named ") + pt->tp_name);
+                if (PyType_Check(pt)) {
+                    throw std::runtime_error(std::string("Couldn't find a name for ") + ((PyTypeObject*)pt)->tp_name);
+                } else {
+                    throw std::runtime_error(std::string("Couldn't find a name for object of type ") + pt->ob_type->tp_name);
+                }
             }
 
             if (!PyUnicode_Check(typeName)) {
                 Py_DECREF(typeName);
-                throw std::runtime_error(std::string("nameForType returned a non-string for ") + pt->tp_name);
+                throw std::runtime_error(std::string("nameForObject returned a non-string"));
             }
 
             b.write_uint8(0);
@@ -3609,7 +3637,7 @@ public:
         }
     }
 
-    PyObject* deserializePythonType(DeserializationBuffer& b) const {
+    PyObject* deserializedNamedObject(DeserializationBuffer& b) const {
         uint32_t ix = b.read_uint32();
         PyObject* p = (PyObject*)b.lookupCachedPointer(ix);
         if (p) {
@@ -3624,11 +3652,11 @@ public:
 
         std::string name = b.readString();
 
-        PyObject* res = PyObject_CallMethod(mTypeSet, "typeFromName", "s", name.c_str());
+        PyObject* res = PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str());
 
         if (!res) {
             PyErr_PrintEx(1);
-            throw std::runtime_error("typeFromName threw an exception.");
+            throw std::runtime_error("objectFromName threw an exception.");
         }
 
         return b.addCachedPointer(ix, res);
@@ -3636,34 +3664,34 @@ public:
 
 
     void serializeNativeType(Type* nativeType, SerializationBuffer& b) const {
-        PyObject* nameForType = PyObject_CallMethod(mTypeSet, "nameForType", "O", native_instance_wrapper::typeObj(nativeType));
+        PyObject* nameForObject = PyObject_CallMethod(mContextObj, "nameForObject", "O", native_instance_wrapper::typeObj(nativeType));
 
-        if (!nameForType) {
+        if (!nameForObject) {
             PyErr_PrintEx(1);
-            throw std::runtime_error("nameForType threw an exception.");
+            throw std::runtime_error("nameForObject threw an exception.");
         }
 
-        if (nameForType != Py_None) {
-            if (!PyUnicode_Check(nameForType)) {
+        if (nameForObject != Py_None) {
+            if (!PyUnicode_Check(nameForObject)) {
                 PyErr_PrintEx(1);
-                Py_DECREF(nameForType);
-                throw std::runtime_error("nameForType returned something other than None or a string.");
+                Py_DECREF(nameForObject);
+                throw std::runtime_error("nameForObject returned something other than None or a string.");
             }
 
             b.write_uint8(0);
-            b.write_string(std::string(PyUnicode_AsUTF8(nameForType)));
-            Py_DECREF(nameForType);
+            b.write_string(std::string(PyUnicode_AsUTF8(nameForObject)));
+            Py_DECREF(nameForObject);
             return;
         }
         b.write_uint8(1);
 
         b.write_uint8(nativeType->getTypeCategory());
 
-        if (nativeType->getTypeCategory() == Type::TypeCategory::catInt64 || 
-                nativeType->getTypeCategory() == Type::TypeCategory::catFloat64 || 
-                nativeType->getTypeCategory() == Type::TypeCategory::catNone || 
-                nativeType->getTypeCategory() == Type::TypeCategory::catBytes || 
-                nativeType->getTypeCategory() == Type::TypeCategory::catString || 
+        if (nativeType->getTypeCategory() == Type::TypeCategory::catInt64 ||
+                nativeType->getTypeCategory() == Type::TypeCategory::catFloat64 ||
+                nativeType->getTypeCategory() == Type::TypeCategory::catNone ||
+                nativeType->getTypeCategory() == Type::TypeCategory::catBytes ||
+                nativeType->getTypeCategory() == Type::TypeCategory::catString ||
                 nativeType->getTypeCategory() == Type::TypeCategory::catBool
                 ) {
             return;
@@ -3706,7 +3734,7 @@ public:
         }
 
         if (nativeType->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-            serializePythonType(((PythonObjectOfType*)nativeType)->pyType(), b);
+            serializedNamedObject((PyObject*)((PythonObjectOfType*)nativeType)->pyType(), b);
             return;
         }
 
@@ -3724,56 +3752,56 @@ public:
         if (b.read_uint8() == 0) {
             //it's a named type
             std::string name = b.readString();
-            PyObject* res = PyObject_CallMethod(mTypeSet, "typeFromName", "s", name.c_str());
+            PyObject* res = PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str());
 
             if (!res) {
                 PyErr_PrintEx(1);
-                throw std::runtime_error("typeFromName threw an exception.");
+                throw std::runtime_error("objectFromName threw an exception.");
             }
 
             if (!PyType_Check(res)) {
                 Py_DECREF(res);
-                throw std::runtime_error("typeFromName returned a non-type.");
+                throw std::runtime_error("objectFromName returned a non-type.");
             }
 
             Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res);
             Py_DECREF(res);
             if (!resultType) {
-                throw std::runtime_error("we expected typeFromName to return a native type in this context, but it didn't.");
+                throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
             }
             return resultType;
         }
 
         uint8_t category = b.read_uint8();
-        if (category == Type::TypeCategory::catInt64) { 
-            return ::Int64::Make(); 
+        if (category == Type::TypeCategory::catInt64) {
+            return ::Int64::Make();
         }
-        if (category == Type::TypeCategory::catFloat64) { 
-            return ::Float64::Make(); 
+        if (category == Type::TypeCategory::catFloat64) {
+            return ::Float64::Make();
         }
-        if (category == Type::TypeCategory::catNone) { 
-            return ::None::Make(); 
+        if (category == Type::TypeCategory::catNone) {
+            return ::None::Make();
         }
-        if (category == Type::TypeCategory::catBytes) { 
-            return ::Bytes::Make(); 
+        if (category == Type::TypeCategory::catBytes) {
+            return ::Bytes::Make();
         }
-        if (category == Type::TypeCategory::catString) { 
-            return ::String::Make(); 
+        if (category == Type::TypeCategory::catString) {
+            return ::String::Make();
         }
-        if (category == Type::TypeCategory::catBool) { 
-            return ::Bool::Make(); 
+        if (category == Type::TypeCategory::catBool) {
+            return ::Bool::Make();
         }
         if (category == Type::TypeCategory::catConstDict) {
             Type* keyType = deserializeNativeType(b);
             Type* valueType = deserializeNativeType(b);
-            
+
             return ::ConstDict::Make(keyType, valueType);
         }
 
         if (category == Type::TypeCategory::catTupleOf) {
             return ::TupleOf::Make(
                 deserializeNativeType(b)
-                ); 
+                );
         }
 
         if (category == Type::TypeCategory::catTuple) {
@@ -3806,13 +3834,13 @@ public:
         }
 
         if (category == Type::TypeCategory::catPythonObjectOfType) {
-            PyObject* typeObj = deserializePythonType(b);
+            PyObject* typeObj = deserializedNamedObject(b);
             return ::PythonObjectOfType::Make((PyTypeObject*)typeObj);
         }
 
         if (category == Type::TypeCategory::catValue) {
             Type* t = deserializeNativeType(b);
-            
+
             Instance i = Instance::createAndInitialize(t, [&](instance_ptr p) {
                 t->deserialize(p, b);
             });
@@ -3826,7 +3854,7 @@ public:
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const {
         uint8_t isNativeType = b.read_uint8() == 0;
         if (isNativeType) {
-            PyObject* pt = deserializePythonType(b);
+            PyObject* pt = deserializedNamedObject(b);
 
             Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(pt);
             Py_DECREF(pt);
@@ -3850,34 +3878,55 @@ public:
                 return deserializePydict(b);
             } else
             if (code == T_OBJECT) {
+                uint32_t id = b.read_uint32();
+                if (b.lookupCachedPointer(id)) {
+                    return incref((PyObject*)b.lookupCachedPointer(id));
+                }
+
                 if (b.read_uint8() == 0) {
                     //no representation
-                    PyObject* t = deserializePythonType(b);
+                    PyObject* t = deserializedNamedObject(b);
                     if (!PyType_Check(t)) {
                         Py_DECREF(t);
                         throw std::runtime_error("Expected a type object");
                     }
 
                     PyObject* result = ((PyTypeObject*)t)->tp_new(((PyTypeObject*)t), PyTuple_Pack(0), NULL);
+
+                    b.addCachedPointer(id, result);
+
                     PyObject* d = deserializePydict(b);
                     PyObject_GenericSetDict(result, d, nullptr);
                     Py_DECREF(d);
                     return result;
                 } else {
-                    PyObject* t = deserializePythonType(b);
-                    PyObject* rep = deserializePythonObject(b);
-                    PyObject* res = PyObject_CallMethod(mTypeSet, "fromRepresentation", "OO", t, rep);
+                    PyObject* t = deserializePythonObject(b);
+                    PyObject* instance = PyObject_CallFunctionObjArgs(t, NULL);
                     Py_DECREF(t);
+
+                    if (!instance) {
+                        PyErr_PrintEx(1);
+                        throw std::runtime_error(std::string("Representation constructor of type ") +
+                                t->ob_type->tp_name + " threw an exception.");
+                    }
+
+                    b.addCachedPointer(id, instance);
+
+                    PyObject* rep = deserializePythonObject(b);
+                    PyObject* res = PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", instance, rep);
                     Py_DECREF(rep);
+
                     if (!res) {
                         PyErr_PrintEx(1);
-                        throw std::runtime_error("fromRepresentation threw an exception.");
+                        throw std::runtime_error("setInstanceStateFromRepresentation threw an exception.");
                     }
-                    return res;
+                    Py_DECREF(res);
+
+                    return instance;
                 }
             } else
-            if (code == T_TYPE) {
-                return deserializePythonType(b);
+            if (code == T_NAMED) {
+                return deserializedNamedObject(b);
             } else
             if (code == T_NONE) {
                 return incref(Py_None);
@@ -3921,7 +3970,7 @@ public:
 
 
 private:
-    PyObject* mTypeSet;
+    PyObject* mContextObj;
 };
 
 
@@ -3950,7 +3999,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
     if (a3) {
-        context.reset(new TypeSetSerializationContext(a3));
+        context.reset(new PythonSerializationContext(a3));
     }
 
     SerializationBuffer b(*context);
@@ -3997,7 +4046,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
     if (a3) {
-        context.reset(new TypeSetSerializationContext(a3));
+        context.reset(new PythonSerializationContext(a3));
     }
     SerializationBuffer b(*context);
 
