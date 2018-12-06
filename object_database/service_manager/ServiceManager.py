@@ -25,6 +25,7 @@ import threading
 import time
 import sys
 
+
 class ServiceManager(object):
     DEFAULT_SHUTDOWN_TIMEOUT = 10.0
 
@@ -164,8 +165,6 @@ class ServiceManager(object):
                 self.collectDeadHosts()
                 self.createInstanceRecords()
 
-
-
             instances = self.instanceRecordsToBoot()
 
             bad_instances = {}
@@ -176,7 +175,7 @@ class ServiceManager(object):
                         service = i.service
                     self.startServiceWorker(service, i._identity)
 
-                except:
+                except Exception:
                     logging.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
                     bad_instances[i] = traceback.format_exc()
 

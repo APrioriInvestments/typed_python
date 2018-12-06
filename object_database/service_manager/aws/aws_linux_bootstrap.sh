@@ -1,8 +1,12 @@
 #!/bin/bash
+set -o errexit
+set -o pipefail
+set -o nounset
+set -o xtrace
 
 export STORAGE=/media/ephemeral0
 
-machineId=`curl http://169.254.169.254/latest/meta-data/instance-id`
+machineId=$(curl http://169.254.169.254/latest/meta-data/instance-id)
 
 echo "****************"
 if [ -b /dev/xvdb ]; then
@@ -42,7 +46,7 @@ sudo chmod 777 /var/run/docker.sock
 
 sudo docker pull {image}
 sudo docker run --privileged --network=host -v $STORAGE:/storage {image} \
-    `hostname` \
+    $(hostname) \
     {db_hostname} \
-    {db_port}
-
+    {db_port} \
+    {worker_token}

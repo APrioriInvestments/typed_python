@@ -12,22 +12,23 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
+import shutil
+import subprocess
+import sys
+import logging
+import threading
+import time
+import traceback
 
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database import connect
 
-import threading
-import traceback
-import time
-import logging
-import sys
-import subprocess
-import os
-import shutil
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
+
 
 def timestampToFileString(timestamp):
     struct = time.localtime(timestamp)
@@ -41,21 +42,23 @@ def timestampToFileString(timestamp):
         int(timestamp*1000) % 1000
         )
 
+
 def parseLogfileToInstanceid(fname):
     if not fname.endswith(".log.txt") or "-" not in fname:
         return
     return fname.split("-")[-1][:-8]
 
+
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, own_hostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4,
+    def __init__(self, ownHostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4,
                         logfileDirectory=None, shutdownTimeout=None, errorLogsOnly=False):
-        self.own_hostname = own_hostname
         self.host = host
         self.port = port
+        self.storageDir = storageDir
         self.logfileDirectory = logfileDirectory
         self.errorLogsOnly = errorLogsOnly
+
         self.lock = threading.Lock()
-        self.storageDir = storageDir
 
         if logfileDirectory is not None:
             if not os.path.exists(logfileDirectory):
@@ -67,12 +70,13 @@ class SubprocessServiceManager(ServiceManager):
         if not os.path.exists(sourceDir):
             os.makedirs(sourceDir)
 
-
         def dbConnectionFactory():
             return connect(host, port)
 
-        ServiceManager.__init__(self, dbConnectionFactory, sourceDir, isMaster, own_hostname, maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout)
-
+        super(SubprocessServiceManager, self).__init__(
+            dbConnectionFactory, sourceDir, isMaster, ownHostname,
+            maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout
+        )
         self.serviceProcesses = {}
 
     def startServiceWorker(self, service, instanceIdentity):

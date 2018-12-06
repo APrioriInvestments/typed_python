@@ -14,21 +14,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
-import threading
-import resource
 import argparse
-import sys
-import time
-import signal
-import logging
-import traceback
-import psutil
-import multiprocessing
-import logging.config
 import concurrent.futures
-from object_database.util import configureLogging, sslContextFromCertPathOrNone
+import logging
+import logging.config
+import multiprocessing
+import psutil
+import resource
+import signal
+import sys
+import threading
+import time
+import traceback
 
+from object_database.util import configureLogging, sslContextFromCertPathOrNone
 from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
@@ -47,7 +46,6 @@ def main(argv=None):
 
     parser.add_argument("--run_db", default=False, action='store_true')
 
-    #if populated, run a db_server as well
     parser.add_argument("--ssl-path", default=None, required=False, help="path to (self-signed) SSL certificate")
     parser.add_argument("--redis_port", type=int, default=None, required=False)
 

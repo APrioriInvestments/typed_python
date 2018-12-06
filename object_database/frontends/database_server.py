@@ -18,10 +18,10 @@ import argparse
 import sys
 import time
 import typed_python
-import object_database.tcp_server as tcp_server
-from object_database.util import sslContextFromCertPathOrNone
 
 from object_database.persistence import InMemoryPersistence, RedisPersistence
+from object_database.tcp_server import TcpServer
+from object_database.util import sslContextFromCertPathOrNone
 
 
 def main(argv):
@@ -41,7 +41,7 @@ def main(argv):
         mem_store = RedisPersistence(port=parsedArgs.redis_port)
 
     ssl_ctx = sslContextFromCertPathOrNone(parsedArgs.ssl_path)
-    databaseServer = tcp_server.TcpServer(
+    databaseServer = TcpServer(
         parsedArgs.host,
         parsedArgs.port,
         mem_store,
@@ -55,6 +55,7 @@ def main(argv):
     		time.sleep(0.1)
     except KeyboardInterrupt:
     	return
+
 
 if __name__ == '__main__':
     main(sys.argv)
