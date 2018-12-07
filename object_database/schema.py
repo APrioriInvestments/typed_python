@@ -32,6 +32,7 @@ class Schema:
     """A collection of types that can be used to access data in a database."""
     def __init__(self, name):
         self._name = name
+        # Map: typename:str -> cls(DatabaseObject)
         self._types = {}
         self._supportingTypes = {}
         # class -> indexname -> fun(object->value)
@@ -40,6 +41,7 @@ class Schema:
         self._indexed_fields = {}
         self._indexTypes = {}
         self._frozen = False
+        # Map: cls(DatabaseObject) -> original_cls
         self._types_to_original = {}
 
     def toDefinition(self):
@@ -57,7 +59,10 @@ class Schema:
         return self._types.get(name[len(self.name)+1:])
 
     def typeToDef(self, t):
-        return TypeDefinition(fields = tuple(t.__types__.keys()) + (" exists",), indices= tuple(self._indices.get(t,{}).keys()))
+        return TypeDefinition(
+            fields = tuple(t.__types__.keys()) + (" exists",),
+            indices= tuple(self._indices.get(t,{}).keys())
+        )
 
     @property
     def name(self):
@@ -72,7 +77,7 @@ class Schema:
             self._frozen = True
 
     def __setattr__(self, typename, val):
-        if typename[:1] == "_":
+        if typename.startswith("_"):
             self.__dict__[typename] = val
             return
 
@@ -86,7 +91,7 @@ class Schema:
     def __getattr__(self, typename):
         assert '.' not in typename
 
-        if typename[:1] == "_":
+        if typename.startswith("_"):
             return self.__dict__[typename]
 
         if typename in self._supportingTypes:
@@ -140,37 +145,41 @@ class Schema:
         self._indexed_fields[type].update(props)
 
     def define(self, cls):
-        assert cls.__name__[:1] != "_", "Illegal to use _ for first character in database classnames."
+        assert not cls.__name__.startswith("_"), "Illegal to use _ for first character in database classnames."
         assert not self._frozen, "Schema is already frozen"
 
+        # get a type stub
         t = getattr(self, cls.__name__)
         self._types_to_original[t] = cls
 
-        types = {}
-
+        # compute baseClasses in order to collect the type's attributes
         baseClasses = list(cls.__mro__)
         for i in range(len(baseClasses)):
             if baseClasses[i] is DatabaseObject:
                 baseClasses = baseClasses[:i]
                 break
 
-        properClasses = [self._types_to_original.get(b, b) for b in baseClasses]
+        properBaseClasses = [self._types_to_original.get(b, b) for b in baseClasses]
 
-        for base in reversed(properClasses):
+        # Collect the type's attributes and populate (_define) the type object
+        # Map: name -> type
+        types = {}
+
+        for base in reversed(properBaseClasses):
             for name, val in base.__dict__.items():
-                if name[:2] != '__' and isinstance(val, type):
-                    types[name] = val
-                elif name[:2] != '__' and isinstance(val, Indexed):
-                    if isinstance(val.obj, type):
-                        types[name] = val.obj
+                if not name.startswith('__'):
+                    if isinstance(val, type):
+                        types[name] = val
+                    elif isinstance(val, Indexed) and isinstance(val.obj, type):
+                            types[name] = val.obj
 
         t._define(**types)
 
-        for base in reversed(properClasses):
+        for base in reversed(properBaseClasses):
             for name, val in base.__dict__.items():
                 if isinstance(val, Index):
                     self._addTupleIndex(t, name, val.names, Tuple(*tuple(types[k] for k in val.names)))
-                if name[:2] != '__' and isinstance(val, Indexed):
+                if not name.startswith('__') and isinstance(val, Indexed):
                     self._addIndex(t, name)
                 elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
                     if isinstance(val, (FunctionType, staticmethod, property)):
