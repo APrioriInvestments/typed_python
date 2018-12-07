@@ -139,6 +139,12 @@ class TypesSerializationTest(unittest.TestCase):
         ts = SerializationContext({'f': f})
         self.assertIs(ts.deserialize(ts.serialize(f)), f)
 
+    def test_serialize_alternatives(self):
+        A = Alternative("A", X={'a': int}, Y={'a': lambda: A})
+
+        ts = SerializationContext({'A': A})
+        self.assertIs(ts.deserialize(ts.serialize(A.X)), A.X)
+
     def test_serialize_lambdas(self):
         ts = SerializationContext()
 
@@ -157,3 +163,18 @@ class TypesSerializationTest(unittest.TestCase):
         check(f2, (10,))
         check(lambda x:x+1, (10,))
         check(lambda x:x+y, (10,))
+
+
+    def test_serialize_class_instance(self):
+        class A:
+            def f(self):
+                return b"an embedded string"
+
+        ts = SerializationContext({'A':A})
+        serialization = ts.serialize(A())
+
+        self.assertTrue(b'an embedded string' not in serialization)
+
+        print(serialization)
+
+

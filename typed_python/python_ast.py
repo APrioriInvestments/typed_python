@@ -437,7 +437,8 @@ Comprehension = Alternative("Comprehension",
     Item = {
         "target": Expr,
         "iter": Expr,
-        "conditions": TupleOf(Expr)
+        "ifs": TupleOf(Expr),
+        "is_async": bool
         }
     )
 
@@ -602,12 +603,12 @@ converters = {
     ast.IsNot: ComparisonOp.IsNot,
     ast.In: ComparisonOp.In,
     ast.NotIn: ComparisonOp.NotIn,
-    ast.comprehension: Comprehension,
+    ast.comprehension: Comprehension.Item,
     ast.excepthandler: lambda x:x,
     ast.ExceptHandler: ExceptionHandler.Item,
     ast.arguments: Arguments.Item,
     ast.arg: Arg.Item,
-    ast.keyword: Keyword,
+    ast.keyword: Keyword.Item,
     ast.alias: Alias.Item
     }
 

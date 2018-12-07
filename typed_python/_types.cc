@@ -3736,6 +3736,12 @@ public:
             return;
         }
 
+        if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            serializeNativeType(nativeType->getBaseType(), b);
+            b.write_uint32(((ConcreteAlternative*)nativeType)->which());
+            return;
+        }
+
         if (nativeType->getTypeCategory() == Type::TypeCategory::catConstDict) {
             serializeNativeType(((ConstDict*)nativeType)->keyType(), b);
             serializeNativeType(((ConstDict*)nativeType)->valueType(), b);
@@ -3830,6 +3836,23 @@ public:
         if (category == Type::TypeCategory::catBool) {
             return ::Bool::Make();
         }
+
+        if (category == Type::TypeCategory::catConcreteAlternative) {
+            Type* base = deserializeNativeType(b);
+            if (base->getTypeCategory() != Type::TypeCategory::catAlternative) {
+                throw std::runtime_error("corrupt data: expected an Alternative type here");
+            }
+            uint32_t which = b.read_uint32();
+
+            Alternative* a = (Alternative*)base;
+            if (which >= a->subtypes().size()) {
+                throw std::runtime_error("corrupt data: invalid alternative specified");
+            }
+
+            return ::ConcreteAlternative::Make(a,which);
+        }
+
+
         if (category == Type::TypeCategory::catConstDict) {
             Type* keyType = deserializeNativeType(b);
             Type* valueType = deserializeNativeType(b);

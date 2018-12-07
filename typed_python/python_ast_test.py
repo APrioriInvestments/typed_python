@@ -66,6 +66,22 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
+    def test_reverse_parse_functions_with_keywords(self):
+        def f():
+            def g(x = 10, y = 20, *args, q = 30):
+                return (x,y,args,q)
+            g(x=20, y=30)
+
+        self.reverseParseCheck(f)
+
+    def test_reverse_parse_comprehensions(self):
+        def f():
+            [x for x in y]
+            [x for x in y for z in q]
+            {k:v for k in v}
+
+        self.reverseParseCheck(f)
+
     def reverseParseAndEvalCheck(self, f, arg):
         pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
 

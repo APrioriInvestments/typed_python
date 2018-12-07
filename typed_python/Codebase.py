@@ -19,6 +19,8 @@ import os
 import sys
 from typed_python.SerializationContext import SerializationContext
 
+_root_level_module_codebase_cache = {}
+
 class Codebase:
     """Represents a bundle of code and objects on disk somewhere.
 
@@ -60,6 +62,9 @@ class Codebase:
 
     @staticmethod
     def FromRootlevelModule(module):
+        if module in _root_level_module_codebase_cache:
+            return _root_level_module_codebase_cache[module]
+
         assert "." not in module.__name__
         assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
 
@@ -67,17 +72,6 @@ class Codebase:
         root, moduleDir = os.path.split(dirpart)
 
         files = {}
-        modules = {module.__name__: module}
-
-        def walkModuleObject(module):
-            for maybeSubmodule in module.__dict__.values():
-                if isinstance(maybeSubmodule, types.ModuleType):
-                    if hasattr(maybeSubmodule, '__file__') and maybeSubmodule.__file__.startswith(dirpart):
-                        if maybeSubmodule.__name__ not in modules:
-                            modules[maybeSubmodule.__name__] = maybeSubmodule
-                            walkModuleObject(maybeSubmodule)
-
-        walkModuleObject(module)
 
         def walkDisk(path, so_far):
             for name in os.listdir(path):
@@ -94,7 +88,28 @@ class Codebase:
 
         walkDisk(os.path.abspath(dirpart), moduleDir)
 
-        return Codebase(root, files, modules)
+        modules_by_name = Codebase.filesToModuleNames(files)
+        modules = Codebase.importModulesByName(modules_by_name)
+
+        _root_level_module_codebase_cache[module] = Codebase(root, files, modules)
+
+        return _root_level_module_codebase_cache[module]
+
+    @staticmethod
+    def filesToModuleNames(files):
+        modules_by_name = set()
+
+        for fpath in files:
+            if fpath.endswith(".py"):
+                module_parts = fpath.split("/")
+                if module_parts[-1] == "__init__.py":
+                    module_parts = module_parts[:-1]
+                else:
+                    module_parts[-1] = module_parts[-1][:-3]
+
+                modules_by_name.add(".".join(module_parts))
+
+        return modules_by_name
 
     @staticmethod
     def Instantiate(filesToContents, rootDirectory=None):
@@ -118,30 +133,25 @@ class Codebase:
         sys.path = [rootDirectory] + sys.path
 
         #get a list of all modules and import each one
-        modules_by_name = set()
-        for fpath in filesToContents:
-            if fpath.endswith(".py"):
-                module_parts = fpath.split("/")
-                if module_parts[-1] == "__init__.py":
-                    module_parts = module_parts[:-1]
-                else:
-                    module_parts[-1] = module_parts[-1][:-3]
-
-                modules_by_name.add(".".join(module_parts))
-
-        modules = {}
+        modules_by_name = Codebase.filesToModuleNames(filesToContents)
 
         try:
-            for mname in modules_by_name:
-                try:
-                    modules[mname] = importlib.import_module(mname)
-                except Exception as e:
-                    logging.warn("Error importing module %s from codebase: %s", mname,  e)
+            modules = Codebase.importModulesByName(modules_by_name)
         finally:
             sys.path.pop(0)
             Codebase.removeUserModules([rootDirectory])
 
         return Codebase(rootDirectory, filesToContents, modules)
+
+    @staticmethod
+    def importModulesByName(modules_by_name):
+        modules = {}
+        for mname in modules_by_name:
+            try:
+                modules[mname] = importlib.import_module(mname)
+            except Exception as e:
+                logging.warn("Error importing module %s from codebase: %s", mname,  e)
+        return modules
 
     @staticmethod
     def removeUserModules(paths):

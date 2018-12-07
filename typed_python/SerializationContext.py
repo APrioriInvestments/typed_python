@@ -71,6 +71,7 @@ class SerializationContext(object):
                 return rep
 
         if isinstance(inst, FunctionType):
+            print("Serializing ", inst)
             representation = {}
             representation["qualname"] = inst.__qualname__
             representation["name"] = inst.__name__
