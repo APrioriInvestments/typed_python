@@ -12,26 +12,22 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import traceback
-import datetime
-import logging
-import time
-import boto3
-import uuid
 import base64
+import boto3
+import datetime
 import json
+import logging
+import os
 import sys
 import time
-import os.path
-import logging
 import traceback
-import datetime
-import os
+import uuid
 
 from typed_python import OneOf, ConstDict
 from object_database import ServiceBase, service_schema, Schema, Indexed
 from object_database.web import cells
 from object_database.util import closest_N_in
+
 
 schema = Schema("core.AwsWorkerBootService")
 
@@ -163,21 +159,12 @@ valid_instance_types = {
     }
 
 
-instance_types_to_show = set([x for x in valid_instance_types if
+instance_types_to_show = set(
+    [x for x in valid_instance_types if
     ('xlarge' in x and '.xlarge' not in x) and
      x.split(".")[0] in ['m4','m5','c4','c5','r4','r5','i3', 'g2', 'x1']
-    ])
-
-
-
-
-
-
-
-
-
-
-
+    ]
+)
 
 
 @schema.define
@@ -195,6 +182,7 @@ class Configuration:
     defaultStorageSize =  int  #gb of disk to mount on booted workers (if they need ebs)
     max_to_boot = int          #maximum number of workers we'll boot
 
+
 @schema.define
 class State:
     instance_type = Indexed(str)
@@ -207,9 +195,12 @@ class State:
     capacityConstrained = bool
     spotPrices = ConstDict(str,float)
 
-own_dir = os.path.split(__file__)[0]
 
-linux_bootstrap_script = open(os.path.join(own_dir, "aws_linux_bootstrap.sh"), "r").read()
+ownDir = os.path.dirname(os.path.abspath(__file__))
+
+with open(os.path.join(ownDir, "aws_linux_bootstrap.sh"), "r") as fh:
+    linux_bootstrap_script = fh.read()
+
 
 class AwsApi:
     def __init__(self):
@@ -217,10 +208,10 @@ class AwsApi:
         if not self.config:
             raise Exception("Please configure the aws service.")
 
-        self.ec2 = boto3.resource('ec2',region_name=self.config.region)
-        self.ec2_client = boto3.client('ec2',region_name=self.config.region)
-        self.s3 = boto3.resource('s3',region_name=self.config.region)
-        self.s3_client = boto3.client('s3',region_name=self.config.region)
+        self.ec2 = boto3.resource('ec2', region_name=self.config.region)
+        self.ec2_client = boto3.client('ec2', region_name=self.config.region)
+        self.s3 = boto3.resource('s3', region_name=self.config.region)
+        self.s3_client = boto3.client('s3', region_name=self.config.region)
 
     def allRunningInstances(self, includePending=True, spot=False):
         filters = [{
@@ -333,7 +324,8 @@ class AwsApi:
             linux_bootstrap_script.format(
                 db_hostname=self.config.db_hostname,
                 db_port=self.config.db_port,
-                image=self.config.docker_image or "nativepython/cloud:latest"
+                image=self.config.docker_image or "nativepython/cloud:latest",
+                worker_token=self.runtimeConfig.serviceToken
                 )
             )
 
@@ -700,6 +692,3 @@ class AwsWorkerBootService(ServiceBase):
                             break
 
         time.sleep(self.SLEEP_INTERVAL)
-
-
-

@@ -20,7 +20,9 @@ from typed_python import Alternative, OneOf, TupleOf, ConstDict, Tuple, NamedTup
 
 from types import FunctionType
 
+
 _base = NamedTuple(_identity=str)
+
 
 class DatabaseObject(_base):
     __types__ = None
@@ -139,15 +141,17 @@ class DatabaseObject(_base):
     def __sha_hash__(self):
         return sha_hash(self._identity) + sha_hash(type(self).__qualname__)
 
+
 class Indexed:
     def __init__(self, obj):
         assert isinstance(obj, type)
         self.obj = obj
+
 
 class Index:
     def __init__(self, *names):
         self.names = names
 
     def __call__(self, instance):
-        return tuple(getattr(instance,x) for x in self.names)
+        return tuple(getattr(instance, x) for x in self.names)
 

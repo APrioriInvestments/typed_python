@@ -50,11 +50,14 @@ def parseLogfileToInstanceid(fname):
 
 
 class SubprocessServiceManager(ServiceManager):
-    def __init__(self, ownHostname, host, port, sourceDir, storageDir, isMaster, maxGbRam=4, maxCores=4,
-                        logfileDirectory=None, shutdownTimeout=None, errorLogsOnly=False):
+    def __init__(self, ownHostname, host, port,
+                sourceDir, storageDir, serviceToken,
+                isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None,
+                shutdownTimeout=None, errorLogsOnly=False):
         self.host = host
         self.port = port
         self.storageDir = storageDir
+        self.serviceToken = serviceToken
         self.logfileDirectory = logfileDirectory
         self.errorLogsOnly = errorLogsOnly
 

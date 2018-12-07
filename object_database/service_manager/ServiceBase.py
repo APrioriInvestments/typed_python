@@ -13,21 +13,14 @@
 #   limitations under the License.
 
 
-import threading
-import traceback
-import logging
-import time
-import os
-import weakref
-import object_database
-
 from object_database.web.cells import Card
-from object_database.core_schema import core_schema
-from object_database.service_manager.ServiceSchema import service_schema
+
 
 class ServiceRuntimeConfig:
-    def __init__(self, serviceTemporaryStorageRoot):
+    def __init__(self, serviceTemporaryStorageRoot, serviceToken):
         self.serviceTemporaryStorageRoot = serviceTemporaryStorageRoot
+        self.serviceToken = serviceToken
+
 
 class ServiceBase:
     coresUsed = 1
@@ -58,4 +51,3 @@ class ServiceBase:
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         return Card("No details provided for service '%s'" % serviceObject.name)
-

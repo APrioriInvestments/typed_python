@@ -43,7 +43,8 @@ def main(argv=None):
     parser.add_argument("port", type=int)
     parser.add_argument("--source", help="path for the source trees used by services", required=True)
     parser.add_argument("--storage", help="path for local storage used by services", required=True)
-
+    parser.add_argument("--service-token", type=str, required=True,
+        help="the auth token to be used with this service")
     parser.add_argument("--run_db", default=False, action='store_true')
 
     parser.add_argument("--ssl-path", default=None, required=False, help="path to (self-signed) SSL certificate")
@@ -63,7 +64,8 @@ def main(argv=None):
         parser.print_help()
         return 2
 
-    logging.info("ServiceManager on %s connecting to %s:%s", parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port)
+    logging.info("ServiceManager on %s connecting to %s:%s",
+        parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port)
 
     shouldStop = threading.Event()
 
@@ -110,6 +112,7 @@ def main(argv=None):
                             parsedArgs.port,
                             parsedArgs.source,
                             parsedArgs.storage,
+                            parsedArgs.service_token,
                             isMaster=parsedArgs.run_db,
                             maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
                             maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),

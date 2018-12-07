@@ -14,14 +14,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
-import threading
 import argparse
-import sys
-import time
-import traceback
 import logging
 import logging.config
+import sys
+import traceback
+
 from object_database import connect
 from object_database.util import configureLogging
 from object_database.service_manager.Codebase import setCodebaseInstantiationDirectory
@@ -37,6 +35,7 @@ def main(argv):
     parser.add_argument("instanceid")
     parser.add_argument("sourceDir")
     parser.add_argument("storageRoot")
+    parser.add_argument("serviceToken")
     parser.add_argument("--error_logs_only", action='store_true', default=False)
 
     parsedArgs = parser.parse_args(argv[1:])
@@ -55,14 +54,18 @@ def main(argv):
     setCodebaseInstantiationDirectory(parsedArgs.sourceDir)
 
     try:
-        manager = ServiceWorker(dbConnectionFactory, parsedArgs.instanceid, parsedArgs.storageRoot)
+        manager = ServiceWorker(
+            dbConnectionFactory, parsedArgs.instanceid,
+            parsedArgs.storageRoot, parsedArgs.serviceToken
+        )
 
         manager.runAndWaitForShutdown()
 
         return 0
-    except:
+    except Exception:
         logging.error("service_entrypoint failed with an exception:\n%s", traceback.format_exc())
         return 1
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))

@@ -12,8 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import hashlib
 import logging
 import os
+import random
 import ssl
 import subprocess
 import tempfile
@@ -176,3 +178,16 @@ def generateSslContext():
 
 def sslContextFromCertPathOrNone(cert_path=None):
     return  sslContextFromCertPath(cert_path) if cert_path else generateSslContext()
+
+
+def genToken(randomness=1000):
+    val = random.randint(1, int(randomness))
+    sha = hashlib.sha256()
+    sha.update(str(val).encode())
+    return sha.hexdigest()
+
+
+def tokenFromString(text):
+    sha = hashlib.sha256()
+    sha.update(text.encode())
+    return sha.hexdigest()

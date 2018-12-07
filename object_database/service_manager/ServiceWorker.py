@@ -29,7 +29,7 @@ import traceback
 
 
 class ServiceWorker:
-    def __init__(self, dbConnectionFactory, instance_id, storageRoot):
+    def __init__(self, dbConnectionFactory, instance_id, storageRoot, serviceToken):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema)
@@ -39,7 +39,7 @@ class ServiceWorker:
         self.db.subscribeToType(service_schema.Codebase, lazySubscription=True)
         self.db.subscribeToType(service_schema.File, lazySubscription=True)
 
-        self.runtimeConfig = ServiceRuntimeConfig(storageRoot)
+        self.runtimeConfig = ServiceRuntimeConfig(storageRoot, serviceToken)
 
         if not os.path.exists(storageRoot):
             os.makedirs(storageRoot)

@@ -12,35 +12,39 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
-import unittest
-import requests
 import os
+import requests
 import subprocess
 import sys
-import time
-import asyncio
-import websockets
 import tempfile
-from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
+import time
+import unittest
+import websockets
 
+from object_database.service_manager.ServiceManager import ServiceManager
+from object_database.web.ActiveWebService import (
+    active_webservice_schema,
+    ActiveWebService
+)
 from object_database import core_schema, connect, service_schema
+from object_database.util import genToken
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
+ownName = os.path.basename(os.path.abspath(__file__))
 
 
 class ActiveWebServiceTest(unittest.TestCase):
     def setUp(self):
+
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
 
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8023",
-                '--run_db',
-                '--source',os.path.join(self.tempDirectoryName,'source'),
-                '--storage',os.path.join(self.tempDirectoryName,'storage'),
+                'localhost', 'localhost', "8023", '--run_db',
+                '--source', os.path.join(self.tempDirectoryName,'source'),
+                '--storage', os.path.join(self.tempDirectoryName,'storage'),
+                '--service-token', genToken(),
                 '--shutdownTimeout', '.5'
             ]
         )
