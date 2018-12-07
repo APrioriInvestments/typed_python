@@ -24,7 +24,7 @@ class InProcessServiceManager(ServiceManager):
         self.storageRoot = tempfile.TemporaryDirectory()
         self.sourceRoot = tempfile.TemporaryDirectory()
 
-        super(InProcessServiceManager, self).__init__(
+        ServiceManager.__init__(
             self, dbConnectionFactory, self.sourceRoot.name, isMaster=True, ownHostname="localhost"
         )
 
@@ -35,7 +35,11 @@ class InProcessServiceManager(ServiceManager):
         if instanceIdentity in self.serviceWorkers:
             return
 
-        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity, os.path.join(self.storageRoot.name, instanceIdentity))
+        worker = ServiceWorker(
+            self.dbConnectionFactory,
+            instanceIdentity,
+            os.path.join(self.storageRoot.name, instanceIdentity)
+        )
 
         self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)
 
