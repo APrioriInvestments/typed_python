@@ -9,6 +9,7 @@ verify_ssl = true
 redis = "*"
 nose = "*"
 gevent = "*"
+lz4 = "*"
 numpy = "*"
 psutil = "*"
 flask-sockets = "*"

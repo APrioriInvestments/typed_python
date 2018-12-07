@@ -61,6 +61,18 @@ class SerializedDatabaseValue:
         self.pyRep = pyRep
         self.serializedByteRep = serializedByteRep
 
+
+def coerce_value(value, toType):
+    if isinstance(value, toType):
+        return value
+    if hasattr(toType, "__typed_python_category__"):
+        return toType(value)
+    if toType in (int, float, bool):
+        return toType(value)
+
+    raise TypeError("Can't coerce %s to type %s" % (value, toType))
+
+
 def default_initialize(t):
     return t()
 
@@ -73,6 +85,7 @@ class View(object):
         object.__init__(self)
         self._db = db
         self._transaction_num = transaction_id
+        self.serializationContext = db.serializationContext
         self._writes = {}
         self._reads = set()
         self._indexReads = set()
@@ -87,6 +100,10 @@ class View(object):
 
     def db(self):
         return self._db
+
+    def setSerializationContext(self, serializationContext):
+        self.serializationContext = serializationContext
+        return self
 
     def transaction_id(self):
         return self._transaction_num
@@ -123,7 +140,7 @@ class View(object):
                 raise TypeError("Unknown field %s on %s" % (kwd, cls))
 
             try:
-                coerced_val = cls.__types__[kwd](val)
+                coerced_val = coerce_value(val, cls.__types__[kwd])
             except:
                 raise TypeError("Can't coerce %s to type %s" % (val, cls.__types__[kwd]))
 
@@ -174,10 +191,12 @@ class View(object):
             if not obj.exists():
                 raise ObjectDoesntExistException(obj)
 
-        return self.unwrapSerializedDatabaseValue(dbValWithPyrep, field_type)
+        return self.unwrapSerializedDatabaseValue(self.serializationContext, dbValWithPyrep, field_type)
 
     @staticmethod
-    def unwrapSerializedDatabaseValue(dbValWithPyrep, field_type):
+    def unwrapSerializedDatabaseValue(serializationContext, dbValWithPyrep, field_type):
+        assert field_type is not None
+
         if dbValWithPyrep is None:
             return default_initialize(field_type)
 
@@ -187,10 +206,10 @@ class View(object):
         if dbValWithPyrep.serializedByteRep is None:
             return default_initialize(field_type)
 
-        if dbValWithPyrep.pyRep.get(field_type) is None:
-            dbValWithPyrep.pyRep[field_type] = deserialize(field_type, dbValWithPyrep.serializedByteRep)
+        if dbValWithPyrep.pyRep.get(serializationContext) is None:
+            dbValWithPyrep.pyRep[serializationContext] = deserialize(field_type, dbValWithPyrep.serializedByteRep, serializationContext)
 
-        return dbValWithPyrep.pyRep[field_type]
+        return dbValWithPyrep.pyRep[serializationContext]
 
     def _exists(self, obj, identity):
         if not self._db._isTypeSubscribed(type(obj)):
@@ -383,7 +402,11 @@ class View(object):
         if self._writes:
             def encode(val):
                 if isinstance(val, tuple) and len(val) == 2 and isinstance(val[0], type):
-                    return SerializedDatabaseValue(serialize(val[0], val[1]), {val[0]:val[1]})
+                    return SerializedDatabaseValue(
+                        serialize(val[0], val[1], self.serializationContext),
+                        {self.serializationContext:val[1]}
+                        )
+
                 elif val is None:
                     return SerializedDatabaseValue(val, {})
                 else:

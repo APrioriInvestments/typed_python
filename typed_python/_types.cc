@@ -1449,6 +1449,10 @@ struct native_instance_wrapper {
     }
 
     static Type* extractTypeFrom(PyTypeObject* typeObj, bool exact=false) {
+        if (exact && isSubclassOfNativeType(typeObj)) {
+            return PythonSubclass::Make(extractTypeFrom(typeObj), typeObj);
+        }
+
         while (!exact && typeObj->tp_base && typeObj->tp_as_buffer != bufferProcs()) {
             typeObj = typeObj->tp_base;
         }
@@ -3371,7 +3375,7 @@ public:
     }
 
     virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const {
-        Type* t = native_instance_wrapper::extractTypeFrom(o->ob_type);
+        Type* t = native_instance_wrapper::extractTypeFrom(o->ob_type, true);
 
         if (t) {
             b.write_uint8(T_NATIVE);
@@ -3392,7 +3396,7 @@ public:
                 serializePyTuple(o, b);
             } else
             if (PyType_Check(o)) {
-                Type* nativeType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)o);
+                Type* nativeType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)o, true);
 
                 if (nativeType) {
                     b.write_uint8(T_NATIVETYPE);
@@ -3439,7 +3443,7 @@ public:
     }
 
     void serializePyDict(PyObject* o, SerializationBuffer& b) const {
-        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(o);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
@@ -3466,7 +3470,7 @@ public:
         }
 
         res = PyDict_New();
-        b.addCachedPointer(id, res);
+        b.addCachedPointer(id, incref(res), true);
 
         size_t sz = b.read_uint32();
 
@@ -3475,7 +3479,11 @@ public:
                 PyObject* key = deserializePythonObject(b);
                 PyObject* value = deserializePythonObject(b);
 
-                PyDict_SetItem(res, key, value);
+                if (PyDict_SetItem(res, key, value) != 0) {
+                    PyErr_Clear();
+                    throw std::runtime_error(std::string("Can't place value of type ") + key->ob_type->tp_name + " into a dict");
+                }
+
                 Py_DECREF(key);
                 Py_DECREF(value);
             }
@@ -3488,7 +3496,7 @@ public:
     }
 
     void serializePyList(PyObject* o, SerializationBuffer& b) const {
-        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(o);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
@@ -3513,7 +3521,7 @@ public:
         size_t sz = b.read_uint32();
 
         res = PyList_New(sz);
-        b.addCachedPointer(id, res);
+        b.addCachedPointer(id, incref(res), true);
 
         try {
             for (long k = 0; k < sz; k++) {
@@ -3528,7 +3536,7 @@ public:
     }
 
     void serializePyTuple(PyObject* o, SerializationBuffer& b) const {
-        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(o);
         b.write_uint32(idAndIsNew.first);
 
         if (idAndIsNew.second) {
@@ -3552,7 +3560,7 @@ public:
         size_t sz = b.read_uint32();
 
         res = PyTuple_New(sz);
-        b.addCachedPointer(id, res);
+        b.addCachedPointer(id, incref(res), true);
 
         try {
             for (long k = 0; k < sz; k++) {
@@ -3567,7 +3575,7 @@ public:
     }
 
     void serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const {
-        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer((void*)o);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(o);
         b.write_uint32(idAndIsNew.first);
 
         if (!idAndIsNew.second) {
@@ -3606,6 +3614,9 @@ public:
             serializePythonObject((PyObject*)o->ob_type, b);
 
             PyObject* d = PyObject_GenericGetDict(o, nullptr);
+            if (!d) {
+                throw std::runtime_error(std::string("Object of type ") + o->ob_type->tp_name + " had no dict.");
+            }
             serializePyDict(d, b);
             Py_DECREF(d);
         } else {
@@ -3642,13 +3653,18 @@ public:
             //no representation
             PyObject* t = deserializePythonObject(b);
             if (!PyType_Check(t)) {
+                std::string tname = t->ob_type->tp_name;
                 Py_DECREF(t);
-                throw std::runtime_error("Expected a type object");
+                throw std::runtime_error("Expected a type object. Got " + tname + " instead");
             }
 
             PyObject* result = ((PyTypeObject*)t)->tp_new(((PyTypeObject*)t), PyTuple_Pack(0), NULL);
 
-            b.addCachedPointer(id, result);
+            if (!result) {
+                throw std::runtime_error("tp_new threw an exception");
+            }
+
+            b.addCachedPointer(id, incref(result), true);
 
             PyObject* d = deserializePydict(b);
             PyObject_GenericSetDict(result, d, nullptr);
@@ -3658,6 +3674,11 @@ public:
         if (code == T_OBJECT_REPRESENTATION) {
             PyObject* t = deserializePythonObject(b);
             PyObject* tArgs = deserializePythonObject(b);
+
+            if (!PyTuple_Check(tArgs)) {
+                throw std::runtime_error("corrupt data: second reconstruction argument is not a tuple.");
+            }
+
             PyObject* instance = PyObject_Call(t, tArgs, NULL);
             Py_DECREF(t);
             Py_DECREF(tArgs);
@@ -3668,7 +3689,7 @@ public:
                         t->ob_type->tp_name + " threw an exception.");
             }
 
-            b.addCachedPointer(id, instance);
+            b.addCachedPointer(id, incref(instance), true);
 
             PyObject* rep = deserializePythonObject(b);
             PyObject* res = PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", instance, rep);
@@ -3696,7 +3717,7 @@ public:
                 throw std::runtime_error("objectFromName threw an exception.");
             }
 
-            return b.addCachedPointer(id, res);
+            return b.addCachedPointer(id, incref(res), true);
         } else {
             throw std::runtime_error("corrupt data: invalid code after T_OBJECT");
         }
@@ -3809,7 +3830,7 @@ public:
                 throw std::runtime_error("objectFromName returned a non-type.");
             }
 
-            Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res);
+            Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res, true);
             Py_DECREF(res);
             if (!resultType) {
                 throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
@@ -4001,10 +4022,10 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    Type* actualType = native_instance_wrapper::extractTypeFrom(a2->ob_type);
+    Type* actualType = native_instance_wrapper::extractTypeFrom(a2->ob_type, true);
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
-    if (a3) {
+    if (a3 && a3 != Py_None) {
         context.reset(new PythonSerializationContext(a3));
     }
 
@@ -4051,7 +4072,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     }
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
-    if (a3) {
+    if (a3 && a3 != Py_None) {
         context.reset(new PythonSerializationContext(a3));
     }
     SerializationBuffer b(*context);

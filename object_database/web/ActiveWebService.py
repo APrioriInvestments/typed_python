@@ -169,7 +169,10 @@ class ActiveWebService(ServiceBase):
             serviceType = serviceObj.instantiateServiceType()
 
             if len(path) == 2:
-                return Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
+                return (
+                    Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
+                        .withSerializationContext(serviceObj.getSerializationContext())
+                    )
 
             typename = path[2]
 
@@ -184,11 +187,17 @@ class ActiveWebService(ServiceBase):
                 return Traceback("Can't find fully-qualified type %s" % typename)
 
             if len(path) == 3:
-                return serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
+                return (
+                    serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
+                        .withSerializationContext(serviceObj.getSerializationContext())
+                    )
 
             instance = typeObj.fromIdentity(path[3])
 
-            return serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
+            return (
+                serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
+                    .withSerializationContext(serviceObj.getSerializationContext())
+                )
 
         return Traceback("Invalid url path: %s" % path)
 
@@ -218,6 +227,7 @@ class ActiveWebService(ServiceBase):
             logging.info("Starting main websocket handler with %s", ws)
 
             cells = Cells(self.db)
+            cells.root.setRootSerializationContext(self.db.serializationContext)
             cells.root.setChild(self.addMainBar(Subscribed(lambda: self.pathToDisplay(path, queryArgs))))
 
             timestamps = []

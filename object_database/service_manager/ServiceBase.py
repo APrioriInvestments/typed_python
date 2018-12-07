@@ -38,6 +38,11 @@ class ServiceBase:
         self.serviceObject = serviceObject
         self.runtimeConfig = runtimeConfig
 
+        if self.serviceObject is not None:
+            self.serializationContext = self.serviceObject.getSerializationContext()
+        else:
+            self.serializationContext = None
+
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):
         """Subclasses should take the remaining args from the commandline and configure using them"""

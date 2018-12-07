@@ -17,8 +17,11 @@ import types
 import tempfile
 import os
 import sys
+import threading
+
 from typed_python.SerializationContext import SerializationContext
 
+_lock = threading.Lock()
 _root_level_module_codebase_cache = {}
 
 class Codebase:
@@ -62,38 +65,39 @@ class Codebase:
 
     @staticmethod
     def FromRootlevelModule(module):
-        if module in _root_level_module_codebase_cache:
+        with _lock:
+            if module in _root_level_module_codebase_cache:
+                return _root_level_module_codebase_cache[module]
+
+            assert "." not in module.__name__
+            assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
+
+            dirpart = os.path.dirname(module.__file__)
+            root, moduleDir = os.path.split(dirpart)
+
+            files = {}
+
+            def walkDisk(path, so_far):
+                for name in os.listdir(path):
+                    fullpath = os.path.join(path, name)
+                    so_far_with_name = os.path.join(so_far, name) if so_far else name
+                    if os.path.isdir(fullpath):
+                        walkDisk(fullpath, so_far_with_name)
+                    else:
+                        if os.path.splitext(name)[1] == ".py":
+                            with open(fullpath, "r") as f:
+                                contents = f.read()
+
+                            files[so_far_with_name] = contents
+
+            walkDisk(os.path.abspath(dirpart), moduleDir)
+
+            modules_by_name = Codebase.filesToModuleNames(files)
+            modules = Codebase.importModulesByName(modules_by_name)
+
+            _root_level_module_codebase_cache[module] = Codebase(root, files, modules)
+
             return _root_level_module_codebase_cache[module]
-
-        assert "." not in module.__name__
-        assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
-
-        dirpart = os.path.dirname(module.__file__)
-        root, moduleDir = os.path.split(dirpart)
-
-        files = {}
-
-        def walkDisk(path, so_far):
-            for name in os.listdir(path):
-                fullpath = os.path.join(path, name)
-                so_far_with_name = os.path.join(so_far, name) if so_far else name
-                if os.path.isdir(fullpath):
-                    walkDisk(fullpath, so_far_with_name)
-                else:
-                    if os.path.splitext(name)[1] == ".py":
-                        with open(fullpath, "r") as f:
-                            contents = f.read()
-
-                        files[so_far_with_name] = contents
-
-        walkDisk(os.path.abspath(dirpart), moduleDir)
-
-        modules_by_name = Codebase.filesToModuleNames(files)
-        modules = Codebase.importModulesByName(modules_by_name)
-
-        _root_level_module_codebase_cache[module] = Codebase(root, files, modules)
-
-        return _root_level_module_codebase_cache[module]
 
     @staticmethod
     def filesToModuleNames(files):
@@ -114,34 +118,35 @@ class Codebase:
     @staticmethod
     def Instantiate(filesToContents, rootDirectory=None):
         """Instantiate a codebase on disk and import the modules."""
-        if rootDirectory is None:
-            rootDirectory = tempfile.TemporaryDirectory().name
+        with _lock:
+            if rootDirectory is None:
+                rootDirectory = tempfile.TemporaryDirectory().name
 
-        for fpath, fcontents in filesToContents.items():
-            path, name = os.path.split(fpath)
+            for fpath, fcontents in filesToContents.items():
+                path, name = os.path.split(fpath)
 
-            fullpath = os.path.join(rootDirectory, path)
+                fullpath = os.path.join(rootDirectory, path)
 
-            if not os.path.exists(fullpath):
-                os.makedirs(fullpath)
+                if not os.path.exists(fullpath):
+                    os.makedirs(fullpath)
 
-            with open(os.path.join(fullpath, name), "wb") as f:
-                f.write(fcontents.encode("utf-8"))
+                with open(os.path.join(fullpath, name), "wb") as f:
+                    f.write(fcontents.encode("utf-8"))
 
-        importlib.invalidate_caches()
+            importlib.invalidate_caches()
 
-        sys.path = [rootDirectory] + sys.path
+            sys.path = [rootDirectory] + sys.path
 
-        #get a list of all modules and import each one
-        modules_by_name = Codebase.filesToModuleNames(filesToContents)
+            #get a list of all modules and import each one
+            modules_by_name = Codebase.filesToModuleNames(filesToContents)
 
-        try:
-            modules = Codebase.importModulesByName(modules_by_name)
-        finally:
-            sys.path.pop(0)
-            Codebase.removeUserModules([rootDirectory])
+            try:
+                modules = Codebase.importModulesByName(modules_by_name)
+            finally:
+                sys.path.pop(0)
+                Codebase.removeUserModules([rootDirectory])
 
-        return Codebase(rootDirectory, filesToContents, modules)
+            return Codebase(rootDirectory, filesToContents, modules)
 
     @staticmethod
     def importModulesByName(modules_by_name):

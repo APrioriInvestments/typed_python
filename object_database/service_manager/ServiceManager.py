@@ -173,7 +173,9 @@ class ServiceManager(object):
             for i in instances:
                 try:
                     with self.db.view():
-                        self._startServiceWorker(i.service, i._identity)
+                        service = i.service
+                    self.startServiceWorker(service, i._identity)
+
                 except:
                     logging.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
                     bad_instances[i] = traceback.format_exc()
@@ -313,7 +315,7 @@ class ServiceManager(object):
                     res.append(i)
         return res
 
-    def _startServiceWorker(self, service, instanceIdentity):
+    def startServiceWorker(self, service, instanceIdentity):
         raise NotImplementedError()
 
     def cleanup(self):

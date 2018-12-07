@@ -13,10 +13,12 @@
 #   limitations under the License.
 
 
+from typed_python.Codebase import Codebase as TypedPythonCodebase
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase, ServiceRuntimeConfig
 
+import object_database
 import traceback
 import threading
 import time
@@ -42,6 +44,14 @@ class ServiceWorker:
 
         self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
         self.db.subscribeToObject(self.instance)
+
+        with self.db.view():
+            if self.instance.service.codebase is None:
+                context = TypedPythonCodebase.FromRootlevelModule(object_database)
+            else:
+                context = self.instance.service.codebase.instantiate().serializationContext
+
+        self.db.setSerializationContext(context)
 
         with self.db.view():
             host = self.instance.host

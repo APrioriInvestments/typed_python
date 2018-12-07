@@ -12,6 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
+import numpy
+import time
+import threading
 from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
     Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction, SerializationContext
 
@@ -28,6 +31,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(ts.deserialize(ts.serialize(b"some bytes")), b"some bytes")
         self.assertEqual(ts.deserialize(ts.serialize((1,2,3))), (1,2,3))
         self.assertEqual(ts.deserialize(ts.serialize({"key":"value"})), {"key":"value"})
+        self.assertEqual(ts.deserialize(ts.serialize({"key":"value", "key2": "value2"})), {"key":"value", "key2": "value2"})
         self.assertEqual(ts.deserialize(ts.serialize([1,2,3])), [1,2,3])
         self.assertEqual(ts.deserialize(ts.serialize([1,2,3])), [1,2,3])
         self.assertEqual(ts.deserialize(ts.serialize(int)), int)
@@ -113,25 +117,6 @@ class TypesSerializationTest(unittest.TestCase):
                     ]:
             self.assertIs(ts.deserialize(ts.serialize(t)), t)
 
-    def test_serialize_with_plugins(self):
-        class A:
-            def __init__(self, z = 20):
-                self.z = z
-
-        class Plugin:
-            def representationFor(self, inst):
-                if isinstance(inst, A):
-                    return (A, (), inst.z)
-                return None
-
-            def setInstanceStateFromRepresentation(self, instance, representation):
-                """Fill out an instance from its representation. """
-                instance.z = representation + 1
-                return True
-
-        ts = SerializationContext({'A': A}).withPlugin(Plugin())
-        self.assertEqual(ts.deserialize(ts.serialize(A(20))).z, 21)
-
     def test_serialize_functions(self):
         def f():
             return 10
@@ -164,17 +149,88 @@ class TypesSerializationTest(unittest.TestCase):
         check(lambda x:x+1, (10,))
         check(lambda x:x+y, (10,))
 
-
     def test_serialize_class_instance(self):
         class A:
+            def __init__(self, x):
+                self.x = x
+
             def f(self):
                 return b"an embedded string"
 
         ts = SerializationContext({'A':A})
-        serialization = ts.serialize(A())
+        serialization = ts.serialize(A(10))
 
         self.assertTrue(b'an embedded string' not in serialization)
 
-        print(serialization)
+        anA = ts.deserialize(serialization)
+
+        self.assertEqual(anA.x, 10)
+
+        anA2 = deserialize(A, serialize(A, A(10), ts), ts)
+        self.assertEqual(anA2.x, 10)
+
+    def test_serialize_and_numpy(self):
+        x = numpy.ones(10000)
+        ts = SerializationContext()
+
+        self.assertTrue(numpy.all(x == ts.deserialize(ts.serialize(x))))
+
+        sizeCompressed = len(ts.serialize(x))
+
+        ts.numpyCompressionEnabled=False
+
+        self.assertTrue(numpy.all(x == ts.deserialize(ts.serialize(x))))
+
+        sizeNotCompressed = len(ts.serialize(x))
+
+        self.assertTrue(sizeNotCompressed > sizeCompressed * 2, (sizeNotCompressed, sizeCompressed))
+
+    def test_serialize_and_numpy_with_dicts(self):
+        x = numpy.ones(10000)
+        ts = SerializationContext()
+
+        self.assertTrue(numpy.all(ts.deserialize(ts.serialize({'a': x, 'b': x}))['a'] == x))
+
+    def test_serialize_and_threads(self):
+        x = numpy.ones(10000)
+
+        class A:
+            def __init__(self, x):
+                self.x=x
+
+        ts = SerializationContext({'A':A})
+
+        OK = []
+        def thread():
+            t0 = time.time()
+            while time.time() - t0 < 1.0:
+                ts.deserialize(ts.serialize(A(10)))
+            OK.append(True)
 
 
+        threads = [threading.Thread(target=thread) for _ in range(10)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(OK), len(threads))
+
+    def test_serialize_named_tuple(self):
+        X = NamedTuple(x=int)
+        ts = SerializationContext()
+        self.assertEqual(ts.deserialize(ts.serialize(X(x=20))), X(x=20))
+
+
+    def test_serialize_named_tuple_subclass(self):
+        class X(NamedTuple(x=int)):
+            def f(self):
+                return self.x
+
+        ts = SerializationContext({'X':X})
+
+        self.assertIs(ts.deserialize(ts.serialize(X)), X)
+
+        self.assertTrue(ts.serialize(X(x=20)) != ts.serialize(X(x=21)))
+
+        self.assertEqual(ts.deserialize(ts.serialize(X(x=20))), X(x=20))

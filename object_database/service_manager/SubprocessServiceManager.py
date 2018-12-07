@@ -75,51 +75,52 @@ class SubprocessServiceManager(ServiceManager):
 
         self.serviceProcesses = {}
 
-    def _startServiceWorker(self, service, instanceIdentity):
-        if instanceIdentity in self.serviceProcesses:
-            return
+    def startServiceWorker(self, service, instanceIdentity):
+        with self.db.view():
+            if instanceIdentity in self.serviceProcesses:
+                return
 
-        with self.lock:
-            logfileName = service.name + "-" + timestampToFileString(time.time()) + "-" + instanceIdentity + ".log.txt"
+            with self.lock:
+                logfileName = service.name + "-" + timestampToFileString(time.time()) + "-" + instanceIdentity + ".log.txt"
 
-            if self.logfileDirectory is not None:
-                output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
+                if self.logfileDirectory is not None:
+                    output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
+                else:
+                    output_file = None
+
+                process = subprocess.Popen(
+                    [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
+                        service.name,
+                        self.host,
+                        str(self.port),
+                        instanceIdentity,
+                        os.path.join(self.sourceDir, instanceIdentity),
+                        os.path.join(self.storageDir, instanceIdentity)
+                        ] + (["--error_logs_only"] if self.errorLogsOnly else []),
+                    cwd=self.storageDir,
+                    stdin=subprocess.DEVNULL,
+                    stdout=output_file,
+                    stderr=subprocess.STDOUT
+                    )
+
+                self.serviceProcesses[instanceIdentity] = process
+
+                if output_file:
+                    output_file.close()
+
+            if self.logfileDirectory:
+                logging.info(
+                    "Started a service logging to %s with pid %s",
+                    os.path.join(self.logfileDirectory, logfileName),
+                    process.pid
+                    )
             else:
-                output_file = None
-
-            process = subprocess.Popen(
-                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
+                logging.info(
+                    "Started service %s/%s with pid %s",
                     service.name,
-                    self.host,
-                    str(self.port),
                     instanceIdentity,
-                    os.path.join(self.sourceDir, instanceIdentity),
-                    os.path.join(self.storageDir, instanceIdentity)
-                    ] + (["--error_logs_only"] if self.errorLogsOnly else []),
-                cwd=self.storageDir,
-                stdin=subprocess.DEVNULL,
-                stdout=output_file,
-                stderr=subprocess.STDOUT
-                )
-
-            self.serviceProcesses[instanceIdentity] = process
-
-            if output_file:
-                output_file.close()
-
-        if self.logfileDirectory:
-            logging.info(
-                "Started a service logging to %s with pid %s",
-                os.path.join(self.logfileDirectory, logfileName),
-                process.pid
-                )
-        else:
-            logging.info(
-                "Started service %s/%s with pid %s",
-                service.name,
-                instanceIdentity,
-                process.pid
-                )
+                    process.pid
+                    )
 
     def stop(self, gracefully=True):
         if gracefully:

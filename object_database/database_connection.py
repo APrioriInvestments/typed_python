@@ -359,8 +359,11 @@ class TransactionListener:
         self._db = db
         self._db._onTransaction.append(self._onTransaction)
         self._queue = queue.Queue()
-
+        self.serializationContext = None
         self.handler = handler
+
+    def setSerializationContext(self, context):
+        self.serializationContext = context
 
     def start(self):
         self._thread.start()
@@ -407,8 +410,8 @@ class TransactionListener:
                 if fieldname != " exists":
                     changed[o].append((
                         fieldname,
-                        View.unwrapSerializedDatabaseValue(key_value[k], o.__types__[fieldname]),
-                        View.unwrapSerializedDatabaseValue(priors[k], o.__types__[fieldname])
+                        View.unwrapSerializedDatabaseValue(self.serializationContext, key_value[k], o.__types__[fieldname]),
+                        View.unwrapSerializedDatabaseValue(self.serializationContext, priors[k], o.__types__[fieldname])
                         ))
 
         self._queue.put(changed)
@@ -461,6 +464,12 @@ class DatabaseConnection:
         self._flushIx = 0
 
         self._largeSubscriptionHeartbeatDelay = 0
+
+        self.serializationContext = None
+
+    def setSerializationContext(self, context):
+        self.serializationContext = context
+        return self
 
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()

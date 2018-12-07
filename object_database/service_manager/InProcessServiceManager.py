@@ -28,11 +28,11 @@ class InProcessServiceManager(ServiceManager):
         self.serviceWorkers = {}
 
 
-    def _startServiceWorker(self, service, instanceIdentity):
+    def startServiceWorker(self, service, instanceIdentity):
         if instanceIdentity in self.serviceWorkers:
             return
 
-        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity, self.sourceDir, os.path.join(self.storageRoot.name, instanceIdentity))
+        worker = ServiceWorker(self.dbConnectionFactory, instanceIdentity, os.path.join(self.storageRoot.name, instanceIdentity))
 
         self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)
 

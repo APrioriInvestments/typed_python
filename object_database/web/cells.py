@@ -207,6 +207,7 @@ class Cells:
                     _cur_cell.cell = n
                     while True:
                         try:
+                            n.prepare()
                             n.recalculate()
                             break
                         except SubscribeAndRetry as e:
@@ -304,6 +305,11 @@ class Cell:
         self._width = None
         self._color = None
         self._height = None
+        self.serializationContext = None
+
+    def withSerializationContext(self, context):
+        self.serializationContext = context
+        return self
 
     def _resetSubscriptionsToViewReads(self, view):
         new_subscriptions = set(view._reads).union(set(view._indexReads))
@@ -315,6 +321,18 @@ class Cell:
             self.cells.keysToCells.setdefault(k, set()).discard(self)
 
         self.subscriptions = new_subscriptions
+
+    def view(self):
+        return self.cells.db.view().setSerializationContext(self.serializationContext)
+
+    def transaction(self):
+        return self.cells.db.transaction().setSerializationContext(self.serializationContext)
+
+    def prepare(self):
+        if self.serializationContext is None and self.parent is not None:
+            if self.parent.serializationContext is None:
+                self.parent.prepare()
+            self.serializationContext = self.parent.serializationContext
 
     def sortsAs(self):
         return None
@@ -663,7 +681,7 @@ class Dropdown(Cell):
 
         while True:
             try:
-                with self.cells.db.transaction() as t:
+                with self.transaction() as t:
                     fun()
                     return
             except RevisionConflictException as e:
@@ -694,6 +712,9 @@ class Container(Cell):
         self.markDirty()
 
 class RootCell(Container):
+    def setRootSerializationContext(self, context):
+        self.serializationContext = context
+
     @property
     def identity(self):
         return "page_root"
@@ -741,7 +762,7 @@ class Subscribed(Cell):
         return Cell.makeCell(self.f()).sortsAs()
 
     def recalculate(self):
-        with self.cells.db.view() as v:
+        with self.view() as v:
             self.contents = """<div %s>____contents__</div>""" % self._divStyle()
             try:
                 c = Cell.makeCell(self.f())
@@ -778,7 +799,7 @@ class SubscribedSequence(Cell):
             return self.children['____child_0__'].sortsAs()
 
     def recalculate(self):
-        with self.cells.db.view() as v:
+        with self.view() as v:
             try:
                 self.spine = list(self.itemsFun())
             except SubscribeAndRetry:
@@ -867,7 +888,7 @@ class Grid(Cell):
         super().prepareForReuse()
 
     def recalculate(self):
-        with self.cells.db.view() as v:
+        with self.view() as v:
             try:
                 self.rows = list(self.rowFun())
             except SubscribeAndRetry:
@@ -1130,7 +1151,7 @@ class Table(Cell):
         return Card(res, padding=1)
 
     def recalculate(self):
-        with self.cells.db.view() as v:
+        with self.view() as v:
             try:
                 self.cols = list(self.colFun())
             except SubscribeAndRetry:
@@ -1263,7 +1284,7 @@ class Clickable(Cell):
 
         while True:
             try:
-                with self.cells.db.transaction():
+                with self.transaction():
                     self.f()
                     return
             except RevisionConflictException as e:
@@ -1478,7 +1499,7 @@ class _PlotUpdater(Cell):
         return res
 
     def recalculate(self):
-        with self.cells.db.view() as v:
+        with self.view() as v:
             #we only exist to run our postscript
             self.contents = """<div style='display:none'>"""
 

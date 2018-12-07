@@ -14,6 +14,15 @@ public:
     {
     }
 
+    ~DeserializationBuffer() {
+        return;
+        for (long k = 0; k < m_needsPyDecref.size(); k++) {
+            if (m_needsPyDecref[k]) {
+                Py_DECREF((PyObject*)m_cachedPointers[k]);
+            }
+        }
+    }
+
     DeserializationBuffer(const DeserializationBuffer&) = delete;
     DeserializationBuffer& operator=(const DeserializationBuffer&) = delete;
 
@@ -86,9 +95,10 @@ public:
     }
 
     template<class T>
-    T* addCachedPointer(int32_t which, T* ptr) {
+    T* addCachedPointer(int32_t which, T* ptr, bool needsPyDecref=false) {
         while (which >= m_cachedPointers.size()) {
             m_cachedPointers.push_back(nullptr);
+            m_needsPyDecref.push_back(false);
         }
         if (!ptr) {
             throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
@@ -97,6 +107,7 @@ public:
             throw std::runtime_error("Corrupt data: tried to write a recursive object multiple times");
         }
         m_cachedPointers[which] = ptr;
+        m_needsPyDecref[which] = needsPyDecref;
         return ptr;
     }
 
@@ -120,4 +131,5 @@ private:
     size_t m_orig_size;
     const SerializationContext& m_context;
     std::vector<void*> m_cachedPointers;
+    std::vector<bool> m_needsPyDecref;
 };

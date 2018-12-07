@@ -20,6 +20,10 @@ public:
         if (m_buffer) {
             free(m_buffer);
         }
+
+        for (auto p: m_pointersNeedingDecref) {
+            Py_DECREF(p);
+        }
     }
 
     SerializationBuffer(const SerializationBuffer&) = delete;
@@ -83,7 +87,19 @@ public:
         return m_context;
     }
 
-    std::pair<uint32_t, bool> cachePointer(void* t) {
+    std::pair<uint32_t, bool> cachePointer(PyObject* t) {
+        Py_INCREF(t);
+        m_pointersNeedingDecref.insert(t);
+
+        auto it = m_idToPointerCache.find(t);
+        if (it == m_idToPointerCache.end()) {
+            m_idToPointerCache[t] = m_idToPointerCache.size();
+            return std::pair<uint32_t, bool>(m_idToPointerCache.size() - 1, true);
+        }
+        return std::pair<uint32_t, bool>(it->second, false);
+    }
+
+    std::pair<uint32_t, bool> cachePointer(Type* t) {
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
             m_idToPointerCache[t] = m_idToPointerCache.size();
@@ -99,4 +115,5 @@ private:
     const SerializationContext& m_context;
 
     std::map<void*, int32_t> m_idToPointerCache;
+    std::set<void*> m_pointersNeedingDecref;
 };

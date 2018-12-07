@@ -25,8 +25,8 @@ import urllib.parse
 import object_database
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.Codebase import Codebase
-
 from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
+from typed_python.Codebase import Codebase as TypedPythonCodebase
 from typed_python import *
 import threading
 
@@ -70,6 +70,12 @@ class Service:
     timesBootedUnsuccessfully = int
     timesCrashed = int
     lastFailureReason = OneOf(None, str)
+
+    def getSerializationContext(self):
+        if self.codebase is None:
+            return TypedPythonCodebase.FromRootlevelModule(object_database).serializationContext
+        else:
+            return self.codebase.instantiate().serializationContext
 
     def isThrottled(self):
         return self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS

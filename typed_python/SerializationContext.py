@@ -15,23 +15,30 @@
 from typed_python._types import serialize, deserialize
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
 from types import FunctionType
+import numpy
+import lz4.frame
+
+_reconstruct = numpy.array([1,2,3]).__reduce__()[0]
+_ndarray = numpy.ndarray
 
 def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast)
 
 _builtin_name_to_value = {".builtin." + k:v for k,v in __builtins__.items() if isinstance(v,type)}
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
+_builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
+_builtin_name_to_value[".builtin._ndarray"] = _ndarray
+_builtin_name_to_value[".builtin.dtype"] = numpy.dtype
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
-
 _builtin_value_to_name = {id(v):k for k,v in _builtin_name_to_value.items()}
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
-    def __init__(self, nameToObject=None, plugin=None):
+    def __init__(self, nameToObject=None):
         super().__init__()
+
         self.nameToObject = nameToObject or {}
-        self.plugin = plugin
         self.objToName = {}
 
         #take the shortest name for each object in case of ambiguity
@@ -39,8 +46,7 @@ class SerializationContext(object):
             if id(v) not in self.objToName or len(k) < len(self.objToName[id(v)]):
                 self.objToName[id(v)] = k
 
-    def withPlugin(self, plugin):
-        return SerializationContext(self.nameToObject, plugin)
+        self.numpyCompressionEnabled = True
 
     def nameForObject(self, t):
         if id(t) in _builtin_value_to_name:
@@ -54,24 +60,24 @@ class SerializationContext(object):
 
         return self.nameToObject.get(name)
 
-    def serialize(self, instance, plugin=None):
-        if plugin:
-            self = self.withPlugin(plugin)
+    def serialize(self, instance):
         return serialize(object, instance, self)
 
-    def deserialize(self, bytes, plugin=None):
-        if plugin:
-            self = self.withPlugin(plugin)
+    def deserialize(self, bytes):
         return deserialize(object, bytes, self)
 
     def representationFor(self, inst):
-        if self.plugin:
-            rep = self.plugin.representationFor(inst)
-            if rep is not None:
-                return rep
+        if isinstance(inst, numpy.ndarray):
+            result = inst.__reduce__()
+            #compress the numpy data
+            if self.numpyCompressionEnabled:
+                result = (result[0], result[1], result[2][:-1] + (lz4.frame.compress(result[2][-1]),))
+            return result
+
+        if isinstance(inst, numpy.dtype):
+            return (numpy.dtype, (str(inst),), None)
 
         if isinstance(inst, FunctionType):
-            print("Serializing ", inst)
             representation = {}
             representation["qualname"] = inst.__qualname__
             representation["name"] = inst.__name__
@@ -88,9 +94,14 @@ class SerializationContext(object):
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
-        if self.plugin:
-            if self.plugin.setInstanceStateFromRepresentation(instance, representation):
-                return True
+        if isinstance(instance, numpy.dtype):
+            return True
+
+        if isinstance(instance, _ndarray):
+            if self.numpyCompressionEnabled:
+                representation = representation[:-1] + (lz4.frame.decompress(representation[-1]),)
+            instance.__setstate__(representation)
+            return True
 
         if isinstance(instance, FunctionType):
             instance.__globals__.update(representation['freevars'])
@@ -101,20 +112,3 @@ class SerializationContext(object):
 
         return False
 
-
-class SerializationPlugin(object):
-    def representationFor(self, inst):
-        """Return an alternative representation for an object.
-
-        If no alternative representation is desired, return None.
-
-        Otherwise, return a tuple
-            (type, representation)
-        where 'type' will be used to construct a new empty object, which
-        will then be passed to 'setInstanceStateFromRepresentation' along with 'representation'.
-        """
-        return None
-
-    def setInstanceStateFromRepresentation(self, instance, representation):
-        """Fill out an instance from its representation. """
-        return False

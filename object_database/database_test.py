@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Alternative, TupleOf, OneOf, ConstDict
+from typed_python.SerializationContext import SerializationContext
 
 from object_database.schema import Indexed, Index, Schema
 from object_database.core_schema import core_schema
@@ -60,7 +61,6 @@ class BlockingCallback:
 
     def releaseCallback(self):
         self.is_released.put(True)
-
 
 expr = Alternative("Expr",
     Constant = {'value': int},
@@ -132,6 +132,58 @@ class ObjectDatabaseTests:
 
         with db.view():
             z = ThingWithDicts.lookupAll()
+
+    def test_serialization_contexts(self):
+        db = self.createNewDb()
+
+        class ArbitraryBaseClass:
+            def __init__(self, x):
+                self.x = x
+
+        class ArbitrarySubclass(ArbitraryBaseClass):
+            def __init__(self, x, y):
+                super().__init__(x)
+                self.y = y
+
+        db.setSerializationContext(SerializationContext({'ABC': ArbitraryBaseClass, 'SUB': ArbitrarySubclass}))
+
+        schema = Schema("test_schema")
+
+        @schema.define
+        class HoldsArbitrary:
+            holding = ArbitraryBaseClass
+
+        @schema.define
+        class HoldsObject:
+            holding = object
+
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            x = HoldsArbitrary(holding=ArbitraryBaseClass(10))
+            self.assertEqual(x.holding.x, 10)
+
+        with db.transaction():
+            self.assertEqual(x.holding.x, 10)
+            self.assertIsInstance(x.holding, ArbitraryBaseClass)
+            x.holding = ArbitrarySubclass(10,20)
+
+        with db.transaction():
+            self.assertEqual(x.holding.x, 10)
+            self.assertEqual(x.holding.y, 20)
+            self.assertIsInstance(x.holding, ArbitrarySubclass)
+
+        with self.assertRaises(Exception):
+            with db.transaction():
+                x.holding = "hi"
+
+        with db.transaction():
+            x = HoldsObject(holding="hi")
+            x.holding = 10
+
+        with db.transaction():
+            self.assertEqual(x.holding, 10)
+
 
     def test_disconnecting(self):
         db = self.createNewDb()

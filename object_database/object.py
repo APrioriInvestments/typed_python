@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.view import _cur_view
+from object_database.view import _cur_view, coerce_value
 
 from typed_python.hash import sha_hash
 
@@ -110,7 +110,7 @@ class DatabaseObject(_base):
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")
 
-        coerced_val = self.__types__[name](val)
+        coerced_val = coerce_value(val, self.__types__[name])
 
         _cur_view.view._set(self, self._identity, name, self.__types__[name], coerced_val)
 
