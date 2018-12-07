@@ -40,8 +40,8 @@ def findGitParent(p_root):
 
 def main(argv):
     with tempfile.TemporaryDirectory() as tf:
-        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(tf.name)
-        return main(argv)
+        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(tf)
+        return _main(argv)
 
 def _main(argv):
     configureLogging()
@@ -155,7 +155,7 @@ def _main(argv):
                 codebase = service_schema.Codebase.create(paths)
 
                 #make sure the codebase is importable, etc
-                module = service_schema.Codebase.instantiateFromLocalSource(paths, modulename)
+                module = codebase.instantiate(modulename)
 
                 if module is None:
                     print("Can't find", module, "in the codebase")
