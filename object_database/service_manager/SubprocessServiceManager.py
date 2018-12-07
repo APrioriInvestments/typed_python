@@ -76,8 +76,8 @@ class SubprocessServiceManager(ServiceManager):
         def dbConnectionFactory():
             return connect(host, port)
 
-        super(SubprocessServiceManager, self).__init__(
-            dbConnectionFactory, sourceDir, isMaster, ownHostname,
+        ServiceManager.__init__(
+            self, dbConnectionFactory, sourceDir, isMaster, ownHostname,
             maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout
         )
         self.serviceProcesses = {}
