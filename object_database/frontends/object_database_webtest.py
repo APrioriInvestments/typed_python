@@ -15,27 +15,39 @@
 #   limitations under the License.
 
 
-import unittest
-import requests
+import argparse
 import os
 import subprocess
 import sys
-import time
-import asyncio
-import websockets
 import tempfile
-import argparse
+import time
 
-from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.service_manager.ServiceManager_test import UninitializableService, \
-                                                        HappyService, GraphDisplayService
-from object_database.web.ActiveWebService import active_webservice_schema, ActiveWebService
+from object_database.service_manager.ServiceManager_test import (
+    GraphDisplayService,
+    HappyService,
+    UninitializableService
+)
+from object_database.web.ActiveWebService import (
+    active_webservice_schema,
+    ActiveWebService
+)
+from object_database import (
+    connect,
+    core_schema,
+    current_transaction,
+    Index,
+    Indexed,
+    Schema,
+    service_schema,
+    TcpServer
+)
+from object_database.util import tokenFromString
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer,\
-                    connect, service_schema, current_transaction
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
+ownName = os.path.basename(os.path.abspath(__file__))
+
 
 def main(argv=None):
     if argv is not None:
@@ -48,6 +60,7 @@ def main(argv=None):
                     'localhost', 'localhost', '8020', '--run_db',
                     '--source', os.path.join(tf,'source'),
                     '--storage', os.path.join(tf,'storage'),
+                    '--service-token', tokenFromString(ownName),
                     #'--logdir', os.path.join(tf,'logs'),
                     '--shutdownTimeout', '.5'
                     ]

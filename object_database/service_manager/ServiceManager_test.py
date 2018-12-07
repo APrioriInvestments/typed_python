@@ -12,35 +12,40 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
+import logging
+import numpy
+import os
+import psutil
+import subprocess
+import sys
+import tempfile
+import textwrap
+import threading
+import time
 import unittest
 
 import object_database
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
-from object_database.web.cells import *
+from object_database.util import genToken
 
-from object_database import Schema, Indexed, Index, core_schema, TcpServer, connect, service_schema, current_transaction
-from typed_python import *
-import psutil
-import threading
-import textwrap
-import time
-import numpy
-import tempfile
-import logging
-import subprocess
-import os
-import sys
+from object_database import (
+    Schema, Indexed, core_schema,
+    connect, service_schema, current_transaction
+)
+
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
+ownName = os.path.basename(os.path.abspath(__file__))
 
 schema = Schema("core.ServiceManagerTest")
+
 
 @schema.define
 class TestServiceCounter:
     k = int
+
 
 @schema.define
 class PointsToShow:
@@ -75,6 +80,7 @@ class TestServiceLastTimestamp:
     def aliveCount(window = None):
         return len(TestServiceLastTimestamp.aliveServices(window))
 
+
 class TestService(ServiceBase):
     def initialize(self):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
@@ -96,6 +102,7 @@ class TestService(ServiceBase):
 
                 self.conn.lastPing = time.time()
 
+
 class HangingService(ServiceBase):
     def initialize(self):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
@@ -106,6 +113,7 @@ class HangingService(ServiceBase):
 
     def doWork(self, shouldStop):
         time.sleep(120)
+
 
 class UninitializableService(ServiceBase):
     def initialize(self):
@@ -187,8 +195,6 @@ class GraphDisplayService(ServiceBase):
                 'mode':'markers', 'opacity': .5, 'marker': {'size':2}}}
 
 
-
-
 happy = Schema("core.test.happy")
 @happy.define
 class Happy:
@@ -197,6 +203,7 @@ class Happy:
     def display(self, queryParams=None):
         ensureSubscribedType(Happy)
         return "Happy %s. " % self.i + str(queryParams)
+
 
 class HappyService(ServiceBase):
     def initialize(self):
@@ -231,7 +238,9 @@ class HappyService(ServiceBase):
                 h = Happy()
             time.sleep(.5)
             with self.db.transaction():
+
                 h.delete()
+
 
 class StorageTest(ServiceBase):
     def initialize(self):
@@ -247,6 +256,7 @@ class StorageTest(ServiceBase):
     def doWork(self, shouldStop):
         shouldStop.wait()
 
+
 class CrashingService(ServiceBase):
     def initialize(self):
         assert False
@@ -254,6 +264,7 @@ class CrashingService(ServiceBase):
     def doWork(self, shouldStop):
         time.sleep(.5)
         assert False
+
 
 def getTestServiceModule(version):
     return {
@@ -299,6 +310,7 @@ def getTestServiceModule(version):
 
 VERBOSE = True
 
+
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
         self.tempDirObj = tempfile.TemporaryDirectory()
@@ -320,6 +332,7 @@ class ServiceManagerTest(unittest.TestCase):
                     "--run_db",
                     '--source',os.path.join(self.tempDirectoryName,'source'),
                     '--storage',os.path.join(self.tempDirectoryName,'storage'),
+                    '--service-token', genToken(),
                     '--shutdownTimeout', '1.0',
                     '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert')
 
