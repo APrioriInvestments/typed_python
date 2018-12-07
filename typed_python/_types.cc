@@ -3826,8 +3826,9 @@ public:
             }
 
             if (!PyType_Check(res)) {
+                std::string msg = "objectFromName returned a non-type for name " + name + ". it has type " + res->ob_type->tp_name;
                 Py_DECREF(res);
-                throw std::runtime_error("objectFromName returned a non-type.");
+                throw std::runtime_error(msg);
             }
 
             Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res, true);

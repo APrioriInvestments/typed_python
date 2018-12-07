@@ -19,6 +19,7 @@ from object_database.view import View, Transaction, _cur_view, SerializedDatabas
 from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
 from typed_python.hash import sha_hash
+from typed_python.Codebase import Codebase as TypedPythonCodebase
 from typed_python import *
 
 import queue
@@ -470,6 +471,13 @@ class DatabaseConnection:
     def setSerializationContext(self, context):
         self.serializationContext = context
         return self
+
+    def serializeFromModule(self, module):
+        """Give the project root we want to serialize from."""
+        self.setSerializationContext(
+            TypedPythonCodebase.FromRootlevelModule(module).serializationContext
+            )
+
 
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()

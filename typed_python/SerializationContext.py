@@ -41,9 +41,9 @@ class SerializationContext(object):
         self.nameToObject = nameToObject or {}
         self.objToName = {}
 
-        #take the shortest name for each object in case of ambiguity
+        #take the lexically lowest name, so that we're not dependent on ordering.
         for k,v in self.nameToObject.items():
-            if id(v) not in self.objToName or len(k) < len(self.objToName[id(v)]):
+            if id(v) not in self.objToName or k < self.objToName[id(v)]:
                 self.objToName[id(v)] = k
 
         self.numpyCompressionEnabled = True
