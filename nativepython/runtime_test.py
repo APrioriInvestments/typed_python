@@ -74,20 +74,14 @@ class TestRuntime(unittest.TestCase):
         failures = 0
 
         for f in [add,sub,mul,div,mod,lshift,rshift,
-                    #pow, -- doesn't work yet
-                    bitxor,bitand,bitor,less,greater,lessEq,greaterEq,eq,neq]:
-            if f in [mod]:
-                lvals = [0,1,10,100]
-                rvals = [1,2,10,100]
-            elif f in [div]:
-                lvals = [-100, -10, -1, 0,1,10,100]
-                rvals = [1,2,10,100, -1, -2, -10]
-            elif f in [lshift,rshift]:
-                lvals = [0,1,10]
-                rvals = [1,2,10]
+                    pow,bitxor,bitand,bitor,less,
+                    greater,lessEq,greaterEq,eq,neq]:
+            if f in [pow]:
+                lvals = range(-5,5)
+                rvals = range(5)
             else:
-                lvals = [-1,0,1,10,100]
-                rvals = [-1,0,1,10,100]
+                lvals = list(range(-20,20))
+                rvals = lvals
 
             f_fast = r.compile(f)
 
@@ -98,7 +92,10 @@ class TestRuntime(unittest.TestCase):
                     except:
                         pyVal = "Exception"
 
-                    llvmVal = f_fast(val1,val2)
+                    try:
+                        llvmVal = f_fast(val1,val2)
+                    except:
+                        llvmVal = "Exception"
 
                     if type(pyVal) is not type(llvmVal) or pyVal != llvmVal:
                         print("FAILURE", f, val1, val2, pyVal, llvmVal)
@@ -202,3 +199,25 @@ class TestRuntime(unittest.TestCase):
         self.assertTrue(t_py / t_fast > 50.0)
 
         print(t_py / t_fast, " speedup")
+
+    def test_tuple_indexing(self):
+        @TypedFunction
+        def f(x: TupleOf(int), y:int) -> int:
+            return x[y]
+
+        Runtime.singleton().compile(f)
+
+        self.assertEqual(f((1,2,3),1), 2)
+
+        with self.assertRaises(Exception):
+            f((1,2,3),1000000000)
+
+    def test_bad_mod_generates_exception(self):
+        @TypedFunction
+        def f(x: int, y:int) -> int:
+            return x % y
+
+        Runtime.singleton().compile(f)
+
+        with self.assertRaises(Exception):
+            f(0,0)

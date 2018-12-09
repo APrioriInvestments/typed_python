@@ -113,7 +113,7 @@ UnaryOp = Alternative(
 BinaryOp = Alternative("BinaryOp",
     Add={}, Sub={}, Mul={}, Div={}, Eq={},
     NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
-    Mod={}, Pow={}, LShift={}, RShift={},
+    Mod={}, LShift={}, RShift={},
     BitOr={}, BitAnd={}, BitXor={},
     __str__ = lambda o:
         "+" if o.matches.Add else
@@ -328,7 +328,6 @@ Expression = Alternative("Expression",
     #clause
     Finally = {'expr': Expression, 'teardowns': TupleOf(Teardown)},
     Sequence = {'vals': TupleOf(Expression)},
-
     ActivatesTeardown = {'name': str},
     StackSlot = {'name': str, 'type': Type},
     ElementPtrIntegers = lambda self, *offsets:
@@ -355,6 +354,11 @@ nullExpr = Expression.Constant(val=Constant.Void())
 emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
 trueExpr = Expression.Constant(val=Constant.Int(bits=1,val=1,signed=False))
 falseExpr = Expression.Constant(val=Constant.Int(bits=1,val=0,signed=False))
+
+def const_float_expr(f):
+    return Expression.Constant(
+        val=Constant.Float(bits=64,val=f)
+        )
 
 def const_int_expr(i):
     return Expression.Constant(

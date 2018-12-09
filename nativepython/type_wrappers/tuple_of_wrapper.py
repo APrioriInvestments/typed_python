@@ -14,6 +14,7 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.typed_expression import TypedExpression
+from nativepython.type_wrappers.exceptions import generateThrowException
 from typed_python import NoneType, Int64
 
 import nativepython.native_ast as native_ast
@@ -49,9 +50,13 @@ class TupleOfWrapper(Wrapper):
         expr = expr.ensureNonReference()
 
         return TypedExpression(
-            expr.expr.ElementPtrIntegers(0,3).cast(
-                self.underlyingWrapperType.getNativeLayoutType().pointer()
-                ).elemPtr(item.toInt64(context).ensureNonReference().expr).load(),
+            native_ast.Expression.Branch(
+                cond=((item >= 0) & (item < self.convert_len(context, expr))).ensureNonReference().expr,
+                true=expr.expr.ElementPtrIntegers(0,3).cast(
+                    self.underlyingWrapperType.getNativeLayoutType().pointer()
+                    ).elemPtr(item.toInt64(context).ensureNonReference().expr).load(),
+                false=generateThrowException(context, IndexError("tuple index out of range"))
+                ),
             self.underlyingWrapperType,
             False
             )
@@ -106,7 +111,7 @@ class TupleOfWrapper(Wrapper):
             native_ast.Expression.Branch(
                 cond=expr.expr,
                 false=native_ast.const_int_expr(0),
-                true=expr.expr.load().ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
+                true=expr.ensureNonReference().expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
                 ),
             nativepython.python_object_representation.typedPythonTypeToTypeWrapper(Int64()),
             False

@@ -1686,16 +1686,20 @@ struct native_instance_wrapper {
                 );
         }
 
-        Instance result = Instance::createAndInitialize(returnType, [&](instance_ptr returnData) {
-            std::vector<instance_ptr> args;
-            for (auto& i: instances) {
-                args.push_back(i.data());
-            }
+        try {
+            Instance result = Instance::createAndInitialize(returnType, [&](instance_ptr returnData) {
+                std::vector<instance_ptr> args;
+                for (auto& i: instances) {
+                    args.push_back(i.data());
+                }
 
-            overload.getEntrypoint()(returnData, &args[0]);
-        });
-
-        return extractPythonObject(result.data(), result.type());
+                overload.getEntrypoint()(returnData, &args[0]);
+            });
+            return extractPythonObject(result.data(), result.type());
+        } catch(...) {
+            PyErr_Format(PyExc_TypeError, "Generated code threw an exception!");
+            return NULL;
+        }
     }
 
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {

@@ -14,10 +14,11 @@
 
 import typed_python.python_ast as python_ast
 
+import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.conversion_exception import ConversionException
 from nativepython.typed_expression import TypedExpression
-
+from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
 
 from typed_python import *
@@ -28,7 +29,6 @@ pyOpToNative = {
     python_ast.BinaryOp.Mult(): native_ast.BinaryOp.Mul(),
     python_ast.BinaryOp.Div(): native_ast.BinaryOp.Div(),
     python_ast.BinaryOp.Mod(): native_ast.BinaryOp.Mod(),
-    python_ast.BinaryOp.Pow(): native_ast.BinaryOp.Pow(),
     python_ast.BinaryOp.LShift(): native_ast.BinaryOp.LShift(),
     python_ast.BinaryOp.RShift(): native_ast.BinaryOp.RShift(),
     python_ast.BinaryOp.BitOr(): native_ast.BinaryOp.BitOr(),
@@ -81,25 +81,84 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             False
             )
 
+    def sugar_comparison(self, left, right, which):
+        if isinstance(right, int):
+            return TypedExpression(
+                native_ast.Expression.Binop(
+                    l=left.ensureNonReference().expr,
+                    r=native_ast.const_int_expr(right),
+                    op=getattr(native_ast.BinaryOp, which)()
+                    ),
+                BoolWrapper(),
+                False
+                )
+        elif isinstance(right, TypedExpression) and isinstance(right.expr_type, Int64Wrapper):
+            return TypedExpression(
+                native_ast.Expression.Binop(
+                    l=left.ensureNonReference().expr,
+                    r=right.ensureNonReference().expr,
+                    op=getattr(native_ast.BinaryOp, which)()
+                    ),
+                BoolWrapper(),
+                False
+                )
+
+        raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
+
     def toInt64(self, context, e):
         return e
 
     def convert_bin_op(self, context, left, op, right):
+        left = left.ensureNonReference()
+        right = right.ensureNonReference()
+
         if op.matches.Div:
             if right.expr_type == self:
                 return left.toFloat64(context).convert_bin_op(context, op, right)
 
-        if op.matches.Pow:
-            if right.expr_type == self:
-                return left.toFloat64(context).convert_bin_op(context, op, right).toInt64(context)
-
-
         if right.expr_type == left.expr_type:
+            if op.matches.Mod:
+                return TypedExpression(
+                    native_ast.Expression.Branch(
+                        cond=right.expr,
+                        true=native_ast.Expression.Call(
+                            target=runtime_functions.nativepython_runtime_mod_int64_int64,
+                            args=(left.expr, right.expr,)
+                            ),
+                        false=generateThrowException(context, ZeroDivisionError())
+                        ),
+                    self,
+                    False
+                    )
+            if op.matches.Pow:
+                return TypedExpression(
+                    native_ast.Expression.Call(
+                        target=runtime_functions.nativepython_runtime_pow_int64_int64,
+                        args=(left.expr, right.expr,)
+                        ),
+                    self,
+                    False
+                    )
+            if op.matches.LShift or op.matches.RShift:
+                return TypedExpression(
+                    native_ast.Expression.Branch(
+                        cond=(right >= 0).ensureNonReference().expr,
+                        true=native_ast.Expression.Binop(
+                            l=left.expr,
+                            r=right.expr,
+                            op=pyOpToNative[op]
+                            ),
+                        false=generateThrowException(context, ValueError("negative shift count"))
+                        ),
+                    self,
+                    False
+                    )
+
             if op in pyOpToNative:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.ensureNonReference().expr,
-                        r=right.ensureNonReference().expr,
+                        l=left.expr,
+                        r=right.expr,
                         op=pyOpToNative[op]
                         ),
                     self,
@@ -108,8 +167,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op in pyCompOp:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.ensureNonReference().expr,
-                        r=right.ensureNonReference().expr,
+                        l=left.expr,
+                        r=right.expr,
                         op=pyCompOp[op]
                         ),
                     BoolWrapper(),
@@ -127,6 +186,23 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=1,signed=False)
+
+    def sugar_operator(self, left, right, opname):
+        if isinstance(right, TypedExpression) and isinstance(right.expr_type, BoolWrapper):
+            return TypedExpression(
+                native_ast.Expression.Binop(
+                    l=left.ensureNonReference().expr,
+                    r=right.ensureNonReference().expr,
+                    op=getattr(native_ast.BinaryOp, opname)()
+                    ),
+                BoolWrapper(),
+                False
+                )
+
+        raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
+
+
+
 
     def toFloat64(self, context, e):
         return TypedExpression(
@@ -164,6 +240,33 @@ class Float64Wrapper(ArithmeticTypeWrapper):
     def toFloat64(self, context, e):
         return e
 
+    def toBool(self, context, e):
+        return e != 0.0
+
+    def sugar_comparison(self, left, right, which):
+        if isinstance(right, float):
+            return TypedExpression(
+                native_ast.Expression.Binop(
+                    l=left.ensureNonReference().expr,
+                    r=native_ast.const_float_expr(right),
+                    op=getattr(native_ast.BinaryOp, which)()
+                    ),
+                BoolWrapper(),
+                False
+                )
+        elif isinstance(right, TypedExpression) and isinstance(right.expr_type, Float64Wrapper):
+            return TypedExpression(
+                native_ast.Expression.Binop(
+                    l=left.ensureNonReference().expr,
+                    r=right.ensureNonReference().expr,
+                    op=getattr(native_ast.BinaryOp, which)()
+                    ),
+                BoolWrapper(),
+                False
+                )
+
+        raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
+
     def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
@@ -179,6 +282,21 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             right = right.toFloat64(context)
 
         if right.expr_type == left.expr_type:
+            if op.matches.Mod or op.matches.Div:
+                return TypedExpression(
+                    native_ast.Expression.Branch(
+                        cond=right.toBool(context).ensureNonReference().expr,
+                        true=native_ast.Expression.Binop(
+                            l=left.ensureNonReference().expr,
+                            r=right.ensureNonReference().expr,
+                            op=pyOpToNative[op]
+                            ),
+                        false=generateThrowException(context, ZeroDivisionError())
+                        ),
+                    self,
+                    False
+                    )
+
             if op in pyOpToNative:
                 return TypedExpression(
                     native_ast.Expression.Binop(

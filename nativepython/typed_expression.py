@@ -83,5 +83,23 @@ class TypedExpression(object):
     def Void(expr=None):
         return TypedExpression(expr if expr is not None else native_ast.nullExpr, NoneWrapper(), False)
 
-    def __add__(self, other):
+    def __rshift__(self, other):
         return TypedExpression(self.expr + other.expr, other.expr_type, other.isReference)
+
+    def __or__(self, other):
+        return self.expr_type.sugar_operator(self, other, "BitOr")
+    def __and__(self, other):
+        return self.expr_type.sugar_operator(self, other, "BitAnd")
+        
+    def __lt__(self, other):
+        return self.expr_type.sugar_comparison(self, other, "Lt")
+    def __le__(self, other):
+        return self.expr_type.sugar_comparison(self, other, "LtE")
+    def __gt__(self, other):
+        return self.expr_type.sugar_comparison(self, other, "Gt")
+    def __ge__(self, other):
+        return self.expr_type.sugar_comparison(self, other, "GtE")
+    def __eq__(self, other):
+        return self.expr_type.sugar_comparison(self, other, "Eq")
+    def __ne__(self, other):
+        return self.expr_type.sugar_comparison(self, other, "NotEq")

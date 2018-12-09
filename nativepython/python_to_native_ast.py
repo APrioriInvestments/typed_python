@@ -735,7 +735,7 @@ class ConversionContext(object):
                         self,
                         slot_ref,
                         val_to_store
-                        ) + TypedExpression.Void(native_ast.Expression.ActivatesTeardown(name=varname))
+                        ) >> TypedExpression.Void(native_ast.Expression.ActivatesTeardown(name=varname))
                 else:
                     #this is an existing variable.
                     slot_ref = self.named_var_expr(varname)

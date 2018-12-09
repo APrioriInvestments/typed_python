@@ -84,7 +84,7 @@ def constant_to_typed_llvm_value(module, builder, c):
             )
 
     if c.matches.NullPointer:
-        nt = native_ast.Type.Pointer(c.value_type)
+        nt = native_ast.Type.Pointer(value_type=c.value_type)
         t = type_to_llvm_type(nt)
         llvm_c = llvmlite.ir.Constant(t, None)
         return TypedLLVMValue(llvm_c, nt)
