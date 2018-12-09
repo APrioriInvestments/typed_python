@@ -2492,6 +2492,7 @@ private:
 
     static layout* noneLayout() {
         static layout* noneLayout = allocateNoneLayout();
+        noneLayout->refcount++;
 
         return noneLayout;
     }
@@ -2515,21 +2516,7 @@ public:
 
     template<class initializer_type>
     static Instance createAndInitialize(Type* t, const initializer_type& initFun) {
-        t->assertForwardsResolved();
-
-        layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
-
-        try {
-            initFun(l->data);
-        } catch(...) {
-            free(l);
-            throw;
-        }
-
-        l->refcount = 1;
-        l->type = t;
-
-        return Instance(l);
+        return Instance(t, initFun);
     }
 
     Instance() {
@@ -2627,6 +2614,10 @@ public:
 
     instance_ptr data() const {
         return mLayout->data;
+    }
+
+    int64_t refcount() const {
+        return mLayout->refcount;
     }
 
 private:

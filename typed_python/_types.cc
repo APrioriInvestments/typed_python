@@ -897,13 +897,36 @@ struct native_instance_wrapper {
         return 0;
     }
 
-    static PyObject* nb_add(PyObject* lhs, PyObject* rhs) {
+    static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs) {
+        std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__rshift__");
+        if (res.first) {
+            return res.second;
+        }
+
+        PyErr_Format(
+            PyExc_TypeError,
+            "Unsupported operand type(s) for >>: %S and %S",
+            lhs->ob_type,
+            rhs->ob_type,
+            NULL
+            );
+
+        return NULL;
+    }
+
+    static std::pair<bool, PyObject*> checkForPyOperator(PyObject* lhs, PyObject* rhs, const char* op) {
         Type* lhs_type = extractTypeFrom(lhs->ob_type);
 
+        Alternative* alt = nullptr;
         if (lhs_type && lhs_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-            Alternative* base = ((ConcreteAlternative*)lhs_type)->getAlternative();
-            auto it = base->getMethods().find("__add__");
-            if (it != base->getMethods().end()) {
+            alt = ((ConcreteAlternative*)lhs_type)->getAlternative();
+        }
+        if (lhs_type && lhs_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
+            alt = ((Alternative*)lhs_type);
+        }
+        if (alt) {
+            auto it = alt->getMethods().find(op);
+            if (it != alt->getMethods().end()) {
                 Function* f = it->second;
 
                 PyObject* argTuple = PyTuple_Pack(2, lhs, rhs);
@@ -912,12 +935,21 @@ struct native_instance_wrapper {
                     std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, argTuple, nullptr);
                     if (res.first) {
                         Py_DECREF(argTuple);
-                        return res.second;
+                        return res;
                     }
 
                 Py_DECREF(argTuple);
                 }
             }
+        }
+
+        return std::pair<bool, PyObject*>(false, NULL);
+    }
+
+    static PyObject* nb_add(PyObject* lhs, PyObject* rhs) {
+        std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__add__");
+        if (res.first) {
+            return res.second;
         }
 
         PyErr_Format(
@@ -982,11 +1014,19 @@ struct native_instance_wrapper {
             }
         }
 
-        PyErr_SetString(
+        std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__sub__");
+        if (res.first) {
+            return res.second;
+        }
+
+        PyErr_Format(
             PyExc_TypeError,
-            (std::string("cannot subtract ") + rhs->ob_type->tp_name + " from "
-                    + lhs->ob_type->tp_name).c_str()
+            "Unsupported operand type(s) for -: %S and %S",
+            lhs->ob_type,
+            rhs->ob_type,
+            NULL
             );
+
         return NULL;
     }
 
@@ -1245,7 +1285,7 @@ struct native_instance_wrapper {
                 0, //inquiry nb_bool
                 0, //unaryfunc nb_invert
                 0, //binaryfunc nb_lshift
-                0, //binaryfunc nb_rshift
+                nb_rshift, //binaryfunc nb_rshift
                 0, //binaryfunc nb_and
                 0, //binaryfunc nb_xor
                 0, //binaryfunc nb_or
@@ -1631,12 +1671,11 @@ struct native_instance_wrapper {
         //force ourselves to convert to the native type
         if (f.getReturnType()) {
             try {
-                return std::make_pair(
-                    true,
-                    native_instance_wrapper::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
+                PyObject* newRes = native_instance_wrapper::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
                         copy_constructor(f.getReturnType(), data, result);
-                    }));
-
+                    });
+                Py_DECREF(result);
+                return std::make_pair(true, newRes);
             } catch (std::exception& e) {
                 Py_DECREF(result);
                 PyErr_SetString(PyExc_TypeError, e.what());
@@ -1651,8 +1690,7 @@ struct native_instance_wrapper {
         Type* returnType = overload.getReturnType();
 
         if (!returnType) {
-            PyErr_Format(PyExc_TypeError, "Can't call %S natively because it doesn't have a return type and we cant handle PyObject* yet", overload.getFunctionObj());
-            return NULL;
+            returnType = PythonObjectOfType::Make(getObjectAsTypeObject());
         }
 
         if (PyTuple_Size(argTuple) != overload.getArgs().size()) {
@@ -1674,14 +1712,15 @@ struct native_instance_wrapper {
                 PyErr_Format(PyExc_TypeError, "Can't call %S natively because we don't support *args and **kwargs yet", overload.getFunctionObj());
                 return NULL;
             }
-            if (!arg.getTypeFilter()) {
-                PyErr_Format(PyExc_TypeError, "Can't call %S natively not all arguments have types and we don't handle PyObject* yet", overload.getFunctionObj());
-                return NULL;
+            
+            Type* toUse = arg.getTypeFilter();
+            if (!toUse) {
+                toUse = PythonObjectOfType::Make(getObjectAsTypeObject());
             }
 
             instances.push_back(
-                Instance::createAndInitialize(arg.getTypeFilter(), [&](instance_ptr p) {
-                    copy_constructor(arg.getTypeFilter(), p, PyTuple_GetItem(argTuple, k));
+                Instance::createAndInitialize(toUse, [&](instance_ptr p) {
+                    copy_constructor(toUse, p, PyTuple_GetItem(argTuple, k));
                 })
                 );
         }
@@ -1695,6 +1734,7 @@ struct native_instance_wrapper {
 
                 overload.getEntrypoint()(returnData, &args[0]);
             });
+
             return extractPythonObject(result.data(), result.type());
         } catch(...) {
             PyErr_Format(PyExc_TypeError, "Generated code threw an exception!");
@@ -2493,6 +2533,12 @@ struct native_instance_wrapper {
         }
     }
 
+    static PyTypeObject* getObjectAsTypeObject() {
+        static PyObject* module = PyImport_ImportModule("typed_python.internals");
+        static PyObject* t = PyObject_GetAttrString(module, "object");
+        return (PyTypeObject*)t;
+    }
+
     static PyObject* createOverloadPyRepresentation(Function* f) {
         static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
 
@@ -2954,6 +3000,35 @@ PyObject *MakeNoneTypeType(PyObject* nullValue, PyObject* args) {
     PyObject* res = (PyObject*)native_instance_wrapper::typeObj(::None::Make());
     Py_INCREF(res);
     return res;
+}
+
+PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "TypeFor takes 1 positional argument");
+        return NULL;
+    }
+
+    PyObject* arg = PyTuple_GetItem(args,0);
+
+    if (arg == Py_None) {
+        return incref((PyObject*)native_instance_wrapper::typeObj(::None::Make()));
+    }
+
+    if (!PyType_Check(arg)) {
+        PyErr_Format(PyExc_TypeError, "TypeFor expects a python primitive or an existing native value, not %S", arg);
+        return NULL;
+    }
+
+    Type* type = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
+
+    if (type) {
+        PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(type);
+        Py_INCREF(typeObj);
+        return typeObj;
+    }
+
+    PyErr_Format(PyExc_TypeError, "Couldn't convert %S to a Type", arg);
+    return NULL;
 }
 
 PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
@@ -4300,6 +4375,7 @@ static PyMethodDef module_methods[] = {
     {"Value", (PyCFunction)MakeValueType, METH_VARARGS, NULL},
     {"Class", (PyCFunction)MakeClassType, METH_VARARGS, NULL},
     {"Function", (PyCFunction)MakeFunctionType, METH_VARARGS, NULL},
+    {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},

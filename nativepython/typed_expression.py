@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import nativepython.native_ast as native_ast
+import nativepython
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
@@ -22,10 +23,14 @@ class TypedExpression(object):
         """Initialize a TypedExpression
 
         expr - a native_ast containing an expression
-        t - a subclass of Wrapper
+        t - a subclass of Wrapper, or a type that we'll convert to a wrapper, or None (meaning
+            control doesn't return)
         isReference - is this a pointer to a memory location, or the actual value?
         """
         super().__init__()
+        if isinstance(t, type) or hasattr(t, "__typed_python_category__"):
+            t = nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
         assert isinstance(t, Wrapper) or t is None, t
         assert isinstance(expr, native_ast.Expression), expr
 
@@ -64,6 +69,11 @@ class TypedExpression(object):
     def convert_call(self, context, args):
         return self.expr_type.convert_call(context, self, args)
 
+    @property
+    def nonref_expr(self):
+        """Get our expression (deferenced if necessary) so that it definitely represents the real object, not its location"""
+        return self.expr_type.ensureNonReference(self).expr
+
     def ensureNonReference(self):
         return self.expr_type.ensureNonReference(self)
 
@@ -76,21 +86,24 @@ class TypedExpression(object):
     def toBool(self, context):
         return self.expr_type.toBool(context, self)
 
+    def convert_incref(self, context):
+        return self.expr_type.convert_incref(context, self)
+
     def __str__(self):
-        return "Expression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
+        return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
 
     @staticmethod
-    def Void(expr=None):
+    def NoneExpr(expr=None):
         return TypedExpression(expr if expr is not None else native_ast.nullExpr, NoneWrapper(), False)
 
     def __rshift__(self, other):
-        return TypedExpression(self.expr + other.expr, other.expr_type, other.isReference)
+        return TypedExpression(self.expr >> other.expr, other.expr_type, other.isReference)
 
     def __or__(self, other):
         return self.expr_type.sugar_operator(self, other, "BitOr")
     def __and__(self, other):
         return self.expr_type.sugar_operator(self, other, "BitAnd")
-        
+
     def __lt__(self, other):
         return self.expr_type.sugar_comparison(self, other, "Lt")
     def __le__(self, other):

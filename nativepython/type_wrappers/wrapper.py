@@ -44,7 +44,7 @@ class Wrapper(object):
     def ensureNonReference(self, e):
         if e.isReference:
             if self.is_empty:
-                return nativepython.typed_expression.TypedExpression.Void(e.expr + native_ast.nullExpr)
+                return nativepython.typed_expression.TypedExpression.NoneExpr(e.expr + native_ast.nullExpr)
             return nativepython.typed_expression.TypedExpression(e.expr.load(), e.expr_type, False)
         return e
 
@@ -54,8 +54,10 @@ class Wrapper(object):
         else:
             return self.getNativeLayoutType()
 
-    def convert_destroy(self, context, target):
-        raise NotImplementedError()
+    def convert_incref(self, context, expr):
+        if self.is_pod:
+            return expr
+        raise NotImplementedError(self)
 
     def convert_assign(self, context, target, toStore):
         raise NotImplementedError()

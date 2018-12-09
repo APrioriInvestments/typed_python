@@ -17,6 +17,7 @@ import typed_python.ast_util as ast_util
 
 import nativepython
 import nativepython.native_ast as native_ast
+from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
@@ -210,7 +211,7 @@ class ExceptionHandlingHelper:
         else:
             bind_expr = self.context.consume_temporaries(self.generate_exception_teardown())
 
-        handler_expr = TypedExpression.Void(
+        handler_expr = TypedExpression.NoneExpr(
             native_ast.Expression.Finally(
                 expr=self.context.convert_statement_list_ast(body).expr,
                 teardowns=[
@@ -559,7 +560,7 @@ class ConversionContext(object):
         if ast.matches.Tuple:
             elts = [self.convert_expression_ast(e) for e in ast.elts]
 
-            struct_type = Struct([("f%s"%i,e.expr_type.variable_storage_type_wrapper) for i,e in enumerate(elts)])
+            struct_type = Struct([("f%s"%i,e.expr_type) for i,e in enumerate(elts)])
 
             tmp_ref = self.allocate_temporary(struct_type)
 
@@ -699,7 +700,7 @@ class ConversionContext(object):
 
             self._init_fields.mark_field_initialized(field, expr)
 
-            return TypedExpression.Void(native_ast.nullExpr)
+            return TypedExpression.NoneExpr(native_ast.nullExpr)
 
         if ast.matches.Assign or ast.matches.AugAssign:
             if self._init_fields is not None:
@@ -724,7 +725,7 @@ class ConversionContext(object):
                 if self._varname_to_type[varname] is None:
                     self._new_variables.add(varname)
 
-                    new_variable_type = val_to_store.expr_type.variable_storage_type_wrapper
+                    new_variable_type = val_to_store.expr_type
 
                     self._varname_to_type[varname] = new_variable_type
 
@@ -735,7 +736,7 @@ class ConversionContext(object):
                         self,
                         slot_ref,
                         val_to_store
-                        ) >> TypedExpression.Void(native_ast.Expression.ActivatesTeardown(name=varname))
+                        ) >> TypedExpression.NoneExpr(native_ast.Expression.ActivatesTeardown(name=varname))
                 else:
                     #this is an existing variable.
                     slot_ref = self.named_var_expr(varname)
@@ -780,7 +781,7 @@ class ConversionContext(object):
                 if self._varname_to_type[FunctionOutput] != e.expr_type:
                     raise ConversionException(
                         "Function returning multiple types:\n\t%s\n\t%s" % (
-                                e.expr_type.variable_storage_type_wrapper,
+                                e.expr_type,
                                 self._varname_to_type[FunctionOutput]
                                 )
                         )
@@ -789,9 +790,7 @@ class ConversionContext(object):
 
             output_type = self._varname_to_type[FunctionOutput]
 
-            assert output_type.is_pod, "for non pod, we should be copying this object"
-
-            return TypedExpression(native_ast.Expression.Return(arg=e.ensureNonReference().expr), None, False)
+            return e.convert_incref(self) >> TypedExpression(native_ast.Expression.Return(arg=e.nonref_expr), None, False)
 
         if ast.matches.Expr:
             return TypedExpression(
@@ -961,14 +960,16 @@ class ConversionContext(object):
             if toplevel:
                 return TypedExpression(native_ast.Expression.Return(None), None)
 
-            return TypedExpression.Void(native_ast.nullExpr)
+            return TypedExpression.NoneExpr(native_ast.nullExpr)
 
         exprs = []
         for s in statements:
             conversion = self.convert_statement_ast_and_teardown_tmps(s)
             exprs.append(conversion)
+
             if conversion.expr_type is None:
                 break
+
 
         if exprs[-1].expr_type is not None:
             flows_off_end = True
@@ -976,10 +977,9 @@ class ConversionContext(object):
             flows_off_end = False
 
         if toplevel and flows_off_end:
-            if self._varname_to_type[FunctionOutput] in (Void, None):
-                if self._varname_to_type[FunctionOutput] is None:
-                    self._varname_to_type[FunctionOutput] = Void
-
+            if self._varname_to_type[FunctionOutput] is None:
+                self._varname_to_type[FunctionOutput] = NoneWrapper()
+            if isinstance(self._varname_to_type[FunctionOutput], NoneWrapper):
                 exprs = exprs + [TypedExpression(native_ast.Expression.Return(None), None)]
                 flows_off_end = False
             else:
@@ -1369,30 +1369,25 @@ class Converter(object):
 
         underlyingDefinition = self._definitions[callTarget.name]
 
-        if underlyingDefinition.args and underlyingDefinition.args[0][0] == '.return':
-            assert False, 'not handled yet.'
-        else:
-            args = []
-            for i in range(len(underlyingDefinition.args)):
-                argname, argtype = underlyingDefinition.args[i]
+        args = []
+        for i in range(len(underlyingDefinition.args)):
+            argname, argtype = underlyingDefinition.args[i]
 
-                untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
+            untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
 
-                if callTarget.input_types[i].is_pass_by_ref:
-                    #we've been handed a pointer, and it's already a pointer
-                    args.append(untypedPtr.cast(argtype))
-                else:
-                    args.append(untypedPtr.cast(argtype.pointer()).load())
+            if callTarget.input_types[i].is_pass_by_ref:
+                #we've been handed a pointer, and it's already a pointer
+                args.append(untypedPtr.cast(argtype))
+            else:
+                args.append(untypedPtr.cast(argtype.pointer()).load())
 
-            body = native_ast.Expression.Call(
-                target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
-                args=args
-                )
+        body = native_ast.Expression.Call(
+            target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
+            args=args
+            )
 
-            if not underlyingDefinition.output_type.matches.Void:
-                assert callTarget.output_type.is_pod
-
-                body = native_ast.var('return').cast(underlyingDefinition.output_type.pointer()).store(body)
+        if not underlyingDefinition.output_type.matches.Void:
+            body = native_ast.var('return').cast(underlyingDefinition.output_type.pointer()).store(body)
 
         body = native_ast.FunctionBody.Internal(body=body)
 
@@ -1445,13 +1440,6 @@ class Converter(object):
         new_name = self.new_name(name_override or f.__name__)
 
         self._names_for_identifier[identifier] = new_name
-
-        if not output_type.is_pod:
-            definition = native_ast.Function(
-                args=(('.return', output_type.pointer.getNativeLayoutType()),) + definition.args,
-                body=definition.body,
-                output_type=native_ast.Type.Void()
-                )
 
         self._targets[new_name] = TypedCallTarget(
             native_ast.NamedCallTarget(

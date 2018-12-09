@@ -167,7 +167,7 @@ Teardown = Alternative("Teardown",
     __str__ = teardown_str
     )
 
-def expr_add(self, other):
+def expr_concatenate(self, other):
     if self.matches.Constant:
         return other
 
@@ -176,7 +176,7 @@ def expr_add(self, other):
     if self.matches.Sequence:
         return Expression.Sequence(vals=self.vals + (other,))
     if other.matches.Sequence:
-        return Expression.Sequence(vals=(self,) + other.vals)
+        return Expression.Sequence(vals=TupleOf(Expression)((self,)) + other.vals)
     return Expression.Sequence(vals=(self,other))
 
 
@@ -341,7 +341,7 @@ Expression = Alternative("Expression",
                 )
             )
         ,
-    __add__ = expr_add,
+    __rshift__ = expr_concatenate,
     __str__ = expr_str,
     load = lambda self: Expression.Load(ptr=self),
     store = lambda self, val: Expression.Store(ptr=self, val=val),

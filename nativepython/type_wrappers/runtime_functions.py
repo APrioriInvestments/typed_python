@@ -15,6 +15,7 @@
 import nativepython.native_ast as native_ast
 
 Int64 = native_ast.Int64
+Void = native_ast.Void
 
 def externalCallTarget(name, output, *inputs):
     return native_ast.CallTarget.Named(
@@ -29,13 +30,28 @@ def externalCallTarget(name, output, *inputs):
             )
         )
 
-nativepython_runtime_mod_int64_int64 = externalCallTarget(
+print_int64 = externalCallTarget(
+        "nativepython_print_integer", 
+        Void, 
+        Int64
+        )
+mod_int64_int64 = externalCallTarget(
         "nativepython_runtime_mod_int64_int64", 
         Int64, 
         Int64, Int64
         )
-nativepython_runtime_pow_int64_int64 = externalCallTarget(
+pow_int64_int64 = externalCallTarget(
         "nativepython_runtime_pow_int64_int64", 
         Int64, 
         Int64, Int64
+        )
+incref_pyobj = externalCallTarget(
+        "nativepython_runtime_incref_pyobj", 
+        Void, 
+        Void.pointer()
+        )
+decref_pyobj = externalCallTarget(
+        "nativepython_runtime_decref_pyobj", 
+        Void, 
+        Void.pointer()
         )

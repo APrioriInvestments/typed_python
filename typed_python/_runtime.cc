@@ -1,7 +1,20 @@
 #include <stdint.h>
 #include <cmath>
+#include <Python.h>
+#include <iostream>
 
 extern "C" {
+
+    void nativepython_print_integer(int64_t ct) {
+        std::cout << "nativepython_print_integer: " << ct << std::endl;
+    }
+
+    void nativepython_runtime_incref_pyobj(PyObject* p) {
+        Py_INCREF(p);
+    }
+    void nativepython_runtime_decref_pyobj(PyObject* p) {
+        Py_DECREF(p);
+    }
 
     int64_t nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
         return std::pow(l,r);

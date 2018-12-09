@@ -39,18 +39,15 @@ class Runtime:
         """Compile a single FunctionOverload and install the pointer"""
         if isinstance(f, FunctionOverload):
             for a in f.args:
-                assert a.typeFilter is not None, 'cant compile partially typed functions yet'
                 assert not a.isStarArg, 'dont support star args yet'
                 assert not a.isKwarg, 'dont support keyword yet'
 
-            assert f.returnType is not None, "cant compile partially typed functions yet"
+            output_wrapper = python_to_native_ast.typedPythonTypeToTypeWrapper(f.returnType or object)
+            input_wrappers = [python_to_native_ast.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
 
-            callTarget = self.converter.convert(f.functionObj, [a.typeFilter for a in f.args])
+            callTarget = self.converter.convert(f.functionObj, input_wrappers)
 
-            wrappingCallTargetName = self.converter.generateCallConverter(
-                callTarget,
-                python_to_native_ast.typedPythonTypeToTypeWrapper(f.returnType)
-                )
+            wrappingCallTargetName = self.converter.generateCallConverter(callTarget, output_wrapper)
 
             targets = self.converter.extract_new_function_definitions()
 
@@ -59,6 +56,7 @@ class Runtime:
             fp = function_pointers[wrappingCallTargetName]
 
             f._installNativePointer(fp.fp)
+
             return f
 
         if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':

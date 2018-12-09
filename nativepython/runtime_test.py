@@ -212,6 +212,27 @@ class TestRuntime(unittest.TestCase):
         with self.assertRaises(Exception):
             f((1,2,3),1000000000)
 
+    def test_tuple_refcounting(self):
+        @TypedFunction
+        def f(x: TupleOf(int), y: TupleOf(int)) -> TupleOf(int):
+            return x
+
+        for compileIt in [False, True]:
+            if compileIt:
+                Runtime.singleton().compile(f)
+
+            intTup = TupleOf(int)(list(range(1000)))
+
+            self.assertEqual(_types.refcount(intTup),1)
+
+            res = f(intTup, intTup)
+
+            self.assertEqual(_types.refcount(intTup),2)
+
+            res = None
+
+            self.assertEqual(_types.refcount(intTup),1)
+
     def test_bad_mod_generates_exception(self):
         @TypedFunction
         def f(x: int, y:int) -> int:

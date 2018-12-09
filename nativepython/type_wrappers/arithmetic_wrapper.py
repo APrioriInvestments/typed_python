@@ -46,23 +46,19 @@ pyCompOp = {
     }
 
 class ArithmeticTypeWrapper(Wrapper):
-    @property
-    def variable_storage_type_wrapper(self):
-        return self
-
     is_pod = True
     is_pass_by_ref = False
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
-        return TypedExpression.Void(target.expr.store(toStore.ensureNonReference().expr))
+        return TypedExpression.NoneExpr(target.expr.store(toStore.nonref_expr))
 
     def convert_initialize_copy(self, context, target, toStore):
         assert target.isReference
-        return TypedExpression.Void(target.expr.store(toStore.ensureNonReference().expr))
+        return TypedExpression.NoneExpr(target.expr.store(toStore.nonref_expr))
 
     def convert_destroy(self, context, instance):
-        return TypedExpression.Void()
+        return TypedExpression.NoneExpr()
 
 class Int64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
@@ -74,7 +70,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
     def toFloat64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.ensureNonReference().expr,
+                left=e.nonref_expr,
                 to_type=native_ast.Type.Float(bits=64)
                 ),
             Float64Wrapper(),
@@ -85,7 +81,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
         if isinstance(right, int):
             return TypedExpression(
                 native_ast.Expression.Binop(
-                    l=left.ensureNonReference().expr,
+                    l=left.nonref_expr,
                     r=native_ast.const_int_expr(right),
                     op=getattr(native_ast.BinaryOp, which)()
                     ),
@@ -95,8 +91,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
         elif isinstance(right, TypedExpression) and isinstance(right.expr_type, Int64Wrapper):
             return TypedExpression(
                 native_ast.Expression.Binop(
-                    l=left.ensureNonReference().expr,
-                    r=right.ensureNonReference().expr,
+                    l=left.nonref_expr,
+                    r=right.nonref_expr,
                     op=getattr(native_ast.BinaryOp, which)()
                     ),
                 BoolWrapper(),
@@ -122,7 +118,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Branch(
                         cond=right.expr,
                         true=native_ast.Expression.Call(
-                            target=runtime_functions.nativepython_runtime_mod_int64_int64,
+                            target=runtime_functions.mod_int64_int64,
                             args=(left.expr, right.expr,)
                             ),
                         false=generateThrowException(context, ZeroDivisionError())
@@ -133,7 +129,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op.matches.Pow:
                 return TypedExpression(
                     native_ast.Expression.Call(
-                        target=runtime_functions.nativepython_runtime_pow_int64_int64,
+                        target=runtime_functions.pow_int64_int64,
                         args=(left.expr, right.expr,)
                         ),
                     self,
@@ -142,7 +138,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op.matches.LShift or op.matches.RShift:
                 return TypedExpression(
                     native_ast.Expression.Branch(
-                        cond=(right >= 0).ensureNonReference().expr,
+                        cond=(right >= 0).nonref_expr,
                         true=native_ast.Expression.Binop(
                             l=left.expr,
                             r=right.expr,
@@ -191,8 +187,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
         if isinstance(right, TypedExpression) and isinstance(right.expr_type, BoolWrapper):
             return TypedExpression(
                 native_ast.Expression.Binop(
-                    l=left.ensureNonReference().expr,
-                    r=right.ensureNonReference().expr,
+                    l=left.nonref_expr,
+                    r=right.nonref_expr,
                     op=getattr(native_ast.BinaryOp, opname)()
                     ),
                 BoolWrapper(),
@@ -207,7 +203,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def toFloat64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.ensureNonReference().expr,
+                left=e.nonref_expr,
                 to_type=native_ast.Type.Float(bits=64)
                 ),
             Float64Wrapper(),
@@ -217,7 +213,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.ensureNonReference().expr,
+                left=e.nonref_expr,
                 to_type=native_ast.Type.Int(bits=64, signed=True)
                 ),
             Int64Wrapper(),
@@ -247,7 +243,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
         if isinstance(right, float):
             return TypedExpression(
                 native_ast.Expression.Binop(
-                    l=left.ensureNonReference().expr,
+                    l=left.nonref_expr,
                     r=native_ast.const_float_expr(right),
                     op=getattr(native_ast.BinaryOp, which)()
                     ),
@@ -257,8 +253,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
         elif isinstance(right, TypedExpression) and isinstance(right.expr_type, Float64Wrapper):
             return TypedExpression(
                 native_ast.Expression.Binop(
-                    l=left.ensureNonReference().expr,
-                    r=right.ensureNonReference().expr,
+                    l=left.nonref_expr,
+                    r=right.nonref_expr,
                     op=getattr(native_ast.BinaryOp, which)()
                     ),
                 BoolWrapper(),
@@ -270,7 +266,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
     def toInt64(self, context, e):
         return TypedExpression(
             native_ast.Expression.Cast(
-                left=e.ensureNonReference().expr,
+                left=e.nonref_expr,
                 to_type=native_ast.Type.Int(bits=64, signed=True)
                 ),
             Int64Wrapper(),
@@ -285,10 +281,10 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             if op.matches.Mod or op.matches.Div:
                 return TypedExpression(
                     native_ast.Expression.Branch(
-                        cond=right.toBool(context).ensureNonReference().expr,
+                        cond=right.toBool(context).nonref_expr,
                         true=native_ast.Expression.Binop(
-                            l=left.ensureNonReference().expr,
-                            r=right.ensureNonReference().expr,
+                            l=left.nonref_expr,
+                            r=right.nonref_expr,
                             op=pyOpToNative[op]
                             ),
                         false=generateThrowException(context, ZeroDivisionError())
@@ -300,8 +296,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             if op in pyOpToNative:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.ensureNonReference().expr,
-                        r=right.ensureNonReference().expr,
+                        l=left.nonref_expr,
+                        r=right.nonref_expr,
                         op=pyOpToNative[op]
                         ),
                     self,
@@ -310,8 +306,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             if op in pyCompOp:
                 return TypedExpression(
                     native_ast.Expression.Binop(
-                        l=left.ensureNonReference().expr,
-                        r=right.ensureNonReference().expr,
+                        l=left.nonref_expr,
+                        r=right.nonref_expr,
                         op=pyCompOp[op]
                         ),
                     BoolWrapper(),

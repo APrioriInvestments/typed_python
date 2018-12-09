@@ -15,6 +15,8 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
+import nativepython.type_wrappers.runtime_functions as runtime_functions
+
 from typed_python import NoneType, Int64
 
 import nativepython.native_ast as native_ast
@@ -51,25 +53,41 @@ class TupleOfWrapper(Wrapper):
 
         return TypedExpression(
             native_ast.Expression.Branch(
-                cond=((item >= 0) & (item < self.convert_len(context, expr))).ensureNonReference().expr,
+                cond=((item >= 0) & (item < self.convert_len(context, expr))).nonref_expr,
                 true=expr.expr.ElementPtrIntegers(0,3).cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
-                    ).elemPtr(item.toInt64(context).ensureNonReference().expr).load(),
+                    ).elemPtr(item.toInt64(context).nonref_expr).load(),
                 false=generateThrowException(context, IndexError("tuple index out of range"))
                 ),
             self.underlyingWrapperType,
             False
             )
 
+    def convert_incref(self, context, expr):
+        assert expr.isReference
+
+        return TypedExpression(
+            expr.expr.load().ElementPtrIntegers(0,0).store(
+                    native_ast.Expression.Binop(
+                        l=expr.expr.load().ElementPtrIntegers(0,0).load(),
+                        op=native_ast.BinaryOp.Add(),
+                        r=native_ast.const_int_expr(1)
+                    )
+                ) >> expr.expr,
+            self,
+            True
+            )
+
     def convert_initialize_copy(self, context, expr, other):
         other = other.ensureNonReference()
         assert expr.isReference
 
-        return TypedExpression.Void(
+        return TypedExpression.NoneExpr(
             native_ast.Expression.Branch(
                 cond=other.expr,
                 false=expr.expr.store(other.expr),
-                true=expr.expr.store(other.expr) +
+                true=
+                    expr.expr.store(other.expr) >>
                     expr.expr.load().ElementPtrIntegers(0,0).store(
                         native_ast.Expression.Binop(
                             l=expr.expr.load().ElementPtrIntegers(0,0).load(),
@@ -85,7 +103,7 @@ class TupleOfWrapper(Wrapper):
 
         assert self.underlyingWrapperType.is_pod, "we don't know how to call destructors yet"
 
-        return TypedExpression.Void(
+        return TypedExpression.NoneExpr(
             native_ast.Expression.Branch(
                 cond=target.expr,
                 false=native_ast.nullExpr,
@@ -96,8 +114,7 @@ class TupleOfWrapper(Wrapper):
                             op=native_ast.BinaryOp.Sub(),
                             r=native_ast.const_int_expr(1)
                         )
-                    )
-                    +
+                    ) >>
                     native_ast.Expression.Branch(
                         cond=target.expr.ElementPtrIntegers(0,0).load(),
                         true=native_ast.nullExpr,
@@ -111,9 +128,9 @@ class TupleOfWrapper(Wrapper):
             native_ast.Expression.Branch(
                 cond=expr.expr,
                 false=native_ast.const_int_expr(0),
-                true=expr.ensureNonReference().expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
+                true=expr.nonref_expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
                 ),
-            nativepython.python_object_representation.typedPythonTypeToTypeWrapper(Int64()),
+            Int64(),
             False
             )
 
