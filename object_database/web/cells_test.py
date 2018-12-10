@@ -14,6 +14,7 @@
 
 from object_database.web.cells import Cells, Sequence, Container, Subscribed, Span, SubscribedSequence, ensureSubscribedType
 from object_database import InMemServer, Schema, Indexed
+from object_database.util import genToken
 
 import unittest
 import threading
@@ -28,10 +29,12 @@ class Thing:
 
 class CellsTests(unittest.TestCase):
     def setUp(self):
-        self.server = InMemServer()
+        self.token = genToken()
+        self.server = InMemServer(auth_token=self.token)
         self.server.start()
 
         self.db = self.server.connect()
+        self.db.authenticate(self.token)
         self.db.subscribeToSchema(test_schema)
         self.cells = Cells(self.db)
 

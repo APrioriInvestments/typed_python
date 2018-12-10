@@ -22,7 +22,7 @@ from object_database.database_connection import TransactionListener, DatabaseCon
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
-from object_database.util import configureLogging
+from object_database.util import configureLogging, genToken
 
 import object_database.messages as messages
 import queue
@@ -46,7 +46,7 @@ def currentMemUsageMb(residentOnly=True):
         return psutil.Process().memory_info().vms / 1024 ** 2
 
 
-configureLogging("test", error=True)
+configureLogging("test", error=False)
 
 
 class BlockingCallback:
@@ -1445,6 +1445,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
     def setUp(self):
         self.tempDir = tempfile.TemporaryDirectory()
         self.tempDirName = self.tempDir.__enter__()
+        self.auth_token = genToken()
 
         if hasattr(self, 'redisProcess') and self.redisProcess:
             self.redisProcess.terminate()
@@ -1459,12 +1460,13 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
 
         redis.StrictRedis(db=0, decode_responses=True, port=1115).echo("hi")
         self.mem_store = RedisPersistence(port=1115)
-        self.server = InMemServer(self.mem_store)
+        self.server = InMemServer(self.mem_store, self.auth_token)
         self.server._gc_interval = .1
         self.server.start()
 
     def createNewDb(self):
         db = DatabaseConnection(self.server.getChannel())
+        db.authenticate(self.auth_token)
         db.initialized.wait()
         return db
 
@@ -1487,13 +1489,16 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
 
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
+        self.auth_token = genToken()
+
         self.mem_store = InMemoryPersistence()
-        self.server = InMemServer(self.mem_store)
+        self.server = InMemServer(self.mem_store, self.auth_token)
         self.server._gc_interval = .1
         self.server.start()
 
     def createNewDb(self):
         db = DatabaseConnection(self.server.getChannel())
+        db.authenticate(self.auth_token)
         db.initialized.wait()
         return db
 
@@ -1586,15 +1591,20 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
     def setUp(self):
         self.mem_store = InMemoryPersistence()
+        self.auth_token = genToken()
+
         sc = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         sc.load_cert_chain('testcert.cert', 'testcert.key')
 
-        self.server = TcpServer(host="localhost", port=8888, mem_store=self.mem_store, ssl_context=sc)
+        self.server = TcpServer(
+            host="localhost", port=8888, mem_store=self.mem_store,
+            ssl_context=sc, auth_token=self.auth_token
+        )
         self.server._gc_interval = .1
         self.server.start()
 
     def createNewDb(self, useSecondaryLoop=False):
-        db = self.server.connect(useSecondaryLoop=useSecondaryLoop)
+        db = self.server.connect(self.auth_token, useSecondaryLoop=useSecondaryLoop)
 
         db.initialized.wait()
 

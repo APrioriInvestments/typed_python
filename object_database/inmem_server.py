@@ -9,6 +9,7 @@ import logging
 import threading
 import traceback
 
+
 class InMemoryChannel:
     def __init__(self, server):
         self._server = server
@@ -32,7 +33,6 @@ class InMemoryChannel:
     def close(self):
         self.stop()
         self._clientCallback(ServerToClient.Disconnected())
-        self._server.dropConnection(self)
 
     def pumpMessagesFromServer(self):
         while not self._shouldStop:
@@ -102,9 +102,10 @@ class InMemoryChannel:
         self._serverCallback = callback
         self._pumpThreadClient.start()
 
+
 class InMemServer(Server):
-    def __init__(self, kvstore=None):
-        Server.__init__(self, kvstore or InMemoryPersistence())
+    def __init__(self, kvstore=None, auth_token=''):
+        Server.__init__(self, kvstore or InMemoryPersistence(), auth_token)
         self.channels = []
         self.stopped = threading.Event()
         self.checkForDeadConnectionsLoopThread = threading.Thread(target=self.checkForDeadConnectionsLoop)
@@ -148,5 +149,5 @@ class InMemServer(Server):
         self.start()
         return self
 
-    def __exit__(self, t,v,traceback):
+    def __exit__(self, t, v, traceback):
         self.stop()

@@ -35,7 +35,7 @@ ownName = os.path.basename(os.path.abspath(__file__))
 
 class ActiveWebServiceTest(unittest.TestCase):
     def setUp(self):
-
+        self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
 
@@ -44,7 +44,7 @@ class ActiveWebServiceTest(unittest.TestCase):
                 'localhost', 'localhost', "8023", '--run_db',
                 '--source', os.path.join(self.tempDirectoryName,'source'),
                 '--storage', os.path.join(self.tempDirectoryName,'storage'),
-                '--service-token', genToken(),
+                '--service-token', self.token,
                 '--shutdownTimeout', '.5'
             ]
         )
@@ -59,7 +59,7 @@ class ActiveWebServiceTest(unittest.TestCase):
             )
 
         try:
-            self.database = connect("localhost", 8023, retry=True)
+            self.database = connect("localhost", 8023, self.token, retry=True)
 
             self.database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 

@@ -36,6 +36,7 @@ DEFAULT_GC_INTERVAL = 900.0
 
 class ConnectedChannel:
     def __init__(self, initial_tid, channel, connectionObject, identityRoot):
+        super(ConnectedChannel, self).__init__()
         self.channel = channel
         self.initial_tid = initial_tid
         self.connectionObject = connectionObject
@@ -46,6 +47,14 @@ class ConnectedChannel:
         self.subscribedIndexKeys = {} #full index keys to lazy transaction id
         self.identityRoot = identityRoot
         self.pendingTransactions = {}
+        self._needsAuthentication = True
+
+    @property
+    def needsAuthentication(self):
+        return self._needsAuthentication
+
+    def authenticate(self):
+        self._needsAuthentication = False
 
     def heartbeat(self):
         self.missedHeartbeats = 0
@@ -90,9 +99,11 @@ class ConnectedChannel:
 
 
 class Server:
-    def __init__(self, kvstore):
-        self._lock = threading.RLock()
+    def __init__(self, kvstore, auth_token):
         self._kvstore = kvstore
+        self._auth_token = auth_token
+
+        self._lock = threading.RLock()
 
         self.verbose = False
 
@@ -100,6 +111,7 @@ class Server:
 
         self._removeOldDeadConnections()
 
+        # InMemoryChannel or ServerToClientProtocol -> ConnectedChannel
         self._clientChannels = {}
 
         #id of the next transaction
@@ -206,7 +218,7 @@ class Server:
                 missed = self._clientChannels[c].missedHeartbeats
                 self._clientChannels[c].missedHeartbeats += 1
 
-                heartbeatCount[missed] = heartbeatCount.get(missed,0) + 1
+                heartbeatCount[missed] = heartbeatCount.get(missed, 0) + 1
 
                 if missed >= 4:
                     logging.info(
@@ -302,7 +314,7 @@ class Server:
                     )
 
                 connectedChannel.sendInitializationMessage()
-        except:
+        except Exception:
             logging.error(
                 "Failed during addConnection which should never happen:\n%s",
                 traceback.format_exc()
@@ -631,6 +643,24 @@ class Server:
     def onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
 
+        # Handle Authentication messages
+        if msg.matches.Authenticate:
+            if msg.token == self._auth_token:
+                connectedChannel.authenticate()
+            # else, do we need to do something?
+            return
+
+        # Abort if connection is not authenticated
+        if connectedChannel.needsAuthentication:
+            # TODO: make logging.info
+            logging.warn(
+                "Received unexpected client message on unauthenticated channel %s",
+                connectedChannel.identityRoot  # FIXME
+            )
+            # TODO: do we need to react towards the client?
+            return
+
+        # Handle remaining types of messages
         if msg.matches.Heartbeat:
             connectedChannel.heartbeat()
         elif msg.matches.LoadLazyObject:
@@ -665,7 +695,7 @@ class Server:
                         data['index_versions'],
                         msg.as_of_version
                         )
-            except:
+            except Exception:
                 logging.error("Unknown error committing transaction: %s", traceback.format_exc())
                 isOK = False
                 badKey = "<NONE>"

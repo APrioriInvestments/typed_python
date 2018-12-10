@@ -17,16 +17,21 @@ import subprocess
 import sys
 import os
 import time
+from object_database.util import genToken
+
 
 own_dir = os.path.split(__file__)[0]
+
 
 class ObjectDatabaseFrontEnd(unittest.TestCase):
     def test_can_run_throughput_test(self):
         try:
+            token = genToken()
             server = subprocess.Popen([
                 sys.executable,
                 os.path.join(own_dir, "frontends", "database_server.py"),
                 "localhost", "8888",
+                "--service-token", token,
                 "--inmem"]
                 )
 
@@ -35,7 +40,9 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
             client = subprocess.run([
                 sys.executable,
                 os.path.join(own_dir, "frontends", "database_throughput_test.py"),
-                "localhost", "8888", "1"
+                "localhost", "8888",
+                "--service-token", token,
+                "1"
                 ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL

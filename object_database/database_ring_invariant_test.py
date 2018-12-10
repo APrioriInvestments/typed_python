@@ -21,6 +21,8 @@ from object_database.database_connection import TransactionListener, DatabaseCon
 from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
+from object_database.util import genToken
+
 import unittest
 import numpy
 import threading
@@ -75,12 +77,14 @@ class Ring:
 
 class RingInvariantTest(unittest.TestCase):
     def setUp(self):
+        self.token = genToken()
         self.mem_store = InMemoryPersistence()
-        self.server = InMemServer(self.mem_store)
+        self.server = InMemServer(self.mem_store, self.token)
         self.server.start()
 
     def createNewDb(self):
         db = DatabaseConnection(self.server.getChannel())
+        db.authenticate(self.token)
         db.initialized.wait()
         return db
 

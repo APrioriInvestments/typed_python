@@ -1,12 +1,15 @@
 from typed_python import *
 from object_database.schema import SchemaDefinition
 
+
 _heartbeatInterval = [5.0]
 def setHeartbeatInterval(newInterval):
     _heartbeatInterval[0] = newInterval
 
+
 def getHeartbeatInterval():
     return _heartbeatInterval[0]
+
 
 ClientToServer = Alternative(
     "ClientToServer",
@@ -31,8 +34,10 @@ ClientToServer = Alternative(
         'fieldname_and_value': OneOf(None, Tuple(str,str)),
         'isLazy': bool #load values when we first request them, instead of blocking on all the data.
         },
-    Flush = {'guid': str}
+    Flush = {'guid': str},
+    Authenticate = {'token': str}
     )
+
 
 ServerToClient = Alternative(
     "ServerToClient",

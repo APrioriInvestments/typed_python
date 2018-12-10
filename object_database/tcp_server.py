@@ -73,7 +73,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
             def callHandler(*args):
                 try:
                     return handler(*args)
-                except:
+                except Exception:
                     logging.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
 
             self.handler = callHandler
@@ -152,7 +152,7 @@ class EventLoopInThread:
 _eventLoop = EventLoopInThread()
 
 
-def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
+def connect(host, port, auth_token, timeout=10.0, retry=False, eventLoop=_eventLoop):
     t0 = time.time()
     # With CLIENT_AUTH we are setting up the SSL to use encryption only, which is what we want.
     # If we also wanted authentication, we would use SERVER_AUTH.
@@ -176,6 +176,8 @@ def connect(host, port, timeout=10.0, retry=False, eventLoop=_eventLoop):
         raise ConnectionRefusedError()
 
     conn = DatabaseConnection(proto)
+    conn.authenticate(auth_token)
+
     conn.initialized.wait(timeout=max(timeout - (time.time() - t0), 0.0))
 
     assert conn.initialized.is_set()
@@ -187,8 +189,8 @@ _eventLoop2 = []
 
 
 class TcpServer(Server):
-    def __init__(self, host, port, mem_store, ssl_context):
-        Server.__init__(self, mem_store or InMemoryPersistence())
+    def __init__(self, host, port, mem_store, ssl_context, auth_token):
+        Server.__init__(self, mem_store or InMemoryPersistence(), auth_token)
 
         self.mem_store = mem_store
         self.host = host
@@ -223,7 +225,7 @@ class TcpServer(Server):
         if self.socket_server:
             self.socket_server.close()
 
-    def connect(self, useSecondaryLoop=False):
+    def connect(self, auth_token, useSecondaryLoop=False):
         if useSecondaryLoop:
             if not _eventLoop2:
                 _eventLoop2.append(EventLoopInThread())
@@ -231,7 +233,7 @@ class TcpServer(Server):
         else:
             loop = _eventLoop
 
-        return connect(self.host, self.port, eventLoop=loop)
+        return connect(self.host, self.port, auth_token, eventLoop=loop)
 
     def __enter__(self):
         self.start()
