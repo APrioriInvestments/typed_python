@@ -499,6 +499,12 @@ class DatabaseConnection:
         with self._lock:
             return not self._versioned_data._version_number_refcount
 
+    def authenticate(self, token):
+        # TODO: do I need to hold self._lock?
+        self._channel.write(
+            ClientToServer.Authenticate(token=token)
+        )
+
     def addSchema(self, schema):
         schema.freeze()
 

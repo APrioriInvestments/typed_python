@@ -25,12 +25,14 @@ def main(argv):
 
     parser.add_argument("host")
     parser.add_argument("port")
+    parser.add_argument("--service-token", type=str, required=True,
+        help="the auth token to be used with this service")
     parser.add_argument("seconds", type=float)
     parser.add_argument("--threads", dest='threads', type=int, default=1)
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    db = connect(parsedArgs.host, parsedArgs.port)
+    db = connect(parsedArgs.host, parsedArgs.port, parsedArgs.service_token)
 
     schema = Schema("database_throughput_test")
 

@@ -74,7 +74,7 @@ class SubprocessServiceManager(ServiceManager):
             os.makedirs(sourceDir)
 
         def dbConnectionFactory():
-            return connect(host, port)
+            return connect(host, port, self.serviceToken)
 
         ServiceManager.__init__(
             self, dbConnectionFactory, sourceDir, isMaster, ownHostname,

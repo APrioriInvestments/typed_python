@@ -313,6 +313,7 @@ VERBOSE = True
 
 class ServiceManagerTest(unittest.TestCase):
     def setUp(self):
+        self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
         object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(self.tempDirectoryName, forceReset=True)
@@ -332,7 +333,7 @@ class ServiceManagerTest(unittest.TestCase):
                     "--run_db",
                     '--source',os.path.join(self.tempDirectoryName,'source'),
                     '--storage',os.path.join(self.tempDirectoryName,'storage'),
-                    '--service-token', genToken(),
+                    '--service-token', self.token,
                     '--shutdownTimeout', '1.0',
                     '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert')
 
@@ -349,7 +350,7 @@ class ServiceManagerTest(unittest.TestCase):
             )
 
         try:
-            self.database = connect("localhost", 8023, retry=True)
+            self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, schema)
         except:
             self.server.terminate()

@@ -49,7 +49,7 @@ def main(argv):
         )
 
     def dbConnectionFactory():
-        return connect(parsedArgs.host, parsedArgs.port)
+        return connect(parsedArgs.host, parsedArgs.port, parsedArgs.serviceToken)
 
     setCodebaseInstantiationDirectory(parsedArgs.sourceDir)
 

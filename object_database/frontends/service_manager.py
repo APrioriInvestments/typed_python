@@ -90,7 +90,8 @@ def main(argv=None):
                 parsedArgs.own_hostname,
                 object_database_port,
                 RedisPersistence(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None else InMemoryPersistence(),
-                ssl_context=ssl_ctx
+                ssl_context=ssl_ctx,
+                auth_token=parsedArgs.service_token
             )
 
 
