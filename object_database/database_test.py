@@ -46,7 +46,7 @@ def currentMemUsageMb(residentOnly=True):
         return psutil.Process().memory_info().vms / 1024 ** 2
 
 
-configureLogging("test", error=False)
+configureLogging("test", error=True)
 
 
 class BlockingCallback:
@@ -1465,10 +1465,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         self.server.start()
 
     def createNewDb(self):
-        db = DatabaseConnection(self.server.getChannel())
-        db.authenticate(self.auth_token)
-        db.initialized.wait()
-        return db
+        return self.server.connect(self.auth_token)
 
     def tearDown(self):
         self.server.stop()
@@ -1497,10 +1494,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
         self.server.start()
 
     def createNewDb(self):
-        db = DatabaseConnection(self.server.getChannel())
-        db.authenticate(self.auth_token)
-        db.initialized.wait()
-        return db
+        return self.server.connect(self.auth_token)
 
     def tearDown(self):
         self.server.stop()

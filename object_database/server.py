@@ -652,12 +652,10 @@ class Server:
 
         # Abort if connection is not authenticated
         if connectedChannel.needsAuthentication:
-            # TODO: make logging.info
-            logging.warn(
+            logging.info(
                 "Received unexpected client message on unauthenticated channel %s",
-                connectedChannel.identityRoot  # FIXME
+                connectedChannel.connectionObject._identity
             )
-            # TODO: do we need to react towards the client?
             return
 
         # Handle remaining types of messages

@@ -83,10 +83,7 @@ class RingInvariantTest(unittest.TestCase):
         self.server.start()
 
     def createNewDb(self):
-        db = DatabaseConnection(self.server.getChannel())
-        db.authenticate(self.token)
-        db.initialized.wait()
-        return db
+        return self.server.connect(self.token)
 
     def tearDown(self):
         self.server.stop()

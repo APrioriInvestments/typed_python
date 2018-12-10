@@ -33,8 +33,7 @@ class CellsTests(unittest.TestCase):
         self.server = InMemServer(auth_token=self.token)
         self.server.start()
 
-        self.db = self.server.connect()
-        self.db.authenticate(self.token)
+        self.db = self.server.connect(self.token)
         self.db.subscribeToSchema(test_schema)
         self.cells = Cells(self.db)
 
