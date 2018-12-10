@@ -500,7 +500,6 @@ class DatabaseConnection:
             return not self._versioned_data._version_number_refcount
 
     def authenticate(self, token):
-        # TODO: do I need to hold self._lock?
         self._channel.write(
             ClientToServer.Authenticate(token=token)
         )
@@ -582,7 +581,9 @@ class DatabaseConnection:
     def subscribeToNone(self, t, block=True):
         self.addSchema(t.__schema__)
         with self._lock:
-            self._schema_and_typename_to_subscription_set.setdefault((t.__schema__.name, t.__qualname__), set())
+            self._schema_and_typename_to_subscription_set.setdefault(
+                (t.__schema__.name, t.__qualname__), set()
+            )
         return ()
 
     def subscribeToSchema(self, *schemas, block=True, lazySubscription=None, excluding=()):

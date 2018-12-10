@@ -121,8 +121,11 @@ class InMemServer(Server):
 
         return channel
 
-    def connect(self):
-        return DatabaseConnection(self.getChannel())
+    def connect(self, auth_token):
+        dbc = DatabaseConnection(self.getChannel())
+        dbc.authenticate(auth_token)
+        dbc.initialized.wait()
+        return dbc
 
     def checkForDeadConnectionsLoop(self):
         lastCheck = time.time()

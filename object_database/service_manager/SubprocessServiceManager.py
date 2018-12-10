@@ -102,7 +102,8 @@ class SubprocessServiceManager(ServiceManager):
                         str(self.port),
                         instanceIdentity,
                         os.path.join(self.sourceDir, instanceIdentity),
-                        os.path.join(self.storageDir, instanceIdentity)
+                        os.path.join(self.storageDir, instanceIdentity),
+                        self.serviceToken
                         ] + (["--error_logs_only"] if self.errorLogsOnly else []),
                     cwd=self.storageDir,
                     stdin=subprocess.DEVNULL,
