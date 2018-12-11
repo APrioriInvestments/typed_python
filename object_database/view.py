@@ -46,7 +46,9 @@ def revisionConflictRetry(f):
             try:
                 return f(*args, **kwargs)
             except RevisionConflictException as e:
-                logging.info("Handled a revision conflict on key %s in %s. Retrying." % (e, f.__name__))
+                logging.getLogger(__name__).info(
+                    "Handled a revision conflict on key %s in %s. Retrying." % (e, f.__name__)
+                )
                 tries += 1
 
         raise RevisionConflictException()
@@ -97,6 +99,7 @@ class View(object):
         self._insistWritesConsistent = True
         self._insistIndexReadsConsistent = False
         self._confirmCommitCallback = None
+        self._logger = logging.getLogger(__name__)
 
     def db(self):
         return self._db
@@ -446,7 +449,7 @@ class View(object):
                 res = result_queue.get()
 
                 if time.time() - t0 > LOG_SLOW_COMMIT_THRESHOLD:
-                    logging.info("Committing %s writes and %s set changes took %.1f seconds",
+                    self._logger.info("Committing %s writes and %s set changes took %.1f seconds",
                         len(self._writes), len(self._set_adds) + len(self._set_removes), time.time() - t0
                         )
 

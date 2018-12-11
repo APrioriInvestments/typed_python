@@ -331,8 +331,8 @@ class ServiceManagerTest(unittest.TestCase):
                 [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
                     'localhost', 'localhost', "8023",
                     "--run_db",
-                    '--source',os.path.join(self.tempDirectoryName,'source'),
-                    '--storage',os.path.join(self.tempDirectoryName,'storage'),
+                    '--source', os.path.join(self.tempDirectoryName, 'source'),
+                    '--storage', os.path.join(self.tempDirectoryName, 'storage'),
                     '--service-token', self.token,
                     '--shutdownTimeout', '1.0',
                     '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert')
@@ -418,7 +418,8 @@ class ServiceManagerTest(unittest.TestCase):
         numpy.random.seed(42)
 
         for count in numpy.random.choice(6, size=20):
-            logging.info("Setting count for TestService to %s and waiting for it to be alive.", count)
+            logging.getLogger(__name__).info(
+                "Setting count for TestService to %s and waiting for it to be alive.", count)
 
             with self.database.transaction():
                 ServiceManager.startService("TestService", int(count))

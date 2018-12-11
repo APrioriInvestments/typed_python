@@ -21,8 +21,6 @@ import json
 import sys
 import time
 import argparse
-import os.path
-import logging
 import traceback
 import datetime
 import os
@@ -55,6 +53,7 @@ class Configuration:
 class ActiveWebService(ServiceBase):
     def __init__(self, db, serviceObject, serviceRuntimeConfig):
         ServiceBase.__init__(self, db, serviceObject, serviceRuntimeConfig)
+        self._logger = logging.getLogger(__name__)
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):
@@ -86,13 +85,13 @@ class ActiveWebService(ServiceBase):
             self.configureApp()
 
     def doWork(self, shouldStop):
-        logging.info("Configuring ActiveWebService")
+        self._logger.info("Configuring ActiveWebService")
         with self.db.view():
             config = Configuration.lookupAny(service=self.serviceObject)
             assert config, "No configuration available."
             host,port = config.hostname, config.port
 
-        logging.info("ActiveWebService listening on %s:%s", host, port)
+        self._logger.info("ActiveWebService listening on %s:%s", host, port)
 
         server = pywsgi.WSGIServer((host, port), self.app, handler_class=WebSocketHandler)
 
@@ -220,11 +219,11 @@ class ActiveWebService(ServiceBase):
     def mainSocket(self, ws, path):
         path = str(path).split("/")
         queryArgs = dict(request.args)
-        logging.info("path = %s", path)
+        self._logger.info("path = %s", path)
         reader = None
 
         try:
-            logging.info("Starting main websocket handler with %s", ws)
+            self._logger.info("Starting main websocket handler with %s", ws)
 
             cells = Cells(self.db)
             cells.root.setRootSerializationContext(self.db.serializationContext)
@@ -251,7 +250,7 @@ class ActiveWebService(ServiceBase):
                             if cell is not None:
                                 cell.onMessage(jsonMsg)
                         except:
-                            logging.error("Exception in inbound message: %s", traceback.format_exc())
+                            self._logger.error("Exception in inbound message: %s", traceback.format_exc())
                         cells.triggerIfHasDirty()
 
             reader = Greenlet.spawn(readThread)
@@ -271,7 +270,7 @@ class ActiveWebService(ServiceBase):
 
                 lastDumpFrames += 1
                 if time.time() - lastDumpTimestamp > 5.0:
-                    logging.info("In the last %.2f seconds, spent %.2f seconds calculating %s messages over %s frames",
+                    self._logger.info("In the last %.2f seconds, spent %.2f seconds calculating %s messages over %s frames",
                         time.time() - lastDumpTimestamp,
                         lastDumpTimeSpentCalculating,
                         lastDumpMessages,
@@ -295,7 +294,7 @@ class ActiveWebService(ServiceBase):
                         sleep(1.0 / MAX_FPS + .001)
 
         except:
-            logging.error("Websocket handler error: %s", traceback.format_exc())
+            self._logger.error("Websocket handler error: %s", traceback.format_exc())
         finally:
             if reader:
                 reader.join()

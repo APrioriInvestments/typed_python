@@ -19,6 +19,7 @@ import threading
 import logging
 import os
 
+
 class InMemoryPersistence(object):
     def __init__(self, db=0):
         self.values = {}
@@ -135,6 +136,8 @@ class RedisPersistence(object):
         self.redis = redis.StrictRedis(db=db, decode_responses=True, **kwds)
         self.cache = {}
 
+        self._logger = logging.getLogger(__name__)
+
     def get(self, key):
         """Get the value stored in a value-style key, or None if no key exists.
 
@@ -151,7 +154,7 @@ class RedisPersistence(object):
                     result = self.redis.get(key)
                     success = True
                 except redis.exceptions.BusyLoadingError:
-                    logging.info("Redis is still loading. Waiting...")
+                    self._logger.info("Redis is still loading. Waiting...")
                     time.sleep(1.0)
 
             if result is None:
@@ -180,7 +183,7 @@ class RedisPersistence(object):
                         vals = self.redis.mget(needed_keys)
                         success = True
                     except redis.exceptions.BusyLoadingError:
-                        logging.info("Redis is still loading. Waiting...")
+                        self._logger.info("Redis is still loading. Waiting...")
                         time.sleep(1.0)
 
                 for ix in range(len(needed_keys)):
@@ -201,7 +204,7 @@ class RedisPersistence(object):
                     vals = self.redis.smembers(key)
                     success = True
                 except redis.exceptions.BusyLoadingError:
-                    logging.info("Redis is still loading. Waiting...")
+                    self._logger.info("Redis is still loading. Waiting...")
                     time.sleep(1.0)
 
             if vals:

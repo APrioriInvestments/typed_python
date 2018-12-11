@@ -204,6 +204,8 @@ with open(os.path.join(ownDir, "aws_linux_bootstrap.sh"), "r") as fh:
 
 class AwsApi:
     def __init__(self):
+        self._logging = logging.getLogger(__name__)
+
         self.config = Configuration.lookupAny()
         if not self.config:
             raise Exception("Please configure the aws service.")
@@ -253,7 +255,7 @@ class AwsApi:
                     )
                 return True
             else:
-                logging.info("srVal %s doesn't match %s", srVal, instanceId)
+                self._logger.info("srVal %s doesn't match %s", srVal, instanceId)
 
         return False
 
@@ -280,11 +282,11 @@ class AwsApi:
     def terminateInstanceById(self, id):
         instance = self.ec2.Instance(id)
         assert self.isInstanceWeOwn(instance)
-        logging.info("Terminating AWS instance %s", instance)
+        self._logger.info("Terminating AWS instance %s", instance)
         instance.terminate()
 
     def getSpotPrices(self):
-        logging.info("Requesting spot price history...")
+        self._logger.info("Requesting spot price history...")
         results = {}
 
         for x in self.ec2_client.get_paginator('describe_spot_price_history').paginate(
@@ -402,6 +404,7 @@ class AwsWorkerBootService(ServiceBase):
     def __init__(self, db, service, serviceRuntimeConfig):
         ServiceBase.__init__(self, db, service, serviceRuntimeConfig)
 
+        self._logger = logging.getLogger(__name__)
         self.SLEEP_INTERVAL = 10.0
         self.lastSpotPriceRequest = 0.0
 
@@ -444,7 +447,7 @@ class AwsWorkerBootService(ServiceBase):
         if not i:
             raise Exception("No instances of type %s are booted." % instance_type)
         else:
-            logging.info("Terminating instance %s", i["InstanceId"])
+            logging.getLogger(__name__).info("Terminating instance %s", i["InstanceId"])
 
         AwsApi().terminateInstanceById(i[0])
 
@@ -512,7 +515,7 @@ class AwsWorkerBootService(ServiceBase):
                 if not self.pushTaskLoopForward():
                     time.sleep(1.0)
             except:
-                logging.error("Failed: %s", traceback.format_exc())
+                self._logger.error("Failed: %s", traceback.format_exc())
                 time.sleep(5.0)
 
 
@@ -622,7 +625,7 @@ class AwsWorkerBootService(ServiceBase):
 
             for state in State.lookupAll():
                 while state.booted > state.desired:
-                    logging.info("We have %s instances of type %s booted vs %s desired. Shutting one down.",
+                    self._logger.info("We have %s instances of type %s booted vs %s desired. Shutting one down.",
                         state.booted,
                         state.instance_type,
                         state.desired
@@ -633,7 +636,7 @@ class AwsWorkerBootService(ServiceBase):
                     state.booted -= 1
 
                 while state.spot_booted > state.spot_desired:
-                    logging.info("We have %s spot instances of type %s requested vs %s desired. Terminating one down.",
+                    self._logger.info("We have %s spot instances of type %s requested vs %s desired. Terminating one down.",
                         state.spot_booted,
                         state.instance_type,
                         state.spot_desired
@@ -644,7 +647,7 @@ class AwsWorkerBootService(ServiceBase):
                     state.spot_booted -= 1
 
                 while state.booted < state.desired:
-                    logging.info("We have %s instances of type %s booted vs %s desired. Booting one.",
+                    self._logger.info("We have %s instances of type %s booted vs %s desired. Booting one.",
                         state.booted,
                         state.instance_type,
                         state.desired
@@ -661,16 +664,16 @@ class AwsWorkerBootService(ServiceBase):
                             state.capacityConstrained = True
                         elif 'You have requested more instances ' in str(e):
                             maxCount = int(str(e).split('than your current instance limit of ')[1].split(' ')[0])
-                            logging.info("Visible limit of %s observed for instance type %s", maxCount, state.instance_type)
+                            self._logger.info("Visible limit of %s observed for instance type %s", maxCount, state.instance_type)
                             state.observedLimit = maxCount
                             state.desired = min(state.desired, maxCount)
                         else:
-                            logging.error("Failed to boot a worker:\n%s", traceback.format_exc())
+                            self._logger.error("Failed to boot a worker:\n%s", traceback.format_exc())
                             time.sleep(self.SLEEP_INTERVAL)
                             break
 
                 while state.spot_booted < state.spot_desired:
-                    logging.info("We have %s spot instances of type %s booted vs %s desired. Booting one.",
+                    self._logger.info("We have %s spot instances of type %s booted vs %s desired. Booting one.",
                         state.spot_booted,
                         state.instance_type,
                         state.spot_desired
@@ -679,16 +682,16 @@ class AwsWorkerBootService(ServiceBase):
                     try:
                         instanceId = self.api.bootWorker(state.instance_type, spotPrice=valid_instance_types[state.instance_type]['COST'])
                         if not self.api.tagSpotRequest(instanceId):
-                            logging.error("Failed to tag spot-request associated with instance %s", instanceId)
+                            self._logger.error("Failed to tag spot-request associated with instance %s", instanceId)
                         state.spot_booted += 1
                     except Exception as e:
                         if 'You have requested more instances ' in str(e):
                             maxCount = int(str(e).split('than your current instance limit of ')[1].split(' ')[0])
-                            logging.info("Visible limit of %s observed for instance type %s", maxCount, state.instance_type)
+                            self._logger.info("Visible limit of %s observed for instance type %s", maxCount, state.instance_type)
                             state.observedLimit = maxCount
                             state.desired = min(state.desired, maxCount)
                         else:
-                            logging.error("Failed to boot a worker:\n%s", traceback.format_exc())
+                            self._logger.error("Failed to boot a worker:\n%s", traceback.format_exc())
                             break
 
         time.sleep(self.SLEEP_INTERVAL)

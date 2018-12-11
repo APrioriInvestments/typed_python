@@ -81,6 +81,7 @@ class SubprocessServiceManager(ServiceManager):
             maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout
         )
         self.serviceProcesses = {}
+        self._logger = logging.getLogger(__name__)
 
     def startServiceWorker(self, service, instanceIdentity):
         with self.db.view():
@@ -117,13 +118,13 @@ class SubprocessServiceManager(ServiceManager):
                     output_file.close()
 
             if self.logfileDirectory:
-                logging.info(
+                self._logger.info(
                     "Started a service logging to %s with pid %s",
                     os.path.join(self.logfileDirectory, logfileName),
                     process.pid
                     )
             else:
-                logging.info(
+                self._logger.info(
                     "Started service %s/%s with pid %s",
                     service.name,
                     instanceIdentity,
@@ -197,10 +198,10 @@ class SubprocessServiceManager(ServiceManager):
                         if file not in self.serviceProcesses:
                             try:
                                 path = os.path.join(self.storageDir, file)
-                                logging.info("Removing storage at path %s for dead service.", path)
+                                self._logger.info("Removing storage at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except:
-                                logging.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
+                                self._logger.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
 
         if self.sourceDir:
             with self.lock:
@@ -209,10 +210,10 @@ class SubprocessServiceManager(ServiceManager):
                         if file not in self.serviceProcesses:
                             try:
                                 path = os.path.join(self.sourceDir, file)
-                                logging.info("Removing source caches at path %s for dead service.", path)
+                                self._logger.info("Removing source caches at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except:
-                                logging.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
+                                self._logger.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
 
 
 

@@ -99,6 +99,8 @@ class Cells:
 
         self.db._onTransaction.append(self._onTransaction)
 
+        self._logger = logging.getLogger(__name__)
+
     def _newID(self):
         self._id += 1
         return str(self._id)
@@ -213,8 +215,8 @@ class Cells:
                         except SubscribeAndRetry as e:
                             e.callback(self.db)
                 except:
-                    logging.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
-                    logging.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
+                    self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
+                    self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(traceback.format_exc())}
 
                 finally:
@@ -687,10 +689,10 @@ class Dropdown(Cell):
             except RevisionConflictException as e:
                 tries += 1
                 if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
-                    logging.error("Button click timed out. This should really fail.")
+                    self._logger.error("Button click timed out. This should really fail.")
                     return
             except:
-                logging.error("Exception in button logic:\n%s", traceback.format_exc())
+                self._logger.error("Exception in button logic:\n%s", traceback.format_exc())
                 return
 
 class Container(Cell):
@@ -805,7 +807,7 @@ class SubscribedSequence(Cell):
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error("Spine calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error("Spine calc threw an exception:\n%s", traceback.format_exc())
                 self.spine = []
 
             self._resetSubscriptionsToViewReads(v)
@@ -894,14 +896,14 @@ class Grid(Cell):
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
             try:
                 self.cols = list(self.colFun())
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
             self._resetSubscriptionsToViewReads(v)
@@ -1102,7 +1104,7 @@ class Table(Cell):
                         r = self.cachedRenderFun(row, col)
                         keymemo[row] = SortWrapper(r.sortsAs())
                     except:
-                        logging.error(traceback.format_exc())
+                        self._logger.error(traceback.format_exc())
                         keymemo[row] = SortWrapper(None)
 
                 return keymemo[row]
@@ -1117,7 +1119,7 @@ class Table(Cell):
             page = max(0, int(self.curPage.get())-1)
             page = min(page, (len(rows) - 1) // self.maxRowsPerPage)
         except:
-            logging.error("Failed to parse current page: %s", traceback.format_exc())
+            self._logger.error("Failed to parse current page: %s", traceback.format_exc())
 
         return rows[page * self.maxRowsPerPage:(page+1) * self.maxRowsPerPage]
 
@@ -1157,7 +1159,7 @@ class Table(Cell):
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
             try:
@@ -1168,7 +1170,7 @@ class Table(Cell):
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
 
             self._resetSubscriptionsToViewReads(v)
@@ -1290,10 +1292,10 @@ class Clickable(Cell):
             except RevisionConflictException as e:
                 tries += 1
                 if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
-                    logging.error("Button click timed out. This should really fail.")
+                    self._logger.error("Button click timed out. This should really fail.")
                     return
             except:
-                logging.error("Exception in button logic:\n%s", traceback.format_exc())
+                self._logger.error("Exception in button logic:\n%s", traceback.format_exc())
                 return
 
 class Button(Clickable):
@@ -1522,7 +1524,7 @@ class _PlotUpdater(Cell):
             except SubscribeAndRetry:
                 raise
             except:
-                logging.error(traceback.format_exc())
+                self._logger.error(traceback.format_exc())
                 self.contents = """<div>____contents__</div>"""
                 self.children = {'____contents__': Traceback(traceback.format_exc())}
 

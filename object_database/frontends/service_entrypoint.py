@@ -16,7 +16,6 @@
 
 import argparse
 import logging
-import logging.config
 import sys
 import traceback
 
@@ -42,11 +41,13 @@ def main(argv):
 
     configureLogging(parsedArgs.instanceid[:8], error=parsedArgs.error_logs_only)
 
-    logging.info("service_entrypoint.py connecting to %s:%s for %s",
+    logger = logging.getLogger(__name__)
+
+    logger.info("service_entrypoint.py connecting to %s:%s for %s",
         parsedArgs.host,
         parsedArgs.port,
         parsedArgs.instanceid
-        )
+    )
 
     def dbConnectionFactory():
         return connect(parsedArgs.host, parsedArgs.port, parsedArgs.serviceToken)
@@ -63,7 +64,7 @@ def main(argv):
 
         return 0
     except Exception:
-        logging.error("service_entrypoint failed with an exception:\n%s", traceback.format_exc())
+        logger.error("service_entrypoint failed with an exception:\n%s", traceback.format_exc())
         return 1
 
 

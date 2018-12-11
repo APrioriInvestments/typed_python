@@ -12,8 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import collections
 import hashlib
 import logging
+import logging.config
 import os
 import random
 import ssl
@@ -21,6 +23,7 @@ import subprocess
 import tempfile
 import time
 import types
+import yaml
 
 
 def formatTable(rows):
@@ -40,13 +43,66 @@ def formatTable(rows):
     return "\n".join(formattedRows)
 
 
+def recursiveUpdate(dictionary, updates):
+    for k, v in updates.items():
+        if isinstance(v, collections.Mapping):
+            dictionary[k] = recursiveUpdate(dictionary.get(k, {}), v)
+        else:
+            dictionary[k] = v
+    return dictionary
+
+
+def setupLogging(
+    default_path='logging.yaml',
+    default_level=logging.INFO,
+    env_key='LOG_CFG',
+    updates=None
+):
+    """Setup logging configuration """
+    path = default_path
+    value = os.getenv(env_key, None)
+    if value:
+        path = value
+    if os.path.exists(path):
+        with open(path, 'rt') as f:
+            config = yaml.safe_load(f.read())
+        if updates:
+            recursiveUpdate(config, updates)
+
+        logging.config.dictConfig(config)
+    else:
+        logging.warning("Failed to configure logging from file")
+        logging.basicConfig(level=default_level)
+
+
 def configureLogging(preamble="", error=False):
+    frmt = (
+        '[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s | ' +
+        (preamble + ' | ' if preamble else '') +
+        '%(message)s'
+    )
+    level = logging.INFO if not error else logging.ERROR
+
+    updates = {
+        'formatters': {
+            'default': {
+                'format': frmt
+            }
+        },
+        'root': {
+            'level': level
+        }
+
+    }
+
+    ownDir = os.path.dirname(os.path.abspath(__file__))
+    setupLogging(
+        default_path=os.path.join(ownDir, '..', 'logging.yaml'),
+        updates=updates
+    )
+
     logging.getLogger('botocore.vendored.requests.packages.urllib3.connectionpool').setLevel(logging.CRITICAL)
     logging.getLogger('asyncio').setLevel(logging.CRITICAL)
-    logging.basicConfig(format='[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s'
-        + ("|" + preamble if preamble else '')
-        + '| %(message)s', level=logging.INFO if not error else logging.ERROR
-        )
 
 
 def secondsToHumanReadable(seconds):
@@ -76,6 +132,7 @@ class Timer:
         if t1 - self.t0 > Timer.granularity:
             m = self.message
             a = []
+            logger = logging.getLogger(__name__)
             for arg in self.args:
                 if isinstance(arg, types.FunctionType):
                     try:
@@ -89,9 +146,9 @@ class Timer:
                 try:
                     m = m % tuple(a)
                 except:
-                    logging.error("Couldn't format %s with %s", m, a)
+                    logger.error("Couldn't format %s with %s", m, a)
 
-            logging.info("%s took %.2f seconds.", m, t1 - self.t0)
+            logger.info("%s took %.2f seconds.", m, t1 - self.t0)
 
     def __call__(self, f):
         def inner(*args, **kwargs):
@@ -164,7 +221,7 @@ def generateSslContext():
                 stderr=subprocess.PIPE
             )
         except subprocess.CalledProcessError as e:
-            logging.error(
+            logging.getLogger(__name__).error(
                 "Failed while executing 'openssl':\n" +
                 e.stderr.decode('utf-8')
             )

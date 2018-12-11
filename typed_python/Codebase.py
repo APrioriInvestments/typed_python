@@ -155,7 +155,8 @@ class Codebase:
             try:
                 modules[mname] = importlib.import_module(mname)
             except Exception as e:
-                logging.warn("Error importing module %s from codebase: %s", mname,  e)
+                logging.getLogger(__name__).warn(
+                    "Error importing module %s from codebase: %s", mname,  e)
         return modules
 
     @staticmethod
