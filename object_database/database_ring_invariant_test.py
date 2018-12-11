@@ -29,7 +29,7 @@ import threading
 
 from object_database.util import configureLogging
 
-configureLogging("test", error=True)
+configureLogging("test")
 
 schema = Schema("test_schema")
 
