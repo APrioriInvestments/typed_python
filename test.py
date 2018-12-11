@@ -38,7 +38,7 @@ import hashlib
 
 from object_database.util import setupLogging
 
-setupLogging()
+setupLogging('logging.yaml')
 logger = logging.getLogger(__name__)
 
 class DirectoryScope(object):

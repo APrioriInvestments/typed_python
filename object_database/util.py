@@ -53,17 +53,26 @@ def recursiveUpdate(dictionary, updates):
 
 
 def setupLogging(
-    default_path='logging.yaml',
-    default_level=logging.INFO,
+    default_path=None,
+    default_level=None,
     env_key='LOG_CFG',
-    updates=None
+    default_format=None
 ):
     """Setup logging configuration """
+    updates = {}
+    if default_format:
+        updates['formatters'] = {}
+        updates['formatters']['default'] = {}
+        updates['formatters']['default']['format'] = default_format
+    if default_level:
+        updates['root'] = {}
+        updates['root']['level'] = default_level
+
     path = default_path
     value = os.getenv(env_key, None)
     if value:
         path = value
-    if os.path.exists(path):
+    if path is not None and os.path.exists(path):
         with open(path, 'rt') as f:
             config = yaml.safe_load(f.read())
         if updates:
@@ -71,8 +80,10 @@ def setupLogging(
 
         logging.config.dictConfig(config)
     else:
-        logging.warning("Failed to configure logging from file")
-        logging.basicConfig(level=default_level)
+        logging.info("Failed to configure logging from file. Falling back to basicConfig")
+        level = default_level or logging.INFO
+        frmt = default_format or '[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s | %(message)s'
+        logging.basicConfig(level=level, format=frmt)
 
 
 def configureLogging(preamble="", level=logging.INFO):
@@ -82,22 +93,11 @@ def configureLogging(preamble="", level=logging.INFO):
         '%(message)s'
     )
 
-    updates = {
-        'formatters': {
-            'default': {
-                'format': frmt
-            }
-        },
-        'root': {
-            'level': level
-        }
-
-    }
-
     ownDir = os.path.dirname(os.path.abspath(__file__))
     setupLogging(
         default_path=os.path.join(ownDir, '..', 'logging.yaml'),
-        updates=updates
+        default_level=level,
+        default_format = frmt
     )
 
     logging.getLogger('botocore.vendored.requests.packages.urllib3.connectionpool').setLevel(logging.CRITICAL)
