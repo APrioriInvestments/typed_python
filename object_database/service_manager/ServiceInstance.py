@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 import importlib
-import logging
 import os
 import six
 import sys

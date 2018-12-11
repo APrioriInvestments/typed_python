@@ -36,6 +36,10 @@ import subprocess
 import pickle
 import hashlib
 
+from object_database.util import setupLogging
+
+setupLogging()
+logger = logging.getLogger(__name__)
 
 class DirectoryScope(object):
     def __init__(self, directory):
@@ -59,11 +63,11 @@ def loadTestModules(testFiles, rootDir):
         try:
             with DirectoryScope(rootDir):
                 moduleName = fileNameToModuleName(f, rootDir)
-                logging.info('importing module %s', moduleName)
+                logger.debug('importing module %s', moduleName)
                 __import__(moduleName)
                 modules.add(sys.modules[moduleName])
         except ImportError:
-            logging.error("Failed to load test module: %s", moduleName)
+            logger.error("Failed to load test module: %s", moduleName)
             traceback.print_exc()
             raise
 
@@ -243,7 +247,7 @@ def loadTestCases(config, testFiles, rootDir):
 
 
 def findTestFiles(rootDir, testRegex):
-    logging.info('finding files from root %s', rootDir)
+    logger.debug('finding files from root %s', rootDir)
     testPattern = re.compile(testRegex)
     testFiles = []
     for directory, subdirectories, files in os.walk(rootDir):
@@ -260,8 +264,8 @@ def logAsInfo(*args):
 
 
 def setLoggingLevel(level):
-    logging.getLogger().setLevel(level)
-    for handler in logging.getLogger().handlers:
+    logger.setLevel(level)
+    for handler in logger.handlers:
         handler.setLevel(level)
 
 
@@ -568,7 +572,7 @@ def main(args):
         return executeTests(args, filter_actions)
     except:
         import traceback
-        logging.error("executeTests() threw an exception: \n%s", traceback.format_exc())
+        logger.error("executeTests() threw an exception: \n%s", traceback.format_exc())
         return 1
 
 

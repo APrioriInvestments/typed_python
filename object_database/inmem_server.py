@@ -27,6 +27,8 @@ class InMemoryChannel:
 
         self._stopHeartbeatingSet = False
 
+        self._logger =  logging.getLogger(__name__)
+
     def _stopHeartbeating(self):
         self._stopHeartbeatingSet = True
 
@@ -45,7 +47,7 @@ class InMemoryChannel:
                 try:
                     self._clientCallback(e)
                 except:
-                    logging.error("Pump thread failed for %s: %s", self, traceback.format_exc())
+                    self._logger.error("Pump thread failed for %s: %s", self, traceback.format_exc())
                     return
 
     def pumpMessagesFromClient(self):
@@ -65,7 +67,7 @@ class InMemoryChannel:
                     self._serverCallback(e)
                 except:
                     traceback.print_exc()
-                    logging.error("Pump thread failed: %s", traceback.format_exc())
+                    self._logger.error("Pump thread failed: %s", traceback.format_exc())
                     return
 
     def start(self):

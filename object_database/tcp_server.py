@@ -21,13 +21,14 @@ class ServerToClientProtocol(AlgebraicProtocol):
         self.dbserver = dbserver
         self.loop = loop
         self.connectionIsDead = False
+        self._logger = logging.getLogger(__name__)
 
     def setClientToServerHandler(self, handler):
         def callHandler(*args):
             try:
                 return handler(*args)
             except:
-                logging.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
+                self._logger.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
 
         self.handler = callHandler
 
@@ -64,6 +65,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
         self.msgs = []
         self.disconnected = False
         self._stopHeartbeatingSet = False
+        self._logger = logging.getLogger(__name__)
 
     def _stopHeartbeating(self):
         self._stopHeartbeatingSet = True
@@ -74,7 +76,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
                 try:
                     return handler(*args)
                 except Exception:
-                    logging.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
+                    self._logger.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
 
             self.handler = callHandler
             for m in self.msgs:

@@ -1,0 +1,16 @@
+version: 1
+disable_existing_loggers: False
+formatters:
+    default:
+        format: '[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s | %(message)s'
+
+handlers:
+    default:
+        class: logging.StreamHandler
+        level: DEBUG
+        formatter: default
+        stream: ext://sys.stdout
+
+root:
+    level: DEBUG
+    handlers: [default]

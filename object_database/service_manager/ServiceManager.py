@@ -48,6 +48,8 @@ class ServiceManager(object):
 
         self.SLEEP_INTERVAL = 0.5
 
+        self._logger = logging.getLogger(__name__)
+
     def start(self):
         self.thread.start()
 
@@ -152,7 +154,7 @@ class ServiceManager(object):
                 )
             self.serviceHostObject.hostname = self.ownHostname
 
-        logging.info("ServiceManager starting work loop.")
+        self._logger.info("ServiceManager starting work loop.")
 
         while not self.shouldStop.is_set():
             self.updateServiceHostStats()
@@ -176,7 +178,7 @@ class ServiceManager(object):
                     self.startServiceWorker(service, i._identity)
 
                 except Exception:
-                    logging.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
+                    self._logger.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
                     bad_instances[i] = traceback.format_exc()
 
             if bad_instances:
@@ -232,7 +234,7 @@ class ServiceManager(object):
                     needRedeploy.append(i)
 
             if needRedeploy:
-                logging.info(
+                self._logger.info(
                     "The following services need to be stopped because their codebases are out of date:\n%s",
                     "\n".join(["  " + i.service.name + "." + i._identity + ". "
                             + str(i.service.codebase) + " != " + str(i.codebase) for i in needRedeploy])

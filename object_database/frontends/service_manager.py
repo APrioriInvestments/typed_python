@@ -17,7 +17,6 @@
 import argparse
 import concurrent.futures
 import logging
-import logging.config
 import multiprocessing
 import psutil
 import resource
@@ -55,7 +54,9 @@ def main(argv=None):
     parser.add_argument("--shutdownTimeout", type=float, default=None, required=False)
 
     parser.add_argument('--logdir', default=None, required=False)
+
     configureLogging("service_manager")
+    logger = logging.getLogger(__name__)
 
     parsedArgs = parser.parse_args(argv[1:])
 
@@ -64,13 +65,13 @@ def main(argv=None):
         parser.print_help()
         return 2
 
-    logging.info("ServiceManager on %s connecting to %s:%s",
+    logger.info("ServiceManager on %s connecting to %s:%s",
         parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port)
 
     shouldStop = threading.Event()
 
     def shutdownCleanly(signalNumber, frame):
-        logging.info("Received signal %s. Stopping.", signalNumber)
+        logger.info("Received signal %s. Stopping.", signalNumber)
         shouldStop.set()
 
     signal.signal(signal.SIGINT, shutdownCleanly)
@@ -97,11 +98,11 @@ def main(argv=None):
 
             databaseServer.start()
 
-            logging.info("Started a database server on %s:%s", parsedArgs.own_hostname, object_database_port)
+            logger.info("Started a database server on %s:%s", parsedArgs.own_hostname, object_database_port)
 
         serviceManager = None
 
-        logging.info("Started object_database")
+        logger.info("Started object_database")
 
         try:
             while not shouldStop.is_set():
@@ -120,12 +121,12 @@ def main(argv=None):
                             logfileDirectory=parsedArgs.logdir,
                             shutdownTimeout=parsedArgs.shutdownTimeout
                         )
-                        logging.info("Connected the service-manager")
+                        logger.info("Connected the service-manager")
                     except (ConnectionRefusedError, DisconnectedException):
                         serviceManager = None
 
                     if serviceManager is None:
-                        logging.error("Failed to connect to service manager. Sleeping and retrying")
+                        logger.error("Failed to connect to service manager. Sleeping and retrying")
                         time.sleep(10)
                     else:
                         serviceManager.start()
@@ -135,11 +136,11 @@ def main(argv=None):
                         serviceManager.cleanup()
                     except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
                         #try to reconnect
-                        logging.error("Disconnected from object_database host. Attempting to reconnect.")
+                        logger.error("Disconnected from object_database host. Attempting to reconnect.")
                         serviceManager.stop(gracefully=False)
                         serviceManager = None
                     except:
-                        logging.error("Service manager cleanup failed:\n%s", traceback.format_exc())
+                        logger.error("Service manager cleanup failed:\n%s", traceback.format_exc())
         except KeyboardInterrupt:
             return 0
 
@@ -149,13 +150,13 @@ def main(argv=None):
             try:
                 serviceManager.stop(gracefully=False)
             except:
-                logging.error("Failed to stop the service manager:\n%s", traceback.format_exc())
+                logger.error("Failed to stop the service manager:\n%s", traceback.format_exc())
 
         if databaseServer is not None:
             try:
                 databaseServer.stop()
             except:
-                logging.error("Failed to stop the database server:\n%s", traceback.format_exc())
+                logger.error("Failed to stop the database server:\n%s", traceback.format_exc())
 
 
 if __name__ == '__main__':

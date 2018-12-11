@@ -392,6 +392,7 @@ class TransactionListener:
             time.sleep(0.001)
 
     def _doWork(self):
+        logger = logging.getLogger(__name__)
         while not self._shouldStop:
             try:
                 todo = self._queue.get(timeout=0.1)
@@ -402,7 +403,7 @@ class TransactionListener:
                 try:
                     self.handler(todo)
                 except:
-                    logging.error("Callback threw exception:\n%s", traceback.format_exc())
+                    logger.error("Callback threw exception:\n%s", traceback.format_exc())
 
 
     def _onTransaction(self, key_value, priors, set_adds, set_removes, tid):
@@ -476,6 +477,8 @@ class DatabaseConnection:
         self._largeSubscriptionHeartbeatDelay = 0
 
         self.serializationContext = None
+
+        self._logger = logging.getLogger(__name__)
 
     def setSerializationContext(self, context):
         self.serializationContext = context
@@ -654,7 +657,7 @@ class DatabaseConnection:
                     if cond():
                         return True
                 except:
-                    logging.error("Condition callback threw an exception:\n%s", traceback.format_exc())
+                    self._logger.error("Condition callback threw an exception:\n%s", traceback.format_exc())
 
                 time.sleep(min(timeout / 20, .25))
         return False
@@ -769,7 +772,7 @@ class DatabaseConnection:
                     try:
                         q(TransactionResult.Disconnected())
                     except:
-                        logging.error(
+                        self._logger.error(
                             "Transaction commit callback threw an exception:\n%s",
                             traceback.format_exc()
                             )
@@ -780,7 +783,7 @@ class DatabaseConnection:
             with self._lock:
                 e = self._flushEvents.get(msg.guid)
                 if not e:
-                    logging.error("Got an unrequested flush response: %s", msg.guid)
+                    self._logger.error("Got an unrequested flush response: %s", msg.guid)
                 else:
                     e.set()
         elif msg.matches.Initialize:
@@ -797,7 +800,7 @@ class DatabaseConnection:
                             else TransactionResult.RevisionConflict(key=msg.badKey)
                         )
                 except:
-                    logging.error(
+                    self._logger.error(
                         "Transaction commit callback threw an exception:\n%s",
                         traceback.format_exc()
                         )
@@ -836,7 +839,7 @@ class DatabaseConnection:
                 try:
                     handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
                 except:
-                    logging.error(
+                    self._logger.error(
                         "_onTransaction callback %s threw an exception:\n%s",
                         handler,
                         traceback.format_exc()
@@ -900,7 +903,7 @@ class DatabaseConnection:
                     tuple(msg.fieldname_and_value) if msg.fieldname_and_value is not None else None))
 
                 if not event:
-                    logging.error("Received unrequested subscription to schema %s / %s / %s. have %s",
+                    self._logger.error("Received unrequested subscription to schema %s / %s / %s. have %s",
                         msg.schema, msg.typename, msg.fieldname_and_value, self._pendingSubscriptions)
                     return
 
@@ -945,7 +948,7 @@ class DatabaseConnection:
                         totalBytes += len(v)
 
                 if totalBytes > 1000000:
-                    logging.info("Subscription %s loaded %.2f mb of raw data.", lookupTuple, totalBytes / 1024.0 ** 2)
+                    self._logger.info("Subscription %s loaded %.2f mb of raw data.", lookupTuple, totalBytes / 1024.0 ** 2)
 
                 if markedLazy:
                     schema_and_typename = lookupTuple[:2]

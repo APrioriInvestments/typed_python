@@ -30,6 +30,7 @@ import traceback
 
 class ServiceWorker:
     def __init__(self, dbConnectionFactory, instance_id, storageRoot, serviceToken):
+        self._logger = logging.getLogger(__name__)
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema)
@@ -83,14 +84,14 @@ class ServiceWorker:
             try:
                 self.serviceObject = self._instantiateServiceObject()
             except:
-                logging.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
+                self._logger.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
                 self.instance.markFailedToStart(traceback.format_exc())
                 return
         try:
-            logging.info("Initializing service object for %s", self.instance._identity)
+            self._logger.info("Initializing service object for %s", self.instance._identity)
             self.serviceObject.initialize()
         except:
-            logging.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
+            self._logger.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
 
             self.serviceObject = None
 
@@ -118,10 +119,10 @@ class ServiceWorker:
             self.instance.state = "Running"
 
         try:
-            logging.info("Starting runloop for service object %s", self.instance._identity)
+            self._logger.info("Starting runloop for service object %s", self.instance._identity)
             self.serviceObject.doWork(self.shouldStop)
         except:
-            logging.error("Service %s/%s failed: %s",
+            self._logger.error("Service %s/%s failed: %s",
                 self.serviceName,
                 self.instance._identity,
                 traceback.format_exc()
@@ -134,7 +135,7 @@ class ServiceWorker:
                 return
         else:
             with self.db.transaction():
-                logging.info(
+                self._logger.info(
                     "Service %s/%s exited gracefully. Setting stopped flag.",
                     self.serviceName,
                     self.instance._identity

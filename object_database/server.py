@@ -162,6 +162,8 @@ class Server:
 
         self.identityProducer = IdentityProducer(self.allocateNewIdentityRoot())
 
+        self._logger = logging.getLogger(__name__)
+
     def start(self):
         self._subscriptionResponseThread = threading.Thread(target=self.serviceSubscriptions)
         self._subscriptionResponseThread.daemon = True
@@ -196,7 +198,7 @@ class Server:
                 except queue.Empty:
                     pass
             except:
-                logging.error("Unexpected error in serviceSubscription thread:\n%s", traceback.format_exc())
+                self._logger.error("Unexpected error in serviceSubscription thread:\n%s", traceback.format_exc())
 
 
     def _removeOldDeadConnections(self):
@@ -221,7 +223,7 @@ class Server:
                 heartbeatCount[missed] = heartbeatCount.get(missed, 0) + 1
 
                 if missed >= 4:
-                    logging.info(
+                    self._logger.info(
                         "Connection %s has not heartbeat in a long time. Killing it.",
                         self._clientChannels[c].connectionObject._identity
                         )
@@ -229,12 +231,12 @@ class Server:
                     c.close()
                     self.dropConnection(c)
 
-            logging.info("Connection heartbeat distribution is %s", heartbeatCount)
+            self._logger.info("Connection heartbeat distribution is %s", heartbeatCount)
 
     def dropConnection(self, channel):
         with self._lock:
             if channel not in self._clientChannels:
-                logging.warn('Tried to drop a nonexistant channel')
+                self._logger.warn('Tried to drop a nonexistant channel')
                 return
 
             connectedChannel = self._clientChannels[channel]
@@ -255,7 +257,7 @@ class Server:
 
             co = connectedChannel.connectionObject
 
-            logging.info("Server dropping connection for connectionObject._identity = %s", co._identity)
+            self._logger.info("Server dropping connection for connectionObject._identity = %s", co._identity)
 
             del self._clientChannels[channel]
 
@@ -315,7 +317,7 @@ class Server:
 
                 connectedChannel.sendInitializationMessage()
         except Exception:
-            logging.error(
+            self._logger.error(
                 "Failed during addConnection which should never happen:\n%s",
                 traceback.format_exc()
                 )
@@ -411,7 +413,7 @@ class Server:
                     typedef, identities = self._parseSubscriptionMsg(connectedChannel, msg)
 
                     if connectedChannel.channel not in self._clientChannels:
-                        logging.warn("Ignoring subscription from dead channel.")
+                        self._logger.warn("Ignoring subscription from dead channel.")
                         return
 
                     if msg.isLazy:
@@ -447,7 +449,7 @@ class Server:
                     with self._lock:
                         messageCount += 1
                         if messageCount == 2:
-                            logging.info(
+                            self._logger.info(
                                 "Beginning large subscription for %s/%s/%s",
                                 msg.schema, msg.typename, msg.fieldname_and_value
                                 )
@@ -652,7 +654,7 @@ class Server:
 
         # Abort if connection is not authenticated
         if connectedChannel.needsAuthentication:
-            logging.info(
+            self._logger.info(
                 "Received unexpected client message on unauthenticated channel %s",
                 connectedChannel.connectionObject._identity
             )
@@ -694,7 +696,7 @@ class Server:
                         msg.as_of_version
                         )
             except Exception:
-                logging.error("Unknown error committing transaction: %s", traceback.format_exc())
+                self._logger.error("Unknown error committing transaction: %s", traceback.format_exc())
                 isOK = False
                 badKey = "<NONE>"
 
@@ -978,7 +980,7 @@ class Server:
             channel.sendTransaction(transaction_message)
 
         if self.verbose or time.time() - t0 > self.longTransactionThreshold:
-            logging.info("Transaction [%.2f/%.2f/%.2f] with %s writes, %s set ops: %s",
+            self._logger.info("Transaction [%.2f/%.2f/%.2f] with %s writes, %s set ops: %s",
                 t1 - t0, t2 - t1, time.time() - t2,
                 len(key_value), len(set_adds) + len(set_removes), sorted(key_value)[:3]
                 )
