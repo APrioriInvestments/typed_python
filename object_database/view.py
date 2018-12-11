@@ -26,16 +26,20 @@ import traceback
 
 LOG_SLOW_COMMIT_THRESHOLD = 1.0
 
+
 class DisconnectedException(Exception):
     pass
 
+
 class RevisionConflictException(Exception):
     pass
+
 
 class ObjectDoesntExistException(Exception):
     def __init__(self, obj):
         super().__init__("%s(%s)" % (type(obj).__qualname__, obj._identity))
         self.obj = obj
+
 
 def revisionConflictRetry(f):
     MAX_TRIES = 100
@@ -55,6 +59,7 @@ def revisionConflictRetry(f):
 
     inner.__name__ = f.__name__
     return inner
+
 
 class SerializedDatabaseValue:
     """A value stored as Json with a python representation."""
@@ -78,7 +83,9 @@ def coerce_value(value, toType):
 def default_initialize(t):
     return t()
 
+
 _cur_view = threading.local()
+
 
 class View(object):
     _writeable = False
@@ -487,6 +494,7 @@ class View(object):
         finally:
             self._db._releaseView(self)
 
+
 class Transaction(View):
     _writeable = True
 
@@ -530,6 +538,7 @@ class Transaction(View):
         self._confirmCommitCallback = ignoreConfirmResult
 
         return self
+
 
 def current_transaction():
     if not hasattr(_cur_view, "view"):

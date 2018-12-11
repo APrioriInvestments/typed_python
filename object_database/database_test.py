@@ -46,7 +46,7 @@ def currentMemUsageMb(residentOnly=True):
         return psutil.Process().memory_info().vms / 1024 ** 2
 
 
-configureLogging("test", error=True)
+configureLogging("test")
 
 
 class BlockingCallback:
@@ -1499,6 +1499,11 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
     def tearDown(self):
         self.server.stop()
 
+    def test_connection_without_auth_disconnects(self):
+        db = DatabaseConnection(self.server.getChannel())
+        with self.assertRaises(DisconnectedException):
+            db.subscribeToSchema(schema)
+
     def test_heartbeats(self):
         old_interval = messages.getHeartbeatInterval()
         messages.setHeartbeatInterval(.25)
@@ -1599,9 +1604,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
 
     def createNewDb(self, useSecondaryLoop=False):
         db = self.server.connect(self.auth_token, useSecondaryLoop=useSecondaryLoop)
-
         db.initialized.wait()
-
         return db
 
     def tearDown(self):

@@ -75,13 +75,12 @@ def setupLogging(
         logging.basicConfig(level=default_level)
 
 
-def configureLogging(preamble="", error=False):
+def configureLogging(preamble="", level=logging.INFO):
     frmt = (
         '[%(asctime)s] %(levelname)8s %(filename)30s:%(lineno)4s | ' +
         (preamble + ' | ' if preamble else '') +
         '%(message)s'
     )
-    level = logging.INFO if not error else logging.ERROR
 
     updates = {
         'formatters': {
