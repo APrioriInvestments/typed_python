@@ -35,11 +35,19 @@ def main(argv):
     parser.add_argument("sourceDir")
     parser.add_argument("storageRoot")
     parser.add_argument("serviceToken")
-    parser.add_argument("--error_logs_only", action='store_true', default=False)
+    parser.add_argument("--log-level", required=False, default="WARNING")
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    configureLogging(parsedArgs.instanceid[:8], error=parsedArgs.error_logs_only)
+    validLogLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+    level = parsedArgs.log_level.upper()
+    if level not in validLogLevels:
+        raise Exception(
+            "invalid --log-level value: %s. Must be one of %s"
+            % (level, validLogLevels)
+        )
+
+    configureLogging(preamble=parsedArgs.instanceid[:8], level=level)
 
     logger = logging.getLogger(__name__)
 
