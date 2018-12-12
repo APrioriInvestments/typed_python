@@ -23,6 +23,7 @@ from typed_python import (
     Value, Class, Member, _types, TypedFunction, SerializationContext
 )
 
+
 def ping_pong(serialization_context, obj):
     return serialization_context.deserialize(
         serialization_context.serialize(obj)

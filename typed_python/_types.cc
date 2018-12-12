@@ -21,7 +21,7 @@ inline PyObject* incref(PyObject* o) {
 }
 
 
-//extension of PyTypeObject that stashes a Type* on the end.
+//extension of PyTypeObject that adds a Type* at the end.
 struct NativeTypeWrapper {
     PyTypeObject typeObj;
     Type* mType;
@@ -1712,7 +1712,7 @@ struct native_instance_wrapper {
                 PyErr_Format(PyExc_TypeError, "Can't call %S natively because we don't support *args and **kwargs yet", overload.getFunctionObj());
                 return NULL;
             }
-            
+
             Type* toUse = arg.getTypeFilter();
             if (!toUse) {
                 toUse = PythonObjectOfType::Make(getObjectAsTypeObject());

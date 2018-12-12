@@ -30,36 +30,27 @@ public:
     SerializationBuffer& operator=(const SerializationBuffer&) = delete;
 
     void write_uint8(uint8_t i) {
-        ensure(sizeof(i));
-        m_buffer[m_size++] = i;
+        write<uint8_t>(i);
     }
 
     void write_uint32(uint32_t i) {
-        ensure(sizeof(i));
-        *(uint32_t*)(m_buffer+m_size) = i;
-        m_size += sizeof(i);
+        write<uint32_t>(i);
     }
 
     void write_uint64(uint64_t i) {
-        ensure(sizeof(i));
-        *(uint64_t*)(m_buffer+m_size) = i;
-        m_size += sizeof(i);
+        write<uint64_t>(i);
     }
 
     void write_int64(int64_t i) {
-        ensure(sizeof(i));
-        *(int64_t*)(m_buffer+m_size) = i;
-        m_size += sizeof(i);
+        write<int64_t>(i);
     }
 
     void write_double(double i) {
-        ensure(sizeof(i));
-        *(double*)(m_buffer+m_size) = i;
-        m_size += sizeof(i);
+        write<double>(i);
     }
     void write_bytes(uint8_t* ptr, size_t bytecount) {
         ensure(bytecount);
-        memcpy(m_buffer+m_size,ptr,bytecount);
+        memcpy(m_buffer+m_size, ptr, bytecount);
         m_size += bytecount;
     }
 
@@ -109,6 +100,13 @@ public:
     }
 
 private:
+    template< class T>
+    void write(T i) {
+        ensure(sizeof(i));
+        *(T*)(m_buffer+m_size) = i;
+        m_size += sizeof(i);
+    }
+
     uint8_t* m_buffer;
     size_t m_size;
     size_t m_reserved;
