@@ -20,12 +20,15 @@ import typed_python._types
 import typed_python.inspect_override as inspect
 
 from typed_python.hash import sha_hash
-from typed_python._types import TupleOf, Tuple, NamedTuple, OneOf, ConstDict, \
-                                Alternative, Value, serialize, deserialize, Int8, \
-                                Int16, Int32, UInt8, UInt32, UInt64, NoneType, Function, TypeFor
+from typed_python._types import (
+    TupleOf, Tuple, NamedTuple, OneOf, ConstDict,
+    Alternative, Value, serialize, deserialize, Int8,
+    Int16, Int32, UInt8, UInt32, UInt64, NoneType, Function, TypeFor
+)
 
 #needed by the C api
 object=object
+
 
 def forwardToName(fwdLambda):
     if hasattr(fwdLambda, "__code__"):
@@ -34,8 +37,8 @@ def forwardToName(fwdLambda):
         if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
             return fwdLambda.__code__.co_freevars[0]
 
-
     return "UnknownForward"
+
 
 class Member:
     def __init__(self, t):
@@ -45,6 +48,7 @@ class Member:
         if not isinstance(other, Member):
             return False
         return self.t == other.t
+
 
 class ClassMetaNamespace:
     def __init__(self):
@@ -57,6 +61,7 @@ class ClassMetaNamespace:
     def __setitem__(self, k, v):
         self.ns[k] = v
         self.order.append((k,v))
+
 
 def makeFunction(name, f):
     spec = inspect.getfullargspec(f)
@@ -102,6 +107,7 @@ def makeFunction(name, f):
 
     return Function(name, return_type, f, tuple(arg_types))
 
+
 class ClassMetaclass(type):
     @classmethod
     def __prepare__(cls, *args, **kwargs):
@@ -141,12 +147,15 @@ class ClassMetaclass(type):
             tuple(classMembers)
             )
 
+
 class Class(metaclass=ClassMetaclass):
     """Base class for all typed python Class objects."""
     pass
 
+
 def TypedFunction(f):
     return makeFunction(f.__name__, f)()
+
 
 class FunctionOverloadArg:
     def __init__(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
@@ -155,6 +164,7 @@ class FunctionOverloadArg:
         self.typeFilter = typeFilter
         self.isStarArg = isStarArg
         self.isKwarg = isKwarg
+
 
 class FunctionOverload:
     def __init__(self, functionTypeObject, index, f, returnType, *huh):
