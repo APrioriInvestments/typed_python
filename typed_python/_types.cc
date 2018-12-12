@@ -20,6 +20,10 @@ inline PyObject* incref(PyObject* o) {
     return o;
 }
 
+inline int attribute_error(PyObject* o, PyObject* attrName) {
+    PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S' yo!", o->ob_type, attrName);
+    return -1;
+}
 
 //extension of PyTypeObject that adds a Type* at the end.
 struct NativeTypeWrapper {
@@ -1506,8 +1510,7 @@ struct native_instance_wrapper {
 
     static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal) {
         if (!PyUnicode_Check(attrName)) {
-            PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S'", o->ob_type, attrName);
-            return -1;
+            return attribute_error(o, attrName);
         }
 
         Type* type = extractTypeFrom(o->ob_type);
@@ -1519,8 +1522,7 @@ struct native_instance_wrapper {
             int i = nt->memberNamed(PyUnicode_AsUTF8(attrName));
 
             if (i < 0) {
-                PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S'", o->ob_type, attrName);
-                return -1;
+                return attribute_error(o, attrName);
             }
 
             Type* eltType = nt->getMembers()[i].second;
@@ -1552,8 +1554,7 @@ struct native_instance_wrapper {
             }
         }
 
-        PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S'", o->ob_type, attrName);
-        return -1;
+        return attribute_error(o, attrName);
     }
 
     static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
@@ -3293,8 +3294,9 @@ Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
 }
 
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 5) {
-        PyErr_SetString(PyExc_TypeError, "Class takes 2 arguments (name and a list of class members)");
+    int expected_args = 5;
+    if (PyTuple_Size(args) != expected_args) {
+        PyErr_Format(PyExc_TypeError, "Class takes %S arguments", expected_args);
         return NULL;
     }
 
@@ -4390,14 +4392,14 @@ static PyMethodDef module_methods[] = {
 
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
-    "_types",
-    NULL,
-    0,
-    module_methods,
-    NULL,
-    NULL,
-    NULL,
-    NULL
+    .m_name = "_types",
+    .m_doc = NULL,
+    .m_size = 0,
+    .m_methods = module_methods,
+    .m_slots = NULL,
+    .m_traverse = NULL,
+    .m_clear = NULL,
+    .m_free = NULL
 };
 
 void updateTypeRepForType(Type* type, PyTypeObject* pyType) {

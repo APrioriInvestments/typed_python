@@ -12,17 +12,22 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types
+from typed_python import (
+    Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict,
+    Alternative, serialize, deserialize, Value, Class, Member, _types
+)
+
 
 class Interior(Class):
     x = Member(int)
     y = Member(int)
 
+
 class Exterior(Class):
     x = Member(int)
     i = Member(Interior)
     iTup = Member(NamedTuple(x=Interior, y=Interior))
+
 
 class NativeClassTypesTests(unittest.TestCase):
     def test_class(self):
@@ -92,16 +97,15 @@ class NativeClassTypesTests(unittest.TestCase):
             def returnsFloat(self, x) -> float:
                 return x
 
-
         c = C()
 
         c.returnsInt(20)
 
         with self.assertRaises(TypeError):
-            #this should throw because we cannot convert a string to an int
+            # this should throw because we cannot convert a string to an int
             c.returnsInt("hi")
 
-        #this should throw because we are happy to convert int to float
+        # this should throw because we are happy to convert int to float
         c.returnsFloat(1)
 
     def test_class_function_dispatch_on_arity(self):
@@ -132,17 +136,18 @@ class NativeClassTypesTests(unittest.TestCase):
                 return 1
 
         c = C()
-        with self.assertRaises(Exception):
+
+        with self.assertRaises(AssertionError):
             c.g(1,2)
 
 
     def test_class_function_sends_args_to_right_place(self):
-        def g(a,b,c=10, *args, d=20, **kwargs):
-            return (a,b,args,kwargs)
+        def g(a, b, c=10, *args, d=20, **kwargs):
+            return (a, b, args, kwargs)
 
         class C(Class):
-            def g(self, a,b, c=10, *args, d=20, **kwargs):
-                return (a,b,args,kwargs)
+            def g(self, a, b, c=10, *args, d=20, **kwargs):
+                return (a, b, args, kwargs)
 
         c = C()
 
@@ -150,7 +155,7 @@ class NativeClassTypesTests(unittest.TestCase):
             self.assertEqual(
                 takesCallable(c.g),
                 takesCallable(g)
-                )
+            )
 
         assertSame(lambda formOfG: formOfG(1,2))
         assertSame(lambda formOfG: formOfG(1,2,3))
@@ -195,6 +200,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.x, 10)
         self.assertEqual(c.y, 0)
 
+        import pdb; pdb.set_trace()
         with self.assertRaises(AttributeError):
             c.x = 20
 
@@ -265,24 +271,34 @@ class NativeClassTypesTests(unittest.TestCase):
                 return "object"
 
         x = X()
+
+        # x.anything
         x.anything = 10
         self.assertEqual(x.anything, 10)
 
         x.anything = NormalPyClass()
         self.assertIsInstance(x.anything, NormalPyClass)
 
+        # x.pyclass
         x.pyclass = NormalPyClass()
         self.assertIsInstance(x.pyclass, NormalPyClass)
+        with self.assertRaises(AssertionError):
+            self.assertIsInstance(x.pyclass, NormalPySubclass)
 
         x.pyclass = NormalPySubclass()
         self.assertIsInstance(x.pyclass, NormalPyClass)
         self.assertIsInstance(x.pyclass, NormalPySubclass)
 
-        x.pysubclass = NormalPySubclass()
-        self.assertIsInstance(x.pyclass, NormalPySubclass)
+        x.pyclass = None
+        self.assertIsInstance(x.pyclass, type(None))
 
         with self.assertRaises(TypeError):
             x.pyclass = 10
+
+        # x.pysubclass
+        x.pysubclass = NormalPySubclass()
+        self.assertIsInstance(x.pysubclass, NormalPySubclass)
+        self.assertIsInstance(x.pysubclass, NormalPyClass)
 
         with self.assertRaises(TypeError):
             x.pysubclass = NormalPyClass()
