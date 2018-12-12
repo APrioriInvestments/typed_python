@@ -11,32 +11,46 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
-import unittest
+
 import numpy
-import time
 import threading
-from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction, SerializationContext
+import time
+import unittest
+
+from typed_python import (
+    Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64,
+    String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
+    Value, Class, Member, _types, TypedFunction, SerializationContext
+)
+
+def ping_pong(serialization_context, obj):
+    return serialization_context.deserialize(
+        serialization_context.serialize(obj)
+    )
+
 
 class TypesSerializationTest(unittest.TestCase):
+    def check_idempotence(self, ser_ctx, obj):
+        self.assertEqual(obj, ping_pong(ser_ctx, obj))
+
     def test_serialize_core_python_objects(self):
         ts = SerializationContext()
 
-        self.assertEqual(ts.deserialize(ts.serialize(10)), 10)
-        self.assertEqual(ts.deserialize(ts.serialize(10.5)), 10.5)
-        self.assertEqual(ts.deserialize(ts.serialize(None)), None)
-        self.assertEqual(ts.deserialize(ts.serialize(True)), True)
-        self.assertEqual(ts.deserialize(ts.serialize(False)), False)
-        self.assertEqual(ts.deserialize(ts.serialize("a string")), "a string")
-        self.assertEqual(ts.deserialize(ts.serialize(b"some bytes")), b"some bytes")
-        self.assertEqual(ts.deserialize(ts.serialize((1,2,3))), (1,2,3))
-        self.assertEqual(ts.deserialize(ts.serialize({"key":"value"})), {"key":"value"})
-        self.assertEqual(ts.deserialize(ts.serialize({"key":"value", "key2": "value2"})), {"key":"value", "key2": "value2"})
-        self.assertEqual(ts.deserialize(ts.serialize([1,2,3])), [1,2,3])
-        self.assertEqual(ts.deserialize(ts.serialize([1,2,3])), [1,2,3])
-        self.assertEqual(ts.deserialize(ts.serialize(int)), int)
-        self.assertEqual(ts.deserialize(ts.serialize(object)), object)
-        self.assertEqual(ts.deserialize(ts.serialize(type)), type)
+
+        self.check_idempotence(ts, 10)
+        self.check_idempotence(ts, 10.5)
+        self.check_idempotence(ts, None)
+        self.check_idempotence(ts, True)
+        self.check_idempotence(ts, False)
+        self.check_idempotence(ts, "a string")
+        self.check_idempotence(ts, b"some bytes")
+        self.check_idempotence(ts, (1,2,3))
+        self.check_idempotence(ts, {"key":"value"})
+        self.check_idempotence(ts, {"key":"value", "key2": "value2"})
+        self.check_idempotence(ts, [1,2,3])
+        self.check_idempotence(ts, int)
+        self.check_idempotence(ts, object)
+        self.check_idempotence(ts, type)
 
     def test_serialize_recursive_list(self):
         ts = SerializationContext()
@@ -44,7 +58,7 @@ class TypesSerializationTest(unittest.TestCase):
         l = []
         l.append(l)
 
-        l_alt = ts.deserialize(ts.serialize(l))
+        l_alt = ping_pong(ts, l)
         self.assertIs(l_alt[0], l_alt)
 
     def test_serialize_recursive_dict(self):
@@ -53,7 +67,7 @@ class TypesSerializationTest(unittest.TestCase):
         d = {}
         d[0] = d
 
-        d_alt = ts.deserialize(ts.serialize(d))
+        d_alt = ping_pong(ts, d)
         self.assertIs(d_alt[0], d_alt)
 
     def test_serialize_memoizes_tuples(self):
@@ -73,7 +87,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         o = AnObject(123)
 
-        o2 = ts.deserialize(ts.serialize(o))
+        o2 = ping_pong(ts, o)
 
         self.assertIsInstance(o2, AnObject)
         self.assertEqual(o2.o, 123)
@@ -88,13 +102,13 @@ class TypesSerializationTest(unittest.TestCase):
         o = AnObject(None)
         o.o = o
 
-        o2 = ts.deserialize(ts.serialize(o))
+        o2 = ping_pong(ts, o)
         self.assertIs(o2.o, o2)
 
     def test_serialize_primitive_native_types(self):
         ts = SerializationContext()
         for t in [Int64, Float64, Bool, NoneType, String, Bytes]:
-            self.assertIs(ts.deserialize(ts.serialize(t())), t())
+            self.assertIs(ping_pong(ts, t()), t())
 
     def test_serialize_primitive_compound_types(self):
         class A:
@@ -115,26 +129,26 @@ class TypesSerializationTest(unittest.TestCase):
                     TupleOf(A),
                     TupleOf(B)
                     ]:
-            self.assertIs(ts.deserialize(ts.serialize(t)), t)
+            self.assertIs(ping_pong(ts, t), t)
 
     def test_serialize_functions(self):
         def f():
             return 10
 
         ts = SerializationContext({'f': f})
-        self.assertIs(ts.deserialize(ts.serialize(f)), f)
+        self.assertIs(ping_pong(ts, f), f)
 
     def test_serialize_alternatives(self):
         A = Alternative("A", X={'a': int}, Y={'a': lambda: A})
 
         ts = SerializationContext({'A': A})
-        self.assertIs(ts.deserialize(ts.serialize(A.X)), A.X)
+        self.assertIs(ping_pong(ts, A.X), A.X)
 
     def test_serialize_lambdas(self):
         ts = SerializationContext()
 
         def check(f, args):
-            self.assertEqual(f(*args), ts.deserialize(ts.serialize(f))(*args))
+            self.assertEqual(f(*args), ping_pong(ts, f)(*args))
 
         y = 20
 
@@ -189,7 +203,7 @@ class TypesSerializationTest(unittest.TestCase):
         x = numpy.ones(10000)
         ts = SerializationContext()
 
-        self.assertTrue(numpy.all(ts.deserialize(ts.serialize({'a': x, 'b': x}))['a'] == x))
+        self.assertTrue(numpy.all(ping_pong(ts, {'a': x, 'b': x})['a'] == x))
 
     def test_serialize_and_threads(self):
         x = numpy.ones(10000)
@@ -204,7 +218,7 @@ class TypesSerializationTest(unittest.TestCase):
         def thread():
             t0 = time.time()
             while time.time() - t0 < 1.0:
-                ts.deserialize(ts.serialize(A(10)))
+                ping_pong(ts, A(10))
             OK.append(True)
 
 
@@ -219,7 +233,7 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_named_tuple(self):
         X = NamedTuple(x=int)
         ts = SerializationContext()
-        self.assertEqual(ts.deserialize(ts.serialize(X(x=20))), X(x=20))
+        self.check_idempotence(ts, X(x=20))
 
 
     def test_serialize_named_tuple_subclass(self):
@@ -229,8 +243,8 @@ class TypesSerializationTest(unittest.TestCase):
 
         ts = SerializationContext({'X':X})
 
-        self.assertIs(ts.deserialize(ts.serialize(X)), X)
+        self.assertIs(ping_pong(ts, X), X)
 
         self.assertTrue(ts.serialize(X(x=20)) != ts.serialize(X(x=21)))
 
-        self.assertEqual(ts.deserialize(ts.serialize(X(x=20))), X(x=20))
+        self.check_idempotence(ts, X(x=20))
