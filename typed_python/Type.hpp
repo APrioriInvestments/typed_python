@@ -3899,6 +3899,7 @@ public:
             m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
     }
+
     const std::vector<std::pair<std::string, Type*> >& getMembers() const {
         return m_members;
     }
