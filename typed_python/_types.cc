@@ -1895,7 +1895,7 @@ struct native_instance_wrapper {
                 }
             }
 
-            for (long k = 0; k < nt->getMemberFunctions().size(); k++) {
+            {
                 auto it = nt->getMemberFunctions().find(attr_name);
                 if (it != nt->getMemberFunctions().end()) {
                     BoundMethod* bm = BoundMethod::Make(nt, it->second);
@@ -1906,7 +1906,7 @@ struct native_instance_wrapper {
                 }
             }
 
-            for (long k = 0; k < nt->getClassMembers().size(); k++) {
+            {
                 auto it = nt->getClassMembers().find(attr_name);
                 if (it != nt->getClassMembers().end()) {
                     PyObject* res = it->second;
