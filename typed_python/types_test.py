@@ -12,8 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Int8, Int64, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
+from typed_python import (
+    Int8, Int64, NoneType, TupleOf, OneOf, Tuple, NamedTuple,
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member
+)
 
 import typed_python._types as _types
 import psutil
@@ -23,6 +25,7 @@ import traceback
 import time
 import numpy
 import sys
+
 
 def typeFor(t):
     assert not isinstance(t, list), t
@@ -231,7 +234,13 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(tuple(i), (1,2,3))
 
         for x in range(10):
-            self.assertEqual(tuple(tupleOfInt(tuple(range(x)))), tuple(range(x)))
+            self.assertEqual(
+                tuple(tupleOfInt(tuple(range(x)))),
+                tuple(range(x))
+            )
+
+        with self.assertRaisesRegex(AttributeError, "do not accept attributes"):
+            tupleOfInt((1,2,3)).x = 2
 
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
@@ -362,7 +371,7 @@ class NativeTypesTests(unittest.TestCase):
     def test_one_of_conversion_failure(self):
         o = OneOf(None, str)
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(TypeError):
             o(b"bytes")
 
     def test_one_of_in_tuple(self):
@@ -389,8 +398,11 @@ class NativeTypesTests(unittest.TestCase):
     def test_named_tuple(self):
         t = NamedTuple(a=int, b=int)
 
-        with self.assertRaises(AttributeError):
+        with self.assertRaisesRegex(AttributeError, "object has no attribute"):
             t().asdf
+
+        with self.assertRaisesRegex(AttributeError, "immutable"):
+            t().a = 1
 
         self.assertEqual(t()[0], 0)
         self.assertEqual(t().a, 0)
@@ -398,7 +410,6 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(t(a=1,b=2).a, 1)
         self.assertEqual(t(a=1,b=2).b, 2)
-
 
     def test_named_tuple_construction(self):
         t = NamedTuple(a=int, b=int)
@@ -763,6 +774,9 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(a.y, 20)
         self.assertTrue(a.matches.child_ints)
         self.assertFalse(a.matches.child_strings)
+
+        with self.assertRaisesRegex(AttributeError, "immutable"):
+            a.x = 20
 
     def test_alternatives_add_operator(self):
         alt = Alternative(

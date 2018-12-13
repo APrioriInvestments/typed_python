@@ -31,6 +31,7 @@ def ping_pong(serialization_context, obj):
 
 
 class TypesSerializationTest(unittest.TestCase):
+
     def check_idempotence(self, ser_ctx, obj):
         self.assertEqual(obj, ping_pong(ser_ctx, obj))
 
@@ -56,11 +57,19 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_recursive_list(self):
         ts = SerializationContext()
 
-        l = []
-        l.append(l)
+        def check_reclist(size):
+            init = list(range(size))
+            reclist = list(init)
+            reclist.append(reclist)
+            alt_reclist = ping_pong(ts, reclist)
 
-        l_alt = ping_pong(ts, l)
-        self.assertIs(l_alt[0], l_alt)
+            for i in range(size):
+                self.assertEqual(init[i], alt_reclist[i])
+                self.assertEqual(reclist[i], alt_reclist[i])
+            self.assertIs(alt_reclist[size], alt_reclist)
+
+        for i in range(4):
+            check_reclist(i)
 
     def test_serialize_recursive_dict(self):
         ts = SerializationContext()

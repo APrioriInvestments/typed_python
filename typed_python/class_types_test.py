@@ -200,9 +200,11 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.x, 10)
         self.assertEqual(c.y, 0)
 
-        import pdb; pdb.set_trace()
-        with self.assertRaises(AttributeError):
+        with self.assertRaisesRegex(AttributeError, "Cannot modify read-only class member"):
             c.x = 20
+
+        with self.assertRaisesRegex(AttributeError, "cannot add attributes to instances of this type"):
+            c.z = 20
 
         self.assertEqual(C.x, 10)
         self.assertEqual(C.y, Member(int))

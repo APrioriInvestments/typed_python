@@ -20,11 +20,6 @@ inline PyObject* incref(PyObject* o) {
     return o;
 }
 
-inline int attribute_error(PyObject* o, PyObject* attrName) {
-    PyErr_Format(PyExc_AttributeError, "Instance of type %S has no attribute '%S' yo!", o->ob_type, attrName);
-    return -1;
-}
-
 //extension of PyTypeObject that adds a Type* at the end.
 struct NativeTypeWrapper {
     PyTypeObject typeObj;
@@ -1510,7 +1505,12 @@ struct native_instance_wrapper {
 
     static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal) {
         if (!PyUnicode_Check(attrName)) {
-            return attribute_error(o, attrName);
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Cannot set attribute '%S' on instance of type '%S'. Attribute does not resolve to a string",
+                attrName, o->ob_type
+            );
+            return -1;
         }
 
         Type* type = extractTypeFrom(o->ob_type);
@@ -1522,7 +1522,21 @@ struct native_instance_wrapper {
             int i = nt->memberNamed(PyUnicode_AsUTF8(attrName));
 
             if (i < 0) {
-                return attribute_error(o, attrName);
+                auto it = nt->getClassMembers().find(PyUnicode_AsUTF8(attrName));
+                if (it == nt->getClassMembers().end()) {
+                    PyErr_Format(
+                        PyExc_AttributeError,
+                        "'%s' object has no attribute '%S' and cannot add attributes to instances of this type",
+                        o->ob_type->tp_name, attrName
+                    );
+                } else {
+                    PyErr_Format(
+                        PyExc_AttributeError,
+                        "Cannot modify read-only class member '%S' of instance of type '%S'",
+                        attrName, o->ob_type
+                    );
+                }
+                return -1;
             }
 
             Type* eltType = nt->getMembers()[i].second;
@@ -1532,7 +1546,10 @@ struct native_instance_wrapper {
             if (eltType == attrType) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)attrVal;
 
-                attrType->assign(nt->eltPtr(self_w->dataPtr(), i), item_w->dataPtr());
+                attrType->assign(
+                    nt->eltPtr(self_w->dataPtr(), i),
+                    item_w->dataPtr()
+                );
 
                 return 0;
             } else {
@@ -1552,9 +1569,22 @@ struct native_instance_wrapper {
 
                 return 0;
             }
+        } else if (type->getTypeCategory() == Type::TypeCategory::catNamedTuple
+            || type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Cannot set attributes on instance of type '%S' because it is immutable",
+                o->ob_type
+            );
+            return -1;
+        } else {
+            PyErr_Format(
+                PyExc_AttributeError,
+                "Instances of type '%S' do not accept attributes",
+                attrName, o->ob_type
+            );
+            return -1;
         }
-
-        return attribute_error(o, attrName);
     }
 
     static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
