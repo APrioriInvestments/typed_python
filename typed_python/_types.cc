@@ -15,7 +15,11 @@
 PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
-        types.push_back(native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
+        types.push_back(
+            native_instance_wrapper::unwrapTypeArgToTypePtr(
+                PyTuple_GetItem(args,k)
+            )
+        );
         if (not types.back()) {
             return NULL;
         }
@@ -640,7 +644,14 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
+/**
+    Serializes an object instance and returns a pointer to a PyBytes object
 
+    Note: we list the params to be extracted from `args`
+    @param a1: Serialization Type
+    @param a2: Instance
+    @param a3: Serialization Context (optional)
+*/
 PyObject *serialize(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
         PyErr_SetString(PyExc_TypeError, "serialize takes 2 or 3 positional arguments");

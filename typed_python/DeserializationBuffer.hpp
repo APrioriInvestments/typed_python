@@ -52,6 +52,7 @@ public:
 
         return f(m_buffer - bytecount);
     }
+
     void read_bytes(uint8_t* ptr, size_t bytecount) {
         if (m_size < bytecount) {
             throw std::runtime_error("out of data");
@@ -104,12 +105,12 @@ public:
 
     template<class T>
     T* addCachedPointer(int32_t which, T* ptr, bool needsPyDecref=false) {
+        if (!ptr) {
+            throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
+        }
         while (which >= m_cachedPointers.size()) {
             m_cachedPointers.push_back(nullptr);
             m_needsPyDecref.push_back(false);
-        }
-        if (!ptr) {
-            throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
         }
         if (m_cachedPointers[which]) {
             throw std::runtime_error("Corrupt data: tried to write a recursive object multiple times");
@@ -139,6 +140,9 @@ private:
     size_t m_size;
     size_t m_orig_size;
     const SerializationContext& m_context;
+
+    // These two vectors implement the pointer-cache datastructure. They map
+    // ids (indices) to pointers and to the whether they need decref-ing
     std::vector<void*> m_cachedPointers;
     std::vector<bool> m_needsPyDecref;
 };

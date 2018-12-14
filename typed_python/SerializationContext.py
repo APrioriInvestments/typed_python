@@ -24,7 +24,10 @@ _ndarray = numpy.ndarray
 def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast)
 
-_builtin_name_to_value = {".builtin." + k:v for k,v in __builtins__.items() if isinstance(v,type)}
+_builtin_name_to_value = {
+    ".builtin." + k: v for k, v in __builtins__.items()
+    if isinstance(v, type) or 'builtin_function_or_method' in str(type(v))
+}
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
 _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
