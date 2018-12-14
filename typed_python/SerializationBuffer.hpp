@@ -78,6 +78,13 @@ public:
         return m_context;
     }
 
+    /**
+        Keep track of whether we've seen this pointer before
+
+        @param t A PyObject pointer to be cached
+        @return an std::pair containing its cache ID (the size of the cache)
+                and 'false' if the pointer was already in the cache
+    */
     std::pair<uint32_t, bool> cachePointer(PyObject* t) {
         Py_INCREF(t);
         m_pointersNeedingDecref.insert(t);

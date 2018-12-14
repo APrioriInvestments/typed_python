@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import numpy
+import sys
 import threading
 import time
 import unittest
@@ -27,44 +28,246 @@ from typed_python import (
     Value, Class, Member, _types, TypedFunction, SerializationContext
 )
 
-def ping_pong(serialization_context, obj):
-    return serialization_context.deserialize(
-        serialization_context.serialize(obj)
-    )
+class C:
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
+
+class D(C):
+    def __init__(self, arg):
+        pass
+
+class E(C):
+    def __getinitargs__(self):
+        return ()
+
+class H(object):
+    pass
+
+# Hashable mutable key
+class K(object):
+    def __init__(self, value):
+        self.value = value
+
+    def __reduce__(self):
+        # Shouldn't support the recursion itself
+        return K, (self.value,)
+
+import __main__
+__main__.C = C
+C.__module__ = "__main__"
+__main__.D = D
+D.__module__ = "__main__"
+__main__.E = E
+E.__module__ = "__main__"
+__main__.H = H
+H.__module__ = "__main__"
+__main__.K = K
+K.__module__ = "__main__"
+
+
+class myint(int):
+    def __init__(self, x):
+        self.str = str(x)
+
+class initarg(C):
+
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+    def __getinitargs__(self):
+        return self.a, self.b
+
+class metaclass(type):
+    pass
+
+class use_metaclass(object, metaclass=metaclass):
+    pass
+
+class pickling_metaclass(type):
+    def __eq__(self, other):
+        return (type(self) == type(other) and
+                self.reduce_args == other.reduce_args)
+
+    def __reduce__(self):
+        return (create_dynamic_class, self.reduce_args)
+
+def create_dynamic_class(name, bases):
+    result = pickling_metaclass(name, bases, dict())
+    result.reduce_args = (name, bases)
+    return result
+
+def create_data():
+    c = C()
+    c.foo = 1
+    c.bar = 2
+    # TODO: add support for complex numbers
+    # x = [0, 1, 2.0, 3.0+0j]
+    x = [0, 1, 2.0]
+    # Append some integer test cases at cPickle.c's internal size
+    # cutoffs.
+    uint1max = 0xff
+    uint2max = 0xffff
+    int4max = 0x7fffffff
+    x.extend([1, -1,
+              uint1max, -uint1max, -uint1max-1,
+              uint2max, -uint2max, -uint2max-1,
+               int4max,  -int4max,  -int4max-1])
+    y = ('abc', 'abc', c, c)
+    x.append(y)
+    x.append(y)
+    x.append(5)
+    return x
+
+# Test classes for newobj
+
+class MyInt(int):
+    sample = 1
+
+class MyFloat(float):
+    sample = 1.0
+
+class MyComplex(complex):
+    sample = 1.0 + 0.0j
+
+class MyStr(str):
+    sample = "hello"
+
+class MyUnicode(str):
+    sample = "hello \u1234"
+
+class MyBytes(bytes):
+    sample = b"hello"
+
+class MyTuple(tuple):
+    sample = (1, 2, 3)
+
+class MyList(list):
+    sample = [1, 2, 3]
+
+class MyDict(dict):
+    sample = {"a": 1, "b": 2}
+
+class MySet(set):
+    sample = {"a", "b"}
+
+class MyFrozenSet(frozenset):
+    sample = frozenset({"a", "b"})
+
+myclasses = [MyInt, MyFloat,
+             MyComplex,
+             MyStr, MyUnicode,
+             MyTuple, MyList, MyDict, MySet, MyFrozenSet]
+
+
+REDUCE_A = 'reduce_A'
+
+class AAA(object):
+    def __reduce__(self):
+        return str, (REDUCE_A,)
+
+
+sc = SerializationContext({
+    'initarg': initarg,
+    'C': C,
+    'D': D,
+    'E': E,
+    'H': H,
+    'K': K,
+    'MyInt': MyInt,
+    'MyFloat': MyFloat,
+    'MyComplex': MyComplex,
+    'MyStr': MyStr,
+    'MyUnicode': MyUnicode,
+    'MyBytes': MyBytes,
+    'MyTuple': MyTuple,
+    'MyList': MyList,
+    'MyDict': MyDict,
+    'MySet': MySet,
+    'MyFrozenSet': MyFrozenSet,
+    'use_metaclass': use_metaclass,
+    'metaclass': metaclass,
+    'pickling_metaclass': pickling_metaclass,
+    'AAA': AAA,
+})
+
+def ping_pong(obj, serialization_context=None):
+    serialization_context = serialization_context or SerializationContext()
+    s = serialization_context.serialize(obj)
+    return serialization_context.deserialize(s)
 
 
 class TypesSerializationTest(unittest.TestCase):
 
-    def check_idempotence(self, ser_ctx, obj):
-        self.assertEqual(obj, ping_pong(ser_ctx, obj))
+    def assert_is_copy(self, obj, objcopy, msg=None):
+        """Utility method to verify if two objects are copies of each others.
+        """
+        if msg is None:
+            msg = "{!r} is not a copy of {!r}".format(obj, objcopy)
+        self.assertEqual(obj, objcopy, msg=msg)
+        self.assertIs(type(obj), type(objcopy), msg=msg)
+        if hasattr(obj, '__dict__'):
+            if isinstance(obj.__dict__, dict):
+                self.assertDictEqual(obj.__dict__, objcopy.__dict__, msg=msg)
+            self.assertIsNot(obj.__dict__, objcopy.__dict__, msg=msg)
+        if hasattr(obj, '__slots__'):
+            self.assertListEqual(obj.__slots__, objcopy.__slots__, msg=msg)
+            for slot in obj.__slots__:
+                self.assertEqual(
+                    hasattr(obj, slot), hasattr(objcopy, slot), msg=msg)
+                self.assertEqual(getattr(obj, slot, None),
+                                 getattr(objcopy, slot, None), msg=msg)
+
+
+    def check_idempotence(self, obj, ser_ctx=None):
+        ser_ctx = ser_ctx or SerializationContext()
+
+        self.assert_is_copy(obj, ping_pong(obj, ser_ctx))
 
     def test_serialize_core_python_objects(self):
-        ts = SerializationContext()
+        self.check_idempotence(0)
+        self.check_idempotence(10)
+        self.check_idempotence(-10)
+        self.check_idempotence(-0.0)
+        self.check_idempotence(0.0)
+        self.check_idempotence(10.5)
+        self.check_idempotence(-10.5)
+        self.check_idempotence(None)
+        self.check_idempotence(True)
+        self.check_idempotence(False)
+        self.check_idempotence("")
+        self.check_idempotence("a string")
+        self.check_idempotence(b"")
+        self.check_idempotence(b"some bytes")
 
+        self.check_idempotence(())
+        self.check_idempotence((1,))
+        self.check_idempotence((1,2,3))
+        self.check_idempotence({})
+        self.check_idempotence({"key":"value"})
+        self.check_idempotence({"key":"value", "key2": "value2"})
+        self.check_idempotence([])
+        self.check_idempotence([1,2,3])
+        self.check_idempotence(set())
+        self.check_idempotence({1,2,3})
+        self.check_idempotence(frozenset())
+        self.check_idempotence(frozenset({1,2,3}))
 
-        self.check_idempotence(ts, 10)
-        self.check_idempotence(ts, 10.5)
-        self.check_idempotence(ts, None)
-        self.check_idempotence(ts, True)
-        self.check_idempotence(ts, False)
-        self.check_idempotence(ts, "a string")
-        self.check_idempotence(ts, b"some bytes")
-        self.check_idempotence(ts, (1,2,3))
-        self.check_idempotence(ts, {"key":"value"})
-        self.check_idempotence(ts, {"key":"value", "key2": "value2"})
-        self.check_idempotence(ts, [1,2,3])
-        self.check_idempotence(ts, int)
-        self.check_idempotence(ts, object)
-        self.check_idempotence(ts, type)
+        self.check_idempotence(int)
+        self.check_idempotence(object)
+        self.check_idempotence(type)
+
+    def test_serialize_python_dict(self):
+        d = {1: 2, 3: '4', '5': 6, 7.0: b'8'}
+        self.check_idempotence(d)
 
     def test_serialize_recursive_list(self):
-        ts = SerializationContext()
 
         def check_reclist(size):
             init = list(range(size))
             reclist = list(init)
             reclist.append(reclist)
-            alt_reclist = ping_pong(ts, reclist)
+            alt_reclist = ping_pong(reclist)
 
             for i in range(size):
                 self.assertEqual(init[i], alt_reclist[i])
@@ -73,15 +276,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         for i in range(4):
             check_reclist(i)
-
-    def test_serialize_recursive_dict(self):
-        ts = SerializationContext()
-
-        d = {}
-        d[0] = d
-
-        d_alt = ping_pong(ts, d)
-        self.assertIs(d_alt[0], d_alt)
 
     def test_serialize_memoizes_tuples(self):
         ts = SerializationContext()
@@ -100,7 +294,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         o = AnObject(123)
 
-        o2 = ping_pong(ts, o)
+        o2 = ping_pong(o, ts)
 
         self.assertIsInstance(o2, AnObject)
         self.assertEqual(o2.o, 123)
@@ -115,13 +309,12 @@ class TypesSerializationTest(unittest.TestCase):
         o = AnObject(None)
         o.o = o
 
-        o2 = ping_pong(ts, o)
+        o2 = ping_pong(o, ts)
         self.assertIs(o2.o, o2)
 
     def test_serialize_primitive_native_types(self):
-        ts = SerializationContext()
         for t in [Int64, Float64, Bool, NoneType, String, Bytes]:
-            self.assertIs(ping_pong(ts, t()), t())
+            self.assertIs(ping_pong(t()), t())
 
     def test_serialize_primitive_compound_types(self):
         class A:
@@ -142,26 +335,25 @@ class TypesSerializationTest(unittest.TestCase):
                     TupleOf(A),
                     TupleOf(B)
                     ]:
-            self.assertIs(ping_pong(ts, t), t)
+            self.assertIs(ping_pong(t, ts), t)
 
     def test_serialize_functions(self):
         def f():
             return 10
 
         ts = SerializationContext({'f': f})
-        self.assertIs(ping_pong(ts, f), f)
+        self.assertIs(ping_pong(f, ts), f)
 
     def test_serialize_alternatives(self):
         A = Alternative("A", X={'a': int}, Y={'a': lambda: A})
 
         ts = SerializationContext({'A': A})
-        self.assertIs(ping_pong(ts, A.X), A.X)
+        self.assertIs(ping_pong(A.X, ts), A.X)
 
     def test_serialize_lambdas(self):
-        ts = SerializationContext()
 
         def check(f, args):
-            self.assertEqual(f(*args), ping_pong(ts, f)(*args))
+            self.assertEqual(f(*args), ping_pong(f)(*args))
 
         y = 20
 
@@ -217,9 +409,8 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_and_numpy_with_dicts(self):
         x = numpy.ones(10000)
-        ts = SerializationContext()
 
-        self.assertTrue(numpy.all(ping_pong(ts, {'a': x, 'b': x})['a'] == x))
+        self.assertTrue(numpy.all(ping_pong({'a': x, 'b': x})['a'] == x))
 
     def test_serialize_and_threads(self):
         x = numpy.ones(10000)
@@ -234,7 +425,7 @@ class TypesSerializationTest(unittest.TestCase):
         def thread():
             t0 = time.time()
             while time.time() - t0 < 1.0:
-                ping_pong(ts, A(10))
+                ping_pong(A(10), ts)
             OK.append(True)
 
 
@@ -248,8 +439,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_named_tuple(self):
         X = NamedTuple(x=int)
-        ts = SerializationContext()
-        self.check_idempotence(ts, X(x=20))
+        self.check_idempotence(X(x=20))
 
 
     def test_serialize_named_tuple_subclass(self):
@@ -257,13 +447,13 @@ class TypesSerializationTest(unittest.TestCase):
             def f(self):
                 return self.x
 
-        ts = SerializationContext({'X':X})
+        ts = SerializationContext({'X': X})
 
-        self.assertIs(ping_pong(ts, X), X)
+        self.assertIs(ping_pong(X, ts), X)
 
         self.assertTrue(ts.serialize(X(x=20)) != ts.serialize(X(x=21)))
 
-        self.check_idempotence(ts, X(x=20))
+        self.check_idempotence(X(x=20), ts)
 
     def test_bad_serialization_context(self):
         with self.assertRaises(AssertionError):
@@ -377,3 +567,335 @@ class TypesSerializationTest(unittest.TestCase):
 
         gc.collect()
         self.assertLess(currentMemUsageMb() - memUsage, 1.0)
+
+
+    ##########################################################################
+    # The Tests below are  Adapted from pickletester.py in cpython/Lib/test
+
+    def test_serialize_roundtrip_equality(self):
+        expected = create_data()
+        got = ping_pong(expected, sc)
+        self.assert_is_copy(expected, got)
+
+    def test_serialize_recursive_tuple_and_list(self):
+        t = ([],)
+        t[0].append(t)
+
+        x = ping_pong(t)
+        self.assertIsInstance(x, tuple)
+        self.assertEqual(len(x), 1)
+        self.assertIsInstance(x[0], list)
+        self.assertEqual(len(x[0]), 1)
+        self.assertIs(x[0][0], x)
+
+    def test_serialize_recursive_dict(self):
+        d = {}
+        d[1] = d
+
+        x = ping_pong(d)
+        self.assertIsInstance(x, dict)
+        self.assertEqual(list(x.keys()), [1])
+        self.assertIs(x[1], x)
+
+    def test_serialize_recursive_dict_key(self):
+        d = {}
+        k = K(d)
+        d[k] = 1
+
+        x = ping_pong(d, sc)
+        self.assertIsInstance(x, dict)
+        self.assertEqual(len(x.keys()), 1)
+        self.assertIsInstance(list(x.keys())[0], K)
+        self.assertIs(list(x.keys())[0].value, x)
+
+    def test_serialize_recursive_set(self):
+        y = set()
+        k = K(y)
+        y.add(k)
+
+        x = ping_pong(y, sc)
+        self.assertIsInstance(x, set)
+        self.assertEqual(len(x), 1)
+        self.assertIsInstance(list(x)[0], K)
+        self.assertIs(list(x)[0].value, x)
+
+    def test_serialize_recursive_inst(self):
+        i = C()
+        i.attr = i
+
+        x = ping_pong(i, sc)
+        self.assertIsInstance(x, C)
+        self.assertEqual(dir(x), dir(i))
+        self.assertIs(x.attr, x)
+
+    def test_serialize_recursive_multi(self):
+        l = []
+        d = {1:l}
+        i = C()
+        i.attr = d
+        l.append(i)
+
+        x = ping_pong(l, sc)
+        self.assertIsInstance(x, list)
+        self.assertEqual(len(x), 1)
+        self.assertEqual(dir(x[0]), dir(i))
+        self.assertEqual(list(x[0].attr.keys()), [1])
+        self.assertTrue(x[0].attr[1] is x)
+
+    def check_recursive_collection_and_inst(self, factory):
+        h = H()
+        y = factory([h])
+        h.attr = y
+
+        x = ping_pong(y, sc)
+        self.assertIsInstance(x, type(y))
+        self.assertEqual(len(x), 1)
+        self.assertIsInstance(list(x)[0], H)
+        self.assertIs(list(x)[0].attr, x)
+
+    def test_serialize_recursive_list_and_inst(self):
+        self.check_recursive_collection_and_inst(list)
+
+    def test_serialize_recursive_tuple_and_inst(self):
+        self.check_recursive_collection_and_inst(tuple)
+
+    def test_serialize_recursive_dict_and_inst(self):
+        self.check_recursive_collection_and_inst(dict.fromkeys)
+
+    def test_serialize_recursive_set_and_inst(self):
+        self.check_recursive_collection_and_inst(set)
+
+    def test_serialize_recursive_frozenset_and_inst(self):
+        self.check_recursive_collection_and_inst(frozenset)
+
+    def test_serialize_base_type_subclass(self):
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyInt())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyFloat())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyComplex())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyStr())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyUnicode())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyBytes())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyTuple())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyList())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyDict())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MySet())
+
+        with self.assertRaises(TypeError):
+            ser = sc.serialize(MyFrozenSet())
+
+    # THIS FAILS
+    @unittest.skip
+    def test_serialize_unicode_1(self):
+        endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
+                    '<\\>', '<\\\U00012345>',
+                    # surrogates
+                    '<\udc80>']
+
+        for u in endcases:
+            print("u = {}".format(u))
+            u2 = ping_pong(u)
+            self.assert_is_copy(u, u2)
+
+    def test_serialize_unicode_high_plane(self):
+        t = '\U00012345'
+
+        t2 = ping_pong(t)
+        self.assert_is_copy(t, t2)
+
+    def test_serialize_bytes(self):
+        for s in b'', b'xyz', b'xyz'*100:
+            s2 = ping_pong(s)
+            self.assert_is_copy(s, s2)
+
+        for s in [bytes([i]) for i in range(256)]:
+            s2 = ping_pong(s)
+            self.assert_is_copy(s, s2)
+
+        for s in [bytes([i, i]) for i in range(256)]:
+            s2 = ping_pong(s)
+            self.assert_is_copy(s, s2)
+
+    def test_serialize_ints(self):
+        n = sys.maxsize
+        while n:
+            for expected in (-n, n):
+                n2 = ping_pong(expected)
+                self.assert_is_copy(expected, n2)
+            n = n >> 1
+
+    # FAILS
+    @unittest.skip
+    def test_serialize_long(self):
+        # 256 bytes is where LONG4 begins.
+        for nbits in 1, 8, 8*254, 8*255, 8*256, 8*257:
+            nbase = 1 << nbits
+            for npos in nbase-1, nbase, nbase+1:
+                for n in npos, -npos:
+                    got = ping_pong(n)
+                    self.assert_is_copy(n, got)
+        # Try a monster.
+        nbase = int("deadbeeffeedface", 16)
+        nbase += nbase << 1000000
+        for n in nbase, -nbase:
+            got = ping_pong(n)
+            # assert_is_copy is very expensive here as it precomputes
+            # a failure message by computing the repr() of n and got,
+            # we just do the check ourselves.
+            self.assertIs(type(got), int)
+            self.assertEqual(n, got)
+
+    def test_serialize_float(self):
+        test_values = [0.0, 4.94e-324, 1e-310, 7e-308, 6.626e-34, 0.1, 0.5,
+                       3.14, 263.44582062374053, 6.022e23, 1e30]
+        test_values = test_values + [-x for x in test_values]
+
+        for value in test_values:
+            got = ping_pong(value)
+            self.assert_is_copy(value, got)
+
+    # FAILS
+    @unittest.skip
+    def test_serialize_reduce(self):
+        inst = AAA()
+        loaded = ping_pong(inst, sc)
+        import pdb; pdb.set_trace()
+        self.assertEqual(loaded, REDUCE_A)
+
+    # FAILS with: TypeError: tp_new threw an exception
+    @unittest.skip
+    def test_serialize_getinitargs(self):
+        inst = initarg(1, 2)
+        loaded = ping_pong(inst)
+        self.assert_is_copy(inst, loaded)
+
+
+    def test_serialize_metaclass(self):
+        a = use_metaclass()
+        b = ping_pong(a, sc)
+        self.assertEqual(a.__class__, b.__class__)
+
+    # Didn't even bother
+    @unittest.skip
+    def test_serialize_dynamic_class(self):
+        a = create_dynamic_class("my_dynamic_class", (object,))
+        copyreg.pickle(pickling_metaclass, pickling_metaclass.__reduce__)
+
+        s = self.dumps(a, proto)
+        b = self.loads(s)
+        self.assertEqual(a, b)
+        self.assertIs(type(a), type(b))
+
+    # FAILS with: TypeError: Classes derived from `tuple` cannot be serialized
+    @unittest.skip
+    def test_serialize_structseq(self):
+        import time
+        import os
+
+        t = time.localtime()
+        import pdb; pdb.set_trace()
+        u = ping_pong(t)
+        self.assert_is_copy(t, u)
+        if hasattr(os, "stat"):
+            t = os.stat(os.curdir)
+            s = self.dumps(t, proto)
+            u = self.loads(s)
+            self.assert_is_copy(t, u)
+        if hasattr(os, "statvfs"):
+            t = os.statvfs(os.curdir)
+            s = self.dumps(t, proto)
+            u = self.loads(s)
+            self.assert_is_copy(t, u)
+
+    # FAILS
+    @unittest.skip
+    def test_serialize_ellipsis(self):
+        u = ping_pong(...)
+        self.assertIs(..., u)
+
+    # FAILS
+    @unittest.skip
+    def test_serialize_notimplemented(self):
+        u = ping_pong(NotImplemented)
+        self.assertIs(NotImplemented, u)
+
+    # FAILS
+    @unittest.skip
+    def test_serialize_singleton_types(self):
+        # Issue #6477: Test that types of built-in singletons can be pickled.
+        singletons = [None, ..., NotImplemented]
+        for singleton in singletons:
+            u = ping_pong(type(singleton))
+            self.assertIs(type(singleton), u)
+
+    def test_serialize_many_puts_and_gets(self):
+        # Test that internal data structures correctly deal with lots of
+        # puts/gets.
+        keys = ("aaa" + str(i) for i in range(100))
+        large_dict = dict((k, [4, 5, 6]) for k in keys)
+        obj = [dict(large_dict), dict(large_dict), dict(large_dict)]
+
+        loaded = ping_pong(obj)
+        self.assert_is_copy(obj, loaded)
+
+    # FAILS with: AssertionError: 'bar' is not 'bar'
+    @unittest.skip
+    def test_serialize_attribute_name_interning(self):
+        # Test that attribute names of pickled objects are interned when
+        # unpickling.
+        x = C()
+        x.foo = 42
+        x.bar = "hello"
+
+        y = ping_pong(x, sc)
+        x_keys = sorted(x.__dict__)
+        y_keys = sorted(y.__dict__)
+        for x_key, y_key in zip(x_keys, y_keys):
+            self.assertIs(x_key, y_key)
+
+    def test_serialize_large_pickles(self):
+        # Test the correctness of internal buffering routines when handling
+        # large data.
+        data = (1, min, b'xy' * (30 * 1024), len)
+        loaded = ping_pong(data, sc)
+        self.assertEqual(len(loaded), len(data))
+        self.assertEqual(loaded, data)
+
+    def test_serialize_nested_names(self):
+        global Nested
+        class Nested:
+            class A:
+                class B:
+                    class C:
+                        pass
+
+        sc = SerializationContext({
+            'Nested': Nested,
+            'Nested.A': Nested.A,
+            'Nested.A.B': Nested.A.B,
+            'Nested.A.B.C': Nested.A.B.C
+            })
+
+        for obj in [Nested.A, Nested.A.B, Nested.A.B.C]:
+            with self.subTest(obj=obj):
+                unpickled = ping_pong(obj, sc)
+                self.assertIs(obj, unpickled)
+>>>>>>> 4566b2d... Serializer work

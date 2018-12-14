@@ -1547,18 +1547,29 @@ struct native_instance_wrapper {
         return 0;
     }
 
+    /**
+        Determine if a given PyTypeObject* is one of our types.
+
+        We are using pointer-equality with the tp_as_buffer function pointer
+        that we set on our types. This should be safe because:
+        - No other type can be pointing to it, and
+        - All of our types point to the unique instance of PyBufferProcs
+    */
+    inline static bool isTypedPythonType(PyTypeObject* typeObj) {
+        return typeObj->tp_as_buffer == bufferProcs();
+    }
+
     static bool isSubclassOfNativeType(PyTypeObject* typeObj) {
-        if (typeObj->tp_as_buffer == bufferProcs()) {
+        if (isTypedPythonType(typeObj)) {
             return false;
         }
 
         while (typeObj) {
-            if (typeObj->tp_as_buffer == bufferProcs()) {
+            if (isTypedPythonType(typeObj)) {
                 return true;
             }
             typeObj = typeObj->tp_base;
         }
-
         return false;
     }
 
@@ -1567,15 +1578,16 @@ struct native_instance_wrapper {
             return PythonSubclass::Make(extractTypeFrom(typeObj), typeObj);
         }
 
-        while (!exact && typeObj->tp_base && typeObj->tp_as_buffer != bufferProcs()) {
+        while (!exact && typeObj->tp_base && !isTypedPythonType(typeObj)) {
             typeObj = typeObj->tp_base;
         }
 
-        if (typeObj->tp_as_buffer == bufferProcs()) {
+        if (isTypedPythonType(typeObj)) {
             return ((NativeTypeWrapper*)typeObj)->mType;
+        } else {
+            return nullptr;
         }
 
-        return nullptr;
     }
 
     static int classInstanceSetAttributeFromPyObject(Class* cls, uint8_t* data, PyObject* attrName, PyObject* attrVal) {
@@ -2423,6 +2435,9 @@ struct native_instance_wrapper {
         return procs;
     }
 
+    /**
+         Maintains a symbol-table and returns a PyTypeObject* for the given Type*
+    */
     static PyTypeObject* typeObjInternal(Type* inType) {
         static std::recursive_mutex mutex;
         static std::map<Type*, NativeTypeWrapper*> types;
@@ -2435,63 +2450,63 @@ struct native_instance_wrapper {
         }
 
         types[inType] = new NativeTypeWrapper { {
-                PyVarObject_HEAD_INIT(NULL, 0)
-                inType->name().c_str(),    /* tp_name */
-                sizeof(native_instance_wrapper),       /* tp_basicsize */
-                0,                         // tp_itemsize
-                native_instance_wrapper::tp_dealloc,// tp_dealloc
-                0,                         // tp_print
-                0,                         // tp_getattr
-                0,                         // tp_setattr
-                0,                         // tp_reserved
-                tp_repr,                   // tp_repr
-                numberMethods(inType),     // tp_as_number
-                sequenceMethodsFor(inType),   // tp_as_sequence
-                mappingMethods(inType),    // tp_as_mapping
-                tp_hash,                   // tp_hash
-                tp_call,                   // tp_call
-                tp_str,                    // tp_str
-                native_instance_wrapper::tp_getattro, // tp_getattro
-                native_instance_wrapper::tp_setattro, // tp_setattro
-                bufferProcs(),             // tp_as_buffer
-                typeCanBeSubclassed(inType) ?
+                PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
+                .tp_name = inType->name().c_str(),          // const char*
+                .tp_basicsize = sizeof(native_instance_wrapper),    // Py_ssize_t
+                .tp_itemsize = 0,                           // Py_ssize_t
+                .tp_dealloc = native_instance_wrapper::tp_dealloc,  // destructor
+                .tp_print = 0,                              // printfunc
+                .tp_getattr = 0,                            // getattrfunc
+                .tp_setattr = 0,                            // setattrfunc
+                .tp_as_async = 0,                           // PyAsyncMethods*
+                .tp_repr = tp_repr,                         // reprfunc
+                .tp_as_number = numberMethods(inType),      // PyNumberMethods*
+                .tp_as_sequence = sequenceMethodsFor(inType),   // PySequenceMethods*
+                .tp_as_mapping = mappingMethods(inType),    // PyMappingMethods*
+                .tp_hash = tp_hash,                         // hashfunc
+                .tp_call = tp_call,                         // ternaryfunc
+                .tp_str = tp_str,                           // reprfunc
+                .tp_getattro = native_instance_wrapper::tp_getattro,    // getattrofunc
+                .tp_setattro = native_instance_wrapper::tp_setattro,    // setattrofunc
+                .tp_as_buffer = bufferProcs(),              // PyBufferProcs*
+                .tp_flags = typeCanBeSubclassed(inType) ?
                     Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
-                :   Py_TPFLAGS_DEFAULT,    // tp_flags
-                0,                         // tp_doc
-                0,                         // traverseproc tp_traverse;
-                0,                         // inquiry tp_clear;
-                tp_richcompare,            // richcmpfunc tp_richcompare;
-                0,                         // Py_ssize_t tp_weaklistoffset;
-                inType->getTypeCategory() == Type::TypeCategory::catConstDict ?
+                :   Py_TPFLAGS_DEFAULT,                     // unsigned long
+                .tp_doc = 0,                                // const char*
+                .tp_traverse = 0,                           // traverseproc
+                .tp_clear = 0,                              // inquiry
+                .tp_richcompare = tp_richcompare,           // richcmpfunc
+                .tp_weaklistoffset = 0,                     // Py_ssize_t
+                .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ?
                     native_instance_wrapper::tp_iter
-                :   0,                     // getiterfunc tp_iter;
-                native_instance_wrapper::tp_iternext,// iternextfunc tp_iternext;
-                typeMethods(inType),       // struct PyMethodDef *tp_methods;
-                0,                         // struct PyMemberDef *tp_members;
-                0,                         // struct PyGetSetDef *tp_getset;
-                0,                         // struct _typeobject *tp_base;
-                PyDict_New(),              // PyObject *tp_dict;
-                0,                         // descrgetfunc tp_descr_get;
-                0,                         // descrsetfunc tp_descr_set;
-                0,                         // Py_ssize_t tp_dictoffset;
-                0,                         // initproc tp_init;
-                0,                         // allocfunc tp_alloc;
-                native_instance_wrapper::tp_new,// newfunc tp_new;
-                0,                         // freefunc tp_free; /* Low-level free-memory routine */
-                0,                         // inquiry tp_is_gc; /* For PyObject_IS_GC */
-                0,                         // PyObject *tp_bases;
-                0,                         // PyObject *tp_mro; /* method resolution order */
-                0,                         // PyObject *tp_cache;
-                0,                         // PyObject *tp_subclasses;
-                0,                         // PyObject *tp_weaklist;
-                0,                         // destructor tp_del;
-                0,                         // unsigned int tp_version_tag;
-                0,                         // destructor tp_finalize;
+                :   0,                                      // getiterfunc tp_iter;
+                .tp_iternext = native_instance_wrapper::tp_iternext,// iternextfunc
+                .tp_methods = typeMethods(inType),          // struct PyMethodDef*
+                .tp_members = 0,                            // struct PyMemberDef*
+                .tp_getset = 0,                             // struct PyGetSetDef*
+                .tp_base = 0,                               // struct _typeobject*
+                .tp_dict = PyDict_New(),                    // PyObject*
+                .tp_descr_get = 0,                          // descrgetfunc
+                .tp_descr_set = 0,                          // descrsetfunc
+                .tp_dictoffset = 0,                         // Py_ssize_t
+                .tp_init = 0,                               // initproc
+                .tp_alloc = 0,                              // allocfunc
+                .tp_new = native_instance_wrapper::tp_new,  // newfunc
+                .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
+                .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
+                .tp_bases = 0,                              // PyObject*
+                .tp_mro = 0,                                // PyObject* /* method resolution order */
+                .tp_cache = 0,                              // PyObject*
+                .tp_subclasses = 0,                         // PyObject*
+                .tp_weaklist = 0,                           // PyObject*
+                .tp_del = 0,                                // destructor
+                .tp_version_tag = 0,                        // unsigned int
+                .tp_finalize = 0,                           // destructor
                 }, inType
                 };
 
-        //at this point, the dictionary has an entry, so if we recurse back to this function
-        //we will return the correct entry.
+        // at this point, the dictionary has an entry, so if we recurse back to this function
+        // we will return the correct entry.
         if (inType->getBaseType()) {
             types[inType]->typeObj.tp_base = typeObjInternal((Type*)inType->getBaseType());
             Py_INCREF(types[inType]->typeObj.tp_base);
@@ -2890,14 +2905,11 @@ struct native_instance_wrapper {
                 Py_INCREF(typearg);
 
                 return PythonSubclass::Make(nativeT, pyType);
+            } else {
+                Type* res = native_instance_wrapper::extractTypeFrom(pyType);
+                return (res) ? res : PythonObjectOfType::Make(pyType);
             }
 
-            Type* res = native_instance_wrapper::extractTypeFrom(pyType);
-            if (res) {
-                return res;
-            }
-
-            return PythonObjectOfType::Make(pyType);
         }
 
         Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
