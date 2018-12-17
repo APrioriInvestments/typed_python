@@ -643,8 +643,10 @@ def convertAlgebraicToPyAst_(pyAst):
         return ast.Str(s=pyAst.s)
 
     if type(pyAst) is Expr.Num:
+        if pyAst.n.matches.Boolean:
+            return ast.NameConstant(value=True if pyAst.n.value else False)
         if pyAst.n.matches.None_:
-            return ast.Num(n=None)
+            return ast.NameConstant(value=None)
         return ast.Num(n=pyAst.n.value)
 
     if type(pyAst) in reverseConverters:

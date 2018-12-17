@@ -28,8 +28,11 @@ class TestPythonAst(unittest.TestCase):
         pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
         native_ast = python_ast.convertAlgebraicToPyAst(pyast)
         pyast2 = python_ast.convertPyAstToAlgebraic(native_ast, pyast.filename)
+        f2 = python_ast.evaluateFunctionPyAst(pyast2)
+        pyast3 = python_ast.convertFunctionToAlgebraicPyAst(f2)
 
         self.assertEqual(pyast, pyast2)
+        self.assertEqual(pyast, pyast3)
 
     def test_reverse_parse(self):
         self.reverseParseCheck(lambda: X)
@@ -37,6 +40,8 @@ class TestPythonAst(unittest.TestCase):
         self.reverseParseCheck(lambda x: X+1)
         self.reverseParseCheck(lambda x: 1.2)
         self.reverseParseCheck(lambda x: "hi")
+        self.reverseParseCheck(lambda x: (x,True))
+        self.reverseParseCheck(lambda x: (x,None))
         self.reverseParseCheck(lambda x: x.asdf)
         self.reverseParseCheck(lambda x: x(10))
 

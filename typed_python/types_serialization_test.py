@@ -171,6 +171,9 @@ class TypesSerializationTest(unittest.TestCase):
         check(f, (10,))
         check(f2, (10,))
         check(lambda x:x+1, (10,))
+        check(lambda x:(x,True, False), (10,))
+        check(lambda x:(x,"hi"), (10,))
+        check(lambda x:(x,None), (10,))
         check(lambda x:x+y, (10,))
 
     def test_serialize_class_instance(self):
