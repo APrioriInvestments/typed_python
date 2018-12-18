@@ -268,3 +268,13 @@ class TypesSerializationTest(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             ts = SerializationContext({b'': int})
+
+    def test_serialization_context_queries(self):
+        sc = SerializationContext({
+            'X': False,
+            'Y': True,
+        })
+        self.assertIs(sc.objectFromName('X'), False)
+        self.assertIs(sc.nameFromObject(False), 'X')
+        self.assertIs(sc.objectFromName('Y'), True)
+        self.assertIs(sc.nameFromObject(True), 'Y')
