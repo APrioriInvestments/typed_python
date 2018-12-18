@@ -261,3 +261,10 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertTrue(ts.serialize(X(x=20)) != ts.serialize(X(x=21)))
 
         self.check_idempotence(ts, X(x=20))
+
+    def test_bad_serialization_context(self):
+        with self.assertRaises(AssertionError):
+            ts = SerializationContext({'': int})
+
+        with self.assertRaises(AssertionError):
+            ts = SerializationContext({b'': int})
