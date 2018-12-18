@@ -70,6 +70,8 @@ class InMemoryChannel:
                     self._logger.error("Pump thread failed: %s", traceback.format_exc())
                     return
 
+        self._server.dropConnection(self)
+
     def start(self):
         assert self._shouldStop
         self._shouldStop = False

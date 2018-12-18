@@ -220,6 +220,28 @@ class ObjectDatabaseTests:
             db.disconnect()
             assert currentMemUsageMb(residentOnly=False) < usage + 100
 
+    def test_disconnecting_is_immediate(self):
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
+
+        db1.subscribeToSchema(core_schema)
+        db2.subscribeToSchema(core_schema)
+
+        with db2.view():
+            assert db1.connectionObject.exists()
+        with db1.view():
+            assert db2.connectionObject.exists()
+
+        db2Connection = db2.connectionObject
+        db2.disconnect()
+
+        t0 = time.time()
+
+        self.assertTrue(
+            db1.waitForCondition(lambda: not db2Connection.exists(), timeout=2.0)
+            )
+
+
     def test_lazy_subscriptions(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
