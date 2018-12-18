@@ -31,7 +31,9 @@ _builtin_name_to_value[".builtin._ndarray"] = _ndarray
 _builtin_name_to_value[".builtin.dtype"] = numpy.dtype
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
+
 _builtin_value_to_name = {id(v):k for k,v in _builtin_name_to_value.items()}
+
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
@@ -41,7 +43,18 @@ class SerializationContext(object):
         self.nameToObject = nameToObject or {}
         self.objToName = {}
 
-        #take the lexically lowest name, so that we're not dependent on ordering.
+        for k in self.nameToObject:
+            assert isinstance(k, str), (
+                "nameToObject keys must be strings (This one was not: {})"
+                .format(k)
+            )
+
+        assert '' not in self.nameToObject, (
+            "Empty object/type name not allowed: {}"
+            .format(self.nameToObject[''])
+        )
+
+        # take the lexically lowest name, so that we're not dependent on ordering.
         for k,v in self.nameToObject.items():
             if id(v) not in self.objToName or k < self.objToName[id(v)]:
                 self.objToName[id(v)] = k
@@ -49,16 +62,23 @@ class SerializationContext(object):
         self.numpyCompressionEnabled = True
 
     def nameForObject(self, t):
-        if id(t) in _builtin_value_to_name:
-            return _builtin_value_to_name[id(t)]
+        ''' Return a name(string) for an input object t, or None if not found. '''
+        tid = id(t)
+        res = self.objToName.get(tid)
 
-        return self.objToName.get(id(t))
+        if res:
+            return res
+        else:
+            return _builtin_value_to_name.get(tid)
 
     def objectFromName(self, name):
-        if name in _builtin_name_to_value:
-            return _builtin_name_to_value[name]
+        ''' Return an object for an input name(string), or None if not found. '''
+        res = self.nameToObject.get(name)
 
-        return self.nameToObject.get(name)
+        if res:
+            return res
+        else:
+            return _builtin_name_to_value.get(name)
 
     def serialize(self, instance):
         return serialize(object, instance, self)
@@ -67,6 +87,15 @@ class SerializationContext(object):
         return deserialize(object, bytes, self)
 
     def representationFor(self, inst):
+        ''' Return the representation of a given instance or None.
+
+            For certain types, we want to special-case how they are serialized.
+            For those types, we return a representation object and for other
+            types we return None.
+
+            @param inst: an instance to be serialized
+            @return a representation object or None
+        '''
         if isinstance(inst, numpy.ndarray):
             result = inst.__reduce__()
             #compress the numpy data
