@@ -66,7 +66,7 @@ class SerializationContext(object):
         tid = id(t)
         res = self.objToName.get(tid)
 
-        if res:
+        if res is not None:
             return res
         else:
             return _builtin_value_to_name.get(tid)
@@ -75,7 +75,7 @@ class SerializationContext(object):
         ''' Return an object for an input name(string), or None if not found. '''
         res = self.nameToObject.get(name)
 
-        if res:
+        if res is not None:
             return res
         else:
             return _builtin_name_to_value.get(name)
