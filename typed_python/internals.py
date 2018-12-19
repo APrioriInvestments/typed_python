@@ -15,7 +15,7 @@
 from types import FunctionType
 
 import threading
-
+import numpy
 import typed_python._types
 import typed_python.inspect_override as inspect
 
@@ -29,8 +29,11 @@ from typed_python._types import (
 #needed by the C api
 object=object
 
-
 def forwardToName(fwdLambda):
+    """Unwrap a 'forward definition' lambda to a name.
+
+    Maps functions like 'lambda: X' to the string 'X'.
+    """
     if hasattr(fwdLambda, "__code__"):
         if fwdLambda.__code__.co_code == b't\x00S\x00':
             return fwdLambda.__code__.co_names[0]
@@ -38,7 +41,6 @@ def forwardToName(fwdLambda):
             return fwdLambda.__code__.co_freevars[0]
 
     return "UnknownForward"
-
 
 class Member:
     def __init__(self, t):
