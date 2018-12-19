@@ -275,6 +275,6 @@ class TypesSerializationTest(unittest.TestCase):
             'Y': True,
         })
         self.assertIs(sc.objectFromName('X'), False)
-        self.assertIs(sc.nameFromObject(False), 'X')
+        self.assertIs(sc.nameForObject(False), 'X')
         self.assertIs(sc.objectFromName('Y'), True)
-        self.assertIs(sc.nameFromObject(True), 'Y')
+        self.assertIs(sc.nameForObject(True), 'Y')
