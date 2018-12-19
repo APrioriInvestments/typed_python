@@ -3370,10 +3370,36 @@ public:
         PyObject* l = *(PyObject**)left;
         PyObject* r = *(PyObject**)right;
 
-        if (PyObject_RichCompareBool(l, r, Py_EQ)) {
+        int res = PyObject_RichCompareBool(l, r, Py_EQ);
+        if (res == -1) {
+            PyErr_Clear();
+            if (l < r) {
+                return -1;
+            }
+            if (l > r) {
+                return 1;
+            }
             return 0;
         }
-        if (PyObject_RichCompareBool(l, r, Py_LT)) {
+
+        if (res) {
+            return 0;
+        }
+
+        res = PyObject_RichCompareBool(l, r, Py_LT);
+
+        if (res == -1) {
+            PyErr_Clear();
+            if (l < r) {
+                return -1;
+            }
+            if (l > r) {
+                return 1;
+            }
+            return 0;
+        }
+
+        if (res) {
             return -1;
         }
         return 1;
