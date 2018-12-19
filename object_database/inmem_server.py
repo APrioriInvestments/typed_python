@@ -33,7 +33,7 @@ class InMemoryChannel:
         self._stopHeartbeatingSet = True
 
     def close(self):
-        self.stop()
+        self.stop(block=False)
         self._clientCallback(ServerToClient.Disconnected())
 
     def pumpMessagesFromServer(self):
@@ -76,12 +76,13 @@ class InMemoryChannel:
         assert self._shouldStop
         self._shouldStop = False
 
-    def stop(self):
+    def stop(self, block=False):
         self._shouldStop = True
         self._clientToServerMsgQueue.put(None)
         self._serverToClientMsgQueue.put(None)
-        self._pumpThreadServer.join()
-        self._pumpThreadClient.join()
+        if block:
+            self._pumpThreadServer.join()
+            self._pumpThreadClient.join()
 
     def sendMessage(self, msg):
         self.write(msg)

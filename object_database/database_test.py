@@ -1523,8 +1523,16 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
     def test_connection_without_auth_disconnects(self):
         db = DatabaseConnection(self.server.getChannel())
-        with self.assertRaises(DisconnectedException):
-            db.subscribeToSchema(schema)
+
+        old_interval = messages.getHeartbeatInterval()
+        messages.setHeartbeatInterval(.25)
+
+        try:
+            with self.assertRaises(DisconnectedException):
+                db.subscribeToSchema(schema)
+
+        finally:
+            messages.setHeartbeatInterval(old_interval)
 
     def test_heartbeats(self):
         old_interval = messages.getHeartbeatInterval()
