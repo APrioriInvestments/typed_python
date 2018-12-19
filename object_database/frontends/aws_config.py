@@ -36,6 +36,7 @@ def main(argv):
 
     parser.add_argument("--hostname", default=os.getenv("ODB_HOST", "localhost"), required=False)
     parser.add_argument("--port", type=int, default=int(os.getenv("ODB_PORT", 8000)), required=False)
+    parser.add_argument("--auth", type=str, default=os.getenv("ODB_AUTH_TOKEN"), required=False, help="Auth token to use to connect.")
 
     subparsers = parser.add_subparsers()
 
@@ -74,7 +75,7 @@ def main(argv):
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    db = connect(parsedArgs.hostname, parsedArgs.port)
+    db = connect(parsedArgs.hostname, parsedArgs.port, parsedArgs.auth)
     db.subscribeToSchema(service_schema, lazySubscription=True)
     db.subscribeToSchema(aws_worker_boot_schema)
 

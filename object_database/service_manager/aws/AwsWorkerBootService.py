@@ -204,8 +204,8 @@ with open(os.path.join(ownDir, "aws_linux_bootstrap.sh"), "r") as fh:
 
 class AwsApi:
     def __init__(self):
-        self._logging = logging.getLogger(__name__)
-
+        self._logger = logging.getLogger(__name__)
+        
         self.config = Configuration.lookupAny()
         if not self.config:
             raise Exception("Please configure the aws service.")
@@ -315,6 +315,7 @@ class AwsApi:
 
     def bootWorker(self,
             instanceType,
+            authToken,
             clientToken=None,
             amiOverride=None,
             nameValueOverride=None,
@@ -327,7 +328,7 @@ class AwsApi:
                 db_hostname=self.config.db_hostname,
                 db_port=self.config.db_port,
                 image=self.config.docker_image or "nativepython/cloud:latest",
-                worker_token=self.runtimeConfig.serviceToken
+                worker_token=authToken
                 )
             )
 
@@ -430,10 +431,6 @@ class AwsWorkerBootService(ServiceBase):
         if not s:
             s = State(instance_type=instance_type)
         s.desired = target
-
-    @staticmethod
-    def bootOneDirectly(instance_type):
-        AwsApi().bootWorker(instance_type)
 
     @staticmethod
     def shutdownAll():
@@ -654,7 +651,7 @@ class AwsWorkerBootService(ServiceBase):
                         )
 
                     try:
-                        self.api.bootWorker(state.instance_type)
+                        self.api.bootWorker(state.instance_type, self.runtimeConfig.serviceToken)
 
                         state.booted += 1
                         state.capacityConstrained = False
@@ -680,7 +677,7 @@ class AwsWorkerBootService(ServiceBase):
                         )
 
                     try:
-                        instanceId = self.api.bootWorker(state.instance_type, spotPrice=valid_instance_types[state.instance_type]['COST'])
+                        instanceId = self.api.bootWorker(state.instance_type, self.runtimeConfig.serviceToken, spotPrice=valid_instance_types[state.instance_type]['COST'])
                         if not self.api.tagSpotRequest(instanceId):
                             self._logger.error("Failed to tag spot-request associated with instance %s", instanceId)
                         state.spot_booted += 1
