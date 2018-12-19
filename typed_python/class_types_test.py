@@ -28,8 +28,49 @@ class Exterior(Class):
     i = Member(Interior)
     iTup = Member(NamedTuple(x=Interior, y=Interior))
 
+class ClassWithInit(Class):
+    x = Member(int)
+    y = Member(float)
+    z = Member(str)
+    cwi = Member(lambda: ClassWithInit)
+
+    def __init__(self):
+        pass
+
+    def __init__(self,x):
+        self.x = x
 
 class NativeClassTypesTests(unittest.TestCase):
+    def test_class_with_uninitializable(self):
+        c = ClassWithInit()
+
+        with self.assertRaises(AttributeError):
+            c.x
+
+        c.x = 10
+        self.assertEqual(c.x, 10)
+
+        with self.assertRaises(AttributeError):
+            c.y
+        c.y = 20.0
+        self.assertEqual(c.y, 20)
+
+        with self.assertRaises(AttributeError):
+            c.z
+
+        c.z = "hi"
+        
+        for i in range(100):
+            c.z = str(i)
+
+        c.cwi = c
+
+        self.assertEqual(c.cwi.cwi.cwi.cwi.cwi.cwi.cwi.y, 20)
+
+        c.cwi = ClassWithInit(10)
+
+        self.assertEqual(c.cwi.x, 10)
+
     def test_class(self):
         with self.assertRaises(TypeError):
             class A(Class):

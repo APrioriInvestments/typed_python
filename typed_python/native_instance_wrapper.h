@@ -10,6 +10,9 @@ struct NativeTypeWrapper {
 
 class InternalPyException {};
 
+//throw to indicate we set a python error already.
+class PythonExceptionSet {};
+
 struct native_instance_wrapper {
     PyObject_HEAD
 
@@ -674,21 +677,81 @@ struct native_instance_wrapper {
         throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
     }
 
-    static void initialize(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
+    static void constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
         guaranteeForwardsResolvedOrThrow(t);
 
         Type::TypeCategory cat = t->getTypeCategory();
 
         if (cat == Type::TypeCategory::catPythonSubclass) {
-            initialize(data, (Type*)t->getBaseType(), args, kwargs);
+            constructFromPythonArguments(data, (Type*)t->getBaseType(), args, kwargs);
             return;
         }
 
         if (cat == Type::TypeCategory::catConcreteAlternative) {
             ConcreteAlternative* alt = (ConcreteAlternative*)t;
             alt->constructor(data, [&](instance_ptr p) {
-                initialize(p, alt->elementType(), args, kwargs);
+                constructFromPythonArguments(p, alt->elementType(), args, kwargs);
             });
+            return;
+        }
+
+        if (cat == Type::TypeCategory::catClass) {
+            Class* classT = (Class*)t;
+
+            auto it = classT->getMemberFunctions().find("__init__");
+            if (it == classT->getMemberFunctions().end()) {
+                //run the default constructor
+                classT->constructor(data);
+                return;
+            }
+
+            classT->emptyConstructor(data);
+
+            Function* initMethod = it->second;
+
+            PyObject* selfAsObject = native_instance_wrapper::initialize(classT, [&](instance_ptr selfData) {
+                classT->copy_constructor(selfData, data);
+            });
+
+            PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+1);
+
+            PyTuple_SetItem(targetArgTuple, 0, selfAsObject); //steals the reference to the new 'selfAsObject'
+
+            for (long k = 0; k < PyTuple_Size(args); k++) {
+                PyTuple_SetItem(targetArgTuple, k+1, incref(PyTuple_GetItem(args, k))); //have to incref because of stealing
+            }
+
+            bool threw = false;
+            bool ran = false;
+
+            for (const auto& overload: initMethod->getOverloads()) {
+                std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, targetArgTuple, kwargs);
+                if (res.first) {
+                    //res.first is true if we matched and tried to call this function
+                    if (res.second) {
+                        //don't need the result.
+                        Py_DECREF(res.second);
+                        ran = true;
+                    } else {
+                        //it threw an exception
+                        ran = true;
+                        threw = true;
+                    }
+
+                    break;
+                }
+            }
+
+            Py_DECREF(targetArgTuple);
+
+            if (!ran) {
+                throw std::runtime_error("Cannot find a valid overload of __init__ with these arguments.");
+            }
+
+            if (threw) {
+                throw PythonExceptionSet();
+            }
+
             return;
         }
 
@@ -822,7 +885,7 @@ struct native_instance_wrapper {
                 self->mIsMatcher = false;
 
                 self->initialize([&](instance_ptr data) {
-                    initialize(data, eltType, args, kwds);
+                    constructFromPythonArguments(data, eltType, args, kwds);
                 });
 
                 return (PyObject*)self;
@@ -830,6 +893,9 @@ struct native_instance_wrapper {
                 subtype->tp_dealloc((PyObject*)self);
 
                 PyErr_SetString(PyExc_TypeError, e.what());
+                return NULL;
+            } catch(PythonExceptionSet& e) {
+                subtype->tp_dealloc((PyObject*)self);
                 return NULL;
             }
 
@@ -840,13 +906,15 @@ struct native_instance_wrapper {
             instance_ptr tgt = (instance_ptr)malloc(eltType->bytecount());
 
             try{
-                initialize(tgt, eltType, args, kwds);
+                constructFromPythonArguments(tgt, eltType, args, kwds);
             } catch(std::exception& e) {
                 free(tgt);
                 PyErr_SetString(PyExc_TypeError, e.what());
                 return NULL;
+            } catch(PythonExceptionSet& e) {
+                free(tgt);
+                return NULL;
             }
-
 
             PyObject* result = extractPythonObject(tgt, eltType);
 
@@ -1528,10 +1596,7 @@ struct native_instance_wrapper {
             if (eltType == attrType) {
                 native_instance_wrapper* item_w = (native_instance_wrapper*)attrVal;
 
-                attrType->assign(
-                    nt->eltPtr(self_w->dataPtr(), i),
-                    item_w->dataPtr()
-                );
+                nt->setAttribute(self_w->dataPtr(), i, item_w->dataPtr());
 
                 return 0;
             } else {
@@ -1544,7 +1609,8 @@ struct native_instance_wrapper {
                     return -1;
                 }
 
-                eltType->assign(nt->eltPtr(self_w->dataPtr(), i), tempObj);
+
+                nt->setAttribute(self_w->dataPtr(), i, tempObj);
 
                 eltType->destroy(tempObj);
                 free(tempObj);
@@ -1869,6 +1935,15 @@ struct native_instance_wrapper {
             for (long k = 0; k < nt->getMembers().size();k++) {
                 if (nt->getMembers()[k].first == attr_name) {
                     Type* eltType = nt->getMembers()[k].second;
+
+                    if (!nt->checkInitializationFlag(w->dataPtr(),k)) {
+                        PyErr_Format(
+                            PyExc_AttributeError,
+                            "Attribute '%S' is not initialized",
+                            attrName
+                        );
+                        return NULL;
+                    }
 
                     return extractPythonObject(
                         nt->eltPtr(w->dataPtr(), k),

@@ -3775,15 +3775,13 @@ public:
     void _forwardTypesMayHaveChanged() {
         m_is_default_constructible = true;
         m_byte_offsets.clear();
-        m_size = 0;
+
+        //first m_members.size() bits (rounded to nearest byte) contains the initialization flags.
+        m_size = int((m_members.size()) / 8) + 1; //round up to nearest byte
 
         for (auto t: m_members) {
             m_byte_offsets.push_back(m_size);
             m_size += t.second->bytecount();
-
-            if (!t.second->is_default_constructible()) {
-                m_is_default_constructible = false;
-            }
         }
     }
 
@@ -3804,9 +3802,22 @@ public:
 
     char cmp(instance_ptr left, instance_ptr right) {
         for (long k = 0; k < m_members.size(); k++) {
-            char res = m_members[k].second->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
-            if (res != 0) {
-                return res;
+            bool leftInit = checkInitializationFlag(left,k);
+            bool rightInit = checkInitializationFlag(right,k);
+            
+            if (leftInit && !rightInit) {
+                return 1;
+            }
+            
+            if (rightInit && !leftInit) {
+                return -1;
+            }
+            
+            if (leftInit && rightInit) {
+                char res = m_members[k].second->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
+                if (res != 0) {
+                    return res;
+                }
             }
         }
 
@@ -3816,14 +3827,24 @@ public:
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < m_members.size();k++) {
-            m_members[k].second->deserialize(eltPtr(self,k),buffer);
+            bool isInitialized = buffer.read_uint8();
+            if (isInitialized) {
+                m_members[k].second->deserialize(eltPtr(self,k),buffer);
+                setInitializationFlag(self, k);
+            }
         }
     }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < m_members.size();k++) {
-            m_members[k].second->serialize(eltPtr(self,k),buffer);
+            bool isInitialized = checkInitializationFlag(self, k);
+            if (isInitialized) {
+                buffer.write_uint8(true);
+                m_members[k].second->serialize(eltPtr(self,k),buffer);
+            } else {
+                buffer.write_uint8(false);
+            }
         }
     }
 
@@ -3835,9 +3856,13 @@ public:
                 stream << ", ";
             }
 
-            stream << m_members[k].first << "=";
+            if (checkInitializationFlag(self, k)) {
+                stream << m_members[k].first << "=";
 
-            m_members[k].second->repr(eltPtr(self,k),stream);
+                m_members[k].second->repr(eltPtr(self,k),stream);
+            } else {
+                stream << m_members[k].first << " not initialized";
+            }
         }
         if (m_members.size() == 1) {
             stream << ",";
@@ -3850,7 +3875,12 @@ public:
         Hash32Accumulator acc((int)getTypeCategory());
 
         for (long k = 0; k < m_members.size();k++) {
-            acc.add(m_members[k].second->hash32(eltPtr(left,k)));
+            if (checkInitializationFlag(left,k)) {
+                acc.add(1);
+                acc.add(m_members[k].second->hash32(eltPtr(left,k)));
+            } else {
+                acc.add(0);
+            }
         }
 
         acc.add(m_members.size());
@@ -3863,6 +3893,7 @@ public:
         for (int64_t k = 0; k < m_members.size(); k++) {
             try {
                 initializer(eltPtr(self, k), k);
+                setInitializationFlag(self, k);
             } catch(...) {
                 for (long k2 = k-1; k2 >= 0; k2--) {
                     m_members[k2].second->destroy(eltPtr(self,k2));
@@ -3872,31 +3903,87 @@ public:
         }
     }
 
-    void constructor(instance_ptr self) {
-        if (!m_is_default_constructible) {
-            throw std::runtime_error(m_name + " is not default-constructible");
+    void setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const {
+        if (checkInitializationFlag(self, memberIndex)) {
+            m_members[memberIndex].second->assign(
+                eltPtr(self, memberIndex),
+                other
+                );
+        } else {
+            m_members[memberIndex].second->copy_constructor(
+                eltPtr(self, memberIndex),
+                other
+                );
+            setInitializationFlag(self, memberIndex);
         }
+    }
 
+    void emptyConstructor(instance_ptr self) {
+        //more efficient would be to just write over the bytes directly.
         for (size_t k = 0; k < m_members.size(); k++) {
-            m_members[k].second->constructor(self+m_byte_offsets[k]);
+            setInitializationFlag(self, k, false);
+        }
+    }
+
+    void constructor(instance_ptr self) {
+        for (size_t k = 0; k < m_members.size(); k++) {
+            if (m_members[k].second->is_default_constructible()) {
+                m_members[k].second->constructor(self+m_byte_offsets[k]);
+                setInitializationFlag(self, k);
+            } else {
+                setInitializationFlag(self, k, false);
+            }
         }
     }
 
     void destroy(instance_ptr self) {
         for (long k = (long)m_members.size() - 1; k >= 0; k--) {
-            m_members[k].second->destroy(self+m_byte_offsets[k]);
+            if (checkInitializationFlag(self, k)) {
+                m_members[k].second->destroy(self+m_byte_offsets[k]);
+            }
         }
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) {
         for (long k = (long)m_members.size() - 1; k >= 0; k--) {
-            m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+            if (checkInitializationFlag(other, k)) {
+                m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+                setInitializationFlag(self, k);
+            }
         }
     }
 
     void assign(instance_ptr self, instance_ptr other) {
         for (long k = (long)m_members.size() - 1; k >= 0; k--) {
-            m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+            bool selfInit = checkInitializationFlag(self,k);
+            bool otherInit = checkInitializationFlag(other,k);
+
+            if (selfInit && otherInit) {
+                m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+            } 
+            else if (selfInit && !otherInit) {
+                m_members[k].second->destroy(self+m_byte_offsets[k]);
+                setInitializationFlag(self,k,false);
+            } else if (!selfInit && otherInit) {
+                m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+                setInitializationFlag(self,k,false);
+            }
+        }
+    }
+
+    bool checkInitializationFlag(instance_ptr self, int memberIndex) const {
+        int byte = memberIndex / 8;
+        int bit = memberIndex % 8;
+        return bool( ((uint8_t*)self)[byte] & (1 << bit) );
+    }
+
+    void setInitializationFlag(instance_ptr self, int memberIndex, bool value=true) const {
+        int byte = memberIndex / 8;
+        int bit = memberIndex % 8;
+        ((uint8_t*)self)[byte] |= (1 << bit);
+
+        if (!value) {
+            ((uint8_t*)self)[byte] -= (1 << bit);
         }
     }
 
@@ -4001,6 +4088,16 @@ public:
         return m_heldClass->eltPtr(l.data, ix);
     }
 
+    void setAttribute(instance_ptr self, int64_t ix, instance_ptr elt) const {
+        layout& l = **(layout**)self;
+        m_heldClass->setAttribute(l.data, ix, elt);
+    }
+
+    bool checkInitializationFlag(instance_ptr self, int64_t ix) const {
+        layout& l = **(layout**)self;
+        return m_heldClass->checkInitializationFlag(l.data, ix);
+    }
+
     char cmp(instance_ptr left, instance_ptr right) {
         layout& l = **(layout**)left;
         layout& r = **(layout**)right;
@@ -4051,6 +4148,19 @@ public:
         } catch (...) {
             free(*(layout**)self);
         }
+    }
+
+    void emptyConstructor(instance_ptr self) {
+        if (!m_is_default_constructible) {
+            throw std::runtime_error(m_name + " is not default-constructible");
+        }
+
+        *(layout**)self = (layout*)malloc(sizeof(layout) + m_heldClass->bytecount());
+
+        layout& l = **(layout**)self;
+        l.refcount = 1;
+
+        m_heldClass->emptyConstructor(l.data);
     }
 
     void constructor(instance_ptr self) {
@@ -4116,6 +4226,8 @@ public:
     HeldClass* getHeldClass() const {
         return m_heldClass;
     }
+
+
 
 private:
     HeldClass* m_heldClass;

@@ -493,6 +493,7 @@ def hashSource(rootPath):
                     path.endswith(".hpp") or
                     path.endswith(".cpp") or
                     path.endswith(".c") or
+                    path.endswith(".h") or
                     "setup.py" in path
                     ):
                 with open(path, "rb") as f:
