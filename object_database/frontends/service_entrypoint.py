@@ -35,7 +35,7 @@ def main(argv):
     parser.add_argument("sourceDir")
     parser.add_argument("storageRoot")
     parser.add_argument("serviceToken")
-    parser.add_argument("--log-level", required=False, default="WARNING")
+    parser.add_argument("--log-level", required=False, default="INFO")
 
     parsedArgs = parser.parse_args(argv[1:])
 

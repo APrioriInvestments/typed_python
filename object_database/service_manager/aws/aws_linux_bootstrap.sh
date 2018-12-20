@@ -49,4 +49,4 @@ sudo docker run --privileged --network=host -v $STORAGE:/storage {image} \
     $(hostname) \
     {db_hostname} \
     {db_port} \
-    {worker_token}
+    --service-token {worker_token}
