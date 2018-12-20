@@ -686,6 +686,8 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
+    } catch(PythonExceptionSet& e) {
+        return NULL;
     }
 
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
@@ -715,7 +717,6 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     if (a3 && a3 != Py_None) {
         context.reset(new PythonSerializationContext(a3));
     }
-    SerializationBuffer b(*context);
 
     DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE(a2), *context);
 
@@ -727,6 +728,8 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
         return native_instance_wrapper::extractPythonObject(i.data(), i.type());
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
         return NULL;
     }
 }

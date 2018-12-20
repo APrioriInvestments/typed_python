@@ -16,6 +16,9 @@ import numpy
 import threading
 import time
 import unittest
+import psutil
+import numpy
+import gc
 
 from typed_python import (
     Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64,
@@ -23,6 +26,11 @@ from typed_python import (
     Value, Class, Member, _types, TypedFunction, SerializationContext
 )
 
+def currentMemUsageMb(residentOnly=True):
+    if residentOnly:
+        return psutil.Process().memory_info().rss / 1024 ** 2
+    else:
+        return psutil.Process().memory_info().vms / 1024 ** 2
 
 def ping_pong(serialization_context, obj):
     return serialization_context.deserialize(
@@ -278,3 +286,99 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(sc.nameForObject(False), 'X')
         self.assertIs(sc.objectFromName('Y'), True)
         self.assertIs(sc.nameForObject(True), 'Y')
+
+    def test_serializing_dicts_in_loop(self):
+        self.serializeInLoop(lambda: 1)
+        self.serializeInLoop(lambda: {})
+        self.serializeInLoop(lambda: {1: 2})
+        self.serializeInLoop(lambda: {1: {2:3}})
+
+    def test_serializing_tuples_in_loop(self):
+        self.serializeInLoop(lambda: ())
+        self.serializeInLoop(lambda: (1,2,3))
+        self.serializeInLoop(lambda: (1,2,(3,4,),((5,6),(((6,),),))))
+
+    def test_serializing_lists_in_loop(self):
+        self.serializeInLoop(lambda: [])
+        self.serializeInLoop(lambda: [1,2,3,4])
+        self.serializeInLoop(lambda: [1,2,[3,4,5],[6,[[[[]]]]]])
+
+    def test_serializing_objects_in_loop(self):
+        class X:
+            def __init__(self,a=None,b=None,c=None):
+                self.a = a
+                self.b = b
+                self.c = c
+        c = SerializationContext({'X':X})
+
+        self.serializeInLoop(lambda: X(a=X(),b=[1,2,3],c=X(a=X())), context=c)
+
+    def test_serializing_numpy_arrays_in_loop(self):
+        self.serializeInLoop(lambda: numpy.array([]))
+        self.serializeInLoop(lambda: numpy.array([1,2,3]))
+        self.serializeInLoop(lambda: numpy.array([[1,2,3],[2,3,4]]))
+        self.serializeInLoop(lambda: numpy.ones(2000))
+
+    def test_serializing_anonymous_recursive_named_tuples(self):
+        NT = NamedTuple(x=OneOf(int, float), y=OneOf(int, lambda: NT))
+
+        nt = NT(x=10,y=NT(x=20,y=2))
+
+        nt_ponged = ping_pong(SerializationContext({}), nt)
+
+        self.assertEqual(nt_ponged.y.x, 20)
+
+    def test_serializing_named_tuples_in_loop(self):
+        NT = NamedTuple(x=OneOf(int, float), y=OneOf(int, lambda: NT))
+
+        context = SerializationContext({'NT': NT})
+
+        self.serializeInLoop(lambda: NT(x=10,y=NT(x=20,y=2)), context=context)
+
+    def test_serializing_tuple_of_in_loop(self):
+        TO = TupleOf(int)
+
+        context = SerializationContext({'TO': TO})
+
+        self.serializeInLoop(lambda: TO((1,2,3,4,5)), context=context)
+
+    def test_serializing_alternatives_in_loop(self):
+        AT = Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': lambda: AT})
+
+        context = SerializationContext({'AT': AT})
+
+        self.serializeInLoop(lambda: AT, context=context)
+        self.serializeInLoop(lambda: AT.Y, context=context)
+        self.serializeInLoop(lambda: AT.X(x=10,y=20), context=context)
+
+    def test_inject_exception_into_context(self):
+        NT = NamedTuple()
+
+        context = SerializationContext({'NT': NT})
+        context2 = SerializationContext({'NT': NT})
+
+        def throws(*args):
+            raise Exception("Test Exception")
+
+        context.nameForObject = throws
+        context2.objectFromName = throws
+
+        with self.assertRaisesRegex(Exception, "Test Exception"):
+            context.serialize(NT)
+
+        data = context2.serialize(NT)
+        with self.assertRaisesRegex(Exception, "Test Exception"):
+            context2.deserialize(data)
+
+    def serializeInLoop(self, objectMaker, context=None):
+        context = context or SerializationContext({})
+        memUsage = currentMemUsageMb()
+
+        t0 = time.time()
+
+        while time.time() - t0 < .25:
+            data = context.serialize(objectMaker())
+            context.deserialize(data)
+
+        gc.collect()
+        self.assertLess(currentMemUsageMb() - memUsage, 1.0)

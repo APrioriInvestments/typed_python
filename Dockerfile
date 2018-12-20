@@ -1,5 +1,7 @@
 FROM ubuntu:18.04
 
+RUN echo "HI"
+
 RUN apt-get -y update
 RUN apt-get -y install python3 python3-pip redis nano
 

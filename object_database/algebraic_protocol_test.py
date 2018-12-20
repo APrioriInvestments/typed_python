@@ -62,7 +62,7 @@ class AlgebraicProtocolTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.loop.close()
 
-    def test_basic_send_and_receive(self):
+    def test_basic_send_and_receive_without_ssl(self):
         loop = self.loop
 
         # Each client connection will create a new protocol instance

@@ -36,9 +36,6 @@ import subprocess
 import pickle
 import hashlib
 
-from object_database.util import setupLogging
-
-setupLogging('object_database/logging.yaml')
 logger = logging.getLogger(__name__)
 
 class DirectoryScope(object):
@@ -566,6 +563,9 @@ def main(args):
             result = buildModule(args)
             if result:
                 return result
+
+        from object_database.util import setupLogging
+        setupLogging('object_database/logging.yaml')
 
         # set the python path so that we load the right version of the library.
         os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH', '') + ":" + os.path.abspath("./build/install")

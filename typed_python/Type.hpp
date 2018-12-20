@@ -513,11 +513,12 @@ protected:
 class Forward : public Type {
 public:
     Forward(PyObject* deferredDefinition, std::string name) :
-        Type(TypeCategory::catForward)
+        Type(TypeCategory::catForward),
+        mTarget(nullptr),
+        mDefinition(deferredDefinition)
     {
-        m_name = name;
-        mDefinition = deferredDefinition;
         m_references_unresolved_forwards = true;
+        m_name = name;
     }
 
     Type* getTarget() const {
@@ -526,6 +527,10 @@ public:
 
     template<class resolve_py_callable_to_type>
     Type* guaranteeForwardsResolvedConcrete(resolve_py_callable_to_type& resolver) {
+        if (mTarget) {
+            return mTarget;
+        }
+
         Type* t = resolver(mDefinition);
 
         if (!t) {
@@ -552,6 +557,14 @@ public:
     }
 
     void _forwardTypesMayHaveChanged() {
+    }
+
+    void resolveDuringSerialization(Type* newTarget) {
+        if (mTarget && mTarget != newTarget) {
+            throw std::runtime_error("can't resolve a forward type to a new value.");
+        }
+
+        mTarget = newTarget;
     }
 
 private:
@@ -2729,6 +2742,7 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
+
         int64_t which;
         uint8_t data[];
     };
@@ -2879,6 +2893,7 @@ public:
             );
 
         layout& record = **(layout**)self;
+
         record.refcount = 1;
         record.which = w;
 
@@ -2929,6 +2944,7 @@ public:
         layout& record = **(layout**)self;
 
         record.refcount--;
+
         if (record.refcount == 0) {
             m_subtypes[record.which].second->destroy(record.data);
             free(*(layout**)self);
@@ -3830,15 +3846,15 @@ public:
         for (long k = 0; k < m_members.size(); k++) {
             bool leftInit = checkInitializationFlag(left,k);
             bool rightInit = checkInitializationFlag(right,k);
-            
+
             if (leftInit && !rightInit) {
                 return 1;
             }
-            
+
             if (rightInit && !leftInit) {
                 return -1;
             }
-            
+
             if (leftInit && rightInit) {
                 char res = m_members[k].second->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
                 if (res != 0) {
@@ -3986,7 +4002,7 @@ public:
 
             if (selfInit && otherInit) {
                 m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
-            } 
+            }
             else if (selfInit && !otherInit) {
                 m_members[k].second->destroy(self+m_byte_offsets[k]);
                 setInitializationFlag(self,k,false);

@@ -15,7 +15,6 @@ public:
     }
 
     ~DeserializationBuffer() {
-        return;
         for (long k = 0; k < m_needsPyDecref.size(); k++) {
             if (m_needsPyDecref[k]) {
                 Py_DECREF((PyObject*)m_cachedPointers[k]);
@@ -95,6 +94,15 @@ public:
     }
 
     template<class T>
+    void updateCachedPointer(int32_t which, T* ptr) {
+        if (which < 0 || which >= m_cachedPointers.size() || !m_cachedPointers[which]) {
+            throw std::runtime_error("Corrupt data: can't replace a cached pointer that's empty.");
+        }
+
+        m_cachedPointers[which] = ptr;
+    }
+
+    template<class T>
     T* addCachedPointer(int32_t which, T* ptr, bool needsPyDecref=false) {
         while (which >= m_cachedPointers.size()) {
             m_cachedPointers.push_back(nullptr);
@@ -108,6 +116,7 @@ public:
         }
         m_cachedPointers[which] = ptr;
         m_needsPyDecref[which] = needsPyDecref;
+
         return ptr;
     }
 

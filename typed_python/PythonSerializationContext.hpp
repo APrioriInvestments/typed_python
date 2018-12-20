@@ -127,6 +127,7 @@ public:
         }
 
         res = PyDict_New();
+
         b.addCachedPointer(id, incref(res), true);
 
         size_t sz = b.read_uint32();
@@ -137,8 +138,7 @@ public:
                 PyObject* value = deserializePythonObject(b);
 
                 if (PyDict_SetItem(res, key, value) != 0) {
-                    PyErr_Clear();
-                    throw std::runtime_error(std::string("Can't place value of type ") + key->ob_type->tp_name + " into a dict");
+                    throw PythonExceptionSet();
                 }
 
                 Py_DECREF(key);
@@ -242,8 +242,7 @@ public:
         //see if the object has a name
         PyObject* typeName = PyObject_CallMethod(mContextObj, "nameForObject", "O", o);
         if (!typeName) {
-            PyErr_PrintEx(1);
-            throw std::runtime_error("Python threw an exception internally when we called 'nameForObject'.");
+            throw PythonExceptionSet();
         }
         if (typeName != Py_None) {
             if (!PyUnicode_Check(typeName)) {
@@ -261,8 +260,7 @@ public:
         //give the plugin a chance to convert the instance to something else
         PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", o);
         if (!representation) {
-            PyErr_PrintEx(1);
-            throw std::runtime_error("representationFor threw an exception.");
+            throw PythonExceptionSet();
         }
 
         if (representation == Py_None) {
@@ -341,9 +339,7 @@ public:
             Py_DECREF(tArgs);
 
             if (!instance) {
-                PyErr_PrintEx(1);
-                throw std::runtime_error(std::string("Representation constructor of type ") +
-                        t->ob_type->tp_name + " threw an exception.");
+                throw PythonExceptionSet();
             }
 
             b.addCachedPointer(id, incref(instance), true);
@@ -353,8 +349,7 @@ public:
             Py_DECREF(rep);
 
             if (!res) {
-                PyErr_PrintEx(1);
-                throw std::runtime_error("setInstanceStateFromRepresentation threw an exception.");
+                throw PythonExceptionSet();
             }
             if (res != Py_True) {
                 Py_DECREF(res);
@@ -370,27 +365,26 @@ public:
             PyObject* res = PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str());
 
             if (!res) {
-                PyErr_PrintEx(1);
-                throw std::runtime_error("objectFromName threw an exception.");
+                throw PythonExceptionSet();
             }
 
-            return b.addCachedPointer(id, incref(res), true);
+            b.addCachedPointer(id, incref(res), true);
+
+            return res;
         } else {
             throw std::runtime_error("corrupt data: invalid code after T_OBJECT");
         }
     }
 
-    void serializeNativeType(Type* nativeType, SerializationBuffer& b) const {
+    void serializeNativeType(Type* nativeType, SerializationBuffer& b, bool allowCaching=false) const {
         PyObject* nameForObject = PyObject_CallMethod(mContextObj, "nameForObject", "O", native_instance_wrapper::typeObj(nativeType));
 
         if (!nameForObject) {
-            PyErr_PrintEx(1);
-            throw std::runtime_error("nameForObject threw an exception.");
+            throw PythonExceptionSet();
         }
 
         if (nameForObject != Py_None) {
             if (!PyUnicode_Check(nameForObject)) {
-                PyErr_PrintEx(1);
                 Py_DECREF(nameForObject);
                 throw std::runtime_error("nameForObject returned something other than None or a string.");
             }
@@ -400,7 +394,19 @@ public:
             Py_DECREF(nameForObject);
             return;
         }
+
+        Py_DECREF(nameForObject);
+
         b.write_uint8(1);
+
+        if (allowCaching) {
+            std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(nativeType);
+            b.write_uint32(idAndIsNew.first);
+
+            if (!idAndIsNew.second) {
+                return;
+            }
+        }
 
         b.write_uint8(nativeType->getTypeCategory());
 
@@ -443,7 +449,7 @@ public:
             b.write_uint32(((CompositeType*)nativeType)->getTypes().size());
             for (long k = 0; k < ((CompositeType*)nativeType)->getTypes().size(); k++) {
                 b.write_string(((CompositeType*)nativeType)->getNames()[k]);
-                serializeNativeType(((CompositeType*)nativeType)->getTypes()[k], b);
+                serializeNativeType(((CompositeType*)nativeType)->getTypes()[k], b, true);
             }
             return;
         }
@@ -471,15 +477,14 @@ public:
         throw std::runtime_error("Can't serialize native type " + nativeType->name() + " if its unnamed.");
     }
 
-    Type* deserializeNativeType(DeserializationBuffer& b) const {
+    Type* deserializeNativeType(DeserializationBuffer& b, bool allowCaching=false) const {
         if (b.read_uint8() == 0) {
             //it's a named type
             std::string name = b.readString();
             PyObject* res = PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str());
 
             if (!res) {
-                PyErr_PrintEx(1);
-                throw std::runtime_error("objectFromName threw an exception.");
+                throw PythonExceptionSet();
             }
 
             if (!PyType_Check(res)) {
@@ -490,12 +495,39 @@ public:
 
             Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res, true);
             Py_DECREF(res);
+
             if (!resultType) {
                 throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
             }
             return resultType;
         }
 
+        if (!allowCaching) {
+            return deserializeNativeTypeUncached(b);
+        }
+
+        int32_t typePtrId = b.read_uint32();
+        Type* cachedTypePtr = (Type*)b.lookupCachedPointer(typePtrId);
+
+        if (cachedTypePtr) {
+            return cachedTypePtr;
+        }
+
+        //otherwise, create a forward type object and stick it in the cache
+        Forward* fwdType = new Forward(nullptr, "<circular type reference during serialization>");
+
+        b.addCachedPointer(typePtrId, fwdType);
+
+        Type* resultType = deserializeNativeTypeUncached(b);
+
+        fwdType->resolveDuringSerialization(resultType);
+
+        b.updateCachedPointer(typePtrId, resultType);
+
+        return resultType;
+    }
+
+    Type* deserializeNativeTypeUncached(DeserializationBuffer& b) const {
         uint8_t category = b.read_uint8();
         if (category == Type::TypeCategory::catInt64) {
             return ::Int64::Make();
@@ -560,7 +592,7 @@ public:
             size_t count = b.read_uint32();
             for (long k = 0; k < count; k++) {
                 names.push_back(b.readString());
-                types.push_back(deserializeNativeType(b));
+                types.push_back(deserializeNativeType(b, true));
             }
             return ::NamedTuple::Make(types, names);
         }
@@ -610,7 +642,7 @@ public:
             });
         } else
         if (code == T_NATIVETYPE) {
-            return (PyObject*)native_instance_wrapper::typeObj(deserializeNativeType(b));
+            return incref((PyObject*)native_instance_wrapper::typeObj(deserializeNativeType(b)));
         } else
         if (code == T_OBJECT) {
             return deserializePythonObjectNamedOrAsObj(b);
@@ -630,8 +662,7 @@ public:
             b.read_bytes_fun(sz, [&](uint8_t* ptr) {
                 result = PyUnicode_DecodeUTF8((const char*)ptr, sz, nullptr);
                 if (!result) {
-                    PyErr_PrintEx(1);
-                    throw std::runtime_error("corrupt data: invalid unicode");
+                    throw PythonExceptionSet();
                 }
             });
             return result;
