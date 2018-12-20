@@ -12,6 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
+import time
+import gc
+from typed_python.test_util import currentMemUsageMb
+
 from typed_python import (
     Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict,
     Alternative, serialize, deserialize, Value, Class, Member, _types
@@ -28,6 +32,9 @@ class Exterior(Class):
     i = Member(Interior)
     iTup = Member(NamedTuple(x=Interior, y=Interior))
 
+    def __init__(self):
+        self.i = Interior()
+
 class ClassWithInit(Class):
     x = Member(int)
     y = Member(float)
@@ -37,31 +44,35 @@ class ClassWithInit(Class):
     def __init__(self):
         pass
 
+    def __init__(self,x=1,cwi=None):
+        self.x = x
+        if cwi is not None:
+            self.cwi = cwi
+
     def __init__(self,x):
         self.x = x
 
+class ClassWithComplexDispatch(Class):
+    x = Member(int)
+
+    def f(self, x):
+        return 'x'
+
+    def f(self, y):
+        return 'y'
+
 class NativeClassTypesTests(unittest.TestCase):
+    def test_class_dispatch_by_name(self):
+        c = ClassWithComplexDispatch(x=200)
+
+        self.assertEqual(c.f(10), 'x')
+        self.assertEqual(c.f(x=10), 'x')
+        self.assertEqual(c.f(y=10), 'y')
+
     def test_class_with_uninitializable(self):
         c = ClassWithInit()
 
-        with self.assertRaises(AttributeError):
-            c.x
-
-        c.x = 10
-        self.assertEqual(c.x, 10)
-
-        with self.assertRaises(AttributeError):
-            c.y
-        c.y = 20.0
-        self.assertEqual(c.y, 20)
-
-        with self.assertRaises(AttributeError):
-            c.z
-
-        c.z = "hi"
-        
-        for i in range(100):
-            c.z = str(i)
+        c.y = 20
 
         c.cwi = c
 
@@ -70,6 +81,37 @@ class NativeClassTypesTests(unittest.TestCase):
         c.cwi = ClassWithInit(10)
 
         self.assertEqual(c.cwi.x, 10)
+
+    def test_implied_init_fun(self):
+        self.assertEqual(Interior().x, 0)
+        self.assertEqual(Interior().y, 0)
+
+        self.assertEqual(Interior(x=10).x, 10)
+        self.assertEqual(Interior(x=10).y, 0)
+
+        self.assertEqual(Interior(y=10).x, 0)
+        self.assertEqual(Interior(y=10).y, 10)
+
+        self.assertEqual(Interior(x=20,y=10).x, 20)
+        self.assertEqual(Interior(x=20,y=10).y, 10)
+
+    def executeInLoop(self, f, duration=.25):
+        memUsage = currentMemUsageMb()
+
+        t0 = time.time()
+
+        while time.time() - t0 < duration:
+            f()
+
+        gc.collect()
+        self.assertLess(currentMemUsageMb() - memUsage, 1.0)
+
+    def test_class_create_doesnt_leak(self):
+        self.executeInLoop(lambda: ClassWithInit(cwi=ClassWithInit()))
+
+    def test_class_member_access_doesnt_leak(self):
+        x = ClassWithInit(cwi=ClassWithInit())
+        self.executeInLoop(lambda: x.cwi.z)
 
     def test_class(self):
         with self.assertRaises(TypeError):
@@ -101,7 +143,6 @@ class NativeClassTypesTests(unittest.TestCase):
     def test_class_holding_class(self):
         e = Exterior()
 
-        #'anI' is a reference to an internal element of 'e'. 'anI' will keep 'e' alive.
         anI = e.i
         anI.x = 10
         self.assertEqual(e.i.x, 10)

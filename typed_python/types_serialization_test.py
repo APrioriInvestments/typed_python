@@ -19,18 +19,13 @@ import unittest
 import psutil
 import numpy
 import gc
+from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
     Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64,
     String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Value, Class, Member, _types, TypedFunction, SerializationContext
 )
-
-def currentMemUsageMb(residentOnly=True):
-    if residentOnly:
-        return psutil.Process().memory_info().rss / 1024 ** 2
-    else:
-        return psutil.Process().memory_info().vms / 1024 ** 2
 
 def ping_pong(serialization_context, obj):
     return serialization_context.deserialize(

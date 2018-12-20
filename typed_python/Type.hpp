@@ -3967,9 +3967,14 @@ public:
         }
     }
 
+    //don't default construct classes
+    static bool wantsToDefaultConstruct(Type* t) {
+        return t->is_default_constructible() && t->getTypeCategory() != TypeCategory::catClass;
+    }
+
     void constructor(instance_ptr self) {
         for (size_t k = 0; k < m_members.size(); k++) {
-            if (m_members[k].second->is_default_constructible()) {
+            if (wantsToDefaultConstruct(m_members[k].second)) {
                 m_members[k].second->constructor(self+m_byte_offsets[k]);
                 setInitializationFlag(self, k);
             } else {
