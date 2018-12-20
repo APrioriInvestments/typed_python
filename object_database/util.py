@@ -95,7 +95,7 @@ def configureLogging(preamble="", level=logging.INFO):
 
     ownDir = os.path.dirname(os.path.abspath(__file__))
     setupLogging(
-        default_path=os.path.join(ownDir, '..', 'logging.yaml'),
+        default_path=os.path.join(ownDir, 'logging.yaml'),
         default_level=level,
         default_format = frmt
     )

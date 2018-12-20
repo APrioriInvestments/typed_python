@@ -1,4 +1,4 @@
 include object_database/web/content/*.css
 include object_database/web/content/*.html
 include object_database/service_manager/aws/*.sh
-include logging.yaml
+include object_database/logging.yaml
