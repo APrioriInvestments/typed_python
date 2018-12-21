@@ -509,7 +509,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         nt = NT(x=10,y=NT(x=20,y=2))
 
-        nt_ponged = ping_pong(SerializationContext({}), nt)
+        nt_ponged = ping_pong(nt)
 
         self.assertEqual(nt_ponged.y.x, 20)
 
@@ -898,4 +898,3 @@ class TypesSerializationTest(unittest.TestCase):
             with self.subTest(obj=obj):
                 unpickled = ping_pong(obj, sc)
                 self.assertIs(obj, unpickled)
->>>>>>> 4566b2d... Serializer work
