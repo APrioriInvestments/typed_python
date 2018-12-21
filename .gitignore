@@ -9,3 +9,4 @@ nativepython.egg-info
 /.python-version
 /testcert.key
 /testcert.cert
+/.venv
