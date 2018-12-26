@@ -12,6 +12,18 @@ extern "C" {
     void nativepython_runtime_incref_pyobj(PyObject* p) {
         Py_INCREF(p);
     }
+    
+    PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
+        PyObject* res = PyObject_GetAttrString(p, a);
+        
+        if (!res) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("python code threw an exception");
+        }
+
+        return res;
+    }
+
     void nativepython_runtime_decref_pyobj(PyObject* p) {
         Py_DECREF(p);
     }

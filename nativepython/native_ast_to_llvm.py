@@ -113,7 +113,7 @@ def constant_to_typed_llvm_value(module, builder, c):
 
         value.initializer = llvm_c
 
-        nt = native_ast.Type.Pointer(native_ast.Type.Int(bits=8,signed=False))
+        nt = native_ast.Type.Int(bits=8,signed=False).pointer()
 
         return TypedLLVMValue(
             builder.bitcast(value, llvm_i8ptr),

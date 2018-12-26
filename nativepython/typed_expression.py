@@ -48,6 +48,9 @@ class TypedExpression(object):
 
             assert False, "we should be jamming this rvalue object into a temporary that we can pass"
 
+    def convert_attribute(self, context, attribute):
+        return self.expr_type.convert_attribute(context, self, attribute)
+
     def convert_assign(self, context, toStore):
         return self.expr_type.convert_assign(context, self, toStore)
 

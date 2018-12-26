@@ -365,6 +365,11 @@ def const_int_expr(i):
         val=Constant.Int(bits=64,val=i,signed=True)
         )
 
+def const_utf8_cstr(i):
+    return Expression.Constant(
+        val=Constant.ByteArray(val=i.encode('utf-8'))
+        )
+
 FunctionBody = Alternative("FunctionBody",
     Internal = {'body': Expression},
     External = {'name': str}

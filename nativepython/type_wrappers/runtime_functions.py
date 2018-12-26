@@ -14,6 +14,7 @@
 
 import nativepython.native_ast as native_ast
 
+UInt8Ptr = native_ast.UInt8Ptr
 Int64 = native_ast.Int64
 Void = native_ast.Void
 
@@ -54,4 +55,10 @@ decref_pyobj = externalCallTarget(
         "nativepython_runtime_decref_pyobj", 
         Void, 
         Void.pointer()
+        )
+getattr_pyobj = externalCallTarget(
+        "nativepython_runtime_getattr_pyobj", 
+        Void.pointer(),
+        Void.pointer(),
+        UInt8Ptr
         )

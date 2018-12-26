@@ -53,7 +53,7 @@ def eq(x:int,y:int)->bool:
 def neq(x:int,y:int)->bool:
     return x != y
 
-class TestRuntime(unittest.TestCase):
+class TestArithmeticCompilation(unittest.TestCase):
     def test_runtime_singleton(self):
         self.assertTrue(Runtime.singleton() is Runtime.singleton())
 
@@ -103,26 +103,6 @@ class TestRuntime(unittest.TestCase):
 
         self.assertEqual(failures, 0)
 
-    def checkFunction(self, f, argsToCheck):
-        r  = Runtime.singleton()
-
-        f_fast = r.compile(f)
-
-        t_py = 0.0
-        t_fast = 0.0
-        for a in argsToCheck:
-            t0 = time.time()
-            fastval = f_fast(*a)
-            t1 = time.time()
-            slowval = f(*a)
-            t2 = time.time()
-
-            t_py += t2-t1
-            t_fast += t1-t0
-
-            self.assertEqual(fastval, slowval)
-        return t_py, t_fast
-
     def checkFunctionOfIntegers(self, f):
         r  = Runtime.singleton()
 
@@ -171,74 +151,3 @@ class TestRuntime(unittest.TestCase):
             return x+y
 
         self.checkFunctionOfIntegers(f)
-
-    def test_tuple_of_float(self):
-        def f(x: TupleOf(float), y:TupleOf(float)) -> float:
-            j = 0
-            res = 0.0
-
-            while j < len(y):
-                i = 0
-                while i < len(x):
-                    res = res + x[i] * y[j]
-                    i = i + 1
-                j = j + 1
-
-            return res
-
-        aTupleOfFloat = TupleOf(float)(list(range(1000)))
-        aTupleOfFloat2 = TupleOf(float)(list(range(1000)))
-
-        self.assertEqual(_types.refcount(aTupleOfFloat),1)
-
-        t_py, t_fast = self.checkFunction(f, [(aTupleOfFloat,aTupleOfFloat2)])
-
-        self.assertEqual(_types.refcount(aTupleOfFloat),1)
-
-        #I get around 150x
-        self.assertTrue(t_py / t_fast > 50.0)
-
-        print(t_py / t_fast, " speedup")
-
-    def test_tuple_indexing(self):
-        @TypedFunction
-        def f(x: TupleOf(int), y:int) -> int:
-            return x[y]
-
-        Runtime.singleton().compile(f)
-
-        self.assertEqual(f((1,2,3),1), 2)
-
-        with self.assertRaises(Exception):
-            f((1,2,3),1000000000)
-
-    def test_tuple_refcounting(self):
-        @TypedFunction
-        def f(x: TupleOf(int), y: TupleOf(int)) -> TupleOf(int):
-            return x
-
-        for compileIt in [False, True]:
-            if compileIt:
-                Runtime.singleton().compile(f)
-
-            intTup = TupleOf(int)(list(range(1000)))
-
-            self.assertEqual(_types.refcount(intTup),1)
-
-            res = f(intTup, intTup)
-
-            self.assertEqual(_types.refcount(intTup),2)
-
-            res = None
-
-            self.assertEqual(_types.refcount(intTup),1)
-
-    def test_bad_mod_generates_exception(self):
-        @TypedFunction
-        def f(x: int, y:int) -> int:
-            return x % y
-
-        Runtime.singleton().compile(f)
-
-        with self.assertRaises(Exception):
-            f(0,0)

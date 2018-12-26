@@ -52,7 +52,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             TypedExpression.NoneExpr(
                 target.expr.store(toStore.nonref_expr)
                 )
-             )
+            )
 
     def convert_initialize_copy(self, context, target, toStore):
         assert target.isReference
@@ -62,7 +62,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
              TypedExpression.NoneExpr(
                 target.expr.store(toStore.nonref_expr)
                 )
-             )
+            )
 
     def convert_destroy(self, context, instance):
         return TypedExpression.NoneExpr(
@@ -72,3 +72,14 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
             )
 
+
+    def convert_attribute(self, context, instance, attr):
+        assert isinstance(attr, str)
+        return TypedExpression(
+            native_ast.Expression.Call(
+                target=runtime_functions.getattr_pyobj,
+                args=(instance.nonref_expr, native_ast.const_utf8_cstr(attr))
+                ),
+            self,
+            False
+            )

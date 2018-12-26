@@ -22,6 +22,8 @@ from nativepython.python_object_representation import pythonObjectRepresentation
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
 
+NoneExprType = NoneWrapper()
+
 from typed_python import *
 
 class TypedCallTarget(object):
@@ -72,7 +74,7 @@ class InitFields:
         self.finalize(context)
 
         if not self.field_order:
-            return TypedExpression(native_ast.nullExpr, Void)
+            return TypedExpression(native_ast.nullExpr, NoneExprType)
 
         expr = self.initialization_expressions[self.field_order[0]]
 
@@ -144,7 +146,7 @@ class ExceptionHandlingHelper:
                     true=handler.expr,
                     false=expr.expr
                     ),
-                Void if (handler.expr_type is not None or expr.expr_type is not None) else
+                NoneExprType if (handler.expr_type is not None or expr.expr_type is not None) else
                     None
                 )
 
@@ -154,7 +156,7 @@ class ExceptionHandlingHelper:
                 varname=".unnamed.exception.var",
                 handler=expr.expr
                 ),
-            Void if body.expr_type is not None else None
+            NoneExprType if body.expr_type is not None else None
             )
 
     def generate_exception_rethrow(self):
@@ -773,10 +775,13 @@ class ConversionContext(object):
                 self._init_fields.finalize(self)
 
             if ast.value is None:
-                e = TypedExpression(native_ast.nullExpr, Void)
+                e = TypedExpression(native_ast.nullExpr, NoneExprType)
             else:
                 e = self.convert_expression_ast(ast.value)
 
+            if e.expr_type is None:
+                return e
+            
             if self._varname_to_type[FunctionOutput] is not None:
                 if self._varname_to_type[FunctionOutput] != e.expr_type:
                     raise ConversionException(
@@ -795,7 +800,7 @@ class ConversionContext(object):
         if ast.matches.Expr:
             return TypedExpression(
                 self.convert_expression_ast(ast.value).expr + native_ast.nullExpr,
-                Void
+                NoneExprType
                 )
 
         if ast.matches.If:
@@ -817,7 +822,7 @@ class ConversionContext(object):
             if true.expr_type is None and false.expr_type is None:
                 ret_type = None
             else:
-                ret_type = Void
+                ret_type = NoneExprType
 
             return TypedExpression(
                 native_ast.Expression.Branch(cond=cond.expr,true=true.expr,false=false.expr),
@@ -825,7 +830,7 @@ class ConversionContext(object):
                 )
 
         if ast.matches.Pass:
-            return TypedExpression(native_ast.nullExpr, Void)
+            return TypedExpression(native_ast.nullExpr, NoneExprType)
 
         if ast.matches.While:
             if self._init_fields is not None:
@@ -927,7 +932,7 @@ class ConversionContext(object):
                             ),
                     teardowns=teardowns_for_iter
                     ),
-                Void
+                NoneExprType
                 )
 
             return res
@@ -1042,7 +1047,7 @@ class ConversionContext(object):
 
         expr = expr_producer(*exprlist)
 
-        if expr.expr_type != Void:
+        if expr.expr_type != NoneExprType:
             expr = native_ast.Expression.Return(expr)
 
         call_target = self.converter.define(
@@ -1261,7 +1266,7 @@ class Converter(object):
 
         res = subconverter.construct_stackslots_around(res, argnames, star_args_name)
 
-        return_type = subconverter._varname_to_type[FunctionOutput] or Void
+        return_type = subconverter._varname_to_type[FunctionOutput] or NoneExprType
 
         return (
             native_ast.Function(
@@ -1386,7 +1391,7 @@ class Converter(object):
             args=args
             )
 
-        if not underlyingDefinition.output_type.matches.Void:
+        if not underlyingDefinition.output_type.matches.NoneExprType:
             body = native_ast.var('return').cast(underlyingDefinition.output_type.pointer()).store(body)
 
         body = native_ast.FunctionBody.Internal(body=body)

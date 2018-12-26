@@ -15,6 +15,8 @@
 import nativepython.native_ast as native_ast
 import nativepython
 
+from nativepython.type_wrappers.exceptions import generateThrowException
+
 class Wrapper(object):
     #properties of all objects:
 
@@ -58,6 +60,13 @@ class Wrapper(object):
         if self.is_pod:
             return expr
         raise NotImplementedError(self)
+
+    def convert_attribute(self, context, instance, attribute):
+        return nativepython.typed_expression.TypedExpression(
+            generateThrowException(context, AttributeError("object has no attribute " + attribute)),
+            None,
+            False
+            )
 
     def convert_assign(self, context, target, toStore):
         raise NotImplementedError()
