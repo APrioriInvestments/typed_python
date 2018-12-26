@@ -12,6 +12,9 @@
 #include "PythonSerializationContext.hpp"
 
 
+thread_local int64_t native_dispatch_disabled = false;
+
+
 PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {

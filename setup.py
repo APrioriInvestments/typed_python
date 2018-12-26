@@ -27,6 +27,7 @@ setuptools.setup(
             'typed_python._types',
             ['typed_python/_runtime.cc',
              'typed_python/_types.cc',
+             'typed_python/native_instance_wrapper.cc'
              ],
             extra_compile_args=['-std=c++14', '-Wno-sign-compare', '-Wno-narrowing', '-Wno-unused-variable']
             )
