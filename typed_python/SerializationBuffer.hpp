@@ -2,6 +2,8 @@
 
 #include <stdexcept>
 #include <stdlib.h>
+#include <map>
+#include <set>
 #include "SerializationContext.hpp"
 
 class Type;

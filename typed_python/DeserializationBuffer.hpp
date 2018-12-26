@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <stdlib.h>
+#include <vector>
 #include "SerializationContext.hpp"
 
 class DeserializationBuffer {
