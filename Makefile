@@ -18,7 +18,9 @@ CPP_FLAGS = -pthread -DNDEBUG -g -fwrapv -O2 -Wall -g -fstack-protector-strong -
 O_FILES = $(BUILD_PATH)/_types.o \
           $(BUILD_PATH)/_runtime.o \
           $(BUILD_PATH)/native_instance_wrapper.o \
-          $(BUILD_PATH)/Type.o
+          $(BUILD_PATH)/Type.o \
+          $(BUILD_PATH)/PythonSerializationContext.o
+
 
 ##########################################################################
 #  RULES
