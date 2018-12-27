@@ -555,7 +555,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    std::vector<std::pair<std::string, Type*> > members;
+    std::vector<std::tuple<std::string, Type*, PyObject*> > members;
     std::vector<std::pair<std::string, Type*> > memberFunctions;
     std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;

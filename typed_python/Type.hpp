@@ -1938,7 +1938,7 @@ private:
 class HeldClass : public Type {
 public:
     HeldClass(std::string inName,
-          const std::vector<std::pair<std::string, Type*> >& members,
+          const std::vector<std::tuple<std::string, Type*, PyObject*> >& members,
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, PyObject*>& classMembers
@@ -2091,12 +2091,13 @@ public:
 private:
     std::vector<size_t> m_byte_offsets;
 
-    std::vector<std::pair<std::string, Type*> > m_members;
+    std::vector<std::tuple<std::string, Type*, PyObject*> > m_members;
 
     std::map<std::string, Function*> m_memberFunctions;
     std::map<std::string, Function*> m_staticFunctions;
     std::map<std::string, PyObject*> m_classMembers;
 };
+
 
 class Class : public Type {
     class layout {
@@ -2134,7 +2135,7 @@ public:
 
     static Class* Make(
             std::string inName,
-            const std::vector<std::pair<std::string, Type*> >& members,
+            const std::vector<std::tuple<std::string, Type*, PyObject*> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, PyObject*>& classMembers
