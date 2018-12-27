@@ -43,8 +43,11 @@ def forwardToName(fwdLambda):
     return "UnknownForward"
 
 class Member:
-    def __init__(self, t):
+    def __init__(self, t, default_value=None):
         self.t = t
+        self.v = default_value
+        if self.v is not None:
+            assert isinstance(self.v, self.t)
 
     def __eq__(self, other):
         if not isinstance(other, Member):
@@ -126,7 +129,7 @@ class ClassMetaclass(type):
 
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
-                members.append((eltName, elt.t))
+                members.append((eltName, elt.t, elt.v))
                 classMembers.append((eltName, elt))
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:

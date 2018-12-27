@@ -875,13 +875,13 @@ PyObject* native_instance_wrapper::tp_new(PyTypeObject *subtype, PyObject *args,
             return NULL;
         }
 
-        //not reachable
+        // not reachable
         assert(false);
 
     } else {
         instance_ptr tgt = (instance_ptr)malloc(eltType->bytecount());
 
-        try{
+        try {
             constructFromPythonArguments(tgt, eltType, args, kwds);
         } catch(std::exception& e) {
             free(tgt);
