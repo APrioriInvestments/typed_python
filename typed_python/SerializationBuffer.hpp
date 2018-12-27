@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <map>
 #include <set>
-#include "SerializationContext.hpp"
 
 class Type;
+class SerializationContext;
+
 
 class SerializationBuffer {
 public:

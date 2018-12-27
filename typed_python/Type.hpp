@@ -7,6 +7,7 @@
 #include <functional>
 #include <mutex>
 #include <set>
+#include <map>
 #include <utility>
 #include <atomic>
 #include <iostream>
