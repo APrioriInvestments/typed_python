@@ -9,6 +9,8 @@
 #include "NullSerializationContext.hpp"
 #include "util.hpp"
 #include "native_instance_wrapper.h"
+#include "SerializationBuffer.hpp"
+#include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 
 
