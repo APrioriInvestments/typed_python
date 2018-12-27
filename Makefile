@@ -5,7 +5,7 @@
 PYTHON ?= $(shell which python3)
 
 # Path to virtual environment
-VIRTUAL_ENV ?= '.venv'
+VIRTUAL_ENV ?= .venv
 
 SRC_PATH ?= typed_python
 
@@ -23,16 +23,13 @@ O_FILES = $(BUILD_PATH)/_types.o \
 
 
 ##########################################################################
-#  RULES
-
-$(VIRTUAL_ENV): $(PYTHON)
-	virtualenv $(VIRTUAL_ENV) --python=$(PYTHON)
+#  MAIN RULES
 
 .PHONY: install
 install: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip install pipenv==2018.11.26; \
-		pipenv install --deploy
+		pipenv install --dev --deploy
 
 .PHONY: test
 test: testcert.cert testcert.key install
@@ -41,6 +38,42 @@ test: testcert.cert testcert.key install
 
 .PHONY: lib
 lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
+
+.PHONY: docker-build
+docker-build:
+	./build.sh -b
+
+.PHONY: docker-push
+docker-push:
+	./build.sh -p
+
+.PHONY: docker-test
+docker-test:
+	./build.sh -t
+
+.PHONY: docker-web
+docker-web:
+	./build.sh -w
+
+.PHONY: lint
+lint:
+	find . -not -path "./.venv*" -name "*.py" | xargs flake8
+
+.PHONY: clean
+clean:
+	rm -rf build/
+	rm -rf nativepython.egg-info/
+	rm -f nose.*.log
+	rm -f typed_python/_types.cpython-*.so
+	rm -f testcert.cert testcert.key
+	rm -rf .venv
+
+
+##########################################################################
+#  HELPER RULES
+
+$(VIRTUAL_ENV): $(PYTHON)
+	virtualenv $(VIRTUAL_ENV) --python=$(PYTHON)
 
 $(BUILD_PATH)/%.o: $(SRC_PATH)/%.cc $(BUILD_PATH)
 	$(CC) $(CPP_FLAGS) -c $< -o $@
@@ -62,32 +95,10 @@ $(BUILD_PATH):
 $(LIB_PATH):
 	mkdir -p $(LIB_PATH)
 
-.PHONY: docker-build
-docker-build:
-	./build.sh -b
-
-.PHONY: docker-push
-docker-push:
-	./build.sh -p
-
-.PHONY: docker-test
-docker-test:
-	./build.sh -t
-
-.PHONY: docker-web
-docker-web:
-	./build.sh -w
-
 testcert.cert testcert.key:
 	openssl req -x509 -newkey rsa:2048 -keyout testcert.key -nodes \
 		-out testcert.cert -sha256 -days 1000 \
 		-subj '/C=US/ST=New York/L=New York/CN=localhost'
 
-.PHONY: clean
-clean:
-	rm -rf build/
-	rm -rf nativepython.egg-info/
-	rm -f nose.*.log
-	rm -f typed_python/_types.cpython-*.so
-	rm -f testcert.cert testcert.key
-	rm -rf .venv
+:w
+
