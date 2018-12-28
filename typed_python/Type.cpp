@@ -1714,8 +1714,8 @@ void HeldClass::_forwardTypesMayHaveChanged() {
     m_is_default_constructible = true;
     m_byte_offsets.clear();
 
-    //first m_members.size() bits (rounded to nearest byte) contains the initialization flags.
-    m_size = int((m_members.size()) / 8) + 1; //round up to nearest byte
+    //first m_members.size() bits (rounded up to nearest byte) contains the initialization flags.
+    m_size = int((m_members.size() + 7) / 8); //round up to nearest byte
 
     for (auto t: m_members) {
         m_byte_offsets.push_back(m_size);
@@ -1814,11 +1814,14 @@ void HeldClass::constructor(instance_ptr self) {
     for (size_t k = 0; k < m_members.size(); k++) {
         Type* member_t = std::get<1>(m_members[k]);
         PyObject* member_val = std::get<2>(m_members[k]);
+        Type* valType = native_instance_wrapper::extractTypeFrom(member_val->ob_type);
         if (wantsToDefaultConstruct(member_t)) {
             if (member_val != Py_None) {
                 std::cout << "blabla!" << std::endl;
-	        }
-            member_t->constructor(self+m_byte_offsets[k]);
+
+	        } else {
+                member_t->constructor(self+m_byte_offsets[k]);
+            }
             setInitializationFlag(self, k);
         } else {
             clearInitializationFlag(self, k);
