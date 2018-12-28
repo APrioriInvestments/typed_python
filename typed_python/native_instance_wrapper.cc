@@ -1554,7 +1554,7 @@ bool native_instance_wrapper::isSubclassOfNativeType(PyTypeObject* typeObj) {
 }
 
 // static
-Type* native_instance_wrapper::extractTypeFrom(PyTypeObject* typeObj, bool exact) {
+Type* native_instance_wrapper::extractTypeFrom(PyTypeObject* typeObj, bool exact /*=false*/) {
     if (exact && isSubclassOfNativeType(typeObj)) {
         return PythonSubclass::Make(extractTypeFrom(typeObj), typeObj);
     }
@@ -1666,8 +1666,11 @@ PyTypeObject* native_instance_wrapper::typeObjInternal(Type* inType) {
     return (PyTypeObject*)types[inType];
 }
 
+/**
+ *  Return 0 if successful and -1 if it failed
+ */
 // static
-int native_instance_wrapper::classInstanceSetAttributeFromPyObject(Class* cls, uint8_t* data, PyObject* attrName, PyObject* attrVal) {
+int native_instance_wrapper::classInstanceSetAttributeFromPyObject(Class* cls, instance_ptr data, PyObject* attrName, PyObject* attrVal) {
     int i = cls->memberNamed(PyUnicode_AsUTF8(attrName));
 
     if (i < 0) {
@@ -1731,13 +1734,14 @@ int native_instance_wrapper::tp_setattro(PyObject *o, PyObject* attrName, PyObje
     }
 
     Type* type = extractTypeFrom(o->ob_type);
+    Type::TypeCategory cat = type->getTypeCategory();
 
-    if (type->getTypeCategory() == Type::TypeCategory::catClass) {
+    if (cat == Type::TypeCategory::catClass) {
         native_instance_wrapper* self_w = (native_instance_wrapper*)o;
 
         return classInstanceSetAttributeFromPyObject((Class*)type, self_w->dataPtr(), attrName, attrVal);
-    } else if (type->getTypeCategory() == Type::TypeCategory::catNamedTuple
-        || type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+    } else if (cat == Type::TypeCategory::catNamedTuple ||
+               cat == Type::TypeCategory::catConcreteAlternative) {
         PyErr_Format(
             PyExc_AttributeError,
             "Cannot set attributes on instance of type '%S' because it is immutable",
@@ -2774,27 +2778,10 @@ Type* native_instance_wrapper::pyFunctionToForward(PyObject* arg) {
     return new Forward(arg, fwdName);
 }
 
-// static
-Type* native_instance_wrapper::tryUnwrapPyInstanceToType(PyObject* arg) {
-    if (PyType_Check(arg)) {
-        Type* possibleType = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
-        if (!possibleType) {
-            return NULL;
-        }
-        return possibleType;
-    }
-
-    if (arg == Py_None) {
-        return None::Make();
-    }
-
-    if (PyFunction_Check(arg)) {
-        return pyFunctionToForward(arg);
-    }
-
-    return  native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
-}
-
+/**
+ *  We are doing this here rather than in Type because we want to create a singleton PyUnicode
+ *  object for each type category to make this function ultra fast.
+ */
 // static
 PyObject* native_instance_wrapper::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catNone) { static PyObject* res = PyUnicode_FromString("None"); return res; }
@@ -2873,13 +2860,34 @@ Type* native_instance_wrapper::tryUnwrapPyInstanceToValueType(PyObject* typearg)
                 )
             );
     }
-
+    std::cout << "didn't manage to build a Value for the PyObject" << std::endl;
     return nullptr;
 }
 
 //static
 PyObject* native_instance_wrapper::typePtrToPyTypeRepresentation(Type* t) {
     return (PyObject*)typeObjInternal(t);
+}
+
+// static
+Type* native_instance_wrapper::tryUnwrapPyInstanceToType(PyObject* arg) {
+    if (PyType_Check(arg)) {
+        Type* possibleType = native_instance_wrapper::unwrapTypeArgToTypePtr(arg);
+        if (!possibleType) {
+            return NULL;
+        }
+        return possibleType;
+    }
+
+    if (arg == Py_None) {
+        return None::Make();
+    }
+
+    if (PyFunction_Check(arg)) {
+        return pyFunctionToForward(arg);
+    }
+
+    return  native_instance_wrapper::tryUnwrapPyInstanceToValueType(arg);
 }
 
 // static
