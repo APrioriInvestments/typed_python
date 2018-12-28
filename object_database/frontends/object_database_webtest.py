@@ -42,16 +42,17 @@ from object_database import (
     service_schema,
     TcpServer
 )
-from object_database.util import tokenFromString
+from object_database.util import tokenFromString, genToken
 
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
-ownName = os.path.basename(os.path.abspath(__file__))
 
 
 def main(argv=None):
     if argv is not None:
         argv = sys.argv
+
+    token = genToken()
 
     with tempfile.TemporaryDirectory() as tf:
         try:
@@ -60,13 +61,13 @@ def main(argv=None):
                     'localhost', 'localhost', '8020', '--run_db',
                     '--source', os.path.join(tf,'source'),
                     '--storage', os.path.join(tf,'storage'),
-                    '--service-token', tokenFromString(ownName),
+                    '--service-token', token,
                     #'--logdir', os.path.join(tf,'logs'),
                     '--shutdownTimeout', '.5'
                     ]
                 )
 
-            database = connect("localhost", 8020, retry=True)
+            database = connect("localhost", 8020, token, retry=True)
             database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
             with database.transaction():
