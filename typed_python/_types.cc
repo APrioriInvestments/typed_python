@@ -297,7 +297,7 @@ bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::str
             return false;
         }
 
-        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry,0));
+        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry, 0));
 
         if (memberNames.find(memberName) != memberNames.end()) {
             PyErr_Format(PyExc_TypeError, "Cannot redefine Class member %s", memberName.c_str());
@@ -309,6 +309,46 @@ bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::str
         out.push_back(
             std::make_pair(memberName, targetType)
             );
+    }
+
+    return true;
+}
+
+bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<std::string, Type*, PyObject*> >& out) {
+    std::set<std::string> memberNames;
+
+    for (int i = 0; i < PyTuple_Size(tuple); ++i) {
+        PyObject* entry = PyTuple_GetItem(tuple, i);
+        Type* targetType = NULL;
+
+        if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 3
+                || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
+                || !(targetType =
+                    native_instance_wrapper::tryUnwrapPyInstanceToType(
+                        PyTuple_GetItem(entry, 1)
+                        ))
+                )
+        {
+            PyErr_SetString(PyExc_TypeError, "Badly formed class type argument.");
+            return false;
+        }
+
+        std::string memberName = PyUnicode_AsUTF8(PyTuple_GetItem(entry, 0));
+
+        if (memberNames.find(memberName) != memberNames.end()) {
+            PyErr_Format(PyExc_TypeError, "Cannot redefine Class member %s", memberName.c_str());
+            return false;
+        }
+
+        memberNames.insert(memberName);
+
+        out.push_back(
+            std::make_tuple(
+                memberName,
+                targetType,
+                PyTuple_GetItem(entry, 2)
+            )
+        );
     }
 
     return true;
@@ -560,7 +600,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;
 
-    if (!unpackTupleToStringAndTypes(memberTuple, members)) {
+    if (!unpackTupleToStringTypesAndValues(memberTuple, members)) {
         return NULL;
     }
     if (!unpackTupleToStringAndTypes(memberFunctionTuple, memberFunctions)) {
