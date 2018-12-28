@@ -780,9 +780,11 @@ void native_instance_wrapper::constructFromPythonArguments(uint8_t* data, Type* 
 }
 
 
-//produce the pythonic representation of this object. for things like integers, string, etc,
-//convert them back to their python-native form. otherwise, a pointer back into a native python
-//structure
+/**
+ *  produce the pythonic representation of this object. for things like integers, string, etc,
+ *  convert them back to their python-native form. otherwise, a pointer back into a native python
+ *  structure
+ */
 // static
 PyObject* native_instance_wrapper::extractPythonObject(instance_ptr data, Type* eltType) {
     if (eltType->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
@@ -1528,17 +1530,22 @@ PyBufferProcs* native_instance_wrapper::bufferProcs() {
     - All of our types point to the unique instance of PyBufferProcs
 */
 // static
-inline bool native_instance_wrapper::isTypedPythonType(PyTypeObject* typeObj) {
+inline bool native_instance_wrapper::isNativeType(PyTypeObject* typeObj) {
     return typeObj->tp_as_buffer == bufferProcs();
 }
+
+/**
+ *  Return true if the given PyTypeObject* is a subclass of a NativeType.
+ *  This will return false when called with a native type
+*/
 // static
 bool native_instance_wrapper::isSubclassOfNativeType(PyTypeObject* typeObj) {
-    if (isTypedPythonType(typeObj)) {
+    if (isNativeType(typeObj)) {
         return false;
     }
 
     while (typeObj) {
-        if (isTypedPythonType(typeObj)) {
+        if (isNativeType(typeObj)) {
             return true;
         }
         typeObj = typeObj->tp_base;
@@ -1552,11 +1559,11 @@ Type* native_instance_wrapper::extractTypeFrom(PyTypeObject* typeObj, bool exact
         return PythonSubclass::Make(extractTypeFrom(typeObj), typeObj);
     }
 
-    while (!exact && typeObj->tp_base && !isTypedPythonType(typeObj)) {
+    while (!exact && typeObj->tp_base && !isNativeType(typeObj)) {
         typeObj = typeObj->tp_base;
     }
 
-    if (isTypedPythonType(typeObj)) {
+    if (isNativeType(typeObj)) {
         return ((NativeTypeWrapper*)typeObj)->mType;
     } else {
         return nullptr;
@@ -1681,7 +1688,7 @@ int native_instance_wrapper::classInstanceSetAttributeFromPyObject(Class* cls, u
         return -1;
     }
 
-    Type* eltType = cls->getMembers()[i].second;
+    Type* eltType = cls->getMemberType(i);
 
     Type* attrType = extractTypeFrom(attrVal->ob_type);
 
@@ -2049,8 +2056,8 @@ PyObject* native_instance_wrapper::tp_getattro(PyObject *o, PyObject* attrName) 
     if (t->getTypeCategory() == Type::TypeCategory::catClass) {
         Class* nt = (Class*)t;
         for (long k = 0; k < nt->getMembers().size();k++) {
-            if (nt->getMembers()[k].first == attr_name) {
-                Type* eltType = nt->getMembers()[k].second;
+            if (nt->getMemberName(k) == attr_name) {
+                Type* eltType = nt->getMemberType(k);
 
                 if (!nt->checkInitializationFlag(w->dataPtr(),k)) {
                     PyErr_Format(
@@ -2063,7 +2070,7 @@ PyObject* native_instance_wrapper::tp_getattro(PyObject *o, PyObject* attrName) 
 
                 return extractPythonObject(
                     nt->eltPtr(w->dataPtr(), k),
-                    nt->getMembers()[k].second
+                    eltType
                     );
             }
         }
@@ -2915,11 +2922,17 @@ Type* native_instance_wrapper::unwrapTypeArgToTypePtr(PyObject* typearg) {
             return PythonSubclass::Make(nativeT, pyType);
         } else {
             Type* res = native_instance_wrapper::extractTypeFrom(pyType);
-            return (res) ? res : PythonObjectOfType::Make(pyType);
+            if (res) {
+                // we have a native type -> return it
+                return res;
+            } else {
+                // we have a python type -> wrap it
+                return PythonObjectOfType::Make(pyType);
+            }
         }
 
     }
-
+    // else: typearg is not a type -> it is a value
     Type* valueType = native_instance_wrapper::tryUnwrapPyInstanceToValueType(typearg);
 
     if (valueType) {

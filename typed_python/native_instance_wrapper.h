@@ -130,7 +130,7 @@ struct native_instance_wrapper {
 
     static bool isSubclassOfNativeType(PyTypeObject* typeObj);
 
-    static bool isTypedPythonType(PyTypeObject* typeObj);
+    static bool isNativeType(PyTypeObject* typeObj);
 
     static Type* extractTypeFrom(PyTypeObject* typeObj, bool exact=false);
 

@@ -1701,8 +1701,8 @@ bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
     }
 
     for (long k = 0; k < m_members.size(); k++) {
-        if (m_members[k].first != otherO->m_members[k].first ||
-                !m_members[k].second->isBinaryCompatibleWith(otherO->m_members[k].second)) {
+        if (std::get<0>(m_members[k]) != std::get<0>(otherO->m_members[k]) ||
+                !std::get<1>(m_members[k])->isBinaryCompatibleWith(std::get<1>(otherO->m_members[k]))) {
             return false;
         }
     }
@@ -1719,7 +1719,7 @@ void HeldClass::_forwardTypesMayHaveChanged() {
 
     for (auto t: m_members) {
         m_byte_offsets.push_back(m_size);
-        m_size += t.second->bytecount();
+        m_size += std::get<1>(t)->bytecount();
     }
 }
 
@@ -1737,7 +1737,7 @@ char HeldClass::cmp(instance_ptr left, instance_ptr right) {
         }
 
         if (leftInit && rightInit) {
-            char res = m_members[k].second->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
+            char res = std::get<1>(m_members[k])->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
             if (res != 0) {
                 return res;
             }
@@ -1756,11 +1756,11 @@ void HeldClass::repr(instance_ptr self, std::ostringstream& stream) {
         }
 
         if (checkInitializationFlag(self, k)) {
-            stream << m_members[k].first << "=";
+            stream << std::get<0>(m_members[k]) << "=";
 
-            m_members[k].second->repr(eltPtr(self,k),stream);
+            std::get<1>(m_members[k])->repr(eltPtr(self,k),stream);
         } else {
-            stream << m_members[k].first << " not initialized";
+            stream << std::get<0>(m_members[k]) << " not initialized";
         }
     }
     if (m_members.size() == 1) {
@@ -1776,7 +1776,7 @@ int32_t HeldClass::hash32(instance_ptr left) {
     for (long k = 0; k < m_members.size();k++) {
         if (checkInitializationFlag(left,k)) {
             acc.add(1);
-            acc.add(m_members[k].second->hash32(eltPtr(left,k)));
+            acc.add(std::get<1>(m_members[k])->hash32(eltPtr(left,k)));
         } else {
             acc.add(0);
         }
@@ -1788,13 +1788,14 @@ int32_t HeldClass::hash32(instance_ptr left) {
 }
 
 void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr other) const {
+	Type* member_t = std::get<1>(m_members[memberIndex]);
     if (checkInitializationFlag(self, memberIndex)) {
-        m_members[memberIndex].second->assign(
+        member_t->assign(
             eltPtr(self, memberIndex),
             other
             );
     } else {
-        m_members[memberIndex].second->copy_constructor(
+        member_t->copy_constructor(
             eltPtr(self, memberIndex),
             other
             );
@@ -1805,33 +1806,40 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
 void HeldClass::emptyConstructor(instance_ptr self) {
     //more efficient would be to just write over the bytes directly.
     for (size_t k = 0; k < m_members.size(); k++) {
-        setInitializationFlag(self, k, false);
+        clearInitializationFlag(self, k);
     }
 }
 
 void HeldClass::constructor(instance_ptr self) {
     for (size_t k = 0; k < m_members.size(); k++) {
-        if (wantsToDefaultConstruct(m_members[k].second)) {
-            m_members[k].second->constructor(self+m_byte_offsets[k]);
+        Type* member_t = std::get<1>(m_members[k]);
+        PyObject* member_val = std::get<2>(m_members[k]);
+        if (wantsToDefaultConstruct(member_t)) {
+            if (member_val != Py_None) {
+                std::cout << "blabla!" << std::endl;
+	        }
+            member_t->constructor(self+m_byte_offsets[k]);
             setInitializationFlag(self, k);
         } else {
-            setInitializationFlag(self, k, false);
+            clearInitializationFlag(self, k);
         }
     }
 }
 
 void HeldClass::destroy(instance_ptr self) {
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
+	    Type* member_t = std::get<1>(m_members[k]);
         if (checkInitializationFlag(self, k)) {
-            m_members[k].second->destroy(self+m_byte_offsets[k]);
+            member_t->destroy(self+m_byte_offsets[k]);
         }
     }
 }
 
 void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
+	    Type* member_t = std::get<1>(m_members[k]);
         if (checkInitializationFlag(other, k)) {
-            m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+            member_t->copy_constructor(self+m_byte_offsets[k], other+m_byte_offsets[k]);
             setInitializationFlag(self, k);
         }
     }
@@ -1841,33 +1849,37 @@ void HeldClass::assign(instance_ptr self, instance_ptr other) {
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         bool selfInit = checkInitializationFlag(self,k);
         bool otherInit = checkInitializationFlag(other,k);
-
+        Type* member_t = std::get<1>(m_members[k]);
         if (selfInit && otherInit) {
-            m_members[k].second->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+            member_t->assign(self + m_byte_offsets[k], other+m_byte_offsets[k]);
         }
         else if (selfInit && !otherInit) {
-            m_members[k].second->destroy(self+m_byte_offsets[k]);
-            setInitializationFlag(self,k,false);
+            member_t->destroy(self+m_byte_offsets[k]);
+            clearInitializationFlag(self, k);
         } else if (!selfInit && otherInit) {
-            m_members[k].second->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
-            setInitializationFlag(self,k,false);
+            member_t->copy_constructor(self + m_byte_offsets[k], other+m_byte_offsets[k]);
+            clearInitializationFlag(self, k);
         }
     }
 }
 
-void HeldClass::setInitializationFlag(instance_ptr self, int memberIndex, bool value) const {
+void HeldClass::setInitializationFlag(instance_ptr self, int memberIndex) const {
     int byte = memberIndex / 8;
     int bit = memberIndex % 8;
-    ((uint8_t*)self)[byte] |= (1 << bit);
+    uint8_t mask = (1 << bit);
+    ((uint8_t*)self)[byte] |= mask;
+}
 
-    if (!value) {
-        ((uint8_t*)self)[byte] -= (1 << bit);
-    }
+void HeldClass::clearInitializationFlag(instance_ptr self, int memberIndex) const {
+    int byte = memberIndex / 8;
+    int bit = memberIndex % 8;
+    uint8_t mask = (1 << bit);
+    ((uint8_t*)self)[byte] &= ~mask;
 }
 
 int HeldClass::memberNamed(const char* c) const {
     for (long k = 0; k < m_members.size(); k++) {
-        if (m_members[k].first == c) {
+        if (std::get<0>(m_members[k]) == c) {
             return k;
         }
     }

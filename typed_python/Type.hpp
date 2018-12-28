@@ -8,6 +8,7 @@
 #include <mutex>
 #include <set>
 #include <map>
+#include <tuple>
 #include <utility>
 #include <atomic>
 #include <iostream>
@@ -1958,24 +1959,24 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         for (auto& o: m_members) {
-            visitor(o.second);
+            visitor(std::get<1>(o));
         }
     }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         for (auto& o: m_members) {
-            visitor(o.second);
+            visitor(std::get<1>(o));
         }
         for (auto& o: m_memberFunctions) {
-            Type* t = o.second;
+            Type* t = std::get<1>(o);
             visitor(t);
-            assert(t == o.second);
+            assert(t == std::get<1>(o));
         }
         for (auto& o: m_staticFunctions) {
-            Type* t = o.second;
+            Type* t = std::get<1>(o);
             visitor(t);
-            assert(t == o.second);
+            assert(t == std::get<1>(o));
         }
     }
 
@@ -1983,7 +1984,7 @@ public:
 
     static HeldClass* Make(
             std::string inName,
-            const std::vector<std::pair<std::string, Type*> >& members,
+            const std::vector<std::tuple<std::string, Type*, PyObject*> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, PyObject*>& classMembers
@@ -2003,7 +2004,7 @@ public:
         for (long k = 0; k < m_members.size();k++) {
             bool isInitialized = buffer.read_uint8();
             if (isInitialized) {
-                m_members[k].second->deserialize(eltPtr(self,k),buffer);
+                std::get<1>(m_members[k])->deserialize(eltPtr(self,k),buffer);
                 setInitializationFlag(self, k);
             }
         }
@@ -2015,7 +2016,7 @@ public:
             bool isInitialized = checkInitializationFlag(self, k);
             if (isInitialized) {
                 buffer.write_uint8(true);
-                m_members[k].second->serialize(eltPtr(self,k),buffer);
+                std::get<1>(m_members[k])->serialize(eltPtr(self,k),buffer);
             } else {
                 buffer.write_uint8(false);
             }
@@ -2034,7 +2035,7 @@ public:
                 setInitializationFlag(self, k);
             } catch(...) {
                 for (long k2 = k-1; k2 >= 0; k2--) {
-                    m_members[k2].second->destroy(eltPtr(self,k2));
+                    std::get<1>(m_members[k2])->destroy(eltPtr(self,k2));
                 }
                 throw;
             }
@@ -2064,9 +2065,19 @@ public:
         return bool( ((uint8_t*)self)[byte] & (1 << bit) );
     }
 
-    void setInitializationFlag(instance_ptr self, int memberIndex, bool value=true) const;
+    void setInitializationFlag(instance_ptr self, int memberIndex) const;
 
-    const std::vector<std::pair<std::string, Type*> >& getMembers() const {
+    void clearInitializationFlag(instance_ptr self, int memberIndex) const;
+
+    Type* getMemberType(int index) const {
+        return std::get<1>(m_members[index]);
+    }
+
+    const std::string& getMemberName(int index) const {
+        return std::get<0>(m_members[index]);
+    }
+
+    const std::vector<std::tuple<std::string, Type*, PyObject*> >& getMembers() const {
         return m_members;
     }
 
@@ -2199,7 +2210,15 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 
-    const std::vector<std::pair<std::string, Type*> >& getMembers() const {
+    Type* getMemberType(int index) const {
+        return m_heldClass->getMemberType(index);
+    }
+
+    const std::string& getMemberName(int index) const {
+        return m_heldClass->getMemberName(index);
+    }
+
+    const std::vector<std::tuple<std::string, Type*, PyObject*> >& getMembers() const {
         return m_heldClass->getMembers();
     }
 
