@@ -1,14 +1,11 @@
 FROM ubuntu:18.04
 
-RUN echo "HI"
+RUN apt-get -y update && \
+    apt-get -y install \
+        python3 python3-pip redis nano \
+        libtcmalloc-minimal4 \
+        gdb python3-dbg
 
-RUN apt-get -y update
-RUN apt-get -y install python3 python3-pip redis nano
-
-RUN apt-get -y install libtcmalloc-minimal4
-ENV LD_PRELOAD=libtcmalloc_minimal.so.4
-
-RUN apt-get -y install gdb python3-dbg
 ENV LD_PRELOAD=libtcmalloc_minimal.so.4
 
 #the gdb-for-python somehow gets confused and thinks that PyUnicodeObject is
@@ -34,6 +31,7 @@ RUN pip3 install --user virtualenv
 ENV PATH ${PATH}:/root/.local/bin
 
 # set-up virtualenv
+RUN rm -rf .venv  # remove .venv if it already existed
 RUN virtualenv --python $(which python3) .venv
 ENV PATH $APP_PATH/.venv/bin:$PATH
 
@@ -43,7 +41,8 @@ ENV LANG C.UTF-8
 
 # install pipenv and use it to install our dependencies (and the library itself)
 RUN pip install pipenv
-RUN pipenv install --deploy --system
+RUN pipenv install --dev  --deploy
+RUN make testcert.cert
 
 ENTRYPOINT ["object_database_service_manager", \
    "--source", "/storage/service_source", \

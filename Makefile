@@ -4,6 +4,8 @@
 # Path to python binary
 PYTHON ?= $(shell which python3)
 
+COMMIT ?= $(shell git rev-parse HEAD)
+
 # Path to virtual environment
 VIRTUAL_ENV ?= .venv
 
@@ -42,18 +44,25 @@ lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
 .PHONY: docker-build
 docker-build:
 	./build.sh -b
+	rm -rf build
+	rm -rf nativepython.egg-info
+	docker build . -t nativepython/cloud:"$(COMMIT)"
+	docker tag nativepython/cloud:"$(COMMIT)"  nativepython/cloud:latest
 
 .PHONY: docker-push
 docker-push:
-	./build.sh -p
+	docker push nativepython/cloud:"$(COMMIT)"
+	docker push nativepython/cloud:latest
 
 .PHONY: docker-test
 docker-test:
-	./build.sh -t
+	#run unit tests in the debugger
+	docker run -it --rm --privileged --entrypoint bash nativepython/cloud:"$(COMMIT)" -c "gdb -ex run --args python ./test.py -v -s"
 
 .PHONY: docker-web
 docker-web:
-	./build.sh -w
+	#run a dummy webframework
+	docker run -it --rm -p 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
 
 .PHONY: lint
 lint:

@@ -28,14 +28,15 @@ setuptools.setup(
             ['typed_python/_runtime.cc',
              'typed_python/_types.cc',
              'typed_python/native_instance_wrapper.cc',
-             'typed_python/Type.cpp'
+             'typed_python/Type.cpp',
+             'typed_python/PythonSerializationContext.cpp'
              ],
             extra_compile_args=['-std=c++14', '-Wno-sign-compare', '-Wno-narrowing', '-Wno-unused-variable']
             )
         ],
     classifiers=[
         "Programming Language :: Python :: 3"
-    	],
+        ],
     entry_points={
         'console_scripts': [
             'object_database_webtest=object_database.frontends.object_database_webtest:main',
