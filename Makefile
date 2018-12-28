@@ -75,16 +75,16 @@ clean:
 $(VIRTUAL_ENV): $(PYTHON)
 	virtualenv $(VIRTUAL_ENV) --python=$(PYTHON)
 
-$(BUILD_PATH)/%.o: $(SRC_PATH)/%.cc $(BUILD_PATH)
+$(BUILD_PATH)/%.o: $(SRC_PATH)/%.cc
 	$(CC) $(CPP_FLAGS) -c $< -o $@
 
-$(BUILD_PATH)/%.o: $(SRC_PATH)/%.cpp $(BUILD_PATH)
+$(BUILD_PATH)/%.o: $(SRC_PATH)/%.cpp
 	$(CXX) $(CPP_FLAGS) -c $< -o $@
 
 typed_python/_types.cpython-36m-x86_64-linux-gnu.so: $(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
 	cp $(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so  typed_python
 
-$(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(LIB_PATH)  $(O_FILES)
+$(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(LIB_PATH) $(BUILD_PATH) $(O_FILES)
 	$(CXX) -pthread -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2 \
 		$(O_FILES) \
 		-o $(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
