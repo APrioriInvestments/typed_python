@@ -5,13 +5,21 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrapper
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
+from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.type_wrappers.len_wrapper import LenWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python._types import TypeFor
 from typed_python import *
 
+_type_to_type_wrapper_cache = {}
+
 def typedPythonTypeToTypeWrapper(t):
+    if t not in _type_to_type_wrapper_cache:
+        _type_to_type_wrapper_cache[t] = _typedPythonTypeToTypeWrapper(t)
+    return _type_to_type_wrapper_cache[t]
+
+def _typedPythonTypeToTypeWrapper(t):
     if isinstance(t, Wrapper):
         return t
 
@@ -30,6 +38,9 @@ def typedPythonTypeToTypeWrapper(t):
 
     if t is NoneType():
         return NoneWrapper()
+
+    if t.__typed_python_category__ == "Class":
+        return ClassWrapper(t)
 
     if t.__typed_python_category__ == "TupleOf":
         return TupleOfWrapper(t)

@@ -34,8 +34,6 @@ class PythonTypeObjectWrapper(Wrapper):
         if len(args) == 1:
             if self.typeRepresentation is int:
                 return args[0].toInt64(context)
-            if self.typeRepresentation is int:
-                return
 
             assert False, "strange type here: %s" % self.typeRepresentation
 

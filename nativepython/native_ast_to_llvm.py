@@ -137,6 +137,12 @@ class TypedLLVMValue(object):
         self.llvm_value = llvm_value
         self.native_type = native_type
 
+    def __str__(self):
+        return "TypedLLVMValue(%s)" % self.native_type
+
+    def __repr__(self):
+        return str(self)
+
 class TeardownOnScopeExit:
     def __init__(self, converter, parent_scope):
         self.converter = converter
@@ -729,7 +735,8 @@ class FunctionConverter:
 
             self.tags_initialized = final_tags
 
-            assert true.native_type == false.native_type, (true,false)
+            if true.native_type != false.native_type:
+                raise Exception("Expected left and right branches to have same type, but %s != %s\n\n%s" % (true,false,expr))
 
             if true.native_type.matches.Void:
                 return TypedLLVMValue(None, native_ast.Type.Void())

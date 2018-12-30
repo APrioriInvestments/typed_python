@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from nativepython.type_wrappers.wrapper import Wrapper
+from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
@@ -22,7 +22,7 @@ from typed_python import NoneType, Int64
 import nativepython.native_ast as native_ast
 import nativepython
 
-class TupleOfWrapper(Wrapper):
+class TupleOfWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -48,6 +48,10 @@ class TupleOfWrapper(Wrapper):
     def convert_bin_op(self, context, left, op, right):
         raise ConversionException("Not convertible")
 
+    def on_refcount_zero(self, context, instance):
+        assert self.underlyingWrapperType.is_pod
+        return native_ast.callFree(instance.expr)
+
     def convert_getitem(self, context, expr, item):
         expr = expr.ensureNonReference()
 
@@ -61,66 +65,6 @@ class TupleOfWrapper(Wrapper):
                 ),
             self.underlyingWrapperType,
             False
-            )
-
-    def convert_incref(self, context, expr):
-        assert expr.isReference
-
-        return TypedExpression(
-            expr.expr.load().ElementPtrIntegers(0,0).store(
-                    native_ast.Expression.Binop(
-                        l=expr.expr.load().ElementPtrIntegers(0,0).load(),
-                        op=native_ast.BinaryOp.Add(),
-                        r=native_ast.const_int_expr(1)
-                    )
-                ) >> expr.expr,
-            self,
-            True
-            )
-
-    def convert_initialize_copy(self, context, expr, other):
-        other = other.ensureNonReference()
-        assert expr.isReference
-
-        return TypedExpression.NoneExpr(
-            native_ast.Expression.Branch(
-                cond=other.expr,
-                false=expr.expr.store(other.expr),
-                true=
-                    expr.expr.store(other.expr) >>
-                    expr.expr.load().ElementPtrIntegers(0,0).store(
-                        native_ast.Expression.Binop(
-                            l=expr.expr.load().ElementPtrIntegers(0,0).load(),
-                            op=native_ast.BinaryOp.Add(),
-                            r=native_ast.const_int_expr(1)
-                        )
-                    )
-                )
-            )
-
-    def convert_destroy(self, context, target):
-        target = target.ensureNonReference()
-
-        assert self.underlyingWrapperType.is_pod, "we don't know how to call destructors yet"
-
-        return TypedExpression.NoneExpr(
-            native_ast.Expression.Branch(
-                cond=target.expr,
-                false=native_ast.nullExpr,
-                true=
-                    target.expr.ElementPtrIntegers(0,0).store(
-                        native_ast.Expression.Binop(
-                            l=target.expr.ElementPtrIntegers(0,0).load(),
-                            op=native_ast.BinaryOp.Sub(),
-                            r=native_ast.const_int_expr(1)
-                        )
-                    ) >>
-                    native_ast.Expression.Branch(
-                        cond=target.expr.ElementPtrIntegers(0,0).load(),
-                        true=native_ast.nullExpr,
-                        false=native_ast.callFree(target.expr)
-                        )
-                )
             )
 
     def convert_len(self, context, expr):

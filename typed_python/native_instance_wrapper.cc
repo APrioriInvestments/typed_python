@@ -2559,6 +2559,23 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
     }
 
     if (inType->getTypeCategory() == Type::TypeCategory::catClass) {
+        Class* classT = (Class*)inType;
+
+        PyObject* types = PyTuple_New(classT->getMembers().size());
+        for (long k = 0; k < classT->getMembers().size(); k++) {
+            PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(classT->getMembers()[k].second)));
+        }
+
+        PyObject* names = PyTuple_New(classT->getMembers().size());
+        for (long k = 0; k < classT->getMembers().size(); k++) {
+            PyObject* namePtr = PyUnicode_FromString(classT->getMembers()[k].first.c_str());
+            PyTuple_SetItem(names, k, namePtr);
+        }
+
+        //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
+        PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
+
         for (auto nameAndObj: ((Class*)inType)->getClassMembers()) {
             PyDict_SetItemString(
                 pyType->tp_dict,
@@ -2566,6 +2583,7 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
                 nameAndObj.second
                 );
         }
+
         for (auto nameAndObj: ((Class*)inType)->getStaticFunctions()) {
             PyDict_SetItemString(
                 pyType->tp_dict,

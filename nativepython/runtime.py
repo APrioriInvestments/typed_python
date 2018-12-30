@@ -34,6 +34,7 @@ class Runtime:
 
     def verboselyDisplayNativeCode(self):
         self.compiler.mark_converter_verbose()
+        self.compiler.mark_llvm_codegen_verbose()
 
     def compile(self, f):
         """Compile a single FunctionOverload and install the pointer"""

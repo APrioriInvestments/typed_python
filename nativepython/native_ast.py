@@ -245,7 +245,7 @@ def expr_str(self):
     if self.matches.Let:
         if self.val.matches.Sequence and len(self.val.vals) > 1:
             return str(
-                Expression.Sequence(
+                Expression.Sequence(vals=
                     self.val.vals[:-1] +
                     (Expression.Let(
                         var=self.var,

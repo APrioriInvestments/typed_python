@@ -48,44 +48,6 @@ class TypedCallTarget(object):
 class FunctionOutput:
     pass
 
-class InitFields:
-    def __init__(self, first_var_name, fields_and_types):
-        self.first_var_name = first_var_name
-        self.uninitialized_fields = set(x[0] for x in fields_and_types)
-        self.field_types = dict(fields_and_types)
-        self.field_order = [x[0] for x in fields_and_types]
-        self.initialization_expressions = {}
-
-    def mark_field_initialized(self, field, expr):
-        self.initialization_expressions[field] = expr
-        self.uninitialized_fields.discard(field)
-
-    def finalize(self, context):
-        for f in self.uninitialized_fields:
-            self.initialization_expressions[f] = (
-                context.named_var_expr(self.first_var_name)
-                    .convert_attribute(context, f)
-                    .convert_initialize(context, ())
-                )
-
-        self.uninitialized_fields = set()
-
-    def init_expr(self, context):
-        self.finalize(context)
-
-        if not self.field_order:
-            return TypedExpression(native_ast.nullExpr, NoneExprType)
-
-        expr = self.initialization_expressions[self.field_order[0]]
-
-        for field in self.field_order[1:]:
-            expr = expr + self.initialization_expressions[field]
-
-        return expr
-
-    def any_remaining(self):
-        return bool(self.uninitialized_fields)
-
 class ExceptionHandlingHelper:
     def __init__(self, conversion_context):
         self.context = conversion_context
@@ -242,17 +204,24 @@ class ConversionContext(object):
         self._temporaries = {}
         self._new_temporaries = set()
         self._temp_let_var = 0
-        self._init_fields = init_fields
 
     def let_varname(self):
         self._temp_let_var += 1
         return ".letvar.%s" % (self._temp_let_var-1)
 
+    def let(self, e1, e2):
+        v = self.let_varname()
+        return native_ast.Expression.Let(
+            var=v,
+            val=e1,
+            within=e2(v)
+            )
+
     def activates_temporary(self, slot):
-        if slot.expr_type.value_type.is_pod:
+        if slot.expr_type.is_pod:
             return native_ast.nullExpr
 
-        return native_ast.Expression.ActivatesTeardown(slot.expr.name)
+        return native_ast.Expression.ActivatesTeardown(name=slot.expr.name)
 
     def allocate_temporary(self, slot_type, type_is_temp_ref = True):
         tname = '.temp.%s' % len(self._temporaries)
@@ -261,8 +230,7 @@ class ConversionContext(object):
 
         return TypedExpression(
             native_ast.Expression.StackSlot(name=tname,type=slot_type.getNativeLayoutType()),
-            slot_type.reference_to_temporary if type_is_temp_ref else
-                slot_type.reference,
+            slot_type,
             isReference=True
             )
 
@@ -327,26 +295,14 @@ class ConversionContext(object):
         for i in range(len(args)):
             new_args.append(make_arg_compatible(i, args[i]))
 
-        if output_type.is_pod:
-            return TypedExpression(
-                native_ast.Expression.Call(
-                    target=native_call_target,
-                    args=[a.expr for a in new_args]
-                    ),
-                output_type
-                )
-        else:
-            slot_ref = self.allocate_temporary(output_type)
-
-            return TypedExpression(
-                native_ast.Expression.Call(
-                    target=native_ast.CallTarget.Pointer(instance.expr),
-                    args=[slot_ref.expr] + [a.expr for a in new_args]
-                    )
-                    + self.activates_temporary(slot_ref)
-                    + slot_ref.expr,
-                slot_ref.expr_type
-                )
+        return TypedExpression(
+            native_ast.Expression.Call(
+                target=native_call_target,
+                args=[a.expr for a in new_args]
+                ),
+            output_type,
+            False
+            )
 
     def call_py_function(self, f, args, name_override=None):
         #force arguments to a type appropriate for argpassing
@@ -360,32 +316,16 @@ class ConversionContext(object):
                 name_override=name_override
                 )
 
-        if not call_target.output_type.is_pod:
-            assert len(call_target.named_call_target.arg_types) == len(args) + 1
+        assert len(call_target.named_call_target.arg_types) == len(args)
 
-            slot = self.allocate_temporary(call_target.output_type)
-
-            return TypedExpression(
-                self.generate_call_expr(
-                    target=call_target.named_call_target,
-                    args=[slot.expr] + native_args
-                    )
-                    + self.activates_temporary(slot)
-                    + slot.expr
-                    ,
-                slot.expr_type
-                )
-        else:
-            assert len(call_target.named_call_target.arg_types) == len(args)
-
-            return TypedExpression(
-                self.generate_call_expr(
-                    target=call_target.named_call_target,
-                    args=native_args
-                    ),
-                call_target.output_type,
-                False
-                )
+        return TypedExpression(
+            self.generate_call_expr(
+                target=call_target.named_call_target,
+                args=native_args
+                ),
+            call_target.output_type,
+            False
+            )
 
     def generate_call_expr(self, target, args):
         lets = []
@@ -437,9 +377,42 @@ class ConversionContext(object):
         return e
 
 
+    def decref(self, expr):
+        varname = self.let_varname()
+        return TypedExpression(
+            native_ast.Expression.Let(
+                var=varname,
+                val=expr.expr,
+                within=TypedExpression(
+                    native_ast.Expression.Variable(name=varname),
+                    expr.expr_type,
+                    expr.isReference
+                    ).convert_destroy(self).expr
+                >> native_ast.Expression.Variable(name=varname)
+                ),
+            expr.expr_type,
+            expr.isReference
+            )
+
+    def incref(self, expr):
+        varname = self.let_varname()
+        return TypedExpression(
+            native_ast.Expression.Let(
+                var=varname,
+                val=expr.expr,
+                within=TypedExpression(
+                    native_ast.Expression.Variable(name=varname),
+                    expr.expr_type,
+                    expr.isReference
+                    ).convert_incref(self).expr
+                >> native_ast.Expression.Variable(name=varname)
+                ),
+            expr.expr_type,
+            expr.isReference
+            )
+
     def convert_expression_ast(self, ast):
         return self.convert_expression_ast_(ast)
-
 
     def convert_expression_ast_(self, ast):
         if ast.matches.Attribute:
@@ -560,18 +533,7 @@ class ConversionContext(object):
             return l.convert_bin_op(self, ast.ops[0], r)
 
         if ast.matches.Tuple:
-            elts = [self.convert_expression_ast(e) for e in ast.elts]
-
-            struct_type = Struct([("f%s"%i,e.expr_type) for i,e in enumerate(elts)])
-
-            tmp_ref = self.allocate_temporary(struct_type)
-
-            return TypedExpression(
-                struct_type.convert_initialize(self, tmp_ref, elts).expr +
-                    self.activates_temporary(tmp_ref) +
-                    tmp_ref.expr,
-                tmp_ref.expr_type
-                )
+            raise NotImplementedError("not implemented yet")
 
         if ast.matches.IfExp:
             test = self.ensure_bool(self.convert_expression_ast(ast.test))
@@ -624,8 +586,8 @@ class ConversionContext(object):
                             name=tname,
                             type=self._temporaries[tname].getNativeLayoutType()
                             ),
-                        self._temporaries[tname].reference,
-                        isReference=True
+                        self._temporaries[tname],
+                        True
                         )
                     ).expr
                 )
@@ -643,71 +605,15 @@ class ConversionContext(object):
 
         return TypedExpression(
             native_ast.Expression.Finally(expr=expr.expr, teardowns=teardowns),
-            expr.expr_type
+            expr.expr_type,
+            expr.isReference
             )
 
     def convert_statement_ast(self, ast):
         return self.convert_statement_ast_(ast)
 
-    def check_statement_is_field_initializer(self, ast):
-        if not ast.matches.Expr:
-            return None
-
-        ast = ast.value
-
-        if not (ast.matches.Call and
-                ast.func.matches.Attribute and
-                ast.func.attr == "__init__" and
-                ast.func.value.matches.Attribute and
-                ast.func.value.value.matches.Name and
-                ast.func.value.value.id == self._init_fields.first_var_name
-                ):
-            return None
-
-        return (ast.func.value.attr, ast.args)
-
     def convert_statement_ast_(self, ast):
-        field_and_args = self.check_statement_is_field_initializer(ast)
-        if field_and_args is not None:
-            field, args = field_and_args
-
-            if self._init_fields is None:
-                raise ConversionException("Invalid use of __init__ outside of constructor")
-
-            if not self._init_fields.any_remaining():
-                raise ConversionException("All members are initialized.")
-
-            if field not in self._init_fields.field_types:
-                raise ConversionException(
-                    "Member %s is not a valid member to initialize. Did you mean %s?" % (
-                        field,
-                        string_util.closest(field, self._init_fields.field_order)
-                        )
-                    )
-
-            if field not in self._init_fields.uninitialized_fields:
-                raise ConversionException("Member %s is already initialized" % field)
-
-            field_type = self._init_fields.field_types[field]
-
-            args = [self.convert_expression_ast(a) for a in args]
-
-            expr = (
-                self.named_var_expr(self._init_fields.first_var_name)
-                    .convert_attribute(self, field)
-                    .convert_initialize(self, args)
-                )
-
-            expr = self.consume_temporaries(expr)
-
-            self._init_fields.mark_field_initialized(field, expr)
-
-            return TypedExpression.NoneExpr(native_ast.nullExpr)
-
         if ast.matches.Assign or ast.matches.AugAssign:
-            if self._init_fields is not None:
-                self._init_fields.finalize(self)
-
             if ast.matches.Assign:
                 assert len(ast.targets) == 1
                 op = None
@@ -771,9 +677,6 @@ class ConversionContext(object):
                 return slicing.convert_set_attribute(self, attr, val_to_store)
 
         if ast.matches.Return:
-            if self._init_fields is not None:
-                self._init_fields.finalize(self)
-
             if ast.value is None:
                 e = TypedExpression(native_ast.nullExpr, NoneExprType)
             else:
@@ -795,7 +698,7 @@ class ConversionContext(object):
 
             output_type = self._varname_to_type[FunctionOutput]
 
-            return e.convert_incref(self) >> TypedExpression(native_ast.Expression.Return(arg=e.nonref_expr), None, False)
+            return TypedExpression(native_ast.Expression.Return(arg=self.incref(e).nonref_expr), None, False)
 
         if ast.matches.Expr:
             return TypedExpression(
@@ -812,9 +715,6 @@ class ConversionContext(object):
                 branch = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
 
                 return cond + branch
-
-            if self._init_fields is not None:
-                self._init_fields.finalize(self)
 
             true = self.convert_statement_list_ast(ast.body)
             false = self.convert_statement_list_ast(ast.orelse)
@@ -833,9 +733,6 @@ class ConversionContext(object):
             return TypedExpression(native_ast.nullExpr, NoneExprType)
 
         if ast.matches.While:
-            if self._init_fields is not None:
-                self._init_fields.finalize(self)
-
             cond = self.ensure_bool(self.convert_expression_ast(ast.test))
             cond = self.consume_temporaries(cond)
 
@@ -857,9 +754,6 @@ class ConversionContext(object):
             return self.exception_helper.convert_tryexcept(ast)
 
         if ast.matches.For:
-            if self._init_fields is not None:
-                self._init_fields.finalize(self)
-
             if not ast.target.matches.Name:
                 raise ConversionException("For loops can only have simple targets for now")
 
