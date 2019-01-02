@@ -2819,7 +2819,7 @@ PyObject* native_instance_wrapper::categoryToPyString(Type::TypeCategory cat) {
 }
 
 // static
-Instance native_instance_wrapper::tryUnwrapPyObjectToInstance(PyObject* inst) {
+Instance native_instance_wrapper::unwrapPyObjectToInstance(PyObject* inst) {
     if (inst == Py_None) {
         return Instance();
     }
@@ -2868,48 +2868,25 @@ Instance native_instance_wrapper::tryUnwrapPyObjectToInstance(PyObject* inst) {
 
     }
 
+    assert(!PyErr_Occurred());
     PyErr_Format(
         PyExc_TypeError,
-        "Cannot convert %S to an Instance (only None, int, and bool supported currently).",
+        "Cannot convert %S to an Instance "
+        "(only None, int, bool, bytes, and str are supported currently).",
         inst
     );
-
 
     return Instance();  // when failed, return a None instance
 }
 
 // static
 Type* native_instance_wrapper::tryUnwrapPyInstanceToValueType(PyObject* typearg) {
-    if (PyBool_Check(typearg)) {
-        return Value::MakeBool(typearg == Py_True);
+    Instance inst = unwrapPyObjectToInstance(typearg);
+
+    if (!PyErr_Occurred()) {
+        return Value::Make(inst);
     }
-    if (PyLong_Check(typearg)) {
-        int64_t val = PyLong_AsLong(typearg);
-        return Value::MakeInt64(val);
-    }
-    if (PyFloat_Check(typearg)) {
-        return Value::MakeFloat64(PyFloat_AsDouble(typearg));
-    }
-    if (PyBytes_Check(typearg)) {
-        return Value::MakeBytes(PyBytes_AsString(typearg), PyBytes_GET_SIZE(typearg));
-    }
-    if (PyUnicode_Check(typearg)) {
-        auto kind = PyUnicode_KIND(typearg);
-        assert(
-            kind == PyUnicode_1BYTE_KIND ||
-            kind == PyUnicode_2BYTE_KIND ||
-            kind == PyUnicode_4BYTE_KIND
-            );
-        return Value::MakeString(
-            kind == PyUnicode_1BYTE_KIND ? 1 :
-            kind == PyUnicode_2BYTE_KIND ? 2 :
-                                            4,
-            PyUnicode_GET_LENGTH(typearg),
-            kind == PyUnicode_1BYTE_KIND ? (char*)PyUnicode_1BYTE_DATA(typearg) :
-            kind == PyUnicode_2BYTE_KIND ? (char*)PyUnicode_2BYTE_DATA(typearg) :
-                                           (char*)PyUnicode_4BYTE_DATA(typearg)
-            );
-    }
+    PyErr_Clear();
 
     Type* nativeType = native_instance_wrapper::extractTypeFrom(typearg->ob_type);
     if (nativeType) {
@@ -2917,8 +2894,8 @@ Type* native_instance_wrapper::tryUnwrapPyInstanceToValueType(PyObject* typearg)
             Instance::create(
                 nativeType,
                 ((native_instance_wrapper*)typearg)->dataPtr()
-                )
-            );
+            )
+        );
     }
     return nullptr;
 }
