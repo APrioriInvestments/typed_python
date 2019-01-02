@@ -5,6 +5,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrapper
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
+from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
 from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.type_wrappers.len_wrapper import LenWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
@@ -44,6 +45,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "TupleOf":
         return TupleOfWrapper(t)
+
+    if t.__typed_python_category__ == "OneOf":
+        return OneOfWrapper(t)
 
     if t.__typed_python_category__ == "PythonObjectOfType":
         return PythonObjectOfTypeWrapper(t)

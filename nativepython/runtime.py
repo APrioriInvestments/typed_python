@@ -46,7 +46,7 @@ class Runtime:
             output_wrapper = python_to_native_ast.typedPythonTypeToTypeWrapper(f.returnType or object)
             input_wrappers = [python_to_native_ast.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
 
-            callTarget = self.converter.convert(f.functionObj, input_wrappers)
+            callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType)
 
             wrappingCallTargetName = self.converter.generateCallConverter(callTarget, output_wrapper)
 

@@ -19,7 +19,7 @@ import nativepython.native_ast as native_ast
 class LenWrapper(Wrapper):
     is_pod = True
     is_empty = False
-    is_pass_by_ref = True
+    is_pass_by_ref = False
 
     def __init__(self):
         super().__init__(len)

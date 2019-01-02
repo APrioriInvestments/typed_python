@@ -2651,6 +2651,19 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
         Py_DECREF(types);
     }
 
+    if (inType->getTypeCategory() == Type::TypeCategory::catOneOf) {
+        OneOf* oneOfT = (OneOf*)inType;
+
+        PyObject* types = PyTuple_New(oneOfT->getTypes().size());
+        for (long k = 0; k < oneOfT->getTypes().size(); k++) {
+            PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(oneOfT->getTypes()[k])));
+        }
+
+        //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(pyType->tp_dict, "Types", types);
+        Py_DECREF(types);
+    }
+
     if (inType->getTypeCategory() == Type::TypeCategory::catTuple) {
         Tuple* tupleT = (Tuple*)inType;
 

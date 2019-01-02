@@ -54,6 +54,9 @@ def type_to_llvm_type(t):
 
         return llvmlite.ir.PointerType(type_to_llvm_type(t.value_type))
 
+    if t.matches.Array:
+        return llvmlite.ir.ArrayType(type_to_llvm_type(t.element_type), t.count)
+
     if t.matches.Float and t.bits == 64:
         return llvmlite.ir.DoubleType()
 
@@ -766,7 +769,7 @@ class FunctionConverter:
                     false = self.convert(expr.orelse)
 
             #it's currently illegal to modify the initialized set in a while loop
-            assert sorted(tags.keys()) == sorted(self.tags_initialized.keys())
+            assert sorted(tags.keys()) == sorted(self.tags_initialized.keys()), (sorted(self.tags_initialized), sorted(tags))
 
             if false is None:
                 self.builder.unreachable()

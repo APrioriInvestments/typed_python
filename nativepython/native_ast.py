@@ -43,6 +43,8 @@ def type_str(c):
         return "*" + str(c.value_type)
     if c.matches.Void:
         return "void"
+    if c.matches.Array:
+        return str(c.element_type) + "[" + str(c.count) + "]"
 
     assert False, type(c)
 
@@ -51,6 +53,7 @@ Type = Alternative("Type",
     Float={'bits': int},
     Int={'bits': int, 'signed': bool},
     Struct={'element_types': TupleOf(Tuple(str, lambda: Type)), 'name': str},
+    Array={'element_type': lambda: Type, 'count': int},
     Function={'output': lambda: Type, 'args': TupleOf(lambda: Type), 'varargs': bool, 'can_throw': bool},
     Pointer={'value_type': lambda: Type},
     attr_ix = type_attr_ix,
@@ -358,8 +361,10 @@ Expression = Alternative("Expression",
         ,
     __rshift__ = expr_concatenate,
     __str__ = expr_str,
+    structElt = lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
     sub = lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
     add = lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
+    eq = lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self,r=ensureExpr(other)),
     lshift = lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
     rshift = lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
     bitand = lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),

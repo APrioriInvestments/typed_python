@@ -26,6 +26,8 @@ NoneExprType = NoneWrapper()
 
 from typed_python import *
 
+typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
 class TypedCallTarget(object):
     def __init__(self, named_call_target, input_types, output_type):
         super().__init__()
@@ -44,9 +46,6 @@ class TypedCallTarget(object):
             [str(x) for x in self.input_types],
             str(self.output_type)
             )
-
-class FunctionOutput:
-    pass
 
 class ExceptionHandlingHelper:
     def __init__(self, conversion_context):
@@ -191,6 +190,8 @@ class ExceptionHandlingHelper:
 
         return (cond_expr, self.context.consume_temporaries(bind_expr + handler_expr))
 
+class FunctionOutput:
+    pass
 
 class ConversionContext(object):
     def __init__(self, converter, varname_to_type, free_variable_lookup):
@@ -199,11 +200,18 @@ class ConversionContext(object):
         self._varname_to_type = varname_to_type
         self._varname_and_type_to_slot_name = {}
         self._varname_uses = {}
-        self._new_variables = set()
         self._free_variable_lookup = free_variable_lookup
         self._temporaries = {}
         self._new_temporaries = set()
         self._temp_let_var = 0
+        self._typesAreUnstable = False
+        self._functionOutputTypeKnown = FunctionOutput in varname_to_type
+
+    def typesAreUnstable(self):
+        return self._typesAreUnstable
+
+    def resetTypeInstabilityFlag(self):
+        self._typesAreUnstable = False
 
     def let_varname(self):
         self._temp_let_var += 1
@@ -285,7 +293,8 @@ class ConversionContext(object):
         call_target = \
             self.converter.convert(
                 f,
-                [a.expr_type for a in args]
+                [a.expr_type for a in args],
+                None
                 )
 
         assert len(call_target.named_call_target.arg_types) == len(args)
@@ -340,7 +349,7 @@ class ConversionContext(object):
     def wrapInTemporaries(self, fun, args):
         """Call 'fun' with args that are all simple reference to values or nonref pod."""
         for i,a in enumerate(args):
-            if not (a.isReference or a.expr_type.is_pod):
+            if not (a.isReference or not a.expr_type.is_pass_by_ref):
                 #'a' contains an increffed value that will be valid for the duration of the statement
                 #we're in. we'll move it to a stack slot. We assume all of our types are moveable (no self pointers to the stack)
                 slot = self.allocate_temporary(a.expr_type)
@@ -580,6 +589,20 @@ class ConversionContext(object):
     def convert_statement_ast(self, ast):
         return self.convert_statement_ast_(ast)
 
+    def upsizeVariableType(self, varname, new_type):
+        assert varname in self._varname_to_type
+        existingType = self._varname_to_type[varname].typeRepresentation
+
+        if hasattr(existingType, '__typed_python_category__') and \
+                existingType.__typed_python_category__ == 'OneOf':
+            if new_type.typeRepresentation in existingType.Types:
+                return
+
+        final_type = OneOf(new_type.typeRepresentation, existingType)
+
+        self._typesAreUnstable = True
+        self._varname_to_type[varname] = typeWrapper(final_type)
+
     def convert_statement_ast_(self, ast):
         if ast.matches.Assign or ast.matches.AugAssign:
             if ast.matches.Assign:
@@ -599,11 +622,7 @@ class ConversionContext(object):
                 val_to_store = self.convert_expression_ast(ast.value)
 
                 if self._varname_to_type[varname] is None:
-                    self._new_variables.add(varname)
-
-                    new_variable_type = val_to_store.expr_type
-
-                    self._varname_to_type[varname] = new_variable_type
+                    self._varname_to_type[varname] = val_to_store.expr_type
 
                     slot_ref = self.named_var_expr(varname)
 
@@ -619,6 +638,15 @@ class ConversionContext(object):
 
                     if op is not None:
                         val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+
+                    if slot_ref.expr_type != val_to_store.expr_type:
+                        self.upsizeVariableType(varname, val_to_store.expr_type)
+
+                    #convert the value to the target type now that we've upsized it
+                    val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
+
+                    if val_to_store.expr_type is None:
+                        return val_to_store
 
                     return slot_ref.convert_assign(val_to_store)
 
@@ -653,31 +681,26 @@ class ConversionContext(object):
             if e.expr_type is None:
                 return e
             
-            if self._varname_to_type[FunctionOutput] is not None:
-                if self._varname_to_type[FunctionOutput] != e.expr_type:
-                    raise ConversionException(
-                        "Function returning multiple types:\n\t%s\n\t%s" % (
-                                e.expr_type,
-                                self._varname_to_type[FunctionOutput]
-                                )
-                        )
-            else:
-                self._varname_to_type[FunctionOutput] = e.expr_type
+            if not self._functionOutputTypeKnown:
+                if self._varname_to_type.get(FunctionOutput) is None:
+                    self._varname_to_type[FunctionOutput] = e.expr_type
+                else:
+                    self.upsizeVariableType(FunctionOutput, e.expr_type)
+
+            if e.expr_type != self._varname_to_type[FunctionOutput]:
+                e = e.convert_to_type(self._varname_to_type[FunctionOutput])
+
+            if e.expr_type is None:
+                return e
 
             if e.isReference:
-                return TypedExpression(
-                    self, 
+                return self.TerminalExpr(
                     e.convert_incref().expr >> 
-                        native_ast.Expression.Return(arg=e.nonref_expr),
-                    None,
-                    False
+                        native_ast.Expression.Return(arg=e.nonref_expr)
                     )
             else:
-                return TypedExpression(
-                    self, 
-                    native_ast.Expression.Return(arg=e.nonref_expr),
-                    None,
-                    False
+                return self.TerminalExpr(
+                    native_ast.Expression.Return(arg=e.nonref_expr)
                     )
 
         if ast.matches.Expr:
@@ -687,8 +710,7 @@ class ConversionContext(object):
 
         if ast.matches.If:
             cond = self.convert_expression_ast(ast.test).toBool()
-            cond = self.consume_temporaries(cond)
-
+            
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
                 branch = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
@@ -713,9 +735,9 @@ class ConversionContext(object):
 
         if ast.matches.While:
             cond = self.convert_expression_ast(ast.test).toBool()
-            cond = self.consume_temporaries(cond)
-
+            
             true = self.convert_statement_list_ast(ast.body)
+
             false = self.convert_statement_list_ast(ast.orelse)
 
             if true.expr_type or false.expr_type:
@@ -830,8 +852,6 @@ class ConversionContext(object):
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 
     def convert_statement_list_ast(self, statements, toplevel=False):
-        orig_vars_in_scope = set(self._varname_to_type)
-
         if not statements:
             if toplevel:
                 return self.TerminalExpr(native_ast.Expression.Return(None))
@@ -846,34 +866,45 @@ class ConversionContext(object):
             if conversion.expr_type is None:
                 break
 
-
         if exprs[-1].expr_type is not None:
             flows_off_end = True
         else:
             flows_off_end = False
 
         if toplevel and flows_off_end:
-            if self._varname_to_type[FunctionOutput] is None:
-                self._varname_to_type[FunctionOutput] = NoneWrapper()
-            if isinstance(self._varname_to_type[FunctionOutput], NoneWrapper):
+            if not self._functionOutputTypeKnown:
+                if self._varname_to_type.get(FunctionOutput) is None:
+                    self._varname_to_type[FunctionOutput] = NoneWrapper()
+                else:
+                    self.upsizeVariableType(FunctionOutput, NoneWrapper())
+
+            outT = self._varname_to_type[FunctionOutput]
+
+            if isinstance(outT, NoneWrapper):
                 exprs = exprs + [self.NoneExpr(native_ast.Expression.Return(arg=None))]
-                flows_off_end = False
             else:
-                raise ConversionException(
-                    "Not all control flow paths return a value and the function returns %s" %
-                        self._varname_to_type[FunctionOutput]
-                    )
+                null_expr = TypedExpression(self, native_ast.nullExpr, NoneWrapper(), True)
+                null_expr = null_expr.convert_to_type(outT)
+
+                exprs = exprs + [
+                    self.TerminalExpr(
+                        e.convert_incref().expr >> 
+                                native_ast.Expression.Return(arg=null_expr)
+                            if null_expr.isReference else 
+                        native_ast.Expression.Return(arg=null_expr)
+                        )
+                    ]
 
         teardowns = []
-        for v in list(self._varname_to_type.keys()):
-            if v not in orig_vars_in_scope:
-                teardowns.append(self.named_variable_teardown(v))
-
-                del self._varname_to_type[v]
+        if toplevel:
+            for v in list(self._varname_to_type.keys()):
+                if v is not FunctionOutput:
+                    teardowns.append(self.named_variable_teardown(v))
 
         seq_expr = native_ast.Expression.Sequence(
                 vals=[e.expr for e in exprs]
                 )
+
         if teardowns:
             seq_expr = native_ast.Expression.Finally(
                 expr=seq_expr,
@@ -912,7 +943,9 @@ class ConversionContext(object):
                         to_add.append(
                             native_ast.Expression.Store(
                                 ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
-                                val=native_ast.Expression.Variable(name=name)
+                                val=
+                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
+                                    native_ast.Expression.Variable(name=name).load()
                                 )
                             )
                     else:
@@ -1024,7 +1057,8 @@ class Converter(object):
                 statements,
                 input_types,
                 local_variables,
-                free_variable_lookup
+                free_variable_lookup,
+                output_type
                 ):
         if ast_arg.vararg is not None:
             star_args_name = ast_arg.vararg.val.arg
@@ -1069,11 +1103,19 @@ class Converter(object):
 
             varname_to_type[star_args_name] = starargs_type
 
-        varname_to_type[FunctionOutput] = None
+        if output_type is not None:
+            varname_to_type[FunctionOutput] = typeWrapper(output_type)
 
         subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
 
-        res = subconverter.convert_statement_list_ast(statements, toplevel=True)
+        while True:
+            #repeatedly try converting as long as the types keep getting bigger.
+            res = subconverter.convert_statement_list_ast(statements, toplevel=True)
+
+            if subconverter.typesAreUnstable():
+                subconverter.resetTypeInstabilityFlag()
+            else:
+                break
 
         if star_args_name is not None:
             res = subconverter.construct_starargs_around(res, star_args_name)
@@ -1091,7 +1133,7 @@ class Converter(object):
             return_type
             )
 
-    def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup):
+    def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup, output_type):
         return self.convert_function_ast(
             ast.args,
             [python_ast.Statement.Return(
@@ -1102,7 +1144,8 @@ class Converter(object):
                 )],
             input_types,
             local_variables,
-            free_variable_lookup
+            free_variable_lookup,
+            output_type
             )
 
     def define(self, identifier, name, input_types, output_type, native_function_definition):
@@ -1134,15 +1177,6 @@ class Converter(object):
         self._unconverted.add(new_name)
 
         return self._targets[new_name]
-
-    def convert_lambda_as_expression(self, lambda_func):
-        ast, free_variable_lookup = self.callable_to_ast_and_vars(lambda_func)
-
-        varname_to_type = {}
-
-        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup, None)
-
-        return subconverter.convert_expression_ast(ast.body)
 
     def callable_to_ast_and_vars(self, f):
         pyast = ast_util.pyAstFor(f)
@@ -1225,7 +1259,7 @@ class Converter(object):
 
         return new_name
 
-    def convert(self, f, input_types):
+    def convert(self, f, input_types, output_type):
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
         identifier = ("pyfunction", f, input_types)
@@ -1237,18 +1271,19 @@ class Converter(object):
         pyast, freevars = self.callable_to_ast_and_vars(f)
 
         if isinstance(pyast, python_ast.Statement.FunctionDef):
-            definition,output_type = \
+            definition, output_type = \
                 self.convert_function_ast(
                     pyast.args,
                     pyast.body,
                     input_types,
                     f.__code__.co_varnames,
-                    freevars
+                    freevars,
+                    output_type
                     )
         else:
             assert pyast.matches.Lambda
 
-            definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars)
+            definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars, output_type)
 
         assert definition is not None
 

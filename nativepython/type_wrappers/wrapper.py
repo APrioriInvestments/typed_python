@@ -85,7 +85,7 @@ class Wrapper(object):
         raise NotImplementedError()
 
     def convert_destroy(self, context, instance):
-        raise NotImplementedError()
+        raise NotImplementedError(self)
 
     def convert_call(self, context, left, args):
         raise NotImplementedError()

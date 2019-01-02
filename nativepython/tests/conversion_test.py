@@ -73,6 +73,23 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(10), 10)
 
+    def test_variable_type_changes_make_sense(self):
+        @Compiled
+        def f(x: int) -> float:
+            y = x
+            y = 1.2
+            return y
+
+        self.assertEqual(f(10), 1.2)
+
+    def test_one_of_basic(self):
+        @Compiled
+        def f(x: OneOf(int, float)) -> OneOf(int, float):
+            return x
+
+        self.assertEqual(f(10), 10)
+        self.assertEqual(f(10.2), 10.2)
+
     def test_call_other_typed_function(self):
         def g(x: int) -> int:
             return x+1

@@ -23,7 +23,7 @@ typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTyp
 class PythonTypeObjectWrapper(Wrapper):
     is_pod = True
     is_empty = False
-    is_pass_by_ref = True
+    is_pass_by_ref = False
 
     def __init__(self, f):
         super().__init__(f)
