@@ -2574,12 +2574,12 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
 
         PyObject* types = PyTuple_New(classT->getMembers().size());
         for (long k = 0; k < classT->getMembers().size(); k++) {
-            PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(classT->getMembers()[k].second)));
+            PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(std::get<1>(classT->getMembers()[k]))));
         }
 
         PyObject* names = PyTuple_New(classT->getMembers().size());
         for (long k = 0; k < classT->getMembers().size(); k++) {
-            PyObject* namePtr = PyUnicode_FromString(classT->getMembers()[k].first.c_str());
+            PyObject* namePtr = PyUnicode_FromString(std::get<0>(classT->getMembers()[k]).c_str());
             PyTuple_SetItem(names, k, namePtr);
         }
 
@@ -2819,6 +2819,66 @@ PyObject* native_instance_wrapper::categoryToPyString(Type::TypeCategory cat) {
 }
 
 // static
+Instance native_instance_wrapper::tryUnwrapPyObjectToInstance(PyObject* inst) {
+    if (inst == Py_None) {
+        return Instance();
+    }
+    if (PyBool_Check(inst)) {
+        return Instance::create(inst == Py_True);
+    }
+    if (PyLong_Check(inst)) {
+        return Instance::create(PyLong_AsLong(inst));
+    }
+    if (PyFloat_Check(inst)) {
+        return Instance::create(PyFloat_AsDouble(inst));
+    }
+    if (PyBytes_Check(inst)) {
+        return Instance::createAndInitialize(
+            Bytes::Make(),
+            [&](instance_ptr i) {
+                Bytes::Make()->constructor(i, PyBytes_GET_SIZE(inst), PyBytes_AsString(inst));
+            }
+        );
+    }
+    if (PyUnicode_Check(inst)) {
+        auto kind = PyUnicode_KIND(inst);
+        assert(
+            kind == PyUnicode_1BYTE_KIND ||
+            kind == PyUnicode_2BYTE_KIND ||
+            kind == PyUnicode_4BYTE_KIND
+            );
+        int64_t bytesPerCodepoint =
+            kind == PyUnicode_1BYTE_KIND ? 1 :
+            kind == PyUnicode_2BYTE_KIND ? 2 :
+                                           4 ;
+
+        int64_t count = PyUnicode_GET_LENGTH(inst);
+
+        const char* data =
+            kind == PyUnicode_1BYTE_KIND ? (char*)PyUnicode_1BYTE_DATA(inst) :
+            kind == PyUnicode_2BYTE_KIND ? (char*)PyUnicode_2BYTE_DATA(inst) :
+                                           (char*)PyUnicode_4BYTE_DATA(inst);
+
+        return Instance::createAndInitialize(
+            String::Make(),
+            [&](instance_ptr i) {
+                String::Make()->constructor(i, bytesPerCodepoint, count, data);
+            }
+        );
+
+    }
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "Cannot convert %S to an Instance (only None, int, and bool supported currently).",
+        inst
+    );
+
+
+    return Instance();  // when failed, return a None instance
+}
+
+// static
 Type* native_instance_wrapper::tryUnwrapPyInstanceToValueType(PyObject* typearg) {
     if (PyBool_Check(typearg)) {
         return Value::MakeBool(typearg == Py_True);
@@ -2860,7 +2920,6 @@ Type* native_instance_wrapper::tryUnwrapPyInstanceToValueType(PyObject* typearg)
                 )
             );
     }
-    std::cout << "didn't manage to build a Value for the PyObject" << std::endl;
     return nullptr;
 }
 

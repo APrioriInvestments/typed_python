@@ -47,6 +47,18 @@ public:
         });
     }
 
+    static Instance create(bool val) {
+        return create(Bool::Make(), (instance_ptr)&val);
+    }
+
+    static Instance create(long val) {
+        return create(Int64::Make(), (instance_ptr)&val);
+    }
+
+    static Instance create(double val) {
+        return create(Float64::Make(), (instance_ptr)&val);
+    }
+
     static Instance create(Type*t, instance_ptr data) {
         t->assertForwardsResolved();
 
@@ -61,7 +73,7 @@ public:
     }
 
     Instance() {
-        //by default, None
+        // by default, None
         mLayout = noneLayout();
         mLayout->refcount++;
     }
