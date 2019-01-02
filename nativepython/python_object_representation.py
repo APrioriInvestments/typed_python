@@ -51,9 +51,6 @@ def _typedPythonTypeToTypeWrapper(t):
     assert False, t
 
 def pythonObjectRepresentation(context, f):
-    if f in (int,bool,float,str,type(None)):
-        return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
-
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)
 
@@ -100,5 +97,8 @@ def pythonObjectRepresentation(context, f):
             PythonFreeFunctionWrapper(f),
             False
             )
+
+    if isinstance(f, type):
+        return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
 
     assert False, f

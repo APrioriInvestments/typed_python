@@ -65,7 +65,13 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(1,0,0), False)
         self.assertEqual(f(1,1,0), False)
         self.assertEqual(f(1,1,1), True)
-        
+
+    def test_object_to_int_conversion(self):
+        @Compiled
+        def f(x: int) -> int:
+            return int(object(x))
+
+        self.assertEqual(f(10), 10)
 
     def test_call_other_typed_function(self):
         def g(x: int) -> int:

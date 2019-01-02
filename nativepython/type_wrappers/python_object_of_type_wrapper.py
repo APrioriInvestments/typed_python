@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import NoneType
+from typed_python import NoneType, Int64
 from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast
@@ -83,3 +83,29 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 ),
             self
             )
+
+    def convert_to_type(self, context, expr, target_type):
+        if target_type.typeRepresentation == Int64():
+            return context.ValueExpr(
+                native_ast.Expression.Call(
+                    target=runtime_functions.pyobj_to_int,
+                    args=(expr.nonref_expr,)
+                    ),
+                target_type
+                )
+
+        return super().convert_to_type(context, expr, target_type)
+
+    def convert_to_self(self, context, expr):
+        if expr.expr_type.typeRepresentation == Int64():
+            return context.ValueExpr(
+                native_ast.Expression.Call(
+                    target=runtime_functions.int_to_pyobj,
+                    args=(expr.nonref_expr,)
+                    ),
+                self
+                )
+
+        return super().convert_to_self(context, expr)
+
+

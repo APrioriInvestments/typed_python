@@ -30,7 +30,7 @@ class Wrapper(object):
     is_pass_by_ref = True
 
     def __repr__(self):
-        return "Wrapper(%s)" % self.typeRepresentation
+        return "Wrapper(%s)" % self.typeRepresentation.__qualname__
 
     def __init__(self, typeRepresentation):
         super().__init__()
@@ -94,7 +94,10 @@ class Wrapper(object):
         raise NotImplementedError()
 
     def convert_to_type(self, context, expr, target_type):
+        return target_type.convert_to_self(context, expr)
+
+    def convert_to_self(self, context, expr):
         return context.TerminalExpr(
-            generateThrowException(context, TypeError("Can't convert from type %s to type %s" % (self, target_type)))
+            generateThrowException(context, TypeError("Can't convert from type %s to type %s" % (expr.expr_type, self)))
             )
 

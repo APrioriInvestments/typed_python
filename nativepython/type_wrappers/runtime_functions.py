@@ -62,3 +62,15 @@ getattr_pyobj = externalCallTarget(
         Void.pointer(),
         UInt8Ptr
         )
+
+int_to_pyobj = externalCallTarget(
+        "nativepython_runtime_int_to_pyobj", 
+        Void.pointer(),
+        Int64
+        )
+
+pyobj_to_int = externalCallTarget(
+        "nativepython_runtime_pyobj_to_int", 
+        Int64,
+        Void.pointer()
+        )

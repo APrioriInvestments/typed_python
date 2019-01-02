@@ -15,6 +15,10 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
 import nativepython.native_ast as native_ast
+import nativepython
+from nativepython.type_wrappers.exceptions import generateThrowException
+
+typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 class PythonTypeObjectWrapper(Wrapper):
     is_pod = True
@@ -32,10 +36,9 @@ class PythonTypeObjectWrapper(Wrapper):
 
     def convert_call(self, context, left, args):
         if len(args) == 1:
-            if self.typeRepresentation is int:
-                return args[0].toInt64()
+            return args[0].convert_to_type(typeWrapper(self.typeRepresentation))
 
-            assert False, "strange type here: %s" % self.typeRepresentation
-
-        assert False, "we should be raising a python exception here but we dont know how yet"
+        return context.TerminalExpr(
+            generateThrowException(context, TypeError("%s() takes at most 1 argument" % (self.typeRepresentation,)))
+            )
 

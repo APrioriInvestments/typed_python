@@ -550,13 +550,12 @@ class ConversionContext(object):
                 tag=tname,
                 expr=self._temporaries[tname].convert_destroy(
                     self,
-                    TypedExpression(
+                    self.RefExpr(
                         native_ast.Expression.StackSlot(
                             name=tname,
                             type=self._temporaries[tname].getNativeLayoutType()
                             ),
-                        self._temporaries[tname],
-                        True
+                        self._temporaries[tname]
                         )
                     ).expr
                 )
@@ -573,6 +572,7 @@ class ConversionContext(object):
             return expr
 
         return TypedExpression(
+            self,
             native_ast.Expression.Finally(expr=expr.expr, teardowns=teardowns),
             expr.expr_type,
             expr.isReference

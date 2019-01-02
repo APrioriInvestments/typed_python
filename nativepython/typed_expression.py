@@ -120,6 +120,12 @@ class TypedExpression(object):
             (self,) + tuple(args)
             )
 
+    def convert_to_type(self, target_type):
+        return self.context.wrapInTemporaries(
+            lambda self: self.expr_type.convert_to_type(self.context, self, target_type),
+            (self,)
+            )
+
     def toFloat64(self):
         return self.context.wrapInTemporaries(
             lambda self: self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64())),

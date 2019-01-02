@@ -51,4 +51,15 @@ extern "C" {
         return l % r;
     }
 
+    PyObject* nativepython_runtime_int_to_pyobj(int64_t i) {
+        return PyLong_FromLong(i);
+    }
+
+    int64_t nativepython_runtime_pyobj_to_int(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to an int64.");
+    }
 }
