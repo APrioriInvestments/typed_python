@@ -21,76 +21,46 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
         if (o == Py_False) {
             b.write_uint8(T_FALSE);
         } else
-        if (PyLong_Check(o)) {
-            if (!PyLong_CheckExact(o)) {
-                throwDerivedClassError("int");
-            }
+        if (PyLong_CheckExact(o)) {
             b.write_uint8(T_LONG);
             b.write_int64(PyLong_AsLong(o));
         } else
-        if (PyFloat_Check(o)) {
-            if (!PyFloat_CheckExact(o)) {
-                throwDerivedClassError("float");
-            }
+        if (PyFloat_CheckExact(o)) {
             b.write_uint8(T_FLOAT);
             b.write_double(PyFloat_AsDouble(o));
         } else
-        if (PyComplex_Check(o)) {
-            if (!PyComplex_CheckExact(o)) {
-                throwDerivedClassError("float");
-            }
+        if (PyComplex_CheckExact(o)) {
             throw std::runtime_error(std::string("`complex` objects cannot be serialized yet"));
         } else
-        if (PyBytes_Check(o)) {
-            if (!PyBytes_CheckExact(o)) {
-                throwDerivedClassError("bytes");
-            }
+        if (PyBytes_CheckExact(o)) {
             b.write_uint8(T_BYTES);
             b.write_uint32(PyBytes_GET_SIZE(o));
             b.write_bytes((uint8_t*)PyBytes_AsString(o), PyBytes_GET_SIZE(o));
         } else
-        if (PyUnicode_Check(o)) {
-            if (!PyUnicode_CheckExact(o)) {
-                throwDerivedClassError("str");
-            }
+        if (PyUnicode_CheckExact(o)) {
             b.write_uint8(T_UNICODE);
             Py_ssize_t sz;
             const char* c = PyUnicode_AsUTF8AndSize(o, &sz);
             b.write_uint32(sz);
             b.write_bytes((uint8_t*)c, sz);
         } else
-        if (PyList_Check(o)) {
-            if (!PyList_CheckExact(o)) {
-                throwDerivedClassError("list");
-            }
+        if (PyList_CheckExact(o)) {
             b.write_uint8(T_LIST);
             serializePyList(o, b);
         } else
-        if (PyTuple_Check(o)) {
-            if (!PyTuple_CheckExact(o)) {
-                throwDerivedClassError("tuple");
-            }
+        if (PyTuple_CheckExact(o)) {
             b.write_uint8(T_TUPLE);
             serializePyTuple(o, b);
         } else
-        if (PySet_Check(o)) {
-            if (!PySet_CheckExact(o)) {
-                throwDerivedClassError("set");
-            }
+        if (PySet_CheckExact(o)) {
             b.write_uint8(T_SET);
             serializePySet(o, b);
         } else
-        if (PyFrozenSet_Check(o)) {
-            if (!PyFrozenSet_CheckExact(o)) {
-                throwDerivedClassError("frozenset");
-            }
+        if (PyFrozenSet_CheckExact(o)) {
             b.write_uint8(T_FROZENSET);
             serializePyFrozenSet(o, b);
         } else
-        if (PyDict_Check(o)) {
-            if (!PyDict_CheckExact(o)) {
-                throwDerivedClassError("dict");
-            }
+        if (PyDict_CheckExact(o)) {
             b.write_uint8(T_DICT);
             serializePyDict(o, b);
         } else
@@ -251,6 +221,38 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     }
 
     if (representation == Py_None) {
+        //check whether this is a type derived from a serializable native type, which we don't support
+        if (PyLong_Check(o)) {
+            throwDerivedClassError("long");
+        }
+        if (PyFloat_Check(o)) {
+            throwDerivedClassError("float");
+        }
+        if (PyBytes_Check(o)) {
+            throwDerivedClassError("bytes");
+        }
+        if (PyComplex_Check(o)) {
+            throwDerivedClassError("complex");
+        }
+        if (PyUnicode_Check(o)) {
+            throwDerivedClassError("str");
+        }
+        if (PyList_Check(o)) {
+            throwDerivedClassError("list");
+        }
+        if (PyTuple_Check(o)) {
+            throwDerivedClassError("tuple");
+        }
+        if (PySet_Check(o)) {
+            throwDerivedClassError("set");
+        }
+        if (PyFrozenSet_Check(o)) {
+            throwDerivedClassError("frozenset");
+        }
+        if (PyDict_Check(o)) {
+            throwDerivedClassError("dict");
+        }
+
         //we did nothing interesting
         b.write_uint8(T_OBJECT_TYPEANDDICT);
         serializePythonObject((PyObject*)o->ob_type, b);

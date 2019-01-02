@@ -32,6 +32,7 @@ _builtin_name_to_value = {
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
 _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
+_builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0] #the 'scalar' function
 _builtin_name_to_value[".builtin.dtype"] = numpy.dtype
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
@@ -116,6 +117,9 @@ class SerializationContext(object):
                 result = (result[0], result[1], result[2][:-1] + (lz4.frame.compress(result[2][-1]),))
             return result
 
+        if isinstance(inst, numpy.number):
+            return inst.__reduce__() + (None,)
+
         if isinstance(inst, numpy.dtype):
             return (numpy.dtype, (str(inst),), None)
 
@@ -137,6 +141,9 @@ class SerializationContext(object):
 
     def setInstanceStateFromRepresentation(self, instance, representation):
         if isinstance(instance, numpy.dtype):
+            return True
+
+        if isinstance(instance, numpy.number):
             return True
 
         if isinstance(instance, _ndarray):

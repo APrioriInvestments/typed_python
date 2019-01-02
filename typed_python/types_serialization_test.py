@@ -772,6 +772,12 @@ class TypesSerializationTest(unittest.TestCase):
             got = ping_pong(value)
             self.assert_is_copy(value, got)
 
+    def test_serialize_numpy_float(self):
+        deserializedVal = ping_pong(numpy.float64(1.0))
+
+        self.assertEqual(deserializedVal, 1.0)
+        self.assertIsInstance(deserializedVal, numpy.float64)
+
     # FAILS
     @unittest.skip
     def test_serialize_reduce(self):
