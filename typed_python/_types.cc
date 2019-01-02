@@ -314,7 +314,7 @@ bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::str
     return true;
 }
 
-bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<std::string, Type*, PyObject*> >& out) {
+bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<std::string, Type*, Instance> >& out) {
     std::set<std::string> memberNames;
 
     for (int i = 0; i < PyTuple_Size(tuple); ++i) {
@@ -342,11 +342,17 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
 
         memberNames.insert(memberName);
 
+        Instance inst = native_instance_wrapper::tryUnwrapPyObjectToInstance(PyTuple_GetItem(entry, 2));
+
+        if (PyErr_Occurred()) {
+            return false;
+        }
+
         out.push_back(
             std::make_tuple(
                 memberName,
                 targetType,
-                PyTuple_GetItem(entry, 2)
+                inst
             )
         );
     }
@@ -595,7 +601,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    std::vector<std::tuple<std::string, Type*, PyObject*> > members;
+    std::vector<std::tuple<std::string, Type*, Instance> > members;
     std::vector<std::pair<std::string, Type*> > memberFunctions;
     std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;
@@ -666,7 +672,7 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     Type* actualType = native_instance_wrapper::extractTypeFrom(a1->ob_type);
 
-    if (!actualType || 
+    if (!actualType ||
             actualType->getTypeCategory() != Type::TypeCategory::catTupleOf &&
             actualType->getTypeCategory() != Type::TypeCategory::catClass &&
             actualType->getTypeCategory() != Type::TypeCategory::catConstDict

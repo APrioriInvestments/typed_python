@@ -1813,12 +1813,12 @@ void HeldClass::emptyConstructor(instance_ptr self) {
 void HeldClass::constructor(instance_ptr self) {
     for (size_t k = 0; k < m_members.size(); k++) {
         Type* member_t = std::get<1>(m_members[k]);
-        PyObject* member_val = std::get<2>(m_members[k]);
-        Type* valType = native_instance_wrapper::extractTypeFrom(member_val->ob_type);
-        if (wantsToDefaultConstruct(member_t)) {
-            if (member_val != Py_None) {
-                std::cout << "blabla!" << std::endl;
+        Instance& member_val = std::get<2>(m_members[k]);
 
+        if (wantsToDefaultConstruct(member_t)) {
+            if (member_val.type() != None::Make()) {
+                std::cout << "blabla!" << std::endl;
+                member_t->copy_constructor(self+m_byte_offsets[k], member_val.data());
 	        } else {
                 member_t->constructor(self+m_byte_offsets[k]);
             }

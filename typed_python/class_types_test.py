@@ -21,6 +21,22 @@ from typed_python import (
     Alternative, serialize, deserialize, Value, Class, Member, _types
 )
 
+class DefaultVal(Class):
+    x0 = Member(int)
+    x1 = Member(int, 5)
+
+    y0 = Member(bool)
+    y1 = Member(bool, True)
+
+    z0 = Member(float)
+    z1 = Member(float, 3.14)
+
+    b0 = Member(bytes)
+    b1 = Member(bytes, b"abc")
+
+    s0 = Member(str)
+    s1 = Member(str, "abc")
+
 
 class Interior(Class):
     x = Member(int)
@@ -62,6 +78,24 @@ class ClassWithComplexDispatch(Class):
         return 'y'
 
 class NativeClassTypesTests(unittest.TestCase):
+    def test_member_default_value(self):
+        c = DefaultVal()
+
+        self.assertEqual(c.x0, 0)
+        self.assertEqual(c.x1, 5)
+
+        self.assertEqual(c.y0, False)
+        self.assertEqual(c.y1, True)
+
+        self.assertEqual(c.z0, 0.0)
+        self.assertEqual(c.z1, 3.14)
+
+        self.assertEqual(c.b0, b"")
+        self.assertEqual(c.b1, b"abc")
+
+        self.assertEqual(c.s0, "")
+        self.assertEqual(c.s1, "abc")
+
     def test_class_dispatch_by_name(self):
         c = ClassWithComplexDispatch(x=200)
 

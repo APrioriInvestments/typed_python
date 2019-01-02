@@ -1939,7 +1939,7 @@ private:
 class HeldClass : public Type {
 public:
     HeldClass(std::string inName,
-          const std::vector<std::tuple<std::string, Type*, PyObject*> >& members,
+          const std::vector<std::tuple<std::string, Type*, Instance> >& members,
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
           const std::map<std::string, PyObject*>& classMembers
@@ -1984,7 +1984,7 @@ public:
 
     static HeldClass* Make(
             std::string inName,
-            const std::vector<std::tuple<std::string, Type*, PyObject*> >& members,
+            const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, PyObject*>& classMembers
@@ -2077,7 +2077,7 @@ public:
         return std::get<0>(m_members[index]);
     }
 
-    const std::vector<std::tuple<std::string, Type*, PyObject*> >& getMembers() const {
+    const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {
         return m_members;
     }
 
@@ -2102,7 +2102,7 @@ public:
 private:
     std::vector<size_t> m_byte_offsets;
 
-    std::vector<std::tuple<std::string, Type*, PyObject*> > m_members;
+    std::vector<std::tuple<std::string, Type*, Instance> > m_members;
 
     std::map<std::string, Function*> m_memberFunctions;
     std::map<std::string, Function*> m_staticFunctions;
@@ -2146,7 +2146,7 @@ public:
 
     static Class* Make(
             std::string inName,
-            const std::vector<std::tuple<std::string, Type*, PyObject*> >& members,
+            const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
             const std::map<std::string, PyObject*>& classMembers
@@ -2218,7 +2218,7 @@ public:
         return m_heldClass->getMemberName(index);
     }
 
-    const std::vector<std::tuple<std::string, Type*, PyObject*> >& getMembers() const {
+    const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {
         return m_heldClass->getMembers();
     }
 
