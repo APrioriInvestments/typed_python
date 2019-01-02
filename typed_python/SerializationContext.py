@@ -14,6 +14,7 @@
 
 from typed_python._types import serialize, deserialize
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
+from typed_python.hash import sha_hash
 from types import FunctionType
 import numpy
 import lz4.frame
@@ -63,6 +64,12 @@ class SerializationContext(object):
                 self.objToName[id(v)] = k
 
         self.numpyCompressionEnabled = True
+        self.encodeLineInformationForCode = True
+
+    def withoutLineInfoEncoded(self):
+        res = SerializationContext(self.nameToObject)
+        res.encodeLineInformationForCode = False
+        return res
 
     def nameForObject(self, t):
         ''' Return a name(string) for an input object t, or None if not found. '''
@@ -82,6 +89,9 @@ class SerializationContext(object):
             return res
         else:
             return _builtin_name_to_value.get(name)
+
+    def sha_hash(self, o):
+        return sha_hash(self.serialize(o))
 
     def serialize(self, instance):
         return serialize(object, instance, self)
@@ -119,7 +129,7 @@ class SerializationContext(object):
             for ix, x in enumerate(inst.__code__.co_freevars):
                 representation["freevars"][x] = inst.__closure__[ix].cell_contents
 
-            args = (convertFunctionToAlgebraicPyAst(inst),)
+            args = (convertFunctionToAlgebraicPyAst(inst, keepLineInformation=self.encodeLineInformationForCode),)
 
             return (createEmptyFunction, args, representation)
 

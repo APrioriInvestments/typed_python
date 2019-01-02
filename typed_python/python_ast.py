@@ -460,7 +460,7 @@ Arguments = Alternative("Arguments",
         "kwonlyargs": TupleOf(Arg),
         "kw_defaults": TupleOf(Expr),
         "kwarg": OneOf(Arg, None),
-        "defaults": TupleOf(Expr),
+        "defaults": TupleOf(Expr)
         }
   )
 
@@ -475,7 +475,7 @@ Arg = Alternative("Arg",
 
 Keyword = Alternative("Keyword",
     Item = {
-        "arg": str,
+        "arg": OneOf(None, str),
         "value": Expr
         }
     )
@@ -654,39 +654,51 @@ def convertAlgebraicToPyAst_(pyAst):
 
     assert False, type(pyAst)
 
-def convertPyAstToAlgebraic(tree,fname):
+def convertPyAstToAlgebraic(tree,fname, keepLineInformation=True):
     if issubclass(type(tree), ast.AST):
         converter = converters[type(tree)]
         args = {}
 
         for f in tree._fields:
-            args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname)
+            args[f] = convertPyAstToAlgebraic(getattr(tree, f), fname, keepLineInformation)
 
         try:
-            args['line_number'] = tree.lineno
-            args['col_offset'] = tree.col_offset
-            args['filename'] = fname
+            if keepLineInformation:
+                args['line_number'] = tree.lineno
+                args['col_offset'] = tree.col_offset
+                args['filename'] = fname
+            else:
+                args['line_number'] = 0
+                args['col_offset'] = 0
+                args['filename'] = ''
         except AttributeError:
             pass
 
         try:
             return converter(**args)
-        except Exception as e:
-            import traceback
-            raise UserWarning(
-                "Failed to construct %s from %s with arguments\n%s\n\n%s"
-                % (converter, type(tree),
-                   "\n".join(["\t%s:%s (from %s)" % (k,repr(v)[:50],getattr(tree, k) if hasattr(tree,k) else None) for k,v in args.items()]),
-                   traceback.format_exc()
-                   )
-                )
+        except:
+            del args['line_number']
+            del args['col_offset']
+            del args['filename']
+
+            try:
+                return converter(**args)
+            except Exception as e:
+                import traceback
+                raise UserWarning(
+                    "Failed to construct %s from %s with arguments\n%s\n\n%s"
+                    % (converter, type(tree),
+                       "\n".join(["\t%s:%s (from %s)" % (k,repr(v)[:50],getattr(tree, k) if hasattr(tree,k) else None) for k,v in args.items()]),
+                       traceback.format_exc()
+                       )
+                    )
 
     if isinstance(tree, list):
-        return [convertPyAstToAlgebraic(x,fname) for x in tree]
+        return [convertPyAstToAlgebraic(x,fname, keepLineInformation) for x in tree]
 
     return tree
 
-def convertFunctionToAlgebraicPyAst(f):
+def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     pyast = ast_util.pyAstFor(f)
 
     _, lineno = ast_util.getSourceLines(f)
@@ -694,7 +706,10 @@ def convertFunctionToAlgebraicPyAst(f):
 
     pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
 
-    return convertPyAstToAlgebraic(pyast, fname)
+    try:
+        return convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
+    except Exception as e:
+        raise Exception("Failed to convert function at %s:%s:\n%s" % (fname, lineno, e))
 
 def evaluateFunctionPyAst(pyAst):
     assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef))
@@ -702,6 +717,18 @@ def evaluateFunctionPyAst(pyAst):
     filename = pyAst.filename
 
     if isinstance(pyAst, Statement):
+        #strip out the decorator definitions. We just want the underlying function
+        #object itself.
+        pyAst = Statement.FunctionDef(
+            name=pyAst.name,
+            args=pyAst.args,
+            body=pyAst.body,
+            decorator_list=(),
+            returns=pyAst.returns,
+            line_number=pyAst.line_number,
+            col_offset=pyAst.col_offset,
+            filename=pyAst.filename,
+            )
         pyAst = Module.Module(body=(pyAst,))
     elif isinstance(pyAst, Expr):
         pyAst = Module.Expression(body=pyAst)
