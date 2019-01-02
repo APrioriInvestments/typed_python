@@ -1146,15 +1146,6 @@ public:
 
 class Value : public Type {
 public:
-    Value(Instance instance) :
-            Type(TypeCategory::catValue),
-            mInstance(instance)
-    {
-        m_size = 0;
-        m_is_default_constructible = true;
-        m_name = mInstance.repr();
-    }
-
     bool isBinaryCompatibleWithConcrete(Type* other) {
         return this == other;
     }
@@ -1241,6 +1232,15 @@ public:
     }
 
 private:
+    Value(Instance instance) :
+            Type(TypeCategory::catValue),
+            mInstance(instance)
+    {
+        m_size = 0;
+        m_is_default_constructible = true;
+        m_name = mInstance.repr();
+    }
+
     Instance mInstance;
 };
 

@@ -342,7 +342,7 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
 
         memberNames.insert(memberName);
 
-        Instance inst = native_instance_wrapper::tryUnwrapPyObjectToInstance(PyTuple_GetItem(entry, 2));
+        Instance inst = native_instance_wrapper::unwrapPyObjectToInstance(PyTuple_GetItem(entry, 2));
 
         if (PyErr_Occurred()) {
             return false;
@@ -672,11 +672,11 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     Type* actualType = native_instance_wrapper::extractTypeFrom(a1->ob_type);
 
-    if (!actualType ||
+    if (!actualType || (
             actualType->getTypeCategory() != Type::TypeCategory::catTupleOf &&
             actualType->getTypeCategory() != Type::TypeCategory::catClass &&
             actualType->getTypeCategory() != Type::TypeCategory::catConstDict
-            ) {
+            )) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to refcount must be one of ConstDict, TupleOf, or Class, not %S",

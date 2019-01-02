@@ -183,7 +183,7 @@ struct native_instance_wrapper {
 
     static PyObject* categoryToPyString(Type::TypeCategory cat);
 
-    static Instance tryUnwrapPyObjectToInstance(PyObject* inst);
+    static Instance unwrapPyObjectToInstance(PyObject* inst);
 
     static Type* tryUnwrapPyInstanceToValueType(PyObject* typearg);
 
