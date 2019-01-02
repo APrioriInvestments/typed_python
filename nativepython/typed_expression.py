@@ -12,13 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, OneOf
+from typed_python import Alternative, OneOf, Bool, Float64, Int64
 
 import nativepython.native_ast as native_ast
 import nativepython
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
+
+typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 class TypedExpression(object):
     def __init__(self, context, expr, t, isReference):
@@ -34,7 +36,7 @@ class TypedExpression(object):
         """
         super().__init__()
         if isinstance(t, type) or hasattr(t, "__typed_python_category__"):
-            t = nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+            t = typeWrapper(t)
 
         assert isinstance(t, Wrapper) or t is None, t
         assert isinstance(expr, native_ast.Expression), expr
@@ -120,19 +122,19 @@ class TypedExpression(object):
 
     def toFloat64(self):
         return self.context.wrapInTemporaries(
-            lambda self: self.expr_type.toFloat64(self.context, self),
+            lambda self: self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64())),
             (self,)
             )
 
     def toInt64(self):
         return self.context.wrapInTemporaries(
-            lambda self: self.expr_type.toInt64(self.context, self),
+            lambda self: self.expr_type.convert_to_type(self.context, self, typeWrapper(Int64())),
             (self,)
             )
 
     def toBool(self):
         return self.context.wrapInTemporaries(
-            lambda s: self.expr_type.toBool(self.context, s),
+            lambda s: self.expr_type.convert_to_type(self.context, s, typeWrapper(Bool())),
             (self,)
             )
 

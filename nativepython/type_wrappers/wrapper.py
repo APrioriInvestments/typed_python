@@ -93,11 +93,8 @@ class Wrapper(object):
     def convert_len(self, context, expr):
         raise NotImplementedError()
 
-    def toInt64(self, e):
-        raise NotImplementedError()
+    def convert_to_type(self, context, expr, target_type):
+        return context.TerminalExpr(
+            generateThrowException(context, TypeError("Can't convert from type %s to type %s" % (self, target_type)))
+            )
 
-    def toFloat64(self, e):
-        raise NotImplementedError()
-
-    def tooBool(self, e):
-        raise NotImplementedError()

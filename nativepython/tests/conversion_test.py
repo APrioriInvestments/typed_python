@@ -18,6 +18,10 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 
+def Compiled(f):
+    f = TypedFunction(f)
+    return Runtime.singleton().compile(f)
+
 class TestCompilationStructures(unittest.TestCase):
     def checkFunctionOfIntegers(self, f):
         r  = Runtime.singleton()
@@ -49,6 +53,19 @@ class TestCompilationStructures(unittest.TestCase):
             return y
 
         self.checkFunctionOfIntegers(f)
+
+    def test_boolean_operators(self):
+        @Compiled
+        def f(x: int, y: int, z: int) -> bool:
+            return x and y and z
+
+        self.assertEqual(f(0,1,1), False)
+        self.assertEqual(f(0,0,1), False)
+        self.assertEqual(f(0,0,0), False)
+        self.assertEqual(f(1,0,0), False)
+        self.assertEqual(f(1,1,0), False)
+        self.assertEqual(f(1,1,1), True)
+        
 
     def test_call_other_typed_function(self):
         def g(x: int) -> int:

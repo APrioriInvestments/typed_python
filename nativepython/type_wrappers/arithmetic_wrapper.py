@@ -98,8 +98,21 @@ class Int64Wrapper(ArithmeticTypeWrapper):
 
         raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
 
-    def toInt64(self, context, e):
-        return e
+    def convert_to_type(self, context, e, target_type):
+        if target_type.typeRepresentation == Float64():
+            return context.ValueExpr(
+                native_ast.Expression.Cast(
+                    left=e.nonref_expr,
+                    to_type=native_ast.Type.Float(bits=64)
+                    ),
+                Float64Wrapper()
+                )
+        elif target_type.typeRepresentation == Int64():
+            return e
+        elif target_type.typeRepresentation == Bool():
+            return e != 0
+
+        return super().convert_to_type(context, e, target_type)
 
     def convert_bin_op(self, context, left, op, right):
         left = left.ensureNonReference()
@@ -188,29 +201,30 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
         raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
 
-    def toFloat64(self, context, e):
-        return context.ValueExpr(
-            native_ast.Expression.Cast(
-                left=e.nonref_expr,
-                to_type=native_ast.Type.Float(bits=64)
-                ),
-            Float64Wrapper()
-            )
+    def convert_to_type(self, context, e, target_type):
+        if target_type.typeRepresentation == Float64():
+            return context.ValueExpr(
+                native_ast.Expression.Cast(
+                    left=e.nonref_expr,
+                    to_type=native_ast.Type.Float(bits=64)
+                    ),
+                Float64Wrapper()
+                )
+        elif target_type.typeRepresentation == Int64():
+            return context.ValueExpr(
+                native_ast.Expression.Cast(
+                    left=e.nonref_expr,
+                    to_type=native_ast.Type.Int(bits=64, signed=True)
+                    ),
+                Int64Wrapper()
+                )
+        elif target_type.typeRepresentation == Bool():
+            return e
 
-    def toInt64(self, context, e):
-        return context.ValueExpr(
-            native_ast.Expression.Cast(
-                left=e.nonref_expr,
-                to_type=native_ast.Type.Int(bits=64, signed=True)
-                ),
-            Int64Wrapper()
-            )
-
+        return super().convert_to_type(context, e, target_type)
+        
     def convert_bin_op(self, context, left, op, right):
         raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
-
-    def toBool(self, context, expr):
-        return expr
 
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
@@ -218,12 +232,6 @@ class Float64Wrapper(ArithmeticTypeWrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Float(bits=64)
-
-    def toFloat64(self, context, e):
-        return e
-
-    def toBool(self, context, e):
-        return e != 0.0
 
     def sugar_comparison(self, left, right, which):
         if isinstance(right, float):
@@ -247,14 +255,21 @@ class Float64Wrapper(ArithmeticTypeWrapper):
 
         raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
 
-    def toInt64(self, context, e):
-        return context.ValueExpr(
-            native_ast.Expression.Cast(
-                left=e.nonref_expr,
-                to_type=native_ast.Type.Int(bits=64, signed=True)
-                ),
-            Int64Wrapper()
-            )
+    def convert_to_type(self, context, e, target_type):
+        if target_type.typeRepresentation == Float64():
+            return e
+        elif target_type.typeRepresentation == Int64():
+            return context.ValueExpr(
+                native_ast.Expression.Cast(
+                    left=e.nonref_expr,
+                    to_type=native_ast.Type.Int(bits=64, signed=True)
+                    ),
+                Int64Wrapper()
+                )
+        elif target_type.typeRepresentation == Bool():
+            return e != 0.0
+
+        return super().convert_to_type(context, e, target_type)
 
     def convert_bin_op(self, context, left, op, right):
         if isinstance(right.expr_type, Int64Wrapper):

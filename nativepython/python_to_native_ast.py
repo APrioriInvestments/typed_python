@@ -416,7 +416,7 @@ class ConversionContext(object):
             return pythonObjectRepresentation(self, ast.s)
 
         if ast.matches.BoolOp:
-            def exprForVals(values):
+            def exprForVals(*values):
                 op = ast.op
                 
                 expr_so_far = []
@@ -455,7 +455,7 @@ class ConversionContext(object):
                         new_expr = native_ast.Expression.Branch(cond=l, true=native_ast.trueExpr, false=r)
                     expr_so_far.append(new_expr)
 
-                return self.ValueExpr(expr_so_far[0], Bool)
+                return self.ValueExpr(expr_so_far[0], bool)
 
             return self.wrapInTemporaries(exprForVals, tuple(self.convert_expression_ast(v).toBool() for v in ast.values))
 
