@@ -177,7 +177,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     )
 
         if isinstance(right.expr_type, Float64Wrapper):
-            return left.toFloat64(context).convert_bin_op(context, op, right)
+            return left.toFloat64().convert_bin_op(op, right)
 
         raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
 

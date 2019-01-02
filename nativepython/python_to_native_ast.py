@@ -193,7 +193,7 @@ class ExceptionHandlingHelper:
 
 
 class ConversionContext(object):
-    def __init__(self, converter, varname_to_type, free_variable_lookup, init_fields):
+    def __init__(self, converter, varname_to_type, free_variable_lookup):
         self.exception_helper = ExceptionHandlingHelper(self)
         self.converter = converter
         self._varname_to_type = varname_to_type
@@ -277,7 +277,7 @@ class ConversionContext(object):
             isReference=True
             )
 
-    def call_py_function(self, f, args, name_override=None):
+    def call_py_function(self, f, args):
         #force arguments to a type appropriate for argpassing
         args = [a.as_call_arg() for a in args]
         native_args = [a.expr for a in args]
@@ -285,8 +285,7 @@ class ConversionContext(object):
         call_target = \
             self.converter.convert(
                 f,
-                [a.expr_type for a in args],
-                name_override=name_override
+                [a.expr_type for a in args]
                 )
 
         assert len(call_target.named_call_target.arg_types) == len(args)
@@ -1025,8 +1024,7 @@ class Converter(object):
                 statements,
                 input_types,
                 local_variables,
-                free_variable_lookup,
-                members_of_arg0_to_initialize
+                free_variable_lookup
                 ):
         if ast_arg.vararg is not None:
             star_args_name = ast_arg.vararg.val.arg
@@ -1073,20 +1071,9 @@ class Converter(object):
 
         varname_to_type[FunctionOutput] = None
 
-        if members_of_arg0_to_initialize:
-            init_fields = InitFields(
-                local_variables[0],
-                members_of_arg0_to_initialize
-                )
-        else:
-            init_fields = None
-
-        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup, init_fields)
+        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
 
         res = subconverter.convert_statement_list_ast(statements, toplevel=True)
-
-        if init_fields:
-            res = init_fields.init_expr(subconverter) + res
 
         if star_args_name is not None:
             res = subconverter.construct_starargs_around(res, star_args_name)
@@ -1115,8 +1102,7 @@ class Converter(object):
                 )],
             input_types,
             local_variables,
-            free_variable_lookup,
-            ()
+            free_variable_lookup
             )
 
     def define(self, identifier, name, input_types, output_type, native_function_definition):
@@ -1175,9 +1161,6 @@ class Converter(object):
                 freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
 
         return pyast, freevars
-
-    def convert_initializer_function(self, f, input_types, name_override, fields_and_types):
-        return self.convert(f, input_types, name_override, fields_and_types)
 
     def generateCallConverter(self, callTarget, returnType):
         """Given a call target that's optimized for C-style dispatch, produce a (native) call-target that
@@ -1242,7 +1225,7 @@ class Converter(object):
 
         return new_name
 
-    def convert(self, f, input_types, name_override=None, fields_and_types_for_initializing=None):
+    def convert(self, f, input_types):
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
         identifier = ("pyfunction", f, input_types)
@@ -1260,18 +1243,16 @@ class Converter(object):
                     pyast.body,
                     input_types,
                     f.__code__.co_varnames,
-                    freevars,
-                    fields_and_types_for_initializing
+                    freevars
                     )
         else:
             assert pyast.matches.Lambda
-            if fields_and_types_for_initializing:
-                raise ConversionException("initializers can't be lambdas")
+
             definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars)
 
         assert definition is not None
 
-        new_name = self.new_name(name_override or f.__name__)
+        new_name = self.new_name(f.__name__)
 
         self._names_for_identifier[identifier] = new_name
 
