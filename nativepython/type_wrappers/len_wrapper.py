@@ -29,7 +29,7 @@ class LenWrapper(Wrapper):
 
     def convert_call(self, context, expr, args):
         if len(args) == 1:
-            return args[0].convert_len(context)
+            return args[0].convert_len()
 
         assert False, "we should be raising a python exception here but we dont know how yet"
 

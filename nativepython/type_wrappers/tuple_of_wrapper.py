@@ -55,27 +55,25 @@ class TupleOfWrapper(RefcountedWrapper):
     def convert_getitem(self, context, expr, item):
         expr = expr.ensureNonReference()
 
-        return TypedExpression(
+        return context.RefExpr(
             native_ast.Expression.Branch(
                 cond=((item >= 0) & (item < self.convert_len(context, expr))).nonref_expr,
                 true=expr.expr.ElementPtrIntegers(0,3).cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
-                    ).elemPtr(item.toInt64(context).nonref_expr).load(),
+                    ).elemPtr(item.toInt64().nonref_expr),
                 false=generateThrowException(context, IndexError("tuple index out of range"))
                 ),
-            self.underlyingWrapperType,
-            False
+            self.underlyingWrapperType
             )
 
     def convert_len(self, context, expr):
-        return TypedExpression(
+        return context.ValueExpr(
             native_ast.Expression.Branch(
                 cond=expr.expr,
                 false=native_ast.const_int_expr(0),
                 true=expr.nonref_expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
                 ),
-            Int64(),
-            False
+            Int64()
             )
 
 

@@ -35,6 +35,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
     def convert_incref(self, context, expr):
         return TypedExpression(
+            context,
             native_ast.Expression.Call(
                 target=runtime_functions.incref_pyobj,
                 args=(expr.nonref_expr,)
@@ -47,25 +48,25 @@ class PythonObjectOfTypeWrapper(Wrapper):
         assert target.isReference
 
         return (
-            toStore.convert_incref(context) >> 
-            target.convert_destroy(context) >> 
-            TypedExpression.NoneExpr(
+            toStore.convert_incref() >> 
+            target.convert_destroy() >> 
+            context.NoneExpr(
                 target.expr.store(toStore.nonref_expr)
                 )
             )
 
-    def convert_initialize_copy(self, context, target, toStore):
+    def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
 
         return (
-            toStore.convert_incref(context) >> 
-             TypedExpression.NoneExpr(
+            toStore.convert_incref() >> 
+             context.NoneExpr(
                 target.expr.store(toStore.nonref_expr)
                 )
             )
 
     def convert_destroy(self, context, instance):
-        return TypedExpression.NoneExpr(
+        return context.NoneExpr(
             native_ast.Expression.Call(
                 target=runtime_functions.decref_pyobj,
                 args=(instance.nonref_expr,)
@@ -75,11 +76,10 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
-        return TypedExpression(
+        return context.ValueExpr(
             native_ast.Expression.Call(
                 target=runtime_functions.getattr_pyobj,
                 args=(instance.nonref_expr, native_ast.const_utf8_cstr(attr))
                 ),
-            self,
-            False
+            self
             )

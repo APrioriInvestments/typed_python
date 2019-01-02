@@ -626,10 +626,14 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     Type* actualType = native_instance_wrapper::extractTypeFrom(a1->ob_type);
 
-    if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catTupleOf) {
+    if (!actualType || 
+            actualType->getTypeCategory() != Type::TypeCategory::catTupleOf &&
+            actualType->getTypeCategory() != Type::TypeCategory::catClass &&
+            actualType->getTypeCategory() != Type::TypeCategory::catConstDict
+            ) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to serialize must be one of ConstDict, TupleOf, or Class, not %S",
+            "first argument to refcount must be one of ConstDict, TupleOf, or Class, not %S",
             a1
             );
         return NULL;
@@ -638,6 +642,18 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (actualType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
         return PyLong_FromLong(
             ((::TupleOf*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
+            );
+    }
+
+    if (actualType->getTypeCategory() == Type::TypeCategory::catClass) {
+        return PyLong_FromLong(
+            ((::Class*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
+            );
+    }
+
+    if (actualType->getTypeCategory() == Type::TypeCategory::catConstDict) {
+        return PyLong_FromLong(
+            ((::ConstDict*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
             );
     }
 

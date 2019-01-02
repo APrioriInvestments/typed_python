@@ -22,13 +22,18 @@ def Compiled(f):
     f = TypedFunction(f)
     return Runtime.singleton().compile(f)
 
-class TestClassCompilationCompilation(unittest.TestCase):
-    def test_tuple_of_float(self):
-        class AClass(Class):
-            x = Member(int)
-            y = Member(float)
-            z = Member(TupleOf(int))
+class AClass(Class):
+    x = Member(int)
+    y = Member(float)
+    z = Member(TupleOf(int))
 
+class AClassWithAnotherClass(Class):
+    x = Member(int)
+    y = Member(float)
+    ac = Member(AClass)
+
+class TestClassCompilationCompilation(unittest.TestCase):
+    def test_class_attribute(self):
         a = AClass(x=10,y=20.5,z=(1,2,3))
 
         @Compiled
@@ -47,3 +52,98 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(getY(a), a.y)
         self.assertEqual(getZ(a), a.z)
                 
+    def test_class_set_attribute(self):
+        a = AClass()
+
+        aTupleOfInt = TupleOf(int)((1,2,3))
+
+        @Compiled
+        def setX(a: AClass, x: int) -> None:
+            a.x = x
+
+        @Compiled
+        def setY(a: AClass, y: float) -> None:
+            a.y = y
+
+        @Compiled
+        def setZ(a: AClass, z: TupleOf(int)) -> None:
+            a.z = z
+
+        setX(a, 20)
+        setY(a, 20.5)
+        setZ(a, aTupleOfInt)
+
+        self.assertEqual(a.x, 20)
+        self.assertEqual(a.y, 20.5)
+        self.assertEqual(a.z, aTupleOfInt)
+
+        self.assertEqual(_types.refcount(aTupleOfInt), 2)
+
+        a.z = (1,2,3,4)
+
+        self.assertEqual(_types.refcount(aTupleOfInt), 1)
+
+        a.z = aTupleOfInt
+
+        self.assertEqual(_types.refcount(aTupleOfInt), 2)
+
+        a = None
+
+        self.assertEqual(_types.refcount(aTupleOfInt), 1)
+
+    def test_class_uninitialized_attribute(self):
+        @Compiled
+        def set(ac: AClassWithAnotherClass, a: AClass) -> None:
+            ac.ac = a
+
+        @Compiled
+        def get(ac: AClassWithAnotherClass) -> AClass:
+            return ac.ac
+
+        ac1 = AClass(x=1)
+        ac2 = AClass(x=2)
+
+        anAWithAClass = AClassWithAnotherClass(ac=ac1)
+
+        self.assertEqual(_types.refcount(ac1), 2)
+        self.assertEqual(_types.refcount(ac2), 1)
+        self.assertEqual(anAWithAClass.ac.x, 1)
+
+        set(anAWithAClass, ac2)
+        self.assertEqual(_types.refcount(ac1), 1)
+        self.assertEqual(_types.refcount(ac2), 2)
+        self.assertEqual(anAWithAClass.ac.x, 2)
+
+        anAWithAClass = AClassWithAnotherClass()
+        self.assertEqual(_types.refcount(ac1), 1)
+        self.assertEqual(_types.refcount(ac2), 1)
+        
+        with self.assertRaises(Exception):
+            get(anAWithAClass)
+
+        
+        set(anAWithAClass, ac1)
+        self.assertEqual(_types.refcount(ac1), 2)
+        self.assertEqual(_types.refcount(ac2), 1)
+        
+        self.assertEqual(get(anAWithAClass).x, 1)
+        self.assertEqual(get(anAWithAClass).x, 1)
+        self.assertEqual(get(anAWithAClass).x, 1)
+        self.assertEqual(get(anAWithAClass).x, 1)
+        self.assertEqual(_types.refcount(ac1), 2)
+        
+        set(anAWithAClass, ac2)
+        self.assertEqual(_types.refcount(ac1), 1)
+        self.assertEqual(_types.refcount(ac2), 2)
+        self.assertEqual(get(anAWithAClass).x, 2)
+
+
+
+
+
+
+
+
+
+
+

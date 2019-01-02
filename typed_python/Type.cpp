@@ -873,6 +873,16 @@ bool ConstDict::instanceIsSubtrees(instance_ptr self) const {
     return record.subpointers != 0;
 }
 
+int64_t ConstDict::refcount(instance_ptr self) const {
+    if (!(*(layout**)self)) {
+        return 0;
+    }
+
+    layout& record = **(layout**)self;
+
+    return record.refcount;
+}
+
 int64_t ConstDict::count(instance_ptr self) const {
     if (!(*(layout**)self)) {
         return 0;
@@ -1940,6 +1950,11 @@ void Class::constructor(instance_ptr self) {
     l.refcount = 1;
 
     m_heldClass->constructor(l.data);
+}
+
+int64_t Class::refcount(instance_ptr self) {
+    layout& l = **(layout**)self;
+    return l.refcount;
 }
 
 void Class::destroy(instance_ptr self) {

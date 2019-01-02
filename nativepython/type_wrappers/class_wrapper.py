@@ -59,12 +59,44 @@ class ClassWrapper(RefcountedWrapper):
 
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
-                expr = context.decref(self.convert_attribute(context, instance, i)).expr >> expr
+                expr = context.wrapInTemporaries(lambda x: x.convert_destroy(), (self.convert_attribute(context, instance, i),)).expr >> expr
 
         return expr
 
     def convert_bin_op(self, context, left, op, right):
         raise ConvsersionException("Not convertible")
+
+    def memberPtr(self, instance, ix):
+        return (
+            instance.nonref_expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])
+                .cast(
+                    typeWrapper(self.typeRepresentation.MemberTypes[ix]).getNativeLayoutType().pointer()
+                    )
+            )
+
+    def isInitializedNativeExpr(self, instance, ix):
+        byte = ix // 8
+        bit = ix % 8
+
+        return (
+            instance.nonref_expr
+                .cast(native_ast.UInt8.pointer())
+                .ElementPtrIntegers(8 + byte)
+                .load()
+                .rshift(native_ast.const_uint8_expr(bit))
+                .bitand(native_ast.const_uint8_expr(1))
+            )
+
+    def setIsInitializedExpr(self, instance, ix):
+        byte = ix // 8
+        bit = ix % 8
+
+        bytePtr = (instance.nonref_expr
+                .cast(native_ast.UInt8.pointer())
+                .ElementPtrIntegers(8 + byte)
+                )
+
+        return bytePtr.store(bytePtr.load().bitor(native_ast.const_uint8_expr(1 << bit)))
 
     def convert_attribute(self, context, instance, attribute):
         if not isinstance(attribute, int):
@@ -73,23 +105,61 @@ class ClassWrapper(RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            return TypedExpression(
-                generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation))),
-                None,
-                False
+            return context.TerminalExpr(
+                generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)))
                 )
 
         instance = instance.ensureNonReference()
 
-        return context.incref(
-            TypedExpression(
-                instance.expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])
-                    .cast(
-                        typeWrapper(self.typeRepresentation.MemberTypes[ix]).getNativeLayoutType().pointer()
-                        ).load(),
-                typeWrapper(self.typeRepresentation.MemberTypes[ix]),
-                False
-                )
+        return context.RefExpr(
+            native_ast.Expression.Branch(
+                cond=self.isInitializedNativeExpr(instance, ix),
+                false=generateThrowException(context, AttributeError("Attribute %s is not initialized" % attribute)),
+                true=self.memberPtr(instance, ix)
+                ),
+            typeWrapper(self.typeRepresentation.MemberTypes[ix])
             )
+
+    def convert_set_attribute(self, context, instance, attribute, value):
+        if not isinstance(attribute, int):
+            ix = self.nameToIndex.get(attribute)
+        else:
+            ix = attribute
+
+        value = value.ensureNonReference()
+
+        if ix is None:
+            return context.TerminalExpr(
+                generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)))
+                )
+
+        instance = instance.ensureNonReference()
+
+        attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
+
+        if attr_type.is_pod:
+            return context.NoneExpr(
+                self.memberPtr(instance, ix).store(value.nonref_expr)
+                    >> self.setIsInitializedExpr(instance, ix)
+                )
+        else:
+            return context.NoneExpr(
+                native_ast.Expression.Branch(
+                    cond=self.isInitializedNativeExpr(instance, ix),
+                    true=attr_type.convert_destroy(
+                        context,
+                        context.RefExpr(
+                            self.memberPtr(instance, ix),
+                            attr_type
+                            )
+                        ).expr,
+                    false=native_ast.nullExpr
+                    ) >> 
+                context.RefExpr(self.memberPtr(instance, ix), attr_type).convert_copy_initialize(value).expr
+                    >> self.setIsInitializedExpr(instance, ix)
+                )
+
+
+
 
 

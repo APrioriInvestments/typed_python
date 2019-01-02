@@ -33,7 +33,7 @@ class PythonTypeObjectWrapper(Wrapper):
     def convert_call(self, context, left, args):
         if len(args) == 1:
             if self.typeRepresentation is int:
-                return args[0].toInt64(context)
+                return args[0].toInt64()
 
             assert False, "strange type here: %s" % self.typeRepresentation
 

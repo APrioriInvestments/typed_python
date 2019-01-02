@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from typed_python import Alternative, OneOf
+
 import nativepython.native_ast as native_ast
 import nativepython
 
@@ -19,13 +21,16 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 
 class TypedExpression(object):
-    def __init__(self, expr, t, isReference):
+    def __init__(self, context, expr, t, isReference):
         """Initialize a TypedExpression
 
         expr - a native_ast containing an expression
         t - a subclass of Wrapper, or a type that we'll convert to a wrapper, or None (meaning
             control doesn't return)
-        isReference - is this a pointer to a memory location, or the actual value?
+        isReference - is this a pointer to a memory location holding the value, or the actual value?
+            if it's a reference, the reference is guaranteed to be valid for the lifetime of the
+            expression. if its the value, then the value contains an implicit incref which must
+            either be transferred or decreffed.
         """
         super().__init__()
         if isinstance(t, type) or hasattr(t, "__typed_python_category__"):
@@ -34,11 +39,12 @@ class TypedExpression(object):
         assert isinstance(t, Wrapper) or t is None, t
         assert isinstance(expr, native_ast.Expression), expr
 
+        self.context = context
         self.expr = expr
         self.expr_type = t
         self.isReference = isReference
 
-    def as_call_arg(self, context):
+    def as_call_arg(self):
         """Convert this expression to a call-argument form."""
         if self.expr_type.is_pod:
             return self.ensureNonReference()
@@ -48,30 +54,6 @@ class TypedExpression(object):
 
             assert False, "we should be jamming this rvalue object into a temporary that we can pass"
 
-    def convert_attribute(self, context, attribute):
-        return self.expr_type.convert_attribute(context, self, attribute)
-
-    def convert_assign(self, context, toStore):
-        return self.expr_type.convert_assign(context, self, toStore)
-
-    def convert_destroy(self, context):
-        return self.expr_type.convert_destroy(context, self)
-
-    def convert_copy_initialize(self, context, target, toStore):
-        return self.expr_type.convert_copy_initialize(context, self, toStore)
-
-    def convert_getitem(self, context, item):
-        return self.expr_type.convert_getitem(context, self, item)
-
-    def convert_len(self, context):
-        return self.expr_type.convert_len(context, self)
-
-    def convert_bin_op(self, context, op, rhs):
-        return self.expr_type.convert_bin_op(context, self, op, rhs)
-
-    def convert_call(self, context, args):
-        return self.expr_type.convert_call(context, self, args)
-
     @property
     def nonref_expr(self):
         """Get our expression (deferenced if necessary) so that it definitely represents the real object, not its location"""
@@ -80,42 +62,106 @@ class TypedExpression(object):
     def ensureNonReference(self):
         return self.expr_type.ensureNonReference(self)
 
-    def toFloat64(self, context):
-        return self.expr_type.toFloat64(context, self)
+    def convert_incref(self):
+        return self.expr_type.convert_incref(self.context, self)
 
-    def toInt64(self, context):
-        return self.expr_type.toInt64(context, self)
+    def convert_set_attribute(self, attribute, expr):
+        return self.expr_type.convert_set_attribute(self.context, self, attribute, expr)
 
-    def toBool(self, context):
-        return self.expr_type.toBool(context, self)
+    def convert_assign(self, toStore):
+        return self.expr_type.convert_assign(self.context, self, toStore)
 
-    def convert_incref(self, context):
-        return self.expr_type.convert_incref(context, self)
+    def convert_destroy(self):
+        return self.expr_type.convert_destroy(self.context, self)
+
+    def convert_copy_initialize(self, toStore):
+        return self.expr_type.convert_copy_initialize(self.context, self, toStore)
+
+    def convert_attribute(self, attribute):
+        return self.context.wrapInTemporaries(
+            lambda self: self.expr_type.convert_attribute(self.context, self, attribute),
+            (self,)
+            )
+
+    def convert_getitem(self, item):
+        return self.context.wrapInTemporaries(
+            lambda self, item:
+                self.expr_type.convert_getitem(self.context, self, item),
+            (self, item)
+            )
+
+    def convert_len(self):
+        return self.context.wrapInTemporaries(
+            lambda self:
+                self.expr_type.convert_len(self.context, self),
+            (self,)
+            )
+
+    def convert_unary_op(self, op):
+        return self.context.wrapInTemporaries(
+            lambda self: 
+                self.expr_type.convert_unary_op(self.context, self, op),
+            (self,)
+            )
+
+    def convert_bin_op(self, op, rhs):
+        return self.context.wrapInTemporaries(
+            lambda l,r: 
+                self.expr_type.convert_bin_op(self.context, l, op, r),
+            (self, rhs)
+            )
+
+    def convert_call(self, args):
+        return self.context.wrapInTemporaries(
+            lambda self, *args:
+                self.expr_type.convert_call(self.context, self, args),
+            (self,) + tuple(args)
+            )
+
+    def toFloat64(self):
+        return self.context.wrapInTemporaries(
+            lambda self: self.expr_type.toFloat64(self.context, self),
+            (self,)
+            )
+
+    def toInt64(self):
+        return self.context.wrapInTemporaries(
+            lambda self: self.expr_type.toInt64(self.context, self),
+            (self,)
+            )
+
+    def toBool(self):
+        return self.context.wrapInTemporaries(
+            lambda s: self.expr_type.toBool(self.context, s),
+            (self,)
+            )
 
     def __str__(self):
         return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
 
-    @staticmethod
-    def NoneExpr(expr=None):
-        return TypedExpression(expr if expr is not None else native_ast.nullExpr, NoneWrapper(), False)
-
     def __rshift__(self, other):
-        return TypedExpression(self.expr >> other.expr, other.expr_type, other.isReference)
+        return TypedExpression(self.context, self.expr >> other.expr, other.expr_type, other.isReference)
 
     def __or__(self, other):
         return self.expr_type.sugar_operator(self, other, "BitOr")
+
     def __and__(self, other):
         return self.expr_type.sugar_operator(self, other, "BitAnd")
 
     def __lt__(self, other):
         return self.expr_type.sugar_comparison(self, other, "Lt")
+
     def __le__(self, other):
         return self.expr_type.sugar_comparison(self, other, "LtE")
+
     def __gt__(self, other):
         return self.expr_type.sugar_comparison(self, other, "Gt")
+
     def __ge__(self, other):
         return self.expr_type.sugar_comparison(self, other, "GtE")
+
     def __eq__(self, other):
         return self.expr_type.sugar_comparison(self, other, "Eq")
+
     def __ne__(self, other):
         return self.expr_type.sugar_comparison(self, other, "NotEq")

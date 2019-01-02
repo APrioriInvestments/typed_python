@@ -50,15 +50,16 @@ def _typedPythonTypeToTypeWrapper(t):
 
     assert False, t
 
-def pythonObjectRepresentation(f):
+def pythonObjectRepresentation(context, f):
     if f in (int,bool,float,str,type(None)):
-        return TypedExpression(native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
+        return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
 
     if f is len:
-        return TypedExpression(native_ast.nullExpr, LenWrapper(), False)
+        return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)
 
     if f is None:
         return TypedExpression(
+            context, 
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Void()
                 ),
@@ -67,6 +68,7 @@ def pythonObjectRepresentation(f):
             )
     if isinstance(f, bool):
         return TypedExpression(
+            context, 
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f,bits=1,signed=False)
                 ),
@@ -75,6 +77,7 @@ def pythonObjectRepresentation(f):
             )
     if isinstance(f, int):
         return TypedExpression(
+            context, 
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f,bits=64,signed=True)
                 ),
@@ -83,6 +86,7 @@ def pythonObjectRepresentation(f):
             )
     if isinstance(f, float):
         return TypedExpression(
+            context, 
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Float(val=f,bits=64)
                 ),
@@ -91,6 +95,7 @@ def pythonObjectRepresentation(f):
             )
     if isinstance(f, type(pythonObjectRepresentation)):
         return TypedExpression(
+            context, 
             native_ast.nullExpr,
             PythonFreeFunctionWrapper(f),
             False

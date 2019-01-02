@@ -883,6 +883,8 @@ public:
 
     bool instanceIsSubtrees(instance_ptr self) const;
 
+    int64_t refcount(instance_ptr self) const;
+
     int64_t count(instance_ptr self) const;
 
     int64_t size(instance_ptr self) const;
@@ -2189,6 +2191,8 @@ public:
     void constructor(instance_ptr self);
 
     void destroy(instance_ptr self);
+
+    int64_t refcount(instance_ptr self);
 
     void copy_constructor(instance_ptr self, instance_ptr other);
 

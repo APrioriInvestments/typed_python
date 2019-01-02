@@ -289,6 +289,21 @@ def expr_str(self):
 
     assert False
 
+def expr_is_simple(expr):
+    if expr.matches.StackSlot:
+        return True
+    if expr.matches.Constant:
+        return True
+    if expr.matches.Variable:
+        return True
+    if expr.matches.ElementPtr:
+        return expr_is_simple(expr.left) and all(expr_is_simple(x) for x in expr.offsets)
+    if expr.matches.Load:
+        return expr_is_simple(expr.ptr)
+    if expr.matches.Sequence and len(expr.vals) == 1:
+        return expr_is_simple(expr.vals[0])
+    return False
+
 Expression = Alternative("Expression",
     Constant = {'val': Constant},
     Comment = {'comment': str, 'expr': Expression},
@@ -343,12 +358,33 @@ Expression = Alternative("Expression",
         ,
     __rshift__ = expr_concatenate,
     __str__ = expr_str,
+    sub = lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
+    add = lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
+    lshift = lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
+    rshift = lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
+    bitand = lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
+    bitor = lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self,r=ensureExpr(other)),
     load = lambda self: Expression.Load(ptr=self),
     store = lambda self, val: Expression.Store(ptr=self, val=val),
     cast = lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
     with_comment = lambda self, c: Expression.Comment(comment=c, expr=self),
-    elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=exprs)
+    elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=exprs),
+    is_simple = expr_is_simple
     )
+
+
+
+def ensureExpr(x):
+    if isinstance(x, int):
+        return const_int_expr(x)
+    if isinstance(x, float):
+        return const_float_expr(x)
+    if isinstance(x, str):
+        return const_utf8_cstr(x)
+    if isinstance(x, Expression):
+        return x
+
+    raise TypeError("Can't convert %s to an Expression" % type(x))
 
 nullExpr = Expression.Constant(val=Constant.Void())
 emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
@@ -363,6 +399,11 @@ def const_float_expr(f):
 def const_int_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=64,val=i,signed=True)
+        )
+
+def const_uint8_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=8,val=i,signed=False)
         )
 
 def const_utf8_cstr(i):

@@ -37,6 +37,19 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    def test_returning(self):
+        def f(x: int) -> int:
+            return x
+
+        self.checkFunctionOfIntegers(f)
+
+    def test_basic_arithmetic(self):
+        def f(x: int) -> int:
+            y = x+1
+            return y
+
+        self.checkFunctionOfIntegers(f)
+
     def test_call_other_typed_function(self):
         def g(x: int) -> int:
             return x+1

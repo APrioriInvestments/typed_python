@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
@@ -32,7 +31,7 @@ class RefcountedWrapper(Wrapper):
     def convert_incref(self, context, expr):
         expr = expr.ensureNonReference()
 
-        return TypedExpression(
+        return context.RefExpr(
             native_ast.Expression.Branch(
                 cond=expr.expr,
                 false=native_ast.nullExpr,
@@ -44,28 +43,27 @@ class RefcountedWrapper(Wrapper):
                         )
                     )
                 ) >> expr.expr,
-            self,
-            True
+            self
             )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference
         other = other.ensureNonReference()
 
-        return TypedExpression.NoneExpr(
+        return context.NoneExpr(
             native_ast.Expression.Let(
                 expr.expr.load(),
                 lambda oldSelf:
-                    self.convert_initialize_copy(context, expr, other).expr
-                        >> self.convert_destroy(context, TypedExpression(self, oldSelf, False))
+                    self.convert_copy_initialize(context, expr, other).expr
+                        >> self.convert_destroy(context, context.ValueExpr(self, oldSelf))
                 )
             )
 
-    def convert_initialize_copy(self, context, expr, other):
+    def convert_copy_initialize(self, context, expr, other):
         other = other.ensureNonReference()
         assert expr.isReference
 
-        return TypedExpression.NoneExpr(
+        return context.NoneExpr(
             native_ast.Expression.Branch(
                 cond=other.expr,
                 false=expr.expr.store(other.expr),
@@ -84,7 +82,7 @@ class RefcountedWrapper(Wrapper):
     def convert_destroy(self, context, target):
         target = target.ensureNonReference()
 
-        return TypedExpression.NoneExpr(
+        return context.NoneExpr(
             native_ast.Expression.Branch(
                 cond=target.expr,
                 false=native_ast.nullExpr,

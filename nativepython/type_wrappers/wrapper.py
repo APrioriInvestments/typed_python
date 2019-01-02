@@ -29,6 +29,9 @@ class Wrapper(object):
     #do we pass this as a reference to a stackslot or as registers?
     is_pass_by_ref = True
 
+    def __repr__(self):
+        return "Wrapper(%s)" % self.typeRepresentation
+
     def __init__(self, typeRepresentation):
         super().__init__()
 
@@ -46,8 +49,8 @@ class Wrapper(object):
     def ensureNonReference(self, e):
         if e.isReference:
             if self.is_empty:
-                return nativepython.typed_expression.TypedExpression.NoneExpr(e.expr + native_ast.nullExpr)
-            return nativepython.typed_expression.TypedExpression(e.expr.load(), e.expr_type, False)
+                return e.context.NoneExpr(e.expr + native_ast.nullExpr)
+            return e.context.ValueExpr(e.expr.load(), e.expr_type)
         return e
 
     def getNativePassingType(self):
@@ -68,10 +71,17 @@ class Wrapper(object):
             False
             )
 
+    def convert_set_attribute(self, context, instance, attribute, value):
+        return nativepython.typed_expression.TypedExpression(
+            generateThrowException(context, AttributeError("object has no attribute " + attribute)),
+            None,
+            False
+            )
+
     def convert_assign(self, context, target, toStore):
         raise NotImplementedError()
 
-    def convert_initialize_copy(self, context, target, toStore):
+    def convert_copy_initialize(self, context, target, toStore):
         raise NotImplementedError()
 
     def convert_destroy(self, context, instance):
