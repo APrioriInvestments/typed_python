@@ -1,0 +1,11 @@
+dist: xenial
+language: python
+compiler: g++
+python:
+  - 3.6
+install:
+  - pip install pipenv
+  - pipenv install --dev --deploy
+script:
+  - make testcert.cert
+  - ./test.py -s

@@ -25,24 +25,38 @@ setuptools.setup(
     ext_modules=[
         setuptools.Extension(
             'typed_python._types',
-            ['typed_python/_runtime.cc',
-             'typed_python/_types.cc',
-             'typed_python/native_instance_wrapper.cc',
-             'typed_python/Type.cpp',
-             'typed_python/PythonSerializationContext.cpp'
-             ],
-            extra_compile_args=['-std=c++14', '-Wno-sign-compare', '-Wno-narrowing', '-Wno-unused-variable']
-            )
-        ],
+            sources=[
+                'typed_python/_runtime.cc',
+                'typed_python/_types.cc',
+                'typed_python/native_instance_wrapper.cc',
+                'typed_python/Type.cpp',
+                'typed_python/PythonSerializationContext.cpp'
+            ],
+            define_macros=[
+                ("_FORTIFY_SOURCE", 2)
+            ],
+            extra_compile_args=[
+                '-O2',
+                '-fstack-protector-strong',
+                '-Wformat',
+                '-Wdate-time',
+                '-Werror=format-security',
+                '-std=c++14',
+                '-Wno-sign-compare',
+                '-Wno-narrowing',
+                '-Wno-unused-variable'
+            ]
+        )
+    ],
     classifiers=[
         "Programming Language :: Python :: 3"
-        ],
+    ],
     entry_points={
         'console_scripts': [
             'object_database_webtest=object_database.frontends.object_database_webtest:main',
             'object_database_service_manager=object_database.frontends.service_manager:main',
-            ]
-        },
+        ]
+    },
     include_package_data=True,
     zip_safe=False
-    )
+)
