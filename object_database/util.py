@@ -236,7 +236,7 @@ def sslContextFromCertPathOrNone(cert_path=None):
     return  sslContextFromCertPath(cert_path) if cert_path else generateSslContext()
 
 
-def genToken(randomness=1000):
+def genToken(randomness=10000000000000000000):
     val = random.randint(1, int(randomness))
     sha = hashlib.sha256()
     sha.update(str(val).encode())

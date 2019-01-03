@@ -32,6 +32,10 @@ from object_database.util import genToken
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
 
+DATABASE_SERVER_PORT=8023
+
+WEB_SERVER_PORT=8025
+
 
 class ActiveWebServiceTest(unittest.TestCase):
     def setUp(self):
@@ -41,7 +45,7 @@ class ActiveWebServiceTest(unittest.TestCase):
 
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8023", '--run_db',
+                'localhost', 'localhost', str(DATABASE_SERVER_PORT), '--run_db',
                 '--source', os.path.join(self.tempDirectoryName,'source'),
                 '--storage', os.path.join(self.tempDirectoryName,'storage'),
                 '--service-token', self.token,
@@ -59,13 +63,13 @@ class ActiveWebServiceTest(unittest.TestCase):
             )
 
         try:
-            self.database = connect("localhost", 8023, self.token, retry=True)
+            self.database = connect("localhost", DATABASE_SERVER_PORT, self.token, retry=True)
 
             self.database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
             with self.database.transaction():
                 service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
-            ActiveWebService.configureFromCommandline(self.database, service, ['--port', '6000', '--host', 'localhost'])
+            ActiveWebService.configureFromCommandline(self.database, service, ['--port', str(WEB_SERVER_PORT), '--host', 'localhost'])
 
             with self.database.transaction():
                 ServiceManager.startService("ActiveWebService", 1)
@@ -81,9 +85,12 @@ class ActiveWebServiceTest(unittest.TestCase):
 
         while time.time() - t0 < timeout:
             try:
-                res = requests.get("http://localhost:6000/content/object_database.css")
+                res = requests.get(
+                    "http://localhost:{port}/content/object_database.css"
+                    .format(port=WEB_SERVER_PORT)
+                )
                 return
-            except:
+            except Exception:
                 time.sleep(.5)
 
         raise Exception("Webservice never came up.")
@@ -94,6 +101,9 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.tempDirObj.__exit__(None, None, None)
 
     def test_start_web_service(self):
-        res = requests.get("http://localhost:6000/content/object_database.css")
+        res = requests.get(
+            "http://localhost:{port}/content/object_database.css"
+            .format(port=WEB_SERVER_PORT)
+        )
         self.assertEqual(res.status_code, 200)
 
