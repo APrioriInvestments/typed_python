@@ -22,6 +22,7 @@ llvmlite = "*"
 nativepython = {editable = true,path = "."}
 boto3 = "*"
 pyyaml = "*"
+ldap3 = "*"
 
 [requires]
 python_version = "3.6.7"

@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "39e04847e48125d44f66e6110efd2aec9372797a5247d4880d1e6906d0b5b87d"
+            "sha256": "80fda5f76ce1ef086ba0c987dcdcc4961cab6e932f08af149ec7e60391b3e13c"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -172,6 +172,14 @@
             ],
             "version": "==0.9.3"
         },
+        "ldap3": {
+            "hashes": [
+                "sha256:3f67c83185b1f0df8fdf6b52fa42c55bc9e9b7120c8b7fec60f0d6003c536d18",
+                "sha256:dd9be8ea27773c4ffc18ede0b95c3ca1eb12513a184590b9f8ae423db3f71eb9"
+            ],
+            "index": "pypi",
+            "version": "==2.5.2"
+        },
         "llvmlite": {
             "hashes": [
                 "sha256:0db9440d163cd63eb6d94213e33e7134bd015c3d4fb2ba92b70d42527ea8f30b",
@@ -318,6 +326,13 @@
             ],
             "index": "pypi",
             "version": "==5.4.8"
+        },
+        "pyasn1": {
+            "hashes": [
+                "sha256:da2420fe13a9452d8ae97a0e478adde1dee153b11ba832a95b223a2ba01c10f7",
+                "sha256:da6b43a8c9ae93bc80e2739efb38cc776ba74a886e3e9318d65fe81a8b8a2c6e"
+            ],
+            "version": "==0.4.5"
         },
         "python-dateutil": {
             "hashes": [
