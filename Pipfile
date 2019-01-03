@@ -23,6 +23,7 @@ nativepython = {editable = true,path = "."}
 boto3 = "*"
 pyyaml = "*"
 ldap3 = "*"
+flask-login = "*"
 
 [requires]
 python_version = "3.6.7"
