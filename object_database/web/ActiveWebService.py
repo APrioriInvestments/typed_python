@@ -27,21 +27,28 @@ import os
 import json
 import gevent.socket
 
-from gevent import pywsgi
+from object_database.util import genToken, checkLogLevelValidity
+from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
+from object_database.web.AuthPlugin import AuthPluginBase, PermissiveAuthPlugin, LdapAuthPlugin
+from object_database.web.cells import *
+from typed_python import TupleOf
+
+from gevent import pywsgi, sleep
+from gevent.greenlet import Greenlet
 from geventwebsocket.handler import WebSocketHandler
 
-from object_database.web.cells import *
-
-from gevent.greenlet import Greenlet
-from gevent import sleep
-
-from flask import Flask, send_from_directory, redirect, url_for, request
+from flask import Flask, send_from_directory, redirect, url_for, request, render_template, flash
+from flask_wtf import FlaskForm
 from flask_sockets import Sockets
 from flask_cors import CORS
+from flask_login import LoginManager, current_user, login_user, logout_user, login_required
 
-from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
+from wtforms import StringField, PasswordField, BooleanField, SubmitField
+from wtforms.validators import DataRequired
+
 
 active_webservice_schema = Schema("core.active_webservice")
+
 
 @active_webservice_schema.define
 class Configuration:
@@ -50,10 +57,75 @@ class Configuration:
     port = int
     hostname = str
 
+    log_level = int
+
+    # auth plugin args
+    auth_type = str
+    authorized_groups = TupleOf(str)
+    auth_hostname = str
+    ldap_base_dn = str
+    ldap_ntlm_domain = str
+
+    # HTML template rendering args
+    company_name = str
+
+
+@active_webservice_schema.define
+class User:
+    username = Indexed(str)
+
+    def __init__(self, username):
+        self.username = username
+
+    def is_authenticated(self):
+        return True
+
+    def is_active(self):
+        return True
+
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.username  # must return unicode by Python 3 strings are unicode
+
+
+class LoginForm(FlaskForm):
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
+    remember_me = BooleanField('Remember Me')
+    submit = SubmitField('Sign In')
+
+
 class ActiveWebService(ServiceBase):
     def __init__(self, db, serviceObject, serviceRuntimeConfig):
         ServiceBase.__init__(self, db, serviceObject, serviceRuntimeConfig)
         self._logger = logging.getLogger(__name__)
+
+    @staticmethod
+    def initialize_auth_plugin(auth_type, authorized_groups=None, hostname=None, ldap_base_dn=None, ldap_ntlm_domain=None):
+        if auth_type == "NONE":
+            return None
+        elif auth_type == "PERMISSIVE":
+            return PermissiveAuthPlugin()
+        elif auth_type == "FORBIDDEN":
+            return AuthPluginBase()
+        elif auth_type == "LDAP":
+            if not hostname:
+                raise Exception("Missing --hostname argument for LDAP")
+
+            if not ldap_base_dn:
+                raise Exception("Missing --base-dn argument for LDAP")
+
+            return LdapAuthPlugin(
+                hostname=hostname,
+                base_dn=ldap_base_dn,
+                ntlm_domain=ldap_ntlm_domain,
+                authorized_groups=authorized_groups
+            )
+        else:
+            raise Exception("Unkown auth-type: {}".format(auth_type))
+
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):
@@ -69,13 +141,43 @@ class ActiveWebService(ServiceBase):
             parser.add_argument("--hostname", type=str)
             parser.add_argument("--port", type=int)
 
+            parser.add_argument("--log-level", type=str, required=False, default="INFO")
+
+            parser.add_argument("--auth", type=str, required=False, default="LDAP")
+            parser.add_argument("--authorized-groups", nargs='+', type=str, required=False, default=())
+            parser.add_argument("--auth-hostname", type=str, required=False, default="")
+            parser.add_argument("--ldap-base-dn", type=str, required=False, default="")
+            parser.add_argument("--ldap-ntlm-domain", type=str, required=False, default="")
+
+            parser.add_argument("--company-name", type=str, required=False, default="")
+
             parsedArgs = parser.parse_args(args)
+
+            VALID_AUTH_TYPES = ["NONE", "LDAP", "PERMISSIVE", "FORBIDDEN"]
+            auth_type = parsedArgs.auth.upper()
+            if  auth_type not in VALID_AUTH_TYPES:
+                raise Exception("invalid --auth value: {auth}. Must be one of {options}"
+                    .format(auth=parsedArgs.auth, options=VALID_AUTH_TYPES))
+
+            level_name = parsedArgs.log_level.upper()
+            checkLogLevelValidity(level_name)
 
             c.port = parsedArgs.port
             c.hostname = parsedArgs.hostname
 
+            c.log_level = logging.getLevelName(level_name)
+
+            c.auth_type = auth_type
+            c.authorized_groups = TupleOf(str)(parsedArgs.authorized_groups)
+            c.auth_hostname = parsedArgs.auth_hostname
+            c.ldap_base_dn = parsedArgs.ldap_base_dn
+            c.ldap_ntlm_domain = parsedArgs.ldap_ntlm_domain
+
+            c.company_name = parsedArgs.company_name
+
     def initialize(self):
         self.db.subscribeToType(Configuration)
+        self.db.subscribeToType(User)
         self.db.subscribeToSchema(service_schema)
 
         with self.db.transaction():
@@ -83,13 +185,38 @@ class ActiveWebService(ServiceBase):
             CORS(self.app)
             self.sockets = Sockets(self.app)
             self.configureApp()
+        self.login_manager = LoginManager(self.app)
+        self.load_user = self.login_manager.user_loader(self.load_user)
+        self.login_manager.login_view = 'login'
+
+    def load_user(self, username):
+        with self.db.view():
+            return User.lookupAny(username=username)
+
 
     def doWork(self, shouldStop):
         self._logger.info("Configuring ActiveWebService")
         with self.db.view():
             config = Configuration.lookupAny(service=self.serviceObject)
             assert config, "No configuration available."
-            host,port = config.hostname, config.port
+            self._logger.setLevel(config.log_level)
+            host, port = config.hostname, config.port
+
+            self.authorized_groups = config.authorized_groups
+
+            self.authorized_groups_text = "All"
+            if self.authorized_groups:
+                self.authorized_groups_text = ", ".join(self.authorized_groups)
+
+            self.auth_plugin = self.initialize_auth_plugin(
+                config.auth_type,
+                authorized_groups=config.authorized_groups,
+                hostname=config.auth_hostname,
+                ldap_base_dn=config.ldap_base_dn,
+                ldap_ntlm_domain=config.ldap_ntlm_domain
+            )
+
+            self.company_name = config.company_name
 
         self._logger.info("ActiveWebService listening on %s:%s", host, port)
 
@@ -99,12 +226,75 @@ class ActiveWebService(ServiceBase):
 
     def configureApp(self):
         instanceName = self.serviceObject.name
-        self.app.route("/")(lambda: redirect("/services"))
-        self.app.route('/content/<path:path>')(self.sendContent)
-        self.app.route('/services')(self.sendPage)
-        self.app.route('/services/<path:path>')(self.sendPage)
-        self.sockets.route("/socket/<path:path>")(self.mainSocket)
+        self.app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or genToken()
 
+        self.app.add_url_rule('/', endpoint=None, view_func=lambda: redirect("/services"))
+        self.app.add_url_rule('/content/<path:path>', endpoint=None, view_func=self.sendContent)
+        self.app.add_url_rule('/services', endpoint=None, view_func=self.sendPage)
+        self.app.add_url_rule('/services/<path:path>', endpoint=None, view_func=self.sendPage)
+        self.app.add_url_rule('/login', endpoint=None, view_func=self.login, methods=['GET', 'POST'])
+        self.app.add_url_rule('/logout', endpoint=None, view_func=self.logout)
+        self.sockets.add_url_rule('/socket/<path:path>', None, self.mainSocket)
+
+    def login_user(self, username, remember=False):
+        with self.db.transaction():
+            users = User.lookupAll(username=username)
+
+            if len(users) == 0:
+                user = User(username=username)
+            elif len(users) == 1:
+                user = users[0]
+            elif len(users) > 1:
+                raise Exception("multiple users found with username={}".format(username))
+            else:
+                raise Exception("This should never happen: len(users)={}".format(len(users)))
+
+            login_user(user, remember=remember)
+
+    def login(self):
+        if current_user.is_authenticated:
+            return redirect('/')
+
+        if self.auth_plugin is None:
+            self.login_user('anonymous', remember=False)
+            return redirect('/')
+
+        form = LoginForm()
+
+        if form.validate_on_submit():
+            username = form.username.data
+            password = form.password.data
+            if not self.auth_plugin.authenticate(username, password):
+                flash(
+                    'Invalid username or password or not a member of an '
+                    'authorized group. Please try again.',
+                    'danger')
+                return render_template(
+                    'login.html',
+                    form=form,
+                    title=self.company_name,
+                    authorized_groups_text=self.authorized_groups_text
+                )
+
+            self.login_user(username, remember=form.remember_me.data)
+
+            return redirect('/')
+
+        if form.errors:
+            flash(form.errors, 'danger')
+
+        return render_template(
+            'login.html',
+            form=form,
+            title=self.company_name,
+            authorized_groups_text=self.authorized_groups_text
+        )
+
+    def logout(self):
+        logout_user()
+        return redirect('/')
+
+    @login_required
     def sendPage(self, path=None):
         return self.sendContent("page.html")
 
@@ -211,11 +401,16 @@ class ActiveWebService(ServiceBase):
                             [(s.name, "/services/" + s.name) for
                                 s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
-                    )
+                    ),
+                Padding(),
+                Text('Authorized Groups: {groups}'.format(groups=self.authorized_groups_text)),
+                Padding(),
+                Button('Logout', '/logout'),
                 ]) +
             Main(display)
             )
 
+    @login_required
     def mainSocket(self, ws, path):
         path = str(path).split("/")
         queryArgs = dict(request.args)
@@ -305,6 +500,7 @@ class ActiveWebService(ServiceBase):
             if message is not None:
                 ws.send(message)
 
+    @login_required
     def sendContent(self, path):
         own_dir = os.path.dirname(__file__)
         return send_from_directory(os.path.join(own_dir, "content"), path)
