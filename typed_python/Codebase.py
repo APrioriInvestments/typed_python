@@ -18,6 +18,7 @@ import tempfile
 import os
 import sys
 import threading
+import logging
 
 from typed_python.SerializationContext import SerializationContext
 
@@ -41,6 +42,10 @@ class Codebase:
                 if isinstance(member, type) or isinstance(member, types.FunctionType):
                     nameToObject[modulename + "." + membername] = member
                     objectsSeen.add(id(member))
+
+            #also add the module so we can serialize it.
+            nameToObject[".modules." + modulename] = module
+            objectsSeen.add(id(module))
 
         for modulename, module in modules.items():
             for membername, member in module.__dict__.items():

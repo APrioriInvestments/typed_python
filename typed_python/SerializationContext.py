@@ -34,6 +34,7 @@ _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
 _builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0] #the 'scalar' function
 _builtin_name_to_value[".builtin.dtype"] = numpy.dtype
+_builtin_name_to_value[".builtin.numpy"] = numpy
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
 
