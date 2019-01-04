@@ -77,7 +77,7 @@ Statement = Alternative("Statement",
         'filename': str
         },
     Delete = {
-        "value": TupleOf(Expr),
+        "targets": TupleOf(Expr),
         'line_number': int,
         'col_offset': int,
         'filename': str
