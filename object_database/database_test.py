@@ -46,9 +46,6 @@ def currentMemUsageMb(residentOnly=True):
         return psutil.Process().memory_info().vms / 1024 ** 2
 
 
-configureLogging("test")
-
-
 class BlockingCallback:
     def __init__(self):
         self.callbackArgs = queue.Queue()
@@ -115,6 +112,10 @@ class StringIndexed:
 
 
 class ObjectDatabaseTests:
+    @classmethod
+    def setUpClass(cls):
+        configureLogging("database_test")
+
     def test_assigning_dicts(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)

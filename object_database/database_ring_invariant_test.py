@@ -29,8 +29,6 @@ import threading
 
 from object_database.util import configureLogging
 
-configureLogging("test")
-
 schema = Schema("test_schema")
 
 @schema.define
@@ -76,6 +74,10 @@ class Ring:
 
 
 class RingInvariantTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        configureLogging('database_ring_invariant_test')
+
     def setUp(self):
         self.token = genToken()
         self.mem_store = InMemoryPersistence()

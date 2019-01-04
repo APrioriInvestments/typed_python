@@ -36,7 +36,6 @@ import subprocess
 import pickle
 import hashlib
 
-logger = logging.getLogger(__name__)
 
 class DirectoryScope(object):
     def __init__(self, directory):
@@ -554,6 +553,7 @@ def buildModule(args):
 
 
 def main(args):
+    global logger
     # parse args, return zero and exit if help string was printed
     parser = PythonTestArgumentParser()
     args, filter_actions = parser.parse_args(args[1:])
@@ -564,8 +564,9 @@ def main(args):
             if result:
                 return result
 
-        from object_database.util import setupLogging
-        setupLogging('object_database/logging.yaml')
+        from object_database.util import configureLogging
+        configureLogging("test", logging.INFO)
+        logger = logging.getLogger(__name__)
 
         # set the python path so that we load the right version of the library.
         os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH', '') + ":" + os.path.abspath("./build/install")
