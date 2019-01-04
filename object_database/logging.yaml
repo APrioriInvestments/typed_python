@@ -7,10 +7,10 @@ formatters:
 handlers:
     default:
         class: logging.StreamHandler
-        level: INFO
+        level: 0  # Default Handler should apply to all levels
         formatter: default
         stream: ext://sys.stdout
 
 root:
-    level: DEBUG
+    level: 10  # Default level==INFO
     handlers: [default]

@@ -72,6 +72,7 @@ def setupLogging(
     value = os.getenv(env_key, None)
     if value:
         path = value
+
     if path is not None and os.path.exists(path):
         with open(path, 'rt') as f:
             config = yaml.safe_load(f.read())

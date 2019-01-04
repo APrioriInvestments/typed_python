@@ -59,14 +59,16 @@ def main(argv=None):
     parsedArgs = parser.parse_args(argv[1:])
 
     validLogLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
-    level = parsedArgs.log_level.upper()
-    if level not in validLogLevels:
+    level_name = parsedArgs.log_level.upper()
+    if level_name not in validLogLevels:
         raise Exception(
             "invalid --log-level value: %s. Must be one of %s"
-            % (level, validLogLevels)
+            % (level_name, validLogLevels)
         )
 
-    configureLogging("service_manager", level=level)
+    # getLevelName returns a name when given an int and an int when given a name,
+    # and there doesn't seem to be an other way to get the int from the string.
+    configureLogging("service_manager", level=logging.getLevelName(level_name))
     logger = logging.getLogger(__name__)
 
     parsedArgs = parser.parse_args(argv[1:])

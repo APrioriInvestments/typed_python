@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import logging
 import os
 import requests
 import subprocess
@@ -42,6 +43,8 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
+        log_level = logging.getLogger(__name__).getEffectiveLevel()
+        log_level_name = logging.getLevelName(log_level)
 
         self.server = subprocess.Popen(
             [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
@@ -49,7 +52,8 @@ class ActiveWebServiceTest(unittest.TestCase):
                 '--source', os.path.join(self.tempDirectoryName,'source'),
                 '--storage', os.path.join(self.tempDirectoryName,'storage'),
                 '--service-token', self.token,
-                '--shutdownTimeout', '.5'
+                '--shutdownTimeout', '.5',
+                '--log-level', log_level_name
             ]
         )
         try:
@@ -69,7 +73,11 @@ class ActiveWebServiceTest(unittest.TestCase):
 
             with self.database.transaction():
                 service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
-            ActiveWebService.configureFromCommandline(self.database, service, ['--port', str(WEB_SERVER_PORT), '--host', 'localhost'])
+            ActiveWebService.configureFromCommandline(
+                self.database,
+                service,
+                ['--port', str(WEB_SERVER_PORT), '--host', 'localhost', '--log-level', log_level_name]
+            )
 
             with self.database.transaction():
                 ServiceManager.startService("ActiveWebService", 1)
