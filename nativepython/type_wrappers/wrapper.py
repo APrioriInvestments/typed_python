@@ -83,19 +83,19 @@ class Wrapper(object):
             )
 
     def convert_assign(self, context, target, toStore):
-        raise NotImplementedError()
+        raise NotImplementedError(self)
 
     def convert_copy_initialize(self, context, target, toStore):
-        raise NotImplementedError()
+        raise NotImplementedError(self)
 
     def convert_destroy(self, context, instance):
         raise NotImplementedError(self)
 
     def convert_call(self, context, left, args):
-        raise NotImplementedError()
+        raise NotImplementedError(self)
 
     def convert_len(self, context, expr):
-        raise NotImplementedError()
+        raise NotImplementedError(self)
 
     def convert_to_type(self, context, expr, target_type):
         return target_type.convert_to_self(context, expr)

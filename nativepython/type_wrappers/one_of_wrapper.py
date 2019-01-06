@@ -66,7 +66,21 @@ class OneOfWrapper(Wrapper):
         if self.is_pod:
             return context.NoneExpr(expr.expr.store(other.nonref_expr))
         else:
-            raise NotImplementedError()
+            temp = context.allocate_temporary(self)
+
+            return context.NoneExpr(
+                temp.expr.store(expr.load()) >> 
+                expr.convert_copy_initialize(other).expr >> 
+                temp.convert_destroy().expr
+                )            
+
+    def refAs(self, context, expr, which):
+        tw = typeWrapper(self.typeRepresentation.Types[which])
+
+        return context.RefExpr(
+            expr.expr.ElementPtrIntegers(0,1).cast(tw.getNativeLayoutType().pointer()),
+            tw
+            )
 
     def convert_copy_initialize(self, context, expr, other):
         assert expr.isReference
@@ -74,13 +88,37 @@ class OneOfWrapper(Wrapper):
         if self.is_pod:
             return context.NoneExpr(expr.expr.store(other.nonref_expr))
         else:
-            raise NotImplementedError()
+            outputExpr = native_ast.nullExpr
+            for ix, t in enumerate(self.typeRepresentation.Types):
+                tWrapper = typeWrapper(t)
 
-    def convert_destroy(self, context, target):
+                copy = self.refAs(context, expr, ix).convert_copy_initialize(self.refAs(context,other,ix))
+
+                outputExpr = outputExpr >> native_ast.Expression.Branch(
+                    cond=other.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(ix)),
+                    true=copy.expr >> expr.expr.ElementPtrIntegers(0,0).store(other.expr.ElementPtrIntegers(0,0).load()),
+                    false=outputExpr
+                    )
+
+            return context.NoneExpr(outputExpr)
+
+    def convert_destroy(self, context, expr):
         if self.is_pod:
             return context.NoneExpr()
         else:
-            raise NotImplementedError()
+            outputExpr = native_ast.nullExpr
+            for ix, t in enumerate(self.typeRepresentation.Types):
+                tWrapper = typeWrapper(t)
+
+                if not tWrapper.is_pod:
+                    destroy = self.refAs(context, expr, ix).convert_destroy()
+                    outputExpr = outputExpr >> native_ast.Expression.Branch(
+                        cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(ix)),
+                        true=destroy.expr,
+                        false=outputExpr
+                        )
+
+            return context.NoneExpr(outputExpr)
 
     def convert_to_type(self, context, expr, otherType):
         if otherType.typeRepresentation in self.typeRepresentation.Types:
@@ -93,7 +131,8 @@ class OneOfWrapper(Wrapper):
             return context.RefExpr(
                 native_ast.Expression.Branch(
                     cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(which)),
-                    true=result.expr.store(expr.expr.ElementPtrIntegers(0,1).cast(otherType.getNativeLayoutType().pointer()).load())
+                    true=result.convert_copy_initialize(self.refAs(context, expr, which)).expr
+                        >> context.activates_temporary(result)
                         >> result.expr,
                     false=generateThrowException(context, Exception("Can't convert"))
                     ),
@@ -101,7 +140,6 @@ class OneOfWrapper(Wrapper):
                 )
 
         return super().convert_to_type(context, expr, otherType)
-
 
     def convert_to_self(self, context, otherExpr):
         if otherExpr.expr_type.typeRepresentation in self.typeRepresentation.Types:
@@ -111,8 +149,8 @@ class OneOfWrapper(Wrapper):
 
             return context.RefExpr(
                 result.expr.ElementPtrIntegers(0,0).store(native_ast.const_uint8_expr(which)) 
-                    >> result.expr.ElementPtrIntegers(0,1).cast(otherExpr.expr_type.getNativeLayoutType().pointer())
-                        .store(otherExpr.nonref_expr)
+                    >> self.refAs(context, result, which).convert_copy_initialize(otherExpr).expr
+                    >> context.activates_temporary(result)
                     >> result.expr,
                 result.expr_type
                 )
