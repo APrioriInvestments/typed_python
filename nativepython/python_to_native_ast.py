@@ -287,67 +287,48 @@ class ConversionContext(object):
 
     def call_py_function(self, f, args):
         #force arguments to a type appropriate for argpassing
-        args = [a.as_call_arg() for a in args]
-        native_args = [a.expr for a in args]
 
-        call_target = \
-            self.converter.convert(
-                f,
-                [a.expr_type for a in args],
-                None
-                )
+        def call(*args):
+            native_args = [a.as_native_call_arg() for a in args]
 
-        assert len(call_target.named_call_target.arg_types) == len(args)
+            call_target = \
+                self.converter.convert(
+                    f,
+                    [a.expr_type for a in args],
+                    None
+                    )
 
-        return self.ValueExpr(
-            self.generate_call_expr(
-                target=call_target.named_call_target,
-                args=native_args
-                ),
-            call_target.output_type
-            )
+            if call_target.output_type.is_pass_by_ref:
+                assert len(call_target.named_call_target.arg_types) == len(args)+1
+            
+                return_val = self.allocate_temporary(call_target.output_type)
 
-    def generate_call_expr(self, target, args):
-        lets = []
-        actual_args = []
-
-        for a in args:
-            while a.matches.Sequence:
-                for sub_expr in a.vals[:-1]:
-                    lets.append((None, sub_expr))
-                a = a.vals[-1]
-
-            if not a.is_simple():
-                name = self.let_varname()
-                lets.append((name, a))
-                actual_args.append(native_ast.Expression.Variable(name=name))
-            else:
-                actual_args.append(a)
-
-        e = native_ast.Expression.Call(
-            target=native_ast.CallTarget.Named(target=target),
-            args=actual_args
-            )
-
-        for k,v in reversed(lets):
-            if k is not None:
-                e = native_ast.Expression.Let(
-                    var=k,
-                    val=v,
-                    within=e
+                return self.RefExpr(
+                    native_ast.Expression.Call(
+                        target=native_ast.CallTarget.Named(target=call_target.named_call_target),
+                        args=(return_val.expr,) + tuple(native_args)
+                        ) >> return_val.expr,
+                    call_target.output_type
                     )
             else:
-                e = v + e
+                assert len(call_target.named_call_target.arg_types) == len(args)
+            
+                return self.ValueExpr(
+                    native_ast.Expression.Call(
+                        target=native_ast.CallTarget.Named(target=call_target.named_call_target),
+                        args=native_args
+                        ),
+                    call_target.output_type
+                    )
 
-        return e
-
-
+        return self.wrapInTemporaries(call, args)
 
     def convert_expression_ast(self, ast):
         return self.convert_expression_ast_(ast)
 
     def wrapInTemporaries(self, fun, args):
         """Call 'fun' with args that are all simple reference to values or nonref pod."""
+
         for i,a in enumerate(args):
             if not (a.isReference or not a.expr_type.is_pass_by_ref):
                 #'a' contains an increffed value that will be valid for the duration of the statement
@@ -693,10 +674,12 @@ class ConversionContext(object):
             if e.expr_type is None:
                 return e
 
-            if e.isReference:
+            if e.expr_type.is_pass_by_ref:
+                returnTarget = self.RefExpr(native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput])
+
                 return self.TerminalExpr(
-                    e.convert_incref().expr >> 
-                        native_ast.Expression.Return(arg=e.nonref_expr)
+                    returnTarget.convert_copy_initialize(e).expr >> 
+                        native_ast.Expression.Return(arg=None)
                     )
             else:
                 return self.TerminalExpr(
@@ -1124,14 +1107,24 @@ class Converter(object):
 
         return_type = subconverter._varname_to_type[FunctionOutput] or NoneExprType
 
-        return (
-            native_ast.Function(
-                args=args,
-                body=native_ast.FunctionBody.Internal(body=res.expr),
-                output_type=return_type.getNativeLayoutType()
-                ),
-            return_type
-            )
+        if return_type.is_pass_by_ref:
+            return (
+                native_ast.Function(
+                    args=(('.return',return_type.getNativeLayoutType().pointer()),) + tuple(args),
+                    body=native_ast.FunctionBody.Internal(body=res.expr),
+                    output_type=native_ast.Void
+                    ),
+                return_type
+                )
+        else:
+            return (
+                native_ast.Function(
+                    args=args,
+                    body=native_ast.FunctionBody.Internal(body=res.expr),
+                    output_type=return_type.getNativeLayoutType()
+                    ),
+                return_type
+                )
 
     def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup, output_type):
         return self.convert_function_ast(
@@ -1217,28 +1210,33 @@ class Converter(object):
         if identifier in self._names_for_identifier:
             return self._names_for_identifier[identifier]
 
-
         underlyingDefinition = self._definitions[callTarget.name]
 
         args = []
-        for i in range(len(underlyingDefinition.args)):
-            argname, argtype = underlyingDefinition.args[i]
+        for i in range(len(callTarget.input_types)):
+            argtype = callTarget.input_types[i].getNativeLayoutType()
 
             untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
 
             if callTarget.input_types[i].is_pass_by_ref:
                 #we've been handed a pointer, and it's already a pointer
-                args.append(untypedPtr.cast(argtype))
+                args.append(untypedPtr.cast(argtype.pointer()))
             else:
                 args.append(untypedPtr.cast(argtype.pointer()).load())
 
-        body = native_ast.Expression.Call(
-            target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
-            args=args
-            )
+        if callTarget.output_type.is_pass_by_ref:
+            body = native_ast.Expression.Call(
+                target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
+                args=(native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),) + tuple(args)
+                )
+        else:
+            body = native_ast.Expression.Call(
+                target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
+                args=args
+                )
 
-        if not underlyingDefinition.output_type.matches.NoneExprType:
-            body = native_ast.var('return').cast(underlyingDefinition.output_type.pointer()).store(body)
+            if not callTarget.output_type.is_empty:
+                body = native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()).store(body)
 
         body = native_ast.FunctionBody.Internal(body=body)
 

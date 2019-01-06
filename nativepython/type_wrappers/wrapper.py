@@ -20,13 +20,17 @@ from nativepython.type_wrappers.exceptions import generateThrowException
 class Wrapper(object):
     #properties of all objects:
 
-    #is this 'plain old data' with no constructor/destructor semantics
+    #is this 'plain old data' with no constructor/destructor semantics?
+    #if so, we can dispense with destructors entirely.
     is_pod = False
 
     #does this boil down to a void type?
     is_empty = False
 
     #do we pass this as a reference to a stackslot or as registers?
+    #if true, then when this is a return value, we also have to pass a pointer
+    #to the output location as the first argument (and return void) rather
+    #than returning registers.
     is_pass_by_ref = True
 
     def __repr__(self):

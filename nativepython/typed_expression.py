@@ -46,15 +46,13 @@ class TypedExpression(object):
         self.expr_type = t
         self.isReference = isReference
 
-    def as_call_arg(self):
+    def as_native_call_arg(self):
         """Convert this expression to a call-argument form."""
-        if self.expr_type.is_pod:
-            return self.ensureNonReference()
+        if self.expr_type.is_pass_by_ref:
+            assert self.isReference
+            return self.expr
         else:
-            if self.isReference:
-                return self
-
-            assert False, "we should be jamming this rvalue object into a temporary that we can pass"
+            return self.nonref_expr
 
     @property
     def nonref_expr(self):
