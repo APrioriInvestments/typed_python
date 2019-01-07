@@ -26,7 +26,7 @@ import threading
 import time
 import traceback
 
-from object_database.util import configureLogging, sslContextFromCertPathOrNone
+from object_database.util import configureLogging, sslContextFromCertPathOrNone, checkLogLevelValidity
 from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
@@ -58,13 +58,8 @@ def main(argv=None):
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    validLogLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     level_name = parsedArgs.log_level.upper()
-    if level_name not in validLogLevels:
-        raise Exception(
-            "invalid --log-level value: %s. Must be one of %s"
-            % (level_name, validLogLevels)
-        )
+    checkLogLevelValidity(level_name)
 
     # getLevelName returns a name when given an int and an int when given a name,
     # and there doesn't seem to be an other way to get the int from the string.

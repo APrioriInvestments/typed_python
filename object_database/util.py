@@ -248,3 +248,13 @@ def tokenFromString(text):
     sha = hashlib.sha256()
     sha.update(text.encode())
     return sha.hexdigest()
+
+
+VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
+
+def checkLogLevelValidity(level: str):
+    if level not in VALID_LOG_LEVELS:
+        raise Exception(
+            "invalid log-level value: {level}. Must be one of {options}"
+            .format(level=level, options=VALID_LOG_LEVELS)
+        )
