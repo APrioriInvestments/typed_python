@@ -124,20 +124,14 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                 return context.ValueExpr(
                     native_ast.Expression.Branch(
                         cond=right.nonref_expr,
-                        true=native_ast.Expression.Call(
-                            target=runtime_functions.mod_int64_int64,
-                            args=(left.nonref_expr, right.nonref_expr,)
-                            ),
+                        true=runtime_functions.mod_int64_int64.call(left.nonref_expr, right.nonref_expr),
                         false=generateThrowException(context, ZeroDivisionError())
                         ),
                     self
                     )
             if op.matches.Pow:
                 return context.ValueExpr(
-                    native_ast.Expression.Call(
-                        target=runtime_functions.pow_int64_int64,
-                        args=(left.nonref_expr, right.nonref_expr,)
-                        ),
+                    runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr),
                     self
                     )
             if op.matches.LShift or op.matches.RShift:
@@ -285,9 +279,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                     )
             if op.matches.Pow:
                 return context.ValueExpr(
-                    native_ast.Expression.Call(
-                        target=runtime_functions.pow_float64_float64,
-                        args=(left.nonref_expr, right.nonref_expr,)
+                    runtime_functions.pow_float64_float64.call(
+                        left.nonref_expr, right.nonref_expr
                         ),
                     self
                     )

@@ -36,10 +36,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def convert_incref(self, context, expr):
         return TypedExpression(
             context,
-            native_ast.Expression.Call(
-                target=runtime_functions.incref_pyobj,
-                args=(expr.nonref_expr,)
-                ) >> expr.expr,
+            runtime_functions.incref_pyobj.call(expr.nonref_expr) >> expr.expr,
             self,
             expr.isReference
             )
@@ -67,19 +64,16 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
     def convert_destroy(self, context, instance):
         return context.NoneExpr(
-            native_ast.Expression.Call(
-                target=runtime_functions.decref_pyobj,
-                args=(instance.nonref_expr,)
-                )
+            runtime_functions.decref_pyobj.call(instance.nonref_expr)
             )
 
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
         return context.ValueExpr(
-            native_ast.Expression.Call(
-                target=runtime_functions.getattr_pyobj,
-                args=(instance.nonref_expr, native_ast.const_utf8_cstr(attr))
+            runtime_functions.getattr_pyobj.call(
+                instance.nonref_expr, 
+                native_ast.const_utf8_cstr(attr)
                 ),
             self
             )
@@ -87,10 +81,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def convert_to_type(self, context, expr, target_type):
         if target_type.typeRepresentation == Int64():
             return context.ValueExpr(
-                native_ast.Expression.Call(
-                    target=runtime_functions.pyobj_to_int,
-                    args=(expr.nonref_expr,)
-                    ),
+                runtime_functions.pyobj_to_int.call(expr.nonref_expr),
                 target_type
                 )
 
@@ -99,10 +90,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def convert_to_self(self, context, expr):
         if expr.expr_type.typeRepresentation == Int64():
             return context.ValueExpr(
-                native_ast.Expression.Call(
-                    target=runtime_functions.int_to_pyobj,
-                    args=(expr.nonref_expr,)
-                    ),
+                runtime_functions.int_to_pyobj.call(expr.nonref_expr),
                 self
                 )
 

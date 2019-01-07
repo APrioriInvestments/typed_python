@@ -80,22 +80,20 @@ class RefcountedWrapper(Wrapper):
             )
 
     def convert_destroy(self, context, target):
-        target = target.ensureNonReference()
-
         return context.NoneExpr(
             native_ast.Expression.Branch(
-                cond=target.expr,
+                cond=target.nonref_expr,
                 false=native_ast.nullExpr,
                 true=
-                    target.expr.ElementPtrIntegers(0,0).store(
+                    target.nonref_expr.ElementPtrIntegers(0,0).store(
                         native_ast.Expression.Binop(
-                            l=target.expr.ElementPtrIntegers(0,0).load(),
+                            l=target.nonref_expr.ElementPtrIntegers(0,0).load(),
                             op=native_ast.BinaryOp.Sub(),
                             r=native_ast.const_int_expr(1)
                         )
                     ) >>
                     native_ast.Expression.Branch(
-                        cond=target.expr.ElementPtrIntegers(0,0).load(),
+                        cond=target.nonref_expr.ElementPtrIntegers(0,0).load(),
                         true=native_ast.nullExpr,
                         false=self.on_refcount_zero(context, target)
                         )

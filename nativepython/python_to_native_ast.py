@@ -36,6 +36,9 @@ class TypedCallTarget(object):
         self.input_types = input_types
         self.output_type = output_type
 
+    def call(self, *args):
+        return native_ast.CallTarget.Named(target=self.named_call_target).call(*args)
+
     @property
     def name(self):
         return self.named_call_target.name
@@ -194,6 +197,7 @@ class FunctionOutput:
     pass
 
 class ConversionContext(object):
+    """Helper function for converting a single python function.""" 
     def __init__(self, converter, varname_to_type, free_variable_lookup):
         self.exception_helper = ExceptionHandlingHelper(self)
         self.converter = converter
@@ -213,16 +217,43 @@ class ConversionContext(object):
     def resetTypeInstabilityFlag(self):
         self._typesAreUnstable = False
 
+    def loop_expr(self, countExpr, callback):
+        """Evaluate 'callbackExpr' on the integers from 0 to 'countExpr'.
+
+        callbackExpr: function from native expression of int to native expression
+        countExpr: an expression containing the number of elements.
+
+        returns a TypedExpression evaluating to None
+        """
+        counter = self.allocate_temporary(typeWrapper(int))
+        max_varname = self.let_varname()
+
+        return self.NoneExpr(
+            native_ast.Expression.Let(
+                var=max_varname,
+                val=countExpr,
+                within=
+                    counter.expr.store(native_ast.const_int_expr(0)) >> 
+                    native_ast.Expression.While(
+                        cond=counter.nonref_expr.lt(native_ast.Expression.Variable(name=max_varname)),
+                        while_true=callback(counter.nonref_expr) >> counter.expr.store(counter.nonref_expr.add(1)),
+                        orelse=native_ast.nullExpr
+                        )
+                )
+            )
+
+
     def let_varname(self):
         self._temp_let_var += 1
         return ".letvar.%s" % (self._temp_let_var-1)
 
     def let(self, e1, e2):
         v = self.let_varname()
+
         return native_ast.Expression.Let(
             var=v,
             val=e1,
-            within=e2(v)
+            within=e2(native_ast.Expression.Variable(name=v))
             )
 
     def NoneExpr(self, expr=None):
@@ -304,20 +335,14 @@ class ConversionContext(object):
                 return_val = self.allocate_temporary(call_target.output_type)
 
                 return self.RefExpr(
-                    native_ast.Expression.Call(
-                        target=native_ast.CallTarget.Named(target=call_target.named_call_target),
-                        args=(return_val.expr,) + tuple(native_args)
-                        ) >> return_val.expr,
+                    call_target.call(return_val.expr, *native_args) >> return_val.expr,
                     call_target.output_type
                     )
             else:
                 assert len(call_target.named_call_target.arg_types) == len(args)
             
                 return self.ValueExpr(
-                    native_ast.Expression.Call(
-                        target=native_ast.CallTarget.Named(target=call_target.named_call_target),
-                        args=native_args
-                        ),
+                    call_target.call(*native_args),
                     call_target.output_type
                     )
 
@@ -452,7 +477,7 @@ class ConversionContext(object):
             l = self.convert_expression_ast(ast.left)
             r = self.convert_expression_ast(ast.right)
 
-            return l.convert_bin_op(ast.op, r)
+            return self.wrapInTemporaries(lambda l,r: l.convert_bin_op(ast.op, r), (l,r))
 
         if ast.matches.UnaryOp:
             operand = self.convert_expression_ast(ast.operand)
@@ -600,38 +625,39 @@ class ConversionContext(object):
                 if varname not in self._varname_to_type:
                     self._varname_to_type[varname] = None
 
-                val_to_store = self.convert_expression_ast(ast.value)
+                def assignDirectly(val_to_store):
+                    if self._varname_to_type[varname] is None:
+                        self._varname_to_type[varname] = val_to_store.expr_type
 
-                if self._varname_to_type[varname] is None:
-                    self._varname_to_type[varname] = val_to_store.expr_type
+                        slot_ref = self.named_var_expr(varname)
 
-                    slot_ref = self.named_var_expr(varname)
+                        #this is a new variable which we are constructing
+                        return self._varname_to_type[varname].convert_copy_initialize(
+                            self,
+                            slot_ref,
+                            val_to_store
+                            ) >> self.NoneExpr(native_ast.Expression.ActivatesTeardown(name=varname))
+                    else:
+                        #this is an existing variable.
+                        slot_ref = self.named_var_expr(varname)
 
-                    #this is a new variable which we are constructing
-                    return self._varname_to_type[varname].convert_copy_initialize(
-                        self,
-                        slot_ref,
-                        val_to_store
-                        ) >> self.NoneExpr(native_ast.Expression.ActivatesTeardown(name=varname))
-                else:
-                    #this is an existing variable.
-                    slot_ref = self.named_var_expr(varname)
+                        if op is not None:
+                            val_to_store = slot_ref.convert_bin_op(op, val_to_store)
 
-                    if op is not None:
-                        val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+                        if slot_ref.expr_type != val_to_store.expr_type:
+                            self.upsizeVariableType(varname, val_to_store.expr_type)
 
-                    if slot_ref.expr_type != val_to_store.expr_type:
-                        self.upsizeVariableType(varname, val_to_store.expr_type)
+                        #convert the value to the target type now that we've upsized it
+                        val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
 
-                    #convert the value to the target type now that we've upsized it
-                    val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
+                        if val_to_store.expr_type is None:
+                            return val_to_store
 
-                    if val_to_store.expr_type is None:
-                        return val_to_store
-
-                    return slot_ref.convert_assign(val_to_store)
+                        return slot_ref.convert_assign(val_to_store)
+                return self.wrapInTemporaries(assignDirectly, (self.convert_expression_ast(ast.value),))
 
             if target.matches.Subscript and target.ctx.matches.Store:
+                raise NotImplementedError("Not implemented correctly yet")
                 assert target.slice.matches.Index
 
                 slicing = self.convert_expression_ast(target.value)
@@ -649,9 +675,13 @@ class ConversionContext(object):
                 val_to_store = self.convert_expression_ast(ast.value)
 
                 if op is not None:
+                    raise NotImplementedError("Not implemented correctly.")
                     val_to_store = slicing.convert_attribute(attr).convert_bin_op(op, val_to_store)
 
-                return slicing.convert_set_attribute(attr, val_to_store)
+                return self.wrapInTemporaries(
+                    lambda slicing, val_to_store: slicing.convert_set_attribute(attr, val_to_store),
+                    (slicing, val_to_store)
+                    )
 
         if ast.matches.Return:
             if ast.value is None:
@@ -668,27 +698,34 @@ class ConversionContext(object):
                 else:
                     self.upsizeVariableType(FunctionOutput, e.expr_type)
 
-            if e.expr_type != self._varname_to_type[FunctionOutput]:
-                e = e.convert_to_type(self._varname_to_type[FunctionOutput])
+            def convertThenReturn(unconvertedExpr):
+                if unconvertedExpr.expr_type != self._varname_to_type[FunctionOutput]:
+                    unconvertedExpr = unconvertedExpr.convert_to_type(self._varname_to_type[FunctionOutput])
 
-            if e.expr_type is None:
-                return e
+                if unconvertedExpr.expr_type is None:
+                    return unconvertedExpr
 
-            if e.expr_type.is_pass_by_ref:
-                returnTarget = self.RefExpr(native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput])
 
-                return self.TerminalExpr(
-                    returnTarget.convert_copy_initialize(e).expr >> 
-                        native_ast.Expression.Return(arg=None)
-                    )
-            else:
-                return self.TerminalExpr(
-                    native_ast.Expression.Return(arg=e.nonref_expr)
-                    )
+                def generateReturn(convertedExpr):
+                    if convertedExpr.expr_type.is_pass_by_ref:
+                        returnTarget = self.RefExpr(native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput])
+
+                        return self.TerminalExpr(
+                            returnTarget.convert_copy_initialize(convertedExpr).expr >> 
+                                native_ast.Expression.Return(arg=None)
+                            )
+                    else:
+                        return self.TerminalExpr(
+                            native_ast.Expression.Return(arg=convertedExpr.nonref_expr)
+                            )
+
+                return self.wrapInTemporaries(generateReturn, (unconvertedExpr,))
+
+            return self.wrapInTemporaries(convertThenReturn, (e,))
 
         if ast.matches.Expr:
             return self.NoneExpr(
-                self.convert_expression_ast(ast.value).expr + native_ast.nullExpr
+                self.convert_expression_ast(ast.value).expr >> native_ast.nullExpr
                 )
 
         if ast.matches.If:
@@ -1027,9 +1064,9 @@ class Converter(object):
 
         return res
 
-    def new_name(self, name):
+    def new_name(self, name, prefix="py."):
         suffix = None
-        getname = lambda: "py." + name + ("" if suffix is None else ".%s" % suffix)
+        getname = lambda: prefix + name + ("" if suffix is None else ".%s" % suffix)
         while getname() in self._targets:
             suffix = 1 if not suffix else suffix+1
         return getname()
@@ -1126,6 +1163,7 @@ class Converter(object):
                 return_type
                 )
 
+
     def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup, output_type):
         return self.convert_function_ast(
             ast.args,
@@ -1140,6 +1178,54 @@ class Converter(object):
             free_variable_lookup,
             output_type
             )
+
+    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
+        """Define a native function if we haven't defined it before already.
+
+            name - the name to actually give the function.
+            identity - a unique identifier for this function to allow us to cache it.
+            input_types - list of Wrapper objects for the incoming types
+            output_ype - Wrapper object for the output type.
+            generatingFunction - a function producing a native_function_definition
+        
+        returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
+        """
+        identity = ("native", identity)
+
+        if identity in self._names_for_identifier:
+            return self._targets[self._names_for_identifier[identity]]
+
+        new_name = self.new_name(name, "runtime.")
+
+        self._names_for_identifier[identity] = new_name
+
+        native_input_types = [t.getNativePassingType() for t in input_types]
+
+        if output_type.is_pass_by_ref:
+            #the first argument is actually the output
+            native_output_type = native_ast.Void
+            native_input_types = [output_type.getNativePassingType()] + native_input_types
+        else:
+            native_output_type = output_type.getNativeLayoutType()
+
+        self._targets[new_name] = TypedCallTarget(
+            native_ast.NamedCallTarget(
+                name=new_name,
+                arg_types=native_input_types,
+                output_type=native_output_type,
+                external=False,
+                varargs=False,
+                intrinsic=False,
+                can_throw=True
+                ),
+            input_types,
+            output_type
+            )
+
+        self._definitions[new_name] = generatingFunction()
+        self._unconverted.add(new_name)
+
+        return self._targets[new_name]
 
     def define(self, identifier, name, input_types, output_type, native_function_definition):
         identifier = ("defined", identifier)
@@ -1225,15 +1311,12 @@ class Converter(object):
                 args.append(untypedPtr.cast(argtype.pointer()).load())
 
         if callTarget.output_type.is_pass_by_ref:
-            body = native_ast.Expression.Call(
-                target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
-                args=(native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),) + tuple(args)
+            body = callTarget.call(
+                native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),
+                *args
                 )
         else:
-            body = native_ast.Expression.Call(
-                target=native_ast.CallTarget.Named(target=callTarget.named_call_target),
-                args=args
-                )
+            body = callTarget.call(*args)
 
             if not callTarget.output_type.is_empty:
                 body = native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()).store(body)

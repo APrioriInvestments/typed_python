@@ -55,7 +55,7 @@ class ClassWrapper(RefcountedWrapper):
         return self.layoutType
 
     def on_refcount_zero(self, context, instance):
-        expr = native_ast.callFree(instance.expr)
+        expr = runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:

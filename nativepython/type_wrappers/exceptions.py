@@ -18,9 +18,8 @@ import nativepython.type_wrappers.runtime_functions as runtime_functions
 def generateThrowException(context, exception):
     return (
         #as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
-        native_ast.Expression.Call(
-           target=runtime_functions.stash_exception_ptr,
-           args=(native_ast.const_utf8_cstr(str(exception)),)
+        runtime_functions.stash_exception_ptr.call(
+           native_ast.const_utf8_cstr(str(exception))
            )
         >> native_ast.Expression.Throw(
             expr=native_ast.Expression.Constant(

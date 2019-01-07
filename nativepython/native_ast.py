@@ -155,6 +155,7 @@ NamedCallTarget = NamedTuple(
 CallTarget = Alternative("CallTarget",
     Named = {'target': NamedCallTarget},
     Pointer = {'expr': Expression},
+    call=lambda self, *args: Expression.Call(target=self, args=args)
     )
 
 def teardown_str(self):
@@ -364,7 +365,9 @@ Expression = Alternative("Expression",
     structElt = lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
     sub = lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
     add = lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
+    mul = lambda self, other: Expression.Binop(op=BinaryOp.Mul(), l=self,r=ensureExpr(other)),
     eq = lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self,r=ensureExpr(other)),
+    lt = lambda self, other: Expression.Binop(op=BinaryOp.Lt(), l=self,r=ensureExpr(other)),
     lshift = lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
     rshift = lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
     bitand = lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
@@ -406,6 +409,11 @@ def const_int_expr(i):
         val=Constant.Int(bits=64,val=i,signed=True)
         )
 
+def const_int32_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=32,val=i,signed=True)
+        )
+
 def const_uint8_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=8,val=i,signed=False)
@@ -438,19 +446,3 @@ Int32 = Type.Int(bits=32, signed=True)
 
 def var(name):
     return Expression.Variable(name=name)
-
-def callFree(argExpr):
-    return Expression.Call(
-        target=CallTarget.Named(
-            target=NamedCallTarget(
-                name = "free",
-                arg_types = [UInt8Ptr],
-                output_type = Void,
-                external=True,
-                varargs=False,
-                intrinsic=False,
-                can_throw=False
-                )
-            ),
-        args=(argExpr.cast(UInt8Ptr),)
-        )

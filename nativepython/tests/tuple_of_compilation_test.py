@@ -17,6 +17,11 @@ import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
 import time
+import psutil
+
+def Compiled(f):
+    f = TypedFunction(f)
+    return Runtime.singleton().compile(f)
 
 class TestTupleOfCompilation(unittest.TestCase):
     def checkFunction(self, f, argsToCheck):
@@ -69,11 +74,9 @@ class TestTupleOfCompilation(unittest.TestCase):
         print(t_py / t_fast, " speedup")
 
     def test_tuple_indexing(self):
-        @TypedFunction
+        @Compiled
         def f(x: TupleOf(int), y:int) -> int:
             return x[y]
-
-        Runtime.singleton().compile(f)
 
         self.assertEqual(f((1,2,3),1), 2)
 
@@ -102,12 +105,68 @@ class TestTupleOfCompilation(unittest.TestCase):
             self.assertEqual(_types.refcount(intTup),1)
 
     def test_bad_mod_generates_exception(self):
-        @TypedFunction
+        @Compiled
         def f(x: int, y:int) -> int:
             return x % y
-
-        Runtime.singleton().compile(f)
 
         with self.assertRaises(Exception):
             f(0,0)
 
+    def test_tuple_of_adding(self):
+        T = TupleOf(int)
+
+        @Compiled
+        def f(x: T, y: T) -> T:
+            return x + y
+
+        t1 = T((1,2,3))
+        t2 = T((3,4))
+        
+        res = f(t1, t2)
+
+        self.assertEqual(_types.refcount(res), 1)
+        self.assertEqual(_types.refcount(t1), 1)
+        self.assertEqual(_types.refcount(t2), 1)
+
+        self.assertEqual(res, t1+t2)
+
+    def test_tuple_of_tuple_refcounting(self):
+        T = TupleOf(int)
+        TT = TupleOf(T)
+
+        @Compiled
+        def f(x: TT) -> TT:
+            return x + x
+
+        t1 = T((1,2,3))
+        t2 = T((4,5,5))
+
+        aTT = TT((t1,t2))
+        
+        fRes = f(aTT)
+        
+        self.assertEqual(fRes, aTT+aTT)
+        self.assertEqual(_types.refcount(aTT), 1)
+        self.assertEqual(_types.refcount(fRes), 1)
+
+        fRes = None
+        aTT = None
+        self.assertEqual(_types.refcount(t1), 1)
+
+    def test_tuple_creation_doesnt_leak(self):
+        T = TupleOf(int)
+
+        @Compiled
+        def f(x: T, y: T) -> T:
+            return x + y
+
+        t1 = T(tuple(range(10000)))
+
+        initMem = psutil.Process().memory_info().rss / 1024 ** 2
+
+        for i in range(10000):
+            f(t1,t1)
+
+        finalMem = psutil.Process().memory_info().rss / 1024 ** 2
+
+        self.assertTrue(finalMem < initMem + 5)

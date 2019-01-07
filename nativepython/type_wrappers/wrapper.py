@@ -14,6 +14,7 @@
 
 import nativepython.native_ast as native_ast
 import nativepython
+from typed_python import _types
 
 from nativepython.type_wrappers.exceptions import generateThrowException
 
@@ -62,6 +63,12 @@ class Wrapper(object):
             return self.getNativeLayoutType().pointer()
         else:
             return self.getNativeLayoutType()
+
+    def getBytecount(self):
+        if self.is_empty:
+            return 0
+
+        return _types.bytecount(self.typeRepresentation)
 
     def convert_incref(self, context, expr):
         if self.is_pod:
