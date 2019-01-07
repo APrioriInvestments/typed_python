@@ -27,9 +27,6 @@ class NoneWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_bin_op(self, context, left, op, right):
-        raise ConversionException("Not convertible")
-
     def convert_assign(self, context, target, toStore):
         return context.NoneExpr()
 

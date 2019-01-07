@@ -17,7 +17,7 @@ from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, Int64, _types
+from typed_python import NoneType, Int64, _types, OneOf
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -51,8 +51,70 @@ class OneOfWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def convert_bin_op(self, context, left, op, right):
-        raise ConversionException("Not convertible")
+    def makeSwitchExpr(self, expr, native_expressions):
+        res = native_expressions[0]
+
+        for i in range(1, len(self.typeRepresentation.Types)):
+            res = native_ast.Expression.Branch(
+                cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(i)),
+                true=native_expressions[i],
+                false=res
+                )
+        
+        return res
+
+    def convert_bin_op(self, context, left, op, right, isReversed=False):
+        exprs = []
+        types = []
+        typesSeen = set()
+        for i in range(len(self.typeRepresentation.Types)):
+            if isReversed:
+                exprs.append(right.convert_bin_op(op, self.refAs(context, left, i)))
+            else:
+                exprs.append(self.refAs(context, left, i).convert_bin_op(op, right))
+            t = exprs[-1].expr_type
+            if t is not None and t not in typesSeen:
+                typesSeen.add(t)
+                types.append(t)
+
+        if len(types) == 0:
+            #all paths throw exceptions.
+            return context.TerminalExpr(
+                self.makeSwitchExpr(left, [e.expr for e in exprs])
+                )
+
+        if len(types) == 1:
+            #all paths throw or return a single expression
+            output_type = types[0]
+
+            if output_type.is_pass_by_ref:
+                return context.RefExpr(
+                    self.makeSwitchExpr(left, [e.expr for e in exprs]),
+                    output_type
+                    )
+            else:
+                return context.ValueExpr(
+                    self.makeSwitchExpr(left, [e.nonref_expr for e in exprs]),
+                    output_type
+                    )
+
+        #we have to convert this to a target output type
+        output_type = typeWrapper(OneOf(*[t.typeRepresentation for t in types]))
+
+        output = context.allocate_temporary(output_type)
+
+        return context.RefExpr(
+            self.makeSwitchExpr(left, [
+                self.convert_to_self_with_target(context, output, exprs[i]).expr for i in range(len(exprs))
+                ]) >>
+            output.expr,
+            output_type
+            )
+
+    def convert_bin_op_reverse(self, context, r, op, l):
+        assert r.expr_type == self
+        assert r.isReference
+        return self.convert_bin_op(context, r, op, l, True)
 
     def convert_incref(self, context, expr):
         if self._is_pod:
@@ -75,6 +137,9 @@ class OneOfWrapper(Wrapper):
                 )            
 
     def refAs(self, context, expr, which):
+        assert expr.expr_type == self
+        assert expr.isReference, expr.expr
+
         tw = typeWrapper(self.typeRepresentation.Types[which])
 
         return context.RefExpr(
@@ -141,18 +206,53 @@ class OneOfWrapper(Wrapper):
 
         return super().convert_to_type(context, expr, otherType)
 
+    def convert_to_self_native_expr(self, context, result, otherExpr, which):
+        assert result.isReference
+
+        return (
+            result.expr.ElementPtrIntegers(0,0).store(native_ast.const_uint8_expr(which)) 
+                    >> self.refAs(context, result, which).convert_copy_initialize(otherExpr).expr
+                    >> context.activates_temporary(result)
+                    >> native_ast.nullExpr
+            )
+
     def convert_to_self(self, context, otherExpr):
+        result = context.allocate_temporary(self)
+
+        return context.RefExpr(
+            self.convert_to_self_with_target(context, result, otherExpr).expr
+                >> result.expr,
+            self
+            )
+
+    def convert_to_self_with_target(self, context, result, otherExpr):
+        if otherExpr.expr_type == self:
+            return context.NoneExpr(
+                result.convert_copy_initialize(otherExpr).expr
+                    >> context.activates_temporary(result)
+                )
+
+        if isinstance(otherExpr.expr_type, OneOfWrapper):
+            #for each type in 'other' that exists in us, generate a conversion option. Otherwise bail
+            exprs = []
+            for i in range(len(otherExpr.expr_type.typeRepresentation.Types)):
+                exprs.append(
+                    self.convert_to_self_with_target(
+                        context,
+                        result, 
+                        otherExpr.expr_type.refAs(context, otherExpr, i)
+                        ).expr
+                    )
+            return context.NoneExpr(
+                otherExpr.expr_type.makeSwitchExpr(otherExpr, exprs)
+                )
+
         if otherExpr.expr_type.typeRepresentation in self.typeRepresentation.Types:
             which = tuple(self.typeRepresentation.Types).index(otherExpr.expr_type.typeRepresentation)
 
-            result = context.allocate_temporary(self)
-
-            return context.RefExpr(
-                result.expr.ElementPtrIntegers(0,0).store(native_ast.const_uint8_expr(which)) 
-                    >> self.refAs(context, result, which).convert_copy_initialize(otherExpr).expr
+            return context.NoneExpr(
+                self.convert_to_self_native_expr(context, result, otherExpr, which)
                     >> context.activates_temporary(result)
-                    >> result.expr,
-                result.expr_type
                 )
 
         return super().convert_to_self(context, otherExpr)

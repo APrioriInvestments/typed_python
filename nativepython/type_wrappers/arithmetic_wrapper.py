@@ -115,9 +115,6 @@ class Int64Wrapper(ArithmeticTypeWrapper):
         return super().convert_to_type(context, e, target_type)
 
     def convert_bin_op(self, context, left, op, right):
-        left = left.ensureNonReference()
-        right = right.ensureNonReference()
-
         if op.matches.Div:
             if right.expr_type == self:
                 return left.toFloat64().convert_bin_op(op, right)
@@ -126,10 +123,10 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op.matches.Mod:
                 return context.ValueExpr(
                     native_ast.Expression.Branch(
-                        cond=right.expr,
+                        cond=right.nonref_expr,
                         true=native_ast.Expression.Call(
                             target=runtime_functions.mod_int64_int64,
-                            args=(left.expr, right.expr,)
+                            args=(left.nonref_expr, right.nonref_expr,)
                             ),
                         false=generateThrowException(context, ZeroDivisionError())
                         ),
@@ -139,7 +136,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                 return context.ValueExpr(
                     native_ast.Expression.Call(
                         target=runtime_functions.pow_int64_int64,
-                        args=(left.expr, right.expr,)
+                        args=(left.nonref_expr, right.nonref_expr,)
                         ),
                     self
                     )
@@ -148,8 +145,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Branch(
                         cond=(right >= 0).nonref_expr,
                         true=native_ast.Expression.Binop(
-                            l=left.expr,
-                            r=right.expr,
+                            l=left.nonref_expr,
+                            r=right.nonref_expr,
                             op=pyOpToNative[op]
                             ),
                         false=generateThrowException(context, ValueError("negative shift count"))
@@ -160,8 +157,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op in pyOpToNative:
                 return context.ValueExpr(
                     native_ast.Expression.Binop(
-                        l=left.expr,
-                        r=right.expr,
+                        l=left.nonref_expr,
+                        r=right.nonref_expr,
                         op=pyOpToNative[op]
                         ),
                     self
@@ -169,8 +166,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             if op in pyCompOp:
                 return context.ValueExpr(
                     native_ast.Expression.Binop(
-                        l=left.expr,
-                        r=right.expr,
+                        l=left.nonref_expr,
+                        r=right.nonref_expr,
                         op=pyCompOp[op]
                         ),
                     BoolWrapper()
@@ -179,7 +176,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
         if isinstance(right.expr_type, Float64Wrapper):
             return left.toFloat64().convert_bin_op(op, right)
 
-        raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
+        return super().convert_bin_op(context, left, op, right)
 
 class BoolWrapper(ArithmeticTypeWrapper):
     def __init__(self):
@@ -223,9 +220,6 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
         return super().convert_to_type(context, e, target_type)
         
-    def convert_bin_op(self, context, left, op, right):
-        raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
-
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Float64())
@@ -309,7 +303,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                     BoolWrapper()
                     )
 
-        raise ConversionException("Not convertible: %s of type %s on %s/%s" % (op, type(op), left.expr_type, right.expr_type))
+        return super().convert_bin_op(context, left, op, right)
 
 
 

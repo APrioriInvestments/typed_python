@@ -63,9 +63,6 @@ class ClassWrapper(RefcountedWrapper):
 
         return expr
 
-    def convert_bin_op(self, context, left, op, right):
-        raise ConvsersionException("Not convertible")
-
     def memberPtr(self, instance, ix):
         return (
             instance.nonref_expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])

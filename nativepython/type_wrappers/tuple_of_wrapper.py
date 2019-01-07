@@ -45,9 +45,6 @@ class TupleOfWrapper(RefcountedWrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def convert_bin_op(self, context, left, op, right):
-        raise ConversionException("Not convertible")
-
     def on_refcount_zero(self, context, instance):
         assert self.underlyingWrapperType.is_pod
         return native_ast.callFree(instance.expr)

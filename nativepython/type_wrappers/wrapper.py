@@ -105,3 +105,10 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't convert from type %s to type %s" % (expr.expr_type, self)))
             )
 
+    def convert_bin_op(self, context, l, op, r):
+        return r.expr_type.convert_bin_op_reverse(context, r, op, l)
+
+    def convert_bin_op_reverse(self, context, r, op, l):
+        return context.TerminalExpr(
+            generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" % (op, l.expr_type, r.expr_type)))
+            )

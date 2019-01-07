@@ -19,4 +19,4 @@ def generateThrowException(context, exception):
         expr=native_ast.Expression.Constant(
             val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
             )
-        )
+        ).with_comment(str(exception))
