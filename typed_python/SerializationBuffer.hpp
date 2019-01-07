@@ -89,13 +89,13 @@ public:
                 and 'false' if the pointer was already in the cache
     */
     std::pair<uint32_t, bool> cachePointer(PyObject* t) {
-        Py_INCREF(t);
-        m_pointersNeedingDecref.insert(t);
-
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
-            m_idToPointerCache[t] = m_idToPointerCache.size();
-            return std::pair<uint32_t, bool>(m_idToPointerCache.size() - 1, true);
+            Py_INCREF(t);
+            m_pointersNeedingDecref.insert(t);
+            uint32_t id = m_idToPointerCache.size();
+            m_idToPointerCache[t] = id;
+            return std::pair<uint32_t, bool>(id, true);
         }
         return std::pair<uint32_t, bool>(it->second, false);
     }
@@ -103,8 +103,9 @@ public:
     std::pair<uint32_t, bool> cachePointer(Type* t) {
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
-            m_idToPointerCache[t] = m_idToPointerCache.size();
-            return std::pair<uint32_t, bool>(m_idToPointerCache.size() - 1, true);
+            uint32_t id = m_idToPointerCache.size();
+            m_idToPointerCache[t] = id;
+            return std::pair<uint32_t, bool>(id, true);
         }
         return std::pair<uint32_t, bool>(it->second, false);
     }
