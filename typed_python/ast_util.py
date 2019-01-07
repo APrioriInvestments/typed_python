@@ -32,15 +32,24 @@ class VisitDone(Exception):
 def areAstsIdentical(ast1, ast2):
     return ast.dump(ast1) == ast.dump(ast2)
 
+_all_caches = []
+def clearAllCaches():
+    inspect.pathExistsOnDiskCache_.clear()
+    for a in _all_caches:
+        a.clear()
+
 def CachedByArgs(f):
     """Function decorator that adds a simple memo to 'f' on its arguments"""
     cache = {}
+    _all_caches.append(cache)
+
     def inner(*args, **kwargs):
         keys = sorted(kwargs)
         all_args = args + tuple((k, kwargs[k]) for k in keys)
         if (all_args) not in cache:
             cache[all_args] = f(*args, **kwargs)
         return cache[all_args]
+
     return inner
 
 def getSourceText(pyObject):

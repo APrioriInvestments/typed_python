@@ -20,6 +20,7 @@ Python ast directly.
 
 import ast
 import typed_python.ast_util as ast_util
+import weakref
 from typed_python._types import Alternative, NamedTuple, TupleOf, OneOf
 
 #forward declarations.
@@ -698,7 +699,14 @@ def convertPyAstToAlgebraic(tree,fname, keepLineInformation=True):
 
     return tree
 
+#a nasty hack to allow us to find the Ast's of functions we have deserialized
+#but for which we never had the source code.
+_originalAstCache = weakref.WeakKeyDictionary()
+
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
+    if f in _originalAstCache:
+        return _originalAstCache[f]
+
     pyast = ast_util.pyAstFor(f)
 
     _, lineno = ast_util.getSourceLines(f)
@@ -719,7 +727,7 @@ def evaluateFunctionPyAst(pyAst):
     if isinstance(pyAst, Statement):
         #strip out the decorator definitions. We just want the underlying function
         #object itself.
-        pyAst = Statement.FunctionDef(
+        pyAstModule = Statement.FunctionDef(
             name=pyAst.name,
             args=pyAst.args,
             body=pyAst.body,
@@ -729,18 +737,22 @@ def evaluateFunctionPyAst(pyAst):
             col_offset=pyAst.col_offset,
             filename=pyAst.filename,
             )
-        pyAst = Module.Module(body=(pyAst,))
+        pyAstModule = Module.Module(body=(pyAst,))
     elif isinstance(pyAst, Expr):
-        pyAst = Module.Expression(body=pyAst)
+        pyAstModule = Module.Expression(body=pyAst)
 
     globals = {}
 
-    if pyAst.matches.Expression:
-        codeObject = compile(convertAlgebraicToPyAst(pyAst), filename, 'eval')
+    if pyAstModule.matches.Expression:
+        codeObject = compile(convertAlgebraicToPyAst(pyAstModule), filename, 'eval')
 
-        return eval(codeObject, globals)
+        res = eval(codeObject, globals)
     else:
-        codeObject = compile(convertAlgebraicToPyAst(pyAst), filename, 'exec')
+        codeObject = compile(convertAlgebraicToPyAst(pyAstModule), filename, 'exec')
         exec(codeObject, globals)
 
-        return globals[pyAst.body[0].name]
+        res = globals[pyAstModule.body[0].name]
+
+    _originalAstCache[res] = pyAst
+
+    return res

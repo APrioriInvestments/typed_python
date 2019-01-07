@@ -14,12 +14,16 @@
 
 import numpy
 import sys
+import os
+import importlib
+import typed_python.ast_util as ast_util
 import threading
 import time
 import unittest
 import psutil
 import numpy
 import gc
+import tempfile
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
@@ -198,7 +202,6 @@ def ping_pong(obj, serialization_context=None):
 
 
 class TypesSerializationTest(unittest.TestCase):
-
     def assert_is_copy(self, obj, objcopy, msg=None):
         """Utility method to verify if two objects are copies of each others.
         """
@@ -904,3 +907,32 @@ class TypesSerializationTest(unittest.TestCase):
             with self.subTest(obj=obj):
                 unpickled = ping_pong(obj, sc)
                 self.assertIs(obj, unpickled)
+
+    def test_serialize_lambdas(self):
+        sc = SerializationContext({})
+
+        with tempfile.TemporaryDirectory() as tf:
+            fpath = os.path.join(tf, "weird_serialization_test.py")
+            with open(fpath, "w") as f:
+                f.write("def f(x):\n    return x + 1\n")
+            sys.path.append(tf)
+
+            m = importlib.import_module('weird_serialization_test')
+
+            #verify we can serialize this
+            deserialized_f = sc.deserialize(sc.serialize(m.f))
+
+            self.assertEqual(deserialized_f(10), 11)
+
+        assert not os.path.exists(fpath)
+
+        ast_util.clearAllCaches()
+
+        #at this point, the backing data for serialization is not there
+        #and also, the cache is cleared.
+        deserialized_f_2 = sc.deserialize(sc.serialize(deserialized_f))
+
+        self.assertEqual(deserialized_f_2(10), 11)
+
+
+
