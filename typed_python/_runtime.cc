@@ -3,10 +3,18 @@
 #include <Python.h>
 #include <iostream>
 
+thread_local const char* nativepython_cur_exception_value = nullptr;
+
+const char* nativepython_runtime_get_stashed_exception() {
+    return nativepython_cur_exception_value;
+}
+
 extern "C" {
 
-    void nativepython_print_integer(int64_t ct) {
-        std::cout << "nativepython_print_integer: " << ct << std::endl;
+    //a temporary kluge to allow us to communicate between exception throw sites and 
+    //the native-code invoker until we have a more complete exception model built out.
+    void nativepython_runtime_stash_const_char_ptr_for_exception(const char* m) {
+        nativepython_cur_exception_value = m;
     }
 
     void nativepython_runtime_incref_pyobj(PyObject* p) {
@@ -26,6 +34,10 @@ extern "C" {
 
     void nativepython_runtime_decref_pyobj(PyObject* p) {
         Py_DECREF(p);
+    }
+
+    double nativepython_runtime_pow_float64_float64(double l, double r) {
+        return std::pow(l,r);
     }
 
     int64_t nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {

@@ -95,7 +95,14 @@ class Wrapper(object):
         raise NotImplementedError(self)
 
     def convert_len(self, context, expr):
-        raise NotImplementedError(self)
+        return context.TerminalExpr(
+            generateThrowException(context, TypeError("Can't take 'len' of instance of type '%s'" % (self,)))
+            )
+
+    def convert_unary_op(self, context, expr, op):
+        return context.TerminalExpr(
+            generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))
+            )
 
     def convert_to_type(self, context, expr, target_type):
         return target_type.convert_to_self(context, expr)

@@ -101,6 +101,20 @@ class TestOneOfOfCompilation(unittest.TestCase):
             for b in things:
                 check(a,b)
 
+    def test_one_of_dual_binop_power(self):
+        @Compiled
+        def f(x: OneOf(int, float), y: OneOf(int, float)) -> OneOf(int, float):
+            return x ** y
+
+        def check(x,y):
+            self.assertIs(type(f(x,y)), type(x**y))
+            self.assertEqual(f(x,y), x**y)
+
+        things = [0,1,2,0.0,1.0,2.0]
+        for a in things:
+            for b in things:
+                check(a,b)
+
     def test_one_of_downcast_to_primitive(self):
         @Compiled
         def f(x: OneOf(int, float)) -> int:

@@ -16,6 +16,7 @@ import nativepython.native_ast as native_ast
 
 UInt8Ptr = native_ast.UInt8Ptr
 Int64 = native_ast.Int64
+Float64 = native_ast.Float64
 Void = native_ast.Void
 
 def externalCallTarget(name, output, *inputs):
@@ -31,11 +32,12 @@ def externalCallTarget(name, output, *inputs):
             )
         )
 
-print_int64 = externalCallTarget(
-        "nativepython_print_integer", 
+stash_exception_ptr = externalCallTarget(
+        "nativepython_runtime_stash_const_char_ptr_for_exception", 
         Void, 
-        Int64
+        UInt8Ptr
         )
+
 mod_int64_int64 = externalCallTarget(
         "nativepython_runtime_mod_int64_int64", 
         Int64, 
@@ -45,6 +47,11 @@ pow_int64_int64 = externalCallTarget(
         "nativepython_runtime_pow_int64_int64", 
         Int64, 
         Int64, Int64
+        )
+pow_float64_float64 = externalCallTarget(
+        "nativepython_runtime_pow_float64_float64", 
+        Float64, 
+        Float64, Float64
         )
 incref_pyobj = externalCallTarget(
         "nativepython_runtime_incref_pyobj", 

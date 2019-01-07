@@ -13,10 +13,18 @@
 #   limitations under the License.
 
 import nativepython.native_ast as native_ast
+import nativepython.type_wrappers.runtime_functions as runtime_functions
 
 def generateThrowException(context, exception):
-    return native_ast.Expression.Throw(
-        expr=native_ast.Expression.Constant(
-            val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+    return (
+        #as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
+        native_ast.Expression.Call(
+           target=runtime_functions.stash_exception_ptr,
+           args=(native_ast.const_utf8_cstr(str(exception)),)
+           )
+        >> native_ast.Expression.Throw(
+            expr=native_ast.Expression.Constant(
+                val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+                )
             )
-        ).with_comment(str(exception))
+        )

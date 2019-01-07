@@ -1,8 +1,7 @@
 #include <Python.h>
 #include "Type.hpp"
-
+#include "_runtime.h"
 #include "native_instance_wrapper.h"
-
 
 // static
 bool native_instance_wrapper::guaranteeForwardsResolved(Type* t) {
@@ -1941,7 +1940,12 @@ PyObject* native_instance_wrapper::dispatchFunctionCallToNative(const Function::
 
         return extractPythonObject(result.data(), result.type());
     } catch(...) {
-        PyErr_Format(PyExc_TypeError, "Generated code threw an exception!");
+        const char* e = nativepython_runtime_get_stashed_exception();
+        if (!e) {
+            e = "Generated code threw an unknown exception.";
+        }
+
+        PyErr_Format(PyExc_TypeError, e);
         return NULL;
     }
 }

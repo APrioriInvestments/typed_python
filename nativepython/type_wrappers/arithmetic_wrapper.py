@@ -273,13 +273,21 @@ class Float64Wrapper(ArithmeticTypeWrapper):
             if op.matches.Mod or op.matches.Div:
                 return context.ValueExpr(
                     native_ast.Expression.Branch(
-                        cond=right.toBool().nonref_expr,
+                        cond=right.nonref_expr,
                         true=native_ast.Expression.Binop(
                             l=left.nonref_expr,
                             r=right.nonref_expr,
                             op=pyOpToNative[op]
                             ),
                         false=generateThrowException(context, ZeroDivisionError())
+                        ),
+                    self
+                    )
+            if op.matches.Pow:
+                return context.ValueExpr(
+                    native_ast.Expression.Call(
+                        target=runtime_functions.pow_float64_float64,
+                        args=(left.nonref_expr, right.nonref_expr,)
                         ),
                     self
                     )
