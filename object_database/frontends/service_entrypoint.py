@@ -20,7 +20,7 @@ import sys
 import traceback
 
 from object_database import connect
-from object_database.util import configureLogging
+from object_database.util import checkLogLevelValidity, configureLogging
 from object_database.service_manager.Codebase import setCodebaseInstantiationDirectory
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
@@ -39,13 +39,8 @@ def main(argv):
 
     parsedArgs = parser.parse_args(argv[1:])
 
-    validLogLevels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
     level = parsedArgs.log_level.upper()
-    if level not in validLogLevels:
-        raise Exception(
-            "invalid --log-level value: %s. Must be one of %s"
-            % (level, validLogLevels)
-        )
+    checkLogLevelValidity(level)
 
     configureLogging(preamble=parsedArgs.instanceid[:8], level=level)
 
