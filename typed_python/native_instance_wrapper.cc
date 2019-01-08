@@ -564,7 +564,7 @@ void native_instance_wrapper::copyConstructFromPythonInstance(Type* eltType, ins
     if (eltType->isComposite()) {
         if (PyTuple_Check(pyRepresentation)) {
             if (((CompositeType*)eltType)->getTypes().size() != PyTuple_Size(pyRepresentation)) {
-                throw std::runtime_error("Wrong number of arguments");
+                throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
             }
 
             ((CompositeType*)eltType)->constructor(tgt,
@@ -576,7 +576,7 @@ void native_instance_wrapper::copyConstructFromPythonInstance(Type* eltType, ins
         }
         if (PyList_Check(pyRepresentation)) {
             if (((CompositeType*)eltType)->getTypes().size() != PyList_Size(pyRepresentation)) {
-                throw std::runtime_error("Wrong number of arguments");
+                throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
             }
 
             ((CompositeType*)eltType)->constructor(tgt,

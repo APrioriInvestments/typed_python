@@ -136,7 +136,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         @Compiled
         def f(x: TT) -> TT:
-            return x + x
+            return x + x + x
 
         t1 = T((1,2,3))
         t2 = T((4,5,5))
@@ -145,7 +145,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         
         fRes = f(aTT)
         
-        self.assertEqual(fRes, aTT+aTT)
+        self.assertEqual(fRes, aTT+aTT+aTT)
         self.assertEqual(_types.refcount(aTT), 1)
         self.assertEqual(_types.refcount(fRes), 1)
 

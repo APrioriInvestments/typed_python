@@ -30,6 +30,10 @@ pointer_size = 8
 def llvm_bool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
 
+def assertTagDictsSame(left_tags, right_tags):
+    for which in [left_tags,right_tags]:
+        for tag in which:
+            assert tag in left_tags and tag in right_tags and right_tags[tag] is left_tags[tag], "Tag %s is not the same" % tag
 
 def type_to_llvm_type(t):
     if t.matches.Void:
@@ -230,6 +234,12 @@ class TeardownOnScopeExit:
                 return None
             if all(k is True for k in incoming.values()):
                 return True
+            if all(not isinstance(k, bool) for k in incoming.values()):
+                names = set(k.name for k in incoming.values())
+                if len(names) == 1:
+                    for i in incoming.values():
+                        return i
+
             phinode = self.builder.phi(llvm_i1, name='is_initialized.' + t)
 
             for b in incoming:
@@ -413,25 +423,28 @@ class FunctionConverter:
 
             self.builder.branch(block)
 
-    def convert_teardown(self, teardown, remove_from_tags=False):
-        tags = self.tags_initialized
+    def convert_teardown(self, teardown):
+        orig_tags = dict(self.tags_initialized)
 
         if teardown.matches.Always:
             self.convert(teardown.expr)
         else:
             assert teardown.matches.ByTag
 
-            if teardown.tag in tags:
-                if tags[teardown.tag] is True:
+            if teardown.tag in self.tags_initialized:
+                tagVal = self.tags_initialized[teardown.tag]
+
+                #mark that the tag is no longer active
+                del self.tags_initialized[teardown.tag]
+                del orig_tags[teardown.tag]
+
+                if tagVal is True:
                     self.convert(teardown.expr)
                 else:
-                    llvm_value = tags[teardown.tag]
-
-                    with self.builder.if_then(llvm_value):
+                    with self.builder.if_then(tagVal):
                         self.convert(teardown.expr)
 
-                if remove_from_tags:
-                    del tags[teardown.tag]
+        assertTagDictsSame(self.tags_initialized, orig_tags)
 
     def generate_exception_and_store_value(self, llvm_pointer_val):
         exception_ptr = self.builder.bitcast(
@@ -696,6 +709,7 @@ class FunctionConverter:
                     true = self.convert(expr.true)
                     true_tags = self.tags_initialized
                     true_block = self.builder.block
+
                 with otherwise:
                     self.tags_initialized = false_tags
                     false = self.convert(expr.false)
@@ -726,15 +740,19 @@ class FunctionConverter:
                     final_tags[tag] = True
                 else:
                     #it's not certain
-                    tag_llvm_value = self.builder.phi(llvm_i1, 'is_initialized.' + tag)
-                    if isinstance(true_val, bool):
-                        true_val = llvm_bool(true_val)
-                    if isinstance(false_val, bool):
-                        false_val = llvm_bool(false_val)
+                    if not isinstance(true_val, bool) and not isinstance(false_val, bool) and true_val.name == false_val.name:
+                        #these are the same bit that's been passed between two different branches.
+                        final_tags[tag] = true_val
+                    else:
+                        tag_llvm_value = self.builder.phi(llvm_i1, 'is_initialized.merge.' + tag)
+                        if isinstance(true_val, bool):
+                            true_val = llvm_bool(true_val)
+                        if isinstance(false_val, bool):
+                            false_val = llvm_bool(false_val)
 
-                    tag_llvm_value.add_incoming(true_val, true_block)
-                    tag_llvm_value.add_incoming(false_val, false_block)
-                    final_tags[tag] = tag_llvm_value
+                        tag_llvm_value.add_incoming(true_val, true_block)
+                        tag_llvm_value.add_incoming(false_val, false_block)
+                        final_tags[tag] = tag_llvm_value
 
             self.tags_initialized = final_tags
 
@@ -769,7 +787,7 @@ class FunctionConverter:
                     false = self.convert(expr.orelse)
 
             #it's currently illegal to modify the initialized set in a while loop
-            assert sorted(tags.keys()) == sorted(self.tags_initialized.keys()), (sorted(self.tags_initialized), sorted(tags))
+            assertTagDictsSame(tags, self.tags_initialized)
 
             if false is None:
                 self.builder.unreachable()
@@ -1038,9 +1056,11 @@ class FunctionConverter:
 
             self.teardown_handler = self.teardown_handler.parent_scope
 
+            #if we have a result, then we need to generate teardowns
+            #in the normal course of execution
             if finally_result is not None:
                 for teardown in expr.teardowns:
-                    self.convert_teardown(teardown, remove_from_tags=True)
+                    self.convert_teardown(teardown)
 
             def generate_teardowns(new_tags):
                 with self.tags_as(new_tags):
