@@ -756,7 +756,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         } else {
             //try to construct a 'serialize type' from the argument and then serialize that
             Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
-                native_instance_wrapper::copy_constructor(serializeType, p, a2);
+                native_instance_wrapper::copyConstructFromPythonInstance(serializeType, p, a2);
             });
 
             i.type()->serialize(i.data(), b);

@@ -1091,3 +1091,17 @@ class NativeTypesTests(unittest.TestCase):
         self.assertIsInstance(nt.x, NormalPyClass)
         self.assertIsInstance(nt.y, NormalPySubclass)
 
+
+    def test_construct_alternatives_with_positional_arguments(self):
+        a = Alternative("A", HasOne = {'a': str}, HasTwo = {'a': str, 'b': str})
+
+        with self.assertRaises(TypeError):
+            a.HasTwo("hi")
+
+        self.assertEqual(a.HasOne("hi"), a.HasOne(a="hi"))
+
+        hasOne = a.HasOne("hi")
+        self.assertEqual(a.HasOne(hasOne), hasOne)
+
+        with self.assertRaises(TypeError):
+            a.HasOne(a.HasTwo(a='1',b='b'))

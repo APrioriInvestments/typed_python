@@ -87,7 +87,7 @@ struct native_instance_wrapper {
 
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation);
 
-    static void copy_constructor(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
+    static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
 
     static void initializeClassWithDefaultArguments(Class* cls, uint8_t* data, PyObject* args, PyObject* kwargs);
 

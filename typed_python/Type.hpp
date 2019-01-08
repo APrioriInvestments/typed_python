@@ -1467,6 +1467,10 @@ public:
         m_alternative->assign(self, other);
     }
 
+    instance_ptr eltPtr(instance_ptr self) const {
+        return m_alternative->eltPtr(self);
+    }
+
     static ConcreteAlternative* Make(Alternative* alt, int64_t which);
 
     Type* elementType() const {

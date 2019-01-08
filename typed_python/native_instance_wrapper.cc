@@ -150,7 +150,7 @@ PyObject* native_instance_wrapper::constDictGet(PyObject* o, PyObject* args) {
         } else {
             instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
             try {
-                copy_constructor(dict_t->keyType(), tempObj, item);
+                copyConstructFromPythonInstance(dict_t->keyType(), tempObj, item);
             } catch(std::exception& e) {
                 free(tempObj);
                 PyErr_SetString(PyExc_TypeError, e.what());
@@ -276,7 +276,7 @@ bool native_instance_wrapper::pyValCouldBeOfType(Type* t, PyObject* pyRepresenta
 }
 
 // static
-void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+void native_instance_wrapper::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
     guaranteeForwardsResolvedOrThrow(eltType);
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
@@ -290,7 +290,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
     Type::TypeCategory cat = eltType->getTypeCategory();
 
     if (cat == Type::TypeCategory::catPythonSubclass) {
-        copy_constructor((Type*)eltType->getBaseType(), tgt, pyRepresentation);
+        copyConstructFromPythonInstance((Type*)eltType->getBaseType(), tgt, pyRepresentation);
         return;
     }
 
@@ -333,7 +333,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
 
             if (pyValCouldBeOfType(subtype, pyRepresentation)) {
                 try {
-                    copy_constructor(subtype, tgt+1, pyRepresentation);
+                    copyConstructFromPythonInstance(subtype, tgt+1, pyRepresentation);
                     *(uint8_t*)tgt = k;
                     return;
                 } catch(...) {
@@ -496,9 +496,9 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
                 int i = 0;
 
                 while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
-                    copy_constructor(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
+                    copyConstructFromPythonInstance(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
                     try {
-                        copy_constructor(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
+                        copyConstructFromPythonInstance(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
                     } catch(...) {
                         dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
                         throw;
@@ -523,7 +523,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
         if (PyTuple_Check(pyRepresentation)) {
             ((TupleOf*)eltType)->constructor(tgt, PyTuple_Size(pyRepresentation),
                 [&](uint8_t* eltPtr, int64_t k) {
-                    copy_constructor(((TupleOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                    copyConstructFromPythonInstance(((TupleOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
                     }
                 );
             return;
@@ -531,7 +531,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
         if (PyList_Check(pyRepresentation)) {
             ((TupleOf*)eltType)->constructor(tgt, PyList_Size(pyRepresentation),
                 [&](uint8_t* eltPtr, int64_t k) {
-                    copy_constructor(((TupleOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
+                    copyConstructFromPythonInstance(((TupleOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
                     }
                 );
             return;
@@ -547,7 +547,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
             ((TupleOf*)eltType)->constructor(tgt, PySet_Size(pyRepresentation),
                 [&](uint8_t* eltPtr, int64_t k) {
                     PyObject* item = PyIter_Next(iterator);
-                    copy_constructor(((TupleOf*)eltType)->getEltType(), eltPtr, item);
+                    copyConstructFromPythonInstance(((TupleOf*)eltType)->getEltType(), eltPtr, item);
                     Py_DECREF(item);
                     }
                 );
@@ -569,7 +569,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
 
             ((CompositeType*)eltType)->constructor(tgt,
                 [&](uint8_t* eltPtr, int64_t k) {
-                    copy_constructor(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                    copyConstructFromPythonInstance(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyTuple_GetItem(pyRepresentation,k));
                     }
                 );
             return;
@@ -581,7 +581,7 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
 
             ((CompositeType*)eltType)->constructor(tgt,
                 [&](uint8_t* eltPtr, int64_t k) {
-                    copy_constructor(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyList_GetItem(pyRepresentation,k));
+                    copyConstructFromPythonInstance(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyList_GetItem(pyRepresentation,k));
                     }
                 );
             return;
@@ -589,20 +589,22 @@ void native_instance_wrapper::copy_constructor(Type* eltType, instance_ptr tgt, 
     }
 
     if (eltType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
+        NamedTuple* namedTupleT = (NamedTuple*)eltType;
+
         if (PyDict_Check(pyRepresentation)) {
-            if (((NamedTuple*)eltType)->getTypes().size() < PyDict_Size(pyRepresentation)) {
+            if (namedTupleT->getTypes().size() < PyDict_Size(pyRepresentation)) {
                 throw std::runtime_error("Couldn't initialize type of " + eltType->name() + " because supplied dictionary had too many items");
             }
             long actuallyUsed = 0;
 
-            ((NamedTuple*)eltType)->constructor(tgt,
+            namedTupleT->constructor(tgt,
                 [&](uint8_t* eltPtr, int64_t k) {
-                    const std::string& name = ((NamedTuple*)eltType)->getNames()[k];
-                    Type* t = ((NamedTuple*)eltType)->getTypes()[k];
+                    const std::string& name = namedTupleT->getNames()[k];
+                    Type* t = namedTupleT->getTypes()[k];
 
                     PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
                     if (o) {
-                        copy_constructor(t, eltPtr, o);
+                        copyConstructFromPythonInstance(t, eltPtr, o);
                         actuallyUsed++;
                     }
                     else if (eltType->is_default_constructible()) {
@@ -663,7 +665,37 @@ void native_instance_wrapper::constructFromPythonArguments(uint8_t* data, Type* 
     if (cat == Type::TypeCategory::catConcreteAlternative) {
         ConcreteAlternative* alt = (ConcreteAlternative*)t;
         alt->constructor(data, [&](instance_ptr p) {
-            constructFromPythonArguments(p, alt->elementType(), args, kwargs);
+            if ((kwargs == nullptr || PyDict_Size(kwargs) == 0) && PyTuple_Size(args) == 1) {
+                //construct an alternative from a single argument.
+                //if it's a binary compatible subtype of the alternative we're constructing, then
+                //invoke the copy constructor.
+                PyObject* arg = PyTuple_GetItem(args, 0);
+                Type* argType = extractTypeFrom(arg->ob_type);
+
+                if (argType && argType->isBinaryCompatibleWith(alt)) {
+                    //it's already the right kind of instance, so we can copy-through the underlying element
+                    alt->elementType()->copy_constructor(p, alt->eltPtr(((native_instance_wrapper*)arg)->dataPtr()));
+                    return;
+                }
+
+                //otherwise, if we have exactly one subelement, attempt to construct from that 
+                if (alt->elementType()->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
+                    throw std::runtime_error("ConcreteAlternatives are supposed to only contain NamedTuples");
+                }
+
+                NamedTuple* alternativeEltType = (NamedTuple*)alt->elementType();
+
+                if (alternativeEltType->getTypes().size() != 1) {
+                    throw std::logic_error("Can't initialize " + t->name() + " with positional arguments because it doesn't have only one field.");
+                }
+
+                native_instance_wrapper::copyConstructFromPythonInstance(alternativeEltType->getTypes()[0], p, arg);
+            } else if (PyTuple_Size(args) == 0) {
+                //construct an alternative from Kwargs
+                constructFromPythonArguments(p, alt->elementType(), args, kwargs);
+            } else {
+                throw std::logic_error("Can only initialize " + t->name() + " from python with kwargs or a single in-place argument");
+            }
         });
         return;
     }
@@ -739,7 +771,7 @@ void native_instance_wrapper::constructFromPythonArguments(uint8_t* data, Type* 
         if (PyTuple_Size(args) == 1) {
             PyObject* argTuple = PyTuple_GetItem(args, 0);
 
-            copy_constructor(t, data, argTuple);
+            copyConstructFromPythonInstance(t, data, argTuple);
 
             return;
         }
@@ -757,7 +789,7 @@ void native_instance_wrapper::constructFromPythonArguments(uint8_t* data, Type* 
                     Type* eltType = compositeT->getTypes()[k];
                     PyObject* o = PyDict_GetItemString(kwargs, compositeT->getNames()[k].c_str());
                     if (o) {
-                        copy_constructor(eltType, eltPtr, o);
+                        copyConstructFromPythonInstance(eltType, eltPtr, o);
                         actuallyUsed++;
                     }
                     else if (eltType->is_default_constructible()) {
@@ -1022,7 +1054,7 @@ PyObject* native_instance_wrapper::nb_subtract(PyObject* lhs, PyObject* rhs) {
                 instance_ptr tempObj = (instance_ptr)malloc(tupleOfKeysType->bytecount());
 
                 try {
-                    copy_constructor(tupleOfKeysType, tempObj, rhs);
+                    copyConstructFromPythonInstance(tupleOfKeysType, tempObj, rhs);
                 } catch(std::exception& e) {
                     free(tempObj);
                     PyErr_SetString(PyExc_TypeError, e.what());
@@ -1086,7 +1118,7 @@ PyObject* native_instance_wrapper::sq_concat(PyObject* lhs, PyObject* rhs) {
                 instance_ptr tempObj = (instance_ptr)malloc(lhs_type->bytecount());
 
                 try {
-                    copy_constructor(lhs_type, tempObj, rhs);
+                    copyConstructFromPythonInstance(lhs_type, tempObj, rhs);
                 } catch(std::exception& e) {
                     free(tempObj);
                     PyErr_SetString(PyExc_TypeError, e.what());
@@ -1166,7 +1198,7 @@ PyObject* native_instance_wrapper::sq_concat(PyObject* lhs, PyObject* rhs) {
                                     }
 
                                     try {
-                                        copy_constructor(eltType, eltPtr, o);
+                                        copyConstructFromPythonInstance(eltType, eltPtr, o);
                                     } catch(...) {
                                         Py_DECREF(o);
                                         throw;
@@ -1388,7 +1420,7 @@ int native_instance_wrapper::sq_contains(PyObject* o, PyObject* item) {
         } else {
             instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
             try {
-                copy_constructor(dict_t->keyType(), tempObj, item);
+                copyConstructFromPythonInstance(dict_t->keyType(), tempObj, item);
             } catch(std::exception& e) {
                 free(tempObj);
                 PyErr_SetString(PyExc_TypeError, e.what());
@@ -1435,7 +1467,7 @@ PyObject* native_instance_wrapper::mp_subscript(PyObject* o, PyObject* item) {
         } else {
             instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
             try {
-                copy_constructor(dict_t->keyType(), tempObj, item);
+                copyConstructFromPythonInstance(dict_t->keyType(), tempObj, item);
             } catch(std::exception& e) {
                 free(tempObj);
                 PyErr_SetString(PyExc_TypeError, e.what());
@@ -1703,7 +1735,7 @@ int native_instance_wrapper::classInstanceSetAttributeFromPyObject(Class* cls, i
     } else {
         instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
         try {
-            copy_constructor(eltType, tempObj, attrVal);
+            copyConstructFromPythonInstance(eltType, tempObj, attrVal);
         } catch(std::exception& e) {
             free(tempObj);
             PyErr_SetString(PyExc_TypeError, e.what());
@@ -1789,7 +1821,7 @@ std::pair<bool, PyObject*> native_instance_wrapper::tryToCallOverload(const Func
             try {
                 PyObject* targetObj =
                     native_instance_wrapper::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                        copy_constructor(targetType, data, elt);
+                        copyConstructFromPythonInstance(targetType, data, elt);
                     });
 
                 PyTuple_SetItem(targetArgTuple, write_slot++, targetObj);
@@ -1832,7 +1864,7 @@ std::pair<bool, PyObject*> native_instance_wrapper::tryToCallOverload(const Func
             else {
                 try {
                     PyObject* convertedValue = native_instance_wrapper::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                        copy_constructor(targetType, data, value);
+                        copyConstructFromPythonInstance(targetType, data, value);
                     });
 
                     PyDict_SetItem(newKwargs, key, convertedValue);
@@ -1874,7 +1906,7 @@ std::pair<bool, PyObject*> native_instance_wrapper::tryToCallOverload(const Func
     if (f.getReturnType()) {
         try {
             PyObject* newRes = native_instance_wrapper::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
-                    copy_constructor(f.getReturnType(), data, result);
+                    copyConstructFromPythonInstance(f.getReturnType(), data, result);
                 });
             Py_DECREF(result);
             return std::make_pair(true, newRes);
@@ -1923,7 +1955,7 @@ PyObject* native_instance_wrapper::dispatchFunctionCallToNative(const Function::
 
         instances.push_back(
             Instance::createAndInitialize(toUse, [&](instance_ptr p) {
-                copy_constructor(toUse, p, PyTuple_GetItem(argTuple, k));
+                copyConstructFromPythonInstance(toUse, p, PyTuple_GetItem(argTuple, k));
             })
             );
     }
