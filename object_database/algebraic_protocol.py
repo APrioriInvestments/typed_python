@@ -35,10 +35,7 @@ class AlgebraicProtocol(asyncio.Protocol):
             dataToSend = longToString(len(dataToSend)) + dataToSend
 
             with self.writelock:
-                #for some insane reason, sending a 5 byte message causes the socket to disconnect on the other
-                #side. Sending the 5 bytes in multiple messages does not, nor does sending an extra packet
-                #of zero-length (as we're doing below). I'm mystified.
-                self.transport.write(longToString(0) * 4 + dataToSend)
+                self.transport.write(dataToSend)
         except:
             self._logger.error("Error in AlgebraicProtocol: %s", traceback.format_exc())
             self.transport.close()
