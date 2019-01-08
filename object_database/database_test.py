@@ -1405,6 +1405,7 @@ class ObjectDatabaseTests:
             for i in range(len(dbs)):
                 self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
 
+    @unittest.skip
     def test_transaction_time_constant(self):
         db1 = self.createNewDb()
         db2 = self.createNewDb()
