@@ -25,6 +25,7 @@ import unittest
 import traceback
 import time
 import numpy
+import os
 import sys
 
 
@@ -157,7 +158,19 @@ class RandomValueProducer:
     def pickRandomly(self):
         return choice(self.levels[choice(list(self.levels))])
 
+
 class NativeTypesTests(unittest.TestCase):
+
+    def check_expected_performance(self, elapsed, expected=1.0):
+        if os.environ.get('TRAVIS_CI', None) is not None:
+            expected = 2 * expected
+
+        self.assertTrue(
+            elapsed < expected,
+            "Slow Performance: expected to take {expected} sec, but took {elapsed}"
+            .format(expected=expected, elapsed=elapsed)
+            )
+
     def test_objects_are_singletons(self):
         self.assertTrue(Int8() is Int8())
         self.assertTrue(NoneType() is NoneType())
@@ -277,10 +290,10 @@ class NativeTypesTests(unittest.TestCase):
         t = (bigTup,bigTup,bigTup,bigTup,bigTup)
         for i in range(1000000):
             tupleOfTupleOfInt(t)
-        print(time.time() - t0, " to do 1mm")
 
-        #like 5mm/sec
-        self.assertTrue(time.time() - t0 < 1.0)
+        elapsed = time.time() - t0
+        print("Took ", elapsed, " to do 1mm")
+        self.check_expected_performance(elapsed)
 
     def test_default_initializer_oneof(self):
         x = OneOf(None, int)
@@ -343,7 +356,7 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             e2 + (1,)
-            
+
 
     def test_tuple_of_one_of_fixed_size(self):
         t = TupleOf(OneOf(0,1,2,3,4))
@@ -467,8 +480,9 @@ class NativeTypesTests(unittest.TestCase):
         for i in range(1000000):
             t(a="a", b="b").a
 
-        print("Took ", time.time() - t0, " to do 1mm")
-        self.assertTrue(time.time() - t0 < 1.0)
+        elapsed = time.time() - t0
+        print("Took ", elapsed, " to do 1mm")
+        self.check_expected_performance(elapsed)
 
     def test_comparisons_in_one_of(self):
         t = OneOf(None, float)
@@ -678,8 +692,10 @@ class NativeTypesTests(unittest.TestCase):
         t0 = time.time()
         for k in range(1000000):
             hash(s)
-        print(time.time() - t0, " to do 1mm")
-        self.assertTrue(time.time() - t0 < 1.0)
+
+        elapsed = time.time() - t0
+        print(elapsed, " to do 1mm")
+        self.check_expected_performance(elapsed)
 
     def test_const_dict_str_perf(self):
         t = ConstDict(str,str)
@@ -688,8 +704,9 @@ class NativeTypesTests(unittest.TestCase):
         for i in range(100000):
             t({str(k): str(k+1) for k in range(10)})
 
-        print("Took ", time.time() - t0, " to do 1mm")
-        self.assertTrue(time.time() - t0 < 1.0)
+        elapsed = time.time() - t0
+        print("Took ", elapsed, " to do 1mm")
+        self.check_expected_performance(elapsed)
 
     def test_const_dict_int_perf(self):
         t = ConstDict(int,int)
@@ -698,8 +715,9 @@ class NativeTypesTests(unittest.TestCase):
         for i in range(100000):
             t({k:k+1 for k in range(10)})
 
-        print("Took ", time.time() - t0, " to do 1mm")
-        self.assertTrue(time.time() - t0 < 1.0)
+        elapsed = time.time() - t0
+        print("Took ", elapsed, " to do 1mm")
+        self.check_expected_performance(elapsed)
 
     def test_const_dict_iter_int(self):
         t = ConstDict(int,int)
@@ -823,8 +841,9 @@ class NativeTypesTests(unittest.TestCase):
             a.matches.child_ints
             a.x
 
-        print("took ", time.time() - t0, " to do 1mm")
-        self.assertTrue(time.time() - t0 < 2.0)
+        elapsed = time.time() - t0
+        print("Took ", elapsed, " to do 1mm")
+        self.check_expected_performance(elapsed, expected=2.0)
 
     def test_object_hashing_and_equality(self):
         for _ in range(100):

@@ -312,6 +312,9 @@ VERBOSE = True
 
 
 class ServiceManagerTest(unittest.TestCase):
+
+    WAIT_FOR_COUNT_TIMEOUT = 20.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
+
     def setUp(self):
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
@@ -367,7 +370,7 @@ class ServiceManagerTest(unittest.TestCase):
         self.assertTrue(
             self.database.waitForCondition(
                 lambda: TestServiceLastTimestamp.aliveCount() == count,
-                timeout=5.0
+                timeout=self.WAIT_FOR_COUNT_TIMEOUT
                 )
             )
 
@@ -509,7 +512,7 @@ class ServiceManagerTest(unittest.TestCase):
                 10
                 )
 
-        #this should force a redeploy.
+        # this should force a redeploy.
         maxProcessesEver = 0
         for i in range(40):
             maxProcessesEver = max(maxProcessesEver, len(psutil.Process().children()[0].children()))
@@ -517,7 +520,10 @@ class ServiceManagerTest(unittest.TestCase):
 
         self.database.flush()
 
-        #after 2 seconds, we should be redeployed
+        # after 2 seconds, we should be redeployed, but give Travis a bit more time
+        if os.environ.get('TRAVIS_CI', None) is not None:
+            time.sleep(5.0)
+
         with self.database.view():
             instances_redeployed = service_schema.ServiceInstance.lookupAll()
 
@@ -527,7 +533,7 @@ class ServiceManagerTest(unittest.TestCase):
 
             self.assertTrue(orig_codebase != instances_redeployed[0].codebase)
 
-        #and we never became too big!
+        # and we never became too big!
         self.assertLess(maxProcessesEver, 11)
 
     def measureThroughput(self, seconds):
@@ -569,9 +575,9 @@ class ServiceManagerTest(unittest.TestCase):
         print("Throughput with no workers: ", emptyThroughputs)
         print("Throughput with 20 workers: ", fullThroughputs)
 
-        #we want to ensure that we don't have some problem where our transaction throughput
-        #goes down because we have left-over connections or something similar in the server,
-        #which would be a real problem!
+        # we want to ensure that we don't have some problem where our transaction throughput
+        # goes down because we have left-over connections or something similar in the server,
+        # which would be a real problem!
         self.assertTrue(emptyThroughputs[-1] * 2 > emptyThroughputs[0], (emptyThroughputs))
 
     def DISABLEDtest_throughput_with_many_workers(self):
