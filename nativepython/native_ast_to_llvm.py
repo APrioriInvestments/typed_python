@@ -778,7 +778,22 @@ class FunctionConverter:
 
             cond = self.convert(expr.cond)
 
-            with self.builder.if_else(cond.llvm_value) as (then, otherwise):
+            cond_llvm = cond.llvm_value
+
+            zero_like = llvmlite.ir.Constant(cond_llvm.type, 0)
+
+            if cond.native_type.matches.Pointer:
+                cond_llvm = self.builder.ptrtoint(cond_llvm, llvm_i64)
+                cond_llvm = self.builder.icmp_signed("!=", cond_llvm, zero_like)
+            elif cond.native_type.matches.Int:
+                if cond_llvm.type.width != 1:
+                    cond_llvm = self.builder.icmp_signed("!=", cond_llvm, zero_like)
+            elif cond.native_type.matches.Float:
+                cond_llvm = self.builder.fcmp_unordered("!=", cond_llvm, zero_like)
+            else:
+                cond_llvm = llvmlite.ir.Constant(llvm_i1, 0)
+
+            with self.builder.if_else(cond_llvm) as (then, otherwise):
                 with then:
                     true = self.convert(expr.while_true)
                     self.builder.branch(loop_block)

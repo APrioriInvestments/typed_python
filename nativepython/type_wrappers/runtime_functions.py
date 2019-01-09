@@ -47,6 +47,11 @@ mod_int64_int64 = externalCallTarget(
         Int64, 
         Int64, Int64
         )
+mod_float64_float64 = externalCallTarget(
+        "nativepython_runtime_mod_float64_float64", 
+        Float64, 
+        Float64, Float64
+        )
 pow_int64_int64 = externalCallTarget(
         "nativepython_runtime_pow_int64_int64", 
         Int64, 

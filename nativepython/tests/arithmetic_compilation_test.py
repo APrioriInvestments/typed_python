@@ -18,39 +18,42 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 
-def add(x:int,y:int)->int:
+In = OneOf(int, float)
+Out = OneOf(int, float, bool)
+
+def add(x:In,y:In)->Out:
     return x+y
-def sub(x:int,y:int)->int:
+def sub(x:In,y:In)->Out:
     return x-y
-def mul(x:int,y:int)->int:
+def mul(x:In,y:In)->Out:
     return x*y
-def div(x:int,y:int)->float:
+def div(x:In,y:In)->Out:
     return x/y
-def mod(x:int,y:int)->int:
+def mod(x:In,y:In)->Out:
     return x%y
-def lshift(x:int,y:int)->int:
+def lshift(x:In,y:In)->Out:
     return x << y
-def rshift(x:int,y:int)->int:
+def rshift(x:In,y:In)->Out:
     return x >> y
-def pow(x:int,y:int)->int:
+def pow(x:In,y:In)->Out:
     return x ** y
-def bitxor(x:int,y:int)->int:
+def bitxor(x:In,y:In)->Out:
     return x ^ y
-def bitand(x:int,y:int)->int:
+def bitand(x:In,y:In)->Out:
     return x&y
-def bitor(x:int,y:int)->int:
+def bitor(x:In,y:In)->Out:
     return x|y
-def less(x:int,y:int)->bool:
+def less(x:In,y:In)->Out:
     return x<y
-def greater(x:int,y:int)->bool:
+def greater(x:In,y:In)->Out:
     return x>y
-def lessEq(x:int,y:int)->bool:
+def lessEq(x:In,y:In)->Out:
     return x<=y
-def greaterEq(x:int,y:int)->bool:
+def greaterEq(x:In,y:In)->Out:
     return x>=y
-def eq(x:int,y:int)->bool:
+def eq(x:In,y:In)->Out:
     return x == y
-def neq(x:int,y:int)->bool:
+def neq(x:In,y:In)->Out:
     return x != y
 
 class TestArithmeticCompilation(unittest.TestCase):
@@ -68,10 +71,11 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(f(20), 60)
         self.assertEqual(f(10), 30)
 
-    def test_binary_operators_int(self):
+    def test_binary_operators(self):
         r  = Runtime.singleton()
 
         failures = 0
+        successes = 0
 
         for f in [add,sub,mul,div,mod,lshift,rshift,
                     pow,bitxor,bitand,bitor,less,
@@ -79,9 +83,16 @@ class TestArithmeticCompilation(unittest.TestCase):
             if f in [pow]:
                 lvals = range(-5,5)
                 rvals = range(5)
+
+                lvals = list(lvals) + [x * 1 for x in lvals]
+                rvals = list(rvals) + [x * 1 for x in rvals]
+
             else:
                 lvals = list(range(-20,20))
                 rvals = lvals
+
+                lvals = list(lvals) + [x / 3 for x in lvals]
+                rvals = list(rvals) + [x / 3 for x in rvals]
 
             f_fast = r.compile(f)
 
@@ -100,8 +111,10 @@ class TestArithmeticCompilation(unittest.TestCase):
                     if type(pyVal) is not type(llvmVal) or pyVal != llvmVal:
                         print("FAILURE", f, val1, val2, pyVal, llvmVal)
                         failures += 1
+                    else:
+                        successes += 1
 
-        self.assertEqual(failures, 0)
+        self.assertEqual(failures, 0, successes)
 
     def checkFunctionOfIntegers(self, f):
         r  = Runtime.singleton()

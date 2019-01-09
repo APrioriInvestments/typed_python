@@ -123,3 +123,16 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.checkFunctionOfIntegers(f)
 
+    def test_loop_variable_changing_type(self):
+        @Compiled
+        def f(top: float) -> OneOf(int, float):
+            y = 0
+            x = 0
+            while x < top:
+                x += 1.0
+                y += x
+
+            return y
+
+        self.assertEqual(f(3.5), 10.0)
+

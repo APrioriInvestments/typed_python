@@ -224,8 +224,14 @@ class FunctionConversionContext(object):
         return ".stackvar.%s" % (self._temp_stack_var-1)
 
     def upsizeVariableType(self, varname, new_type):
-        assert varname in self._varname_to_type
+        if self._varname_to_type.get(varname) is None:
+            self._varname_to_type[varname] = new_type
+            return
+
         existingType = self._varname_to_type[varname].typeRepresentation
+
+        if existingType == new_type.typeRepresentation:
+            return
 
         if hasattr(existingType, '__typed_python_category__') and \
                 existingType.__typed_python_category__ == 'OneOf':
@@ -262,33 +268,33 @@ class FunctionConversionContext(object):
                 if val_to_store is None:
                     return subcontext.finalize(None), False
 
-                if self._varname_to_type[varname] is None:
-                    self._varname_to_type[varname] = val_to_store.expr_type
-                    slot_ref = subcontext.named_var_expr(varname)
-                else:
-                    slot_ref = subcontext.named_var_expr(varname)
-
-                    if slot_ref.expr_type != val_to_store.expr_type:
-                        self.upsizeVariableType(varname, val_to_store.expr_type)
-                        slot_ref = subcontext.named_var_expr(varname)
-
                 if op is not None:
-                    val_to_store = slot_ref.convert_bin_op(op, val_to_store)
-                    if val_to_store is None:
-                        return subcontext.finalize(None), False
+                    if varname not in self._varname_to_type:
+                        raise NotImplementedError()
+                    else:
+                        slot_ref = subcontext.named_var_expr(varname)
+                        val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+
+                        if val_to_store is None:
+                            return subcontext.finalize(None), False
+
+                self.upsizeVariableType(varname, val_to_store.expr_type)
+                slot_ref = subcontext.named_var_expr(varname)
 
                 #convert the value to the target type now that we've upsized it
                 val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
 
-                if val_to_store is None:
-                    return subcontext.finalize(None), False
+                assert val_to_store is not None, "We should always be able to upsize"
 
-                with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
-                    with true_block:
-                        subcontext.pushEffect(slot_ref.convert_assign(val_to_store))
-                    with false_block:
-                        subcontext.pushEffect(slot_ref.convert_copy_initialize(val_to_store))
-                        subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+                if slot_ref.expr_type.is_pod:
+                    subcontext.pushEffect(slot_ref.convert_copy_initialize(val_to_store))
+                else:
+                    with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
+                        with true_block:
+                            subcontext.pushEffect(slot_ref.convert_assign(val_to_store))
+                        with false_block:
+                            subcontext.pushEffect(slot_ref.convert_copy_initialize(val_to_store))
+                            subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
 
                 return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
             
@@ -387,7 +393,7 @@ class FunctionConversionContext(object):
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
             return (
-                native_ast.Expression.Branch(cond=cond_context.finalize(cond),true=true,false=false),
+                native_ast.Expression.Branch(cond=cond_context.finalize(cond.nonref_expr),true=true,false=false),
                 true_returns or false_returns
                 )
 
@@ -398,17 +404,17 @@ class FunctionConversionContext(object):
             cond_context = ExpressionConversionContext(self)
             cond = cond_context.convert_expression_ast(ast.test)
             if cond is None:
-                return cond.finalize(None)
+                return cond_context.finalize(None)
             cond = cond.toBool()
             if cond is None:
-                return cond.finalize(None)
+                return cond_context.finalize(None)
 
             true, true_returns = self.convert_statement_list_ast(ast.body)
 
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
             return (
-                native_ast.Expression.While(cond=cond_context.finalize(cond),while_true=true,orelse=false),
+                native_ast.Expression.While(cond=cond_context.finalize(cond.nonref_expr),while_true=true,orelse=false),
                 true_returns or false_returns
                 )
 
@@ -743,6 +749,8 @@ class Converter(object):
                 functionConverter.resetTypeInstabilityFlag()
             else:
                 break
+
+        print("Vartypes are ", functionConverter._varname_to_type)
 
         if star_args_name is not None:
             body_native_expr = functionConverter.construct_starargs_around(body_native_expr, star_args_name)

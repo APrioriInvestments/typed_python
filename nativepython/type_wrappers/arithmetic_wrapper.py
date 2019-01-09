@@ -36,6 +36,14 @@ pyOpToNative = {
     python_ast.BinaryOp.BitAnd(): native_ast.BinaryOp.BitAnd()
     }
 
+pyOpNotForFloat = {
+    python_ast.BinaryOp.LShift(),
+    python_ast.BinaryOp.RShift(),
+    python_ast.BinaryOp.BitOr(),
+    python_ast.BinaryOp.BitXor(),
+    python_ast.BinaryOp.BitAnd()
+}
+
 pyCompOp = {
     python_ast.ComparisonOp.Eq(): native_ast.BinaryOp.Eq(),
     python_ast.ComparisonOp.NotEq(): native_ast.BinaryOp.NotEq(),
@@ -220,8 +228,17 @@ class Float64Wrapper(ArithmeticTypeWrapper):
         if isinstance(right.expr_type, Int64Wrapper):
             right = right.toFloat64()
 
-        if right.expr_type == left.expr_type:
-            if op.matches.Mod or op.matches.Div:
+        if right.expr_type == left.expr_type:            
+            if op.matches.Mod:
+                return context.pushPod(
+                    self,
+                    native_ast.Expression.Branch(
+                        cond=right.nonref_expr,
+                        true=runtime_functions.mod_float64_float64.call(left.nonref_expr, right.nonref_expr),
+                        false=generateThrowException(context, ZeroDivisionError())
+                        )
+                    )
+            if op.matches.Div:
                 return context.pushPod(
                     self,
                     native_ast.Expression.Branch(
@@ -242,7 +259,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                         )
                     )
 
-            if op in pyOpToNative:
+            if op in pyOpToNative and op not in pyOpNotForFloat:
                 return context.pushPod(
                     self,
                     native_ast.Expression.Binop(
@@ -251,9 +268,10 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                         op=pyOpToNative[op]
                         )
                     )
+
             if op in pyCompOp:
                 return context.pushPod(
-                    self,
+                    bool,
                     native_ast.Expression.Binop(
                         l=left.nonref_expr,
                         r=right.nonref_expr,

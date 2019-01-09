@@ -32,6 +32,8 @@ class OneOfWrapper(Wrapper):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t)
 
+        assert len(t.Types) > 1
+
         excessBytes = _types.bytecount(t)-1
 
         self.layoutType = native_ast.Type.Struct(
@@ -66,13 +68,14 @@ class OneOfWrapper(Wrapper):
 
                 if exprs[-1] is not None:
                     t = exprs[-1].expr_type
+
                     if t not in typesSeen:
                         typesSeen.add(t)
                         types.append(t)
 
             if len(types) == 0:
                 #all paths throw exceptions. we're done
-                return native_ast.nullExpr
+                return None
 
             if len(types) == 1:
                 output_type = types[0]

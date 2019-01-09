@@ -63,6 +63,31 @@ extern "C" {
         return l % r;
     }
 
+    double nativepython_runtime_mod_float64_float64(double l, double r) {
+        if (r == 0 || l == 0) {
+            return 0;
+        }
+
+        if (r < 0) {
+            if (l < 0) {
+                return -(fmod((-l), (-r)));
+            }
+            double res = fmod(l, r) + r;
+            if (res - r <= 0.0) 
+                res -= r;
+            return res;
+        }
+
+        if (l < 0) {
+            double res = fmod(l, r) + r;
+            if (res - r >= 0.0)
+                res -= r;
+            return res;
+        }
+
+        return fmod(l, r);
+    }
+
     PyObject* nativepython_runtime_int_to_pyobj(int64_t i) {
         return PyLong_FromLong(i);
     }

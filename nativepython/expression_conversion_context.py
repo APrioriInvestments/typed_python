@@ -163,14 +163,31 @@ class ExpressionConversionContext(object):
 
         varname = self.functionContext.stack_varname()
 
-        return TypedExpression(
+        resExpr = TypedExpression(
             self, 
             native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()), 
             type, 
             True
             )
 
+        if not type.is_pod:
+            with self.subcontext() as sc:
+                self.pushEffect(type.convert_destroy(self, resExpr))
+
+            self.teardowns.append(
+                native_ast.Teardown.ByTag(
+                    tag=varname,
+                    expr=sc.result
+                    )
+                )
+
+        return resExpr
+
+
     def markUninitializedSlotInitialized(self, slot):
+        if slot.expr_type.is_pod:
+            return
+
         assert slot.expr.matches.StackSlot
 
         self.pushEffect(native_ast.Expression.ActivatesTeardown(slot.expr.name))
@@ -180,6 +197,9 @@ class ExpressionConversionContext(object):
         a native_ast.Expression or TypedExpression(None) initializing it.
         """
         type = typeWrapper(type)
+
+        if type.is_pod:
+            wantsTeardown = False
 
         varname = self.functionContext.stack_varname()
 
