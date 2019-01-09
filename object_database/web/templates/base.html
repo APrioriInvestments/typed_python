@@ -23,9 +23,6 @@
               {% if title %}
               <b>{{ title }}</b>
               {% endif %}
-              {% if authorized_groups_text %}
-              [Authorized Groups: {{ authorized_groups_text }}]
-              {% endif %}
             </div>
             <hr>
             {% with messages = get_flashed_messages() %}

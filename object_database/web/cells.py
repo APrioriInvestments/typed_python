@@ -31,6 +31,7 @@ def quoteForJs(string, quoteType):
 def multiReplace(msg, replacements):
     for k,v in replacements.items():
         assert k[:4] == "____", k
+
     chunks = msg.split("____")
     outChunks = []
     for chunk in chunks:
@@ -308,6 +309,8 @@ class Cell:
         self._color = None
         self._height = None
         self.serializationContext = None
+
+        self._logger = logging.getLogger(__name__)
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -692,7 +695,7 @@ class Dropdown(Cell):
                     self._logger.error("Button click timed out. This should really fail.")
                     return
             except:
-                self._logger.error("Exception in button logic:\n%s", traceback.format_exc())
+                self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
                 return
 
 class Container(Cell):
