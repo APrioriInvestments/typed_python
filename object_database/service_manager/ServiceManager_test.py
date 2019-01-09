@@ -625,37 +625,70 @@ class ServiceManagerTest(unittest.TestCase):
         self.waitForCount(1)
 
     def test_update_module_code(self):
-        with self.database.transaction():
-            ServiceManager.createServiceWithCodebase(
-                service_schema.Codebase.createFromFiles(getTestServiceModule(1)),
-                "test_service.service.Service",
-                "TestService",
-                1
-                )
+        serviceName = "TestService"
 
-        self.waitForCount(1)
+        def deploy_helper(codebase_version, expected_version, existing_service=None):
+            with self.database.transaction():
+                print("Setting codebase")
+                ServiceManager.createServiceWithCodebase(
+                    service_schema.Codebase.createFromFiles(getTestServiceModule(codebase_version)),
+                    "test_service.service.Service",
+                    serviceName,
+                    targetCount=1
+                    )
 
-        with self.database.transaction():
-            s = TestServiceLastTimestamp.aliveServices()[0]
-            self.assertEqual(s.version, 1)
+            if existing_service:
+                self.database.waitForCondition(
+                    lambda: not existing_service.connection.exists(), timeout=5.0)
 
-        with self.database.transaction():
-            ServiceManager.createServiceWithCodebase(
-                service_schema.Codebase.createFromFiles(getTestServiceModule(2)),
-                "test_service.service.Service",
-                "TestService",
-                1
-                )
+            self.waitForCount(1)
 
-        self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
+            with self.database.transaction():
+                s = TestServiceLastTimestamp.aliveServices()[0]
+                self.assertEqual(s.version, expected_version)
 
-        self.waitForCount(1)
+            return s
 
-        with self.database.transaction():
-            s = TestServiceLastTimestamp.aliveServices()[0]
-            self.assertEqual(s.version, 2)
+        def lock_helper():
+            with self.database.transaction():
+                service = service_schema.Service.lookupAny(name=serviceName)
+                self.assertIsNotNone(service)
+                service.lock()
+                self.assertTrue(service.isLocked)
 
+        def unlock_helper():
+            with self.database.transaction():
+                service = service_schema.Service.lookupAny(name=serviceName)
+                self.assertIsNotNone(service)
+                service.unlock()
+                self.assertFalse(service.isLocked)
 
+        def prepare_helper():
+            with self.database.transaction():
+                service = service_schema.Service.lookupAny(name=serviceName)
+                self.assertIsNotNone(service)
+                service.prepare()
+                self.assertFalse(service.isLocked)
 
+        # Initial deploy should succeed
+        s = deploy_helper(1, 1)
 
+        # Trying to update the codebase without unlocking should fail
+        s = deploy_helper(2, 1, s)
+
+        # Trying to update the codebase after preparing for deployment should succeed
+        prepare_helper()
+        s = deploy_helper(3, 3, s)
+
+        # Trying to update the codebase a second time after preparing for deployment should fail
+        s = deploy_helper(4, 3, s)
+
+        # Trying to update the codebase after unlocking should succeed
+        unlock_helper()
+        s = deploy_helper(5, 5, s)
+        s = deploy_helper(6, 6, s)
+
+        # Trying to update the codebase after locking should fail
+        lock_helper()
+        s = deploy_helper(7, 6, s)
 

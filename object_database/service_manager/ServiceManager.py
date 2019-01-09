@@ -86,7 +86,10 @@ class ServiceManager(object):
         return service
 
     @staticmethod
-    def createServiceWithCodebase(codebase, className, serviceName, targetCount=None, placement=None, coresUsed=None, gbRamUsed=None, isSingleton=None):
+    def createServiceWithCodebase(codebase, className, serviceName,
+                                  targetCount=None, placement=None,
+                                  coresUsed=None, gbRamUsed=None, isSingleton=None):
+
         assert len(className.split(".")) > 1, "className should be a fully-qualified module.classname"
 
         service = service_schema.Service.lookupAny(name=serviceName)
@@ -94,7 +97,8 @@ class ServiceManager(object):
         if not service:
             service = service_schema.Service(name=serviceName, placement="Any")
 
-        service.setCodebase(codebase, ".".join(className.split(".")[:-1]), className.split(".")[-1])
+        # TODO: Do we need to raise an exception if setCodebase fails because the service is locked?
+        res = service.setCodebase(codebase, ".".join(className.split(".")[:-1]), className.split(".")[-1])
 
         if isSingleton is not None:
             service.isSingleton = isSingleton
@@ -235,7 +239,7 @@ class ServiceManager(object):
 
             if needRedeploy:
                 self._logger.info(
-                    "The following services need to be stopped because their codebases are out of date:\n%s",
+                    "The following services need to be stopped because their codebases are out of date: %s",
                     "\n".join(["  " + i.service.name + "." + i._identity + ". "
                             + str(i.service.codebase) + " != " + str(i.codebase) for i in needRedeploy])
                     )

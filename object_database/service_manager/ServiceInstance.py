@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import importlib
+import logging
 import os
 import six
 import sys
@@ -51,7 +52,8 @@ class ServiceHost:
 @service_schema.define
 class Service:
     name = Indexed(str)
-    codebase = OneOf(None, service_schema.Codebase)
+    _codebase = OneOf(None, service_schema.Codebase)
+    _locked = OneOf("PREPARED", "LOCKED", "UNLOCKED")  # protects _codebase from modification
 
     service_module_name = str
     service_class_name = str
@@ -72,6 +74,40 @@ class Service:
     timesCrashed = int
     lastFailureReason = OneOf(None, str)
 
+    @property
+    def isUnlocked(self):
+        return self._locked == "UNLOCKED"
+
+    @property
+    def isLocked(self):
+        return self._locked == "LOCKED"
+
+    def unlock(self):
+        self._locked = "UNLOCKED"
+
+    def lock(self):
+        self._locked = "LOCKED"
+
+    def prepare(self):
+        if self._locked == "LOCKED":
+            self._locked = "PREPARED"
+
+    def deploy(self):
+        if self._locked == "PREPARED":
+            self._locked = "LOCKED"
+
+    def _getCodebase(self):
+        return self._codebase
+
+    def _setCodebase(self, other):
+        if self.isLocked:
+            logging.getLogger(__name__).warning("Cannot set codebase of locked service")
+        else:
+            self._codebase = other
+            self.deploy()
+
+    codebase = property(_getCodebase, _setCodebase)
+
     def getSerializationContext(self):
         if self.codebase is None:
             return TypedPythonCodebase.FromRootlevelModule(object_database).serializationContext
@@ -88,10 +124,19 @@ class Service:
 
     def setCodebase(self, codebase, moduleName, className):
         if codebase != self.codebase or moduleName != self.service_module_name or className != self.service_class_name:
-            self.codebase = codebase
+            if self.isLocked:
+                logging.getLogger(__name__).warning("Cannot set codebase of locked service")
+                return False
+
+            # self.codebase = codebase
+            self._setCodebase(codebase)
+
             self.service_module_name = moduleName
             self.service_class_name = className
             self.resetCounters()
+            return True
+
+        return True
 
     def effectiveTargetCount(self):
         if self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS:
