@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Alternative, OneOf, Bool, Float64, Int64
-
+from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import nativepython.native_ast as native_ast
 import nativepython
 
@@ -25,7 +25,8 @@ typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTyp
 class TypedExpression(object):
     def __init__(self, context, expr, t, isReference):
         """Initialize a TypedExpression
-
+    
+        context - an ExpressionConversionContext
         expr - a native_ast containing an expression
         t - a subclass of Wrapper, or a type that we'll convert to a wrapper, or None (meaning
             control doesn't return)
@@ -60,7 +61,12 @@ class TypedExpression(object):
         if self.expr_type is None:
             return self.expr
 
-        return self.expr_type.ensureNonReference(self).expr
+        if self.isReference:
+            if self.expr_type.is_empty:
+                return self.expr + native_ast.nullExpr
+            return self.expr.load()
+        else:
+            return self.expr
 
     def ensureNonReference(self):
         return self.expr_type.ensureNonReference(self)
@@ -81,69 +87,37 @@ class TypedExpression(object):
         return self.expr_type.convert_copy_initialize(self.context, self, toStore)
 
     def convert_attribute(self, attribute):
-        return self.context.wrapInTemporaries(
-            lambda self: self.expr_type.convert_attribute(self.context, self, attribute),
-            (self,)
-            )
+        return self.expr_type.convert_attribute(self.context, self, attribute)
 
     def convert_getitem(self, item):
-        return self.context.wrapInTemporaries(
-            lambda self, item:
-                self.expr_type.convert_getitem(self.context, self, item),
-            (self, item)
-            )
+        return self.expr_type.convert_getitem(self.context, self, item)
+
+    def convert_getitem_unsafe(self, item):
+        return self.expr_type.convert_getitem_unsafe(self.context, self, item)
 
     def convert_len(self):
-        return self.context.wrapInTemporaries(
-            lambda self:
-                self.expr_type.convert_len(self.context, self),
-            (self,)
-            )
+        return self.expr_type.convert_len(self.context, self)
 
     def convert_unary_op(self, op):
-        return self.context.wrapInTemporaries(
-            lambda self: 
-                self.expr_type.convert_unary_op(self.context, self, op),
-            (self,)
-            )
+        return self.expr_type.convert_unary_op(self.context, self, op)
 
     def convert_bin_op(self, op, rhs):
-        return self.context.wrapInTemporaries(
-            lambda l,r: 
-                self.expr_type.convert_bin_op(self.context, l, op, r),
-            (self, rhs)
-            )
+        return self.expr_type.convert_bin_op(self.context, self, op, rhs)
 
     def convert_call(self, args):
-        return self.context.wrapInTemporaries(
-            lambda self, *args:
-                self.expr_type.convert_call(self.context, self, args),
-            (self,) + tuple(args)
-            )
+        return self.expr_type.convert_call(self.context, self, args)
 
     def convert_to_type(self, target_type):
-        return self.context.wrapInTemporaries(
-            lambda self: self.expr_type.convert_to_type(self.context, self, target_type),
-            (self,)
-            )
+        return self.expr_type.convert_to_type(self.context, self, target_type)
 
     def toFloat64(self):
-        return self.context.wrapInTemporaries(
-            lambda self: self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64())),
-            (self,)
-            )
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64()))
 
     def toInt64(self):
-        return self.context.wrapInTemporaries(
-            lambda self: self.expr_type.convert_to_type(self.context, self, typeWrapper(Int64())),
-            (self,)
-            )
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Int64()))
 
     def toBool(self):
-        return self.context.wrapInTemporaries(
-            lambda s: self.expr_type.convert_to_type(self.context, s, typeWrapper(Bool())),
-            (self,)
-            )
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Bool()))
 
     def __str__(self):
         return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
@@ -151,26 +125,52 @@ class TypedExpression(object):
     def __rshift__(self, other):
         return TypedExpression(self.context, self.expr >> other.expr, other.expr_type, other.isReference)
 
-    def __or__(self, other):
-        return self.expr_type.sugar_operator(self, other, "BitOr")
+    @staticmethod
+    def sugar_operator(left, right, opname):
+        if isinstance(right, (int,float,bool)):
+            right = left.context.constant(right)
+
+        if hasattr(BinaryOp, opname):
+            op = getattr(BinaryOp, opname)()
+        elif hasattr(ComparisonOp, opname):
+            op = getattr(ComparisonOp, opname)()
+        elif hasattr(BooleanOp, opname):
+            op = getattr(BooleanOp, opname)()
+
+        return left.convert_bin_op(op, right)
+
+    def __add__(self, other):
+        return TypedExpression.sugar_operator(self, other, "Add")
+
+    def __sub__(self, other):
+        return TypedExpression.sugar_operator(self, other, "Sub")
+
+    def __mul__(self, other):
+        return TypedExpression.sugar_operator(self, other, "Div")
 
     def __and__(self, other):
-        return self.expr_type.sugar_operator(self, other, "BitAnd")
+        return TypedExpression.sugar_operator(self, other, "BitAnd")
+
+    def __or__(self, other):
+        return TypedExpression.sugar_operator(self, other, "BitOr")
+
+    def __and__(self, other):
+        return TypedExpression.sugar_operator(self, other, "BitAnd")
 
     def __lt__(self, other):
-        return self.expr_type.sugar_comparison(self, other, "Lt")
+        return TypedExpression.sugar_operator(self, other, "Lt")
 
     def __le__(self, other):
-        return self.expr_type.sugar_comparison(self, other, "LtE")
+        return TypedExpression.sugar_operator(self, other, "LtE")
 
     def __gt__(self, other):
-        return self.expr_type.sugar_comparison(self, other, "Gt")
+        return TypedExpression.sugar_operator(self, other, "Gt")
 
     def __ge__(self, other):
-        return self.expr_type.sugar_comparison(self, other, "GtE")
+        return TypedExpression.sugar_operator(self, other, "GtE")
 
     def __eq__(self, other):
-        return self.expr_type.sugar_comparison(self, other, "Eq")
+        return TypedExpression.sugar_operator(self, other, "Eq")
 
     def __ne__(self, other):
-        return self.expr_type.sugar_comparison(self, other, "NotEq")
+        return TypedExpression.sugar_operator(self, other, "NotEq")

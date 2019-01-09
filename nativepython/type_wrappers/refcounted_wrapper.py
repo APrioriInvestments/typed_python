@@ -29,73 +29,52 @@ class RefcountedWrapper(Wrapper):
         raise NotImplementedError()
 
     def convert_incref(self, context, expr):
-        expr = expr.ensureNonReference()
-
-        return context.RefExpr(
-            native_ast.Expression.Branch(
-                cond=expr.expr,
+        return native_ast.Expression.Branch(
+                cond=expr.nonref_expr,
                 false=native_ast.nullExpr,
-                true=expr.expr.ElementPtrIntegers(0,0).store(
+                true=expr.nonref_expr.ElementPtrIntegers(0,0).store(
                         native_ast.Expression.Binop(
-                            l=expr.expr.ElementPtrIntegers(0,0).load(),
+                            l=expr.nonref_expr.ElementPtrIntegers(0,0).load(),
                             op=native_ast.BinaryOp.Add(),
                             r=native_ast.const_int_expr(1)
                         )
                     )
-                ) >> expr.expr,
-            self
-            )
+                )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference
-        other = other.ensureNonReference()
 
-        return context.NoneExpr(
-            native_ast.Expression.Let(
-                expr.expr.load(),
-                lambda oldSelf:
-                    self.convert_copy_initialize(context, expr, other).expr
-                        >> self.convert_destroy(context, context.ValueExpr(self, oldSelf))
-                )
-            )
+        return (self.convert_incref(context, other)
+            >> self.convert_destroy(context, expr)
+            >> expr.expr.store(other.nonref_expr))
 
     def convert_copy_initialize(self, context, expr, other):
-        other = other.ensureNonReference()
-        assert expr.isReference
+        expr = expr.expr
+        other = other.nonref_expr
 
-        return context.NoneExpr(
-            native_ast.Expression.Branch(
-                cond=other.expr,
-                false=expr.expr.store(other.expr),
+        return native_ast.Expression.Branch(
+                cond=other,
+                false=expr.store(other),
                 true=
-                    expr.expr.store(other.expr) >>
-                    expr.expr.load().ElementPtrIntegers(0,0).store(
-                        native_ast.Expression.Binop(
-                            l=expr.expr.load().ElementPtrIntegers(0,0).load(),
-                            op=native_ast.BinaryOp.Add(),
-                            r=native_ast.const_int_expr(1)
+                    expr.store(other) >>
+                    expr.load().ElementPtrIntegers(0,0).store(
+                        expr.load().ElementPtrIntegers(0,0).load().add(native_ast.const_int_expr(1))
                         )
-                    )
                 )
-            )
 
     def convert_destroy(self, context, target):
-        return context.NoneExpr(
-            native_ast.Expression.Branch(
-                cond=target.nonref_expr,
-                false=native_ast.nullExpr,
-                true=
-                    target.nonref_expr.ElementPtrIntegers(0,0).store(
-                        native_ast.Expression.Binop(
-                            l=target.nonref_expr.ElementPtrIntegers(0,0).load(),
-                            op=native_ast.BinaryOp.Sub(),
-                            r=native_ast.const_int_expr(1)
+        assert target.isReference
+        targetExpr = target.nonref_expr
+
+        with context.ifelse(targetExpr) as (true, false):
+            with true:
+                context.pushEffect(
+                    targetExpr.ElementPtrIntegers(0,0).store(
+                        targetExpr.ElementPtrIntegers(0,0).load().sub(native_ast.const_int_expr(1))
                         )
-                    ) >>
-                    native_ast.Expression.Branch(
-                        cond=target.nonref_expr.ElementPtrIntegers(0,0).load(),
-                        true=native_ast.nullExpr,
-                        false=self.on_refcount_zero(context, target)
-                        )
-                )
-            )
+                    )
+                with context.ifelse(targetExpr.ElementPtrIntegers(0,0).load()) as (subtrue, subfalse):
+                    with subfalse:
+                        context.pushEffect(self.on_refcount_zero(context, target))
+
+        return native_ast.nullExpr

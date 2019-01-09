@@ -51,90 +51,66 @@ class OneOfWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def makeSwitchExpr(self, expr, native_expressions):
-        res = native_expressions[0]
-
-        for i in range(1, len(self.typeRepresentation.Types)):
-            res = native_ast.Expression.Branch(
-                cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(i)),
-                true=native_expressions[i],
-                false=res
-                )
-        
-        return res
-
     def convert_bin_op(self, context, left, op, right, isReversed=False):
-        exprs = []
         types = []
+        exprs = []
         typesSeen = set()
-        for i in range(len(self.typeRepresentation.Types)):
-            if isReversed:
-                exprs.append(right.convert_bin_op(op, self.refAs(context, left, i)))
+
+        with context.switch(left.expr.ElementPtrIntegers(0,0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
+            for i, subcontext in indicesAndContexts:
+                with subcontext:
+                    if isReversed:
+                        exprs.append(right.convert_bin_op(op, self.refAs(context, left, i)))
+                    else:
+                        exprs.append(self.refAs(context, left, i).convert_bin_op(op, right))
+
+                if exprs[-1] is not None:
+                    t = exprs[-1].expr_type
+                    if t not in typesSeen:
+                        typesSeen.add(t)
+                        types.append(t)
+
+            if len(types) == 0:
+                #all paths throw exceptions. we're done
+                return native_ast.nullExpr
+
+            if len(types) == 1:
+                output_type = types[0]
             else:
-                exprs.append(self.refAs(context, left, i).convert_bin_op(op, right))
-            t = exprs[-1].expr_type
-            if t is not None and t not in typesSeen:
-                typesSeen.add(t)
-                types.append(t)
+                output_type = typeWrapper(OneOf(*[t.typeRepresentation for t in types]))
 
-        if len(types) == 0:
-            #all paths throw exceptions.
-            return context.TerminalExpr(
-                self.makeSwitchExpr(left, [e.expr for e in exprs])
-                )
+            out_slot = context.allocateUninitializedSlot(output_type)
 
-        if len(types) == 1:
-            #all paths throw or return a single expression
-            output_type = types[0]
+            for i, subcontext in indicesAndContexts:
+                with subcontext:
+                    if exprs[i] is not None:
+                        converted_res = exprs[i].convert_to_type(output_type)
+                        if converted_res is not None:
+                            context.pushEffect(
+                                out_slot.convert_copy_initialize(converted_res)
+                                )
 
-            if output_type.is_pass_by_ref:
-                return context.RefExpr(
-                    self.makeSwitchExpr(left, [e.expr for e in exprs]),
-                    output_type
-                    )
-            else:
-                return context.ValueExpr(
-                    self.makeSwitchExpr(left, [e.nonref_expr for e in exprs]),
-                    output_type
-                    )
+                            context.markUninitializedSlotInitialized(out_slot)
 
-        #we have to convert this to a target output type
-        output_type = typeWrapper(OneOf(*[t.typeRepresentation for t in types]))
-
-        output = context.allocate_temporary(output_type)
-
-        return context.RefExpr(
-            self.makeSwitchExpr(left, [
-                self.convert_to_self_with_target(context, output, exprs[i]).expr for i in range(len(exprs))
-                ]) >>
-            output.expr,
-            output_type
-            )
+        return out_slot
 
     def convert_bin_op_reverse(self, context, r, op, l):
         assert r.expr_type == self
         assert r.isReference
         return self.convert_bin_op(context, r, op, l, True)
 
-    def convert_incref(self, context, expr):
-        if self._is_pod:
-            return context.NoneExpr()
-
-        raise NotImplementedError()
-
     def convert_assign(self, context, expr, other):
         assert expr.isReference
 
         if self.is_pod:
-            return context.NoneExpr(expr.expr.store(other.nonref_expr))
+            return expr.expr.store(other.nonref_expr)
         else:
-            temp = context.allocate_temporary(self)
-
-            return context.NoneExpr(
-                temp.expr.store(expr.load()) >> 
-                expr.convert_copy_initialize(other).expr >> 
-                temp.convert_destroy().expr
-                )            
+            temp = context.pushMove(expr)
+            
+            return (
+                expr.convert_copy_initialize(other) >> 
+                temp.convert_destroy()
+                )
 
     def refAs(self, context, expr, which):
         assert expr.expr_type == self
@@ -142,66 +118,59 @@ class OneOfWrapper(Wrapper):
 
         tw = typeWrapper(self.typeRepresentation.Types[which])
 
-        return context.RefExpr(
-            expr.expr.ElementPtrIntegers(0,1).cast(tw.getNativeLayoutType().pointer()),
-            tw
+        return context.pushReference(
+            tw,
+            expr.expr.ElementPtrIntegers(0,1).cast(tw.getNativeLayoutType().pointer())
             )
 
     def convert_copy_initialize(self, context, expr, other):
         assert expr.isReference
 
         if self.is_pod:
-            return context.NoneExpr(expr.expr.store(other.nonref_expr))
+            return expr.expr.store(other.nonref_expr)
         else:
-            outputExpr = native_ast.nullExpr
-            for ix, t in enumerate(self.typeRepresentation.Types):
-                tWrapper = typeWrapper(t)
+            with context.switch(other.expr.ElementPtrIntegers(0,0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
+                for ix, subcontext in indicesAndContexts:
+                    with subcontext:
+                        context.pushEffect(
+                            self.refAs(context, expr, ix).convert_copy_initialize(self.refAs(context, other, ix)) >>
+                            expr.expr.ElementPtrIntegers(0,0).store(native_ast.const_uint8_expr(ix))
+                            )
 
-                copy = self.refAs(context, expr, ix).convert_copy_initialize(self.refAs(context,other,ix))
-
-                outputExpr = outputExpr >> native_ast.Expression.Branch(
-                    cond=other.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(ix)),
-                    true=copy.expr >> expr.expr.ElementPtrIntegers(0,0).store(other.expr.ElementPtrIntegers(0,0).load()),
-                    false=outputExpr
-                    )
-
-            return context.NoneExpr(outputExpr)
+            return native_ast.nullExpr
 
     def convert_destroy(self, context, expr):
         if self.is_pod:
-            return context.NoneExpr()
+            return native_ast.nullExpr
         else:
-            outputExpr = native_ast.nullExpr
-            for ix, t in enumerate(self.typeRepresentation.Types):
-                tWrapper = typeWrapper(t)
+            with context.switch(expr.expr.ElementPtrIntegers(0,0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
+                for ix, subcontext in indicesAndContexts:
+                    with subcontext:
+                        context.pushEffect(
+                            self.refAs(context, expr, ix).convert_destroy()
+                            )
 
-                if not tWrapper.is_pod:
-                    destroy = self.refAs(context, expr, ix).convert_destroy()
-                    outputExpr = outputExpr >> native_ast.Expression.Branch(
-                        cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(ix)),
-                        true=destroy.expr,
-                        false=outputExpr
-                        )
-
-            return context.NoneExpr(outputExpr)
+            return native_ast.nullExpr
 
     def convert_to_type(self, context, expr, otherType):
+        if otherType == self:
+            return expr
+
         if otherType.typeRepresentation in self.typeRepresentation.Types:
+            #this is wrong - we need to be unpacking each of the alternatives
+            #and attempting to convert them. Which should probably be a function...
             assert expr.isReference
 
             which = tuple(self.typeRepresentation.Types).index(otherType.typeRepresentation)
 
-            result = context.allocate_temporary(otherType)
-
-            return context.RefExpr(
-                native_ast.Expression.Branch(
-                    cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(which)),
-                    true=result.convert_copy_initialize(self.refAs(context, expr, which)).expr
-                        >> context.activates_temporary(result)
-                        >> result.expr,
-                    false=generateThrowException(context, Exception("Can't convert"))
-                    ),
-                otherType
+            return context.push(
+                otherType,
+                lambda result:
+                    native_ast.Expression.Branch(
+                        cond=expr.expr.ElementPtrIntegers(0,0).load().eq(native_ast.const_uint8_expr(which)),
+                        true=result.convert_copy_initialize(self.refAs(context, expr, which)),
+                        false=generateThrowException(context, Exception("Can't convert"))
+                        )
                 )
 
         return super().convert_to_type(context, expr, otherType)
@@ -211,48 +180,41 @@ class OneOfWrapper(Wrapper):
 
         return (
             result.expr.ElementPtrIntegers(0,0).store(native_ast.const_uint8_expr(which)) 
-                    >> self.refAs(context, result, which).convert_copy_initialize(otherExpr).expr
-                    >> context.activates_temporary(result)
-                    >> native_ast.nullExpr
+                    >> self.refAs(context, result, which).convert_copy_initialize(otherExpr)
             )
 
     def convert_to_self(self, context, otherExpr):
-        result = context.allocate_temporary(self)
+        if otherExpr.expr_type == self:
+            return otherExpr
 
-        return context.RefExpr(
-            self.convert_to_self_with_target(context, result, otherExpr).expr
-                >> result.expr,
-            self
+        return context.push(self, lambda result:
+            self.convert_to_self_with_target(context, result, otherExpr)
             )
 
     def convert_to_self_with_target(self, context, result, otherExpr):
         if otherExpr.expr_type == self:
-            return context.NoneExpr(
-                result.convert_copy_initialize(otherExpr).expr
-                    >> context.activates_temporary(result)
-                )
+            return result.convert_copy_initialize(otherExpr)
 
         if isinstance(otherExpr.expr_type, OneOfWrapper):
-            #for each type in 'other' that exists in us, generate a conversion option. Otherwise bail
-            exprs = []
-            for i in range(len(otherExpr.expr_type.typeRepresentation.Types)):
-                exprs.append(
-                    self.convert_to_self_with_target(
-                        context,
-                        result, 
-                        otherExpr.expr_type.refAs(context, otherExpr, i)
-                        ).expr
-                    )
-            return context.NoneExpr(
-                otherExpr.expr_type.makeSwitchExpr(otherExpr, exprs)
-                )
+            with context.switch(
+                    otherExpr.expr.ElementPtrIntegers(0,0).load(), 
+                    range(len(otherExpr.expr_type.typeRepresentation.Types)),
+                    False
+                    ) as indicesAndContexts:
+                for i, subcontext in indicesAndContexts:
+                    with subcontext:
+                        context.pushEffect(
+                            self.convert_to_self_with_target(
+                                context,
+                                result,
+                                otherExpr.expr_type.refAs(context, otherExpr, i)
+                                )
+                            )
+            return native_ast.nullExpr
 
         if otherExpr.expr_type.typeRepresentation in self.typeRepresentation.Types:
             which = tuple(self.typeRepresentation.Types).index(otherExpr.expr_type.typeRepresentation)
 
-            return context.NoneExpr(
-                self.convert_to_self_native_expr(context, result, otherExpr, which)
-                    >> context.activates_temporary(result)
-                )
+            return self.convert_to_self_native_expr(context, result, otherExpr, which)
 
         return super().convert_to_self(context, otherExpr)

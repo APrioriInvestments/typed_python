@@ -34,12 +34,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         assert False
 
     def convert_incref(self, context, expr):
-        return TypedExpression(
-            context,
-            runtime_functions.incref_pyobj.call(expr.nonref_expr) >> expr.expr,
-            self,
-            expr.isReference
-            )
+        return runtime_functions.incref_pyobj.call(expr.nonref_expr) >> expr.expr
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
@@ -47,9 +42,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         return (
             toStore.convert_incref() >> 
             target.convert_destroy() >> 
-            context.NoneExpr(
-                target.expr.store(toStore.nonref_expr)
-                )
+            target.expr.store(toStore.nonref_expr)
             )
 
     def convert_copy_initialize(self, context, target, toStore):
@@ -57,41 +50,43 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         return (
             toStore.convert_incref() >> 
-             context.NoneExpr(
-                target.expr.store(toStore.nonref_expr)
-                )
+            target.expr.store(toStore.nonref_expr)
             )
 
     def convert_destroy(self, context, instance):
-        return context.NoneExpr(
-            runtime_functions.decref_pyobj.call(instance.nonref_expr)
-            )
+        return runtime_functions.decref_pyobj.call(instance.nonref_expr)
 
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
-        return context.ValueExpr(
-            runtime_functions.getattr_pyobj.call(
-                instance.nonref_expr, 
-                native_ast.const_utf8_cstr(attr)
-                ),
-            self
+        return context.push(
+            self,
+            lambda targetSlot:
+                targetSlot.expr.store(
+                    runtime_functions.getattr_pyobj.call(
+                        instance.nonref_expr, 
+                        native_ast.const_utf8_cstr(attr)
+                        )
+                    )
             )
 
     def convert_to_type(self, context, expr, target_type):
         if target_type.typeRepresentation == Int64():
-            return context.ValueExpr(
-                runtime_functions.pyobj_to_int.call(expr.nonref_expr),
-                target_type
+            return context.pushPod(
+                target_type,
+                runtime_functions.pyobj_to_int.call(expr.nonref_expr)
                 )
 
         return super().convert_to_type(context, expr, target_type)
 
     def convert_to_self(self, context, expr):
         if expr.expr_type.typeRepresentation == Int64():
-            return context.ValueExpr(
-                runtime_functions.int_to_pyobj.call(expr.nonref_expr),
-                self
+            return context.push(
+                self,
+                lambda targetSlot:
+                    targetSlot.expr.store(
+                        runtime_functions.int_to_pyobj.call(expr.nonref_expr)
+                        )
                 )
 
         return super().convert_to_self(context, expr)

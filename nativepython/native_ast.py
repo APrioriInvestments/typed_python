@@ -230,7 +230,7 @@ def expr_str(self):
         f = str(self.false)
         if "\n" in t or "\n" in f:
             return "if " + str(self.cond) + ":\n"\
-                    + indent(t).rstrip() + "\nelse:\n" + indent(f).rstrip()
+                    + indent(t).rstrip() + ("\nelse:\n" + indent(f).rstrip() if self.false != nullExpr else "")
         else:
             return "((%s) if %s else (%s))" % (t,str(self.cond),f)
     if self.matches.MakeStruct:

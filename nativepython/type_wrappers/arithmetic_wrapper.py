@@ -51,14 +51,14 @@ class ArithmeticTypeWrapper(Wrapper):
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
-        return context.NoneExpr(target.expr.store(toStore.nonref_expr))
+        return target.expr.store(toStore.nonref_expr)
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
-        return context.NoneExpr(target.expr.store(toStore.nonref_expr))
+        return target.expr.store(toStore.nonref_expr)
 
     def convert_destroy(self, context, instance):
-        return context.NoneExpr()
+        return native_ast.nullExpr
 
 class Int64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
@@ -68,44 +68,22 @@ class Int64Wrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Int(bits=64,signed=True)
 
     def toFloat64(self, context, e):
-        return context.ValueExpr(
+        return context.pushPod(
+            float,
             native_ast.Expression.Cast(
                 left=e.nonref_expr,
                 to_type=native_ast.Type.Float(bits=64)
-                ),
-            Float64Wrapper()
+                )
             )
-
-    def sugar_comparison(self, left, right, which):
-        if isinstance(right, int):
-            return left.context.ValueExpr(
-                native_ast.Expression.Binop(
-                    l=left.nonref_expr,
-                    r=native_ast.const_int_expr(right),
-                    op=getattr(native_ast.BinaryOp, which)()
-                    ),
-                BoolWrapper()
-                )
-        elif isinstance(right, TypedExpression) and isinstance(right.expr_type, Int64Wrapper):
-            return left.context.ValueExpr(
-                native_ast.Expression.Binop(
-                    l=left.nonref_expr,
-                    r=right.nonref_expr,
-                    op=getattr(native_ast.BinaryOp, which)()
-                    ),
-                BoolWrapper()
-                )
-
-        raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
 
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == Float64():
-            return context.ValueExpr(
+            return context.pushPod(
+                float,
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Float(bits=64)
-                    ),
-                Float64Wrapper()
+                    )
                 )
         elif target_type.typeRepresentation == Int64():
             return e
@@ -121,21 +99,22 @@ class Int64Wrapper(ArithmeticTypeWrapper):
 
         if right.expr_type == left.expr_type:
             if op.matches.Mod:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     native_ast.Expression.Branch(
                         cond=right.nonref_expr,
                         true=runtime_functions.mod_int64_int64.call(left.nonref_expr, right.nonref_expr),
                         false=generateThrowException(context, ZeroDivisionError())
-                        ),
-                    self
+                        )
                     )
             if op.matches.Pow:
-                return context.ValueExpr(
-                    runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr),
-                    self
+                return context.pushPod(
+                    self,
+                    runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr)
                     )
             if op.matches.LShift or op.matches.RShift:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     native_ast.Expression.Branch(
                         cond=(right >= 0).nonref_expr,
                         true=native_ast.Expression.Binop(
@@ -144,27 +123,26 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                             op=pyOpToNative[op]
                             ),
                         false=generateThrowException(context, ValueError("negative shift count"))
-                        ),
-                    self
+                        )
                     )
 
             if op in pyOpToNative:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     native_ast.Expression.Binop(
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyOpToNative[op]
-                        ),
-                    self
+                        )
                     )
             if op in pyCompOp:
-                return context.ValueExpr(
+                return context.pushPod(
+                    bool,
                     native_ast.Expression.Binop(
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyCompOp[op]
-                        ),
-                    BoolWrapper()
+                        )
                     )
 
         if isinstance(right.expr_type, Float64Wrapper):
@@ -179,40 +157,41 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=1,signed=False)
 
-    def sugar_operator(self, left, right, opname):
-        if isinstance(right, TypedExpression) and isinstance(right.expr_type, BoolWrapper):
-            return left.context.ValueExpr(
-                native_ast.Expression.Binop(
-                    l=left.nonref_expr,
-                    r=right.nonref_expr,
-                    op=getattr(native_ast.BinaryOp, opname)()
-                    ),
-                BoolWrapper()
-                )
-
-        raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
-
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == Float64():
-            return context.ValueExpr(
+            return context.pushPod(
+                float,
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Float(bits=64)
-                    ),
-                Float64Wrapper()
+                    )
                 )
         elif target_type.typeRepresentation == Int64():
-            return context.ValueExpr(
+            return context.pushPod(
+                int,
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Int(bits=64, signed=True)
-                    ),
-                Int64Wrapper()
+                    )
                 )
         elif target_type.typeRepresentation == Bool():
             return e
 
         return super().convert_to_type(context, e, target_type)
+
+    def convert_bin_op(self, context, left, op, right):
+        if right.expr_type == left.expr_type:
+            if op.matches.BitOr or op.matches.BitAnd or op.matches.BitXor:
+                return context.pushPod(
+                    self,
+                    native_ast.Expression.Binop(
+                        l=left.nonref_expr,
+                        r=right.nonref_expr,
+                        op=pyOpToNative[op]
+                        )
+                    )
+
+        return super().convert_bin_op(context, left, op, right)
         
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
@@ -221,38 +200,16 @@ class Float64Wrapper(ArithmeticTypeWrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Float(bits=64)
 
-    def sugar_comparison(self, left, right, which):
-        if isinstance(right, float):
-            return left.context.ValueExpr(
-                native_ast.Expression.Binop(
-                    l=left.nonref_expr,
-                    r=native_ast.const_float_expr(right),
-                    op=getattr(native_ast.BinaryOp, which)()
-                    ),
-                BoolWrapper()
-                )
-        elif isinstance(right, TypedExpression) and isinstance(right.expr_type, Float64Wrapper):
-            return right.context.ValueExpr(
-                native_ast.Expression.Binop(
-                    l=left.nonref_expr,
-                    r=right.nonref_expr,
-                    op=getattr(native_ast.BinaryOp, which)()
-                    ),
-                BoolWrapper()
-                )
-
-        raise TypeError("Can't provide a syntactic-sugar for op %s and types %s and %s" % (op, left.expr_type, right.expr_type))
-
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == Float64():
             return e
         elif target_type.typeRepresentation == Int64():
-            return context.ValueExpr(
+            return context.pushPod(
+                int,
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Int(bits=64, signed=True)
-                    ),
-                Int64Wrapper()
+                    )
                 )
         elif target_type.typeRepresentation == Bool():
             return e != 0.0
@@ -265,7 +222,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
 
         if right.expr_type == left.expr_type:
             if op.matches.Mod or op.matches.Div:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     native_ast.Expression.Branch(
                         cond=right.nonref_expr,
                         true=native_ast.Expression.Binop(
@@ -274,34 +232,33 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                             op=pyOpToNative[op]
                             ),
                         false=generateThrowException(context, ZeroDivisionError())
-                        ),
-                    self
+                        )
                     )
             if op.matches.Pow:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     runtime_functions.pow_float64_float64.call(
                         left.nonref_expr, right.nonref_expr
-                        ),
-                    self
+                        )
                     )
 
             if op in pyOpToNative:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     native_ast.Expression.Binop(
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyOpToNative[op]
-                        ),
-                    self
+                        )
                     )
             if op in pyCompOp:
-                return context.ValueExpr(
+                return context.pushPod(
+                    self,
                     native_ast.Expression.Binop(
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyCompOp[op]
-                        ),
-                    BoolWrapper()
+                        )
                     )
 
         return super().convert_bin_op(context, left, op, right)

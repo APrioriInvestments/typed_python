@@ -24,6 +24,10 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+def withFreshContext(callback):
+    c = nativepython.expression_conversion_context.ExpressionConversionContext()
+    return c.finalize(callback(c))
+
 class TupleOfWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -57,27 +61,26 @@ class TupleOfWrapper(RefcountedWrapper):
                     ('destructor', self), 
                     [self],
                     typeWrapper(NoneType()),
-                    lambda: self.generateNativeDestructorFunction(context)
+                    lambda: self.generateNativeDestructorFunction()
                     )
                 .call(instance.expr)
                 )
 
-    def generateNativeDestructorFunction(self, context):
-        inst_expr = native_ast.Expression.Variable(name='input').load()
+    def generateNativeDestructorFunction(self):
+        context = nativepython.expression_conversion_context.ExpressionConversionContext()
 
-        body = native_ast.FunctionBody.Internal(body=
-            context.loop_expr(
-                inst_expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64),
-                lambda ix_expr:
-                    context.RefExpr(
-                        inst_expr.ElementPtrIntegers(0,3).cast(
-                            self.underlyingWrapperType.getNativeLayoutType().pointer()
-                            ).elemPtr(ix_expr),
-                        self.underlyingWrapperType
-                        ).convert_destroy().expr
-                ).expr >>
-            runtime_functions.free.call(inst_expr.cast(native_ast.UInt8Ptr))
+        inst = context.inputArg(self, 'input')
+        
+        with context.loop(inst.convert_len()) as i:
+            context.pushEffect(
+                inst.convert_getitem_unsafe(i).convert_destroy()
+                )
+
+        context.pushEffect(
+            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
             )
+
+        body = native_ast.FunctionBody.Internal(context.finalize(None))
 
         return native_ast.Function(
             args=[
@@ -90,35 +93,66 @@ class TupleOfWrapper(RefcountedWrapper):
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
             if op.matches.Add:
-                new_tuple = context.allocate_temporary(self)
-
-                return context.RefExpr(
-                    context.converter.defineNativeFunction(
-                        'concatenate_tuples(' + self.typeRepresentation.__name__ + "," + right.expr_type.typeRepresentation.__name__ + ")",
-                        ('util', self, 'concatenate', right.expr_type),
-                        [self, self],
-                        self,
-                        lambda: self.generateConcatenateTuple(context)
-                        ).call(new_tuple.expr, left.expr, right.expr)
-                    >> context.activates_temporary(new_tuple)
-                    >> new_tuple.expr,
-                    self                    
+                return context.push(
+                    self,
+                    lambda new_tuple:
+                        context.converter.defineNativeFunction(
+                            'concatenate_tuples(' + self.typeRepresentation.__name__ + "," + right.expr_type.typeRepresentation.__name__ + ")",
+                            ('util', self, 'concatenate', right.expr_type),
+                            [self, self],
+                            self,
+                            lambda: self.generateConcatenateTuple()
+                            ).call(new_tuple.expr, left.expr, right.expr)
                     )
 
         return super().convert_bin_op(context, left, op, right)
 
-    def generateConcatenateTuple(self, context):
+    def generateConcatenateTuple(self):
         out_expr = native_ast.Expression.Variable(name='output')
         left_expr = native_ast.Expression.Variable(name='left').load()
         right_expr = native_ast.Expression.Variable(name='right').load()
 
+        #create a native-function expression context
+        context = nativepython.expression_conversion_context.ExpressionConversionContext()
 
         def elt_ref(tupPtrExpr, iExpr):
-            return context.RefExpr(
+            return context.pushReference(
+                self.underlyingWrapperType,
                 tupPtrExpr.ElementPtrIntegers(0,3).cast(
                         self.underlyingWrapperType.getNativeLayoutType().pointer()
-                        ).elemPtr(iExpr),
-                self.underlyingWrapperType
+                        ).elemPtr(iExpr)
+                )
+
+        left = context.inputArg(self, 'left')
+        right = context.inputArg(self, 'right')
+        out = context.inputArg(self, 'output')
+
+        left_size = left.convert_len()
+        right_size = right.convert_len()
+
+        context.pushEffect(
+            out.expr.store(
+                runtime_functions.malloc.call(
+                    left_size.nonref_expr
+                        .add(right_size.nonref_expr)
+                        .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
+                        .add(native_ast.const_int_expr(16))
+                    ).cast(self.getNativeLayoutType())
+                ) >>
+            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
+            out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
+            out.expr.load().ElementPtrIntegers(0, 2).store(
+                left_size.nonref_expr.add(right_size.nonref_expr).cast(native_ast.Int32)
+                )
+            )
+        with context.loop(left_size) as i:
+            context.pushEffect(
+                out.convert_getitem_unsafe(i).convert_copy_initialize(left.convert_getitem_unsafe(i))
+                )
+
+        with context.loop(right_size) as i:
+            context.pushEffect(
+                out.convert_getitem_unsafe(i+left_size).convert_copy_initialize(right.convert_getitem_unsafe(i))
                 )
 
         return native_ast.Function(
@@ -127,47 +161,27 @@ class TupleOfWrapper(RefcountedWrapper):
                   ('right', self.getNativePassingType())
                   ],
             output_type=native_ast.Void,
-            body=
-                native_ast.FunctionBody.Internal(body=
-                    context.let(self.convert_len_native(left_expr), lambda left_size_expr:
-                    context.let(self.convert_len_native(right_expr), lambda right_size_expr:
-                    out_expr.store(
-                        runtime_functions.malloc.call(
-                            left_size_expr.add(right_size_expr).mul(self.underlyingWrapperType.getBytecount())
-                                .add(native_ast.const_int_expr(16))
-                            ).cast(self.getNativeLayoutType())
-                        ) >>
-                    out_expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
-                    out_expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
-                    out_expr.load().ElementPtrIntegers(0, 2).store(
-                        left_size_expr.add(right_size_expr).cast(native_ast.Int32)
-                        ) >>
-                    context.loop_expr(
-                        left_size_expr,
-                        lambda i: elt_ref(out_expr.load(), i)
-                            .convert_copy_initialize(elt_ref(left_expr, i)).expr
-                        ).expr >> 
-                    context.loop_expr(
-                        right_size_expr,
-                        lambda i: elt_ref(out_expr.load(), i.add(left_size_expr))
-                            .convert_copy_initialize(elt_ref(right_expr, i)).expr
-                        ).expr
-                    ))
-                )
+            body=native_ast.FunctionBody.Internal(context.finalize(None))
             )
 
     def convert_getitem(self, context, expr, item):
-        expr = expr.ensureNonReference()
-
-        return context.RefExpr(
+        return context.pushReference(
+            self.underlyingWrapperType,
             native_ast.Expression.Branch(
                 cond=((item >= 0) & (item < self.convert_len(context, expr))).nonref_expr,
-                true=expr.expr.ElementPtrIntegers(0,3).cast(
+                true=expr.nonref_expr.ElementPtrIntegers(0,3).cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
                     ).elemPtr(item.toInt64().nonref_expr),
                 false=generateThrowException(context, IndexError("tuple index out of range"))
-                ),
-            self.underlyingWrapperType
+                )
+            )
+
+    def convert_getitem_unsafe(self, context, expr, item):
+        return context.pushReference(
+            self.underlyingWrapperType,
+            expr.nonref_expr.ElementPtrIntegers(0,3).cast(
+                self.underlyingWrapperType.getNativeLayoutType().pointer()
+                ).elemPtr(item.toInt64().nonref_expr)
             )
 
     def convert_len_native(self, expr):
@@ -178,10 +192,7 @@ class TupleOfWrapper(RefcountedWrapper):
                 )
 
     def convert_len(self, context, expr):
-        return context.ValueExpr(
-            self.convert_len_native(expr.nonref_expr),
-            Int64()
-            )
+        return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
 
 

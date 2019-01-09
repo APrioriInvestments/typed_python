@@ -51,13 +51,6 @@ class Wrapper(object):
     def __hash__(self):
         return hash(self.typeRepresentation)
 
-    def ensureNonReference(self, e):
-        if e.isReference:
-            if self.is_empty:
-                return e.context.NoneExpr(e.expr + native_ast.nullExpr)
-            return e.context.ValueExpr(e.expr.load(), e.expr_type)
-        return e
-
     def getNativePassingType(self):
         if self.is_pass_by_ref:
             return self.getNativeLayoutType().pointer()
@@ -76,17 +69,13 @@ class Wrapper(object):
         raise NotImplementedError(self)
 
     def convert_attribute(self, context, instance, attribute):
-        return nativepython.typed_expression.TypedExpression(
-            generateThrowException(context, AttributeError("object has no attribute " + attribute)),
-            None,
-            False
+        return context.pushTerminal(
+            generateThrowException(context, AttributeError("object has no attribute " + attribute))
             )
 
     def convert_set_attribute(self, context, instance, attribute, value):
-        return nativepython.typed_expression.TypedExpression(
-            generateThrowException(context, AttributeError("object has no attribute " + attribute)),
-            None,
-            False
+        return context.pushTerminal(
+            generateThrowException(context, AttributeError("object has no attribute " + attribute))
             )
 
     def convert_assign(self, context, target, toStore):
@@ -102,12 +91,12 @@ class Wrapper(object):
         raise NotImplementedError(self)
 
     def convert_len(self, context, expr):
-        return context.TerminalExpr(
+        return context.pushTerminal(
             generateThrowException(context, TypeError("Can't take 'len' of instance of type '%s'" % (self,)))
             )
 
     def convert_unary_op(self, context, expr, op):
-        return context.TerminalExpr(
+        return context.pushTerminal(
             generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))
             )
 
@@ -115,7 +104,9 @@ class Wrapper(object):
         return target_type.convert_to_self(context, expr)
 
     def convert_to_self(self, context, expr):
-        return context.TerminalExpr(
+        if expr.expr_type == self:
+            return expr
+        return context.pushTerminal(
             generateThrowException(context, TypeError("Can't convert from type %s to type %s" % (expr.expr_type, self)))
             )
 
@@ -123,6 +114,6 @@ class Wrapper(object):
         return r.expr_type.convert_bin_op_reverse(context, r, op, l)
 
     def convert_bin_op_reverse(self, context, r, op, l):
-        return context.TerminalExpr(
+        return context.pushTerminal(
             generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" % (op, l.expr_type, r.expr_type)))
             )

@@ -142,4 +142,14 @@ class TestOneOfOfCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10)
         self.assertIs(f(None), None)
 
+    def test_one_of_returning(self):
+        @Compiled
+        def f(x: OneOf(None, int, float)) -> OneOf(None, int, float):
+            y = x
+            return y
+
+        self.assertEqual(f(10), 10)
+        self.assertEqual(f(10.5), 10.5)
+        self.assertIs(f(None), None)
+
     

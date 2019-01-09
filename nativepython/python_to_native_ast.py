@@ -17,6 +17,7 @@ import typed_python.ast_util as ast_util
 
 import nativepython
 import nativepython.native_ast as native_ast
+from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
 from nativepython.typed_expression import TypedExpression
@@ -196,18 +197,15 @@ class ExceptionHandlingHelper:
 class FunctionOutput:
     pass
 
-class ConversionContext(object):
+class FunctionConversionContext(object):
     """Helper function for converting a single python function.""" 
     def __init__(self, converter, varname_to_type, free_variable_lookup):
         self.exception_helper = ExceptionHandlingHelper(self)
         self.converter = converter
         self._varname_to_type = varname_to_type
-        self._varname_and_type_to_slot_name = {}
-        self._varname_uses = {}
         self._free_variable_lookup = free_variable_lookup
-        self._temporaries = {}
-        self._new_temporaries = set()
         self._temp_let_var = 0
+        self._temp_stack_var = 0
         self._typesAreUnstable = False
         self._functionOutputTypeKnown = FunctionOutput in varname_to_type
 
@@ -217,383 +215,13 @@ class ConversionContext(object):
     def resetTypeInstabilityFlag(self):
         self._typesAreUnstable = False
 
-    def loop_expr(self, countExpr, callback):
-        """Evaluate 'callbackExpr' on the integers from 0 to 'countExpr'.
-
-        callbackExpr: function from native expression of int to native expression
-        countExpr: an expression containing the number of elements.
-
-        returns a TypedExpression evaluating to None
-        """
-        counter = self.allocate_temporary(typeWrapper(int))
-        max_varname = self.let_varname()
-
-        return self.NoneExpr(
-            native_ast.Expression.Let(
-                var=max_varname,
-                val=countExpr,
-                within=
-                    counter.expr.store(native_ast.const_int_expr(0)) >> 
-                    native_ast.Expression.While(
-                        cond=counter.nonref_expr.lt(native_ast.Expression.Variable(name=max_varname)),
-                        while_true=callback(counter.nonref_expr) >> counter.expr.store(counter.nonref_expr.add(1)),
-                        orelse=native_ast.nullExpr
-                        )
-                )
-            )
-
-
     def let_varname(self):
         self._temp_let_var += 1
         return ".letvar.%s" % (self._temp_let_var-1)
 
-    def let(self, e1, e2):
-        v = self.let_varname()
-
-        return native_ast.Expression.Let(
-            var=v,
-            val=e1,
-            within=e2(native_ast.Expression.Variable(name=v))
-            )
-
-    def NoneExpr(self, expr=None):
-        return TypedExpression(self, expr if expr is not None else native_ast.nullExpr, NoneWrapper(), False)
-
-    def TerminalExpr(self, expr):
-        return TypedExpression(self, expr, None, False)
-
-    def ValueExpr(self, expr, type):
-        return TypedExpression(self, expr, type, False)
-
-    def RefExpr(self, expr, type):
-        return TypedExpression(self, expr, type, True)
-
-    def activates_temporary(self, slot):
-        if slot.expr_type.is_pod:
-            return native_ast.nullExpr
-
-        return native_ast.Expression.ActivatesTeardown(name=slot.expr.name)
-
-    def allocate_temporary(self, slot_type):
-        tname = '.temp.%s' % len(self._temporaries)
-        self._new_temporaries.add(tname)
-        self._temporaries[tname] = slot_type
-
-        return self.RefExpr(
-            native_ast.Expression.StackSlot(name=tname,type=slot_type.getNativeLayoutType()),
-            slot_type
-            )
-
-    def named_var_expr(self, name):
-        if self._varname_to_type[name] is None:
-            raise ConversionException(
-                "variable %s is not in scope here" % name
-                )
-
-        slot_type = self._varname_to_type[name]
-
-        if name not in self._varname_uses:
-            self._varname_uses[name] = 0
-
-        if (slot_type, name) not in self._varname_and_type_to_slot_name:
-            self._varname_uses[name] += 1
-            if self._varname_uses[name] > 1:
-                name_to_use = name + ".%s" % self._varname_uses[name]
-            else:
-                name_to_use = name
-
-            self._varname_and_type_to_slot_name[slot_type,name] = name_to_use
-
-        name_to_use = self._varname_and_type_to_slot_name[slot_type,name]
-
-        return TypedExpression(
-            self,
-            native_ast.Expression.StackSlot(
-                name=name_to_use,
-                type=slot_type.getNativeLayoutType()
-                ),
-            slot_type,
-            isReference=True
-            )
-
-    def call_py_function(self, f, args):
-        #force arguments to a type appropriate for argpassing
-
-        def call(*args):
-            native_args = [a.as_native_call_arg() for a in args]
-
-            call_target = \
-                self.converter.convert(
-                    f,
-                    [a.expr_type for a in args],
-                    None
-                    )
-
-            if call_target.output_type.is_pass_by_ref:
-                assert len(call_target.named_call_target.arg_types) == len(args)+1
-            
-                return_val = self.allocate_temporary(call_target.output_type)
-
-                return self.RefExpr(
-                    call_target.call(return_val.expr, *native_args) >> return_val.expr,
-                    call_target.output_type
-                    )
-            else:
-                assert len(call_target.named_call_target.arg_types) == len(args)
-            
-                return self.ValueExpr(
-                    call_target.call(*native_args),
-                    call_target.output_type
-                    )
-
-        return self.wrapInTemporaries(call, args)
-
-    def convert_expression_ast(self, ast):
-        return self.convert_expression_ast_(ast)
-
-    def wrapInTemporaries(self, fun, args):
-        """Call 'fun' with args that are all simple reference to values or nonref pod."""
-
-        for i,a in enumerate(args):
-            if not (a.isReference or not a.expr_type.is_pass_by_ref):
-                #'a' contains an increffed value that will be valid for the duration of the statement
-                #we're in. we'll move it to a stack slot. We assume all of our types are moveable (no self pointers to the stack)
-                slot = self.allocate_temporary(a.expr_type)
-
-                result = self.wrapInTemporaries(fun, args[:i] + (slot,) + args[i+1:])
-
-                return TypedExpression(
-                    self,
-                    slot.expr.store(a.expr)
-                        >> result.expr,
-                    result.expr_type,
-                    result.isReference
-                    )
-
-            elif not a.expr.is_simple():
-                let_varname = self.let_varname()
-
-                result = self.wrapInTemporaries(
-                    fun, 
-                    args[:i]
-                        + (TypedExpression(self, native_ast.Expression.Variable(name=let_varname), a.expr_type, a.isReference),) 
-                        + args[i+1:]
-                    )
-
-                return TypedExpression(
-                    self,
-                    native_ast.Expression.Let(
-                        var=let_varname,
-                        val=a.expr,
-                        within=result.expr
-                        ),
-                    result.expr_type,
-                    result.isReference
-                    )
-
-        return fun(*args)
-
-    def convert_expression_ast_(self, ast):
-        if ast.matches.Attribute:
-            attr = ast.attr
-            val = self.convert_expression_ast(ast.value)
-
-            return val.convert_attribute(attr)
-
-        if ast.matches.Name:
-            assert ast.ctx.matches.Load
-            if ast.id in self._varname_to_type:
-                return self.named_var_expr(ast.id)
-
-            if ast.id in self._free_variable_lookup:
-                return pythonObjectRepresentation(self, self._free_variable_lookup[ast.id])
-
-            elif ast.id in __builtins__:
-                return pythonObjectRepresentation(self, __builtins__[ast.id])
-
-            if ast.id not in self._varname_to_type:
-                raise ConversionException(
-                    "can't find variable %s"  % ast.id
-                    )
-
-        if ast.matches.Num:
-            if ast.n.matches.None_:
-                return pythonObjectRepresentation(self, None)
-            if ast.n.matches.Boolean:
-                return pythonObjectRepresentation(self, bool(ast.n.value))
-            if ast.n.matches.Int:
-                return pythonObjectRepresentation(self, int(ast.n.value))
-            if ast.n.matches.Float:
-                return pythonObjectRepresentation(self, float(ast.n.value))
-
-        if ast.matches.Str:
-            return pythonObjectRepresentation(self, ast.s)
-
-        if ast.matches.BoolOp:
-            def exprForVals(*values):
-                op = ast.op
-                
-                expr_so_far = []
-
-                for i in range(len(values)):
-                    expr_so_far.append(values[i].toBool().expr)
-                    if expr_so_far[-1].matches.Constant:
-                        if (expr_so_far[-1].val.val and op.matches.Or or
-                                    (not expr_so_far[-1].val.val) and op.matches.And):
-                            #this is a short-circuit
-                            if len(expr_so_far) == 1:
-                                return self.ValueExpr(expr_so_far[0], Bool)
-
-                            return self.ValueExpr(
-                                native_ast.Expression.Sequence(expr_so_far),
-                                Bool
-                                )
-                        else:
-                            expr_so_far.pop()
-
-                if not expr_so_far:
-                    if op.matches.Or:
-                        #must have had all False constants
-                        return self.ValueExpr(native_ast.falseExpr, Bool)
-                    else:
-                        #must have had all True constants
-                        return self.ValueExpr(native_ast.trueExpr, Bool)
-
-                while len(expr_so_far) > 1:
-                    l,r = expr_so_far[-2], expr_so_far[-1]
-                    expr_so_far.pop()
-                    expr_so_far.pop()
-                    if op.matches.And:
-                        new_expr = native_ast.Expression.Branch(cond=l, true=r, false=native_ast.falseExpr)
-                    else:
-                        new_expr = native_ast.Expression.Branch(cond=l, true=native_ast.trueExpr, false=r)
-                    expr_so_far.append(new_expr)
-
-                return self.ValueExpr(expr_so_far[0], bool)
-
-            return self.wrapInTemporaries(exprForVals, tuple(self.convert_expression_ast(v).toBool() for v in ast.values))
-
-        if ast.matches.BinOp:
-            l = self.convert_expression_ast(ast.left)
-            r = self.convert_expression_ast(ast.right)
-
-            return self.wrapInTemporaries(lambda l,r: l.convert_bin_op(ast.op, r), (l,r))
-
-        if ast.matches.UnaryOp:
-            operand = self.convert_expression_ast(ast.operand)
-
-            return operand.convert_unary_op(ast.op)
-
-        if ast.matches.Subscript:
-            assert ast.slice.matches.Index
-
-            val = self.convert_expression_ast(ast.value)
-            index = self.convert_expression_ast(ast.slice.value)
-
-            return val.convert_getitem(index)
-
-        if ast.matches.Call:
-            l = self.convert_expression_ast(ast.func)
-
-            ast_args = ast.args
-            stararg = None
-
-            for a in ast_args:
-                assert not a.matches.Starred, "not implemented yet"
-
-            args = [self.convert_expression_ast(a) for a in ast_args]
-
-            return l.convert_call(args)
-
-        if ast.matches.Compare:
-            assert len(ast.comparators) == 1, "multi-comparison not implemented yet"
-            assert len(ast.ops) == 1
-
-            l = self.convert_expression_ast(ast.left)
-            r = self.convert_expression_ast(ast.comparators[0])
-
-            return l.convert_bin_op(ast.ops[0], r)
-
-        if ast.matches.Tuple:
-            raise NotImplementedError("not implemented yet")
-
-        if ast.matches.IfExp:
-            test = self.convert_expression_ast(ast.test).toBool()
-            body = self.convert_expression_ast(ast.body)
-            orelse = self.convert_expression_ast(ast.orelse)
-
-            if body.expr_type != orelse.expr_type:
-                if body.expr_type.nonref_type == orelse.expr_type.nonref_type and \
-                        body.expr_type.nonref_type.is_pod:
-                    body = body.dereference()
-                    orelse = orelse.dereference()
-                else:
-                    raise ConversionException("Expected IfExpr to have the same type, but got " +
-                        "%s and %s" % (body.expr_type, orelse.expr_type))
-
-            assert body.isReference == orelse.isReference
-
-            return TypedExpression(
-                    self,
-                    native_ast.Expression.Branch(
-                        cond=test.expr,
-                        true=body.expr,
-                        false=orelse.expr
-                        ),
-                    body.expr_type,
-                    body.isReference
-                    )
-
-        raise ConversionException("can't handle python expression type %s" % ast._which)
-
-    def convert_statement_ast_and_teardown_tmps(self, ast):
-        if self._new_temporaries:
-            raise ConversionException("Expected no temporaries on %s. instead have of types %s" %
-                (ast._which, [str(self._temporaries[x]) for x in self._new_temporaries])
-                )
-
-        expr = self.convert_statement_ast(ast)
-
-        return self.consume_temporaries(expr)
-
-    def consume_temporaries(self, expr):
-        teardowns = []
-
-        for tname in sorted(self._new_temporaries):
-            teardown = native_ast.Teardown.ByTag(
-                tag=tname,
-                expr=self._temporaries[tname].convert_destroy(
-                    self,
-                    self.RefExpr(
-                        native_ast.Expression.StackSlot(
-                            name=tname,
-                            type=self._temporaries[tname].getNativeLayoutType()
-                            ),
-                        self._temporaries[tname]
-                        )
-                    ).expr
-                )
-
-            if not teardown.expr.matches.Constant:
-                teardowns.append(teardown)
-
-        self._new_temporaries = set()
-
-        if expr is None:
-            return teardowns
-
-        if not teardowns:
-            return expr
-
-        return TypedExpression(
-            self,
-            native_ast.Expression.Finally(expr=expr.expr, teardowns=teardowns),
-            expr.expr_type,
-            expr.isReference
-            )
-
-    def convert_statement_ast(self, ast):
-        return self.convert_statement_ast_(ast)
+    def stack_varname(self):
+        self._temp_stack_var += 1
+        return ".stackvar.%s" % (self._temp_stack_var-1)
 
     def upsizeVariableType(self, varname, new_type):
         assert varname in self._varname_to_type
@@ -609,7 +237,7 @@ class ConversionContext(object):
         self._typesAreUnstable = True
         self._varname_to_type[varname] = typeWrapper(final_type)
 
-    def convert_statement_ast_(self, ast):
+    def convert_statement_ast(self, ast):
         if ast.matches.Assign or ast.matches.AugAssign:
             if ast.matches.Assign:
                 assert len(ast.targets) == 1
@@ -625,37 +253,45 @@ class ConversionContext(object):
                 if varname not in self._varname_to_type:
                     self._varname_to_type[varname] = None
 
-                def assignDirectly(val_to_store):
-                    if self._varname_to_type[varname] is None:
-                        self._varname_to_type[varname] = val_to_store.expr_type
+                subcontext = ExpressionConversionContext(self)
 
-                        slot_ref = self.named_var_expr(varname)
+                val_to_store = subcontext.convert_expression_ast(ast.value)
 
-                        #this is a new variable which we are constructing
-                        return self._varname_to_type[varname].convert_copy_initialize(
-                            self,
-                            slot_ref,
-                            val_to_store
-                            ) >> self.NoneExpr(native_ast.Expression.ActivatesTeardown(name=varname))
-                    else:
-                        #this is an existing variable.
-                        slot_ref = self.named_var_expr(varname)
+                subcontext.pushComment("evaluated rhs")
 
-                        if op is not None:
-                            val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+                if val_to_store is None:
+                    return subcontext.finalize(None), False
 
-                        if slot_ref.expr_type != val_to_store.expr_type:
-                            self.upsizeVariableType(varname, val_to_store.expr_type)
+                if self._varname_to_type[varname] is None:
+                    self._varname_to_type[varname] = val_to_store.expr_type
+                    slot_ref = subcontext.named_var_expr(varname)
+                else:
+                    slot_ref = subcontext.named_var_expr(varname)
 
-                        #convert the value to the target type now that we've upsized it
-                        val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
+                    if slot_ref.expr_type != val_to_store.expr_type:
+                        self.upsizeVariableType(varname, val_to_store.expr_type)
+                        slot_ref = subcontext.named_var_expr(varname)
 
-                        if val_to_store.expr_type is None:
-                            return val_to_store
+                if op is not None:
+                    val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+                    if val_to_store is None:
+                        return subcontext.finalize(None), False
 
-                        return slot_ref.convert_assign(val_to_store)
-                return self.wrapInTemporaries(assignDirectly, (self.convert_expression_ast(ast.value),))
+                #convert the value to the target type now that we've upsized it
+                val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
 
+                if val_to_store is None:
+                    return subcontext.finalize(None), False
+
+                with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
+                    with true_block:
+                        subcontext.pushEffect(slot_ref.convert_assign(val_to_store))
+                    with false_block:
+                        subcontext.pushEffect(slot_ref.convert_copy_initialize(val_to_store))
+                        subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+
+                return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
+            
             if target.matches.Subscript and target.ctx.matches.Store:
                 raise NotImplementedError("Not implemented correctly yet")
                 assert target.slice.matches.Index
@@ -670,104 +306,110 @@ class ConversionContext(object):
                 return slicing.convert_setitem(index, val_to_store)
 
             if target.matches.Attribute and target.ctx.matches.Store:
-                slicing = self.convert_expression_ast(target.value)
+                subcontext = ExpressionConversionContext(self)
+
+                slicing = subcontext.convert_expression_ast(target.value)
                 attr = target.attr
-                val_to_store = self.convert_expression_ast(ast.value)
+                val_to_store = subcontext.convert_expression_ast(ast.value)
 
                 if op is not None:
                     raise NotImplementedError("Not implemented correctly.")
                     val_to_store = slicing.convert_attribute(attr).convert_bin_op(op, val_to_store)
 
-                return self.wrapInTemporaries(
-                    lambda slicing, val_to_store: slicing.convert_set_attribute(attr, val_to_store),
-                    (slicing, val_to_store)
-                    )
+                slicing.convert_set_attribute(attr, val_to_store)
+
+                return subcontext.finalize(None), False
 
         if ast.matches.Return:
-            if ast.value is None:
-                e = self.NoneExpr()
-            else:
-                e = self.convert_expression_ast(ast.value)
+            subcontext = ExpressionConversionContext(self)
 
-            if e.expr_type is None:
-                return e
-            
+            if ast.value is None:
+                e = subcontext.convert_expression_ast(python_ast.Expr.Num(n=python_ast.NumericConstant.None_()))
+            else:
+                e = subcontext.convert_expression_ast(ast.value)
+
+            if e is None:
+                return subcontext.finalize(None), False
+
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
                     self._varname_to_type[FunctionOutput] = e.expr_type
                 else:
                     self.upsizeVariableType(FunctionOutput, e.expr_type)
+            
+            if e.expr_type != self._varname_to_type[FunctionOutput]:
+                e = e.convert_to_type(self._varname_to_type[FunctionOutput])
 
-            def convertThenReturn(unconvertedExpr):
-                if unconvertedExpr.expr_type != self._varname_to_type[FunctionOutput]:
-                    unconvertedExpr = unconvertedExpr.convert_to_type(self._varname_to_type[FunctionOutput])
+            if e is None:
+                return subcontext.finalize(None), False
 
-                if unconvertedExpr.expr_type is None:
-                    return unconvertedExpr
+            if e.expr_type.is_pass_by_ref:
+                returnTarget = TypedExpression(subcontext, native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput], True)
 
+                subcontext.pushEffect(
+                    returnTarget.convert_copy_initialize(e)
+                    )
 
-                def generateReturn(convertedExpr):
-                    if convertedExpr.expr_type.is_pass_by_ref:
-                        returnTarget = self.RefExpr(native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput])
+                subcontext.pushTerminal(
+                    native_ast.Expression.Return(arg=None)
+                    )
+            else:
+                subcontext.pushTerminal(
+                    native_ast.Expression.Return(arg=e.nonref_expr)
+                    )
 
-                        return self.TerminalExpr(
-                            returnTarget.convert_copy_initialize(convertedExpr).expr >> 
-                                native_ast.Expression.Return(arg=None)
-                            )
-                    else:
-                        return self.TerminalExpr(
-                            native_ast.Expression.Return(arg=convertedExpr.nonref_expr)
-                            )
-
-                return self.wrapInTemporaries(generateReturn, (unconvertedExpr,))
-
-            return self.wrapInTemporaries(convertThenReturn, (e,))
+            return subcontext.finalize(None), False
 
         if ast.matches.Expr:
-            return self.NoneExpr(
-                self.convert_expression_ast(ast.value).expr >> native_ast.nullExpr
-                )
+            subcontext = ExpressionConversionContext(self)
+
+            result_expr = subcontext.convert_expression_ast(ast.value)
+
+            return subcontext.finalize(result_expr), result_expr is not None
 
         if ast.matches.If:
-            cond = self.convert_expression_ast(ast.test).toBool()
-            
+            cond_context = ExpressionConversionContext(self)
+            cond = cond_context.convert_expression_ast(ast.test)
+            if cond is None:
+                return cond.finalize(None)
+            cond = cond.toBool()
+            if cond is None:
+                return cond.finalize(None)
+
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
-                branch = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
 
-                return cond + branch
+                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
 
-            true = self.convert_statement_list_ast(ast.body)
-            false = self.convert_statement_list_ast(ast.orelse)
+                return cond.expr + branch, flow_returns
 
-            if true.expr_type is None and false.expr_type is None:
-                ret_type = None
-            else:
-                ret_type = NoneExprType
+            true, true_returns = self.convert_statement_list_ast(ast.body)
+            false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
-            return TypedExpression(
-                native_ast.Expression.Branch(cond=cond.expr,true=true.expr,false=false.expr),
-                ret_type
+            return (
+                native_ast.Expression.Branch(cond=cond_context.finalize(cond),true=true,false=false),
+                true_returns or false_returns
                 )
 
         if ast.matches.Pass:
-            return TypedExpression(native_ast.nullExpr, NoneExprType)
+            return native_ast.nullExpr, True
 
         if ast.matches.While:
-            cond = self.convert_expression_ast(ast.test).toBool()
-            
-            true = self.convert_statement_list_ast(ast.body)
+            cond_context = ExpressionConversionContext(self)
+            cond = cond_context.convert_expression_ast(ast.test)
+            if cond is None:
+                return cond.finalize(None)
+            cond = cond.toBool()
+            if cond is None:
+                return cond.finalize(None)
 
-            false = self.convert_statement_list_ast(ast.orelse)
+            true, true_returns = self.convert_statement_list_ast(ast.body)
 
-            if true.expr_type or false.expr_type:
-                ret_type = typedPythonTypeToTypeWrapper(NoneType())
-            else:
-                ret_type = None
+            false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
-            return self.ValueExpr(
-                native_ast.Expression.While(cond=cond.expr,while_true=true.expr,orelse=false.expr),
-                ret_type
+            return (
+                native_ast.Expression.While(cond=cond_context.finalize(cond),while_true=true,orelse=false),
+                true_returns or false_returns
                 )
 
         if ast.matches.Try:
@@ -871,86 +513,43 @@ class ConversionContext(object):
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 
+    def convert_function_body(self, statements):
+        return self.convert_statement_list_ast(statements, toplevel=True)
+
     def convert_statement_list_ast(self, statements, toplevel=False):
-        if not statements:
-            if toplevel:
-                return self.TerminalExpr(native_ast.Expression.Return(None))
-
-            return self.NoneExpr()
-
-        exprs = []
+        exprAndReturns = []
         for s in statements:
-            conversion = self.convert_statement_ast_and_teardown_tmps(s)
-            exprs.append(conversion)
+            expr, controlFlowReturns = self.convert_statement_ast(s)
+            exprAndReturns.append((expr, controlFlowReturns))
 
-            if conversion.expr_type is None:
+            if not controlFlowReturns:
                 break
 
-        if exprs[-1].expr_type is not None:
+        if not exprAndReturns or exprAndReturns[-1][1]:
             flows_off_end = True
         else:
             flows_off_end = False
 
         if toplevel and flows_off_end:
+            flows_off_end = False
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
                     self._varname_to_type[FunctionOutput] = NoneWrapper()
                 else:
                     self.upsizeVariableType(FunctionOutput, NoneWrapper())
 
-            outT = self._varname_to_type[FunctionOutput]
-
-            if isinstance(outT, NoneWrapper):
-                exprs = exprs + [self.NoneExpr(native_ast.Expression.Return(arg=None))]
-            else:
-                null_expr = TypedExpression(self, native_ast.nullExpr, NoneWrapper(), True)
-                null_expr = null_expr.convert_to_type(outT)
-
-                exprs = exprs + [
-                    self.TerminalExpr(
-                        e.convert_incref().expr >> 
-                                native_ast.Expression.Return(arg=null_expr)
-                            if null_expr.isReference else 
-                        native_ast.Expression.Return(arg=null_expr)
-                        )
-                    ]
-
-        teardowns = []
-        if toplevel:
-            for v in list(self._varname_to_type.keys()):
-                if v is not FunctionOutput:
-                    teardowns.append(self.named_variable_teardown(v))
+            exprAndReturns.append(self.convert_statement_ast(python_ast.Statement.Return(value=None, filename="", line_number=0, col_offset=0)))
 
         seq_expr = native_ast.Expression.Sequence(
-                vals=[e.expr for e in exprs]
-                )
+            vals=[expr for expr,_ in exprAndReturns]
+            )
 
-        if teardowns:
-            seq_expr = native_ast.Expression.Finally(
-                expr=seq_expr,
-                teardowns=teardowns
-                )
-
-        return TypedExpression(self, seq_expr, typedPythonTypeToTypeWrapper(NoneType()) if flows_off_end else None, False)
-
-    def named_variable_teardown(self, v):
-        return native_ast.Teardown.ByTag(
-                tag=v,
-                expr=self._varname_to_type[v].convert_destroy(
-                    self,
-                    self.RefExpr(
-                        native_ast.Expression.StackSlot(
-                            name=v,
-                            type=self._varname_to_type[v].getNativeLayoutType()
-                            ),
-                        self._varname_to_type[v]
-                        )
-                    ).expr
-                )
+        return seq_expr, flows_off_end
 
     def construct_stackslots_around(self, expr, argnames, stararg_name):
         to_add = []
         destructors = []
+
         for name in argnames:
             if name is not FunctionOutput and name != stararg_name:
                 if name not in self._varname_to_type:
@@ -971,47 +570,54 @@ class ConversionContext(object):
                     else:
                         #need to make a stackslot for this variable
                         #the argument will be a pointer because it's POD
-                        var_expr = self.RefExpr(
-                            native_ast.Expression.Variable(name=name),
-                            slot_type
+                        context = ExpressionConversionContext(self)
+
+                        var_expr = context.inputArg(slot_type, name)
+
+                        slot_expr = context.named_var_expr(name)
+
+                        context.pushEffect(
+                            slot_type.convert_copy_initialize(context, slot_expr, var_expr).with_comment("initialize %s from arg" % name)
+                            )
+                        context.pushEffect(
+                            context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
                             )
 
-                        slot_expr = self.RefExpr(
-                            native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
-                            slot_type
-                            )
+                        to_add.append(context.finalize(None))
 
-                        to_add.append(
-                            slot_type.convert_copy_initialize(self, slot_expr, var_expr)
-                                .expr.with_comment("initialize %s from arg" % name)
-                            )
+        for name in self._varname_to_type:
+            if name is not FunctionOutput and name != stararg_name:
+                context = ExpressionConversionContext(self)
 
-                        destructors.append(
-                            native_ast.Teardown.Always(
-                                expr=slot_type.convert_destroy(self, slot_expr).expr
-                                )
-                            )
+                slot_expr = context.named_var_expr(name)
+
+                with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
+                    with true:
+                        context.pushEffect(slot_expr.convert_destroy())
+
+                destructors.append(
+                    native_ast.Teardown.Always(
+                        expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                        )
+                    )
+
+                if name not in argnames:
+                    #this is a variable in the function that we assigned to. we need to ensure that
+                    #the initializer flag is zero
+                    context = ExpressionConversionContext(self)
+                    context.pushEffect(context.isInitializedVarExpr(name).expr.store(native_ast.falseExpr))
+                    to_add.append(context.finalize(None))
 
         if to_add:
-            expr = TypedExpression(
-                self,
-                native_ast.Expression.Sequence(
-                    vals=to_add + [expr.expr]
-                    ),
-                expr.expr_type,
-                expr.isReference
+            expr = native_ast.Expression.Sequence(
+                vals=to_add + [expr]
                 )
 
         if destructors:
-            expr = TypedExpression(
-                self,
-                native_ast.Expression.Finally(
+            expr = native_ast.Expression.Finally(
                     teardowns=destructors,
-                    expr=expr.expr
-                    ),
-                expr.expr_type,
-                expr.isReference
-                )
+                    expr=expr
+                    )
 
         return expr
 
@@ -1126,29 +732,30 @@ class Converter(object):
         if output_type is not None:
             varname_to_type[FunctionOutput] = typeWrapper(output_type)
 
-        subconverter = ConversionContext(self, varname_to_type, free_variable_lookup)
+        functionConverter = FunctionConversionContext(self, varname_to_type, free_variable_lookup)
 
         while True:
             #repeatedly try converting as long as the types keep getting bigger.
-            res = subconverter.convert_statement_list_ast(statements, toplevel=True)
+            body_native_expr, controlFlowReturns = functionConverter.convert_function_body(statements)
+            assert not controlFlowReturns
 
-            if subconverter.typesAreUnstable():
-                subconverter.resetTypeInstabilityFlag()
+            if functionConverter.typesAreUnstable():
+                functionConverter.resetTypeInstabilityFlag()
             else:
                 break
 
         if star_args_name is not None:
-            res = subconverter.construct_starargs_around(res, star_args_name)
+            body_native_expr = functionConverter.construct_starargs_around(body_native_expr, star_args_name)
 
-        res = subconverter.construct_stackslots_around(res, argnames, star_args_name)
+        body_native_expr = functionConverter.construct_stackslots_around(body_native_expr, argnames, star_args_name)
 
-        return_type = subconverter._varname_to_type[FunctionOutput] or NoneExprType
+        return_type = functionConverter._varname_to_type.get(FunctionOutput, NoneExprType)
 
         if return_type.is_pass_by_ref:
             return (
                 native_ast.Function(
                     args=(('.return',return_type.getNativeLayoutType().pointer()),) + tuple(args),
-                    body=native_ast.FunctionBody.Internal(body=res.expr),
+                    body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=native_ast.Void
                     ),
                 return_type
@@ -1157,7 +764,7 @@ class Converter(object):
             return (
                 native_ast.Function(
                     args=args,
-                    body=native_ast.FunctionBody.Internal(body=res.expr),
+                    body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=return_type.getNativeLayoutType()
                     ),
                 return_type

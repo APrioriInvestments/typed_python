@@ -73,6 +73,25 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         print(t_py / t_fast, " speedup")
 
+    def test_tuple_passing(self):
+        @Compiled
+        def f(x: TupleOf(int)) -> int:
+            return 0
+
+        self.assertEqual(f((1,2,3)), 0)
+
+    def test_tuple_assign(self):
+        @Compiled
+        def f(x: TupleOf(int)) -> TupleOf(int):
+            y = x
+            return y
+
+        t = TupleOf(int)((1,2,3))
+
+        self.assertEqual(f(t), t)
+
+        self.assertEqual(_types.refcount(t),1)
+
     def test_tuple_indexing(self):
         @Compiled
         def f(x: TupleOf(int), y:int) -> int:
