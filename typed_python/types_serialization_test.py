@@ -934,5 +934,21 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(deserialized_f_2(10), 11)
 
+    def test_serialize_result_of_decorator(self):
+        sc = SerializationContext({})
+
+        def decorator(f):
+            def addsOne(x):
+                return f(x) + 1
+
+            return addsOne
+
+        @decorator
+        def g(x):
+            return x + 1
+
+        g2 = sc.deserialize(sc.serialize(g))
+
+        self.assertEqual(g2(10), g(10))
 
 

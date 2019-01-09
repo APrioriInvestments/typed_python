@@ -737,7 +737,7 @@ def evaluateFunctionPyAst(pyAst):
             col_offset=pyAst.col_offset,
             filename=pyAst.filename,
             )
-        pyAstModule = Module.Module(body=(pyAst,))
+        pyAstModule = Module.Module(body=(pyAstModule,))
     elif isinstance(pyAst, Expr):
         pyAstModule = Module.Expression(body=pyAst)
 
