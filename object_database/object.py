@@ -91,9 +91,6 @@ class DatabaseObject(_base):
         return _cur_view.view._exists(self, self._identity)
 
     def __getattr__(self, name):
-        if name[:1] == "_":
-            raise AttributeError(name)
-
         return self.get_field(name)
 
     def get_field(self, name):
