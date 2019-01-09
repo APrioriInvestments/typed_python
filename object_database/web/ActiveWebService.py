@@ -392,6 +392,9 @@ class ActiveWebService(ServiceBase):
 
 
     def addMainBar(self, display):
+        with self.db.view():
+            current_username = current_user.username
+
         return (
             HeaderBar(
                 [Subscribed(lambda:
@@ -402,10 +405,19 @@ class ActiveWebService(ServiceBase):
                                 s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
                     ),
-                Padding(),
-                Text('Authorized Groups: {groups}'.format(groups=self.authorized_groups_text)),
-                Padding(),
-                Button('Logout', '/logout'),
+                Dropdown(
+                    Octicon("three-bars"),
+                    [
+                        (Sequence([Octicon('person'),
+                                   Span('Logged in as: {}'.format(current_username))]),
+                         lambda: None),
+                        (Sequence([Octicon('organization'),
+                                   Span('Authorized Groups: {}'.format(self.authorized_groups_text))]),
+                         lambda: None),
+                        (Sequence([Octicon('sign-out'),
+                                   Span('Logout')]),
+                         '/logout')
+                    ])
                 ]) +
             Main(display)
             )
