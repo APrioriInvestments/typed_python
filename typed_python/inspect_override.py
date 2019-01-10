@@ -121,7 +121,7 @@ def findsource(pyObject):
     if not sourcefile and pyFile[:1] + pyFile[-1:] != '<>':
         raise IOError('source code not available')
 
-    pyFile = sourcefile if sourcefile else file
+    pyFile = sourcefile if sourcefile else pyFile
 
     lines = getlines(pyFile)
 

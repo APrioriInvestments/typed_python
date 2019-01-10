@@ -707,12 +707,16 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     if f in _originalAstCache:
         return _originalAstCache[f]
 
-    pyast = ast_util.pyAstFor(f)
+    try:
+        pyast = ast_util.pyAstFor(f)
 
-    _, lineno = ast_util.getSourceLines(f)
-    _, fname = ast_util.getSourceFilenameAndText(f)
+        _, lineno = ast_util.getSourceLines(f)
+        _, fname = ast_util.getSourceFilenameAndText(f)
 
-    pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
+        pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
+    except Exception as e:
+        raise Exception("Failed to get source for function %s" % (f.__qualname__))
+
 
     try:
         return convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
