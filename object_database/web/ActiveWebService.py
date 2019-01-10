@@ -27,6 +27,7 @@ import os
 import json
 import gevent.socket
 
+from object_database.view import revisionConflictRetry
 from object_database.util import genToken, checkLogLevelValidity
 from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
 from object_database.web.AuthPlugin import AuthPluginBase, PermissiveAuthPlugin, LdapAuthPlugin
@@ -259,7 +260,8 @@ class ActiveWebService(ServiceBase):
         self.app.add_url_rule('/logout', endpoint=None, view_func=self.logout)
         self.sockets.add_url_rule('/socket/<path:path>', None, self.mainSocket)
 
-    def login_user(self, username, remember=False):
+    @revisionConflictRetry
+    def login_user(self, username):
         with self.db.transaction():
             users = User.lookupAll(username=username)
 
@@ -272,14 +274,14 @@ class ActiveWebService(ServiceBase):
             else:
                 raise Exception("This should never happen: len(users)={}".format(len(users)))
             user.login()
-            login_user(UserWrapper.makeFromUser(user), remember=remember)
+            login_user(UserWrapper.makeFromUser(user))
 
     def login(self):
         if current_user.is_authenticated:
             return redirect('/')
 
         if self.auth_plugin is None:
-            self.login_user('anonymous', remember=False)
+            self.login_user('anonymous')
             return redirect('/')
 
         form = LoginForm()
@@ -299,7 +301,7 @@ class ActiveWebService(ServiceBase):
                     authorized_groups_text=self.authorized_groups_text
                 )
 
-            self.login_user(username, remember=form.remember_me.data)
+            self.login_user(username)
 
             return redirect('/')
 
