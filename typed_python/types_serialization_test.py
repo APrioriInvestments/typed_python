@@ -35,6 +35,8 @@ from typed_python import (
     Value, Class, Member, _types, TypedFunction, SerializationContext
 )
 
+module_level_testfun = dummy_test_module.testfunction
+
 class C:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
@@ -954,7 +956,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(g2(10), g(10))
 
-
     def test_serialize_modules(self):
         codebase = Codebase.FromModule(dummy_test_module)
         sc = codebase.serializationContext
@@ -966,5 +967,18 @@ class TypesSerializationTest(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "Cannot serialize module 'threading"):
             sc.serialize(threading)
+
+    def test_serialize_lambdas_with_references_in_list_comprehensions(self):
+        codebase = Codebase.FromModule(dummy_test_module)
+        sc = codebase.serializationContext
+
+        #note that it matters that the 'module_level_testfun' is at the module level,
+        #because that induces a freevar in a list-comprehension code object
+        def f():
+            return [module_level_testfun() for _ in range(1)][0]
+
+        self.assertEqual(f(), "testfunction")
+
+        self.assertEqual(sc.deserialize(sc.serialize(f))(), "testfunction")
 
 

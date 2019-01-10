@@ -129,7 +129,18 @@ class SerializationContext(object):
             representation["qualname"] = inst.__qualname__
             representation["name"] = inst.__name__
             representation["module"] = inst.__module__
-            representation["freevars"] = {k:v for k,v in inst.__globals__.items() if k in inst.__code__.co_names}
+
+            all_names = set()
+            def walkCodeObject(code):
+                all_names.update(code.co_names)
+                #there are 'code' objects for embedded list comprehensions.
+                for c in code.co_consts:
+                    if type(c) is type(code):
+                        walkCodeObject(c)
+
+            walkCodeObject(inst.__code__)
+
+            representation["freevars"] = {k:v for k,v in inst.__globals__.items() if k in all_names}
 
             for ix, x in enumerate(inst.__code__.co_freevars):
                 representation["freevars"][x] = inst.__closure__[ix].cell_contents
