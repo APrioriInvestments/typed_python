@@ -115,6 +115,7 @@ class ObjectDatabaseTests:
     @classmethod
     def setUpClass(cls):
         configureLogging("database_test")
+        cls.PERFORMANCE_FACTOR = 1.0 if os.environ.get('TRAVIS_CI', None) is None else 2.0
 
     def test_assigning_dicts(self):
         db = self.createNewDb()
@@ -1182,6 +1183,7 @@ class ObjectDatabaseTests:
             self.assertEqual(len(Counter.lookupAll(k=0)), 21000)
 
     def test_adding_while_subscribing(self, shouldSubscribeToIndex=False):
+        pfactor = self.PERFORMANCE_FACTOR
         db1 = self.createNewDb()
         db2 = self.createNewDb()
 
@@ -1204,7 +1206,7 @@ class ObjectDatabaseTests:
         else:
             subscriptionEvents = db2.subscribeToType(Counter, block=False)
 
-        self.assertEqual(blocker.waitForCallback(1.0), 0)
+        self.assertEqual(blocker.waitForCallback(pfactor), 0)
 
         #make a transaction
         with db1.transaction():
@@ -1213,14 +1215,14 @@ class ObjectDatabaseTests:
 
         blocker.releaseCallback()
         for i in range(1,101):
-            self.assertEqual(blocker.waitForCallback(1.0), i)
+            self.assertEqual(blocker.waitForCallback(pfactor), i)
             blocker.releaseCallback()
 
-        self.assertEqual(blocker.waitForCallback(1.0), "DONE")
+        self.assertEqual(blocker.waitForCallback(pfactor), "DONE")
         blocker.releaseCallback()
 
         for e in subscriptionEvents:
-            assert e.wait(timeout=2.0)
+            assert e.wait(timeout=2.0*pfactor)
 
         with db2.transaction():
             #verify we see the write on c1
@@ -1466,6 +1468,10 @@ class ObjectDatabaseTests:
 
 
 class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
+    @classmethod
+    def setUpClass(cls):
+        ObjectDatabaseTests.setUpClass()
+
     def setUp(self):
         self.tempDir = tempfile.TemporaryDirectory()
         self.tempDirName = self.tempDir.__enter__()
@@ -1509,6 +1515,10 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
 
 
 class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
+    @classmethod
+    def setUpClass(cls):
+        ObjectDatabaseTests.setUpClass()
+
     def setUp(self):
         self.auth_token = genToken()
 
@@ -1620,6 +1630,10 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
 
 class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
+    @classmethod
+    def setUpClass(cls):
+        ObjectDatabaseTests.setUpClass()
+
     def setUp(self):
         self.mem_store = InMemoryPersistence()
         self.auth_token = genToken()
