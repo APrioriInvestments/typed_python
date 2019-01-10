@@ -31,7 +31,7 @@ from object_database.util import genToken, checkLogLevelValidity
 from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
 from object_database.web.AuthPlugin import AuthPluginBase, PermissiveAuthPlugin, LdapAuthPlugin
 from object_database.web.cells import *
-from typed_python import TupleOf
+from typed_python import TupleOf, Float64
 
 from gevent import pywsgi, sleep
 from gevent.greenlet import Greenlet
@@ -70,19 +70,42 @@ class Configuration:
     company_name = str
 
 
+USER_LOGIN_DURATION = 24 * 60 * 60  # 24 hours
+
 @active_webservice_schema.define
 class User:
     username = Indexed(str)
+    login_expiration = Float64()
 
-    def __init__(self, username):
+    def login(self):
+        self.login_expiration = time.time() + USER_LOGIN_DURATION
+
+    def logout(self):
+        self.login_expiration = 0.0
+
+
+class UserWrapper:
+    #  must be called with an open view of the user argument
+    @staticmethod
+    def makeFromUser(user):
+        if user is None:
+            return None
+        else:
+            return UserWrapper(user.username, user.login_expiration)
+
+    def __init__(self, username, login_expiration):
         self.username = username
+        self.login_expiration = login_expiration
 
+    @property
     def is_authenticated(self):
-        return True
+        return True if time.time() < self.login_expiration else False
 
+    @property
     def is_active(self):
         return True
 
+    @property
     def is_anonymous(self):
         return False
 
@@ -191,7 +214,7 @@ class ActiveWebService(ServiceBase):
 
     def load_user(self, username):
         with self.db.view():
-            return User.lookupAny(username=username)
+            return UserWrapper.makeFromUser(User.lookupAny(username=username))
 
 
     def doWork(self, shouldStop):
@@ -248,8 +271,8 @@ class ActiveWebService(ServiceBase):
                 raise Exception("multiple users found with username={}".format(username))
             else:
                 raise Exception("This should never happen: len(users)={}".format(len(users)))
-
-            login_user(user, remember=remember)
+            user.login()
+            login_user(UserWrapper.makeFromUser(user), remember=remember)
 
     def login(self):
         if current_user.is_authenticated:
@@ -466,6 +489,11 @@ class ActiveWebService(ServiceBase):
                 t0 = time.time()
                 cells.recalculate()
                 messages = cells.renderMessages()
+
+                user = self.load_user(current_user.username)
+                if not user.is_authenticated:
+                    ws.close()
+                    return
 
                 lastDumpTimeSpentCalculating += time.time() - t0
 

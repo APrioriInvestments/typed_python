@@ -26,8 +26,10 @@ from bs4 import BeautifulSoup
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.web.ActiveWebService import (
     active_webservice_schema,
-    ActiveWebService
+    ActiveWebService,
+    User
 )
+
 from object_database import core_schema, connect, service_schema
 from object_database.util import genToken, configureLogging
 
@@ -48,7 +50,8 @@ class ActiveWebServiceTest(unittest.TestCase):
 
     def configurableSetUp(self, auth_type="LDAP",
                           auth_hostname=None, authorized_groups=(),
-                          ldap_base_dn=None, ldap_ntlm_domain=None, company_name=None):
+                          ldap_base_dn=None, ldap_ntlm_domain=None,
+                          company_name=None):
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
@@ -172,6 +175,7 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.configurableSetUp(auth_type="PERMISSIVE")
         url = self.base_url + "/content/object_database.css"
         client = requests.Session()
+        username = 'anonymous'
 
         # 1. Cannot access without login
         res = requests.get(url)
@@ -183,10 +187,21 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.assertTrue('login' in res.url)
 
         # 2. login successfully
-        self.login(client)
+        self.login(client, username)
 
         # 3. now we can access our target page
         res = client.get(url)
         self.assertFalse(res.history)
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.url, url)
+
+        # 4. test that we get auto-logged-out by modifying the user in object DB
+        with self.database.transaction():
+            user = User.lookupAny(username=username)
+            if user:
+                user.logout()
+        res = client.get(url)
+        self.assertTrue(res.history)
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue('login' in res.url)
+
