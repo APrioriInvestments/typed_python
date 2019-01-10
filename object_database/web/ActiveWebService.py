@@ -135,7 +135,7 @@ class ActiveWebService(ServiceBase):
                     (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                     ""
                     ),
-                maxRowsPerPage=10
+                maxRowsPerPage=50
                 ),
             Hosts=Table(
                 colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
@@ -152,7 +152,7 @@ class ActiveWebService(ServiceBase):
                     ("%2.1f" % s.actualMemoryUseGB) + " GB" if field == "RAM USE" else
                     ""
                     ),
-                maxRowsPerPage=10
+                maxRowsPerPage=50
                 )
             )
 
