@@ -34,28 +34,33 @@ class PythonObjectOfTypeWrapper(Wrapper):
         assert False
 
     def convert_incref(self, context, expr):
-        return runtime_functions.incref_pyobj.call(expr.nonref_expr) >> expr.expr
+        context.pushEffect(
+            runtime_functions.incref_pyobj.call(expr.nonref_expr)
+            )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
 
-        return (
-            toStore.convert_incref() >> 
-            target.convert_destroy() >> 
+        toStore.convert_incref()
+        target.convert_destroy()
+
+        context.pushEffect(
             target.expr.store(toStore.nonref_expr)
             )
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
 
-        return (
-            toStore.convert_incref() >> 
+        toStore.convert_incref()
+
+        context.pushEffect(
             target.expr.store(toStore.nonref_expr)
             )
 
     def convert_destroy(self, context, instance):
-        return runtime_functions.decref_pyobj.call(instance.nonref_expr)
-
+        context.pushEffect(
+            runtime_functions.decref_pyobj.call(instance.nonref_expr)
+            )
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
@@ -64,7 +69,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             lambda targetSlot:
                 targetSlot.expr.store(
                     runtime_functions.getattr_pyobj.call(
-                        instance.nonref_expr, 
+                        instance.nonref_expr,
                         native_ast.const_utf8_cstr(attr)
                         )
                     )

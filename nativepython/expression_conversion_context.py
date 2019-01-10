@@ -29,8 +29,8 @@ from typed_python import *
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 ExpressionIntermediate = Alternative("ExpressionIntermediate",
-    Effect={"expr": native_ast.Expression}, 
-    Terminal={"expr": native_ast.Expression}, 
+    Effect={"expr": native_ast.Expression},
+    Terminal={"expr": native_ast.Expression},
     Simple={"name": str, "expr": native_ast.Expression},
     StackSlot={"name": str, "expr": native_ast.Expression}
     )
@@ -81,7 +81,7 @@ class ExpressionConversionContext(object):
 
         assert type.is_pod
         assert not type.is_pass_by_ref
-        
+
         varname = self.functionContext.let_varname()
 
         self.intermediates.append(
@@ -123,7 +123,7 @@ class ExpressionConversionContext(object):
         (copy its bits, but don't inc or decref it)
         """
         return self.push(
-            typed_expression.expr_type, 
+            typed_expression.expr_type,
             lambda other: other.expr.store(typed_expression.nonref_expr),
             wantsTeardown=False
             )
@@ -141,7 +141,7 @@ class ExpressionConversionContext(object):
         """Given a native expression that returns a reference, duplicate the object
         and return a handle."""
         type = typeWrapper(type)
-        
+
         toCopy = self.pushReference(type, expression)
 
         return self.push(type, lambda target: type.convert_copy_initialize(target, toCopy))
@@ -149,7 +149,7 @@ class ExpressionConversionContext(object):
     def pushReference(self, type, expression):
         """Push a reference to an object that's guaranteed to be alive for the duration of the expression."""
         type = typeWrapper(type)
-        
+
         varname = self.functionContext.let_varname()
 
         self.intermediates.append(
@@ -164,15 +164,15 @@ class ExpressionConversionContext(object):
         varname = self.functionContext.stack_varname()
 
         resExpr = TypedExpression(
-            self, 
-            native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()), 
-            type, 
+            self,
+            native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
+            type,
             True
             )
 
         if not type.is_pod:
             with self.subcontext() as sc:
-                self.pushEffect(type.convert_destroy(self, resExpr))
+                type.convert_destroy(self, resExpr)
 
             self.teardowns.append(
                 native_ast.Teardown.ByTag(
@@ -204,13 +204,16 @@ class ExpressionConversionContext(object):
         varname = self.functionContext.stack_varname()
 
         resExpr = TypedExpression(
-            self, 
-            native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()), 
-            type, 
+            self,
+            native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
+            type,
             True
             )
 
         expr = callback(resExpr)
+
+        if expr is None:
+            expr = native_ast.nullExpr
 
         if isinstance(expr, TypedExpression):
             assert expr.expr_type.typeRepresentation is NoneType()
@@ -220,14 +223,14 @@ class ExpressionConversionContext(object):
 
         self.intermediates.append(
             ExpressionIntermediate.StackSlot(
-                name=varname, 
+                name=varname,
                 expr=expr if not wantsTeardown else expr >> native_ast.Expression.ActivatesTeardown(varname)
                 )
             )
 
         if wantsTeardown:
             with self.subcontext() as sc:
-                self.pushEffect(type.convert_destroy(self, resExpr))
+                type.convert_destroy(self, resExpr)
 
             self.teardowns.append(
                 native_ast.Teardown.ByTag(
@@ -418,7 +421,7 @@ class ExpressionConversionContext(object):
         else:
             assert call_target.output_type.is_pod
             assert len(call_target.named_call_target.arg_types) == len(args)
-        
+
             return self.pushPod(
                 call_target.output_type,
                 call_target.call(*native_args)
@@ -501,7 +504,7 @@ class ExpressionConversionContext(object):
                 values.append(v)
 
             op = ast.op
-            
+
             expr_so_far = []
 
             for v in ast.values:
@@ -628,14 +631,14 @@ class ExpressionConversionContext(object):
 
                 with true_block:
                     true_res = true_res.convert_to_type(out_type)
-                    self.pushEffect(out_slot.convert_copy_initialize(true_res))
+                    out_slot.convert_copy_initialize(true_res)
                     self.markUninitializedSlotInitialized(out_slot)
 
                 with false_block:
                     false_res = false_res.convert_to_type(out_type)
-                    self.pushEffect(out_slot.convert_copy_initialize(false_res))
+                    out_slot.convert_copy_initialize(false_res)
                     self.markUninitializedSlotInitialized(out_slot)
 
             return out_slot
-            
+
         raise ConversionException("can't handle python expression type %s" % ast._which)

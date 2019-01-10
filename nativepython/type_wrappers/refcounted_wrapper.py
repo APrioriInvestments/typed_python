@@ -29,7 +29,8 @@ class RefcountedWrapper(Wrapper):
         raise NotImplementedError()
 
     def convert_incref(self, context, expr):
-        return native_ast.Expression.Branch(
+        context.pushEffect(
+            native_ast.Expression.Branch(
                 cond=expr.nonref_expr,
                 false=native_ast.nullExpr,
                 true=expr.nonref_expr.ElementPtrIntegers(0,0).store(
@@ -40,19 +41,24 @@ class RefcountedWrapper(Wrapper):
                         )
                     )
                 )
+            )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference
 
-        return (self.convert_incref(context, other)
-            >> self.convert_destroy(context, expr)
-            >> expr.expr.store(other.nonref_expr))
+        self.convert_incref(context, other)
+        self.convert_destroy(context, expr)
+
+        context.pushEffect(
+            expr.expr.store(other.nonref_expr)
+            )
 
     def convert_copy_initialize(self, context, expr, other):
         expr = expr.expr
         other = other.nonref_expr
 
-        return native_ast.Expression.Branch(
+        context.pushEffect(
+            native_ast.Expression.Branch(
                 cond=other,
                 false=expr.store(other),
                 true=
@@ -61,6 +67,7 @@ class RefcountedWrapper(Wrapper):
                         expr.load().ElementPtrIntegers(0,0).load().add(native_ast.const_int_expr(1))
                         )
                 )
+            )
 
     def convert_destroy(self, context, target):
         assert target.isReference
@@ -76,5 +83,3 @@ class RefcountedWrapper(Wrapper):
                 with context.ifelse(targetExpr.ElementPtrIntegers(0,0).load()) as (subtrue, subfalse):
                     with subfalse:
                         context.pushEffect(self.on_refcount_zero(context, target))
-
-        return native_ast.nullExpr

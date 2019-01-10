@@ -28,10 +28,10 @@ class NoneWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_assign(self, context, target, toStore):
-        return native_ast.nullExpr
+        pass
 
     def convert_copy_initialize(self, context, target, toStore):
-        return native_ast.nullExpr
+        pass
 
     def convert_destroy(self, context, instance):
-        return native_ast.nullExpr
+        pass

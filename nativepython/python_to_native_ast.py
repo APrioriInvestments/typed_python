@@ -198,7 +198,7 @@ class FunctionOutput:
     pass
 
 class FunctionConversionContext(object):
-    """Helper function for converting a single python function.""" 
+    """Helper function for converting a single python function."""
     def __init__(self, converter, varname_to_type, free_variable_lookup):
         self.exception_helper = ExceptionHandlingHelper(self)
         self.converter = converter
@@ -287,17 +287,17 @@ class FunctionConversionContext(object):
                 assert val_to_store is not None, "We should always be able to upsize"
 
                 if slot_ref.expr_type.is_pod:
-                    subcontext.pushEffect(slot_ref.convert_copy_initialize(val_to_store))
+                    slot_ref.convert_copy_initialize(val_to_store)
                 else:
                     with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
                         with true_block:
-                            subcontext.pushEffect(slot_ref.convert_assign(val_to_store))
+                            slot_ref.convert_assign(val_to_store)
                         with false_block:
-                            subcontext.pushEffect(slot_ref.convert_copy_initialize(val_to_store))
+                            slot_ref.convert_copy_initialize(val_to_store)
                             subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
 
                 return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
-            
+
             if target.matches.Subscript and target.ctx.matches.Store:
                 raise NotImplementedError("Not implemented correctly yet")
                 assert target.slice.matches.Index
@@ -342,7 +342,7 @@ class FunctionConversionContext(object):
                     self._varname_to_type[FunctionOutput] = e.expr_type
                 else:
                     self.upsizeVariableType(FunctionOutput, e.expr_type)
-            
+
             if e.expr_type != self._varname_to_type[FunctionOutput]:
                 e = e.convert_to_type(self._varname_to_type[FunctionOutput])
 
@@ -352,9 +352,7 @@ class FunctionConversionContext(object):
             if e.expr_type.is_pass_by_ref:
                 returnTarget = TypedExpression(subcontext, native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput], True)
 
-                subcontext.pushEffect(
-                    returnTarget.convert_copy_initialize(e)
-                    )
+                returnTarget.convert_copy_initialize(e)
 
                 subcontext.pushTerminal(
                     native_ast.Expression.Return(arg=None)
@@ -582,9 +580,8 @@ class FunctionConversionContext(object):
 
                         slot_expr = context.named_var_expr(name)
 
-                        context.pushEffect(
-                            slot_type.convert_copy_initialize(context, slot_expr, var_expr).with_comment("initialize %s from arg" % name)
-                            )
+                        slot_type.convert_copy_initialize(context, slot_expr, var_expr)
+
                         context.pushEffect(
                             context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
                             )
@@ -599,7 +596,7 @@ class FunctionConversionContext(object):
 
                 with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
                     with true:
-                        context.pushEffect(slot_expr.convert_destroy())
+                        slot_expr.convert_destroy()
 
                 destructors.append(
                     native_ast.Teardown.Always(
@@ -802,7 +799,7 @@ class Converter(object):
             input_types - list of Wrapper objects for the incoming types
             output_ype - Wrapper object for the output type.
             generatingFunction - a function producing a native_function_definition
-        
+
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
         """
         identity = ("native", identity)
@@ -902,8 +899,8 @@ class Converter(object):
 
         returns the name of the defined native function
         """
-        if callTarget.output_type != returnType: 
-            raise Exception("Can't call a call target whose output type is %s when our return type is %s" % 
+        if callTarget.output_type != returnType:
+            raise Exception("Can't call a call target whose output type is %s when our return type is %s" %
                 (callTarget.output_type, returnType))
 
         identifier = ("call_converter", callTarget.name)

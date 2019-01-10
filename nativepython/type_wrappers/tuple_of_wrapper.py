@@ -57,8 +57,8 @@ class TupleOfWrapper(RefcountedWrapper):
         else:
             return (
                 context.converter.defineNativeFunction(
-                    "destructor_" + str(self.typeRepresentation), 
-                    ('destructor', self), 
+                    "destructor_" + str(self.typeRepresentation),
+                    ('destructor', self),
                     [self],
                     typeWrapper(NoneType()),
                     lambda: self.generateNativeDestructorFunction()
@@ -70,11 +70,9 @@ class TupleOfWrapper(RefcountedWrapper):
         context = nativepython.expression_conversion_context.ExpressionConversionContext()
 
         inst = context.inputArg(self, 'input')
-        
+
         with context.loop(inst.convert_len()) as i:
-            context.pushEffect(
-                inst.convert_getitem_unsafe(i).convert_destroy()
-                )
+            inst.convert_getitem_unsafe(i).convert_destroy()
 
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
@@ -146,14 +144,10 @@ class TupleOfWrapper(RefcountedWrapper):
                 )
             )
         with context.loop(left_size) as i:
-            context.pushEffect(
-                out.convert_getitem_unsafe(i).convert_copy_initialize(left.convert_getitem_unsafe(i))
-                )
+            out.convert_getitem_unsafe(i).convert_copy_initialize(left.convert_getitem_unsafe(i))
 
         with context.loop(right_size) as i:
-            context.pushEffect(
-                out.convert_getitem_unsafe(i+left_size).convert_copy_initialize(right.convert_getitem_unsafe(i))
-                )
+            out.convert_getitem_unsafe(i+left_size).convert_copy_initialize(right.convert_getitem_unsafe(i))
 
         return native_ast.Function(
             args=[('output', self.getNativePassingType()),

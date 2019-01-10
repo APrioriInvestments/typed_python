@@ -59,14 +59,18 @@ class ArithmeticTypeWrapper(Wrapper):
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
-        return target.expr.store(toStore.nonref_expr)
+        context.pushEffect(
+            target.expr.store(toStore.nonref_expr)
+            )
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
-        return target.expr.store(toStore.nonref_expr)
+        context.pushEffect(
+            target.expr.store(toStore.nonref_expr)
+            )
 
     def convert_destroy(self, context, instance):
-        return native_ast.nullExpr
+        pass
 
 class Int64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
@@ -200,7 +204,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     )
 
         return super().convert_bin_op(context, left, op, right)
-        
+
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Float64())
@@ -228,7 +232,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
         if isinstance(right.expr_type, Int64Wrapper):
             right = right.toFloat64()
 
-        if right.expr_type == left.expr_type:            
+        if right.expr_type == left.expr_type:
             if op.matches.Mod:
                 return context.pushPod(
                     self,

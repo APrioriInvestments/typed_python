@@ -25,7 +25,7 @@ import nativepython
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
-        
+
 class ClassWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -38,7 +38,7 @@ class ClassWrapper(RefcountedWrapper):
         self.indexToByteOffset = {}
 
         element_types = [('refcount', native_ast.Int64), ('data',native_ast.UInt8)]
-        
+
         #this follows the general layout of 'held class' which is 1 bit per field for initialization and then
         #each field packed directly according to byte size
         byteOffset = 8 + (len(t.MemberNames) // 8 + 1)
@@ -148,13 +148,11 @@ class ClassWrapper(RefcountedWrapper):
 
             with context.ifelse(context.pushPod(bool,self.isInitializedNativeExpr(instance, ix))) as (true_block, false_block):
                 with true_block:
-                    context.pushEffect(
-                        member.convert_assign(value)
-                        )
+                    member.convert_assign(value)
                 with false_block:
+                    member.convert_copy_initialize(value)
                     context.pushEffect(
-                        member.convert_copy_initialize(value)
-                            >> self.setIsInitializedExpr(instance, ix)
+                        self.setIsInitializedExpr(instance, ix)
                         )
 
             return native_ast.nullExpr

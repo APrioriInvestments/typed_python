@@ -65,7 +65,8 @@ class Wrapper(object):
 
     def convert_incref(self, context, expr):
         if self.is_pod:
-            return expr
+            return
+
         raise NotImplementedError(self)
 
     def convert_attribute(self, context, instance, attribute):
