@@ -24,6 +24,9 @@ import psutil
 import numpy
 import gc
 import tempfile
+import typed_python.dummy_test_module as dummy_test_module
+
+from typed_python.Codebase import Codebase
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
@@ -950,5 +953,18 @@ class TypesSerializationTest(unittest.TestCase):
         g2 = sc.deserialize(sc.serialize(g))
 
         self.assertEqual(g2(10), g(10))
+
+
+    def test_serialize_modules(self):
+        codebase = Codebase.FromModule(dummy_test_module)
+        sc = codebase.serializationContext
+
+        self.assertIn('.modules.pytz', sc.nameToObject)
+
+        pytz = dummy_test_module.pytz
+        self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
+
+        with self.assertRaisesRegex(Exception, "Cannot serialize module 'threading"):
+            sc.serialize(threading)
 
 

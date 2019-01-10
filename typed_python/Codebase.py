@@ -36,26 +36,25 @@ class Codebase:
         self.modules = modules
 
         nameToObject = {}
-        objectsSeen = set()
         for modulename, module in modules.items():
             for membername, member in module.__dict__.items():
-                if isinstance(member, type) or isinstance(member, types.FunctionType):
+                if isinstance(member, (type, types.FunctionType)):
                     nameToObject[modulename + "." + membername] = member
-                    objectsSeen.add(id(member))
+                elif isinstance(member, types.ModuleType):
+                    nameToObject[".modules." + member.__name__] = member
 
-            #also add the module so we can serialize it.
+            #also add the module itself so we can serialize it
             nameToObject[".modules." + modulename] = module
-            objectsSeen.add(id(module))
 
         for modulename, module in modules.items():
             for membername, member in module.__dict__.items():
                 if isinstance(member, type) and hasattr(member, '__dict__'):
                     for sub_name, sub_obj in member.__dict__.items():
                         if not (sub_name[:2] == "__" and sub_name[-2:] == "__"):
-                            if isinstance(member, type) or isinstance(member, types.FunctionType):
-                                if id(sub_obj) not in objectsSeen:
-                                    nameToObject[membername + "." + sub_name] = sub_obj
-                                    objectsSeen.add(id(sub_obj))
+                            if isinstance(sub_obj, (type, types.FunctionType)):
+                                nameToObject[modulename + "." + membername + "." + sub_name] = sub_obj
+                            elif isinstance(sub_obj, types.ModuleType):
+                                nameToObject[".modules." + sub_obj.__name__] = sub_obj
 
         self.serializationContext = SerializationContext(nameToObject)
 
@@ -70,11 +69,20 @@ class Codebase:
 
     @staticmethod
     def FromRootlevelModule(module):
+        assert '.' not in module.__name__
+        return Codebase.FromModule(module)
+
+    @staticmethod
+    def FromModule(module):
+        if '.' in module.__name__:
+            prefix = module.__name__.rsplit(".",1)[0]
+        else:
+            prefix = None
+
         with _lock:
             if module in _root_level_module_codebase_cache:
                 return _root_level_module_codebase_cache[module]
 
-            assert "." not in module.__name__
             assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
 
             dirpart = os.path.dirname(module.__file__)
@@ -97,7 +105,7 @@ class Codebase:
 
             walkDisk(os.path.abspath(dirpart), moduleDir)
 
-            modules_by_name = Codebase.filesToModuleNames(files)
+            modules_by_name = Codebase.filesToModuleNames(files, prefix)
             modules = Codebase.importModulesByName(modules_by_name)
 
             _root_level_module_codebase_cache[module] = Codebase(root, files, modules)
@@ -105,7 +113,7 @@ class Codebase:
             return _root_level_module_codebase_cache[module]
 
     @staticmethod
-    def filesToModuleNames(files):
+    def filesToModuleNames(files, prefix=None):
         modules_by_name = set()
 
         for fpath in files:
@@ -115,6 +123,9 @@ class Codebase:
                     module_parts = module_parts[:-1]
                 else:
                     module_parts[-1] = module_parts[-1][:-3]
+
+                if prefix is not None:
+                    module_parts = [prefix] + module_parts
 
                 modules_by_name.add(".".join(module_parts))
 
