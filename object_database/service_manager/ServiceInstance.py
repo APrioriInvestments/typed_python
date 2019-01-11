@@ -53,7 +53,7 @@ class ServiceHost:
 class Service:
     name = Indexed(str)
     _codebase = OneOf(None, service_schema.Codebase)
-    _locked = OneOf("PREPARED", "LOCKED", "UNLOCKED")  # protects _codebase from modification
+    _codebaseStatus = OneOf("PREPARED", "LOCKED", "UNLOCKED")  # protects _codebase from modification
 
     service_module_name = str
     service_class_name = str
@@ -75,28 +75,37 @@ class Service:
     lastFailureReason = OneOf(None, str)
 
     @property
+    def codebaseStatus(self):
+        return self._codebaseStatus
+
+    @property
     def isUnlocked(self):
-        return self._locked == "UNLOCKED"
+        return self._codebaseStatus == "UNLOCKED"
 
     @property
     def isLocked(self):
-        return self._locked == "LOCKED"
+        return self._codebaseStatus == "LOCKED"
+
+    @property
+    def isPrepared(self):
+        return self._codebaseStatus == "PREPARED"
 
     def unlock(self):
-        self._locked = "UNLOCKED"
+        self._codebaseStatus = "UNLOCKED"
 
     def lock(self):
-        self._locked = "LOCKED"
+        self._codebaseStatus = "LOCKED"
 
     def prepare(self):
-        if self._locked == "LOCKED":
-            self._locked = "PREPARED"
+        if self._codebaseStatus == "LOCKED":
+            self._codebaseStatus = "PREPARED"
 
     def deploy(self):
-        if self._locked == "PREPARED":
-            self._locked = "LOCKED"
+        if self._codebaseStatus == "PREPARED":
+            self._codebaseStatus = "LOCKED"
 
-    def _getCodebase(self):
+    @property
+    def codebase(self):
         return self._codebase
 
     def _setCodebase(self, other):
@@ -106,7 +115,18 @@ class Service:
             self._codebase = other
             self.deploy()
 
-    codebase = property(_getCodebase, _setCodebase)
+    def setCodebase(self, codebase, moduleName=None, className=None):
+        if (codebase != self.codebase or
+                (moduleName is not None and moduleName != self.service_module_name) or
+                (className is not None and className != self.service_class_name)):
+            if self.isLocked:
+                raise Exception(
+                    "Cannot set codebase of locked service '{}'".format(self.name))
+
+            self._setCodebase(codebase)
+            self.service_module_name = moduleName
+            self.service_class_name = className
+            self.resetCounters()
 
     def getSerializationContext(self):
         if self.codebase is None:
@@ -121,22 +141,6 @@ class Service:
         self.timesBootedUnsuccessfully = 0
         self.timesCrashed = 0
         self.lastFailureReason = None
-
-    def setCodebase(self, codebase, moduleName, className):
-        if codebase != self.codebase or moduleName != self.service_module_name or className != self.service_class_name:
-            if self.isLocked:
-                logging.getLogger(__name__).warning("Cannot set codebase of locked service")
-                return False
-
-            # self.codebase = codebase
-            self._setCodebase(codebase)
-
-            self.service_module_name = moduleName
-            self.service_class_name = className
-            self.resetCounters()
-            return True
-
-        return True
 
     def effectiveTargetCount(self):
         if self.timesBootedUnsuccessfully >= MAX_BAD_BOOTS:

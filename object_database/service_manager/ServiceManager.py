@@ -75,7 +75,7 @@ class ServiceManager(object):
                 for _ in module.__name__.split("."):
                     module_path = os.path.dirname(module_path)
 
-                service.codebase = service_schema.Codebase.create([module_path])
+                service.setCodebase(service_schema.Codebase.create([module_path]))
 
         if target_count is not None:
             service.target_count = target_count
