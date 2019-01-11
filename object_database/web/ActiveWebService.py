@@ -331,13 +331,34 @@ class ActiveWebService(ServiceBase):
 
         serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
 
-        return Tabs(
+        buttons = Sequence([
+            Padding(),
+            Button(
+                Sequence([Octicon('shield').color('green'), Span('Lock ALL')]),
+                lambda: [s.lock() for s in service_schema.Service.lookupAll()]),
+            Button(
+                Sequence([Octicon('shield').color('orange'), Span('Prepare ALL')]),
+                lambda: [s.prepare() for s in service_schema.Service.lookupAll()]),
+            Button(
+                Sequence([Octicon('stop').color('red'), Span('Unlock ALL')]),
+                lambda: [s.unlock() for s in service_schema.Service.lookupAll()]),
+        ])
+        tabs = Tabs(
             Services=Table(
-                colFun=lambda: ['Service', 'Codebase', 'Module', 'Class', 'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
-                rowFun=lambda: sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
+                colFun=lambda: [
+                    'Service', 'Codebase Status', 'Codebase', 'Module', 'Class',
+                    'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
+                rowFun=lambda:
+                    sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
                 headerFun=lambda x: x,
-                rendererFun=lambda s,field: Subscribed(lambda:
+                rendererFun=lambda s, field: Subscribed(lambda:
                     Clickable(s.name, "/services/" + s.name) if field == 'Service' else
+                    (   Clickable(Sequence([Octicon('stop').color('red'), Span('Unlocked')]),
+                                  lambda: s.lock()) if s.isUnlocked else
+                        Clickable(Sequence([Octicon('shield').color('green'), Span('Locked')]),
+                                  lambda: s.prepare()) if s.isLocked else
+                        Clickable(Sequence([Octicon('shield').color('orange'), Span('Prepared')]),
+                                  lambda: s.unlock())) if field == 'Codebase Status' else
                     (str(s.codebase) if s.codebase else "") if field == 'Codebase' else
                     s.service_module_name if field == 'Module' else
                     s.service_class_name if field == 'Class' else
@@ -370,6 +391,7 @@ class ActiveWebService(ServiceBase):
                 maxRowsPerPage=50
                 )
             )
+        return Sequence([buttons, tabs])
 
     def pathToDisplay(self, path, queryArgs):
         if len(path) and path[0] == 'services':
