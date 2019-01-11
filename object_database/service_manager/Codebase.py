@@ -77,6 +77,9 @@ class Codebase:
         total_bytes = [0]
 
         def walk(path, so_far):
+            if so_far.startswith("."):
+                return  # skip hidden directories
+
             for name in os.listdir(path):
                 fullpath = os.path.join(path, name)
                 so_far_with_name = os.path.join(so_far, name) if so_far else name
