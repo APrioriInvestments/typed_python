@@ -49,6 +49,9 @@ class ServiceHost:
     statsLastUpdateTime = float
 
 
+class CodebaseLockedException(Exception):
+    pass
+
 @service_schema.define
 class Service:
     name = Indexed(str)
@@ -120,13 +123,23 @@ class Service:
                 (moduleName is not None and moduleName != self.service_module_name) or
                 (className is not None and className != self.service_class_name)):
             if self.isLocked:
-                raise Exception(
+                raise CodebaseLockedException(
                     "Cannot set codebase of locked service '{}'".format(self.name))
 
             self._setCodebase(codebase)
             self.service_module_name = moduleName
             self.service_class_name = className
             self.resetCounters()
+
+    def trySetCodebase(self, codebase, moduleName=None, className=None):
+        try:
+            self.setCodebase(codebase, moduleName, className)
+            return True
+        except CodebaseLockedException:
+            logging.getLogger(__name__).warning(
+                "Cannot set codebase of locked service '{}'".format(self.name)
+            )
+            return False
 
     def getSerializationContext(self):
         if self.codebase is None:

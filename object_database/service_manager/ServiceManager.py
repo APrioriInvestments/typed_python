@@ -58,7 +58,7 @@ class ServiceManager(object):
         self.thread.join()
 
     @staticmethod
-    def createService(serviceClass, serviceName, target_count=None, placement=None, isSingleton=None):
+    def createOrUpdateService(serviceClass, serviceName, target_count=None, placement=None, isSingleton=None):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
@@ -86,9 +86,9 @@ class ServiceManager(object):
         return service
 
     @staticmethod
-    def createServiceWithCodebase(codebase, className, serviceName,
-                                  targetCount=None, placement=None,
-                                  coresUsed=None, gbRamUsed=None, isSingleton=None):
+    def createOrUpdateServiceWithCodebase(codebase, className, serviceName,
+                                          targetCount=None, placement=None,
+                                          coresUsed=None, gbRamUsed=None, isSingleton=None):
 
         assert len(className.split(".")) > 1, "className should be a fully-qualified module.classname"
 
@@ -97,8 +97,7 @@ class ServiceManager(object):
         if not service:
             service = service_schema.Service(name=serviceName, placement="Any")
 
-        # TODO: Do we need to raise an exception if setCodebase fails because the service is locked?
-        res = service.setCodebase(codebase, ".".join(className.split(".")[:-1]), className.split(".")[-1])
+        service.setCodebase(codebase, ".".join(className.split(".")[:-1]), className.split(".")[-1])
 
         if isSingleton is not None:
             service.isSingleton = isSingleton

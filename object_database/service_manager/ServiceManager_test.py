@@ -376,19 +376,19 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_starting_services(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
     def test_service_storage(self):
         with self.database.transaction():
-            ServiceManager.createService(StorageTest, "StorageTest", target_count=1)
+            ServiceManager.createOrUpdateService(StorageTest, "StorageTest", target_count=1)
 
         self.waitForCount(1)
 
     def test_starting_uninitializable_services(self):
         with self.database.transaction():
-            svc = ServiceManager.createService(UninitializableService, "UninitializableService", target_count=1)
+            svc = ServiceManager.createOrUpdateService(UninitializableService, "UninitializableService", target_count=1)
 
         self.assertTrue(
             self.database.waitForCondition(
@@ -416,7 +416,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
 
         numpy.random.seed(42)
 
@@ -434,12 +434,13 @@ class ServiceManagerTest(unittest.TestCase):
 
         self.waitForCount(0)
 
-        #make sure we don't have a bunch of zombie processes hanging underneath the service manager
+        # make sure we don't have a bunch of zombie processes hanging underneath the service manager
+        time.sleep(1.0)
         self.assertEqual(len(psutil.Process().children()[0].children()), 0)
 
     def test_shutdown_hanging_services(self):
         with self.database.transaction():
-            ServiceManager.createService(HangingService, "HangingService", target_count=10)
+            ServiceManager.createOrUpdateService(HangingService, "HangingService", target_count=10)
 
         self.waitForCount(10)
 
@@ -452,7 +453,8 @@ class ServiceManagerTest(unittest.TestCase):
 
         self.assertTrue(time.time() - t0 < 2.0)
 
-        #make sure we don't have a bunch of zombie processes hanging underneath the service manager
+        # make sure we don't have a bunch of zombie processes hanging underneath the service manager
+        time.sleep(1.0)
         self.assertEqual(len(psutil.Process().children()[0].children()), 0)
 
     def test_conflicting_codebases(self):
@@ -496,7 +498,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_redeploy_hanging_services(self):
         with self.database.transaction():
-            ServiceManager.createService(HangingService, "HangingService", target_count=10)
+            ServiceManager.createOrUpdateService(HangingService, "HangingService", target_count=10)
 
         self.waitForCount(10)
 
@@ -505,7 +507,7 @@ class ServiceManagerTest(unittest.TestCase):
             orig_codebase = instances[0].codebase
 
         with self.database.transaction():
-            ServiceManager.createServiceWithCodebase(
+            ServiceManager.createOrUpdateServiceWithCodebase(
                 service_schema.Codebase.createFromFiles(getTestServiceModule(2)),
                 "test_service.service.Service",
                 "HangingService",
@@ -551,7 +553,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_throughput_while_adjusting_servicecount(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", target_count=0)
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=0)
 
 
         emptyThroughputs = [self.measureThroughput(1.0)]
@@ -582,7 +584,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def DISABLEDtest_throughput_with_many_workers(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", target_count=0)
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=0)
 
         throughputs = []
 
@@ -598,7 +600,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_service_restarts_after_soft_kill(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
@@ -612,7 +614,7 @@ class ServiceManagerTest(unittest.TestCase):
 
     def test_service_restarts_after_killing(self):
         with self.database.transaction():
-            ServiceManager.createService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
 
@@ -629,13 +631,15 @@ class ServiceManagerTest(unittest.TestCase):
 
         def deploy_helper(codebase_version, expected_version, existing_service=None):
             with self.database.transaction():
-                print("Setting codebase")
-                ServiceManager.createServiceWithCodebase(
-                    service_schema.Codebase.createFromFiles(getTestServiceModule(codebase_version)),
-                    "test_service.service.Service",
-                    serviceName,
-                    targetCount=1
-                    )
+                try:
+                    ServiceManager.createOrUpdateServiceWithCodebase(
+                        service_schema.Codebase.createFromFiles(getTestServiceModule(codebase_version)),
+                        "test_service.service.Service",
+                        serviceName,
+                        targetCount=1
+                        )
+                except Exception:
+                    pass
 
             if existing_service:
                 self.database.waitForCondition(
