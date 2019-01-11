@@ -71,7 +71,7 @@ def main(argv=None):
             database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
             with database.transaction():
-                service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
+                service = ServiceManager.createOrUpdateService(ActiveWebService, "ActiveWebService", target_count=0)
 
             ActiveWebService.configureFromCommandline(database, service, ['--port', '8000', '--host', '0.0.0.0'])
 
@@ -79,13 +79,13 @@ def main(argv=None):
                 ServiceManager.startService("ActiveWebService", 1)
 
             with database.transaction():
-                service = ServiceManager.createService(UninitializableService, "UninitializableService", target_count=1)
+                service = ServiceManager.createOrUpdateService(UninitializableService, "UninitializableService", target_count=1)
 
             with database.transaction():
-                service = ServiceManager.createService(HappyService, "HappyService", target_count=1)
+                service = ServiceManager.createOrUpdateService(HappyService, "HappyService", target_count=1)
 
             with database.transaction():
-                service = ServiceManager.createService(GraphDisplayService, "GraphDisplayService", target_count=1)
+                service = ServiceManager.createOrUpdateService(GraphDisplayService, "GraphDisplayService", target_count=1)
 
 
 

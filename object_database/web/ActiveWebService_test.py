@@ -84,7 +84,7 @@ class ActiveWebServiceTest(unittest.TestCase):
             self.database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
             with self.database.transaction():
-                service = ServiceManager.createService(ActiveWebService, "ActiveWebService", target_count=0)
+                service = ServiceManager.createOrUpdateService(ActiveWebService, "ActiveWebService", target_count=0)
 
             optional_args = []
             if len(authorized_groups) > 0:

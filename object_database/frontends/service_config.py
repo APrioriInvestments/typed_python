@@ -151,7 +151,7 @@ def _main(argv):
                     print("Named class %s is not a ServiceBase subclass." % fullClassname)
                     return 1
 
-                ServiceManager.createService(actualClass, classname, placement=parsedArgs.placement, isSingleton=parsedArgs.singleton)
+                ServiceManager.createOrUpdateService(actualClass, classname, placement=parsedArgs.placement, isSingleton=parsedArgs.singleton)
             else:
                 codebase = service_schema.Codebase.create(paths)
 
@@ -185,7 +185,7 @@ def _main(argv):
                 else:
                     name = parsedArgs.name
 
-                ServiceManager.createServiceWithCodebase(codebase, fullClassname, name, targetCount=None,
+                ServiceManager.createOrUpdateServiceWithCodebase(codebase, fullClassname, name, targetCount=None,
                         placement=parsedArgs.placement, coresUsed=coresUsed, gbRamUsed=gbRamUsed)
 
     if parsedArgs.command == 'list':

@@ -103,7 +103,7 @@ def main(argv):
 
     if parsedArgs.command == 'install':
         with db.transaction():
-            ServiceManager.createService(AwsWorkerBootService, "AwsWorkerBootService", placement="Master")
+            ServiceManager.createOrUpdateService(AwsWorkerBootService, "AwsWorkerBootService", placement="Master")
 
     if parsedArgs.command == 'list':
         print()
