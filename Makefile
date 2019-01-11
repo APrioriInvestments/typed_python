@@ -109,5 +109,5 @@ testcert.cert testcert.key:
 		-out testcert.cert -sha256 -days 1000 \
 		-subj '/C=US/ST=New York/L=New York/CN=localhost'
 
-:w
+
 
