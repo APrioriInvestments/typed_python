@@ -749,8 +749,6 @@ class Converter(object):
             else:
                 break
 
-        print("Vartypes are ", functionConverter._varname_to_type)
-
         if star_args_name is not None:
             body_native_expr = functionConverter.construct_starargs_around(body_native_expr, star_args_name)
 
@@ -889,7 +887,7 @@ class Converter(object):
 
         return pyast, freevars
 
-    def generateCallConverter(self, callTarget, returnType):
+    def generateCallConverter(self, callTarget):
         """Given a call target that's optimized for C-style dispatch, produce a (native) call-target that
         we can dispatch to from our C extension.
 
@@ -901,10 +899,6 @@ class Converter(object):
 
         returns the name of the defined native function
         """
-        if callTarget.output_type != returnType:
-            raise Exception("Can't call a call target whose output type is %s when our return type is %s" %
-                (callTarget.output_type, returnType))
-
         identifier = ("call_converter", callTarget.name)
 
         if identifier in self._names_for_identifier:

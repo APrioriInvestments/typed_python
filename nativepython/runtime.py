@@ -43,12 +43,11 @@ class Runtime:
                 assert not a.isStarArg, 'dont support star args yet'
                 assert not a.isKwarg, 'dont support keyword yet'
 
-            output_wrapper = python_to_native_ast.typedPythonTypeToTypeWrapper(f.returnType or object)
             input_wrappers = [python_to_native_ast.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
 
             callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType)
 
-            wrappingCallTargetName = self.converter.generateCallConverter(callTarget, output_wrapper)
+            wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
             targets = self.converter.extract_new_function_definitions()
 
@@ -56,7 +55,7 @@ class Runtime:
 
             fp = function_pointers[wrappingCallTargetName]
 
-            f._installNativePointer(fp.fp)
+            f._installNativePointer(fp.fp, callTarget.output_type.typeRepresentation, [i.typeRepresentation for i in input_wrappers])
 
             return f
 

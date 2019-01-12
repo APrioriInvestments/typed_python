@@ -278,6 +278,27 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
     return NULL;
 }
 
+bool unpackTupleToAndTypes(PyObject* tuple, std::vector<Type*>& out) {
+    if (!PyTuple_Check(tuple)) {
+        PyErr_SetString(PyExc_TypeError, "Argument to type tuple was not a tuple");
+        return false;
+    }
+    for (int i = 0; i < PyTuple_Size(tuple); ++i) {
+        PyObject* entry = PyTuple_GetItem(tuple, i);
+        Type* targetType = NULL;
+
+        targetType = native_instance_wrapper::tryUnwrapPyInstanceToType(entry);
+        if (!targetType) {
+            PyErr_Format(PyExc_TypeError, "Expected a type in position %d of type tuple. Got %S instead.", i, entry);
+            return false;
+        }
+
+        out.push_back(targetType);
+    }
+
+    return true;
+}
+
 bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::string, Type*> >& out) {
     std::set<std::string> memberNames;
 
@@ -862,13 +883,15 @@ PyObject *enableNativeDispatch(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 3) {
-        PyErr_SetString(PyExc_TypeError, "installNativeFunctionPointer takes 3 positional arguments");
+    if (PyTuple_Size(args) != 5) {
+        PyErr_SetString(PyExc_TypeError, "installNativeFunctionPointer takes 5 positional arguments");
         return NULL;
     }
     PyObject* a1 = PyTuple_GetItem(args, 0);
     PyObject* a2 = PyTuple_GetItem(args, 1);
     PyObject* a3 = PyTuple_GetItem(args, 2);
+    PyObject* a4 = PyTuple_GetItem(args, 3);
+    PyObject* a5 = PyTuple_GetItem(args, 4);
 
     Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
@@ -887,6 +910,20 @@ PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
+
+    Type* returnType = native_instance_wrapper::unwrapTypeArgToTypePtr(a4);
+
+    if (!returnType) {
+        PyErr_SetString(PyExc_TypeError, "fourth argument to 'installNativeFunctionPointer' must be a type object (return type)");
+        return NULL;
+    }
+
+    std::vector<Type*> argTypes;
+
+    if (!unpackTupleToAndTypes(a5, argTypes)) {
+        return NULL;
+    }
+
     Function* f = (Function*)t1;
 
     int index = PyLong_AsLong(a2);
@@ -897,7 +934,7 @@ PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    f->setEntrypoint(index,(compiled_code_entrypoint)ptr);
+    f->addCompiledSpecialization(index,(compiled_code_entrypoint)ptr, returnType, argTypes);
 
     return incref(Py_None);
 }

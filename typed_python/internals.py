@@ -186,8 +186,8 @@ class FunctionOverload:
     def __str__(self):
         return "FunctionOverload(%s->%s, %s)" % (self.f, self.returnType, self.args)
 
-    def _installNativePointer(self, fp):
-        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp)
+    def _installNativePointer(self, fp, returnType, argumentTypes):
+        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
 
 
 class DisableCompiledCode:

@@ -1711,6 +1711,36 @@ public:
         bool m_isKwarg;
     };
 
+    class CompiledSpecialization {
+    public:
+        CompiledSpecialization(
+                    compiled_code_entrypoint funcPtr,
+                    Type* returnType,
+                    const std::vector<Type*>& argTypes
+                    ) :
+            mFuncPtr(funcPtr),
+            mReturnType(returnType),
+            mArgTypes(argTypes)
+        {}
+
+        compiled_code_entrypoint getFuncPtr() const {
+            return mFuncPtr;
+        }
+
+        Type* getReturnType() const {
+            return mReturnType;
+        }
+
+        const std::vector<Type*>& getArgTypes() const {
+            return mArgTypes;
+        }
+
+    private:
+        compiled_code_entrypoint mFuncPtr;
+        Type* mReturnType;
+        std::vector<Type*> mArgTypes;
+    };
+
     class Overload {
     public:
         Overload(
@@ -1747,22 +1777,19 @@ public:
             }
         }
 
-        compiled_code_entrypoint getEntrypoint() const {
-            return mCompiledCodePtr;
+        const std::vector<CompiledSpecialization>& getCompiledSpecializations() const {
+            return mCompiledSpecializations;
         }
 
-        void setEntrypoint(compiled_code_entrypoint e) {
-            if (mCompiledCodePtr) {
-                throw std::runtime_error("Can't redefine a function entrypoint");
-            }
-
-            mCompiledCodePtr = e;
+        void addCompiledSpecialization(compiled_code_entrypoint e, Type* returnType, const std::vector<Type*>& argTypes) {
+            mCompiledSpecializations.push_back(CompiledSpecialization(e,returnType,argTypes));
         }
 
     private:
         PyFunctionObject* mFunctionObj;
         Type* mReturnType;
         std::vector<FunctionArg> mArgs;
+        std::vector<CompiledSpecialization> mCompiledSpecializations;
         compiled_code_entrypoint mCompiledCodePtr; //accepts a pointer to packed arguments and another pointer with the return value
     };
 
@@ -1926,12 +1953,17 @@ public:
         return mOverloads;
     }
 
-    void setEntrypoint(long whichOverload, compiled_code_entrypoint entrypoint) {
+    void addCompiledSpecialization(
+                    long whichOverload, 
+                    compiled_code_entrypoint entrypoint,
+                    Type* returnType,
+                    const std::vector<Type*>& argTypes
+                    ) {
         if (whichOverload < 0 || whichOverload >= mOverloads.size()) {
             throw std::runtime_error("Invalid overload index.");
         }
 
-        mOverloads[whichOverload].setEntrypoint(entrypoint);
+        mOverloads[whichOverload].addCompiledSpecialization(entrypoint, returnType, argTypes);
     }
 
 private:

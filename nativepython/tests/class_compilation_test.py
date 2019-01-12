@@ -27,6 +27,9 @@ class AClass(Class):
     y = Member(float)
     z = Member(TupleOf(int))
 
+    def f(self):
+        return self.x + self.y
+
 class AClassWithAnotherClass(Class):
     x = Member(int)
     y = Member(float)

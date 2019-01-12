@@ -1886,9 +1886,15 @@ std::pair<bool, PyObject*> native_instance_wrapper::tryToCallOverload(const Func
 
     PyObject* result;
 
-    if (f.getEntrypoint() && !native_dispatch_disabled) {
-        result = dispatchFunctionCallToNative(f, targetArgTuple, newKwargs);
-    } else {
+    bool hadNativeDispatch = false;
+
+    if (!native_dispatch_disabled) {
+        auto tried_and_result = dispatchFunctionCallToNative(f, targetArgTuple, newKwargs);
+        hadNativeDispatch = tried_and_result.first;
+        result = tried_and_result.second;
+    } 
+
+    if (!hadNativeDispatch) {
         result = PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs);
     }
 
@@ -1921,43 +1927,59 @@ std::pair<bool, PyObject*> native_instance_wrapper::tryToCallOverload(const Func
 }
 
 // static
-PyObject* native_instance_wrapper::dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs) {
-    Type* returnType = overload.getReturnType();
-
-    if (!returnType) {
-        returnType = PythonObjectOfType::Make(getObjectAsTypeObject());
+std::pair<bool, PyObject*> native_instance_wrapper::dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs) {
+    for (const auto& spec: overload.getCompiledSpecializations()) {
+        auto res = dispatchFunctionCallToCompiledSpecialization(overload, spec, argTuple, kwargs);
+        if (res.first) {
+            return res;
+        }
     }
 
-    if (PyTuple_Size(argTuple) != overload.getArgs().size()) {
-        PyErr_Format(PyExc_TypeError, "Can't call %S natively with %d arguments", PyTuple_Size(argTuple));
-        return NULL;
+    return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
+}
+
+std::pair<bool, PyObject*> native_instance_wrapper::dispatchFunctionCallToCompiledSpecialization(
+                                                        const Function::Overload& overload, 
+                                                        const Function::CompiledSpecialization& specialization,
+                                                        PyObject* argTuple, 
+                                                        PyObject *kwargs
+                                                        ) {
+    Type* returnType = specialization.getReturnType();
+
+    if (!returnType) {
+        throw std::runtime_error("Malformed function specialization: missing a return type.");
+    }
+
+    if (PyTuple_Size(argTuple) != overload.getArgs().size() || overload.getArgs().size() != specialization.getArgTypes().size()) {
+        return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
     }
 
     if (kwargs && PyDict_Size(kwargs)) {
-        PyErr_Format(PyExc_TypeError, "Can't call %S natively with keyword arguments", PyTuple_Size(argTuple));
-        return NULL;
+        return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
     }
 
     std::vector<Instance> instances;
 
     for (long k = 0; k < overload.getArgs().size(); k++) {
         auto arg = overload.getArgs()[k];
+        Type* argType = specialization.getArgTypes()[k];
 
         if (arg.getIsKwarg() || arg.getIsStarArg()) {
-            PyErr_Format(PyExc_TypeError, "Can't call %S natively because we don't support *args and **kwargs yet", overload.getFunctionObj());
-            return NULL;
+            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
 
-        Type* toUse = arg.getTypeFilter();
-        if (!toUse) {
-            toUse = PythonObjectOfType::Make(getObjectAsTypeObject());
+        try {
+            instances.push_back(
+                Instance::createAndInitialize(argType, [&](instance_ptr p) {
+                    copyConstructFromPythonInstance(argType, p, PyTuple_GetItem(argTuple, k));
+                })
+                );
+            }
+        catch(...) {
+            //failed to convert
+            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
 
-        instances.push_back(
-            Instance::createAndInitialize(toUse, [&](instance_ptr p) {
-                copyConstructFromPythonInstance(toUse, p, PyTuple_GetItem(argTuple, k));
-            })
-            );
     }
 
     try {
@@ -1967,10 +1989,10 @@ PyObject* native_instance_wrapper::dispatchFunctionCallToNative(const Function::
                 args.push_back(i.data());
             }
 
-            overload.getEntrypoint()(returnData, &args[0]);
+            specialization.getFuncPtr()(returnData, &args[0]);
         });
 
-        return extractPythonObject(result.data(), result.type());
+        return std::pair<bool, PyObject*>(true, (PyObject*)extractPythonObject(result.data(), result.type()));
     } catch(...) {
         const char* e = nativepython_runtime_get_stashed_exception();
         if (!e) {
@@ -1978,7 +2000,7 @@ PyObject* native_instance_wrapper::dispatchFunctionCallToNative(const Function::
         }
 
         PyErr_Format(PyExc_TypeError, e);
-        return NULL;
+        return std::pair<bool, PyObject*>(true, (PyObject*)nullptr);
     }
 }
 

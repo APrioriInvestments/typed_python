@@ -148,3 +148,12 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "local variable 'x' referenced before assignment"):
             self.assertEqual(f(0, (1,2,3)), (1,2,3))
 
+    def test_return_from_function_without_return_value_specified(self):
+        @Compiled
+        def f(t: TupleOf(int)):
+            return t
+
+        self.assertEqual(f((1,2,3)), (1,2,3))
+
+    
+
