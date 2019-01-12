@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.python_to_native_ast as python_to_native_ast
+import nativepython.python_to_native_converter as python_to_native_converter
 import nativepython.native_ast as native_ast
 import nativepython.llvm_compiler as llvm_compiler
 import nativepython
@@ -30,7 +30,7 @@ class Runtime:
 
     def __init__(self):
         self.compiler = llvm_compiler.Compiler()
-        self.converter = python_to_native_ast.Converter()
+        self.converter = python_to_native_converter.PythonToNativeConverter()
 
     def verboselyDisplayNativeCode(self):
         self.compiler.mark_converter_verbose()
@@ -43,7 +43,7 @@ class Runtime:
                 assert not a.isStarArg, 'dont support star args yet'
                 assert not a.isKwarg, 'dont support keyword yet'
 
-            input_wrappers = [python_to_native_ast.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
+            input_wrappers = [python_to_native_converter.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
 
             callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType)
 
