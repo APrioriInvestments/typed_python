@@ -136,3 +136,15 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(3.5), 10.0)
 
+    def test_unassigned_variables(self):
+        @Compiled
+        def f(switch: int, t: TupleOf(int)) -> TupleOf(int):
+            if switch:
+                x = t
+            return x
+
+        self.assertEqual(f(1, (1,2,3)), (1,2,3))
+
+        with self.assertRaisesRegex(Exception, "local variable 'x' referenced before assignment"):
+            self.assertEqual(f(0, (1,2,3)), (1,2,3))
+

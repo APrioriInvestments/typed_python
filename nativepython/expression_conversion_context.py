@@ -17,6 +17,8 @@ import typed_python.ast_util as ast_util
 
 import nativepython
 import nativepython.native_ast as native_ast
+import nativepython.type_wrappers.runtime_functions as runtime_functions
+
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
 from nativepython.typed_expression import TypedExpression
@@ -459,6 +461,20 @@ class ExpressionConversionContext(object):
     def pushComment(self, c):
         self.pushEffect(native_ast.nullExpr.with_comment(c))
 
+    def pushException(self, type, value):
+        self.pushEffect(
+            #as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
+            runtime_functions.stash_exception_ptr.call(
+               native_ast.const_utf8_cstr(str(value))
+               )
+            >> native_ast.Expression.Throw(
+                expr=native_ast.Expression.Constant(
+                    val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+                    )
+                )
+            )
+
+
     def convert_expression_ast(self, ast):
         if ast.matches.Attribute:
             attr = ast.attr
@@ -469,6 +485,9 @@ class ExpressionConversionContext(object):
         if ast.matches.Name:
             assert ast.ctx.matches.Load
             if ast.id in self.functionContext._varname_to_type:
+                with self.ifelse(self.isInitializedVarExpr(ast.id)) as (true,false):
+                    with false:
+                        self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % ast.id)
                 return self.named_var_expr(ast.id)
 
             if ast.id in self.functionContext._free_variable_lookup:

@@ -263,8 +263,6 @@ class FunctionConversionContext(object):
 
                 val_to_store = subcontext.convert_expression_ast(ast.value)
 
-                subcontext.pushComment("evaluated rhs")
-
                 if val_to_store is None:
                     return subcontext.finalize(None), False
 
@@ -288,6 +286,7 @@ class FunctionConversionContext(object):
 
                 if slot_ref.expr_type.is_pod:
                     slot_ref.convert_copy_initialize(val_to_store)
+                    subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
                 else:
                     with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
                         with true_block:
@@ -561,9 +560,11 @@ class FunctionConversionContext(object):
                 slot_type = self._varname_to_type[name]
 
                 if slot_type is not None:
+                    context = ExpressionConversionContext(self)
+
                     if slot_type.is_pod:
                         #we can just copy this into the stackslot directly. no destructor needed
-                        to_add.append(
+                        context.pushEffect(
                             native_ast.Expression.Store(
                                 ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
                                 val=
@@ -571,11 +572,12 @@ class FunctionConversionContext(object):
                                     native_ast.Expression.Variable(name=name).load()
                                 )
                             )
+                        context.pushEffect(
+                            context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
+                            )
                     else:
                         #need to make a stackslot for this variable
                         #the argument will be a pointer because it's POD
-                        context = ExpressionConversionContext(self)
-
                         var_expr = context.inputArg(slot_type, name)
 
                         slot_expr = context.named_var_expr(name)
@@ -586,7 +588,7 @@ class FunctionConversionContext(object):
                             context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
                             )
 
-                        to_add.append(context.finalize(None))
+                    to_add.append(context.finalize(None))
 
         for name in self._varname_to_type:
             if name is not FunctionOutput and name != stararg_name:
