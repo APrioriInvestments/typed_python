@@ -26,7 +26,7 @@ import nativepython
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
-class ClassWrapper(RefcountedWrapper):
+class ClassWrapperBase(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -36,18 +36,19 @@ class ClassWrapper(RefcountedWrapper):
 
         self.nameToIndex = {}
         self.indexToByteOffset = {}
+        self.classType = t if t.__typed_python_category__ == "Class" else t.Class
 
         element_types = [('refcount', native_ast.Int64), ('data',native_ast.UInt8)]
 
         #this follows the general layout of 'held class' which is 1 bit per field for initialization and then
         #each field packed directly according to byte size
-        byteOffset = 8 + (len(t.MemberNames) // 8 + 1)
+        byteOffset = 8 + (len(self.classType.MemberNames) // 8 + 1)
 
-        for i,name in enumerate(t.MemberNames):
+        for i,name in enumerate(self.classType.MemberNames):
             self.nameToIndex[name] = i
             self.indexToByteOffset[i] = byteOffset
 
-            byteOffset += _types.bytecount(t.MemberTypes[i])
+            byteOffset += _types.bytecount(self.classType.MemberTypes[i])
 
         self.layoutType = native_ast.Type.Struct(element_types=element_types,name=t.__qualname__+"Layout").pointer()
 
@@ -67,6 +68,7 @@ class ClassWrapper(RefcountedWrapper):
 
         return native_ast.nullExpr
 
+class ClassWrapper(ClassWrapperBase):
     def memberPtr(self, instance, ix):
         return (
             instance.nonref_expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])
@@ -100,6 +102,10 @@ class ClassWrapper(RefcountedWrapper):
         return bytePtr.store(bytePtr.load().bitor(native_ast.const_uint8_expr(1 << bit)))
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
+        if attribute in self.typeRepresentation.MemberFunctions:
+            methodType = typeWrapper(_types.BoundMethod(self.typeRepresentation, self.typeRepresentation.MemberFunctions[attribute]))
+            return instance.changeType(methodType)
+
         if not isinstance(attribute, int):
             ix = self.nameToIndex.get(attribute)
         else:
@@ -157,6 +163,16 @@ class ClassWrapper(RefcountedWrapper):
 
             return native_ast.nullExpr
 
+class BoundMethodWrapper(ClassWrapperBase):
+    def convert_call(self, context, left, args):
+        clsType = typeWrapper(self.typeRepresentation.Class)
+        funcType = typeWrapper(self.typeRepresentation.Function)
+
+        return funcType.convert_call(
+            context,
+            context.pushPod(funcType, native_ast.nullExpr),
+            (left.changeType(clsType),) + tuple(args)
+            )
 
 
 

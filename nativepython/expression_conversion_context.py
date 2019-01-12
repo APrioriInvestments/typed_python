@@ -410,14 +410,21 @@ class ExpressionConversionContext(object):
 
         return native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
-    def call_py_function(self, f, args):
+    def call_py_function(self, f, args, returnTypeOverload=None):
         #force arguments to a type appropriate for argpassing
         native_args = [a.as_native_call_arg() for a in args]
 
-        call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], None)
+        call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
 
         if call_target is None:
             self.pushException(TypeError, "Function was not convertible.")
+            return
+
+        if call_target.output_type is None:
+            #this always throws
+            assert len(call_target.named_call_target.arg_types) == len(args)
+
+            call_target.call(*native_args)
             return
 
         if call_target.output_type.is_pass_by_ref:

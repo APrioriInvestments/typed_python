@@ -65,7 +65,14 @@ class FunctionConversionContext(object):
         return_type = self._varname_to_type.get(FunctionOutput, None)
 
         if return_type is None:
-            return None, None
+            return (
+                native_ast.Function(
+                    args=self._native_args,
+                    body=native_ast.FunctionBody.Internal(body=body_native_expr),
+                    output_type=native_ast.Void
+                    ),
+                return_type
+                )
 
         if return_type.is_pass_by_ref:
             return (
@@ -150,6 +157,9 @@ class FunctionConversionContext(object):
 
     def upsizeVariableType(self, varname, new_type):
         if self._varname_to_type.get(varname) is None:
+            if new_type is None:
+                return
+
             self._varname_to_type[varname] = new_type
             self._typesAreUnstable = True
             return
@@ -301,10 +311,10 @@ class FunctionConversionContext(object):
             cond_context = ExpressionConversionContext(self)
             cond = cond_context.convert_expression_ast(ast.test)
             if cond is None:
-                return cond.finalize(None)
+                return cond.finalize(None), False
             cond = cond.toBool()
             if cond is None:
-                return cond.finalize(None)
+                return cond.finalize(None), False
 
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
@@ -326,12 +336,14 @@ class FunctionConversionContext(object):
 
         if ast.matches.While:
             cond_context = ExpressionConversionContext(self)
+
             cond = cond_context.convert_expression_ast(ast.test)
+
             if cond is None:
-                return cond_context.finalize(None)
+                return cond_context.finalize(None), False
             cond = cond.toBool()
             if cond is None:
-                return cond_context.finalize(None)
+                return cond_context.finalize(None), False
 
             true, true_returns = self.convert_statement_list_ast(ast.body)
 

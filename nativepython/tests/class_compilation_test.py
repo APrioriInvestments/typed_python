@@ -22,6 +22,7 @@ def Compiled(f):
     f = TypedFunction(f)
     return Runtime.singleton().compile(f)
 
+AClass = lambda: AClass
 class AClass(Class):
     x = Member(int)
     y = Member(float)
@@ -29,6 +30,15 @@ class AClass(Class):
 
     def f(self):
         return self.x + self.y
+
+    def loop(self, count: int):
+        i = 0
+        res = self.y
+        while i < count:
+            res = res + self.y
+            i = i + 1
+
+        return res
 
 class AClassWithAnotherClass(Class):
     x = Member(int)
@@ -46,7 +56,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         @Compiled
         def getY(a: AClass) -> float:
             return a.y
-        
+
         @Compiled
         def getZ(a: AClass) -> TupleOf(int):
             return a.z
@@ -54,7 +64,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(getX(a), a.x)
         self.assertEqual(getY(a), a.y)
         self.assertEqual(getZ(a), a.z)
-                
+
     def test_class_set_attribute(self):
         a = AClass()
 
@@ -120,26 +130,54 @@ class TestClassCompilationCompilation(unittest.TestCase):
         anAWithAClass = AClassWithAnotherClass()
         self.assertEqual(_types.refcount(ac1), 1)
         self.assertEqual(_types.refcount(ac2), 1)
-        
+
         with self.assertRaises(Exception):
             get(anAWithAClass)
 
-        
+
         set(anAWithAClass, ac1)
         self.assertEqual(_types.refcount(ac1), 2)
         self.assertEqual(_types.refcount(ac2), 1)
-        
+
         self.assertEqual(get(anAWithAClass).x, 1)
         self.assertEqual(get(anAWithAClass).x, 1)
         self.assertEqual(get(anAWithAClass).x, 1)
         self.assertEqual(get(anAWithAClass).x, 1)
         self.assertEqual(_types.refcount(ac1), 2)
-        
+
         set(anAWithAClass, ac2)
         self.assertEqual(_types.refcount(ac1), 1)
         self.assertEqual(_types.refcount(ac2), 2)
         self.assertEqual(get(anAWithAClass).x, 2)
 
+    def test_call_method(self):
+        @Compiled
+        def f(c: AClass):
+            return c.f()
+
+        c = AClass()
+
+        self.assertEqual(f(c), c.f())
+
+    def test_compile_class_method(self):
+        c = AClass(x = 20)
+
+        t0 = time.time()
+        uncompiled_res = c.loop(100000)
+        uncompiled_time = time.time() - t0
+
+        Runtime.singleton().compile(AClass.loop)
+
+        t0 = time.time()
+        compiled_res = c.loop(100000)
+        compiled_time = time.time() - t0
+
+        speedup = uncompiled_time / compiled_time
+
+        self.assertGreater(speedup, 20)
+        self.assertEqual(compiled_res, uncompiled_res)
+
+        print("speedup is ", speedup) #I get about 75
 
 
 

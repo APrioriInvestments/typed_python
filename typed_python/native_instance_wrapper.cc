@@ -678,7 +678,7 @@ void native_instance_wrapper::constructFromPythonArguments(uint8_t* data, Type* 
                     return;
                 }
 
-                //otherwise, if we have exactly one subelement, attempt to construct from that 
+                //otherwise, if we have exactly one subelement, attempt to construct from that
                 if (alt->elementType()->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
                     throw std::runtime_error("ConcreteAlternatives are supposed to only contain NamedTuples");
                 }
@@ -1892,7 +1892,7 @@ std::pair<bool, PyObject*> native_instance_wrapper::tryToCallOverload(const Func
         auto tried_and_result = dispatchFunctionCallToNative(f, targetArgTuple, newKwargs);
         hadNativeDispatch = tried_and_result.first;
         result = tried_and_result.second;
-    } 
+    }
 
     if (!hadNativeDispatch) {
         result = PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs);
@@ -1939,9 +1939,9 @@ std::pair<bool, PyObject*> native_instance_wrapper::dispatchFunctionCallToNative
 }
 
 std::pair<bool, PyObject*> native_instance_wrapper::dispatchFunctionCallToCompiledSpecialization(
-                                                        const Function::Overload& overload, 
+                                                        const Function::Overload& overload,
                                                         const Function::CompiledSpecialization& specialization,
-                                                        PyObject* argTuple, 
+                                                        PyObject* argTuple,
                                                         PyObject *kwargs
                                                         ) {
     Type* returnType = specialization.getReturnType();
@@ -2627,6 +2627,14 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
             );
     }
 
+
+    if (inType->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
+        BoundMethod* methodT = (BoundMethod*)inType;
+
+        PyDict_SetItemString(pyType->tp_dict, "Class", typePtrToPyTypeRepresentation(methodT->getClass()));
+        PyDict_SetItemString(pyType->tp_dict, "Function", typePtrToPyTypeRepresentation(methodT->getFunction()));
+    }
+
     if (inType->getTypeCategory() == Type::TypeCategory::catClass) {
         Class* classT = (Class*)inType;
 
@@ -2641,9 +2649,17 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
             PyTuple_SetItem(names, k, namePtr);
         }
 
+        PyObject* memberFunctions = PyDict_New();
+        for (auto p: classT->getMemberFunctions()) {
+            PyDict_SetItemString(memberFunctions, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+            PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+        }
+
         //expose 'ElementType' as a member of the type object
         PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
         PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
+
+        PyDict_SetItemString(pyType->tp_dict, "MemberFunctions", memberFunctions);
 
         for (auto nameAndObj: ((Class*)inType)->getClassMembers()) {
             PyDict_SetItemString(

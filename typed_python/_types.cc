@@ -416,6 +416,34 @@ bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::s
     return true;
 }
 
+PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "BoundMetho takes 2");
+        return NULL;
+    }
+
+    PyObject* a0 = PyTuple_GetItem(args,0);
+    PyObject* a1 = PyTuple_GetItem(args,1);
+
+    Type* t0 = native_instance_wrapper::unwrapTypeArgToTypePtr(a0);
+    Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+    if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catClass) {
+        PyErr_SetString(PyExc_TypeError, "Expected first argument to be a Class");
+        return NULL;
+    }
+    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_SetString(PyExc_TypeError, "Expected second argument to be a Function");
+        return NULL;
+    }
+
+    Type* resType = BoundMethod::Make((Class*)t0, (Function*)t1);
+
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(resType);
+    Py_INCREF(typeObj);
+    return typeObj;
+}
+
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 4 && PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "Function takes 2 or 4 arguments");
@@ -1053,6 +1081,7 @@ static PyMethodDef module_methods[] = {
     {"Value", (PyCFunction)MakeValueType, METH_VARARGS, NULL},
     {"Class", (PyCFunction)MakeClassType, METH_VARARGS, NULL},
     {"Function", (PyCFunction)MakeFunctionType, METH_VARARGS, NULL},
+    {"BoundMethod", (PyCFunction)MakeBoundMethodType, METH_VARARGS, NULL},
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},

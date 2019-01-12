@@ -198,7 +198,7 @@ class PythonToNativeConverter(object):
             else:
                 args.append(untypedPtr.cast(argtype.pointer()).load())
 
-        if callTarget.output_type.is_pass_by_ref:
+        if callTarget.output_type is not None and callTarget.output_type.is_pass_by_ref:
             body = callTarget.call(
                 native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),
                 *args
@@ -206,7 +206,7 @@ class PythonToNativeConverter(object):
         else:
             body = callTarget.call(*args)
 
-            if not callTarget.output_type.is_empty:
+            if not (callTarget.output_type is None or callTarget.output_type.is_empty):
                 body = native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()).store(body)
 
         body = native_ast.FunctionBody.Internal(body=body)
@@ -261,17 +261,24 @@ class PythonToNativeConverter(object):
         return repeat or len(self._inflight_function_conversions) != oldCount
 
     def _resolveAllInflightFunctions(self):
+        passCt = 0
         while self._resolveInflightOnePass():
-            pass
+            passCt += 1
+            if passCt > 100:
+                print("We've done ", passCt, " with ", len(self._inflight_function_conversions))
+                for c in self._inflight_function_conversions.values():
+                    print("    ", c.identity[1].__name__, c.identity[2], "->", c._output_type)
+                raise Exception("Exceed max pass count")
 
     def convert(self, f, input_types, output_type, assertIsRoot=False):
         """Convert a single pure python function using args of 'input_types'.
 
-        It will return no more than 'output_type'.
+        It will return no more than 'output_type'. if output_type is None we produce
+        the tightest output type possible.
         """
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identifier = ("pyfunction", f, input_types)
+        identifier = ("pyfunction", f, input_types, output_type)
 
         if identifier in self._names_for_identifier:
             name = self._names_for_identifier[identifier]

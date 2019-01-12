@@ -200,6 +200,20 @@ class TestCompilationStructures(unittest.TestCase):
 
             print("for ", input, " speedup is ", speedup)
 
+    def test_call_typed_function(self):
+        @TypedFunction
+        def f(x):
+            return x
+
+        @TypedFunction
+        def g(x: int):
+            return f(x+1)
+
+        Runtime.singleton().compile(g)
+        Runtime.singleton().compile(f)
+
+        self.assertEqual(g(10), 11)
+
 
 
 

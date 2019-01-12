@@ -68,7 +68,7 @@ class ClassMetaNamespace:
         self.order.append((k,v))
 
 
-def makeFunction(name, f):
+def makeFunction(name, f, firstArgType=None):
     spec = inspect.getfullargspec(f)
 
     def getAnn(argname):
@@ -91,7 +91,11 @@ def makeFunction(name, f):
         else:
             default = None
 
-        arg_types.append((argname, getAnn(argname), default, False, False))
+        ann = getAnn(argname)
+        if ann is None and i == 0 and firstArgType is not None:
+            ann = firstArgType
+
+        arg_types.append((argname, ann, default, False, False))
 
     return_type = None
 
@@ -138,19 +142,20 @@ class ClassMetaclass(type):
                     staticFunctions[eltName] = Function(staticFunctions[eltName], makeFunction(eltName, elt.__func__))
             elif isinstance(elt, FunctionType):
                 if eltName not in memberFunctions:
-                    memberFunctions[eltName] = makeFunction(eltName, elt)
+                    memberFunctions[eltName] = makeFunction(eltName, elt, lambda: actualClass)
                 else:
-                    memberFunctions[eltName] = Function(memberFunctions[eltName], makeFunction(eltName, elt))
+                    memberFunctions[eltName] = Function(memberFunctions[eltName], makeFunction(eltName, elt, lambda: actualClass))
             else:
                 classMembers.append((eltName, elt))
 
-        return typed_python._types.Class(
+        actualClass = typed_python._types.Class(
             name,
             tuple(members),
             tuple(memberFunctions.items()),
             tuple(staticFunctions.items()),
             tuple(classMembers)
             )
+        return actualClass
 
 
 class Class(metaclass=ClassMetaclass):
@@ -182,6 +187,17 @@ class FunctionOverload:
 
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
+
+    def matchesTypes(self, argTypes):
+        """Do the types in 'argTypes' match our argument typeFilters at a binary level"""
+        if len(argTypes) == len(self.args) and not any(x.isStarArg or x.isKwarg for x in self.args):
+            for i in range(len(argTypes)):
+                if self.args[i].typeFilter is not None and not typed_python._types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i]):
+                    return False
+
+            return True
+
+        return False
 
     def __str__(self):
         return "FunctionOverload(%s->%s, %s)" % (self.f, self.returnType, self.args)

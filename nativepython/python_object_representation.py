@@ -4,9 +4,10 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrapper
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
+from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
-from nativepython.type_wrappers.class_wrapper import ClassWrapper
+from nativepython.type_wrappers.class_wrapper import ClassWrapper, BoundMethodWrapper
 from nativepython.type_wrappers.len_wrapper import LenWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
@@ -43,6 +44,12 @@ def _typedPythonTypeToTypeWrapper(t):
     if t.__typed_python_category__ == "Class":
         return ClassWrapper(t)
 
+    if t.__typed_python_category__ == "Function":
+        return PythonTypedFunctionWrapper(t)
+
+    if t.__typed_python_category__ == "BoundMethod":
+        return BoundMethodWrapper(t)
+
     if t.__typed_python_category__ == "TupleOf":
         return TupleOfWrapper(t)
 
@@ -60,7 +67,7 @@ def pythonObjectRepresentation(context, f):
 
     if f is None:
         return TypedExpression(
-            context, 
+            context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Void()
                 ),
@@ -69,7 +76,7 @@ def pythonObjectRepresentation(context, f):
             )
     if isinstance(f, bool):
         return TypedExpression(
-            context, 
+            context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f,bits=1,signed=False)
                 ),
@@ -78,7 +85,7 @@ def pythonObjectRepresentation(context, f):
             )
     if isinstance(f, int):
         return TypedExpression(
-            context, 
+            context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f,bits=64,signed=True)
                 ),
@@ -87,7 +94,7 @@ def pythonObjectRepresentation(context, f):
             )
     if isinstance(f, float):
         return TypedExpression(
-            context, 
+            context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Float(val=f,bits=64)
                 ),
@@ -96,11 +103,20 @@ def pythonObjectRepresentation(context, f):
             )
     if isinstance(f, type(pythonObjectRepresentation)):
         return TypedExpression(
-            context, 
+            context,
             native_ast.nullExpr,
             PythonFreeFunctionWrapper(f),
             False
             )
+
+    if hasattr(f, '__typed_python_category__'):
+        if f.__typed_python_category__ == "Function":
+            return TypedExpression(
+                context,
+                native_ast.nullExpr,
+                PythonTypedFunctionWrapper(f),
+                False
+                )
 
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)

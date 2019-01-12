@@ -47,6 +47,9 @@ class TypedExpression(object):
         self.expr_type = t
         self.isReference = isReference
 
+    def changeType(self, newType):
+        return TypedExpression(self.context, self.expr, newType, self.isReference)
+
     def as_native_call_arg(self):
         """Convert this expression to a call-argument form."""
         if self.expr_type.is_pass_by_ref:

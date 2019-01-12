@@ -16,6 +16,7 @@ import nativepython.python_to_native_converter as python_to_native_converter
 import nativepython.native_ast as native_ast
 import nativepython.llvm_compiler as llvm_compiler
 import nativepython
+from typed_python import _types
 from typed_python import TypedFunction
 from typed_python.internals import FunctionOverload
 
@@ -74,13 +75,25 @@ class Runtime:
 
             fp = function_pointers[wrappingCallTargetName]
 
-            f._installNativePointer(fp.fp, callTarget.output_type.typeRepresentation, [i.typeRepresentation for i in input_wrappers])
+            f._installNativePointer(
+                fp.fp,
+                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else _types.NoneType(),
+                [i.typeRepresentation for i in input_wrappers]
+                )
 
             return targets
 
         if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
             for o in f.overloads:
                 self.compile(o, argument_types)
+            return f
+
+        if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+            for o in f.Function.overloads:
+                arg_types = dict(argument_types)
+                arg_types[o.args[0].name] = typeWrapper(f.Class)
+                print(arg_types)
+                self.compile(o, arg_types)
             return f
 
         if callable(f):
