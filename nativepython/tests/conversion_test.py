@@ -185,18 +185,20 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(10), g_typed(10))
 
-        t0 = time.time()
-        g(18)
-        untyped_duration = time.time() - t0
+        for input in [18, 18.0]:
+            t0 = time.time()
+            g(input)
+            untyped_duration = time.time() - t0
 
+            t0 = time.time()
+            g_typed(input)
+            typed_duration = time.time() - t0
 
-        t0 = time.time()
-        g_typed(18)
-        typed_duration = time.time() - t0
+            #I get around 50x for ints and 12 for floats
+            speedup = untyped_duration / typed_duration
+            self.assertGreater(speedup, 20 if isinstance(input, int) else 4)
 
-        #I get around 50x.
-        speedup = untyped_duration / typed_duration
-        self.assertGreater(speedup, 20)
+            print("for ", input, " speedup is ", speedup)
 
 
 

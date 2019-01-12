@@ -76,7 +76,7 @@ class Runtime:
 
             f._installNativePointer(fp.fp, callTarget.output_type.typeRepresentation, [i.typeRepresentation for i in input_wrappers])
 
-            return f
+            return targets
 
         if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
             for o in f.overloads:
