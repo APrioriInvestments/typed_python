@@ -57,21 +57,13 @@ class PythonToNativeConverter(object):
         self._names_for_identifier = {}
         self._definitions = {}
         self._targets = {}
-        self._typeids = {}
-
+    
         self._unconverted = set()
 
         self.verbose = False
 
-    def get_typeid(self, t):
-        if t in self._typeids:
-            return self._typeids[t]
-
-        self._typeids[t] = len(self._typeids) + 1024
-
-        return self._typeids[t]
-
     def extract_new_function_definitions(self):
+        """Return a list of all new function definitions from the last conversion."""
         res = {}
 
         for u in self._unconverted:
@@ -91,40 +83,20 @@ class PythonToNativeConverter(object):
             suffix = 1 if not suffix else suffix+1
         return getname()
 
-    def convert_function_ast(
-                self,
-                ast_arg,
-                statements,
-                input_types,
-                local_variables,
-                free_variable_lookup,
-                output_type
-                ):
-        functionConverter = FunctionConversionContext(self, ast_arg, statements, input_types, output_type, free_variable_lookup)
+    def createConversionContext(self, f, input_types, output_type):
+        pyast, freevars = self._callable_to_ast_and_vars(f)
 
-        while True:
-            #repeatedly try converting as long as the types keep getting bigger.
-            nativeFunction = functionConverter.convertToNativeFunction()
-
-            if functionConverter.typesAreUnstable():
-                functionConverter.resetTypeInstabilityFlag()
-            else:
-                return nativeFunction
-
-    def convert_lambda_ast(self, ast, input_types, local_variables, free_variable_lookup, output_type):
-        return self.convert_function_ast(
-            ast.args,
-            [python_ast.Statement.Return(
+        if isinstance(pyast, python_ast.Statement.FunctionDef):
+            body = pyast.body
+        else:
+            body = [python_ast.Statement.Return(
                 value=ast.body,
                 line_number=ast.body.line_number,
                 col_offset=ast.body.col_offset,
                 filename=ast.body.filename
-                )],
-            input_types,
-            local_variables,
-            free_variable_lookup,
-            output_type
-            )
+                )]
+
+        return FunctionConversionContext(self, pyast.args, pyast.body, input_types, output_type, freevars)
 
     def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
         """Define a native function if we haven't defined it before already.
@@ -174,37 +146,7 @@ class PythonToNativeConverter(object):
 
         return self._targets[new_name]
 
-    def define(self, identifier, name, input_types, output_type, native_function_definition):
-        identifier = ("defined", identifier)
-
-        if identifier in self._names_for_identifier:
-            name = self._names_for_identifier[identifier]
-
-            return self._targets[name]
-
-        new_name = self.new_name(name)
-        self._names_for_identifier[identifier] = new_name
-
-        self._targets[new_name] = TypedCallTarget(
-            native_ast.NamedCallTarget(
-                name=new_name,
-                arg_types=[x[1] for x in native_function_definition.args],
-                output_type=native_function_definition.output_type,
-                external=False,
-                varargs=False,
-                intrinsic=False,
-                can_throw=True
-                ),
-            input_types,
-            output_type
-            )
-
-        self._definitions[new_name] = native_function_definition
-        self._unconverted.add(new_name)
-
-        return self._targets[new_name]
-
-    def callable_to_ast_and_vars(self, f):
+    def _callable_to_ast_and_vars(self, f):
         pyast = ast_util.pyAstFor(f)
 
         _, lineno = ast_util.getSourceLines(f)
@@ -284,6 +226,10 @@ class PythonToNativeConverter(object):
         return new_name
 
     def convert(self, f, input_types, output_type):
+        """Convert a single pure python function using args of 'input_types'.
+
+        It will return no more than 'output_type'.
+        """
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
         identifier = ("pyfunction", f, input_types)
@@ -292,24 +238,18 @@ class PythonToNativeConverter(object):
             name = self._names_for_identifier[identifier]
             return self._targets[name]
 
-        pyast, freevars = self.callable_to_ast_and_vars(f)
+        functionConverter = self.createConversionContext(f, input_types, output_type)
 
-        if isinstance(pyast, python_ast.Statement.FunctionDef):
-            definition, output_type = \
-                self.convert_function_ast(
-                    pyast.args,
-                    pyast.body,
-                    input_types,
-                    f.__code__.co_varnames,
-                    freevars,
-                    output_type
-                    )
-        else:
-            assert pyast.matches.Lambda
+        while True:
+            #repeatedly try converting as long as the types keep getting bigger.
+            nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
 
-            definition,output_type = self.convert_lambda_ast(pyast, input_types, f.__code__.co_varnames, freevars, output_type)
+            if functionConverter.typesAreUnstable():
+                functionConverter.resetTypeInstabilityFlag()
+            else:
+                break
 
-        assert definition is not None
+        assert nativeFunction is not None
 
         new_name = self.new_name(f.__name__)
 
@@ -318,18 +258,18 @@ class PythonToNativeConverter(object):
         self._targets[new_name] = TypedCallTarget(
             native_ast.NamedCallTarget(
                 name=new_name,
-                arg_types=[x[1] for x in definition.args],
-                output_type=definition.output_type,
+                arg_types=[x[1] for x in nativeFunction.args],
+                output_type=nativeFunction.output_type,
                 external=False,
                 varargs=False,
                 intrinsic=False,
                 can_throw=True
                 ),
             input_types,
-            output_type
+            actual_output_type
             )
 
-        self._definitions[new_name] = definition
+        self._definitions[new_name] = nativeFunction
         self._unconverted.add(new_name)
 
         return self._targets[new_name]

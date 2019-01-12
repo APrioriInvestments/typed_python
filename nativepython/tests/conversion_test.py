@@ -155,5 +155,15 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f((1,2,3)), (1,2,3))
 
+    def test_return_from_function_with_bad_convert_throws(self):
+        @Compiled
+        def f(t: TupleOf(int)) -> None:
+            return t
+
+        with self.assertRaisesRegex(Exception, "Can't convert"):
+            f((1,2,3))
+
+    
+
     
 

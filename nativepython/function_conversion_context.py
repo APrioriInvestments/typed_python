@@ -82,8 +82,6 @@ class FunctionConversionContext(object):
                 return_type
                 )
 
-
-
     def _constructInitialVarnameToType(self):
         input_types = self._input_types
 

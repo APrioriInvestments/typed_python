@@ -108,7 +108,12 @@ class Wrapper(object):
         if expr.expr_type == self:
             return expr
         return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't convert from type %s to type %s" % (expr.expr_type, self)))
+            generateThrowException(context, 
+                TypeError("Can't convert from type %s to type %s" % (
+                    expr.expr_type.typeRepresentation.__name__, 
+                    self.typeRepresentation.__name__)
+                    )
+                )
             )
 
     def convert_bin_op(self, context, l, op, r):
