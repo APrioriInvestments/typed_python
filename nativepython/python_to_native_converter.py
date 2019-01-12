@@ -57,8 +57,8 @@ class PythonToNativeConverter(object):
         self._names_for_identifier = {}
         self._definitions = {}
         self._targets = {}
-    
-        self._unconverted = set()
+        self._inflight_function_conversions = {}
+        self._new_native_functions = set()
 
         self.verbose = False
 
@@ -66,13 +66,13 @@ class PythonToNativeConverter(object):
         """Return a list of all new function definitions from the last conversion."""
         res = {}
 
-        for u in self._unconverted:
+        for u in self._new_native_functions:
             res[u] = self._definitions[u]
 
             if self.verbose:
                 print(self._targets[u])
 
-        self._unconverted = set()
+        self._new_native_functions = set()
 
         return res
 
@@ -83,7 +83,7 @@ class PythonToNativeConverter(object):
             suffix = 1 if not suffix else suffix+1
         return getname()
 
-    def createConversionContext(self, f, input_types, output_type):
+    def createConversionContext(self, identity, f, input_types, output_type):
         pyast, freevars = self._callable_to_ast_and_vars(f)
 
         if isinstance(pyast, python_ast.Statement.FunctionDef):
@@ -96,7 +96,7 @@ class PythonToNativeConverter(object):
                 filename=ast.body.filename
                 )]
 
-        return FunctionConversionContext(self, pyast.args, pyast.body, input_types, output_type, freevars)
+        return FunctionConversionContext(self, identity, pyast.args, pyast.body, input_types, output_type, freevars)
 
     def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
         """Define a native function if we haven't defined it before already.
@@ -142,7 +142,7 @@ class PythonToNativeConverter(object):
             )
 
         self._definitions[new_name] = generatingFunction()
-        self._unconverted.add(new_name)
+        self._new_native_functions.add(new_name)
 
         return self._targets[new_name]
 
@@ -221,11 +221,45 @@ class PythonToNativeConverter(object):
         self._names_for_identifier[identifier] = new_name
 
         self._definitions[new_name] = definition
-        self._unconverted.add(new_name)
+        self._new_native_functions.add(new_name)
 
         return new_name
 
-    def convert(self, f, input_types, output_type):
+    def _resolveInflightOnePass(self):
+        oldCount = len(self._inflight_function_conversions)
+        repeat = False
+
+        for identity, functionConverter in list(self._inflight_function_conversions.items()):
+            nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+
+            if functionConverter.typesAreUnstable():
+                functionConverter.resetTypeInstabilityFlag()
+                repeat = True
+
+            name = self._names_for_identifier[identity]
+
+            self._targets[name] = TypedCallTarget(
+                native_ast.NamedCallTarget(
+                    name=name,
+                    arg_types=[x[1] for x in nativeFunction.args],
+                    output_type=nativeFunction.output_type,
+                    external=False,
+                    varargs=False,
+                    intrinsic=False,
+                    can_throw=True
+                    ),
+                functionConverter._input_types,
+                actual_output_type
+                )
+
+        return repeat or len(self._inflight_function_conversions) != oldCount
+
+    def _resolveAllInflightFunctions(self):
+        while self._resolveInflightOnePass():
+            pass
+        self._resolveInflightOnePass()
+
+    def convert(self, f, input_types, output_type, assertIsRoot=False):
         """Convert a single pure python function using args of 'input_types'.
 
         It will return no more than 'output_type'.
@@ -236,41 +270,50 @@ class PythonToNativeConverter(object):
 
         if identifier in self._names_for_identifier:
             name = self._names_for_identifier[identifier]
+        else:
+            name = self.new_name(f.__name__)
+            self._names_for_identifier[identifier] = name
+
+        if name in self._targets:
             return self._targets[name]
 
-        functionConverter = self.createConversionContext(f, input_types, output_type)
+        isRoot = len(self._inflight_function_conversions) == 0
 
-        while True:
-            #repeatedly try converting as long as the types keep getting bigger.
+        if assertIsRoot:
+            assert isRoot
+
+        if identifier not in self._inflight_function_conversions:
+            functionConverter = self.createConversionContext(identifier, f, input_types, output_type)
+
+            self._inflight_function_conversions[identifier] = functionConverter
+
+        if isRoot:
+            try:
+                self._resolveAllInflightFunctions()
+                self._installInflightFunctions()
+                return self._targets[name]
+            finally:
+                self._inflight_function_conversions.clear()
+        else:
+            #above us on the stack, we are walking a set of function conversions.
+            #if we have ever calculated this function before, we'll have a call
+            #target with an output type and we can return that. Otherwise we have to
+            #return None, which will cause callers to replace this with a throw
+            #until we have had a chance to do a full pass of conversion.
+            if name in self._targets:
+                return self._targets[name]
+            else:
+                return None
+
+    def _installInflightFunctions(self):
+        for identifier, functionConverter in self._inflight_function_conversions.items():
             nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
 
-            if functionConverter.typesAreUnstable():
-                functionConverter.resetTypeInstabilityFlag()
-            else:
-                break
+            assert nativeFunction is not None
+            name = self._names_for_identifier[identifier]
 
-        assert nativeFunction is not None
+            self._definitions[name] = nativeFunction
+            self._new_native_functions.add(name)
 
-        new_name = self.new_name(f.__name__)
-
-        self._names_for_identifier[identifier] = new_name
-
-        self._targets[new_name] = TypedCallTarget(
-            native_ast.NamedCallTarget(
-                name=new_name,
-                arg_types=[x[1] for x in nativeFunction.args],
-                output_type=nativeFunction.output_type,
-                external=False,
-                varargs=False,
-                intrinsic=False,
-                can_throw=True
-                ),
-            input_types,
-            actual_output_type
-            )
-
-        self._definitions[new_name] = nativeFunction
-        self._unconverted.add(new_name)
-
-        return self._targets[new_name]
+        self._inflight_function_conversions.clear()
 

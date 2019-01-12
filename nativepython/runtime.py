@@ -45,7 +45,9 @@ class Runtime:
 
             input_wrappers = [python_to_native_converter.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
 
-            callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType)
+            callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
+
+            assert callTarget is not None
 
             wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 

@@ -34,8 +34,9 @@ class FunctionOutput:
 
 class FunctionConversionContext(object):
     """Helper function for converting a single python function."""
-    def __init__(self, converter, ast_arg, statements, input_types, output_type, free_variable_lookup):
+    def __init__(self, converter, identity, ast_arg, statements, input_types, output_type, free_variable_lookup):
         self.converter = converter
+        self.identity = identity
         self._ast_arg = ast_arg
         self._argnames = None
         self._statements = statements
