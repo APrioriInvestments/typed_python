@@ -21,6 +21,8 @@ from typed_python.internals import FunctionOverload
 
 _singleton = [None]
 
+typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
+
 class Runtime:
     @staticmethod
     def singleton():
@@ -36,14 +38,29 @@ class Runtime:
         self.compiler.mark_converter_verbose()
         self.compiler.mark_llvm_codegen_verbose()
 
-    def compile(self, f):
-        """Compile a single FunctionOverload and install the pointer"""
+    def compile(self, f, argument_types=None):
+        """Compile a single FunctionOverload and install the pointer
+
+        if provided, 'argument_types' can be a dictionary from variablename to a type.
+        this will take precedence over any types specified on the function. Keep in mind
+        that function overloads already filter by type, so if you specify a type that's
+        not compatible with the type argument of the existing overload, the resulting
+        specialization will never be called.
+        """
+        argument_types = argument_types or {}
+
         if isinstance(f, FunctionOverload):
             for a in f.args:
                 assert not a.isStarArg, 'dont support star args yet'
                 assert not a.isKwarg, 'dont support keyword yet'
 
-            input_wrappers = [python_to_native_converter.typedPythonTypeToTypeWrapper(a.typeFilter or object) for a in f.args]
+            def chooseTypeFilter(a):
+                return argument_types.pop(a.name, a.typeFilter or object)
+
+            input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
+
+            if len(argument_types):
+                raise Exception("No argument exists for type overrides %s" % argument_types)
 
             callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
 
@@ -63,12 +80,12 @@ class Runtime:
 
         if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
             for o in f.overloads:
-                self.compile(o)
+                self.compile(o, argument_types)
             return f
 
         if callable(f):
             result = TypedFunction(f)
-            self.compile(result)
+            self.compile(result, argument_types)
             return result
 
         assert False, f

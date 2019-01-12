@@ -163,6 +163,41 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't convert"):
             f((1,2,3))
 
+    def test_mutually_recursive_untyped_functions(self):
+        def q(x):
+            return x-1
+
+        def z(x):
+            return q(x)+1
+
+        def f(x):
+            return z(g(x - 1)) + z(g(x - 2)) + z(x)
+
+        def g(x):
+            if x > 0:
+                return z(f(x-1)) * z(2) + f(x-2)
+            return 1
+
+        g_typed = TypedFunction(g)
+
+        Runtime.singleton().compile(g_typed, {'x': int})
+        Runtime.singleton().compile(g_typed, {'x': float})
+
+        self.assertEqual(g(10), g_typed(10))
+
+        t0 = time.time()
+        g(18)
+        untyped_duration = time.time() - t0
+
+
+        t0 = time.time()
+        g_typed(18)
+        typed_duration = time.time() - t0
+
+        #I get around 50x.
+        speedup = untyped_duration / typed_duration
+        self.assertGreater(speedup, 20)
+
 
 
 

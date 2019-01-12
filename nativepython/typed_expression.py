@@ -25,7 +25,7 @@ typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTyp
 class TypedExpression(object):
     def __init__(self, context, expr, t, isReference):
         """Initialize a TypedExpression
-    
+
         context - an ExpressionConversionContext
         expr - a native_ast containing an expression
         t - a subclass of Wrapper, or a type that we'll convert to a wrapper, or None (meaning
@@ -63,7 +63,7 @@ class TypedExpression(object):
 
         if self.isReference:
             if self.expr_type.is_empty:
-                return self.expr + native_ast.nullExpr
+                return self.expr >> native_ast.nullExpr
             return self.expr.load()
         else:
             return self.expr

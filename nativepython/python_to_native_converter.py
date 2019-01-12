@@ -59,6 +59,7 @@ class PythonToNativeConverter(object):
         self._targets = {}
         self._inflight_function_conversions = {}
         self._new_native_functions = set()
+        self._used_names = set()
 
         self.verbose = False
 
@@ -79,9 +80,11 @@ class PythonToNativeConverter(object):
     def new_name(self, name, prefix="py."):
         suffix = None
         getname = lambda: prefix + name + ("" if suffix is None else ".%s" % suffix)
-        while getname() in self._targets:
+        while getname() in self._used_names:
             suffix = 1 if not suffix else suffix+1
-        return getname()
+        res = getname()
+        self._used_names.add(res)
+        return res
 
     def createConversionContext(self, identity, f, input_types, output_type):
         pyast, freevars = self._callable_to_ast_and_vars(f)
@@ -232,32 +235,34 @@ class PythonToNativeConverter(object):
         for identity, functionConverter in list(self._inflight_function_conversions.items()):
             nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
 
-            if functionConverter.typesAreUnstable():
-                functionConverter.resetTypeInstabilityFlag()
+            if nativeFunction is None:
                 repeat = True
+            else:
+                if functionConverter.typesAreUnstable():
+                    functionConverter.resetTypeInstabilityFlag()
+                    repeat = True
 
-            name = self._names_for_identifier[identity]
+                name = self._names_for_identifier[identity]
 
-            self._targets[name] = TypedCallTarget(
-                native_ast.NamedCallTarget(
-                    name=name,
-                    arg_types=[x[1] for x in nativeFunction.args],
-                    output_type=nativeFunction.output_type,
-                    external=False,
-                    varargs=False,
-                    intrinsic=False,
-                    can_throw=True
-                    ),
-                functionConverter._input_types,
-                actual_output_type
-                )
+                self._targets[name] = TypedCallTarget(
+                    native_ast.NamedCallTarget(
+                        name=name,
+                        arg_types=[x[1] for x in nativeFunction.args],
+                        output_type=nativeFunction.output_type,
+                        external=False,
+                        varargs=False,
+                        intrinsic=False,
+                        can_throw=True
+                        ),
+                    functionConverter._input_types,
+                    actual_output_type
+                    )
 
         return repeat or len(self._inflight_function_conversions) != oldCount
 
     def _resolveAllInflightFunctions(self):
         while self._resolveInflightOnePass():
             pass
-        self._resolveInflightOnePass()
 
     def convert(self, f, input_types, output_type, assertIsRoot=False):
         """Convert a single pure python function using args of 'input_types'.

@@ -137,7 +137,9 @@ class TypedLLVMValue(object):
         object.__init__(self)
 
         if native_type.matches.Void:
-            assert llvm_value is None, llvm_value
+            if llvm_value is not None:
+                assert llvm_value.type == llvm_void
+                llvm_value = None
         else:
             assert llvm_value is not None
 
@@ -526,7 +528,7 @@ class FunctionConverter:
         if expr.matches.StackSlot:
             if expr.name not in self.stack_slots:
                 if expr.type.matches.Void:
-                    llvm_type = type_to_llvm_type(native_ast.Type.Struct(()))
+                    llvm_type = type_to_llvm_type(native_ast.Type.Struct(element_types=(),name="void"))
                 else:
                     llvm_type = type_to_llvm_type(expr.type)
 

@@ -585,7 +585,14 @@ class ExpressionConversionContext(object):
 
         if ast.matches.BinOp:
             l = self.convert_expression_ast(ast.left)
+
+            if l is None:
+                return None
+
             r = self.convert_expression_ast(ast.right)
+
+            if r is None:
+                return None
 
             return l.convert_bin_op(ast.op, r)
 
@@ -609,13 +616,20 @@ class ExpressionConversionContext(object):
         if ast.matches.Call:
             l = self.convert_expression_ast(ast.func)
 
+            if l is None:
+                return None
+
             ast_args = ast.args
             stararg = None
 
             for a in ast_args:
                 assert not a.matches.Starred, "not implemented yet"
 
-            args = [self.convert_expression_ast(a) for a in ast_args]
+            args = []
+            for a in ast_args:
+                args.append(self.convert_expression_ast(a))
+                if args[-1] is None:
+                    return None
 
             return l.convert_call(args)
 

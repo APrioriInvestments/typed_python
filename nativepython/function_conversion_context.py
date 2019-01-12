@@ -62,7 +62,10 @@ class FunctionConversionContext(object):
 
         body_native_expr = self.construct_stackslots_around(body_native_expr, self._argnames, self._star_args_name)
 
-        return_type = self._varname_to_type.get(FunctionOutput, NoneExprType)
+        return_type = self._varname_to_type.get(FunctionOutput, None)
+
+        if return_type is None:
+            return None, None
 
         if return_type.is_pass_by_ref:
             return (
@@ -148,6 +151,7 @@ class FunctionConversionContext(object):
     def upsizeVariableType(self, varname, new_type):
         if self._varname_to_type.get(varname) is None:
             self._varname_to_type[varname] = new_type
+            self._typesAreUnstable = True
             return
 
         existingType = self._varname_to_type[varname].typeRepresentation
@@ -260,6 +264,7 @@ class FunctionConversionContext(object):
 
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
+                    self._typesAreUnstable = True
                     self._varname_to_type[FunctionOutput] = e.expr_type
                 else:
                     self.upsizeVariableType(FunctionOutput, e.expr_type)
@@ -370,6 +375,7 @@ class FunctionConversionContext(object):
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
                     self._varname_to_type[FunctionOutput] = NoneWrapper()
+                    self._typesAreUnstable = True
                 else:
                     self.upsizeVariableType(FunctionOutput, NoneWrapper())
 
