@@ -127,8 +127,13 @@ class Service:
                     "Cannot set codebase of locked service '{}'".format(self.name))
 
             self._setCodebase(codebase)
-            self.service_module_name = moduleName
-            self.service_class_name = className
+
+            if moduleName is not None:
+                self.service_module_name = moduleName
+
+            if className is not None:
+                self.service_class_name = className
+
             self.resetCounters()
 
     def trySetCodebase(self, codebase, moduleName=None, className=None):
