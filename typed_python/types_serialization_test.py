@@ -20,7 +20,6 @@ import typed_python.ast_util as ast_util
 import threading
 import time
 import unittest
-import psutil
 import numpy
 import gc
 import tempfile
