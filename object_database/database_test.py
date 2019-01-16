@@ -240,7 +240,9 @@ class ObjectDatabaseTests:
         t0 = time.time()
 
         self.assertTrue(
-            db1.waitForCondition(lambda: not db2Connection.exists(), timeout=2.0)
+            db1.waitForCondition(
+                lambda: not db2Connection.exists(),
+                timeout=2.0*self.PERFORMANCE_FACTOR)
             )
 
 
@@ -392,7 +394,10 @@ class ObjectDatabaseTests:
 
             FINISHED.append(True)
 
-            db.waitForCondition(lambda: len(FINISHED) == threadCount, 10.0)
+            db.waitForCondition(
+                lambda: len(FINISHED) == threadCount,
+                10.0*self.PERFORMANCE_FACTOR
+            )
             db.flush()
 
             with db.view():
@@ -1107,8 +1112,8 @@ class ObjectDatabaseTests:
             c2_0 = Counter(k=0)
             c2_1 = Counter(k=1)
 
-        db1.waitForCondition(lambda: c2_0.exists(), 2)
-        db2.waitForCondition(lambda: c2_1.exists(), 2)
+        db1.waitForCondition(lambda: c2_0.exists(), 2*self.PERFORMANCE_FACTOR)
+        db2.waitForCondition(lambda: c2_1.exists(), 2*self.PERFORMANCE_FACTOR)
 
         with db2.view():
             self.assertFalse(c2_0.exists())
@@ -1119,15 +1124,15 @@ class ObjectDatabaseTests:
         with db_all.transaction():
             c2_0.k = 1
 
-        db1.waitForCondition(lambda: c2_0.exists(), 2)
-        db2.waitForCondition(lambda: c2_0.exists(), 2)
+        db1.waitForCondition(lambda: c2_0.exists(), 2*self.PERFORMANCE_FACTOR)
+        db2.waitForCondition(lambda: c2_0.exists(), 2*self.PERFORMANCE_FACTOR)
 
         #now, we should see it get subscribed to in both
         with db_all.transaction():
             c2_0.x = 40
 
-        db1.waitForCondition(lambda: c2_0.x == 40, 2)
-        db2.waitForCondition(lambda: c2_0.x == 40, 2)
+        db1.waitForCondition(lambda: c2_0.x == 40, 2*self.PERFORMANCE_FACTOR)
+        db2.waitForCondition(lambda: c2_0.x == 40, 2*self.PERFORMANCE_FACTOR)
 
         #but if we make a new database connection and subscribe, we won't see it
         db3 = self.createNewDb()
@@ -1251,7 +1256,7 @@ class ObjectDatabaseTests:
         subscriptionEvents = db2.subscribeToIndex(Counter, k=123, block=False)
 
         for i in range(0,50):
-            self.assertEqual(blocker.waitForCallback(1.0), i)
+            self.assertEqual(blocker.waitForCallback(self.PERFORMANCE_FACTOR), i)
             blocker.releaseCallback()
 
         #even while this is going, we should be able to subscribe to something small
@@ -1265,14 +1270,14 @@ class ObjectDatabaseTests:
             c1.k = 123
 
         for i in range(50,101):
-            self.assertEqual(blocker.waitForCallback(1.0), i)
+            self.assertEqual(blocker.waitForCallback(self.PERFORMANCE_FACTOR), i)
             blocker.releaseCallback()
 
-        self.assertEqual(blocker.waitForCallback(1.0), "DONE")
+        self.assertEqual(blocker.waitForCallback(self.PERFORMANCE_FACTOR), "DONE")
         blocker.releaseCallback()
 
         for e in subscriptionEvents:
-            assert e.wait(timeout=1.0)
+            assert e.wait(timeout=self.PERFORMANCE_FACTOR)
 
         with db2.transaction():
             #verify we see the write on c1
@@ -1399,7 +1404,7 @@ class ObjectDatabaseTests:
 
             #make sure that the main db sees it
             for thing in things:
-                db.waitForCondition(lambda: thing.exists(), 10)
+                db.waitForCondition(lambda: thing.exists(), 10*self.PERFORMANCE_FACTOR)
 
             #verify the main db sees something quadratic in the number of transactions plus a constant
             self.assertLess(db._messages_received, (len(schemas) + 1) * (len(schemas) + 2) + 8)
@@ -1565,7 +1570,10 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
             db1._stopHeartbeating()
 
-            db2.waitForCondition(lambda: len(core_schema.Connection.lookupAll()) == 1, 5.0)
+            db2.waitForCondition(
+                lambda: len(core_schema.Connection.lookupAll()) == 1,
+                5.0 * self.PERFORMANCE_FACTOR
+            )
 
             with db2.view():
                 self.assertEqual(len(core_schema.Connection.lookupAll()), 1)
