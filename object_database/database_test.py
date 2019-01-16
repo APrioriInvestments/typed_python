@@ -23,6 +23,7 @@ from object_database.tcp_server import TcpServer, connect
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.util import configureLogging, genToken
+from object_database.test_util import currentMemUsageMb
 
 import object_database.messages as messages
 import queue
@@ -35,15 +36,7 @@ import os
 import threading
 import random
 import time
-import psutil
 import ssl
-
-
-def currentMemUsageMb(residentOnly=True):
-    if residentOnly:
-        return psutil.Process().memory_info().rss / 1024 ** 2
-    else:
-        return psutil.Process().memory_info().vms / 1024 ** 2
 
 
 class BlockingCallback:
