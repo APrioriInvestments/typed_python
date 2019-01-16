@@ -558,6 +558,7 @@ class ActiveWebService(ServiceBase):
             if reader:
                 reader.join()
 
+    @login_required
     def echoSocket(self, ws):
         while not ws.closed:
             message = ws.receive()
