@@ -158,7 +158,7 @@ def main(argv):
             for i in api.allRunningInstances():
                 try:
                     api.terminateInstanceById(i)
-                except:
+                except Exception:
                     pass
 
     return 0

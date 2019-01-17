@@ -100,12 +100,12 @@ class TestArithmeticCompilation(unittest.TestCase):
                 for val2 in rvals:
                     try:
                         pyVal = f(val1,val2)
-                    except:
+                    except Exception:
                         pyVal = "Exception"
 
                     try:
                         llvmVal = f_fast(val1,val2)
-                    except:
+                    except Exception:
                         llvmVal = "Exception"
 
                     if type(pyVal) is not type(llvmVal) or pyVal != llvmVal:

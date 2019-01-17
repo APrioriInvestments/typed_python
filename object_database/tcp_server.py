@@ -27,7 +27,7 @@ class ServerToClientProtocol(AlgebraicProtocol):
         def callHandler(*args):
             try:
                 return handler(*args)
-            except:
+            except Exception:
                 self._logger.error("Unexpected exception in %s:\n%s", handler.__name__, traceback.format_exc())
 
         self.handler = callHandler
@@ -217,7 +217,7 @@ class TcpServer(Server):
             _eventLoop.loop.call_later(getHeartbeatInterval(), self.checkHeartbeatsCallback)
             try:
                 self.checkForDeadConnections()
-            except:
+            except Exception:
                 logging.error("Caught exception in checkForDeadConnections:\n%s", traceback.format_exc())
 
     def stop(self):

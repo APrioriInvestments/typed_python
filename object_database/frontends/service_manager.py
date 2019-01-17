@@ -147,7 +147,7 @@ def main(argv=None):
                         logger.error("Disconnected from object_database host. Attempting to reconnect.")
                         serviceManager.stop(gracefully=False)
                         serviceManager = None
-                    except:
+                    except Exception:
                         logger.error("Service manager cleanup failed:\n%s", traceback.format_exc())
         except KeyboardInterrupt:
             return 0
@@ -157,13 +157,13 @@ def main(argv=None):
         if serviceManager is not None:
             try:
                 serviceManager.stop(gracefully=False)
-            except:
+            except Exception:
                 logger.error("Failed to stop the service manager:\n%s", traceback.format_exc())
 
         if databaseServer is not None:
             try:
                 databaseServer.stop()
-            except:
+            except Exception:
                 logger.error("Failed to stop the database server:\n%s", traceback.format_exc())
 
 

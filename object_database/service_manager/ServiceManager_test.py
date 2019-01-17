@@ -355,7 +355,7 @@ class ServiceManagerTest(unittest.TestCase):
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, schema)
-        except:
+        except Exception:
             self.server.terminate()
             self.server.wait()
             self.tempDirObj.__exit__(None,None,None)

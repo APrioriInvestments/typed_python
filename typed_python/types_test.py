@@ -81,7 +81,7 @@ def makeAlternative(severalDicts):
             try:
                 res.append(getattr(alt,"a_%s" % i)(**thing))
                 did = True
-            except:
+            except Exception:
                 pass
 
             if did:
@@ -124,7 +124,7 @@ class RandomValueProducer:
             whichLevel = choice(sublevels)
             try:
                 return choice(self.levels[whichLevel])
-            except:
+            except Exception:
                 print(self.levels[whichLevel])
                 raise
 

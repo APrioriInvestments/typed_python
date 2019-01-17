@@ -122,7 +122,7 @@ class Codebase:
                 try:
                     if not os.path.exists(_codebase_instantiation_dir):
                         os.makedirs(_codebase_instantiation_dir)
-                except:
+                except Exception:
                     logging.getLogger(__name__).warn("Exception trying to make directory %s", _codebase_instantiation_dir)
 
                 disk_path = os.path.join(_codebase_instantiation_dir, self.hash)
