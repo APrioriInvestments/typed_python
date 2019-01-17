@@ -46,7 +46,7 @@ class InMemoryChannel:
             if e:
                 try:
                     self._clientCallback(e)
-                except:
+                except Exception:
                     self._logger.error("Pump thread failed for %s: %s", self, traceback.format_exc())
                     return
 
@@ -65,7 +65,7 @@ class InMemoryChannel:
             if e:
                 try:
                     self._serverCallback(e)
-                except:
+                except Exception:
                     traceback.print_exc()
                     self._logger.error("Pump thread failed: %s", traceback.format_exc())
                     return

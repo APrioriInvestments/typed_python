@@ -36,7 +36,7 @@ class AlgebraicProtocol(asyncio.Protocol):
 
             with self.writelock:
                 self.transport.write(dataToSend)
-        except:
+        except Exception:
             self._logger.error("Error in AlgebraicProtocol: %s", traceback.format_exc())
             self.transport.close()
 
@@ -65,7 +65,7 @@ class AlgebraicProtocol(asyncio.Protocol):
                 if toConsume:
                     try:
                         self.messageReceived(deserialize(self.receiveType, toConsume))
-                    except:
+                    except Exception:
                         self._logger.error("Error in AlgebraicProtocol: %s", traceback.format_exc())
                         self.transport.close()
             else:

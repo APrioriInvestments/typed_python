@@ -200,7 +200,7 @@ class SubprocessServiceManager(ServiceManager):
                                 path = os.path.join(self.storageDir, file)
                                 self._logger.info("Removing storage at path %s for dead service.", path)
                                 shutil.rmtree(path)
-                            except:
+                            except Exception:
                                 self._logger.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
 
         if self.sourceDir:
@@ -212,7 +212,7 @@ class SubprocessServiceManager(ServiceManager):
                                 path = os.path.join(self.sourceDir, file)
                                 self._logger.info("Removing source caches at path %s for dead service.", path)
                                 shutil.rmtree(path)
-                            except:
+                            except Exception:
                                 self._logger.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
 
 

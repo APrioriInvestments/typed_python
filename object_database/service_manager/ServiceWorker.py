@@ -83,14 +83,14 @@ class ServiceWorker:
 
             try:
                 self.serviceObject = self._instantiateServiceObject()
-            except:
+            except Exception:
                 self._logger.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
                 self.instance.markFailedToStart(traceback.format_exc())
                 return
         try:
             self._logger.info("Initializing service object for %s", self.instance._identity)
             self.serviceObject.initialize()
-        except:
+        except Exception:
             self._logger.error('Service thread for %s failed:\n%s', self.instance._identity, traceback.format_exc())
 
             self.serviceObject = None
@@ -121,7 +121,7 @@ class ServiceWorker:
         try:
             self._logger.info("Starting runloop for service object %s", self.instance._identity)
             self.serviceObject.doWork(self.shouldStop)
-        except:
+        except Exception:
             self._logger.error("Service %s/%s failed: %s",
                 self.serviceName,
                 self.instance._identity,

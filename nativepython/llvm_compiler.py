@@ -107,7 +107,7 @@ class Compiler:
         try:
             mod = llvm.parse_assembly(module)
             mod.verify()
-        except:
+        except Exception:
             print("failing: ", module)
             raise
 

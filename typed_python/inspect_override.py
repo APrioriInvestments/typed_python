@@ -161,7 +161,7 @@ def findsource(pyObject):
     if isfunction(pyObject):
         try:
             pyObject = pyObject.__code__
-        except:
+        except Exception:
             print(pyObject)
             print(dir(pyObject))
             raise

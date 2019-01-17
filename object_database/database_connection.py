@@ -402,7 +402,7 @@ class TransactionListener:
             if todo:
                 try:
                     self.handler(todo)
-                except:
+                except Exception:
                     logger.error("Callback threw exception:\n%s", traceback.format_exc())
 
 
@@ -656,7 +656,7 @@ class DatabaseConnection:
                 try:
                     if cond():
                         return True
-                except:
+                except Exception:
                     self._logger.error("Condition callback threw an exception:\n%s", traceback.format_exc())
 
                 time.sleep(min(timeout / 20, .25))
@@ -771,7 +771,7 @@ class DatabaseConnection:
                 for q in self._transaction_callbacks.values():
                     try:
                         q(TransactionResult.Disconnected())
-                    except:
+                    except Exception:
                         self._logger.error(
                             "Transaction commit callback threw an exception:\n%s",
                             traceback.format_exc()
@@ -799,7 +799,7 @@ class DatabaseConnection:
                         TransactionResult.Success() if msg.success
                             else TransactionResult.RevisionConflict(key=msg.badKey)
                         )
-                except:
+                except Exception:
                     self._logger.error(
                         "Transaction commit callback threw an exception:\n%s",
                         traceback.format_exc()
@@ -838,7 +838,7 @@ class DatabaseConnection:
             for handler in self._onTransaction:
                 try:
                     handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
-                except:
+                except Exception:
                     self._logger.error(
                         "_onTransaction callback %s threw an exception:\n%s",
                         handler,

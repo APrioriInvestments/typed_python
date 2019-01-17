@@ -197,7 +197,7 @@ class Server:
                         self.handleSubscriptionOnBackgroundThread(connectedChannel, msg)
                 except queue.Empty:
                     pass
-            except:
+            except Exception:
                 self._logger.error("Unexpected error in serviceSubscription thread:\n%s", traceback.format_exc())
 
 

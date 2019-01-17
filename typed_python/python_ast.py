@@ -509,7 +509,7 @@ def createPythonAstConstant(n, **kwds):
 def createPythonAstString(s, **kwds):
     try:
         return Expr.Str(s=str(s), **kwds)
-    except:
+    except Exception:
         return Expr.Num(
             n=NumericConstant.Unknown(),
             **kwds
@@ -677,7 +677,7 @@ def convertPyAstToAlgebraic(tree,fname, keepLineInformation=True):
 
         try:
             return converter(**args)
-        except:
+        except Exception:
             del args['line_number']
             del args['col_offset']
             del args['filename']

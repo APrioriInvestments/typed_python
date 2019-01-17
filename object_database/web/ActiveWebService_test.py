@@ -117,7 +117,7 @@ class ActiveWebServiceTest(unittest.TestCase):
                 ServiceManager.startService("ActiveWebService", 1)
 
             self.waitUntilUp()
-        except:
+        except Exception:
             self.server.terminate()
             self.server.wait()
             raise

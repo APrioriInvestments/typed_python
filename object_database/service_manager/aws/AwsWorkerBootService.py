@@ -205,7 +205,7 @@ with open(os.path.join(ownDir, "aws_linux_bootstrap.sh"), "r") as fh:
 class AwsApi:
     def __init__(self):
         self._logger = logging.getLogger(__name__)
-        
+
         self.config = Configuration.lookupAny()
         if not self.config:
             raise Exception("Please configure the aws service.")
@@ -300,7 +300,7 @@ class AwsApi:
 
                 try:
                     price = float(record['SpotPrice'])
-                except:
+                except Exception:
                     price = None
 
                 if (instance_type, az) not in results:
@@ -511,7 +511,7 @@ class AwsWorkerBootService(ServiceBase):
             try:
                 if not self.pushTaskLoopForward():
                     time.sleep(1.0)
-            except:
+            except Exception:
                 self._logger.error("Failed: %s", traceback.format_exc())
                 time.sleep(5.0)
 

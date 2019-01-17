@@ -151,7 +151,7 @@ class View(object):
 
             try:
                 coerced_val = coerce_value(val, cls.__types__[kwd])
-            except:
+            except Exception:
                 raise TypeError("Can't coerce %s to type %s" % (val, cls.__types__[kwd]))
 
             writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)

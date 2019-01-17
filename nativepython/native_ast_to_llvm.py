@@ -965,7 +965,7 @@ class FunctionConverter:
                     self.builder.position_at_start(normal_target)
                 else:
                     llvm_call_result = self.builder.call(func.llvm_value, [a.llvm_value for a in args])
-            except:
+            except Exception:
                 print("failing while calling ", target.name)
                 for a in args:
                     print("\t", a.llvm_value, a.native_type)

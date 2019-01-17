@@ -137,7 +137,7 @@ class Timer:
                 if isinstance(arg, types.FunctionType):
                     try:
                         a.append(arg())
-                    except:
+                    except Exception:
                         a.append("<error>")
                 else:
                     a.append(arg)
@@ -145,7 +145,7 @@ class Timer:
             if a:
                 try:
                     m = m % tuple(a)
-                except:
+                except Exception:
                     logger.error("Couldn't format %s with %s", m, a)
 
             logger.info("%s took %.2f seconds.", m, t1 - self.t0)

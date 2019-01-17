@@ -503,7 +503,7 @@ class ActiveWebService(ServiceBase):
                             cell = cells.cells.get(cell_id)
                             if cell is not None:
                                 cell.onMessage(jsonMsg)
-                        except:
+                        except Exception:
                             self._logger.error("Exception in inbound message: %s", traceback.format_exc())
                         cells.triggerIfHasDirty()
 
@@ -552,7 +552,7 @@ class ActiveWebService(ServiceBase):
                     if (time.time() - timestamps[0]) < 1.0:
                         sleep(1.0 / MAX_FPS + .001)
 
-        except:
+        except Exception:
             self._logger.error("Websocket handler error: %s", traceback.format_exc())
         finally:
             if reader:

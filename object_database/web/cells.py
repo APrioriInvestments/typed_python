@@ -215,7 +215,7 @@ class Cells:
                             break
                         except SubscribeAndRetry as e:
                             e.callback(self.db)
-                except:
+                except Exception:
                     self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
                     self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(traceback.format_exc())}
@@ -259,7 +259,7 @@ class Cells:
 
         try:
             contents = multiReplace(contents, formatArgs)
-        except:
+        except Exception:
             raise Exception("Failed to format these contents with args %s:\n\n%s", formatArgs, contents)
 
         res = {
@@ -694,7 +694,7 @@ class Dropdown(Cell):
                 if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
                     self._logger.error("Button click timed out. This should really fail.")
                     return
-            except:
+            except Exception:
                 self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
                 return
 
@@ -776,7 +776,7 @@ class Subscribed(Cell):
                 self.children = {'____contents__': c}
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self.children = {'____contents__': Traceback(traceback.format_exc())}
 
             self._resetSubscriptionsToViewReads(v)
@@ -809,7 +809,7 @@ class SubscribedSequence(Cell):
                 self.spine = list(self.itemsFun())
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self._logger.error("Spine calc threw an exception:\n%s", traceback.format_exc())
                 self.spine = []
 
@@ -824,7 +824,7 @@ class SubscribedSequence(Cell):
                         self.existingItems[s] = new_children["____child_%s__" % ix] = self.rendererFun(s)
                     except SubscribeAndRetry:
                         raise
-                    except:
+                    except Exception:
                         self.existingItems[s] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
 
         self.children = new_children
@@ -898,14 +898,14 @@ class Grid(Cell):
                 self.rows = list(self.rowFun())
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
             try:
                 self.cols = list(self.colFun())
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self._logger.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
@@ -923,7 +923,7 @@ class Grid(Cell):
                     self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col))
                 except SubscribeAndRetry:
                     raise
-                except:
+                except Exception:
                     self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
 
         if self.rowLabelFun is not None:
@@ -936,7 +936,7 @@ class Grid(Cell):
                         self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
                     except SubscribeAndRetry:
                         raise
-                    except:
+                    except Exception:
                         self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
 
         seen = set()
@@ -950,7 +950,7 @@ class Grid(Cell):
                         self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
                     except SubscribeAndRetry:
                         raise
-                    except:
+                    except Exception:
                         self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
 
         self.children = new_children
@@ -991,10 +991,10 @@ class SortWrapper:
                 return self.x < other.x
             else:
                 return str(type(self.x)) < str(type(other.x))
-        except:
+        except Exception:
             try:
                 return str(self.x) < str(self.other)
-            except:
+            except Exception:
                 return False
 
     def __eq__(self, other):
@@ -1003,10 +1003,10 @@ class SortWrapper:
                 return self.x == other.x
             else:
                 return str(type(self.x)) == str(type(other.x))
-        except:
+        except Exception:
             try:
                 return str(self.x) == str(self.other)
-            except:
+            except Exception:
                 return True
 
 class SingleLineTextBox(Cell):
@@ -1106,7 +1106,7 @@ class Table(Cell):
                     try:
                         r = self.cachedRenderFun(row, col)
                         keymemo[row] = SortWrapper(r.sortsAs())
-                    except:
+                    except Exception:
                         self._logger.error(traceback.format_exc())
                         keymemo[row] = SortWrapper(None)
 
@@ -1121,7 +1121,7 @@ class Table(Cell):
         try:
             page = max(0, int(self.curPage.get())-1)
             page = min(page, (len(rows) - 1) // self.maxRowsPerPage)
-        except:
+        except Exception:
             self._logger.error("Failed to parse current page: %s", traceback.format_exc())
 
         return rows[page * self.maxRowsPerPage:(page+1) * self.maxRowsPerPage]
@@ -1161,7 +1161,7 @@ class Table(Cell):
                 self.cols = list(self.colFun())
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self._logger.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
@@ -1172,7 +1172,7 @@ class Table(Cell):
 
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
 
@@ -1190,7 +1190,7 @@ class Table(Cell):
                     self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = self.makeHeaderCell(col_ix)
                 except SubscribeAndRetry:
                     raise
-                except:
+                except Exception:
                     self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
 
         seen = set()
@@ -1204,7 +1204,7 @@ class Table(Cell):
                         self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
                     except SubscribeAndRetry:
                         raise
-                    except:
+                    except Exception:
                         self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
 
         self.children = new_children
@@ -1297,7 +1297,7 @@ class Clickable(Cell):
                 if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
                     self._logger.error("Button click timed out. This should really fail.")
                     return
-            except:
+            except Exception:
                 self._logger.error("Exception in button logic:\n%s", traceback.format_exc())
                 return
 
@@ -1526,7 +1526,7 @@ class _PlotUpdater(Cell):
                         )
             except SubscribeAndRetry:
                 raise
-            except:
+            except Exception:
                 self._logger.error(traceback.format_exc())
                 self.contents = """<div>____contents__</div>"""
                 self.children = {'____contents__': Traceback(traceback.format_exc())}

@@ -572,7 +572,7 @@ def main(args):
         os.environ['PYTHONPATH'] = os.environ.get('PYTHONPATH', '') + ":" + os.path.abspath("./build/install")
 
         return executeTests(args, filter_actions)
-    except:
+    except Exception:
         import traceback
         logger.error("executeTests() threw an exception: \n%s", traceback.format_exc())
         return 1
