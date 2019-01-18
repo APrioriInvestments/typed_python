@@ -50,6 +50,7 @@ def multiReplace(msg, replacements):
 
     return "".join(outChunks)
 
+
 class GeventPipe:
     """A simple mechanism for triggering the gevent webserver from a thread other than
     the webserver thread. Gevent itself expects everything to happen on greenlets. The
@@ -66,67 +67,99 @@ class GeventPipe:
         self.netChange -= 1
 
     def trigger(self):
-        #it's OK that we don't check if the bytes are written because we're just
-        #trying to wake up the other side. If the operating system's buffer is full,
-        #then that means the other side hasn't been clearing the bytes anyways,
-        #and that it will come back around and read our data.
+        # it's OK that we don't check if the bytes are written because we're just
+        # trying to wake up the other side. If the operating system's buffer is full,
+        # then that means the other side hasn't been clearing the bytes anyways,
+        # and that it will come back around and read our data.
         if self.netChange > 2:
             return
 
         self.netChange += 1
         os.write(self.write_fd, b"\n")
 
+
 class Cells:
     def __init__(self, db):
         self.db = db
 
-        self.dirtyNodes = set()
-        self.nodesNeedingBroadcast = set()
-        self.root = RootCell()
+        self.db.registerOnTransactionHandler(self._onTransaction)
 
-        self.cells = {}
-        self.cellsKnownChildren = {}
+        # map: Cell.identity ->  Cell
+        self._cells = {}
 
-        self.nodesNeedingBroadcast.add(self.root)
-        self.nodesToDiscard = set()
+        # map: Cell.identity -> set(Cell)
+        self._cellsKnownChildren = {}
 
-        self.transactionQueue = queue.Queue()
-        self.gEventHasTransactions = GeventPipe()
-        self.keysToCells = {}
+        # set(Cell)
+        self._dirtyNodes = set()
 
+        # set(Cell)
+        self._nodesToBroadcast = set()
+
+        # set(Cell)
+        self._nodesToDiscard = set()
+
+        self._transactionQueue = queue.Queue()
+
+        self._gEventHasTransactions = GeventPipe()
+
+        # map: db.key -> set(Cell)
+        self._subscribedCells = {}
+
+        # used by _newID to generate unique identifiers
         self._id = 0
 
-        self._addCell(self.root, None)
-
-        self.db._onTransaction.append(self._onTransaction)
-
         self._logger = logging.getLogger(__name__)
+
+        self._root = RootCell()
+
+        self._addCell(self._root, parent=None)
+
+    @property
+    def root(self):
+        return self._root
+
+    def __contains__(self, cell_or_id):
+        if isinstance(cell_or_id, Cell):
+            return cell_or_id.identity in self._cells
+        else:
+            return cell_or_id in self._cells
+
+    def __len__(self):
+        return len(self._cells)
+
+    def __getitem__(self, ix):
+        return self._cells.get(ix)
 
     def _newID(self):
         self._id += 1
         return str(self._id)
 
     def triggerIfHasDirty(self):
-        if self.dirtyNodes:
-            self.gEventHasTransactions.trigger()
+        if self._dirtyNodes:
+            self._gEventHasTransactions.trigger()
+
+    def wait(self):
+        self._gEventHasTransactions.wait()
 
     def _onTransaction(self, *trans):
-        self.transactionQueue.put(trans)
-        self.gEventHasTransactions.trigger()
+        self._transactionQueue.put(trans)
+        self._gEventHasTransactions.trigger()
 
     def _handleTransaction(self, key_value, priors, set_adds, set_removes, transactionId):
+        """ Given the updates coming from a transaction, update self._subscribedCells. """
         for k in list(key_value) + list(set_adds) + list(set_removes):
-            if k in self.keysToCells:
-                toDrop = []
-                for cell in self.keysToCells[k]:
-                    if not cell.garbageCollected:
-                        cell.markDirty()
-                    else:
-                        toDrop.append(cell)
-                for cell in toDrop:
-                    self.keysToCells[k].discard(cell)
-                if not self.keysToCells[k]:
-                    del self.keysToCells[k]
+            if k in self._subscribedCells:
+
+                self._subscribedCells[k] = set(
+                    cell for cell in self._subscribedCells[k] if not cell.garbageCollected
+                )
+
+                for cell in self._subscribedCells[k]:
+                    cell.markDirty()
+
+                if not self._subscribedCells[k]:
+                    del self._subscribedCells[k]
 
     def _addCell(self, cell, parent):
         assert isinstance(cell, Cell)
@@ -136,61 +169,82 @@ class Cells:
         cell.parent = parent
         cell.level = parent.level + 1 if parent else 0
 
-        self.cellsKnownChildren[cell.identity] = set()
+        assert cell.identity not in self._cellsKnownChildren
+        self._cellsKnownChildren[cell.identity] = set()
 
-        assert cell.identity not in self.cells
-        self.cells[cell.identity] = cell
+        assert cell.identity not in self._cells
+        self._cells[cell.identity] = cell
 
-        self.dirtyNodes.add(cell)
-
-        self.markForBroadcast(cell)
+        self.markDirty(cell)
 
     def _cellOutOfScope(self, cell):
         for c in cell.children.values():
             self._cellOutOfScope(c)
 
-        self.nodesToDiscard.add(cell)
+        self.markToDiscard(cell)
         if cell.cells is not None:
-            del self.cells[cell.identity]
-            del self.cellsKnownChildren[cell.identity]
+            assert cell.cells == self
+            del self._cells[cell.identity]
+            del self._cellsKnownChildren[cell.identity]
+            for sub in cell.subscriptions:
+                self.unsubscribeCell(cell, sub)
 
         cell.garbageCollected = True
 
-    def markForBroadcast(self, node):
+    def subscribeCell(self, cell, subscription):
+        self._subscribedCells.setdefault(subscription, set()).add(cell)
+
+    def unsubscribeCell(self, cell, subscription):
+        if subscription in self._subscribedCells:
+            self._subscribedCells[subscription].discard(cell)
+            if not self._subscribedCells[subscription]:
+                del self._subscribedCells[subscription]
+
+    def markDirty(self, cell):
+        assert not cell.garbageCollected
+
+        self._dirtyNodes.add(cell)
+
+    def markToDiscard(self, cell):
+        assert not cell.garbageCollected
+
+        self._nodesToDiscard.add(cell)
+
+    def markToBroadcast(self, node):
         assert node.cells is self
 
-        self.nodesNeedingBroadcast.add(node)
+        self._nodesToBroadcast.add(node)
 
     def renderMessages(self):
-        self.recalculate()
+        self._recalculateCells()
 
         res = []
 
+        # map<level:int -> cells:set<Cells> >
         cellsByLevel = {}
 
-        for n in self.nodesNeedingBroadcast:
-            if n not in self.nodesToDiscard:
-                if n.level not in cellsByLevel:
-                    cellsByLevel[n.level] = set()
-                cellsByLevel[n.level].add(n)
+        for n in self._nodesToBroadcast:
+            if n not in self._nodesToDiscard:
+                cellsByLevel.setdefault(n.level, set()).add(n)
 
         for level, cells in reversed(sorted(cellsByLevel.items())):
             for n in cells:
                 res.append(self.updateMessageFor(n))
 
-        for n in self.nodesToDiscard:
+        for n in self._nodesToDiscard:
             if n.cells is not None:
+                assert n.cells == self
                 res.append({'id': n.identity, 'discard': True})
 
-        self.nodesNeedingBroadcast = set()
-        self.nodesToDiscard = set()
+        self._nodesToBroadcast = set()
+        self._nodesToDiscard = set()
 
         return res
 
-    def recalculate(self):
-        #handle all the transactions so far
-        old_queue = self.transactionQueue
-        self.transactionQueue = queue.Queue()
+    def _recalculateCells(self):
+        # handle all the transactions so far
+        old_queue = self._transactionQueue
+        self._transactionQueue = queue.Queue()
 
         try:
             while True:
@@ -198,13 +252,13 @@ class Cells:
         except queue.Empty:
             pass
 
-        while self.dirtyNodes:
-            n = self.dirtyNodes.pop()
+        while self._dirtyNodes:
+            n = self._dirtyNodes.pop()
 
             if not n.garbageCollected:
-                self.markForBroadcast(n)
+                self.markToBroadcast(n)
 
-                origChildren = self.cellsKnownChildren[n.identity]
+                origChildren = self._cellsKnownChildren[n.identity]
 
                 try:
                     _cur_cell.cell = n
@@ -226,24 +280,12 @@ class Cells:
                 newChildren = set(n.children.values())
 
                 for c in newChildren.difference(origChildren):
-                    assert isinstance(c, Cell)
-
-                    if c.cells is not None and not c.prepareForReuse():
-                        for k,v in n.children.items():
-                            if v is c:
-                                c = n.children[k] = Traceback("Cell %s being used twice in the tree" % c)
-
                     self._addCell(c, n)
 
                 for c in origChildren.difference(newChildren):
                     self._cellOutOfScope(c)
 
-                self.cellsKnownChildren[n.identity] = newChildren
-
-    def markDirty(self, cell):
-        assert not cell.garbageCollected
-
-        self.dirtyNodes.add(cell)
+                self._cellsKnownChildren[n.identity] = newChildren
 
     def updateMessageFor(self, cell):
         contents = cell.contents
@@ -272,6 +314,7 @@ class Cells:
             res['postscript'] = cell.postscript
         return res
 
+
 class Slot:
     """Holds some arbitrary state for use in a session. Not mirrored in the DB."""
     def __init__(self, value=None):
@@ -295,15 +338,15 @@ class Slot:
 
 class Cell:
     def __init__(self):
-        self.cells = None #will get set when its added to a 'Cells' object
+        self.cells = None  # will get set when its added to a 'Cells' object
         self.parent = None
         self.level = None
-        self.children = {} #local node def to global node def
-        self.contents = "" #some contents containing a local node def
+        self.children = {}  # local node def to global node def
+        self.contents = ""  # some contents containing a local node def
         self._identity = None
         self.postscript = None
         self.garbageCollected = False
-        self.subscriptions  = set()
+        self.subscriptions = set()
         self._nowrap = False
         self._width = None
         self._color = None
@@ -316,14 +359,21 @@ class Cell:
         self.serializationContext = context
         return self
 
+    def _clearSubscriptions(self):
+        if self.cells:
+            for sub in self.subscriptions:
+                self.cells.unsubscribeCell(self, sub)
+
+        self.subscriptions = set()
+
     def _resetSubscriptionsToViewReads(self, view):
         new_subscriptions = set(view._reads).union(set(view._indexReads))
 
         for k in new_subscriptions.difference(self.subscriptions):
-            self.cells.keysToCells.setdefault(k, set()).add(self)
+            self.cells.subscribeCell(self, k)
 
         for k in self.subscriptions.difference(new_subscriptions):
-            self.cells.keysToCells.setdefault(k, set()).discard(self)
+            self.cells.unsubscribeCell(self, k)
 
         self.subscriptions = new_subscriptions
 
@@ -754,7 +804,7 @@ class Subscribed(Cell):
         self.f = f
 
     def prepareForReuse(self):
-        self.subscriptions = set()
+        self._clearSubscriptions()
         return super().prepareForReuse()
 
     def __repr__(self):
@@ -788,13 +838,11 @@ class SubscribedSequence(Cell):
         self.itemsFun = itemsFun
         self.rendererFun = rendererFun
 
-        self.subscriptions  = set()
-
         self.existingItems = {}
         self.spine = []
 
     def prepareForReuse(self):
-        self.subscriptions = set()
+        self._clearSubscriptions()
         self.existingItems = {}
         self.spine = []
         return super().prepareForReuse()
@@ -879,14 +927,12 @@ class Grid(Cell):
         self.rowLabelFun = rowLabelFun
         self.rendererFun = rendererFun
 
-        self.subscriptions  = set()
-
         self.existingItems = {}
         self.rows = []
         self.cols = []
 
     def prepareForReuse(self):
-        self.subscriptions = set()
+        self._clearSubscriptions()
         self.existingItems = []
         self.rows = []
         self.cols = []
@@ -1045,8 +1091,6 @@ class Table(Cell):
         self.headerFun = headerFun
         self.rendererFun = rendererFun
 
-        self.subscriptions  = set()
-
         self.existingItems = {}
         self.rows = []
         self.cols = []
@@ -1059,7 +1103,7 @@ class Table(Cell):
         self.columnFilters = {}
 
     def prepareForReuse(self):
-        self.subscriptions = set()
+        self._clearSubscriptions()
         self.existingItems = {}
         self.rows = []
         self.cols = []

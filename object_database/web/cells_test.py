@@ -12,12 +12,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.web.cells import Cells, Sequence, Container, Subscribed, Span, SubscribedSequence, ensureSubscribedType
+from object_database.web.cells import (
+    Cells, Sequence, Container, Subscribed, Span, SubscribedSequence,
+    ensureSubscribedType
+)
 from object_database import InMemServer, Schema, Indexed
-from object_database.util import genToken
+from object_database.util import genToken, configureLogging
+from object_database.test_util import currentMemUsageMb
 
+import logging
 import unittest
 import threading
+import time
 
 test_schema = Schema("core.web.test")
 
@@ -28,6 +34,14 @@ class Thing:
 
 
 class CellsTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        configureLogging(
+            preamble="cells_test",
+            level=logging.INFO
+        )
+        cls._logger = logging.getLogger(__name__)
+
     def setUp(self):
         self.token = genToken()
         self.server = InMemServer(auth_token=self.token)
@@ -40,7 +54,7 @@ class CellsTests(unittest.TestCase):
     def tearDown(self):
         self.server.stop()
 
-    def test_messages(self):
+    def test_cells_messages(self):
         pair = [
             Container("HI"),
             Container("HI2")
@@ -48,17 +62,17 @@ class CellsTests(unittest.TestCase):
         pairCell = Sequence(pair)
         self.cells.root.setChild(pairCell)
 
-        self.cells.recalculate()
+        msgs = self.cells.renderMessages()
 
         expectedCells = [self.cells.root, pairCell, pair[0], pair[1]]
 
-        self.assertTrue(self.cells.root.identity in self.cells.cells)
-        self.assertTrue(pairCell.identity in self.cells.cells)
-        self.assertTrue(pair[0].identity in self.cells.cells)
-        self.assertTrue(pair[1].identity in self.cells.cells)
+        self.assertTrue(self.cells.root in self.cells)
+        self.assertTrue(pairCell in self.cells)
+        self.assertTrue(pair[0] in self.cells)
+        self.assertTrue(pair[1] in self.cells)
 
         messages = {}
-        for m in self.cells.renderMessages():
+        for m in msgs:
             assert m['id'] not in messages
 
             messages[m['id']] = m
@@ -76,7 +90,7 @@ class CellsTests(unittest.TestCase):
             set([pairCell.identity])
             )
 
-    def test_recalculation(self):
+    def test_cells_recalculation(self):
         pair = [
             Container("HI"),
             Container("HI2")
@@ -86,43 +100,38 @@ class CellsTests(unittest.TestCase):
             Sequence(pair)
             )
 
-        self.cells.recalculate()
         self.cells.renderMessages()
 
         pair[0].setChild("HIHI")
 
-        self.cells.recalculate()
-
-        #a new message for the child, and also for 'pair[0]'
+        # a new message for the child, and also for 'pair[0]'
         self.assertEqual(len(self.cells.renderMessages()), 3)
 
-    def test_subscriptions(self):
+    def test_cells_subscriptions(self):
         self.cells.root.setChild(
             Subscribed(lambda:
                 Sequence([
-                    Span("Thing(k=%s).x = %s" % (thing.k, thing.x)) for thing in Thing.lookupAll()
+                    Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
+                    for thing in Thing.lookupAll()
                     ])
                 )
             )
 
-        self.cells.recalculate()
         self.cells.renderMessages()
 
         with self.db.transaction():
             Thing(x=1,k=1)
             Thing(x=2,k=2)
 
-        self.cells.recalculate()
+        self.cells._recalculateCells()
 
         with self.db.transaction():
             Thing(x=3,k=3)
 
-        self.cells.recalculate()
-
-        #three 'Span', three 'Text', the Sequence, the Subscribed, and a delete
+        # three 'Span', three 'Text', the Sequence, the Subscribed, and a delete
         self.assertEqual(len(self.cells.renderMessages()), 9)
 
-    def test_ensure_subscribed(self):
+    def test_cells_ensure_subscribed(self):
         schema = Schema("core.web.test2")
 
         @schema.define
@@ -145,18 +154,16 @@ class CellsTests(unittest.TestCase):
 
         self.cells.root.setChild(Subscribed(checkThing2s))
 
-        self.cells.recalculate()
         self.cells.renderMessages()
 
         self.assertTrue(computed.wait(timeout=5.0))
 
+    def test_cells_garbage_collection(self):
+        # create a cell that subscribes to a specific 'thing', but that
+        # creates new cells each time, and verify that we reduce our
+        # cell count, and that we send deletion messages
 
-    def test_garbage_collection(self):
-        #create a cell that subscribes to a specific 'thing', but that
-        #creates new cells each time, and verify that we reduce our
-        #cell count, and that we send deletion messages
-
-        #subscribes to the set of cells with k=0 and displays something
+        # subscribes to the set of cells with k=0 and displays something
         self.cells.root.setChild(
             SubscribedSequence(
                 lambda: Thing.lookupAll(k=0),
@@ -177,8 +184,7 @@ class CellsTests(unittest.TestCase):
                 for anything in Thing.lookupAll():
                     anything.x = anything.x + 1
 
-            self.cells.recalculate()
             messages = self.cells.renderMessages()
 
-            self.assertTrue(len(self.cells.cells) < 20, "Have %s cells at pass %s" % (len(self.cells.cells), i))
+            self.assertTrue(len(self.cells) < 20, "Have %s cells at pass %s" % (len(self.cells), i))
             self.assertTrue(len(messages) < 20, "Got %s messages at pass %s" % (len(messages), i))
