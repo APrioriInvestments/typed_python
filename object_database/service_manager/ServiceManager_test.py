@@ -29,7 +29,7 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.util import genToken
-from object_database.test_util import start_service_manager
+from object_database.test_util import autoconfigure_and_start_service_manager
 
 from object_database import (
     Schema, Indexed, core_schema,
@@ -317,6 +317,8 @@ class ServiceManagerTest(unittest.TestCase):
     WAIT_FOR_COUNT_TIMEOUT = 20.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
 
     def setUp(self):
+        self.cleanupFn = lambda error=None: None
+        self.port = 8023
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
@@ -325,27 +327,22 @@ class ServiceManagerTest(unittest.TestCase):
         os.makedirs(os.path.join(self.tempDirectoryName,'source'))
         os.makedirs(os.path.join(self.tempDirectoryName,'storage'))
 
-        self.server = start_service_manager(
-            self.tempDirectoryName,
-            8023,
-            self.token,
+        self.server, self.cleanupFn = autoconfigure_and_start_service_manager(
+            port=self.port,
+            auth_token=self.token,
             timeout=2.0,
             verbose=VERBOSE
         )
 
         try:
-            self.database = connect("localhost", 8023, self.token, retry=True)
+            self.database = connect("localhost", self.port, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, schema)
         except Exception:
-            self.server.terminate()
-            self.server.wait()
-            self.tempDirObj.__exit__(None,None,None)
+            self.cleanupFn(error=True)
             raise
 
     def tearDown(self):
-        self.server.terminate()
-        self.server.wait()
-        self.tempDirObj.__exit__(None,None,None)
+        self.cleanupFn()
 
     def waitForCount(self, count):
         self.assertTrue(

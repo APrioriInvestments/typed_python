@@ -15,12 +15,8 @@
 import logging
 import os
 import requests
-import subprocess
-import sys
-import tempfile
 import time
 import unittest
-import websockets
 
 from bs4 import BeautifulSoup
 from object_database.service_manager.ServiceManager import ServiceManager
@@ -31,8 +27,8 @@ from object_database.web.ActiveWebService import (
 )
 
 from object_database import core_schema, connect, service_schema
-from object_database.util import genToken, configureLogging
-from object_database.test_util import start_service_manager, currentMemUsageMb
+from object_database.util import configureLogging, genToken
+from object_database.test_util import autoconfigure_and_start_service_manager, currentMemUsageMb
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
@@ -45,6 +41,8 @@ WEB_SERVER_PORT=8025
 class ActiveWebServiceTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        cls.cleanupFn = lambda error=None: None
+
         cls.base_url = "http://localhost:{port}".format(port=WEB_SERVER_PORT)
         configureLogging("aws_test")
         cls._logger = logging.getLogger(__name__)
@@ -53,20 +51,15 @@ class ActiveWebServiceTest(unittest.TestCase):
                           auth_hostname=None, authorized_groups=(),
                           ldap_base_dn=None, ldap_ntlm_domain=None,
                           company_name=None):
+
         self.token = genToken()
-
-        self.tempDirObj = tempfile.TemporaryDirectory()
-        self.tempDirectoryName = self.tempDirObj.__enter__()
-
         log_level = self._logger.getEffectiveLevel()
         loglevel_name = logging.getLevelName(log_level)
 
-        self.server = start_service_manager(
-            self.tempDirectoryName,
-            DATABASE_SERVER_PORT,
-            self.token,
-            loglevel_name
-        )
+        self.server, self.cleanupFn = autoconfigure_and_start_service_manager(
+            port=DATABASE_SERVER_PORT,
+            auth_token=self.token,
+            loglevel_name=loglevel_name)
 
         try:
             self.database = connect("localhost", DATABASE_SERVER_PORT, self.token, retry=True)
@@ -108,8 +101,7 @@ class ActiveWebServiceTest(unittest.TestCase):
 
             self.waitUntilUp()
         except Exception:
-            self.server.terminate()
-            self.server.wait()
+            self.cleanupFn(error=True)
             raise
 
     def waitUntilUp(self, timeout = 2.0):
@@ -125,9 +117,7 @@ class ActiveWebServiceTest(unittest.TestCase):
         raise Exception("Webservice never came up.")
 
     def tearDown(self):
-        self.server.terminate()
-        self.server.wait()
-        self.tempDirObj.__exit__(None, None, None)
+        self.cleanupFn()
 
     def login(self, client, username='anonymous', password='bogus'):
         # Because of CSRF security we need to do the following to authenticate:
