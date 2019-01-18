@@ -365,7 +365,7 @@ class TransactionListener:
         self._thread.daemon = True
         self._shouldStop = False
         self._db = db
-        self._db._onTransaction.append(self._onTransaction)
+        self._db.registerOnTransactionHandler(self._onTransaction)
         self._queue = queue.Queue()
         self.serializationContext = None
         self.handler = handler
@@ -450,7 +450,7 @@ class DatabaseConnection:
         self.connectionObject = None
 
         # transaction handlers. These must be nonblocking since we call them under lock
-        self._onTransaction = []
+        self._onTransactionHandlers = []
 
         self._flushEvents = {}
 
@@ -479,6 +479,9 @@ class DatabaseConnection:
         self.serializationContext = None
 
         self._logger = logging.getLogger(__name__)
+
+    def registerOnTransactionHandler(self, handler):
+        self._onTransactionHandlers.append(handler)
 
     def setSerializationContext(self, context):
         self.serializationContext = context
@@ -835,12 +838,12 @@ class DatabaseConnection:
 
                 self._versioned_data.cleanup(self._cur_transaction_num)
 
-            for handler in self._onTransaction:
+            for handler in self._onTransactionHandlers:
                 try:
                     handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
                 except Exception:
                     self._logger.error(
-                        "_onTransaction callback %s threw an exception:\n%s",
+                        "_onTransaction handler %s threw an exception:\n%s",
                         handler,
                         traceback.format_exc()
                         )
