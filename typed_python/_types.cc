@@ -957,8 +957,7 @@ PyObject *resolveForwards(PyObject* nullValue, PyObject* args) {
     Type* t1 = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
 
     if (!t1) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'resolveForwards' must be a native type object");
-        return NULL;
+        return incref(Py_False);
     }
 
     if (native_instance_wrapper::guaranteeForwardsResolved(t1)) {

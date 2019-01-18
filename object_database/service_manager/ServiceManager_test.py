@@ -25,6 +25,7 @@ import time
 import unittest
 
 import object_database
+from object_database.service_manager.ServiceManagerTestCommon import ServiceManagerTestCommon
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
@@ -34,8 +35,7 @@ from object_database.test_util import autoconfigure_and_start_service_manager
 from object_database import (
     Schema, Indexed, core_schema,
     connect, service_schema, current_transaction
-)
-
+    )
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
@@ -122,7 +122,6 @@ class UninitializableService(ServiceBase):
 
     def doWork(self, shouldStop):
         time.sleep(120)
-
 
 
 class GraphDisplayService(ServiceBase):
@@ -309,40 +308,10 @@ def getTestServiceModule(version):
             """.format(version=version))
     }
 
-VERBOSE = True
+class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
+    def schemasToSubscribeTo(self):
+        return [schema]
 
-
-class ServiceManagerTest(unittest.TestCase):
-
-    WAIT_FOR_COUNT_TIMEOUT = 20.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
-
-    def setUp(self):
-        self.cleanupFn = lambda error=None: None
-        self.port = 8023
-        self.token = genToken()
-        self.tempDirObj = tempfile.TemporaryDirectory()
-        self.tempDirectoryName = self.tempDirObj.__enter__()
-        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(self.tempDirectoryName, forceReset=True)
-
-        os.makedirs(os.path.join(self.tempDirectoryName,'source'))
-        os.makedirs(os.path.join(self.tempDirectoryName,'storage'))
-
-        self.server, self.cleanupFn = autoconfigure_and_start_service_manager(
-            port=self.port,
-            auth_token=self.token,
-            timeout=2.0,
-            verbose=VERBOSE
-        )
-
-        try:
-            self.database = connect("localhost", self.port, self.token, retry=True)
-            self.database.subscribeToSchema(core_schema, service_schema, schema)
-        except Exception:
-            self.cleanupFn(error=True)
-            raise
-
-    def tearDown(self):
-        self.cleanupFn()
 
     def waitForCount(self, count):
         self.assertTrue(

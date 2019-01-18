@@ -308,7 +308,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
         PyObject* result = ((PyTypeObject*)t)->tp_new(((PyTypeObject*)t), PyTuple_Pack(0), NULL);
 
         if (!result) {
-            throw std::runtime_error("tp_new threw an exception");
+            throw std::runtime_error("tp_new for " + std::string(((PyTypeObject*)t)->tp_name) + " threw an exception");
         }
 
         b.addCachedPointer(id, incref(result), true);

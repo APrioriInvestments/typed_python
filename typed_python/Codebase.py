@@ -35,28 +35,7 @@ class Codebase:
         filesToContents = filesToContents
         self.modules = modules
 
-        nameToObject = {}
-        for modulename, module in modules.items():
-            for membername, member in module.__dict__.items():
-                if isinstance(member, (type, types.FunctionType)):
-                    nameToObject[modulename + "." + membername] = member
-                elif isinstance(member, types.ModuleType):
-                    nameToObject[".modules." + member.__name__] = member
-
-            #also add the module itself so we can serialize it
-            nameToObject[".modules." + modulename] = module
-
-        for modulename, module in modules.items():
-            for membername, member in module.__dict__.items():
-                if isinstance(member, type) and hasattr(member, '__dict__'):
-                    for sub_name, sub_obj in member.__dict__.items():
-                        if not (sub_name[:2] == "__" and sub_name[-2:] == "__"):
-                            if isinstance(sub_obj, (type, types.FunctionType)):
-                                nameToObject[modulename + "." + membername + "." + sub_name] = sub_obj
-                            elif isinstance(sub_obj, types.ModuleType):
-                                nameToObject[".modules." + sub_obj.__name__] = sub_obj
-
-        self.serializationContext = SerializationContext(nameToObject)
+        self.serializationContext = SerializationContext.FromModules(modules.values())
 
     def getModuleByName(self, module_name):
         if module_name not in self.modules:

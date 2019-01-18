@@ -12,10 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import serialize, deserialize
+from typed_python._types import serialize, deserialize, resolveForwards
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
 from typed_python.hash import sha_hash
-from types import FunctionType
+from types import FunctionType, ModuleType
 import numpy
 import lz4.frame
 
@@ -67,6 +67,45 @@ class SerializationContext(object):
 
         self.numpyCompressionEnabled = True
         self.encodeLineInformationForCode = True
+
+    @staticmethod
+    def FromModules(modules):
+        """Given a list of modules, produce a serialization context by walking the objects."""
+        nameToObject = {}
+
+        for module in modules:
+            modulename = module.__name__
+
+            for membername, member in module.__dict__.items():
+                if isinstance(member, (type, FunctionType)):
+                    nameToObject[modulename + "." + membername] = member
+                elif isinstance(member, ModuleType):
+                    nameToObject[".modules." + member.__name__] = member
+
+            #also add the module itself so we can serialize it
+            nameToObject[".modules." + modulename] = module
+
+        for module in modules:
+            modulename = module.__name__
+
+            for membername, member in module.__dict__.items():
+                if isinstance(member, type) and hasattr(member, '__dict__'):
+                    for sub_name, sub_obj in member.__dict__.items():
+                        if not (sub_name[:2] == "__" and sub_name[-2:] == "__"):
+                            if isinstance(sub_obj, (type, FunctionType)):
+                                nameToObject[modulename + "." + membername + "." + sub_name] = sub_obj
+                            elif isinstance(sub_obj, ModuleType):
+                                nameToObject[".modules." + sub_obj.__name__] = sub_obj
+
+        return SerializationContext(nameToObject)
+
+    def union(self, other):
+        nameToObject = dict(self.nameToObject)
+        nameToObject.update(other.nameToObject)
+        return SerializationContext(nameToObject)
+
+    def withPrefix(self, prefix):
+        return SerializationContext({prefix + "." + k: v for k,v  in self.nameToObject.items()})
 
     def withoutLineInfoEncoded(self):
         res = SerializationContext(self.nameToObject)

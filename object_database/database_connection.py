@@ -19,8 +19,11 @@ from object_database.view import View, Transaction, _cur_view, SerializedDatabas
 from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
 from typed_python.hash import sha_hash
+from typed_python.SerializationContext import SerializationContext
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 from typed_python import Alternative
+
+import typed_python, object_database
 
 import queue
 import threading
@@ -425,6 +428,15 @@ class TransactionListener:
 
         self._queue.put(changed)
 
+_coreSerializationContext = [None]
+def coreSerializationContext():
+    if _coreSerializationContext[0] is None:
+        context1 = TypedPythonCodebase.FromRootlevelModule(object_database).serializationContext
+        context2 = TypedPythonCodebase.FromRootlevelModule(typed_python).serializationContext
+
+        _coreSerializationContext[0] = context1.union(context2)
+
+    return _coreSerializationContext[0]
 
 class DatabaseConnection:
     def __init__(self, channel):
@@ -476,7 +488,7 @@ class DatabaseConnection:
 
         self._largeSubscriptionHeartbeatDelay = 0
 
-        self.serializationContext = None
+        self.serializationContext = coreSerializationContext()
 
         self._logger = logging.getLogger(__name__)
 
@@ -484,7 +496,8 @@ class DatabaseConnection:
         self._onTransactionHandlers.append(handler)
 
     def setSerializationContext(self, context):
-        self.serializationContext = context
+        assert isinstance(context, SerializationContext), context
+        self.serializationContext = coreSerializationContext().union(context)
         return self
 
     def serializeFromModule(self, module):

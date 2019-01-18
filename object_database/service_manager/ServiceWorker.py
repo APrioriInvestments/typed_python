@@ -50,11 +50,12 @@ class ServiceWorker:
 
         with self.db.view():
             if self.instance.service.codebase is None:
-                context = TypedPythonCodebase.FromRootlevelModule(object_database)
+                context = None
             else:
                 context = self.instance.service.codebase.instantiate().serializationContext
 
-        self.db.setSerializationContext(context)
+        if context is not None:
+            self.db.setSerializationContext(context)
 
         with self.db.view():
             host = self.instance.host
