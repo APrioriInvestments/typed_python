@@ -32,6 +32,7 @@ from object_database.web.ActiveWebService import (
 
 from object_database import core_schema, connect, service_schema
 from object_database.util import genToken, configureLogging
+from object_database.test_util import start_service_manager, currentMemUsageMb
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
@@ -46,37 +47,26 @@ class ActiveWebServiceTest(unittest.TestCase):
     def setUpClass(cls):
         cls.base_url = "http://localhost:{port}".format(port=WEB_SERVER_PORT)
         configureLogging("aws_test")
-        cls.logger = logging.getLogger(__name__)
+        cls._logger = logging.getLogger(__name__)
 
     def configurableSetUp(self, auth_type="LDAP",
                           auth_hostname=None, authorized_groups=(),
                           ldap_base_dn=None, ldap_ntlm_domain=None,
                           company_name=None):
         self.token = genToken()
+
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.__enter__()
-        log_level = logging.getLogger(__name__).getEffectiveLevel()
-        log_level_name = logging.getLevelName(log_level)
 
-        self.server = subprocess.Popen(
-            [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', str(DATABASE_SERVER_PORT), '--run_db',
-                '--source', os.path.join(self.tempDirectoryName,'source'),
-                '--storage', os.path.join(self.tempDirectoryName,'storage'),
-                '--service-token', self.token,
-                '--shutdownTimeout', '.5',
-                '--log-level', log_level_name
-            ]
+        log_level = self._logger.getEffectiveLevel()
+        loglevel_name = logging.getLevelName(log_level)
+
+        self.server = start_service_manager(
+            self.tempDirectoryName,
+            DATABASE_SERVER_PORT,
+            self.token,
+            loglevel_name
         )
-        try:
-            # this should throw a subprocess.TimeoutExpired exception if the service did not crash
-            self.server.wait(0.7)
-        except subprocess.TimeoutExpired:
-            pass
-        else:
-            raise Exception("Failed to start service_manager (retcode:{})"
-                .format(self.server.returncode)
-            )
 
         try:
             self.database = connect("localhost", DATABASE_SERVER_PORT, self.token, retry=True)
@@ -108,7 +98,7 @@ class ActiveWebServiceTest(unittest.TestCase):
                 [
                     '--port', str(WEB_SERVER_PORT),
                     '--host', 'localhost',
-                    '--log-level', log_level_name,
+                    '--log-level', loglevel_name,
                     '--auth', auth_type
                 ] + optional_args
             )

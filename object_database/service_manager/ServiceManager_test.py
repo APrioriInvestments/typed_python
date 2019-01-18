@@ -29,6 +29,7 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.util import genToken
+from object_database.test_util import start_service_manager
 
 from object_database import (
     Schema, Indexed, core_schema,
@@ -324,33 +325,13 @@ class ServiceManagerTest(unittest.TestCase):
         os.makedirs(os.path.join(self.tempDirectoryName,'source'))
         os.makedirs(os.path.join(self.tempDirectoryName,'storage'))
 
-        if not VERBOSE:
-            kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
-        else:
-            kwargs = {}
-
-        try:
-            self.server = subprocess.Popen(
-                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', "8023",
-                    "--run_db",
-                    '--source', os.path.join(self.tempDirectoryName, 'source'),
-                    '--storage', os.path.join(self.tempDirectoryName, 'storage'),
-                    '--service-token', self.token,
-                    '--shutdownTimeout', '1.0',
-                    '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert')
-
-                ],
-                **kwargs
-            )
-            # this should throw a subprocess.TimeoutExpired exception if the service did not crash
-            self.server.wait(1.3)
-        except subprocess.TimeoutExpired:
-            pass
-        else:
-            raise Exception("Failed to start service_manager (retcode:{})"
-                .format(self.server.returncode)
-            )
+        self.server = start_service_manager(
+            self.tempDirectoryName,
+            8023,
+            self.token,
+            timeout=2.0,
+            verbose=VERBOSE
+        )
 
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
