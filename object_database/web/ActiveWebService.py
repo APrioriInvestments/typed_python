@@ -136,10 +136,10 @@ class ActiveWebService(ServiceBase):
             return AuthPluginBase()
         elif auth_type == "LDAP":
             if not hostname:
-                raise Exception("Missing --hostname argument for LDAP")
+                raise Exception("Missing required argument for LDAP: --hostname")
 
             if not ldap_base_dn:
-                raise Exception("Missing --base-dn argument for LDAP")
+                raise Exception("Missing required argument for LDAP: --base-dn")
 
             return LdapAuthPlugin(
                 hostname=hostname,
@@ -500,7 +500,7 @@ class ActiveWebService(ServiceBase):
                             jsonMsg = json.loads(msg)
 
                             cell_id = jsonMsg.get('target_cell')
-                            cell = cells.cells.get(cell_id)
+                            cell = cells[cell_id]
                             if cell is not None:
                                 cell.onMessage(jsonMsg)
                         except Exception:
@@ -511,7 +511,6 @@ class ActiveWebService(ServiceBase):
 
             while not ws.closed:
                 t0 = time.time()
-                cells.recalculate()
                 messages = cells.renderMessages()
 
                 user = self.load_user(current_user.username)
@@ -543,7 +542,7 @@ class ActiveWebService(ServiceBase):
 
                 ws.send(json.dumps("postscripts"))
 
-                cells.gEventHasTransactions.wait()
+                cells.wait()
 
                 timestamps.append(time.time())
 
