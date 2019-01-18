@@ -82,17 +82,17 @@ def log_cells_stats(cells, logger, indentation=0):
 
     log("#####################################################")
     log("#  Cells structure DEBUG Log")
-    log("#dirty: {}"
+    log("#  - dirty: {}"
         .format(len(cells._dirtyNodes)))
-    log("#need bcast: {}"
+    log("#  - need bcast: {}"
         .format(len(cells._nodesToBroadcast)))
-    log("#cells: {}"
+    log("#  - cells: {}"
         .format(len(cells._cells)))
-    log("#known children: {}"
+    log("#  - known children: {}"
         .format(len(cells._cellsKnownChildren)))
-    log("#to discard: {}"
+    log("#  - to discard: {}"
         .format(len(cells._nodesToDiscard)))
-    log("#subscribed-to keys: {}"
+    log("#  - subscribed-to keys: {}"
         .format(len(cells._subscribedCells)))
     log("#####################################################")
 
