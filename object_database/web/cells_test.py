@@ -16,9 +16,13 @@ from object_database.web.cells import (
     Cells, Sequence, Container, Subscribed, Span, SubscribedSequence,
     ensureSubscribedType
 )
-from object_database import InMemServer, Schema, Indexed
+from object_database import InMemServer, Schema, Indexed, connect
 from object_database.util import genToken, configureLogging
-from object_database.test_util import currentMemUsageMb
+from object_database.test_util import (
+    currentMemUsageMb,
+    autoconfigure_and_start_service_manager,
+    log_cells_stats
+)
 
 import logging
 import unittest
@@ -188,3 +192,107 @@ class CellsTests(unittest.TestCase):
 
             self.assertTrue(len(self.cells) < 20, "Have %s cells at pass %s" % (len(self.cells), i))
             self.assertTrue(len(messages) < 20, "Got %s messages at pass %s" % (len(messages), i))
+
+    def helper_memory_leak(self, cell, initFn, workFn, thresholdMB):
+        port = 8021
+        server, cleanupFn = autoconfigure_and_start_service_manager(
+            port=port,
+            auth_token=self.token,
+        )
+        try:
+            db = connect("localhost", port, self.token, retry=True)
+            db.subscribeToSchema(test_schema)
+            cells = Cells(db)
+
+            cells.root.setChild(cell)
+
+            initFn(db, cells)
+
+            rss0 = currentMemUsageMb()
+            log_cells_stats(cells, self._logger.info, indentation=4)
+
+            workFn(db, cells)
+            log_cells_stats(cells, self._logger.info, indentation=4)
+
+            rss = currentMemUsageMb()
+            self._logger.info("Initial Memory Usage: {} MB".format(rss0))
+            self._logger.info("Final   Memory Usage: {} MB".format(rss))
+            self.assertTrue(
+                rss - rss0 < thresholdMB,
+                "Memory Usage Increased by {} MB.".format(rss - rss0)
+            )
+        finally:
+            cleanupFn()
+
+    def test_cells_memory_leak1(self):
+        cell = Subscribed(lambda:
+            Sequence([
+                Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
+                for thing in Thing.lookupAll(k=0)
+            ])
+        )
+
+        def workFn(db, cells, iterations=5000):
+            with db.view():
+                thing = Thing.lookupAny(k=0)
+
+            for counter in range(iterations):
+                with db.transaction():
+                    thing.delete()
+                    thing = Thing(k=0, x=counter)
+
+                msg = cells.renderMessages()
+
+        def initFn(db, cells):
+            with db.transaction():
+                thing = Thing(k=0, x=0)
+
+            msg = cells.renderMessages()
+
+            workFn(db, cells, iterations=500)
+
+        self.helper_memory_leak(cell, initFn, workFn, 1)
+
+    def test_cells_memory_leak2(self):
+        cell = (
+            SubscribedSequence(
+                lambda: Thing.lookupAll(k=0),
+                lambda thing: Subscribed(
+                    lambda: Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
+                )
+            ) +
+            SubscribedSequence(
+                lambda: Thing.lookupAll(k=1),
+                lambda thing: Subscribed(
+                    lambda: Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
+                )
+            )
+        )
+
+        def workFn(db, cells, iterations=5000):
+            with db.view():
+                thing = Thing.lookupAny(k=0)
+
+            for counter in range(iterations):
+                with db.transaction():
+                    if counter % 3 == 0:
+                        thing.k = 1 - thing.k
+                        thing.delete()
+                        thing = Thing(x=counter, k=0)
+
+                    all_things = Thing.lookupAll()
+                    self.assertEqual(len(all_things), 1)
+                    for anything in all_things:
+                        anything.x = anything.x + 1
+
+                msg = cells.renderMessages()
+
+        def initFn(db, cells):
+            with db.transaction():
+                thing = Thing(x=1, k=0)
+
+            cells.renderMessages()
+
+            workFn(db, cells, iterations=500)
+
+        self.helper_memory_leak(cell, initFn, workFn, 1)
