@@ -55,9 +55,9 @@ def main(argv=None):
 
     token = genToken()
     port = 8020
-    with tempfile.TemporaryDirectory() as tf:
+    with tempfile.TemporaryDirectory() as tmpDirName:
         try:
-            server = start_service_manager(tf, port, token)
+            server = start_service_manager(tmpDirName, port, token)
 
             database = connect("localhost", port, token, retry=True)
             database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
