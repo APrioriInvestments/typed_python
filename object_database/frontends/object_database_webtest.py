@@ -42,6 +42,7 @@ from object_database import (
     service_schema,
     TcpServer
 )
+from object_database.test_util import start_service_manager
 from object_database.util import tokenFromString, genToken
 
 
@@ -53,27 +54,24 @@ def main(argv=None):
         argv = sys.argv
 
     token = genToken()
-
+    port = 8020
     with tempfile.TemporaryDirectory() as tf:
         try:
-            server = subprocess.Popen(
-                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', '8020', '--run_db',
-                    '--source', os.path.join(tf,'source'),
-                    '--storage', os.path.join(tf,'storage'),
-                    '--service-token', token,
-                    #'--logdir', os.path.join(tf,'logs'),
-                    '--shutdownTimeout', '.5'
-                    ]
-                )
+            server = start_service_manager(tf, port, token)
 
-            database = connect("localhost", 8020, token, retry=True)
+            database = connect("localhost", port, token, retry=True)
             database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
 
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(ActiveWebService, "ActiveWebService", target_count=0)
 
-            ActiveWebService.configureFromCommandline(database, service, ['--port', '8000', '--host', '0.0.0.0'])
+            ActiveWebService.configureFromCommandline(
+                database, service,
+                ['--port', '8000',
+                '--host', '0.0.0.0',
+                '--auth', 'NONE',
+                '--log-level', 'INFO']
+            )
 
             with database.transaction():
                 ServiceManager.startService("ActiveWebService", 1)
