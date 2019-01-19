@@ -21,6 +21,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
+from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext, FunctionOutput
 
 NoneExprType = NoneWrapper()
@@ -107,7 +108,7 @@ class PythonToNativeConverter(object):
             name - the name to actually give the function.
             identity - a unique identifier for this function to allow us to cache it.
             input_types - list of Wrapper objects for the incoming types
-            output_ype - Wrapper object for the output type.
+            output_type - Wrapper object for the output type.
             generatingFunction - a function producing a native_function_definition
 
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
@@ -120,6 +121,17 @@ class PythonToNativeConverter(object):
         new_name = self.new_name(name, "runtime.")
 
         self._names_for_identifier[identity] = new_name
+
+        subcontext = ExpressionConversionContext(None)
+
+        if output_type.is_pass_by_ref:
+            outputArg = subcontext.inputArg(output_type, '.return')
+        else:
+            outputArg = None
+
+        inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
+                        else subcontext.pushPod(native_ast.nullExpr, input_types[i])
+                        for i in range(len(input_types))]
 
         native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
 
@@ -144,7 +156,21 @@ class PythonToNativeConverter(object):
             output_type
             )
 
-        self._definitions[new_name] = generatingFunction()
+        generatingFunction(subcontext, outputArg, *inputArgs)
+
+        native_args = [('a_%s' % i, input_types[i].getNativePassingType())
+            for i in range(len(input_types)) if not input_types[i].is_empty]
+        if output_type.is_pass_by_ref:
+            native_args = [('.return', output_type.getNativePassingType())] + native_args
+
+        function = native_ast.Function(
+            args=native_args,
+            output_type=native_ast.Void if output_type.is_pass_by_ref else output_type.getNativeLayoutType(),
+            body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
+            )
+
+        self._definitions[new_name] = function
+
         self._new_native_functions.add(new_name)
 
         return self._targets[new_name]

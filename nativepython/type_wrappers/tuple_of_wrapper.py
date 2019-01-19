@@ -61,31 +61,17 @@ class TupleOfWrapper(RefcountedWrapper):
                     ('destructor', self),
                     [self],
                     typeWrapper(NoneType()),
-                    lambda: self.generateNativeDestructorFunction()
+                    self.generateNativeDestructorFunction
                     )
                 .call(instance.expr)
                 )
 
-    def generateNativeDestructorFunction(self):
-        context = nativepython.expression_conversion_context.ExpressionConversionContext()
-
-        inst = context.inputArg(self, 'input')
-
+    def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(inst.convert_len()) as i:
             inst.convert_getitem_unsafe(i).convert_destroy()
 
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
-            )
-
-        body = native_ast.FunctionBody.Internal(context.finalize(None))
-
-        return native_ast.Function(
-            args=[
-                ('input', self.getNativeLayoutType().pointer())
-                ],
-            body=body,
-            output_type=native_ast.Type.Void()
             )
 
     def convert_bin_op(self, context, left, op, right):
@@ -99,20 +85,13 @@ class TupleOfWrapper(RefcountedWrapper):
                             ('util', self, 'concatenate', right.expr_type),
                             [self, self],
                             self,
-                            lambda: self.generateConcatenateTuple()
+                            self.generateConcatenateTuple
                             ).call(new_tuple.expr, left.expr, right.expr)
                     )
 
         return super().convert_bin_op(context, left, op, right)
 
-    def generateConcatenateTuple(self):
-        out_expr = native_ast.Expression.Variable(name='output')
-        left_expr = native_ast.Expression.Variable(name='left').load()
-        right_expr = native_ast.Expression.Variable(name='right').load()
-
-        #create a native-function expression context
-        context = nativepython.expression_conversion_context.ExpressionConversionContext()
-
+    def generateConcatenateTuple(self, context, out, left, right):
         def elt_ref(tupPtrExpr, iExpr):
             return context.pushReference(
                 self.underlyingWrapperType,
@@ -120,10 +99,6 @@ class TupleOfWrapper(RefcountedWrapper):
                         self.underlyingWrapperType.getNativeLayoutType().pointer()
                         ).elemPtr(iExpr)
                 )
-
-        left = context.inputArg(self, 'left')
-        right = context.inputArg(self, 'right')
-        out = context.inputArg(self, 'output')
 
         left_size = left.convert_len()
         right_size = right.convert_len()
@@ -148,15 +123,6 @@ class TupleOfWrapper(RefcountedWrapper):
 
         with context.loop(right_size) as i:
             out.convert_getitem_unsafe(i+left_size).convert_copy_initialize(right.convert_getitem_unsafe(i))
-
-        return native_ast.Function(
-            args=[('output', self.getNativePassingType()),
-                  ('left', self.getNativePassingType()),
-                  ('right', self.getNativePassingType())
-                  ],
-            output_type=native_ast.Void,
-            body=native_ast.FunctionBody.Internal(context.finalize(None))
-            )
 
     def convert_getitem(self, context, expr, item):
         return context.pushReference(
