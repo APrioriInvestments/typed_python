@@ -412,7 +412,7 @@ class ExpressionConversionContext(object):
 
     def call_py_function(self, f, args, returnTypeOverload=None):
         #force arguments to a type appropriate for argpassing
-        native_args = [a.as_native_call_arg() for a in args]
+        native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
         call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
 
@@ -422,9 +422,10 @@ class ExpressionConversionContext(object):
 
         if call_target.output_type is None:
             #this always throws
-            assert len(call_target.named_call_target.arg_types) == len(args)
+            assert len(call_target.named_call_target.arg_types) == len(native_args)
 
-            call_target.call(*native_args)
+            self.pushTerminal(call_target.call(*native_args))
+            self.pushException(TypeError, "Unreachable code.")
             return
 
         if call_target.output_type.is_pass_by_ref:
@@ -433,7 +434,7 @@ class ExpressionConversionContext(object):
                 )
         else:
             assert call_target.output_type.is_pod
-            assert len(call_target.named_call_target.arg_types) == len(args)
+            assert len(call_target.named_call_target.arg_types) == len(native_args)
 
             return self.pushPod(
                 call_target.output_type,

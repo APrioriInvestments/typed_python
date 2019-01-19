@@ -214,6 +214,82 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(10), 11)
 
+    def test_adding_with_nones_throws(self):
+        @TypedFunction
+        def g():
+            return None + None
+
+        Runtime.singleton().compile(g)
+
+        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+            g()
+
+    def test_exception_before_return_propagated(self):
+        @TypedFunction
+        def g():
+            None+None
+            return None
+
+        Runtime.singleton().compile(g)
+
+        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+            g()
+
+    def test_call_function_with_none(self):
+        @TypedFunction
+        def g(x: None):
+            return None
+
+        Runtime.singleton().compile(g)
+
+        self.assertEqual(g(None), None)
+
+    def test_call_other_function_with_none(self):
+        def f(x):
+            return x
+
+        @TypedFunction
+        def g(x: int):
+            return f(None)
+
+        Runtime.singleton().compile(g)
+
+        self.assertEqual(g(1), None)
+
+    def test_interleaving_nones(self):
+        def f(x,y,z):
+            x+z
+            return y
+
+        @TypedFunction
+        def works(x: int):
+            return f(x,None,x)
+
+        @TypedFunction
+        def throws(x: int):
+            return f(None,None,x)
+
+        Runtime.singleton().compile(works)
+        Runtime.singleton().compile(throws)
+
+        self.assertEqual(works(1), None)
+        with self.assertRaisesRegex(Exception, "Can't apply op Add.. to expressions of type NoneType"):
+            throws(1)
+
+    def test_assign_with_none(self):
+        def f(x):
+            return x
+
+        @TypedFunction
+        def g(x: int):
+            y = f(None)
+            z = y
+            return z
+
+        Runtime.singleton().compile(g)
+
+        self.assertEqual(g(1), None)
+
 
 
 

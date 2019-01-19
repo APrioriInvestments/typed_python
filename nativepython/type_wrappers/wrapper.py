@@ -25,7 +25,8 @@ class Wrapper(object):
     #if so, we can dispense with destructors entirely.
     is_pod = False
 
-    #does this boil down to a void type?
+    #does this boil down to a void type? if so, it will always be excluded
+    #from function argument lists (both in the defeinitions and in calls)
     is_empty = False
 
     #do we pass this as a reference to a stackslot or as registers?
@@ -36,6 +37,9 @@ class Wrapper(object):
 
     def __repr__(self):
         return "Wrapper(%s)" % self.typeRepresentation.__qualname__
+
+    def __str__(self):
+        return self.typeRepresentation.__qualname__
 
     def __init__(self, typeRepresentation):
         super().__init__()
@@ -93,7 +97,7 @@ class Wrapper(object):
 
     def convert_len(self, context, expr):
         return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't take 'len' of instance of type '%s'" % (self,)))
+            generateThrowException(context, TypeError("Can't take 'len' of instance of type '%s'" % (str(self),)))
             )
 
     def convert_unary_op(self, context, expr, op):
@@ -108,9 +112,9 @@ class Wrapper(object):
         if expr.expr_type == self:
             return expr
         return context.pushTerminal(
-            generateThrowException(context, 
+            generateThrowException(context,
                 TypeError("Can't convert from type %s to type %s" % (
-                    expr.expr_type.typeRepresentation.__name__, 
+                    expr.expr_type.typeRepresentation.__name__,
                     self.typeRepresentation.__name__)
                     )
                 )
@@ -121,5 +125,6 @@ class Wrapper(object):
 
     def convert_bin_op_reverse(self, context, r, op, l):
         return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" % (op, l.expr_type, r.expr_type)))
+            generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" %
+                (op, str(l.expr_type), str(r.expr_type))))
             )

@@ -121,7 +121,7 @@ class PythonToNativeConverter(object):
 
         self._names_for_identifier[identity] = new_name
 
-        native_input_types = [t.getNativePassingType() for t in input_types]
+        native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
 
         if output_type.is_pass_by_ref:
             #the first argument is actually the output
@@ -188,15 +188,16 @@ class PythonToNativeConverter(object):
 
         args = []
         for i in range(len(callTarget.input_types)):
-            argtype = callTarget.input_types[i].getNativeLayoutType()
+            if not callTarget.input_types[i].is_empty:
+                argtype = callTarget.input_types[i].getNativeLayoutType()
 
-            untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
+                untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
 
-            if callTarget.input_types[i].is_pass_by_ref:
-                #we've been handed a pointer, and it's already a pointer
-                args.append(untypedPtr.cast(argtype.pointer()))
-            else:
-                args.append(untypedPtr.cast(argtype.pointer()).load())
+                if callTarget.input_types[i].is_pass_by_ref:
+                    #we've been handed a pointer, and it's already a pointer
+                    args.append(untypedPtr.cast(argtype.pointer()))
+                else:
+                    args.append(untypedPtr.cast(argtype.pointer()).load())
 
         if callTarget.output_type is not None and callTarget.output_type.is_pass_by_ref:
             body = callTarget.call(

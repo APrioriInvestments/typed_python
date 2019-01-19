@@ -114,9 +114,10 @@ class FunctionConversionContext(object):
         self._native_args = []
         for i in range(len(self._ast_arg.args)):
             self._varname_to_type[self._ast_arg.args[i].arg] = input_types[i]
-            self._native_args.append((self._ast_arg.args[i].arg, input_types[i].getNativePassingType()))
+            if not input_types[i].is_empty:
+                self._native_args.append((self._ast_arg.args[i].arg, input_types[i].getNativePassingType()))
 
-        self._argnames = [a[0] for a in self._native_args]
+        self._argnames = [a.arg for a in self._ast_arg.args]
 
         if self._star_args_name is not None:
             star_args_count = len(input_types) - len(self._ast_arg.args)
@@ -409,7 +410,11 @@ class FunctionConversionContext(object):
                     raise ConversionException("Couldn't find a type for argument %s" % name)
                 slot_type = self._varname_to_type[name]
 
-                if slot_type is not None:
+                if slot_type.is_empty:
+                    #we don't need to generate a stackslot for this value. Whenever we look it up
+                    #we'll simply make a void expression
+                    pass
+                elif slot_type is not None:
                     context = ExpressionConversionContext(self)
 
                     if slot_type.is_pod:
@@ -444,24 +449,25 @@ class FunctionConversionContext(object):
             if name is not FunctionOutput and name != stararg_name:
                 context = ExpressionConversionContext(self)
 
-                slot_expr = context.named_var_expr(name)
+                if self._varname_to_type[name] is not None:
+                    slot_expr = context.named_var_expr(name)
 
-                with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
-                    with true:
-                        slot_expr.convert_destroy()
+                    with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
+                        with true:
+                            slot_expr.convert_destroy()
 
-                destructors.append(
-                    native_ast.Teardown.Always(
-                        expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                    destructors.append(
+                        native_ast.Teardown.Always(
+                            expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                            )
                         )
-                    )
 
-                if name not in argnames:
-                    #this is a variable in the function that we assigned to. we need to ensure that
-                    #the initializer flag is zero
-                    context = ExpressionConversionContext(self)
-                    context.pushEffect(context.isInitializedVarExpr(name).expr.store(native_ast.falseExpr))
-                    to_add.append(context.finalize(None))
+                    if name not in argnames:
+                        #this is a variable in the function that we assigned to. we need to ensure that
+                        #the initializer flag is zero
+                        context = ExpressionConversionContext(self)
+                        context.pushEffect(context.isInitializedVarExpr(name).expr.store(native_ast.falseExpr))
+                        to_add.append(context.finalize(None))
 
         if to_add:
             expr = native_ast.Expression.Sequence(
