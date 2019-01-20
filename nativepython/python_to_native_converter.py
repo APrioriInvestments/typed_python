@@ -30,6 +30,72 @@ from typed_python import *
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+class NativeFunctionConversionContext:
+    def __init__(self, converter, input_types, output_type, generatingFunction):
+        self.varnames = 0
+        self.converter = converter
+        self._input_types = input_types
+        self._output_type = output_type
+        self._generatingFunction = generatingFunction
+
+    def let_varname(self):
+        self.varnames += 1
+        return ".var_%s" % self.varnames
+
+    def stack_varname(self):
+        return self.let_varname()
+
+    def typesAreUnstable(self):
+        return False
+
+    def resetTypeInstabilityFlag(self):
+        pass
+
+    def convertToNativeFunction(self):
+        return self.getFunction(), self._output_type
+
+    def getFunction(self):
+        subcontext = ExpressionConversionContext(self)
+        output_type = self._output_type
+        input_types = self._input_types
+        generatingFunction = self._generatingFunction
+
+        if output_type.is_pass_by_ref:
+            outputArg = subcontext.inputArg(output_type, '.return')
+        else:
+            outputArg = None
+
+        inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
+                        else subcontext.pushPod(native_ast.nullExpr, input_types[i])
+                        for i in range(len(input_types))]
+
+        native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
+
+        if output_type.is_pass_by_ref:
+            #the first argument is actually the output
+            native_output_type = native_ast.Void
+            native_input_types = [output_type.getNativePassingType()] + native_input_types
+        else:
+            native_output_type = output_type.getNativeLayoutType()
+
+        generatingFunction(subcontext, outputArg, *inputArgs)
+
+        native_args = [('a_%s' % i, input_types[i].getNativePassingType())
+            for i in range(len(input_types)) if not input_types[i].is_empty]
+        if output_type.is_pass_by_ref:
+            native_args = [('.return', output_type.getNativePassingType())] + native_args
+
+        return native_ast.Function(
+            args=native_args,
+            output_type=native_ast.Void if output_type.is_pass_by_ref else output_type.getNativeLayoutType(),
+            body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
+            )
+
+
+
+
+
+
 class TypedCallTarget(object):
     def __init__(self, named_call_target, input_types, output_type):
         super().__init__()
@@ -121,30 +187,25 @@ class PythonToNativeConverter(object):
         new_name = self.new_name(name, "runtime.")
 
         self._names_for_identifier[identity] = new_name
+        self._inflight_function_conversions[identity] = NativeFunctionConversionContext(self, input_types, output_type, generatingFunction)
 
-        subcontext = ExpressionConversionContext(None)
+        self._targets[new_name] = self.getTypedCallTarget(new_name, input_types, output_type)
 
-        if output_type.is_pass_by_ref:
-            outputArg = subcontext.inputArg(output_type, '.return')
-        else:
-            outputArg = None
+        return self._targets[new_name]
 
-        inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
-                        else subcontext.pushPod(native_ast.nullExpr, input_types[i])
-                        for i in range(len(input_types))]
-
-        native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
-
-        if output_type.is_pass_by_ref:
-            #the first argument is actually the output
-            native_output_type = native_ast.Void
+    def getTypedCallTarget(self, name, input_types, output_type):
+        native_input_types = [a.getNativePassingType() for a in input_types if not a.is_empty]
+        if output_type is None:
+            native_output_type = native_ast.Type.Void()
+        elif output_type.is_pass_by_ref:
             native_input_types = [output_type.getNativePassingType()] + native_input_types
+            native_output_type = native_ast.Type.Void()
         else:
             native_output_type = output_type.getNativeLayoutType()
 
-        self._targets[new_name] = TypedCallTarget(
+        return TypedCallTarget(
             native_ast.NamedCallTarget(
-                name=new_name,
+                name=name,
                 arg_types=native_input_types,
                 output_type=native_output_type,
                 external=False,
@@ -155,25 +216,6 @@ class PythonToNativeConverter(object):
             input_types,
             output_type
             )
-
-        generatingFunction(subcontext, outputArg, *inputArgs)
-
-        native_args = [('a_%s' % i, input_types[i].getNativePassingType())
-            for i in range(len(input_types)) if not input_types[i].is_empty]
-        if output_type.is_pass_by_ref:
-            native_args = [('.return', output_type.getNativePassingType())] + native_args
-
-        function = native_ast.Function(
-            args=native_args,
-            output_type=native_ast.Void if output_type.is_pass_by_ref else output_type.getNativeLayoutType(),
-            body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
-            )
-
-        self._definitions[new_name] = function
-
-        self._new_native_functions.add(new_name)
-
-        return self._targets[new_name]
 
     def _callable_to_ast_and_vars(self, f):
         pyast = ast_util.pyAstFor(f)
@@ -271,19 +313,7 @@ class PythonToNativeConverter(object):
 
                 name = self._names_for_identifier[identity]
 
-                self._targets[name] = TypedCallTarget(
-                    native_ast.NamedCallTarget(
-                        name=name,
-                        arg_types=[x[1] for x in nativeFunction.args],
-                        output_type=nativeFunction.output_type,
-                        external=False,
-                        varargs=False,
-                        intrinsic=False,
-                        can_throw=True
-                        ),
-                    functionConverter._input_types,
-                    actual_output_type
-                    )
+                self._targets[name] = self.getTypedCallTarget(name, functionConverter._input_types, actual_output_type)
 
         return repeat or len(self._inflight_function_conversions) != oldCount
 

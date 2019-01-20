@@ -252,15 +252,23 @@ class FunctionConversionContext(object):
 
                 slicing = subcontext.convert_expression_ast(target.value)
                 attr = target.attr
+
                 val_to_store = subcontext.convert_expression_ast(ast.value)
+                if val_to_store is None:
+                    return subcontext.finalize(None), False
 
                 if op is not None:
-                    raise NotImplementedError("Not implemented correctly.")
-                    val_to_store = slicing.convert_attribute(attr).convert_bin_op(op, val_to_store)
+                    input_val = slicing.convert_attribute(attr)
+                    if input_val is None:
+                        return subcontext.finalize(None), False
+
+                    val_to_store = input_val.convert_bin_op(op, val_to_store)
+                    if val_to_store is None:
+                        return subcontext.finalize(None), False
 
                 slicing.convert_set_attribute(attr, val_to_store)
 
-                return subcontext.finalize(None), False
+                return subcontext.finalize(None), True
 
         if ast.matches.Return:
             subcontext = ExpressionConversionContext(self)

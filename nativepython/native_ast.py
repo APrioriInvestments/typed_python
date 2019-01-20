@@ -152,10 +152,27 @@ NamedCallTarget = NamedTuple(
                 can_throw = bool
                 )
 
+def filterCallTargetArgs(args):
+    """Given a list of native expressions or typed expressions, filter them down,
+    dropping 'empty' arguments, as per our calling convention."""
+    res = []
+    for a in args:
+        if isinstance(a, Expression):
+            res.append(a)
+        elif a.expr_type.is_empty:
+            pass
+        else:
+            if a.expr_type.is_pass_by_ref:
+                assert a.isReference
+                res.append(a.expr)
+            else:
+                res.append(a.nonref_expr)
+    return res
+
 CallTarget = Alternative("CallTarget",
     Named = {'target': NamedCallTarget},
     Pointer = {'expr': Expression},
-    call=lambda self, *args: Expression.Call(target=self, args=args)
+    call=lambda self, *args: Expression.Call(target=self, args=filterCallTargetArgs(args))
     )
 
 def teardown_str(self):

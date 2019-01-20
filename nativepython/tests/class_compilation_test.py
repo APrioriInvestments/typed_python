@@ -45,6 +45,26 @@ class AClassWithAnotherClass(Class):
     y = Member(float)
     ac = Member(AClass)
 
+class AClassWithDefaults(Class):
+    x = Member(int, 123)
+    y = Member(int)
+
+class AClassWithInit(Class):
+    x = Member(int)
+    y = Member(float)
+
+    def __init__(self):
+        self.x = 100
+        self.y = 100.0
+
+    def __init__(self, x):
+        self.x = x
+        self.y = 100.0
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
 class TestClassCompilationCompilation(unittest.TestCase):
     def test_class_attribute(self):
         a = AClass(x=10,y=20.5,z=(1,2,3))
@@ -178,6 +198,22 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(compiled_res, uncompiled_res)
 
         print("speedup is ", speedup) #I get about 75
+
+    def test_compile_class_init(self):
+        @Compiled
+        def f(x:int) -> AClassWithInit:
+            return AClassWithInit(x, 22.0)
+
+        self.assertEqual(f(10).x, 10)
+        self.assertEqual(f(10).y, 22.0)
+
+    def test_compile_class_init_with_defaults(self):
+        @Compiled
+        def f() -> AClassWithDefaults:
+            return AClassWithDefaults()
+
+        self.assertEqual(f().x, 123)
+        self.assertEqual(f().y, 0)
 
 
 

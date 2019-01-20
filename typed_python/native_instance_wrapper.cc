@@ -2649,6 +2649,24 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
             PyTuple_SetItem(names, k, namePtr);
         }
 
+        PyObject* defaults = PyDict_New();
+        for (long k = 0; k < classT->getMembers().size(); k++) {
+
+            if (classT->getHeldClass()->memberHasDefaultValue(k)) {
+                const Instance& i = classT->getHeldClass()->getMemberDefaultValue(k);
+
+                PyObject* defaultVal = native_instance_wrapper::extractPythonObject(i.data(), i.type());
+
+                PyDict_SetItemString(
+                    defaults,
+                    classT->getHeldClass()->getMemberName(k).c_str(),
+                    defaultVal
+                    );
+
+                Py_DECREF(defaultVal);
+            }
+        }
+
         PyObject* memberFunctions = PyDict_New();
         for (auto p: classT->getMemberFunctions()) {
             PyDict_SetItemString(memberFunctions, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
@@ -2656,8 +2674,10 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
         }
 
         //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
         PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
         PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
+        PyDict_SetItemString(pyType->tp_dict, "MemberDefaultValues", defaults);
 
         PyDict_SetItemString(pyType->tp_dict, "MemberFunctions", memberFunctions);
 

@@ -861,6 +861,40 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     }
 }
 
+PyObject *is_default_constructible(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "is_default_constructible takes 1 positional argument");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+
+    Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'is_default_constructible' must be a native type object");
+        return NULL;
+    }
+
+    return incref(t->is_default_constructible() ? Py_True : Py_False);
+}
+
+PyObject *wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "wantsToDefaultConstruct takes 1 positional argument");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+
+    Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'wantsToDefaultConstruct' must be a native type object");
+        return NULL;
+    }
+
+    return incref(HeldClass::wantsToDefaultConstruct(t) ? Py_True : Py_False);
+}
+
 PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "bytecount takes 1 positional argument");
@@ -1085,9 +1119,11 @@ static PyMethodDef module_methods[] = {
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
+    {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
+    {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},

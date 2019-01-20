@@ -38,6 +38,15 @@ class PythonObjectOfTypeWrapper(Wrapper):
             runtime_functions.incref_pyobj.call(expr.nonref_expr)
             )
 
+    def convert_default_initialize(self, context, target):
+        if isinstance(None, self.typeRepresentation):
+            target.convert_copy_initialize(
+                TypedExpression(context, self, runtime_functions.get_pyobj_None.call(), False)
+                )
+            return
+
+        context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
+
     def convert_assign(self, context, target, toStore):
         assert target.isReference
 

@@ -11,7 +11,7 @@ const char* nativepython_runtime_get_stashed_exception() {
 
 extern "C" {
 
-    //a temporary kluge to allow us to communicate between exception throw sites and 
+    //a temporary kluge to allow us to communicate between exception throw sites and
     //the native-code invoker until we have a more complete exception model built out.
     void nativepython_runtime_stash_const_char_ptr_for_exception(const char* m) {
         nativepython_cur_exception_value = m;
@@ -20,10 +20,14 @@ extern "C" {
     void nativepython_runtime_incref_pyobj(PyObject* p) {
         Py_INCREF(p);
     }
-    
+
+    PyObject* nativepython_runtime_get_pyobj_None() {
+        return Py_None;
+    }
+
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
         PyObject* res = PyObject_GetAttrString(p, a);
-        
+
         if (!res) {
             PyErr_PrintEx(0);
             throw std::runtime_error("python code threw an exception");
@@ -73,7 +77,7 @@ extern "C" {
                 return -(fmod((-l), (-r)));
             }
             double res = fmod(l, r) + r;
-            if (res - r <= 0.0) 
+            if (res - r <= 0.0)
                 res -= r;
             return res;
         }

@@ -18,7 +18,7 @@ import nativepython.native_ast as native_ast
 
 class PythonTypedFunctionWrapper(Wrapper):
     is_pod = True
-    is_empty = False
+    is_empty = True
     is_pass_by_ref = False
 
     def __init__(self, f):
@@ -45,4 +45,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                     overload.returnType
                     )
 
-        context.pushException(TypeError, "No overload for ", )
+        context.pushException(TypeError, "No overload for %s with args of type (%s)" % (
+            self.typeRepresentation.__qualname__,
+            ",".join([str(x.expr_type) for x in args])
+            ))

@@ -37,17 +37,6 @@ ExpressionIntermediate = Alternative("ExpressionIntermediate",
     StackSlot={"name": str, "expr": native_ast.Expression}
     )
 
-class SimpleFunctionContext:
-    def __init__(self):
-        self.varnames = 0
-
-    def let_varname(self):
-        self.varnames += 1
-        return ".var_%s" % self.varnames
-
-    def stack_varname(self):
-        return self.let_varname()
-
 class ExpressionConversionContext(object):
     """Context class when we're converting a single compound expression.
 
@@ -55,8 +44,8 @@ class ExpressionConversionContext(object):
     evaluation, and provides convenience methods to allow expression generators to stash
     compound expressions and get back simple variable references.
     """
-    def __init__(self, functionContext=None):
-        self.functionContext = functionContext or SimpleFunctionContext()
+    def __init__(self, functionContext):
+        self.functionContext = functionContext
         self.intermediates = []
         self.teardowns = []
 
@@ -76,6 +65,10 @@ class ExpressionConversionContext(object):
         if isinstance(x, float):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False)
         assert False
+
+    def pushVoid(self, type):
+        assert type.is_empty, type
+        return TypedExpression(self, native_ast.nullExpr, type, False)
 
     def pushPod(self, type, expression):
         """stash an expression that generates POD passed as a value"""
@@ -417,7 +410,7 @@ class ExpressionConversionContext(object):
         call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
 
         if call_target is None:
-            self.pushException(TypeError, "Function was not convertible.")
+            self.pushException(TypeError, "Function %s was not convertible." % f.__qualname__)
             return
 
         if call_target.output_type is None:

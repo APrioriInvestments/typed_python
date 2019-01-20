@@ -83,6 +83,9 @@ class TypedExpression(object):
     def convert_assign(self, toStore):
         return self.expr_type.convert_assign(self.context, self, toStore)
 
+    def convert_default_initialize(self):
+        return self.expr_type.convert_default_initialize(self.context, self)
+
     def convert_destroy(self):
         return self.expr_type.convert_destroy(self.context, self)
 

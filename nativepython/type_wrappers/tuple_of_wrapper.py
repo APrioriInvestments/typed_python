@@ -24,10 +24,6 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-def withFreshContext(callback):
-    c = nativepython.expression_conversion_context.ExpressionConversionContext()
-    return c.finalize(callback(c))
-
 class TupleOfWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -63,7 +59,7 @@ class TupleOfWrapper(RefcountedWrapper):
                     typeWrapper(NoneType()),
                     self.generateNativeDestructorFunction
                     )
-                .call(instance.expr)
+                .call(instance)
                 )
 
     def generateNativeDestructorFunction(self, context, out, inst):
@@ -86,7 +82,7 @@ class TupleOfWrapper(RefcountedWrapper):
                             [self, self],
                             self,
                             self.generateConcatenateTuple
-                            ).call(new_tuple.expr, left.expr, right.expr)
+                            ).call(new_tuple, left, right)
                     )
 
         return super().convert_bin_op(context, left, op, right)

@@ -20,6 +20,7 @@ from nativepython.conversion_exception import ConversionException
 from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
+import nativepython
 
 from typed_python import *
 
@@ -56,6 +57,13 @@ pyCompOp = {
 class ArithmeticTypeWrapper(Wrapper):
     is_pod = True
     is_pass_by_ref = False
+
+    def convert_default_initialize(self, context, target):
+        return self.convert_copy_initialize(
+            context,
+            target,
+            nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
+            )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference

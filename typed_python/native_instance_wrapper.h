@@ -148,9 +148,9 @@ struct native_instance_wrapper {
     //we can't convert, then return <false, nullptr>. If we do dispatch, return <true, result or none> and set
     //the python exception if native code returns an exception.
     static std::pair<bool, PyObject*> dispatchFunctionCallToCompiledSpecialization(
-                                                const Function::Overload& overload, 
-                                                const Function::CompiledSpecialization& specialization, 
-                                                PyObject* argTuple, 
+                                                const Function::Overload& overload,
+                                                const Function::CompiledSpecialization& specialization,
+                                                PyObject* argTuple,
                                                 PyObject *kwargs
                                                 );
 

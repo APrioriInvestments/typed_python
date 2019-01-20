@@ -102,6 +102,15 @@ class OneOfWrapper(Wrapper):
         assert r.isReference
         return self.convert_bin_op(context, r, op, l, True)
 
+    def convert_default_initialize(self, context, target):
+        for i,t in enumerate(self.typeRepresentation.Types):
+            if _types.is_default_constructible(t):
+                self.refAs(context, target, i).convert_default_initialize()
+                context.pushEffect(target.expr.ElementPtrIntegers(0,0).store(native_ast.const_uint8_expr(i)))
+                return
+
+        context.pushException(TypeError, "Can't default-initialize any subtypes of %s" % self.typeRepresentation.__qualname__)
+
     def convert_assign(self, context, expr, other):
         assert expr.isReference
 

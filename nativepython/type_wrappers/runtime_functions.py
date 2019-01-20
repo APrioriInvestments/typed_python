@@ -37,56 +37,61 @@ free=externalCallTarget("free", Void, UInt8Ptr)
 malloc=externalCallTarget("malloc", UInt8Ptr, Int64)
 
 stash_exception_ptr = externalCallTarget(
-        "nativepython_runtime_stash_const_char_ptr_for_exception", 
-        Void, 
+        "nativepython_runtime_stash_const_char_ptr_for_exception",
+        Void,
         UInt8Ptr
         )
 
 mod_int64_int64 = externalCallTarget(
-        "nativepython_runtime_mod_int64_int64", 
-        Int64, 
+        "nativepython_runtime_mod_int64_int64",
+        Int64,
         Int64, Int64
         )
 mod_float64_float64 = externalCallTarget(
-        "nativepython_runtime_mod_float64_float64", 
-        Float64, 
+        "nativepython_runtime_mod_float64_float64",
+        Float64,
         Float64, Float64
         )
 pow_int64_int64 = externalCallTarget(
-        "nativepython_runtime_pow_int64_int64", 
-        Int64, 
+        "nativepython_runtime_pow_int64_int64",
+        Int64,
         Int64, Int64
         )
 pow_float64_float64 = externalCallTarget(
-        "nativepython_runtime_pow_float64_float64", 
-        Float64, 
+        "nativepython_runtime_pow_float64_float64",
+        Float64,
         Float64, Float64
         )
+get_pyobj_None = externalCallTarget(
+        "nativepython_runtime_get_pyobj_None",
+        Void,
+        Void.pointer()
+        )
 incref_pyobj = externalCallTarget(
-        "nativepython_runtime_incref_pyobj", 
-        Void, 
+        "nativepython_runtime_incref_pyobj",
+        Void,
         Void.pointer()
         )
 decref_pyobj = externalCallTarget(
-        "nativepython_runtime_decref_pyobj", 
-        Void, 
+        "nativepython_runtime_decref_pyobj",
+        Void,
         Void.pointer()
         )
 getattr_pyobj = externalCallTarget(
-        "nativepython_runtime_getattr_pyobj", 
+        "nativepython_runtime_getattr_pyobj",
         Void.pointer(),
         Void.pointer(),
         UInt8Ptr
         )
 
 int_to_pyobj = externalCallTarget(
-        "nativepython_runtime_int_to_pyobj", 
+        "nativepython_runtime_int_to_pyobj",
         Void.pointer(),
         Int64
         )
 
 pyobj_to_int = externalCallTarget(
-        "nativepython_runtime_pyobj_to_int", 
+        "nativepython_runtime_pyobj_to_int",
         Int64,
         Void.pointer()
         )

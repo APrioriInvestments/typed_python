@@ -32,10 +32,4 @@ class PythonTypeObjectWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, left, args):
-        if len(args) == 1:
-            return args[0].convert_to_type(typeWrapper(self.typeRepresentation))
-
-        return context.TerminalExpr(
-            generateThrowException(context, TypeError("%s() takes at most 1 argument" % (self.typeRepresentation,)))
-            )
-
+        return typeWrapper(self.typeRepresentation).convert_type_call(context, left, args)

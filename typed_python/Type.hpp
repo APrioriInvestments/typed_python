@@ -1954,7 +1954,7 @@ public:
     }
 
     void addCompiledSpecialization(
-                    long whichOverload, 
+                    long whichOverload,
                     compiled_code_entrypoint entrypoint,
                     Type* returnType,
                     const std::vector<Type*>& argTypes
@@ -2111,6 +2111,14 @@ public:
 
     const std::string& getMemberName(int index) const {
         return std::get<0>(m_members[index]);
+    }
+
+    bool memberHasDefaultValue(int index) const {
+        return std::get<2>(m_members[index]).type()->getTypeCategory() != TypeCategory::catNone;
+    }
+
+    const Instance& getMemberDefaultValue(int index) const {
+        return std::get<2>(m_members[index]);
     }
 
     const std::vector<std::tuple<std::string, Type*, Instance> >& getMembers() const {

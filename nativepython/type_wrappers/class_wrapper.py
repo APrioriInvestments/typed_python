@@ -44,6 +44,8 @@ class ClassWrapperBase(RefcountedWrapper):
         #each field packed directly according to byte size
         byteOffset = 8 + (len(self.classType.MemberNames) // 8 + 1)
 
+        self.bytesOfInitBits = byteOffset - 8;
+
         for i,name in enumerate(self.classType.MemberNames):
             self.nameToIndex[name] = i
             self.indexToByteOffset[i] = byteOffset
@@ -162,6 +164,57 @@ class ClassWrapper(ClassWrapperBase):
                         )
 
             return native_ast.nullExpr
+
+    def convert_type_call(self, context, typeInst, args):
+        return context.push(
+            self,
+            lambda new_class:
+                context.converter.defineNativeFunction(
+                    'construct(' + self.typeRepresentation.__name__ + ")(" + ",".join([a.expr_type.typeRepresentation.__name__ for a in args]) + ")",
+                    ('util', self, 'construct', tuple([a.expr_type for a in args])),
+                    [a.expr_type for a in args],
+                    self,
+                    self.generateConstructor
+                    ).call(new_class, *args)
+            )
+
+    def generateConstructor(self, context, out, *args):
+        context.pushEffect(
+            out.expr.store(
+                runtime_functions.malloc.call(native_ast.const_int_expr(_types.bytecount(self.typeRepresentation.HeldClass) + 8))
+                    .cast(self.getNativeLayoutType())
+                ) >>
+            #store a refcount
+            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))
+            )
+
+        #clear bits of init flags
+        for byteOffset in range(self.bytesOfInitBits):
+            context.pushEffect(out.nonref_expr
+                .cast(native_ast.UInt8.pointer())
+                .ElementPtrIntegers(8 + byteOffset).store(native_ast.const_uint8_expr(0))
+                )
+
+        for i in range(len(self.classType.MemberTypes)):
+            if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
+                name = self.classType.MemberNames[i]
+
+                if name in self.classType.MemberDefaultValues:
+                    defVal = self.classType.MemberDefaultValues.get(name)
+                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
+                        nativepython.python_object_representation.pythonObjectRepresentation(context, defVal)
+                        )
+                else:
+                    context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
+                context.pushEffect(self.setIsInitializedExpr(out, i))
+
+        if '__init__' in self.typeRepresentation.MemberFunctions:
+            initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])
+            initFuncType.convert_call(context, context.pushVoid(initFuncType), (out,) + args)
+        else:
+            if len(args):
+                context.pushException(TypeError, "Can't construct a " + self.typeRepresentation.__qualname__ +
+                        " with positional arguments because it doesn't have an __init__")
 
 class BoundMethodWrapper(ClassWrapperBase):
     def convert_call(self, context, left, args):

@@ -86,6 +86,9 @@ class Wrapper(object):
     def convert_assign(self, context, target, toStore):
         raise NotImplementedError(self)
 
+    def convert_default_initialize(self, context, target):
+        raise NotImplementedError(self)
+
     def convert_copy_initialize(self, context, target, toStore):
         raise NotImplementedError(self)
 
@@ -128,3 +131,13 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" %
                 (op, str(l.expr_type), str(r.expr_type))))
             )
+
+    def convert_type_call(self, context, typeInst, args):
+        if len(args) == 1:
+            return args[0].convert_to_type(self)
+
+        return context.pushException(
+            TypeError,
+            "%s() takes at most 1 argument" % str(self)
+            )
+

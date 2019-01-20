@@ -18,7 +18,7 @@ import nativepython.native_ast as native_ast
 
 class PythonFreeFunctionWrapper(Wrapper):
     is_pod = True
-    is_empty = False
+    is_empty = True
     is_pass_by_ref = False
 
     def __init__(self, f):

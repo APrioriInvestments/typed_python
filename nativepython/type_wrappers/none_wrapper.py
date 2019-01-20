@@ -24,6 +24,9 @@ class NoneWrapper(Wrapper):
     def __init__(self):
         super().__init__(NoneType())
 
+    def convert_default_initialize(self, context, target):
+        pass
+
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
