@@ -137,7 +137,7 @@ def autoconfigure_and_start_service_manager(port=None, auth_token=None, loglevel
         loglevel_name = logging.getLevelName(loglevel)
 
     tempDirObj = tempfile.TemporaryDirectory()
-    tempDirectoryName = tempDirObj.__enter__()
+    tempDirectoryName = tempDirObj.name
 
     server = start_service_manager(
         tempDirectoryName,
@@ -156,6 +156,6 @@ def autoconfigure_and_start_service_manager(port=None, auth_token=None, loglevel
                 .format(tempDirectoryName)
             )
         else:
-            tempDirObj.__exit__(None, None, None)
+            tempDirObj.cleanup()
 
     return server, cleanupFn

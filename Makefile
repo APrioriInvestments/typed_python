@@ -43,7 +43,6 @@ lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
 
 .PHONY: docker-build
 docker-build:
-	./build.sh -b
 	rm -rf build
 	rm -rf nativepython.egg-info
 	docker build . -t nativepython/cloud:"$(COMMIT)"

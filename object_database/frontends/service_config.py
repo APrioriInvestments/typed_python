@@ -50,7 +50,7 @@ def _main(argv):
 
     parser.add_argument("--hostname", default=os.getenv("ODB_HOST", "localhost"), required=False)
     parser.add_argument("--port", type=int, default=int(os.getenv("ODB_PORT", 8000)), required=False)
-    parser.add_argument("--auth", type=str, default=os.getenv("ODB_AUTH_TOKEN"), required=False, help="Auth token to use to connect.")
+    parser.add_argument("--auth", type=str, default=os.getenv("ODB_AUTH_TOKEN", ""), required=False, help="Auth token to use to connect.")
 
     subparsers = parser.add_subparsers()
 
