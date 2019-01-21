@@ -1270,7 +1270,7 @@ class ObjectDatabaseTests:
         blocker.releaseCallback()
 
         for e in subscriptionEvents:
-            assert e.wait(timeout=self.PERFORMANCE_FACTOR)
+            assert e.wait(timeout=2.0*self.PERFORMANCE_FACTOR)
 
         with db2.transaction():
             #verify we see the write on c1
