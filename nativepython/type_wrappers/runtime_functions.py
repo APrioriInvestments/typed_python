@@ -95,3 +95,24 @@ pyobj_to_int = externalCallTarget(
         Int64,
         Void.pointer()
         )
+
+string_concat = externalCallTarget(
+        "nativepython_runtime_string_concat",
+        Void.pointer(),
+        Void.pointer(), Void.pointer()
+        )
+string_getitem_int64 = externalCallTarget(
+        "nativepython_runtime_string_getitem_int64",
+        Void.pointer(),
+        Void.pointer(), Int64
+        )
+string_from_utf8_and_len = externalCallTarget(
+        "nativepython_runtime_string_from_utf8_and_len",
+        Void.pointer(),
+        UInt8Ptr, Int64
+        )
+destroy_string = externalCallTarget(
+        "nativepython_runtime_destroy_string",
+        Void,
+        Void.pointer()
+        )

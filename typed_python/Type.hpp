@@ -999,6 +999,23 @@ public:
         m_size = sizeof(void*);
     }
 
+    static int64_t bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length);
+
+    static void decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length);
+
+    //return an increffed layout containing a copy of lhs at the desired number of codepoints
+    static layout* upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint);
+
+    //return an increffed concatenated layouf of lhs and rhs
+    static layout* concatenate(layout* lhs, layout* rhs);
+
+    //return an increffed string containing the one codepoint at 'offset'. this function
+    //will correctly map negative indices, but performs no other boundschecking.
+    static layout* getitem(layout* lhs, int64_t offset);
+
+    //return an increffed string containing the data from the utf-encoded string
+    static layout* createFromUtf8(const char* utfEncodedString, int64_t len);
+
     bool isBinaryCompatibleWithConcrete(Type* other) {
         if (other->getTypeCategory() != m_typeCategory) {
             return false;
@@ -1063,6 +1080,8 @@ public:
     void constructor(instance_ptr self) {
         *(layout**)self = 0;
     }
+
+    static void destroyStatic(instance_ptr self);
 
     void destroy(instance_ptr self);
 

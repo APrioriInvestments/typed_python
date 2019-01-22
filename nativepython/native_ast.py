@@ -380,11 +380,15 @@ Expression = Alternative("Expression",
     __rshift__ = expr_concatenate,
     __str__ = expr_str,
     structElt = lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
+    negate = lambda self: Expression.Unaryop(op=UnaryOp.Negate(), operand=self),
     sub = lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
     add = lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
     mul = lambda self, other: Expression.Binop(op=BinaryOp.Mul(), l=self,r=ensureExpr(other)),
     eq = lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self,r=ensureExpr(other)),
     lt = lambda self, other: Expression.Binop(op=BinaryOp.Lt(), l=self,r=ensureExpr(other)),
+    gt = lambda self, other: Expression.Binop(op=BinaryOp.Gt(), l=self,r=ensureExpr(other)),
+    lte = lambda self, other: Expression.Binop(op=BinaryOp.LtE(), l=self,r=ensureExpr(other)),
+    gte = lambda self, other: Expression.Binop(op=BinaryOp.GtE(), l=self,r=ensureExpr(other)),
     lshift = lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
     rshift = lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
     bitand = lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
@@ -453,6 +457,7 @@ Function = NamedTuple(
     )
 
 Void = Type.Void()
+VoidPtr = Void.pointer()
 Bool = Type.Int(bits=1, signed=False)
 UInt8 = Type.Int(bits=8, signed=False)
 UInt8Ptr = UInt8.pointer()

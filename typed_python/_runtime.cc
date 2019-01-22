@@ -2,6 +2,7 @@
 #include <cmath>
 #include <Python.h>
 #include <iostream>
+#include "Type.hpp"
 
 thread_local const char* nativepython_cur_exception_value = nullptr;
 
@@ -10,6 +11,22 @@ const char* nativepython_runtime_get_stashed_exception() {
 }
 
 extern "C" {
+
+    String::layout* nativepython_runtime_string_concat(String::layout* lhs, String::layout* rhs) {
+        return String::concatenate(lhs, rhs);
+    }
+
+    String::layout* nativepython_runtime_string_getitem_int64(String::layout* lhs, int64_t index) {
+        return String::getitem(lhs, index);
+    }
+
+    String::layout* nativepython_runtime_string_from_utf8_and_len(const char* utf8_str, int64_t len) {
+        return String::createFromUtf8(utf8_str, len);
+    }
+
+    void nativepython_runtime_destroy_string(String::layout* ptr) {
+        free(ptr);
+    }
 
     //a temporary kluge to allow us to communicate between exception throw sites and
     //the native-code invoker until we have a more complete exception model built out.
@@ -103,4 +120,6 @@ extern "C" {
 
         throw std::runtime_error("Couldn't convert to an int64.");
     }
+
+
 }

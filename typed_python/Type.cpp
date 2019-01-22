@@ -1011,6 +1011,225 @@ void ConstDict::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
+String::layout* String::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint) {
+    if (!lhs) {
+        return lhs;
+    }
+
+    if (newBytesPerCodepoint == lhs->bytes_per_codepoint) {
+        lhs->refcount++;
+        return lhs;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + lhs->pointcount * newBytesPerCodepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = newBytesPerCodepoint;
+    new_layout->pointcount = lhs->pointcount;
+
+    if (lhs->bytes_per_codepoint == 1 && new_layout->bytes_per_codepoint == 2) {
+        for (long i = 0; i < lhs->pointcount; i++) {
+            ((uint16_t*)new_layout->data)[i] = ((uint8_t*)lhs->data)[i];
+        }
+    }
+    if (lhs->bytes_per_codepoint == 1 && new_layout->bytes_per_codepoint == 4) {
+        for (long i = 0; i < lhs->pointcount; i++) {
+            ((uint32_t*)new_layout->data)[i] = ((uint8_t*)lhs->data)[i];
+        }
+    }
+    if (lhs->bytes_per_codepoint == 2 && new_layout->bytes_per_codepoint == 4) {
+        for (long i = 0; i < lhs->pointcount; i++) {
+            ((uint32_t*)new_layout->data)[i] = ((uint16_t*)lhs->data)[i];
+        }
+    }
+
+    return new_layout;
+}
+
+String::layout* String::concatenate(layout* lhs, layout* rhs) {
+    if (!rhs && !lhs) {
+        return lhs;
+    }
+    if (!rhs) {
+        lhs->refcount++;
+        return lhs;
+    }
+    if (!lhs) {
+        rhs->refcount++;
+        return rhs;
+    }
+
+    if (lhs->bytes_per_codepoint < rhs->bytes_per_codepoint) {
+        layout* newLayout = upgradeCodePoints(lhs, rhs->bytes_per_codepoint);
+
+        layout* result = concatenate(newLayout, rhs);
+        String::destroyStatic((instance_ptr)&newLayout);
+        return result;
+    }
+
+    if (rhs->bytes_per_codepoint < lhs->bytes_per_codepoint) {
+        layout* newLayout = upgradeCodePoints(rhs, lhs->bytes_per_codepoint);
+
+        layout* result = concatenate(lhs, newLayout);
+        String::destroyStatic((instance_ptr)&newLayout);
+        return result;
+    }
+
+    //they're the same
+    int64_t new_byteCount = sizeof(layout) + (rhs->pointcount + lhs->pointcount) * lhs->bytes_per_codepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
+    new_layout->pointcount = lhs->pointcount + rhs->pointcount;
+
+    memcpy(new_layout->data, lhs->data, lhs->pointcount * lhs->bytes_per_codepoint);
+    memcpy(new_layout->data + lhs->pointcount * lhs->bytes_per_codepoint,
+        rhs->data, rhs->pointcount * lhs->bytes_per_codepoint);
+
+    return new_layout;
+}
+
+String::layout* String::getitem(layout* lhs, int64_t offset) {
+    if (!lhs) {
+        return lhs;
+    }
+
+    if (lhs->pointcount == 1) {
+        lhs->refcount++;
+        return lhs;
+    }
+
+    if (offset < 0) {
+        offset += lhs->pointcount;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + 1 * lhs->bytes_per_codepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = lhs->bytes_per_codepoint;
+    new_layout->pointcount = 1;
+
+    //we could figure out if we can represent this with a smaller encoding.
+    if (new_layout->bytes_per_codepoint == 1) {
+        ((int8_t*)new_layout->data)[0] = ((int8_t*)lhs->data)[offset];
+    }
+    if (new_layout->bytes_per_codepoint == 2) {
+        ((int16_t*)new_layout->data)[0] = ((int16_t*)lhs->data)[offset];
+    }
+    if (new_layout->bytes_per_codepoint == 4) {
+        ((int32_t*)new_layout->data)[0] = ((int32_t*)lhs->data)[offset];
+    }
+
+    return new_layout;
+}
+
+int64_t String::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length) {
+    int64_t bytes_per_codepoint = 1;
+    while (length > 0) {
+        if (utf8Str[0] >> 7 == 0) {
+            //one byte encoded here
+            length -= 1;
+            utf8Str++;
+        }
+
+        if (utf8Str[0] >> 5 == 0b110) {
+            length -= 1;
+            utf8Str+=2;
+            bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
+        }
+
+        if (utf8Str[0] >> 4 == 0b1110) {
+            length -= 1;
+            utf8Str += 3;
+            bytes_per_codepoint = std::max<int64_t>(4, bytes_per_codepoint);
+        }
+
+        if (utf8Str[0] >> 3 == 0b11110) {
+            length -= 1;
+            utf8Str+=4;
+            bytes_per_codepoint = std::max<int64_t>(4, bytes_per_codepoint);
+        }
+    }
+    return bytes_per_codepoint;
+}
+
+template<class T>
+void decodeUtf8ToTyped(T* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length) {
+    while (length > 0) {
+        if ((utf8Str[0] >> 7) == 0) {
+            //one byte encoded here
+            target[0] = utf8Str[0];
+
+            length -= 1;
+            target++;
+            utf8Str++;
+        }
+        else if ((utf8Str[0] >> 5) == 0b110) {
+            target[0] = (uint32_t(utf8Str[0] & 0b11111) << 6) + uint32_t(utf8Str[1] & 0b111111);
+            length -= 1;
+            target++;
+            utf8Str+=2;
+        }
+        else if ((utf8Str[0] >> 4) == 0b1110) {
+            target[0] =
+                (uint32_t(utf8Str[0] & 0b1111) << 12) +
+                (uint32_t(utf8Str[1] & 0b111111) << 6) +
+                 uint32_t(utf8Str[2] & 0b111111);
+            length -= 1;
+            target++;
+            utf8Str+=3;
+        }
+        else if ((utf8Str[0] >> 3) == 0b11110) {
+            target[0] =
+                (uint32_t(utf8Str[0] & 0b111) << 18) +
+                (uint32_t(utf8Str[1] & 0b111111) << 12) +
+                (uint32_t(utf8Str[2] & 0b111111) << 6) +
+                 uint32_t(utf8Str[3] & 0b111111);
+            length -= 1;
+            target++;
+            utf8Str+=4;
+        }
+    }
+}
+
+void String::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length) {
+    if (bytes_per_codepoint == 1) {
+        decodeUtf8ToTyped(target, utf8Str, bytes_per_codepoint, length);
+    }
+    if (bytes_per_codepoint == 2) {
+        decodeUtf8ToTyped((uint16_t*)target, utf8Str, bytes_per_codepoint, length);
+    }
+    if (bytes_per_codepoint == 4) {
+        decodeUtf8ToTyped((uint32_t*)target, utf8Str, bytes_per_codepoint, length);
+    }
+}
+
+String::layout* String::createFromUtf8(const char* utfEncodedString, int64_t length) {
+    int64_t bytes_per_codepoint = bytesPerCodepointRequiredForUtf8((uint8_t*)utfEncodedString, length);
+
+    int64_t new_byteCount = sizeof(layout) + length * bytes_per_codepoint;
+
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = bytes_per_codepoint;
+    new_layout->pointcount = length;
+
+    if (bytes_per_codepoint == 1) {
+        memcpy(new_layout->data, utfEncodedString, length);
+    } else {
+        decodeUtf8To((uint8_t*)new_layout->data, (uint8_t*)utfEncodedString, bytes_per_codepoint, length);
+    }
+
+    return new_layout;
+}
+
 int32_t String::hash32(instance_ptr left) {
     if (!(*(layout**)left)) {
         return 0x12345;
@@ -1138,6 +1357,10 @@ int64_t String::count(instance_ptr self) const {
 }
 
 void String::destroy(instance_ptr self) {
+    destroyStatic(self);
+}
+
+void String::destroyStatic(instance_ptr self) {
     if (!*(layout**)self) {
         return;
     }
