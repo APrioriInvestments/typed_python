@@ -11,6 +11,7 @@ from nativepython.type_wrappers.class_wrapper import ClassWrapper, BoundMethodWr
 from nativepython.type_wrappers.len_wrapper import LenWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.type_wrappers.string_wrapper import StringWrapper
+from nativepython.type_wrappers.bytes_wrapper import BytesWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from typed_python._types import TypeFor
 from typed_python import *
@@ -44,6 +45,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t is String():
         return StringWrapper()
+
+    if t is Bytes():
+        return BytesWrapper()
 
     if t.__typed_python_category__ == "Class":
         return ClassWrapper(t)
@@ -107,6 +111,8 @@ def pythonObjectRepresentation(context, f):
             )
     if isinstance(f, str):
         return StringWrapper().constant(context, f)
+    if isinstance(f, bytes):
+        return BytesWrapper().constant(context, f)
 
     if isinstance(f, type(pythonObjectRepresentation)):
         return TypedExpression(

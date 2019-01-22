@@ -17,7 +17,7 @@ from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, Int64, String
+from typed_python import NoneType, Int64, Bytes
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -26,13 +26,13 @@ from nativepython.native_ast import VoidPtr
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-class StringWrapper(RefcountedWrapper):
+class BytesWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
 
     def __init__(self):
-        super().__init__(String())
+        super().__init__(Bytes())
 
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
@@ -49,9 +49,9 @@ class StringWrapper(RefcountedWrapper):
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
             if op.matches.Add:
-                return context.push(str, lambda strRef:
-                    strRef.expr.store(
-                        runtime_functions.string_concat.call(
+                return context.push(bytes, lambda bytesRef:
+                    bytesRef.expr.store(
+                        runtime_functions.bytes_concat.call(
                             left.nonref_expr.cast(VoidPtr),
                             right.nonref_expr.cast(VoidPtr)
                             ).cast(self.layoutType)
@@ -67,13 +67,17 @@ class StringWrapper(RefcountedWrapper):
 
         with context.ifelse((item.nonref_expr.lt(len_expr.nonref_expr.negate())).bitor(item.nonref_expr.gte(len_expr.nonref_expr))) as (true,false):
             with true:
-                context.pushException(IndexError, "string index out of range")
+                context.pushException(IndexError, "index out of range")
 
-        return context.push(str, lambda strRef:
-            strRef.expr.store(
-                runtime_functions.string_getitem_int64.call(expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr)
-                    .cast(self.layoutType)
-                )
+        return context.pushPod(
+            int,
+            expr.nonref_expr.ElementPtrIntegers(0,1).elemPtr(
+                native_ast.Expression.Branch(
+                    cond=item.nonref_expr.lt(native_ast.const_int_expr(0)),
+                    false=item.nonref_expr,
+                    true=item.nonref_expr.add(len_expr.nonref_expr)
+                    ).add(native_ast.const_int_expr(8))
+                ).load().cast(native_ast.Int64)
             )
 
     def convert_len_native(self, expr):
@@ -87,10 +91,10 @@ class StringWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        return context.push(str, lambda strRef:
-            strRef.expr.store(
-                runtime_functions.string_from_utf8_and_len.call(
-                    native_ast.const_utf8_cstr(s),
+        return context.push(bytes, lambda bytesRef:
+            bytesRef.expr.store(
+                runtime_functions.bytes_from_ptr_and_len.call(
+                    native_ast.const_bytes_cstr(s),
                     native_ast.const_int_expr(len(s))
                     ).cast(self.layoutType)
                 )

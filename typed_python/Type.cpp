@@ -1479,6 +1479,41 @@ char Bytes::cmp(instance_ptr left, instance_ptr right) {
     return 0;
 }
 
+Bytes::layout* Bytes::concatenate(layout* lhs, layout* rhs) {
+    if (!rhs && !lhs) {
+        return lhs;
+    }
+    if (!rhs) {
+        lhs->refcount++;
+        return lhs;
+    }
+    if (!lhs) {
+        rhs->refcount++;
+        return rhs;
+    }
+
+    layout* new_layout = (layout*)malloc(sizeof(layout) + rhs->bytecount + lhs->bytecount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = lhs->bytecount + rhs->bytecount;
+
+    memcpy(new_layout->data, lhs->data, lhs->bytecount);
+    memcpy(new_layout->data + lhs->bytecount, rhs->data, rhs->bytecount);
+
+    return new_layout;
+}
+
+Bytes::layout* Bytes::createFromPtr(const char* data, int64_t length) {
+    layout* new_layout = (layout*)malloc(sizeof(layout) + length);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytecount = length;
+
+    memcpy(new_layout->data, data, length);
+
+    return new_layout;
+}
+
 void Bytes::constructor(instance_ptr self, int64_t count, const char* data) const {
     if (count == 0) {
         *(layout**)self = nullptr;

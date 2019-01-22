@@ -24,8 +24,12 @@ extern "C" {
         return String::createFromUtf8(utf8_str, len);
     }
 
-    void nativepython_runtime_destroy_string(String::layout* ptr) {
-        free(ptr);
+    Bytes::layout* nativepython_runtime_bytes_concat(Bytes::layout* lhs, Bytes::layout* rhs) {
+        return Bytes::concatenate(lhs, rhs);
+    }
+
+    Bytes::layout* nativepython_runtime_bytes_from_ptr_and_len(const char* utf8_str, int64_t len) {
+        return Bytes::createFromPtr(utf8_str, len);
     }
 
     //a temporary kluge to allow us to communicate between exception throw sites and

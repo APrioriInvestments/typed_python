@@ -111,8 +111,14 @@ string_from_utf8_and_len = externalCallTarget(
         Void.pointer(),
         UInt8Ptr, Int64
         )
-destroy_string = externalCallTarget(
-        "nativepython_runtime_destroy_string",
-        Void,
-        Void.pointer()
+
+bytes_concat = externalCallTarget(
+        "nativepython_runtime_bytes_concat",
+        Void.pointer(),
+        Void.pointer(), Void.pointer()
+        )
+bytes_from_ptr_and_len = externalCallTarget(
+        "nativepython_runtime_bytes_from_ptr_and_len",
+        Void.pointer(),
+        UInt8Ptr, Int64
         )

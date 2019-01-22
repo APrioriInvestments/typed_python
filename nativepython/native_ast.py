@@ -444,6 +444,10 @@ def const_utf8_cstr(i):
     return Expression.Constant(
         val=Constant.ByteArray(val=i.encode('utf-8'))
         )
+def const_bytes_cstr(i):
+    return Expression.Constant(
+        val=Constant.ByteArray(val=i)
+        )
 
 FunctionBody = Alternative("FunctionBody",
     Internal = {'body': Expression},

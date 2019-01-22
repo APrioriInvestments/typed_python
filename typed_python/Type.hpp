@@ -1006,7 +1006,7 @@ public:
     //return an increffed layout containing a copy of lhs at the desired number of codepoints
     static layout* upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint);
 
-    //return an increffed concatenated layouf of lhs and rhs
+    //return an increffed concatenated layout of lhs and rhs
     static layout* concatenate(layout* lhs, layout* rhs);
 
     //return an increffed string containing the one codepoint at 'offset'. this function
@@ -1131,6 +1131,12 @@ public:
             buffer.read_bytes(eltPtr(self,0), ct);
         }
     }
+
+    //return an increffed concatenated layout of lhs and rhs
+    static layout* concatenate(layout* lhs, layout* rhs);
+
+    //return an increffed bytes object containing a pointer to the requisite bytes
+    static layout* createFromPtr(const char* data, int64_t len);
 
     void _forwardTypesMayHaveChanged() {}
 
