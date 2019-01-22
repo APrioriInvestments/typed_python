@@ -101,6 +101,11 @@ string_concat = externalCallTarget(
         Void.pointer(),
         Void.pointer(), Void.pointer()
         )
+string_cmp = externalCallTarget(
+        "nativepython_runtime_string_cmp",
+        Int64,
+        Void.pointer(), Void.pointer()
+        )
 string_getitem_int64 = externalCallTarget(
         "nativepython_runtime_string_getitem_int64",
         Void.pointer(),

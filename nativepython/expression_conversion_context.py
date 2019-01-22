@@ -258,6 +258,36 @@ class ExpressionConversionContext(object):
 
         return Scope()
 
+    def whileLoop(self, conditionExpr):
+        if isinstance(conditionExpr, TypedExpression):
+            conditionExpr = conditionExpr.nonref_expr
+
+        class Scope:
+            def __init__(scope):
+                scope.intermediates = None
+                scope.teardowns = None
+
+            def __enter__(scope):
+                scope.intermediates = self.intermediates
+                scope.teardowns = self.teardowns
+                self.intermediates = []
+                self.teardowns = []
+
+            def __exit__(scope, *args):
+                result = self.finalize(None)
+                self.intermediates = scope.intermediates
+                self.teardowns = scope.teardowns
+
+                self.pushEffect(
+                    native_ast.Expression.While(
+                        cond=conditionExpr,
+                        while_true=
+                            result,
+                        orelse=native_ast.nullExpr
+                        )
+                    )
+        return Scope()
+
     def loop(self, countExpr):
         class Scope:
             def __init__(scope):

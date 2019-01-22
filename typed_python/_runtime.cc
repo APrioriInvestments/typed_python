@@ -12,6 +12,10 @@ const char* nativepython_runtime_get_stashed_exception() {
 
 extern "C" {
 
+    int64_t nativepython_runtime_string_cmp(String::layout* lhs, String::layout* rhs) {
+        return String::cmpStatic(lhs, rhs);
+    }
+
     String::layout* nativepython_runtime_string_concat(String::layout* lhs, String::layout* rhs) {
         return String::concatenate(lhs, rhs);
     }

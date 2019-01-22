@@ -1067,6 +1067,8 @@ public:
 
     char cmp(instance_ptr left, instance_ptr right);
 
+    static char cmpStatic(layout* left, layout* right);
+
     void constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const;
 
     void repr(instance_ptr self, std::ostringstream& stream);

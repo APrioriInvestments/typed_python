@@ -798,7 +798,8 @@ class FunctionConverter:
             with self.builder.if_else(cond_llvm) as (then, otherwise):
                 with then:
                     true = self.convert(expr.while_true)
-                    self.builder.branch(loop_block)
+                    if true is not None:
+                        self.builder.branch(loop_block)
 
                 with otherwise:
                     false = self.convert(expr.orelse)

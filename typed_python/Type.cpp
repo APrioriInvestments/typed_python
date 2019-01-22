@@ -1247,42 +1247,73 @@ int32_t String::hash32(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
+template<class T1, class T2>
+char typedArrayCompare(T1* l, T2* r, size_t count) {
+    for (size_t i = 0; i < count; i++) {
+        uint32_t lv = l[i];
+        uint32_t rv = r[i];
+        if (lv < rv) {
+            return -1;
+        }
+        if (lv > rv) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 char String::cmp(instance_ptr left, instance_ptr right) {
-    if ( !(*(layout**)left) && !(*(layout**)right) ) {
+    return cmpStatic(*(layout**)left, *(layout**)right);
+}
+
+char String::cmpStatic(layout* left, layout* right) {
+    if ( !left && !right ) {
         return 0;
     }
-    if ( !(*(layout**)left) && (*(layout**)right) ) {
+    if ( !left && right ) {
         return -1;
     }
-    if ( (*(layout**)left) && !(*(layout**)right) ) {
+    if ( left && !right ) {
         return 1;
     }
 
-    if (bytes_per_codepoint(left) < bytes_per_codepoint(right)) {
-        return -1;
+    int bytesPerLeft = left->bytes_per_codepoint;
+    int bytesPerRight = right->bytes_per_codepoint;
+    int commonCount = std::min(left->pointcount, right->pointcount);
+
+    char res = 0;
+
+    if (bytesPerLeft == 1 && bytesPerRight == 1) {
+        res = byteCompare(left->data, right->data, bytesPerLeft * commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint16_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint32_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint8_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint16_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint32_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint8_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint16_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint32_t*)right->data, commonCount);
+    } else {
+        throw std::runtime_error("Nonsensical bytes-per-codepoint");
     }
-
-    if (bytes_per_codepoint(left) > bytes_per_codepoint(right)) {
-        return 1;
-    }
-
-    int bytesPer = bytes_per_codepoint(right);
-
-    char res = byteCompare(
-        eltPtr(left, 0),
-        eltPtr(right, 0),
-        bytesPer * std::min(count(left), count(right))
-        );
 
     if (res) {
         return res;
     }
 
-    if (count(left) < count(right)) {
+    if (left->pointcount < right->pointcount) {
         return -1;
     }
 
-    if (count(left) > count(right)) {
+    if (left->pointcount > right->pointcount) {
         return 1;
     }
 

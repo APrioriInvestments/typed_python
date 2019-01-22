@@ -76,6 +76,40 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(s+s2, concat(s,s2))
                 self.assertEqual(len(s+s2), concatLen(s,s2))
 
+    def test_string_comparison(self):
+        @Compiled
+        def lt(x: str, y: str):
+            return x < y
+
+        @Compiled
+        def lte(x: str, y: str):
+            return x <= y
+
+        @Compiled
+        def gte(x: str, y: str):
+            return x >= y
+
+        @Compiled
+        def gt(x: str, y: str):
+            return x > y
+
+        @Compiled
+        def eq(x: str, y: str):
+            return x == y
+
+        @Compiled
+        def neq(x: str, y: str):
+            return x != y
+
+        for s in someStrings:
+            for s2 in someStrings:
+                self.assertEqual(eq(s,s2),s==s2)
+                self.assertEqual(neq(s,s2),s!=s2)
+                self.assertEqual(gte(s,s2),s>=s2)
+                self.assertEqual(lte(s,s2),s<=s2)
+                self.assertEqual(gt(s,s2),s>s2)
+                self.assertEqual(lt(s,s2),s<s2)
+
     def test_string_constants(self):
         def makeConstantConcatenator(s):
             def returner():
