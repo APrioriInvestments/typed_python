@@ -502,9 +502,8 @@ class ExpressionConversionContext(object):
                 return pythonObjectRepresentation(self, __builtins__[ast.id])
 
             if ast.id not in self.functionContext._varname_to_type:
-                raise ConversionException(
-                    "can't find variable %s"  % ast.id
-                    )
+                self.pushException(NameError, "name '%s' is not defined" % ast.id)
+                return None
 
         if ast.matches.Num:
             if ast.n.matches.None_:

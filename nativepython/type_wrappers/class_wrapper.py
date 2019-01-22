@@ -26,7 +26,7 @@ import nativepython
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
-class ClassWrapperBase(RefcountedWrapper):
+class ClassWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -36,7 +36,7 @@ class ClassWrapperBase(RefcountedWrapper):
 
         self.nameToIndex = {}
         self.indexToByteOffset = {}
-        self.classType = t if t.__typed_python_category__ == "Class" else t.Class
+        self.classType = t
 
         element_types = [('refcount', native_ast.Int64), ('data',native_ast.UInt8)]
 
@@ -58,6 +58,18 @@ class ClassWrapperBase(RefcountedWrapper):
         return self.layoutType
 
     def on_refcount_zero(self, context, instance):
+        return (
+            context.converter.defineNativeFunction(
+                "destructor_" + str(self.typeRepresentation),
+                ('destructor', self),
+                [self],
+                typeWrapper(NoneType()),
+                self.generateNativeDestructorFunction
+                )
+            .call(instance)
+            )
+
+    def generateNativeDestructorFunction(self, context, out, instance):
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
                 with context.ifelse(context.pushPod(bool,self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
@@ -68,9 +80,6 @@ class ClassWrapperBase(RefcountedWrapper):
 
         context.pushEffect(runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr)))
 
-        return native_ast.nullExpr
-
-class ClassWrapper(ClassWrapperBase):
     def memberPtr(self, instance, ix):
         return (
             instance.nonref_expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])
@@ -106,6 +115,7 @@ class ClassWrapper(ClassWrapperBase):
     def convert_attribute(self, context, instance, attribute, nocheck=False):
         if attribute in self.typeRepresentation.MemberFunctions:
             methodType = typeWrapper(_types.BoundMethod(self.typeRepresentation, self.typeRepresentation.MemberFunctions[attribute]))
+
             return instance.changeType(methodType)
 
         if not isinstance(attribute, int):
@@ -215,19 +225,6 @@ class ClassWrapper(ClassWrapperBase):
             if len(args):
                 context.pushException(TypeError, "Can't construct a " + self.typeRepresentation.__qualname__ +
                         " with positional arguments because it doesn't have an __init__")
-
-class BoundMethodWrapper(ClassWrapperBase):
-    def convert_call(self, context, left, args):
-        clsType = typeWrapper(self.typeRepresentation.Class)
-        funcType = typeWrapper(self.typeRepresentation.Function)
-
-        return funcType.convert_call(
-            context,
-            context.pushPod(funcType, native_ast.nullExpr),
-            (left.changeType(clsType),) + tuple(args)
-            )
-
-
 
 
 

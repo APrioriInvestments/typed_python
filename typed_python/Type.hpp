@@ -1361,6 +1361,8 @@ public:
 
     int64_t which(instance_ptr self) const;
 
+    int64_t refcount(instance_ptr self) const;
+
     void constructor(instance_ptr self);
 
     void destroy(instance_ptr self);
@@ -1455,6 +1457,10 @@ public:
     }
 
     void constructor(instance_ptr self);
+
+    int64_t refcount(instance_ptr self) const {
+        return m_alternative->refcount(self);
+    }
 
     //returns an uninitialized object of type-index 'which'
     template<class subconstructor>
@@ -2317,43 +2323,44 @@ private:
     HeldClass* m_heldClass;
 };
 
-class BoundMethod : public Class {
+class BoundMethod : public Type {
 public:
-    BoundMethod(Class* inClass, Function* inFunc) : Class(inClass->getHeldClass())
+    BoundMethod(Type* inFirstArg, Function* inFunc) : Type(TypeCategory::catBoundMethod)
     {
-        m_typeCategory = TypeCategory::catBoundMethod;
         m_function = inFunc;
-        m_class = inClass;
+        m_is_default_constructible = false;
+        m_first_arg = inFirstArg;
+
         forwardTypesMayHaveChanged();
     }
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
-        visitor(m_class);
+        visitor(m_first_arg);
     }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        Type* c = m_class;
+        Type* c = m_first_arg;
         Type* f = m_function;
 
         visitor(c);
         visitor(f);
 
-        assert(c == m_class);
+        assert(c == m_first_arg);
         assert(f == m_function);
     }
 
     void _forwardTypesMayHaveChanged() {
-        m_name = "BoundMethod(" + m_class->name() + "." + m_function->name() + ")";
+        m_name = "BoundMethod(" + m_first_arg->name() + "." + m_function->name() + ")";
     }
 
-    static BoundMethod* Make(Class* c, Function* f) {
+    static BoundMethod* Make(Type* c, Function* f) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<Class*, Function*> keytype;
+        typedef std::pair<Type*, Function*> keytype;
 
         static std::map<keytype, BoundMethod*> m;
 
@@ -2372,8 +2379,38 @@ public:
         stream << m_name;
     }
 
-    Class* getClass() const {
-        return m_class;
+    int32_t hash32(instance_ptr left) {
+        return m_first_arg->hash32(left);
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer) {
+        m_first_arg->deserialize(self,buffer);
+    }
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer) {
+        m_first_arg->serialize(self,buffer);
+    }
+
+    char cmp(instance_ptr left, instance_ptr right) {
+        return m_first_arg->cmp(left,right);
+    }
+
+    void destroy(instance_ptr self) {
+        m_first_arg->destroy(self);
+    }
+
+    void copy_constructor(instance_ptr self, instance_ptr other) {
+        m_first_arg->copy_constructor(self, other);
+    }
+
+    void assign(instance_ptr self, instance_ptr other) {
+        m_first_arg->assign(self, other);
+    }
+
+    Type* getFirstArgType() const {
+        return m_first_arg;
     }
 
     Function* getFunction() const {
@@ -2382,7 +2419,7 @@ public:
 
 private:
     Function* m_function;
-    Class* m_class;
+    Type* m_first_arg;
 };
 
 

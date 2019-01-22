@@ -724,7 +724,9 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (!actualType || (
             actualType->getTypeCategory() != Type::TypeCategory::catTupleOf &&
             actualType->getTypeCategory() != Type::TypeCategory::catClass &&
-            actualType->getTypeCategory() != Type::TypeCategory::catConstDict
+            actualType->getTypeCategory() != Type::TypeCategory::catConstDict &&
+            actualType->getTypeCategory() != Type::TypeCategory::catAlternative &&
+            actualType->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
             )) {
         PyErr_Format(
             PyExc_TypeError,
@@ -749,6 +751,16 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (actualType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         return PyLong_FromLong(
             ((::ConstDict*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
+            );
+    }
+    if (actualType->getTypeCategory() == Type::TypeCategory::catAlternative) {
+        return PyLong_FromLong(
+            ((::Alternative*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
+            );
+    }
+    if (actualType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        return PyLong_FromLong(
+            ((::ConcreteAlternative*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
             );
     }
 
@@ -876,6 +888,28 @@ PyObject *is_default_constructible(PyObject* nullValue, PyObject* args) {
     }
 
     return incref(t->is_default_constructible() ? Py_True : Py_False);
+}
+
+PyObject *all_alternatives_empty(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "all_alternatives_empty takes 1 positional argument");
+        return NULL;
+    }
+    PyObject* a1 = PyTuple_GetItem(args, 0);
+
+    Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(a1);
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'all_alternatives_empty' must be a native type object");
+        return NULL;
+    }
+
+    if (t->getTypeCategory() != Type::TypeCategory::catAlternative) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'all_alternatives_empty' must be an Alternative");
+        return NULL;
+    }
+
+    return incref(((Alternative*)t)->all_alternatives_empty() ? Py_True : Py_False);
 }
 
 PyObject *wantsToDefaultConstruct(PyObject* nullValue, PyObject* args) {
@@ -1124,6 +1158,7 @@ static PyMethodDef module_methods[] = {
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
+    {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},

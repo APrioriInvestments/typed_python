@@ -7,7 +7,10 @@ from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFu
 from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
-from nativepython.type_wrappers.class_wrapper import ClassWrapper, BoundMethodWrapper
+from nativepython.type_wrappers.class_wrapper import ClassWrapper
+from nativepython.type_wrappers.tuple_wrapper import TupleWrapper, NamedTupleWrapper
+from nativepython.type_wrappers.alternative_wrapper import makeAlternativeWrapper
+from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.len_wrapper import LenWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.type_wrappers.string_wrapper import StringWrapper
@@ -51,6 +54,18 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "Class":
         return ClassWrapper(t)
+
+    if t.__typed_python_category__ == "Alternative":
+        return makeAlternativeWrapper(t)
+
+    if t.__typed_python_category__ == "ConcreteAlternative":
+        return makeAlternativeWrapper(t)
+
+    if t.__typed_python_category__ == "NamedTuple":
+        return NamedTupleWrapper(t)
+
+    if t.__typed_python_category__ == "Tuple":
+        return TupleWrapper(t)
 
     if t.__typed_python_category__ == "Function":
         return PythonTypedFunctionWrapper(t)

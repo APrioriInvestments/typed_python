@@ -290,6 +290,14 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(g(1), None)
 
+    def test_nonexistent_variable(self):
+        @Compiled
+        def f():
+            return this_variable_name_is_undefined
+
+        with self.assertRaisesRegex(Exception, "name 'this_variable_name_is_undefined' is not defined"):
+            f()
+
 
 
 

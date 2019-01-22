@@ -2028,7 +2028,7 @@ PyObject* native_instance_wrapper::tp_call(PyObject* o, PyObject* args, PyObject
         BoundMethod* methodType = (BoundMethod*)self_type;
 
         Function* f = methodType->getFunction();
-        Class* c = methodType->getClass();
+        Type* c = methodType->getFirstArgType();
 
         PyObject* objectInstance = native_instance_wrapper::initializePythonRepresentation(c, [&](instance_ptr d) {
             c->copy_constructor(d, w->dataPtr());
@@ -2631,7 +2631,7 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
     if (inType->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
         BoundMethod* methodT = (BoundMethod*)inType;
 
-        PyDict_SetItemString(pyType->tp_dict, "Class", typePtrToPyTypeRepresentation(methodT->getClass()));
+        PyDict_SetItemString(pyType->tp_dict, "FirstArgType", typePtrToPyTypeRepresentation(methodT->getFirstArgType()));
         PyDict_SetItemString(pyType->tp_dict, "Function", typePtrToPyTypeRepresentation(methodT->getFunction()));
     }
 

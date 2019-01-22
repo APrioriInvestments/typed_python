@@ -1605,6 +1605,13 @@ bool Alternative::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
+int64_t Alternative::refcount(instance_ptr i) const {
+    if (m_all_alternatives_empty) {
+        return 0;
+    }
+    return ((layout**)i)[0]->refcount;
+}
+
 void Alternative::_forwardTypesMayHaveChanged() {
     m_size = sizeof(void*);
 
