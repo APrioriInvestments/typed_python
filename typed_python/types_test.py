@@ -1124,3 +1124,13 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             a.HasOne(a.HasTwo(a='1',b='b'))
+
+    def test_recursive_classes_repr(self):
+        class ASelfRecursiveClass(Class):
+            x = Member(OneOf(None, lambda: ASelfRecursiveClass))
+
+        a = ASelfRecursiveClass()
+        a.x = a
+
+        print(repr(a))
+

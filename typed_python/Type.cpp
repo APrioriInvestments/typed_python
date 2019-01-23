@@ -1,6 +1,6 @@
 #include "Type.hpp"
 
-void Type::repr(instance_ptr self, std::ostringstream& out) {
+void Type::repr(instance_ptr self, ReprAccumulator& out) {
     assertForwardsResolved();
 
     this->check([&](auto& subtype) {
@@ -196,7 +196,7 @@ std::string OneOf::computeName() const {
     return res;
 }
 
-void OneOf::repr(instance_ptr self, std::ostringstream& stream) {
+void OneOf::repr(instance_ptr self, ReprAccumulator& stream) {
     m_types[*((uint8_t*)self)]->repr(self+1, stream);
 }
 
@@ -349,7 +349,7 @@ char CompositeType::cmp(instance_ptr left, instance_ptr right) {
     return 0;
 }
 
-void CompositeType::repr(instance_ptr self, std::ostringstream& stream) {
+void CompositeType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "(";
 
     for (long k = 0; k < getTypes().size();k++) {
@@ -448,7 +448,14 @@ bool TupleOf::isBinaryCompatibleWithConcrete(Type* other) {
     return m_element_type->isBinaryCompatibleWith(otherO->m_element_type);
 }
 
-void TupleOf::repr(instance_ptr self, std::ostringstream& stream) {
+void TupleOf::repr(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
     stream << "(";
 
     int32_t ct = count(self);
@@ -641,7 +648,14 @@ ConstDict* ConstDict::Make(Type* key, Type* value) {
     return it->second;
 }
 
-void ConstDict::repr(instance_ptr self, std::ostringstream& stream) {
+void ConstDict::repr(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
     stream << "{";
 
     int32_t ct = count(self);
@@ -1338,7 +1352,7 @@ void String::constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t
     }
 }
 
-void String::repr(instance_ptr self, std::ostringstream& stream) {
+void String::repr(instance_ptr self, ReprAccumulator& stream) {
     //as if it were bytes, which is totally wrong...
     stream << "\"";
     long bytes = count(self);
@@ -1430,7 +1444,7 @@ bool Bytes::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
-void Bytes::repr(instance_ptr self, std::ostringstream& stream) {
+void Bytes::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "b" << "'";
     long bytes = count(self);
     uint8_t* base = eltPtr(self,0);
@@ -1701,7 +1715,14 @@ char Alternative::cmp(instance_ptr left, instance_ptr right) {
     return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data);
 }
 
-void Alternative::repr(instance_ptr self, std::ostringstream& stream) {
+void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
     stream << m_subtypes[which(self)].first;
     m_subtypes[which(self)].second->repr(eltPtr(self), stream);
 }
@@ -1903,7 +1924,7 @@ PythonSubclass* PythonSubclass::Make(Type* base, PyTypeObject* pyType) {
     return it->second;
 }
 
-void PythonObjectOfType::repr(instance_ptr self, std::ostringstream& stream) {
+void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     PyObject* p = *(PyObject**)self;
 
     PyObject* o = PyObject_Repr(p);
@@ -2043,7 +2064,14 @@ char HeldClass::cmp(instance_ptr left, instance_ptr right) {
     return 0;
 }
 
-void HeldClass::repr(instance_ptr self, std::ostringstream& stream) {
+void HeldClass::repr(instance_ptr self, ReprAccumulator& stream) {
+    PushReprState isNew(stream, self);
+
+    if (!isNew) {
+        stream << m_name << "(" << (void*)self << ")";
+        return;
+    }
+
     stream << m_name << "(";
 
     for (long k = 0; k < m_members.size();k++) {
@@ -2225,7 +2253,7 @@ char Class::cmp(instance_ptr left, instance_ptr right) {
     return m_heldClass->cmp(l.data,r.data);
 }
 
-void Class::repr(instance_ptr self, std::ostringstream& stream) {
+void Class::repr(instance_ptr self, ReprAccumulator& stream) {
     layout& l = **(layout**)self;
     m_heldClass->repr(l.data, stream);
 }

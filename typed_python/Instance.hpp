@@ -152,8 +152,10 @@ public:
 
     std::string repr() const {
         std::ostringstream s;
-        s << std::showpoint;
-        mLayout->type->repr(mLayout->data, s);
+        ReprAccumulator accumulator(s);
+
+        accumulator << std::showpoint;
+        mLayout->type->repr(mLayout->data, accumulator);
         return s.str();
     }
 

@@ -2548,9 +2548,11 @@ PyObject* native_instance_wrapper::tp_repr(PyObject *o) {
     native_instance_wrapper* w = (native_instance_wrapper*)o;
 
     std::ostringstream str;
+    ReprAccumulator accumulator(str);
+
     str << std::showpoint;
 
-    self_type->repr(w->dataPtr(), str);
+    self_type->repr(w->dataPtr(), accumulator);
 
     return PyUnicode_FromString(str.str().c_str());
 }

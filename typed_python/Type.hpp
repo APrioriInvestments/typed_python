@@ -12,7 +12,7 @@
 #include <utility>
 #include <atomic>
 #include <iostream>
-#include <sstream>
+#include "ReprAccumulator.hpp"
 #include "SerializationContext.hpp"
 #include "HashAccumulator.hpp"
 #include "SerializationBuffer.hpp"
@@ -123,7 +123,7 @@ public:
         return this;
     }
 
-    void repr(instance_ptr self, std::ostringstream& out);
+    void repr(instance_ptr self, ReprAccumulator& out);
 
     char cmp(instance_ptr left, instance_ptr right);
 
@@ -508,7 +508,7 @@ public:
         m_types[*((uint8_t*)self)]->serialize(self+1, buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -587,7 +587,7 @@ public:
         }
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -735,7 +735,7 @@ public:
         });
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -857,7 +857,7 @@ public:
         incKvPairCount(self, ct);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -970,7 +970,7 @@ public:
     void serialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream) {
         stream << "None";
     }
 };
@@ -1071,7 +1071,7 @@ public:
 
     void constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const;
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     instance_ptr eltPtr(instance_ptr self, int64_t i) const;
 
@@ -1111,7 +1111,7 @@ public:
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
@@ -1196,7 +1196,7 @@ public:
         return mInstance.hash32();
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream) {
         mInstance.type()->repr(mInstance.data(), stream);
     }
 
@@ -1355,7 +1355,7 @@ public:
         m_subtypes[w].second->deserialize(record.data, buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -1440,7 +1440,7 @@ public:
         return m_alternative->hash32(left);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream) {
         m_alternative->repr(self,stream);
     }
 
@@ -1567,7 +1567,7 @@ public:
         m_base->deserialize(self,buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream) {
         m_base->repr(self,stream);
     }
 
@@ -1657,7 +1657,7 @@ public:
          *(PyObject**)self = buffer.getContext().deserializePythonObject(buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     char cmp(instance_ptr left, instance_ptr right);
 
@@ -1954,7 +1954,7 @@ public:
     void serialize(instance_ptr self, buf_t& buffer) {
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream) {
         stream << "<function " << m_name << ">";
     }
 
@@ -2092,7 +2092,7 @@ public:
         }
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -2258,7 +2258,7 @@ public:
         m_heldClass->serialize(l.data, buffer);
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream);
+    void repr(instance_ptr self, ReprAccumulator& stream);
 
     int32_t hash32(instance_ptr left);
 
@@ -2377,7 +2377,7 @@ public:
         return it->second;
     }
 
-    void repr(instance_ptr self, std::ostringstream& stream) {
+    void repr(instance_ptr self, ReprAccumulator& stream) {
         stream << m_name;
     }
 
