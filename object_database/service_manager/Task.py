@@ -15,10 +15,12 @@
 import logging
 import os
 import traceback
+import threading
 import time
 
 import object_database
 
+from object_database.web import cells as cells
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.Codebase import Codebase
@@ -168,6 +170,17 @@ class TaskService(ServiceBase):
                 with self.db.transaction():
                     self.workerObject.hasTask = False
 
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        cells.ensureSubscribedType(TaskStatus, lazy=True)
+
+        return cells.Card(
+            cells.Subscribed(lambda: cells.Text("Total Tasks: %s" % len(TaskStatus.lookupAll()))) +
+            cells.Subscribed(lambda: cells.Text("Working Tasks: %s" % len(TaskStatus.lookupAll(state='Working')))) +
+            cells.Subscribed(lambda: cells.Text("WaitingForSubtasks Tasks: %s" % len(TaskStatus.lookupAll(state='WaitForSubtasks')))) +
+            cells.Subscribed(lambda: cells.Text("Unassigned Tasks: %s" % len(TaskStatus.lookupAll(state='Unassigned'))))
+            )
+
     def doTask(self, taskStatus):
         with self.db.view():
             task = taskStatus.task
@@ -266,7 +279,7 @@ class TaskService(ServiceBase):
 
 class TaskDispatchService(ServiceBase):
     coresUsed = 1
-    gbRamUsed = 8
+    gbRamUsed = 4
 
     def initialize(self):
         self.logger = logging.getLogger(__name__)
@@ -305,14 +318,35 @@ class TaskDispatchService(ServiceBase):
             deleteWorker(d)
 
     def doWork(self, shouldStop):
-        while not shouldStop.is_set():
-            try:
-                self.checkForDeadWorkers()
+        def checkForDeadWorkersLoop():
+            while not shouldStop.is_set():
+                try:
+                    self.checkForDeadWorkers()
+                    time.sleep(5.0)
+                except Exception:
+                    self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
 
-                if self.assignWork() + self.collectResults() == 0:
-                    shouldStop.wait(timeout=.01)
-            except Exception:
-                self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
+        def assignLoop():
+            while not shouldStop.is_set():
+                try:
+                    if self.assignWork():
+                        shouldStop.wait(timeout=.01)
+                except Exception:
+                    self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
+
+        def collectLoop():
+            while not shouldStop.is_set():
+                try:
+                    if self.collectResults():
+                        shouldStop.wait(timeout=.01)
+                except Exception:
+                    self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
+
+        threads = [threading.Thread(target=t) for t in [checkForDeadWorkersLoop, assignLoop, collectLoop]]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
 
     @revisionConflictRetry
     def assignWork(self):

@@ -58,7 +58,8 @@ class ServiceManager(object):
         self.thread.join()
 
     @staticmethod
-    def createOrUpdateService(serviceClass, serviceName, target_count=None, placement=None, isSingleton=None):
+    def createOrUpdateService(serviceClass, serviceName, target_count=None, placement=None, isSingleton=None,
+                              coresUsed=None, gbRamUsed=None):
         service = service_schema.Service.lookupAny(name=serviceName)
 
         if not service:
@@ -82,6 +83,12 @@ class ServiceManager(object):
 
         if placement is not None:
             service.placement = placement
+
+        if coresUsed is not None:
+            service.coresUsed = coresUsed
+
+        if gbRamUsed is not None:
+            service.gbRamUsed = gbRamUsed
 
         return service
 
