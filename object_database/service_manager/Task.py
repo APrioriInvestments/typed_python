@@ -37,8 +37,9 @@ class ResourceScope:
 
 class TaskContext(object):
     """Placeholder for information about the current running task environment passed into tasks."""
-    def __init__(self, db, codebase):
+    def __init__(self, db, storageRoot, codebase):
         self.db = db
+        self.storageRoot = storageRoot
         self.codebase = codebase
 
 class RunningTask(object):
@@ -86,6 +87,8 @@ TaskResult = Alternative("TaskResult",
 @task_schema.define
 class Task:
     service = Indexed(service_schema.Service)
+    service_and_finished = Index('service', 'finished')
+
     resourceScope = Indexed(OneOf(None, ResourceScope))
     executor = TaskExecutor
     parent = OneOf(None, task_schema.Task)
@@ -216,7 +219,8 @@ class TaskService(ServiceBase):
                 instanceState = executor.instantiate()
 
             t0 = time.time()
-            execResult = instanceState.execute(TaskContext(self.db, codebase), subtask_results)
+            context = TaskContext(self.db, self.runtimeConfig.serviceTemporaryStorageRoot, codebase)
+            execResult = instanceState.execute(context, subtask_results)
             logging.info("Executed task %s with state %s producing result %s", task, instanceState, execResult)
 
             assert isinstance(execResult, TaskStatusResult), execResult
