@@ -22,8 +22,11 @@ import logging
 
 from typed_python.SerializationContext import SerializationContext
 
-_lock = threading.Lock()
+import object_database, typed_python
+
+_lock = threading.RLock()
 _root_level_module_codebase_cache = {}
+_coreSerializationContext = [None]
 
 class Codebase:
     """Represents a bundle of code and objects on disk somewhere.
@@ -35,7 +38,9 @@ class Codebase:
         filesToContents = filesToContents
         self.modules = modules
 
-        self.serializationContext = SerializationContext.FromModules(modules.values())
+        self.serializationContext = Codebase.coreSerializationContext().union(
+            SerializationContext.FromModules(modules.values())
+            )
 
     def getModuleByName(self, module_name):
         if module_name not in self.modules:
@@ -45,6 +50,23 @@ class Codebase:
     def getClassByName(self, qualifiedName):
         modulename, classname = qualifiedName.rsplit(".")
         return getattr(self.getModuleByName(modulename), classname)
+
+    @staticmethod
+    def coreSerializationContext():
+        with _lock:
+            if _coreSerializationContext[0] is None:
+                allModules = []
+
+                context1 = SerializationContext.FromModules(
+                    Codebase.walkModuleDiskRepresentation(typed_python)[2].values()
+                    )
+                context2 = SerializationContext.FromModules(
+                    Codebase.walkModuleDiskRepresentation(object_database)[2].values()
+                    )
+
+                _coreSerializationContext[0] = context1.union(context2)
+
+            return _coreSerializationContext[0]
 
     @staticmethod
     def FromRootlevelModule(module):
@@ -64,32 +86,41 @@ class Codebase:
 
             assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
 
-            dirpart = os.path.dirname(module.__file__)
-            root, moduleDir = os.path.split(dirpart)
+            root,files,modules = Codebase.walkModuleDiskRepresentation(module, prefix)
 
-            files = {}
+            codebase = Codebase(root, files, modules)
 
-            def walkDisk(path, so_far):
-                for name in os.listdir(path):
-                    fullpath = os.path.join(path, name)
-                    so_far_with_name = os.path.join(so_far, name) if so_far else name
-                    if os.path.isdir(fullpath):
-                        walkDisk(fullpath, so_far_with_name)
-                    else:
-                        if os.path.splitext(name)[1] == ".py":
-                            with open(fullpath, "r") as f:
-                                contents = f.read()
-
-                            files[so_far_with_name] = contents
-
-            walkDisk(os.path.abspath(dirpart), moduleDir)
-
-            modules_by_name = Codebase.filesToModuleNames(files, prefix)
-            modules = Codebase.importModulesByName(modules_by_name)
-
-            _root_level_module_codebase_cache[module] = Codebase(root, files, modules)
+            _root_level_module_codebase_cache[module] = codebase
 
             return _root_level_module_codebase_cache[module]
+
+
+    @staticmethod
+    def walkModuleDiskRepresentation(module, prefix=None):
+        dirpart = os.path.dirname(module.__file__)
+        root, moduleDir = os.path.split(dirpart)
+
+        files = {}
+
+        def walkDisk(path, so_far):
+            for name in os.listdir(path):
+                fullpath = os.path.join(path, name)
+                so_far_with_name = os.path.join(so_far, name) if so_far else name
+                if os.path.isdir(fullpath):
+                    walkDisk(fullpath, so_far_with_name)
+                else:
+                    if os.path.splitext(name)[1] == ".py":
+                        with open(fullpath, "r") as f:
+                            contents = f.read()
+
+                        files[so_far_with_name] = contents
+
+        walkDisk(os.path.abspath(dirpart), moduleDir)
+
+        modules_by_name = Codebase.filesToModuleNames(files, prefix)
+        modules = Codebase.importModulesByName(modules_by_name)
+
+        return root, files, modules
 
     @staticmethod
     def filesToModuleNames(files, prefix=None):

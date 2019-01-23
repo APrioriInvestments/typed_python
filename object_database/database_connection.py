@@ -428,16 +428,6 @@ class TransactionListener:
 
         self._queue.put(changed)
 
-_coreSerializationContext = [None]
-def coreSerializationContext():
-    if _coreSerializationContext[0] is None:
-        context1 = TypedPythonCodebase.FromRootlevelModule(object_database).serializationContext
-        context2 = TypedPythonCodebase.FromRootlevelModule(typed_python).serializationContext
-
-        _coreSerializationContext[0] = context1.union(context2)
-
-    return _coreSerializationContext[0]
-
 class DatabaseConnection:
     def __init__(self, channel):
         self._channel = channel
@@ -488,7 +478,7 @@ class DatabaseConnection:
 
         self._largeSubscriptionHeartbeatDelay = 0
 
-        self.serializationContext = coreSerializationContext()
+        self.serializationContext = TypedPythonCodebase.coreSerializationContext()
 
         self._logger = logging.getLogger(__name__)
 
@@ -497,7 +487,7 @@ class DatabaseConnection:
 
     def setSerializationContext(self, context):
         assert isinstance(context, SerializationContext), context
-        self.serializationContext = coreSerializationContext().union(context)
+        self.serializationContext = context
         return self
 
     def serializeFromModule(self, module):
@@ -505,7 +495,6 @@ class DatabaseConnection:
         self.setSerializationContext(
             TypedPythonCodebase.FromRootlevelModule(module).serializationContext
             )
-
 
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()

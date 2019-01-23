@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import numpy
 import sys
 import os
 import importlib
@@ -963,9 +962,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         pytz = dummy_test_module.pytz
         self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
-
-        with self.assertRaisesRegex(Exception, "Cannot serialize module 'threading"):
-            sc.serialize(threading)
 
     def test_serialize_lambdas_with_references_in_list_comprehensions(self):
         codebase = Codebase.FromModule(dummy_test_module)
