@@ -2041,24 +2041,13 @@ void HeldClass::_forwardTypesMayHaveChanged() {
 }
 
 char HeldClass::cmp(instance_ptr left, instance_ptr right) {
-    for (long k = 0; k < m_members.size(); k++) {
-        bool leftInit = checkInitializationFlag(left,k);
-        bool rightInit = checkInitializationFlag(right,k);
-
-        if (leftInit && !rightInit) {
-            return 1;
-        }
-
-        if (rightInit && !leftInit) {
-            return -1;
-        }
-
-        if (leftInit && rightInit) {
-            char res = std::get<1>(m_members[k])->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
-            if (res != 0) {
-                return res;
-            }
-        }
+    uint64_t leftPtr = *(uint64_t*)left;
+    uint64_t rightPtr = *(uint64_t*)right;
+    if (leftPtr < rightPtr) {
+        return -1;
+    }
+    if (leftPtr > rightPtr) {
+        return 1;
     }
 
     return 0;
@@ -2097,16 +2086,8 @@ void HeldClass::repr(instance_ptr self, ReprAccumulator& stream) {
 int32_t HeldClass::hash32(instance_ptr left) {
     Hash32Accumulator acc((int)getTypeCategory());
 
-    for (long k = 0; k < m_members.size();k++) {
-        if (checkInitializationFlag(left,k)) {
-            acc.add(1);
-            acc.add(std::get<1>(m_members[k])->hash32(eltPtr(left,k)));
-        } else {
-            acc.add(0);
-        }
-    }
-
-    acc.add(m_members.size());
+    //hash the class pointer, since the values within the class can change.
+    acc.addRegister(*(uint64_t*)left);
 
     return acc.get();
 }

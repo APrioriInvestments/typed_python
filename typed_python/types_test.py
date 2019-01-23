@@ -1132,5 +1132,10 @@ class NativeTypesTests(unittest.TestCase):
         a = ASelfRecursiveClass()
         a.x = a
 
+        b = ASelfRecursiveClass()
+        b.x = b
+
+        a < b
+
         print(repr(a))
 
