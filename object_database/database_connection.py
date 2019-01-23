@@ -552,6 +552,7 @@ class DatabaseConnection:
             self.addSchema(type(t).__schema__)
         self.subscribeMultiple([
             (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity), False)
+                for t in objects
             ])
 
     def _lazinessForType(self, typeObj, desiredLaziness):
@@ -633,6 +634,7 @@ class DatabaseConnection:
                     e = self._pendingSubscriptions[(tup[0], tup[1], tup[2])] = threading.Event()
 
                 assert tup[0] and tup[1]
+
                 self._channel.write(
                     ClientToServer.Subscribe(schema=tup[0], typename=tup[1], fieldname_and_value=tup[2], isLazy=tup[3])
                     )

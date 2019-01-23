@@ -136,6 +136,24 @@ class ObjectDatabaseTests:
         with db.view():
             z = ThingWithDicts.lookupAll()
 
+    def test_subscribe_to_objects(self):
+        db1 = self.createNewDb()
+        db1.subscribeToSchema(schema)
+
+        db2 = self.createNewDb()
+
+        with db1.transaction():
+            someThings = [Counter(k=i) for i in range(10)]
+
+        db2.subscribeToObjects(someThings[::2])
+
+        with db2.view():
+            for i in range(10):
+                if i % 2 == 0:
+                    self.assertTrue(someThings[i].exists())
+                else:
+                    self.assertFalse(someThings[i].exists())
+
     def test_serialization_contexts(self):
         db = self.createNewDb()
 
