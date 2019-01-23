@@ -141,7 +141,7 @@ class TaskWorker:
 
 class TaskService(ServiceBase):
     coresUsed = 1
-    gbRamUsed = 0
+    gbRamUsed = 8
 
     def initialize(self):
         self.db.subscribeToNone(TaskWorker)
