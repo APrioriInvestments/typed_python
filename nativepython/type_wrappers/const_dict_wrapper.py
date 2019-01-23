@@ -97,6 +97,27 @@ class ConstDictWrapper(RefcountedWrapper):
                 .cast(self.valueType.getNativeLayoutType().pointer())
             )
 
+    def convert_bin_op_reverse(self, context, left, op, right):
+        if op.matches.In or op.matches.NotIn:
+            right = right.convert_to_type(self.keyType)
+            if right is None:
+                return None
+
+            native_contains = context.converter.defineNativeFunction(
+                    "dict_contains" + str(self.typeRepresentation),
+                    ('dict_contains', self),
+                    [self, self.keyType],
+                    bool,
+                    self.generateContains()
+                    )
+
+            if op.matches.In:
+                return context.pushPod(bool, native_contains.call(left, right))
+            else:
+                return context.pushPod(bool, native_contains.call(left, right).logical_not())
+
+        return super().convert_bin_op(context,left,op,right)
+
     def convert_getitem(self, context, instance, item):
         item = item.convert_to_type(self.keyType)
         if item is None:
@@ -107,7 +128,7 @@ class ConstDictWrapper(RefcountedWrapper):
                 ('dict_getitem', self),
                 [self, self.keyType],
                 self.valueType,
-                self.generateGetitem
+                self.generateGetitem()
                 )
 
         if self.valueType.is_pass_by_ref:
@@ -122,42 +143,55 @@ class ConstDictWrapper(RefcountedWrapper):
                 lambda output:
                     output.expr.store(native_getitem.call(instance, item))
                 )
+    def generateGetitem(self):
+        return self.generateLookupFun(False)
 
-    def generateGetitem(self, context, out, inst, key):
-        #a linear scan for now.
-        lowIx = context.push(int, lambda x: x.expr.store(native_ast.const_int_expr(0)))
-        highIx = context.push(int, lambda x: x.expr.store(self.convert_len_native(inst.nonref_expr)))
+    def generateContains(self):
+        return self.generateLookupFun(True)
 
-        with context.whileLoop(lowIx.nonref_expr.lt(highIx.nonref_expr)):
-            mid = context.pushPod(int, lowIx.nonref_expr.add(highIx.nonref_expr).div(2))
+    def generateLookupFun(self, containmentOnly):
+        def f(context, out, inst, key):
+            #a linear scan for now.
+            lowIx = context.push(int, lambda x: x.expr.store(native_ast.const_int_expr(0)))
+            highIx = context.push(int, lambda x: x.expr.store(self.convert_len_native(inst.nonref_expr)))
 
-            isLt = key < self.convert_getkey_by_index_unsafe(context, inst, mid)
-            isEq = key == self.convert_getkey_by_index_unsafe(context, inst, mid)
+            with context.whileLoop(lowIx.nonref_expr.lt(highIx.nonref_expr)):
+                mid = context.pushPod(int, lowIx.nonref_expr.add(highIx.nonref_expr).div(2))
 
-            if isLt is not None and isEq is not None:
-                with context.ifelse(isEq.nonref_expr) as (true, false):
-                    with true:
-                        result = self.convert_getvalue_by_index_unsafe(context, inst, mid)
+                isLt = key < self.convert_getkey_by_index_unsafe(context, inst, mid)
+                isEq = key == self.convert_getkey_by_index_unsafe(context, inst, mid)
 
-                        if out is not None:
-                            context.pushEffect(
-                                out.convert_copy_initialize(result)
-                                )
-                            context.pushTerminal(
-                                native_ast.Expression.Return(arg=None)
-                                )
+                if isLt is not None and isEq is not None:
+                    with context.ifelse(isEq.nonref_expr) as (true, false):
+                        if containmentOnly:
+                            with true:
+                                context.pushTerminal(native_ast.Expression.Return(arg=native_ast.const_bool_expr(True)))
                         else:
-                            context.pushTerminal(
-                                native_ast.Expression.Return(arg=result.nonref_expr)
-                                )
+                            with true:
+                                result = self.convert_getvalue_by_index_unsafe(context, inst, mid)
 
-                with context.ifelse(isLt.nonref_expr) as (true, false):
-                    with true:
-                        context.pushEffect(highIx.expr.store(mid.nonref_expr))
-                    with false:
-                        context.pushEffect(lowIx.expr.store(mid.nonref_expr.add(1)))
+                                if out is not None:
+                                    context.pushEffect(
+                                        out.convert_copy_initialize(result)
+                                        )
+                                    context.pushTerminal(
+                                        native_ast.Expression.Return(arg=None)
+                                        )
+                                else:
+                                    context.pushTerminal(
+                                        native_ast.Expression.Return(arg=result.nonref_expr)
+                                        )
 
-        context.pushException(KeyError, "Can't find key")
+                    with context.ifelse(isLt.nonref_expr) as (true, false):
+                        with true:
+                            context.pushEffect(highIx.expr.store(mid.nonref_expr))
+                        with false:
+                            context.pushEffect(lowIx.expr.store(mid.nonref_expr.add(1)))
+            if containmentOnly:
+                context.pushTerminal(native_ast.Expression.Return(arg=native_ast.const_bool_expr(False)))
+            else:
+                context.pushException(KeyError, "Can't find key")
+        return f
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(

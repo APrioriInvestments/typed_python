@@ -380,6 +380,8 @@ Expression = Alternative("Expression",
     __rshift__ = expr_concatenate,
     __str__ = expr_str,
     structElt = lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
+    logical_not = lambda self: Expression.Unaryop(op=UnaryOp.LogicalNot(), operand=self),
+    bitwise_not = lambda self: Expression.Unaryop(op=UnaryOp.BitwiseNot(), operand=self),
     negate = lambda self: Expression.Unaryop(op=UnaryOp.Negate(), operand=self),
     sub = lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
     add = lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
@@ -440,6 +442,11 @@ def const_int32_expr(i):
 def const_uint8_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=8,val=i,signed=False)
+        )
+
+def const_bool_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=1,val=i,signed=False)
         )
 
 def const_utf8_cstr(i):

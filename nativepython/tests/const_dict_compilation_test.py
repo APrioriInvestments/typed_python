@@ -86,6 +86,23 @@ class TestConstDictCompilation(unittest.TestCase):
             for key in bigger_d:
                 self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d,key)))
 
+    def test_const_dict_contains(self):
+        for dtype in dictTypes:
+            @Compiled
+            def compiledIn(x: dtype, y: dtype.KeyType):
+                return y in x
+
+            @Compiled
+            def compiledNotIn(x: dtype, y: dtype.KeyType):
+                return y not in x
+
+            d = makeSomeValues(dtype, 10)
+            bigger_d = makeSomeValues(dtype, 20)
+
+            for key in bigger_d:
+                self.assertEqual(key in d, compiledIn(d,key))
+                self.assertEqual(key not in d, compiledNotIn(d,key))
+
     def test_const_dict_loops(self):
         def loop(x: ConstDict(int,int)):
             res = 0
@@ -116,7 +133,6 @@ class TestConstDictCompilation(unittest.TestCase):
         #because most of the time is spent in the dictionary lookup, and python's
         #dict lookup is quite fast.
         self.assertGreater(speedup, 2)
-
 
 
 

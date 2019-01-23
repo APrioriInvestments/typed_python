@@ -179,6 +179,9 @@ class PythonToNativeConverter(object):
 
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
         """
+        output_type = typeWrapper(output_type)
+        input_types = [typeWrapper(x) for x in input_types]
+
         identity = ("native", identity)
 
         if identity in self._names_for_identifier:
