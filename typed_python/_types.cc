@@ -17,7 +17,7 @@
 thread_local int64_t native_dispatch_disabled = false;
 
 
-PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
+PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
         types.push_back(
@@ -35,10 +35,20 @@ PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(TupleOf::Make(types[0]));
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(
+        isTuple ? (TupleOrListOf*)TupleOf::Make(types[0]) : (TupleOrListOf*)ListOf::Make(types[0])
+        );
 
     Py_INCREF(typeObj);
     return typeObj;
+}
+
+PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
+    return MakeTupleOrListOfType(nullValue, args, true);
+}
+
+PyObject *MakeListOfType(PyObject* nullValue, PyObject* args) {
+    return MakeTupleOrListOfType(nullValue, args, false);
 }
 
 PyObject *MakeTupleType(PyObject* nullValue, PyObject* args) {
@@ -723,6 +733,7 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     if (!actualType || (
             actualType->getTypeCategory() != Type::TypeCategory::catTupleOf &&
+            actualType->getTypeCategory() != Type::TypeCategory::catListOf &&
             actualType->getTypeCategory() != Type::TypeCategory::catClass &&
             actualType->getTypeCategory() != Type::TypeCategory::catConstDict &&
             actualType->getTypeCategory() != Type::TypeCategory::catAlternative &&
@@ -739,6 +750,12 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (actualType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
         return PyLong_FromLong(
             ((::TupleOf*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
+            );
+    }
+
+    if (actualType->getTypeCategory() == Type::TypeCategory::catListOf) {
+        return PyLong_FromLong(
+            ((::ListOf*)actualType)->refcount(((native_instance_wrapper*)a1)->dataPtr())
             );
     }
 
@@ -1140,6 +1157,7 @@ static PyMethodDef module_methods[] = {
     {"String", (PyCFunction)MakeStringType, METH_VARARGS, NULL},
     {"Bytes", (PyCFunction)MakeBytesType, METH_VARARGS, NULL},
     {"TupleOf", (PyCFunction)MakeTupleOfType, METH_VARARGS, NULL},
+    {"ListOf", (PyCFunction)MakeListOfType, METH_VARARGS, NULL},
     {"Tuple", (PyCFunction)MakeTupleType, METH_VARARGS, NULL},
     {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"OneOf", (PyCFunction)MakeOneOfType, METH_VARARGS, NULL},

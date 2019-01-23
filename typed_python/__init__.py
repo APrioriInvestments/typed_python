@@ -19,7 +19,7 @@ from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
 from typed_python._types import (
-	TupleOf, Tuple, NamedTuple, OneOf, ConstDict,
+	TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
 	Alternative, Value, serialize, deserialize, Int8,
 	Bool, Int16, Int32, Int64, UInt8, UInt32, UInt64,
 	Float32, Float64, NoneType, String, Bytes

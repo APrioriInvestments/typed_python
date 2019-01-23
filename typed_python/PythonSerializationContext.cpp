@@ -429,6 +429,11 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
         return;
     }
 
+    if (nativeType->getTypeCategory() == Type::TypeCategory::catListOf) {
+        serializeNativeType(((ListOf*)nativeType)->getEltType(), b);
+        return;
+    }
+
     if (nativeType->getTypeCategory() == Type::TypeCategory::catTuple) {
         b.write_uint32(((CompositeType*)nativeType)->getTypes().size());
         for (auto t: ((CompositeType*)nativeType)->getTypes()) {
@@ -565,6 +570,12 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
 
     if (category == Type::TypeCategory::catTupleOf) {
         return ::TupleOf::Make(
+            deserializeNativeType(b)
+            );
+    }
+
+    if (category == Type::TypeCategory::catListOf) {
+        return ::ListOf::Make(
             deserializeNativeType(b)
             );
     }

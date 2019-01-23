@@ -438,7 +438,7 @@ void Tuple::_forwardTypesMayHaveChanged() {
     m_name += ")";
 }
 
-bool TupleOf::isBinaryCompatibleWithConcrete(Type* other) {
+bool TupleOrListOf::isBinaryCompatibleWithConcrete(Type* other) {
     if (other->getTypeCategory() != m_typeCategory) {
         return false;
     }
@@ -448,15 +448,20 @@ bool TupleOf::isBinaryCompatibleWithConcrete(Type* other) {
     return m_element_type->isBinaryCompatibleWith(otherO->m_element_type);
 }
 
-void TupleOf::repr(instance_ptr self, ReprAccumulator& stream) {
+void TupleOrListOf::repr(instance_ptr self, ReprAccumulator& stream) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
-        stream << m_name << "(" << (void*)self << ")";
+        if (m_is_tuple) {
+            stream << m_name << "(" << (void*)self << ")";
+        } else {
+            stream << m_name << "[" << (void*)self << "]";
+        }
+
         return;
     }
 
-    stream << "(";
+    stream << (m_is_tuple ? "(" : "[");
 
     int32_t ct = count(self);
 
@@ -468,10 +473,10 @@ void TupleOf::repr(instance_ptr self, ReprAccumulator& stream) {
         m_element_type->repr(eltPtr(self,k),stream);
     }
 
-    stream << ")";
+    stream << (m_is_tuple ? ")" : "]");
 }
 
-int32_t TupleOf::hash32(instance_ptr left) {
+int32_t TupleOrListOf::hash32(instance_ptr left) {
     if (!(*(layout**)left)) {
         return 0x123;
     }
@@ -495,7 +500,7 @@ int32_t TupleOf::hash32(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
-char TupleOf::cmp(instance_ptr left, instance_ptr right) {
+char TupleOrListOf::cmp(instance_ptr left, instance_ptr right) {
     if (!(*(layout**)left) && (*(layout**)right)) {
         return -1;
     }
@@ -550,7 +555,23 @@ TupleOf* TupleOf::Make(Type* elt) {
     return it->second;
 }
 
-instance_ptr TupleOf::eltPtr(instance_ptr self, int64_t i) const {
+// static
+ListOf* ListOf::Make(Type* elt) {
+    static std::mutex guard;
+
+    std::lock_guard<std::mutex> lock(guard);
+
+    static std::map<Type*, ListOf*> m;
+
+    auto it = m.find(elt);
+    if (it == m.end()) {
+        it = m.insert(std::make_pair(elt, new ListOf(elt))).first;
+    }
+
+    return it->second;
+}
+
+instance_ptr TupleOrListOf::eltPtr(instance_ptr self, int64_t i) const {
     if (!(*(layout**)self)) {
         return self;
     }
@@ -558,7 +579,7 @@ instance_ptr TupleOf::eltPtr(instance_ptr self, int64_t i) const {
     return (*(layout**)self)->data + i * m_element_type->bytecount();
 }
 
-int64_t TupleOf::count(instance_ptr self) const {
+int64_t TupleOrListOf::count(instance_ptr self) const {
     if (!(*(layout**)self)) {
         return 0;
     }
@@ -566,7 +587,7 @@ int64_t TupleOf::count(instance_ptr self) const {
     return (*(layout**)self)->count;
 }
 
-int64_t TupleOf::refcount(instance_ptr self) const {
+int64_t TupleOrListOf::refcount(instance_ptr self) const {
     if (!(*(layout**)self)) {
         return 0;
     }
@@ -574,30 +595,34 @@ int64_t TupleOf::refcount(instance_ptr self) const {
     return (*(layout**)self)->refcount;
 }
 
-void TupleOf::constructor(instance_ptr self) {
+void TupleOrListOf::constructor(instance_ptr self) {
     constructor(self, 0, [](instance_ptr i, int64_t k) {});
 }
 
-void TupleOf::destroy(instance_ptr self) {
-    if (!(*(layout**)self)) {
+void TupleOrListOf::destroy(instance_ptr selfPtr) {
+    layout_ptr& self = *(layout_ptr*)selfPtr;
+
+    if (!self) {
         return;
     }
 
-    (*(layout**)self)->refcount--;
-    if ((*(layout**)self)->refcount == 0) {
-        m_element_type->destroy((*(layout**)self)->count, [&](int64_t k) {return eltPtr(self,k);});
-        free((*(layout**)self));
+    self->refcount--;
+
+    if (self->refcount == 0) {
+        m_element_type->destroy(self->count, [&](int64_t k) {return eltPtr(self,k);});
+        free(self->data);
+        free(self);
     }
 }
 
-void TupleOf::copy_constructor(instance_ptr self, instance_ptr other) {
+void TupleOrListOf::copy_constructor(instance_ptr self, instance_ptr other) {
     (*(layout**)self) = (*(layout**)other);
     if (*(layout**)self) {
         (*(layout**)self)->refcount++;
     }
 }
 
-void TupleOf::assign(instance_ptr self, instance_ptr other) {
+void TupleOrListOf::assign(instance_ptr self, instance_ptr other) {
     layout* old = (*(layout**)self);
 
     (*(layout**)self) = (*(layout**)other);
@@ -607,6 +632,32 @@ void TupleOf::assign(instance_ptr self, instance_ptr other) {
     }
 
     destroy((instance_ptr)&old);
+}
+
+void ListOf::append(instance_ptr self, instance_ptr other) {
+    typedef layout* layout_ptr;
+
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    if (!self_layout) {
+        self_layout = (layout_ptr)malloc(sizeof(layout) + getEltType()->bytecount() * 1);
+
+        self_layout->count = 1;
+        self_layout->refcount = 1;
+        self_layout->reserved = 1;
+        self_layout->hash_cache = -1;
+
+        getEltType()->copy_constructor(eltPtr(self, 0), other);
+    } else {
+        if (self_layout->count == self_layout->reserved) {
+            int64_t new_reserved = self_layout->reserved * 1.25 + 1;
+            self_layout->data = (uint8_t*)realloc(self_layout->data, getEltType()->bytecount() * new_reserved);
+            self_layout->reserved = new_reserved;
+        }
+
+        getEltType()->copy_constructor(eltPtr(self, self_layout->count), other);
+        self_layout->count++;
+    }
 }
 
 void ConstDict::_forwardTypesMayHaveChanged() {

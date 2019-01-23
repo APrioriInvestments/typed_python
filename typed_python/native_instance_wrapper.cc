@@ -118,6 +118,49 @@ PyObject* native_instance_wrapper::constDictValues(PyObject *o) {
     return NULL;
 }
 
+
+// static
+PyObject* native_instance_wrapper::listAppend(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
+        return NULL;
+    }
+
+    PyObject* value = PyTuple_GetItem(args, 0);
+
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    native_instance_wrapper* value_w = (native_instance_wrapper*)value;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+    Type* value_type = extractTypeFrom(value->ob_type);
+
+    ListOf* listT = (ListOf*)self_type;
+    Type* eltType = listT->getEltType();
+
+    if (value_type == eltType) {
+        native_instance_wrapper* value_w = (native_instance_wrapper*)value;
+
+        listT->append(self_w->dataPtr(), value_w->dataPtr());
+    } else {
+        instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
+        try {
+            copyConstructFromPythonInstance(eltType, tempObj, value);
+        } catch(std::exception& e) {
+            free(tempObj);
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return NULL;
+        }
+
+        listT->append(self_w->dataPtr(), tempObj);
+
+        eltType->destroy(tempObj);
+
+        free(tempObj);
+    }
+
+    return incref(Py_None);
+}
+
 // static
 PyObject* native_instance_wrapper::constDictGet(PyObject* o, PyObject* args) {
     native_instance_wrapper* self_w = (native_instance_wrapper*)o;
@@ -190,6 +233,13 @@ PyMethodDef* native_instance_wrapper::typeMethods(Type* t) {
         };
     }
 
+    if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
+        return new PyMethodDef [5] {
+            {"append", (PyCFunction)native_instance_wrapper::listAppend, METH_VARARGS, NULL},
+            {NULL, NULL}
+        };
+    }
+
     return new PyMethodDef [2] {
         {NULL, NULL}
     };
@@ -238,6 +288,7 @@ bool native_instance_wrapper::pyValCouldBeOfType(Type* t, PyObject* pyRepresenta
 
     if (t->getTypeCategory() == Type::TypeCategory::catNamedTuple ||
             t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
+            t->getTypeCategory() == Type::TypeCategory::catListOf ||
             t->getTypeCategory() == Type::TypeCategory::catTuple
             ) {
         return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
@@ -519,35 +570,35 @@ void native_instance_wrapper::copyConstructFromPythonInstance(Type* eltType, ins
                 + " with a " + pyRepresentation->ob_type->tp_name);
     }
 
-    if (cat == Type::TypeCategory::catTupleOf) {
+    if (cat == Type::TypeCategory::catTupleOf || cat == Type::TypeCategory::catListOf) {
         if (PyTuple_Check(pyRepresentation)) {
-            ((TupleOf*)eltType)->constructor(tgt, PyTuple_Size(pyRepresentation),
+            ((TupleOrListOf*)eltType)->constructor(tgt, PyTuple_Size(pyRepresentation),
                 [&](uint8_t* eltPtr, int64_t k) {
-                    copyConstructFromPythonInstance(((TupleOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                    copyConstructFromPythonInstance(((TupleOrListOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
                     }
                 );
             return;
         }
         if (PyList_Check(pyRepresentation)) {
-            ((TupleOf*)eltType)->constructor(tgt, PyList_Size(pyRepresentation),
+            ((TupleOrListOf*)eltType)->constructor(tgt, PyList_Size(pyRepresentation),
                 [&](uint8_t* eltPtr, int64_t k) {
-                    copyConstructFromPythonInstance(((TupleOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
+                    copyConstructFromPythonInstance(((TupleOrListOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
                     }
                 );
             return;
         }
         if (PySet_Check(pyRepresentation)) {
             if (PySet_Size(pyRepresentation) == 0) {
-                ((TupleOf*)eltType)->constructor(tgt);
+                ((TupleOrListOf*)eltType)->constructor(tgt);
                 return;
             }
 
             PyObject *iterator = PyObject_GetIter(pyRepresentation);
 
-            ((TupleOf*)eltType)->constructor(tgt, PySet_Size(pyRepresentation),
+            ((TupleOrListOf*)eltType)->constructor(tgt, PySet_Size(pyRepresentation),
                 [&](uint8_t* eltPtr, int64_t k) {
                     PyObject* item = PyIter_Next(iterator);
-                    copyConstructFromPythonInstance(((TupleOf*)eltType)->getEltType(), eltPtr, item);
+                    copyConstructFromPythonInstance(((TupleOrListOf*)eltType)->getEltType(), eltPtr, item);
                     Py_DECREF(item);
                     }
                 );
@@ -940,8 +991,8 @@ Py_ssize_t native_instance_wrapper::sq_length(PyObject* o) {
 
     Type* t = extractTypeFrom(o->ob_type);
 
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        return ((TupleOf*)t)->count(w->dataPtr());
+    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || t->getTypeCategory() == Type::TypeCategory::catListOf) {
+        return ((TupleOrListOf*)t)->count(w->dataPtr());
     }
     if (t->isComposite()) {
         return ((CompositeType*)t)->getTypes().size();
@@ -1139,12 +1190,12 @@ PyObject* native_instance_wrapper::sq_concat(PyObject* lhs, PyObject* rhs) {
                 return (PyObject*)self;
             }
         }
-        if (lhs_type->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-            //TupleOf(X) + TupleOf(X) fastpath
+        if (lhs_type->getTypeCategory() == Type::TypeCategory::catTupleOf || lhs_type->getTypeCategory() == Type::TypeCategory::catListOf) {
+            //TupleOrListOf(X) + TupleOrListOf(X) fastpath
             if (lhs_type == rhs_type) {
                 native_instance_wrapper* w_rhs = (native_instance_wrapper*)rhs;
 
-                TupleOf* tupT = (TupleOf*)lhs_type;
+                TupleOrListOf* tupT = (TupleOrListOf*)lhs_type;
                 Type* eltType = tupT->getEltType();
                 native_instance_wrapper* self =
                     (native_instance_wrapper*)typeObj(tupT)
@@ -1169,7 +1220,7 @@ PyObject* native_instance_wrapper::sq_concat(PyObject* lhs, PyObject* rhs) {
             }
             //generic path to add any kind of iterable.
             if (PyObject_Length(rhs) != -1) {
-                TupleOf* tupT = (TupleOf*)lhs_type;
+                TupleOrListOf* tupT = (TupleOrListOf*)lhs_type;
                 Type* eltType = tupT->getEltType();
 
                 native_instance_wrapper* self =
@@ -1232,8 +1283,8 @@ PyObject* native_instance_wrapper::sq_item(PyObject* o, Py_ssize_t ix) {
     native_instance_wrapper* w = (native_instance_wrapper*)o;
     Type* t = extractTypeFrom(o->ob_type);
 
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        int64_t count = ((TupleOf*)t)->count(w->dataPtr());
+    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || t->getTypeCategory() == Type::TypeCategory::catListOf) {
+        int64_t count = ((TupleOrListOf*)t)->count(w->dataPtr());
 
         if (ix < 0) {
             ix += count;
@@ -1244,9 +1295,9 @@ PyObject* native_instance_wrapper::sq_item(PyObject* o, Py_ssize_t ix) {
             return NULL;
         }
 
-        Type* eltType = (Type*)((TupleOf*)t)->getEltType();
+        Type* eltType = (Type*)((TupleOrListOf*)t)->getEltType();
         return extractPythonObject(
-            ((TupleOf*)t)->eltPtr(w->dataPtr(), ix),
+            ((TupleOrListOf*)t)->eltPtr(w->dataPtr(), ix),
             eltType
             );
     }
@@ -1310,7 +1361,8 @@ PyTypeObject* native_instance_wrapper::typeObj(Type* inType) {
 
 // static
 PySequenceMethods* native_instance_wrapper::sequenceMethodsFor(Type* t) {
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
+    if (    t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
+            t->getTypeCategory() == Type::TypeCategory::catListOf ||
             t->getTypeCategory() == Type::TypeCategory::catTuple ||
             t->getTypeCategory() == Type::TypeCategory::catNamedTuple ||
             t->getTypeCategory() == Type::TypeCategory::catString ||
@@ -1394,6 +1446,10 @@ Py_ssize_t native_instance_wrapper::mp_length(PyObject* o) {
         return ((TupleOf*)t)->count(w->dataPtr());
     }
 
+    if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
+        return ((ListOf*)t)->count(w->dataPtr());
+    }
+
     return 0;
 }
 
@@ -1441,6 +1497,64 @@ int native_instance_wrapper::sq_contains(PyObject* o, PyObject* item) {
     }
 
     return 0;
+}
+
+int native_instance_wrapper::mp_ass_subscript(PyObject* o, PyObject* item, PyObject* value) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+    Type* value_type = extractTypeFrom(value->ob_type);
+
+    if (self_type->getTypeCategory() == Type::TypeCategory::catListOf) {
+        ListOf* listT = (ListOf*)self_type;
+        Type* eltType = listT->getEltType();
+
+        if (PyLong_Check(item)) {
+            int64_t ix = PyLong_AsLong(item);
+            int64_t count = ((TupleOrListOf*)self_type)->count(self_w->dataPtr());
+
+            if (ix < 0) {
+                ix += count;
+            }
+
+            if (ix >= count || ix < 0) {
+                PyErr_SetString(PyExc_IndexError, "index out of range");
+                return -1;
+            }
+
+            if (value_type == eltType) {
+                native_instance_wrapper* value_w = (native_instance_wrapper*)value;
+
+                eltType->assign(
+                    listT->eltPtr(self_w->dataPtr(), ix),
+                    value_w->dataPtr()
+                    );
+            } else {
+                instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
+                try {
+                    copyConstructFromPythonInstance(eltType, tempObj, value);
+                } catch(std::exception& e) {
+                    free(tempObj);
+                    PyErr_SetString(PyExc_TypeError, e.what());
+                    return -1;
+                }
+
+                eltType->assign(
+                    listT->eltPtr(self_w->dataPtr(), ix),
+                    tempObj
+                    );
+
+                eltType->destroy(tempObj);
+
+                free(tempObj);
+
+                return 0;
+            }
+        }
+    }
+
+    PyErr_Format(PyExc_TypeError, "'%s' object does not support item assignment", o->ob_type->tp_name);
+    return -1;
 }
 
 // static
@@ -1491,9 +1605,11 @@ PyObject* native_instance_wrapper::mp_subscript(PyObject* o, PyObject* item) {
         return NULL;
     }
 
-    if (self_type->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+    if (self_type->getTypeCategory() == Type::TypeCategory::catTupleOf ||
+            self_type->getTypeCategory() == Type::TypeCategory::catListOf
+            ) {
         if (PySlice_Check(item)) {
-            TupleOf* tupType = (TupleOf*)self_type;
+            TupleOrListOf* tupType = (TupleOrListOf*)self_type;
 
             Py_ssize_t start,stop,step,slicelength;
             if (PySlice_GetIndicesEx(item, tupType->count(self_w->dataPtr()), &start,
@@ -1535,11 +1651,12 @@ PyMappingMethods* native_instance_wrapper::mappingMethods(Type* t) {
         new PyMappingMethods {
             native_instance_wrapper::mp_length, //mp_length
             native_instance_wrapper::mp_subscript, //mp_subscript
-            0 //mp_ass_subscript
+            native_instance_wrapper::mp_ass_subscript //mp_ass_subscript
             };
 
     if (t->getTypeCategory() == Type::TypeCategory::catConstDict ||
-        t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+        t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
+        t->getTypeCategory() == Type::TypeCategory::catListOf) {
         return res;
     }
 
@@ -2380,6 +2497,24 @@ char native_instance_wrapper::compare_to_python(Type* t, instance_ptr self, PyOb
         }
     }
 
+    if (PyList_Check(other)) {
+        if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
+            ListOf* listT = (ListOf*)t;
+            int lenO = PyList_Size(other);
+            int lenS = listT->count(self);
+            for (long k = 0; k < lenO && k < lenS; k++) {
+                char res = compare_to_python(listT->getEltType(), listT->eltPtr(self, k), PyList_GetItem(other,k), exact);
+                if (res) {
+                    return res;
+                }
+            }
+
+            if (lenS < lenO) { return -1; }
+            if (lenS > lenO) { return 1; }
+            return 0;
+        }
+    }
+
     if (PyUnicode_Check(other) && t->getTypeCategory() == Type::TypeCategory::catString) {
         auto kind = PyUnicode_KIND(other);
         int bytesPer = kind == PyUnicode_1BYTE_KIND ? 1 :
@@ -2702,7 +2837,8 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
         }
     }
 
-    if (inType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+    if (inType->getTypeCategory() == Type::TypeCategory::catTupleOf ||
+                    inType->getTypeCategory() == Type::TypeCategory::catListOf) {
         TupleOf* tupleOfType = (TupleOf*)inType;
 
         //expose 'ElementType' as a member of the type object

@@ -73,6 +73,8 @@ struct native_instance_wrapper {
 
     instance_ptr dataPtr();
 
+    static PyObject* listAppend(PyObject* o, PyObject* args);
+
     static PyObject* constDictItems(PyObject *o);
 
     static PyObject* constDictKeys(PyObject *o);
@@ -123,6 +125,8 @@ struct native_instance_wrapper {
     static Py_ssize_t mp_length(PyObject* o);
 
     static int sq_contains(PyObject* o, PyObject* item);
+
+    static int mp_ass_subscript(PyObject* o, PyObject* item, PyObject* value);
 
     static PyObject* mp_subscript(PyObject* o, PyObject* item);
 

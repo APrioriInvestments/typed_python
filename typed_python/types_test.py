@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import (
-    Int8, Int64, NoneType, TupleOf, OneOf, Tuple, NamedTuple,
+    Int8, Int64, NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple,
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member,
     TypeFilter
 )
@@ -309,6 +309,44 @@ class NativeTypesTests(unittest.TestCase):
             self.assertTrue(type(t[0]) is typeOfThing)
             self.assertEqual(t[0], thing)
 
+    def test_tuple_assign_fails(self):
+        with self.assertRaisesRegex(TypeError, "does not support item assignment"):
+            (1,2,3)[10] = 20
+        with self.assertRaisesRegex(TypeError, "does not support item assignment"):
+            TupleOf(int)((1,2,3))[10] = 20
+
+    def test_list_of(self):
+        L = ListOf(int)
+        self.assertEqual(L.__qualname__, "ListOf(Int64)")
+
+        l = L([1,2,3,4])
+
+        self.assertEqual(l[0], 1)
+        self.assertEqual(l[-1], 4)
+
+        l[0] = 10
+        self.assertEqual(l[0], 10)
+
+        l[-1] = 11
+        self.assertEqual(l[3], 11)
+
+        with self.assertRaisesRegex(IndexError, "index out of range"):
+            l[100] = 20
+
+        l2 = L((10,2,3,11))
+
+        self.assertEqual(l,l2)
+        self.assertNotEqual(l,(10,2,3,11))
+        self.assertEqual(l,[10,2,3,11])
+
+        self.assertEqual(str(l),str([10,2,3,11]))
+
+        l3 = l + l2
+        self.assertEqual(l3, [10,2,3,11,10,2,3,11])
+
+        l3.append(23)
+        self.assertEqual(l3, [10,2,3,11,10,2,3,11, 23])
+
     def test_one_of(self):
         o = OneOf(None, str)
 
@@ -392,7 +430,6 @@ class NativeTypesTests(unittest.TestCase):
             a = OneOf(vals[0], vals[1], type(vals[2]))
 
             for v in vals:
-                print(a,vals[0],vals[1])
                 self.assertEqual(a(v), v, (a(v),v))
 
             tup = TupleOf(a)

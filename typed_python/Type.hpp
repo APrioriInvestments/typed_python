@@ -39,6 +39,7 @@ class Bytes;
 class OneOf;
 class Value;
 class TupleOf;
+class ListOf;
 class NamedTuple;
 class Tuple;
 class ConstDict;
@@ -78,6 +79,7 @@ public:
         catValue,
         catOneOf,
         catTupleOf,
+        catListOf,
         catNamedTuple,
         catTuple,
         catConstDict,
@@ -188,6 +190,8 @@ public:
                 return f(*(OneOf*)this);
             case catTupleOf:
                 return f(*(TupleOf*)this);
+            case catListOf:
+                return f(*(ListOf*)this);
             case catNamedTuple:
                 return f(*(NamedTuple*)this);
             case catTuple:
@@ -677,19 +681,24 @@ public:
     }
 };
 
-class TupleOf : public Type {
+class TupleOrListOf : public Type {
+protected:
     class layout {
     public:
         std::atomic<int64_t> refcount;
         int32_t hash_cache;
         int32_t count;
-        uint8_t data[];
+        int32_t reserved;
+        uint8_t* data;
     };
 
+    typedef layout* layout_ptr;
+
 public:
-    TupleOf(Type* type) :
-            Type(TypeCategory::catTupleOf),
-            m_element_type(type)
+    TupleOrListOf(Type* type, bool isTuple) :
+            Type(isTuple ? TypeCategory::catTupleOf : TypeCategory::catListOf),
+            m_element_type(type),
+            m_is_tuple(isTuple)
     {
         m_size = sizeof(void*);
         m_is_default_constructible = true;
@@ -710,7 +719,7 @@ public:
     }
 
     void _forwardTypesMayHaveChanged() {
-        m_name = "TupleOf(" + m_element_type->name() + ")";
+        m_name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
     }
 
     template<class buf_t>
@@ -727,7 +736,7 @@ public:
         int32_t ct = buffer.read_uint32();
 
         if (ct > buffer.remaining() && m_element_type->bytecount()) {
-            throw std::runtime_error("Corrupt data (tuplecount)");
+            throw std::runtime_error("Corrupt data (count)");
         }
 
         constructor(self, ct, [&](instance_ptr tgt, int k) {
@@ -745,7 +754,9 @@ public:
         return m_element_type;
     }
 
-    static TupleOf* Make(Type* elt);
+    instance_ptr eltPtr(layout_ptr self, int64_t i) const {
+        return eltPtr((instance_ptr)&self, i);
+    }
 
     instance_ptr eltPtr(instance_ptr self, int64_t i) const;
 
@@ -754,17 +765,21 @@ public:
     int64_t refcount(instance_ptr self) const;
 
     template<class sub_constructor>
-    void constructor(instance_ptr self, int64_t count, const sub_constructor& allocator) {
+    void constructor(instance_ptr selfPtr, int64_t count, const sub_constructor& allocator) {
+        layout_ptr& self = *(layout_ptr*)selfPtr;
+
         if (count == 0) {
-            (*(layout**)self) = nullptr;
+            self = nullptr;
             return;
         }
 
-        (*(layout**)self) = (layout*)malloc(sizeof(layout) + getEltType()->bytecount() * count);
+        self = (layout*)malloc(sizeof(layout));
 
-        (*(layout**)self)->count = count;
-        (*(layout**)self)->refcount = 1;
-        (*(layout**)self)->hash_cache = -1;
+        self->count = count;
+        self->refcount = 1;
+        self->reserved = count;
+        self->hash_cache = -1;
+        self->data = (uint8_t*)malloc(getEltType()->bytecount() * count);
 
         for (int64_t k = 0; k < count; k++) {
             try {
@@ -773,7 +788,8 @@ public:
                 for (long k2 = k-1; k2 >= 0; k2--) {
                     m_element_type->destroy(eltPtr(self,k2));
                 }
-                free(*(layout**)self);
+                free(self->data);
+                free(self);
                 throw;
             }
         }
@@ -787,11 +803,31 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 
-private:
+protected:
     Type* m_element_type;
+
+    bool m_is_tuple;
 };
 
+class ListOf : public TupleOrListOf {
+public:
+    ListOf(Type* type) : TupleOrListOf(type, false)
+    {
+    }
 
+    static ListOf* Make(Type* elt);
+
+    void append(instance_ptr self, instance_ptr other);
+};
+
+class TupleOf : public TupleOrListOf {
+public:
+    TupleOf(Type* type) : TupleOrListOf(type, true)
+    {
+    }
+
+    static TupleOf* Make(Type* elt);
+};
 
 class ConstDict : public Type {
     class layout {

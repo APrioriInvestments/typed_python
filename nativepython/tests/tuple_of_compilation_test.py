@@ -80,6 +80,13 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(f((1,2,3)), 0)
 
+    def test_tuple_len(self):
+        @Compiled
+        def f(x: TupleOf(int)) -> int:
+            return len(x)
+
+        self.assertEqual(f((1,2,3)), 3)
+
     def test_tuple_assign(self):
         @Compiled
         def f(x: TupleOf(int)) -> TupleOf(int):
@@ -140,7 +147,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         t1 = T((1,2,3))
         t2 = T((3,4))
-        
+
         res = f(t1, t2)
 
         self.assertEqual(_types.refcount(res), 1)
@@ -161,9 +168,9 @@ class TestTupleOfCompilation(unittest.TestCase):
         t2 = T((4,5,5))
 
         aTT = TT((t1,t2))
-        
+
         fRes = f(aTT)
-        
+
         self.assertEqual(fRes, aTT+aTT+aTT)
         self.assertEqual(_types.refcount(aTT), 1)
         self.assertEqual(_types.refcount(fRes), 1)
