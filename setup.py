@@ -48,6 +48,22 @@ setuptools.setup(
             ]
         )
     ],
+    install_requires=[
+        'boto3',
+        'flask-login',
+        'flask-sockets',
+        'flask-wtf',
+        'gevent',
+        'ldap3',
+        'llvmlite',
+        'lz4',
+        'numpy',
+        'psutil',
+        'pyyaml',
+        'redis',
+        'requests',
+        'websockets',
+    ],
     classifiers=[
         "Programming Language :: Python :: 3"
     ],
