@@ -45,10 +45,10 @@ class ListOfWrapper(TupleOrListOfWrapper):
         return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0,3).load().cast(native_ast.Int64))
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("resize","reserve","reserved","append","clear","pop"):
+        if attr in ("resize","reserve","reserved","append","clear","pop","getUnsafe", "setUnsafe", "setSizeUnsafe", "initializeUnsafe"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
-        return super().convert_assign(context, instance, attr)
+        return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args):
         if methodname == "pop":
@@ -77,6 +77,49 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         self.underlyingWrapperType,
                         native.call(instance, count)
                         )
+
+        if methodname == "getUnsafe":
+            if len(args) == 1:
+                count = args[0].toInt64()
+                if count is None:
+                    return
+
+                return instance.convert_getitem_unsafe(count)
+        if methodname == "setSizeUnsafe":
+            if len(args) == 1:
+                count = args[0].toInt64()
+                if count is None:
+                    return
+
+                context.pushEffect(instance.nonref_expr.ElementPtrIntegers(0, 2).store(count.nonref_expr.cast(native_ast.Int32)))
+
+                return context.pushVoid()
+
+        if methodname == "initializeUnsafe":
+            if len(args) == 2:
+                count = args[0].toInt64()
+                if count is None:
+                    return
+
+                val = args[1].convert_to_type(self.underlyingWrapperType)
+                if val is None:
+                    return
+
+                instance.convert_getitem_unsafe(count).convert_copy_initialize(val)
+                return context.pushVoid()
+
+        if methodname == "setUnsafe":
+            if len(args) == 2:
+                count = args[0].toInt64()
+                if count is None:
+                    return
+
+                val = args[1].convert_to_type(self.underlyingWrapperType)
+                if val is None:
+                    return
+
+                instance.convert_getitem_unsafe(count).convert_assign(val)
+                return context.pushVoid()
 
         if methodname == "resize":
             if len(args) == 1:
@@ -273,25 +316,31 @@ class ListOfWrapper(TupleOrListOfWrapper):
         context.pushEffect(native_ast.Expression.Return(arg=listInst.convert_reserved().nonref_expr))
 
     def convert_default_initialize(self, context, tgt):
-        return context.push(self, lambda selfPtr:
+        context.pushEffect(
             context.converter.defineNativeFunction(
                 'empty(' + self.typeRepresentation.__name__ + ")",
                 ('util', self, 'empty'),
-                [self, int],
-                None,
+                [],
+                self,
                 self.createEmptyList
-                ).call(selfPtr)
+                ).call(tgt)
             )
 
     def createEmptyList(self, context, out):
         context.pushEffect(
             out.expr.store(
-                runtime_functions.malloc(self.getBytecount()).cast(self.getNativeLayoutType().pointer())
+                runtime_functions.malloc.call(28).cast(self.getNativeLayoutType())
                 )
             >> out.nonref_expr.ElementPtrIntegers(0,0).store(native_ast.const_int_expr(1)) #refcount
             >> out.nonref_expr.ElementPtrIntegers(0,1).store(native_ast.const_int32_expr(-1)) #hash cache
             >> out.nonref_expr.ElementPtrIntegers(0,2).store(native_ast.const_int32_expr(0)) #count
-            >> out.nonref_expr.ElementPtrIntegers(0,3).store(native_ast.const_int32_expr(0)) #reserved
-            >> out.nonref_expr.ElementPtrIntegers(0,4).store(native_ast.UInt8Ptr.zero()) #data
+            >> out.nonref_expr.ElementPtrIntegers(0,3).store(native_ast.const_int32_expr(1)) #reserved
+            >> out.nonref_expr.ElementPtrIntegers(0,4).store(
+                runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())
+                ) #data
             )
 
+    def convert_setitem(self, context, expr, index, item):
+        expr.convert_getitem(index).convert_assign(item)
+
+        return context.pushVoid()

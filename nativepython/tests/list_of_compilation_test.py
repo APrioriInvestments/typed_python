@@ -17,6 +17,7 @@ import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
 import time
+import numpy
 import psutil
 
 def Compiled(f):
@@ -250,6 +251,59 @@ class TestListOfCompilation(unittest.TestCase):
         f(aList)
 
         self.assertEqual(aList, [2,4])
+
+    def test_lists_add_perf(self):
+        T = ListOf(int)
+
+        @Compiled
+        def range(x: int):
+            out = T()
+            out.resize(x)
+
+            i = 0
+            while i < x:
+                out[i] = i
+                i = i + 1
+
+            return out
+
+        @Compiled
+        def add(x: T, y: T):
+            out = T()
+            out.reserve(len(x))
+
+            i = 0
+            ct = len(x)
+
+            while i < ct:
+                out.initializeUnsafe(i, x.getUnsafe(i) + y.getUnsafe(i))
+                i = i + 1
+
+            out.setSizeUnsafe(ct)
+
+            return out
+
+        x = range(1000000)
+        y = range(1000000)
+
+        xnumpy = numpy.arange(1000000)
+        ynumpy = numpy.arange(1000000)
+
+        t0 = time.time()
+        for _ in range(10):
+            y = add(x,y)
+        t1 = time.time()
+        for _ in range(10):
+            ynumpy = xnumpy+ynumpy
+        t2 = time.time()
+
+        slowerThan = (t1 - t0) / (t2 - t1)
+
+        #right now, about 1.8x
+        print(slowerThan, "times slower than numpy.")
+
+        self.assertEqual(y[10], x[10] * 11)
+        self.assertLess(slowerThan, 2.5)
 
 
 

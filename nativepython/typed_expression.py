@@ -95,6 +95,9 @@ class TypedExpression(object):
     def convert_attribute(self, attribute):
         return self.expr_type.convert_attribute(self.context, self, attribute)
 
+    def convert_setitem(self, index, value):
+        return self.expr_type.convert_setitem(self.context, self, index, value)
+
     def convert_getitem(self, item):
         return self.expr_type.convert_getitem(self.context, self, item)
 

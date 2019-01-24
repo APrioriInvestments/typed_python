@@ -50,7 +50,7 @@ class SimpleAlternativeWrapper(Wrapper):
         return self.layoutType
 
     def convert_default_initialize(self, context, target):
-        return self.convert_copy_initialize(
+        self.convert_copy_initialize(
             context,
             target,
             nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())

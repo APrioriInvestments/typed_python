@@ -571,14 +571,6 @@ ListOf* ListOf::Make(Type* elt) {
     return it->second;
 }
 
-instance_ptr TupleOrListOf::eltPtr(instance_ptr self, int64_t i) const {
-    if (!(*(layout**)self)) {
-        return self;
-    }
-
-    return (*(layout**)self)->data + i * m_element_type->bytecount();
-}
-
 int64_t TupleOrListOf::count(instance_ptr self) const {
     if (!(*(layout**)self)) {
         return 0;

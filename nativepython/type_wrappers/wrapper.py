@@ -83,6 +83,16 @@ class Wrapper(object):
             generateThrowException(context, AttributeError("object has no attribute " + attribute))
             )
 
+    def convert_getitem(self, context, instance, item):
+        return context.pushTerminal(
+            generateThrowException(context, AttributeError("%s is not subscriptable" % str(self)))
+            )
+
+    def convert_setitem(self, context, instance, index, value):
+        return context.pushTerminal(
+            generateThrowException(context, AttributeError("%s does not support item assignment" % str(self)))
+            )
+
     def convert_assign(self, context, target, toStore):
         raise NotImplementedError(self)
 
@@ -133,6 +143,9 @@ class Wrapper(object):
             )
 
     def convert_type_call(self, context, typeInst, args):
+        if len(args) == 0:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
         if len(args) == 1:
             return args[0].convert_to_type(self)
 

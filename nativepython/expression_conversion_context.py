@@ -66,9 +66,12 @@ class ExpressionConversionContext(object):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False)
         assert False
 
-    def pushVoid(self, type):
-        assert type.is_empty, type
-        return TypedExpression(self, native_ast.nullExpr, type, False)
+    def pushVoid(self, t=None):
+        if t is None:
+            t = typeWrapper(type(None))
+
+        assert t.is_empty, t
+        return TypedExpression(self, native_ast.nullExpr, t, False)
 
     def pushPod(self, type, expression):
         """stash an expression that generates POD passed as a value"""
@@ -211,7 +214,7 @@ class ExpressionConversionContext(object):
             expr = native_ast.nullExpr
 
         if isinstance(expr, TypedExpression):
-            assert expr.expr_type.typeRepresentation is NoneType()
+            assert expr.expr_type.typeRepresentation is NoneType(), expr.expr_type
             expr = expr.expr
         else:
             assert isinstance(expr, native_ast.Expression)

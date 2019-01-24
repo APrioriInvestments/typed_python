@@ -235,17 +235,32 @@ class FunctionConversionContext(object):
                 return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
 
             if target.matches.Subscript and target.ctx.matches.Store:
-                raise NotImplementedError("Not implemented correctly yet")
                 assert target.slice.matches.Index
 
-                slicing = self.convert_expression_ast(target.value)
-                index = self.convert_expression_ast(target.slice.value)
-                val_to_store = self.convert_expression_ast(ast.value)
+                subcontext = ExpressionConversionContext(self)
+
+                slicing = subcontext.convert_expression_ast(target.value)
+                if slicing is None:
+                    return subcontext.finalize(None), False
+
+                index = subcontext.convert_expression_ast(target.slice.value)
+
+                if slicing is None:
+                    return subcontext.finalize(None), False
+
+                val_to_store = subcontext.convert_expression_ast(ast.value)
+
+                if val_to_store is None:
+                    return subcontext.finalize(None), False
 
                 if op is not None:
                     val_to_store = slicing.convert_getitem(index).convert_bin_op(op, val_to_store)
+                    if val_to_store is None:
+                        return subcontext.finalize(None), False
 
-                return slicing.convert_setitem(index, val_to_store)
+                slicing.convert_setitem(index, val_to_store)
+
+                return subcontext.finalize(None), True
 
             if target.matches.Attribute and target.ctx.matches.Store:
                 subcontext = ExpressionConversionContext(self)

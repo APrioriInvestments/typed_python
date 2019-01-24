@@ -773,7 +773,7 @@ class FunctionConverter:
         if expr.matches.While:
             tags = dict(self.tags_initialized)
 
-            loop_block = self.builder.append_basic_block()
+            loop_block = self.builder.append_basic_block("while")
 
             self.builder.branch(loop_block)
             self.builder.position_at_start(loop_block)

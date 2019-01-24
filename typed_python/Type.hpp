@@ -780,7 +780,13 @@ public:
         return eltPtr((instance_ptr)&self, i);
     }
 
-    instance_ptr eltPtr(instance_ptr self, int64_t i) const;
+    instance_ptr eltPtr(instance_ptr self, int64_t i) const {
+        if (!(*(layout**)self)) {
+            return self;
+        }
+
+        return (*(layout**)self)->data + i * m_element_type->bytecount();
+    }
 
     int64_t count(instance_ptr self) const;
 

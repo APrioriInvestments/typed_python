@@ -59,7 +59,7 @@ class ArithmeticTypeWrapper(Wrapper):
     is_pass_by_ref = False
 
     def convert_default_initialize(self, context, target):
-        return self.convert_copy_initialize(
+        self.convert_copy_initialize(
             context,
             target,
             nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())

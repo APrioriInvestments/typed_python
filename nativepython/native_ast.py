@@ -67,7 +67,7 @@ Type = Alternative("Type",
             Constant.Float(val=0.0,bits=self.bits) if self.matches.Float else
             Constant.Int(val=0,bits=self.bits,signed=self.signed) if self.matches.Int else
             Constant.Struct(elements=[(name, t.zero()) for name,t in self.element_types]) if self.matches.Struct else
-            Constant.NullPointer(value_type=self) if self.matches.Pointer else
+            Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
             raising(Exception("Can't make a zero value from %s" % self))
             )
     )
@@ -168,7 +168,11 @@ def filterCallTargetArgs(args):
     dropping 'empty' arguments, as per our calling convention."""
     res = []
     for a in args:
-        if isinstance(a, Expression):
+        if isinstance(a, int):
+            res.append(const_int_expr(a))
+        elif isinstance(a, float):
+            res.append(const_float_expr(a))
+        elif isinstance(a, Expression):
             res.append(a)
         elif a.expr_type.is_empty:
             pass
