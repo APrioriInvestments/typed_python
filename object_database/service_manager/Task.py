@@ -309,7 +309,7 @@ class TaskDispatchService(ServiceBase):
                     for taskStatus in taskStatuses:
                         taskStatus.times_failed += 1
                         if taskStatus.times_failed > MAX_TIMES_FAILED:
-                            taskStatus.finish(self.db, TaskResult.Failure(), 0.0)
+                            taskStatus._finish(TaskResult.Failure(), 0.0)
                         else:
                             taskStatus.state = "Unassigned"
                             taskStatus.worker = None
