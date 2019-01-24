@@ -678,7 +678,7 @@ void ListOf::remove(instance_ptr self, size_t index) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 
     getEltType()->destroy(eltPtr(self, index));
-    memcpy(eltPtr(self, index), eltPtr(self, index+1), (self_layout->count - index - 1) * getEltType()->bytecount());
+    memmove(eltPtr(self, index), eltPtr(self, index+1), (self_layout->count - index - 1) * getEltType()->bytecount());
     self_layout->count--;
 }
 

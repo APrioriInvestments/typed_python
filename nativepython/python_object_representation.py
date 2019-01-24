@@ -6,6 +6,7 @@ from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrap
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
+from nativepython.type_wrappers.list_of_wrapper import ListOfWrapper
 from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
 from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.type_wrappers.const_dict_wrapper import ConstDictWrapper
@@ -70,6 +71,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "Tuple":
         return TupleWrapper(t)
+
+    if t.__typed_python_category__ == "ListOf":
+        return ListOfWrapper(t)
 
     if t.__typed_python_category__ == "Function":
         return PythonTypedFunctionWrapper(t)

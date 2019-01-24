@@ -24,7 +24,7 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-class TupleOfWrapper(RefcountedWrapper):
+class TupleOrListOfWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
@@ -32,6 +32,8 @@ class TupleOfWrapper(RefcountedWrapper):
     def __init__(self, t):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t)
+
+        self.is_tuple = t.__typed_python_category__ == "TupleOf"
 
         self.underlyingWrapperType = typeWrapper(t.ElementType)
 
@@ -41,7 +43,7 @@ class TupleOfWrapper(RefcountedWrapper):
             ('count', native_ast.Int32),
             ('reserved', native_ast.Int32),
             ('data', native_ast.UInt8Ptr)
-            ), name='TupleOfLayout').pointer()
+            ), name='TupleOfLayout' if self.is_tuple else 'ListOfLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -79,7 +81,7 @@ class TupleOfWrapper(RefcountedWrapper):
                     self,
                     lambda new_tuple:
                         context.converter.defineNativeFunction(
-                            'concatenate_tuples(' + self.typeRepresentation.__name__ + "," + right.expr_type.typeRepresentation.__name__ + ")",
+                            'concatenate(' + self.typeRepresentation.__name__ + "," + right.expr_type.typeRepresentation.__name__ + ")",
                             ('util', self, 'concatenate', right.expr_type),
                             [self, self],
                             self,
@@ -137,7 +139,7 @@ class TupleOfWrapper(RefcountedWrapper):
                 true=expr.nonref_expr.ElementPtrIntegers(0,4).load().cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
                     ).elemPtr(item.toInt64().nonref_expr),
-                false=generateThrowException(context, IndexError("tuple index out of range"))
+                false=generateThrowException(context, IndexError(("tuple" if self.is_tuple else "list") + " index out of range"))
                 )
             )
 
@@ -159,5 +161,10 @@ class TupleOfWrapper(RefcountedWrapper):
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
+class TupleOfWrapper(TupleOrListOfWrapper):
+    def convert_default_initialize(self, context, tgt):
+        context.pushEffect(
+            tgt.expr.store(tgt.expr_type.getNativeLayoutType().zero())
+            )
 
 

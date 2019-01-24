@@ -104,6 +104,9 @@ class TypedExpression(object):
     def convert_len(self):
         return self.expr_type.convert_len(self.context, self)
 
+    def convert_reserved(self):
+        return self.expr_type.convert_reserved(self.context, self)
+
     def convert_unary_op(self, op):
         return self.expr_type.convert_unary_op(self.context, self, op)
 
@@ -142,6 +145,8 @@ class TypedExpression(object):
             op = getattr(ComparisonOp, opname)()
         elif hasattr(BooleanOp, opname):
             op = getattr(BooleanOp, opname)()
+        else:
+            assert False, opname
 
         return left.convert_bin_op(op, right)
 
@@ -152,6 +157,9 @@ class TypedExpression(object):
         return TypedExpression.sugar_operator(self, other, "Sub")
 
     def __mul__(self, other):
+        return TypedExpression.sugar_operator(self, other, "Mult")
+
+    def __truediv__(self, other):
         return TypedExpression.sugar_operator(self, other, "Div")
 
     def __and__(self, other):

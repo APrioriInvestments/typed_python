@@ -48,6 +48,9 @@ def type_str(c):
 
     assert False, type(c)
 
+def raising(e):
+    raise e
+
 Type = Alternative("Type",
     Void={},
     Float={'bits': int},
@@ -58,7 +61,15 @@ Type = Alternative("Type",
     Pointer={'value_type': lambda: Type},
     attr_ix = type_attr_ix,
     __str__ = type_str,
-    pointer = lambda self: Type.Pointer(value_type=self)
+    pointer = lambda self: Type.Pointer(value_type=self),
+    zero = lambda self: Expression.Constant(
+            Constant.Void() if self.matches.Void else
+            Constant.Float(val=0.0,bits=self.bits) if self.matches.Float else
+            Constant.Int(val=0,bits=self.bits,signed=self.signed) if self.matches.Int else
+            Constant.Struct(elements=[(name, t.zero()) for name,t in self.element_types]) if self.matches.Struct else
+            Constant.NullPointer(value_type=self) if self.matches.Pointer else
+            raising(Exception("Can't make a zero value from %s" % self))
+            )
     )
 
 
@@ -398,10 +409,10 @@ Expression = Alternative("Expression",
     bitand = lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
     bitor = lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self,r=ensureExpr(other)),
     load = lambda self: Expression.Load(ptr=self),
-    store = lambda self, val: Expression.Store(ptr=self, val=val),
+    store = lambda self, val: Expression.Store(ptr=self, val=ensureExpr(val)),
     cast = lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
     with_comment = lambda self, c: Expression.Comment(comment=c, expr=self),
-    elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=exprs),
+    elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=[ensureExpr(e) for e in exprs]),
     is_simple = expr_is_simple
     )
 
@@ -416,8 +427,7 @@ def ensureExpr(x):
         return const_utf8_cstr(x)
     if isinstance(x, Expression):
         return x
-
-    raise TypeError("Can't convert %s to an Expression" % type(x))
+    return x.nonref_expr
 
 nullExpr = Expression.Constant(val=Constant.Void())
 emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
