@@ -161,6 +161,174 @@ PyObject* native_instance_wrapper::listAppend(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
+
+// static
+PyObject* native_instance_wrapper::listReserved(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.reserved takes no arguments");
+        return NULL;
+    }
+
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+
+    ListOf* listT = (ListOf*)self_type;
+
+    return PyLong_FromLong(listT->reserved(self_w->dataPtr()));
+}
+
+PyObject* native_instance_wrapper::listReserve(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
+        return NULL;
+    }
+
+    PyObject* pyReserveSize = PyTuple_GetItem(args, 0);
+
+    if (!PyLong_Check(pyReserveSize)) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.append takes an integer");
+        return NULL;
+    }
+
+    int size = PyLong_AsLong(pyReserveSize);
+
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+
+    ListOf* listT = (ListOf*)self_type;
+
+    listT->reserve(self_w->dataPtr(), size);
+
+    return incref(Py_None);
+}
+
+PyObject* native_instance_wrapper::listClear(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.clear takes no arguments");
+        return NULL;
+    }
+
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+
+    ListOf* listT = (ListOf*)self_type;
+
+    listT->resize(self_w->dataPtr(), 0);
+
+    return incref(Py_None);
+}
+
+PyObject* native_instance_wrapper::listResize(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 1 && PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.append takes one argument");
+        return NULL;
+    }
+
+    PyObject* pySize = PyTuple_GetItem(args, 0);
+
+    if (!PyLong_Check(pySize)) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.append takes an integer");
+        return NULL;
+    }
+
+    int size = PyLong_AsLong(pySize);
+
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+
+    ListOf* listT = (ListOf*)self_type;
+
+    if (listT->count(self_w->dataPtr()) > size) {
+        listT->resize(self_w->dataPtr(), size);
+    } else {
+        if (PyTuple_Size(args) == 2) {
+            Type* eltType = listT->getEltType();
+
+            instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
+
+            try {
+                copyConstructFromPythonInstance(eltType, tempObj, PyTuple_GetItem(args, 1));
+            } catch(std::exception& e) {
+                free(tempObj);
+                PyErr_SetString(PyExc_TypeError, e.what());
+                return NULL;
+            }
+
+            listT->resize(self_w->dataPtr(), size, tempObj);
+
+            eltType->destroy(tempObj);
+
+            free(tempObj);
+        } else {
+            if (!listT->getEltType()->is_default_constructible()) {
+                PyErr_SetString(PyExc_TypeError, "Cannot increase the size of this list without an object to copy in because the"
+                    " element type is not copy-constructible");
+                return NULL;
+            }
+
+            listT->resize(self_w->dataPtr(), size);
+        }
+    }
+
+    return incref(Py_None);
+}
+
+
+PyObject* native_instance_wrapper::listPop(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 0 && PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.pop takes zero or one argument");
+        return NULL;
+    }
+
+    int which = -1;
+
+    if (PyTuple_Size(args)) {
+        PyObject* pySize = PyTuple_GetItem(args, 0);
+
+        if (!PyLong_Check(pySize)) {
+            PyErr_SetString(PyExc_TypeError, "ListOf.append takes an integer");
+            return NULL;
+        }
+
+        which = PyLong_AsLong(pySize);
+    }
+
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+
+    Type* self_type = extractTypeFrom(o->ob_type);
+
+    ListOf* listT = (ListOf*)self_type;
+
+    int listSize = listT->count(self_w->dataPtr());
+
+    if (listSize == 0) {
+        PyErr_SetString(PyExc_TypeError, "pop from empty list");
+        return NULL;
+    }
+
+    if (which < 0) {
+        which += listSize;
+    }
+
+    if (which < 0 || which >= listSize) {
+        PyErr_SetString(PyExc_IndexError, "pop index out of range");
+        return NULL;
+    }
+
+    PyObject* result = extractPythonObject(
+            listT->eltPtr(self_w->dataPtr(), which),
+            listT->getEltType()
+            );
+
+    listT->remove(self_w->dataPtr(), which);
+
+    return result;
+}
+
 // static
 PyObject* native_instance_wrapper::constDictGet(PyObject* o, PyObject* args) {
     native_instance_wrapper* self_w = (native_instance_wrapper*)o;
@@ -234,8 +402,13 @@ PyMethodDef* native_instance_wrapper::typeMethods(Type* t) {
     }
 
     if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
-        return new PyMethodDef [5] {
+        return new PyMethodDef [7] {
             {"append", (PyCFunction)native_instance_wrapper::listAppend, METH_VARARGS, NULL},
+            {"clear", (PyCFunction)native_instance_wrapper::listClear, METH_VARARGS, NULL},
+            {"reserved", (PyCFunction)native_instance_wrapper::listReserved, METH_VARARGS, NULL},
+            {"reserve", (PyCFunction)native_instance_wrapper::listReserve, METH_VARARGS, NULL},
+            {"resize", (PyCFunction)native_instance_wrapper::listResize, METH_VARARGS, NULL},
+            {"pop", (PyCFunction)native_instance_wrapper::listPop, METH_VARARGS, NULL},
             {NULL, NULL}
         };
     }

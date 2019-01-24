@@ -302,6 +302,17 @@ public:
     // call subtype.constructor
     void constructor(instance_ptr self);
 
+    template<class ptr_func>
+    void constructor(int64_t count, const ptr_func& ptrToChild) {
+        assertForwardsResolved();
+
+        this->check([&](auto& subtype) {
+            for (long k = 0; k < count; k++) {
+                subtype.constructor(ptrToChild(k));
+            }
+        });
+    }
+
     // call subtype.destroy
     void destroy(instance_ptr self);
 
@@ -334,6 +345,17 @@ public:
 
     // call subtype.copy_constructor
     void copy_constructor(instance_ptr self, instance_ptr other);
+
+    template<class ptr_func_dest, class ptr_func_src>
+    void copy_constructor(int64_t count, const ptr_func_dest& ptrToTarget, const ptr_func_src& ptrToSrc) {
+        assertForwardsResolved();
+
+        this->check([&](auto& subtype) {
+            for (long k = 0; k < count; k++) {
+                subtype.copy_constructor(ptrToTarget(k), ptrToSrc(k));
+            }
+        });
+    }
 
     // call subtype.assign
     void assign(instance_ptr self, instance_ptr other);
@@ -768,7 +790,7 @@ public:
     void constructor(instance_ptr selfPtr, int64_t count, const sub_constructor& allocator) {
         layout_ptr& self = *(layout_ptr*)selfPtr;
 
-        if (count == 0) {
+        if (count == 0 && m_is_tuple) {
             self = nullptr;
             return;
         }
@@ -777,9 +799,9 @@ public:
 
         self->count = count;
         self->refcount = 1;
-        self->reserved = count;
+        self->reserved = std::max<int32_t>(1, count);
         self->hash_cache = -1;
-        self->data = (uint8_t*)malloc(getEltType()->bytecount() * count);
+        self->data = (uint8_t*)malloc(getEltType()->bytecount() * self->reserved);
 
         for (int64_t k = 0; k < count; k++) {
             try {
@@ -818,6 +840,16 @@ public:
     static ListOf* Make(Type* elt);
 
     void append(instance_ptr self, instance_ptr other);
+
+    size_t reserved(instance_ptr self);
+
+    void reserve(instance_ptr self, size_t count);
+
+    void remove(instance_ptr self, size_t count);
+
+    void resize(instance_ptr self, size_t count);
+
+    void resize(instance_ptr self, size_t count, instance_ptr value);
 };
 
 class TupleOf : public TupleOrListOf {

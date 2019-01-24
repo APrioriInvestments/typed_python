@@ -635,8 +635,6 @@ void TupleOrListOf::assign(instance_ptr self, instance_ptr other) {
 }
 
 void ListOf::append(instance_ptr self, instance_ptr other) {
-    typedef layout* layout_ptr;
-
     layout_ptr& self_layout = *(layout_ptr*)self;
 
     if (!self_layout) {
@@ -657,6 +655,68 @@ void ListOf::append(instance_ptr self, instance_ptr other) {
 
         getEltType()->copy_constructor(eltPtr(self, self_layout->count), other);
         self_layout->count++;
+    }
+}
+
+size_t ListOf::reserved(instance_ptr self) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    return self_layout->reserved;
+}
+void ListOf::reserve(instance_ptr self, size_t target) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    if (target < self_layout->count) {
+        target = self_layout->count;
+    }
+
+    self_layout->data = (uint8_t*)realloc(self_layout->data, getEltType()->bytecount() * target);
+    self_layout->reserved = target;
+}
+
+void ListOf::remove(instance_ptr self, size_t index) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    getEltType()->destroy(eltPtr(self, index));
+    memcpy(eltPtr(self, index), eltPtr(self, index+1), (self_layout->count - index - 1) * getEltType()->bytecount());
+    self_layout->count--;
+}
+
+void ListOf::resize(instance_ptr self, size_t count) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    if (count > self_layout->reserved) {
+        reserve(self, count);
+    }
+
+    if (count < self_layout->count) {
+        getEltType()->destroy(self_layout->count - count, [&](int64_t k) {return eltPtr(self,k + count);});
+        self_layout->count = count;
+    }
+    else if (count > self_layout->count) {
+        getEltType()->constructor(count - self_layout->count, [&](int64_t k) {return eltPtr(self,k + self_layout->count);});
+        self_layout->count = count;
+    }
+}
+
+void ListOf::resize(instance_ptr self, size_t count, instance_ptr value) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    if (count > self_layout->reserved) {
+        reserve(self, count);
+    }
+
+    if (count < self_layout->count) {
+        getEltType()->destroy(self_layout->count - count, [&](int64_t k) {return eltPtr(self,k + count);});
+        self_layout->count = count;
+    }
+    else if (count > self_layout->count) {
+        getEltType()->copy_constructor(
+            count - self_layout->count,
+            [&](int64_t k) {return eltPtr(self,k + self_layout->count);},
+            [&](int64_t k) {return value;}
+            );
+        self_layout->count = count;
     }
 }
 

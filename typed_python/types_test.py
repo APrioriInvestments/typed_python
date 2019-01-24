@@ -347,6 +347,46 @@ class NativeTypesTests(unittest.TestCase):
         l3.append(23)
         self.assertEqual(l3, [10,2,3,11,10,2,3,11, 23])
 
+    def test_list_resize(self):
+        l = ListOf(TupleOf(int))()
+
+        l.resize(10)
+        self.assertEqual(l.reserved(), 10)
+        self.assertEqual(len(l), 10)
+
+        emptyTup = TupleOf(int)()
+        aTup = TupleOf(int)((1,2,3))
+
+        self.assertEqual(list(l), [emptyTup] * 10)
+        l.resize(20, aTup)
+        self.assertEqual(list(l), [emptyTup] * 10 + [aTup] * 10)
+
+        self.assertEqual(_types.refcount(aTup), 11)
+
+        self.assertEqual(l.pop(15), aTup)
+        self.assertEqual(l.pop(5), emptyTup)
+
+        self.assertEqual(_types.refcount(aTup), 10)
+
+        l.resize(15)
+
+        with self.assertRaises(IndexError):
+            l.pop(100)
+
+        self.assertEqual(_types.refcount(aTup), 7) #6 in the list because we popped at '5'
+
+        l.pop()
+
+        self.assertEqual(_types.refcount(aTup), 6)
+
+        #this pops one of the empty tuples
+        l.pop(-10)
+
+        self.assertEqual(_types.refcount(aTup), 6)
+
+        l.clear()
+        self.assertEqual(len(l), 0)
+
     def test_one_of(self):
         o = OneOf(None, str)
 
