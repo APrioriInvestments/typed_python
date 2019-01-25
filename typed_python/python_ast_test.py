@@ -14,7 +14,12 @@
 
 from typed_python import *
 import typed_python.python_ast as python_ast
+
+import os
 import unittest
+
+ownName = os.path.abspath(__file__)
+
 
 class TestPythonAst(unittest.TestCase):
     def test_basic_parsing(self):
@@ -87,15 +92,28 @@ class TestPythonAst(unittest.TestCase):
 
         self.reverseParseCheck(f)
 
-    def reverseParseAndEvalCheck(self, f, arg):
+    def reverseParseAndEvalCheck(self, f, args):
+        try:
+            iter(args)
+        except TypeError:
+            args = tuple([args])
+
         pyast = python_ast.convertFunctionToAlgebraicPyAst(f)
 
         f_2 = python_ast.evaluateFunctionPyAst(pyast)
 
-        self.assertEqual(f(arg), f_2(arg))
+        self.assertEqual(f(*args), f_2(*args))
 
     def test_reverse_parse_eval(self):
         def f(x):
             return x+x
         self.reverseParseAndEvalCheck(f, 10)
         self.reverseParseAndEvalCheck(lambda x:x+x, 10)
+
+    def test_reverse_parse_eval_withblock(self):
+        def f(x, filename):
+            with open(filename, 'r') as f:
+                pass
+            return x+x
+
+        self.reverseParseAndEvalCheck(f, (10, ownName))

@@ -40,6 +40,7 @@ ExceptionHandler = lambda: ExceptionHandler
 Arguments = lambda: Arguments
 Keyword = lambda: Keyword
 Alias = lambda: Alias
+WithItem = lambda: WithItem
 
 Module = Alternative("Module",
     Module = {"body": TupleOf(Statement)},
@@ -132,8 +133,7 @@ Statement = Alternative("Statement",
         'filename': str
         },
     With = {
-        "context_expr": Expr,
-        "optional_vars": OneOf(Expr, None),
+        "items": TupleOf(WithItem),
         "body": TupleOf(Statement),
         'line_number': int,
         'col_offset': int,
@@ -488,6 +488,13 @@ Alias = Alternative("Alias",
         }
     )
 
+WithItem = Alternative("WithItem",
+    Item = {
+        "context_expr": Expr,
+        "optional_vars": OneOf(Expr, None),
+        }
+    )
+
 numericConverters = {
     int: lambda x: NumericConstant.Int(value=x),
     bool: lambda x: NumericConstant.Boolean(value=x),
@@ -518,6 +525,8 @@ def createPythonAstString(s, **kwds):
 def makeNameConstant(value, **kwds):
     return Expr.Num(n=numericConverters[type(value)](value), **kwds)
 
+
+# map Python AST types to our syntax-tree types (defined above)
 converters = {
     ast.Module: Module.Module,
     ast.Expression: Module.Expression,
@@ -610,12 +619,15 @@ converters = {
     ast.arguments: Arguments.Item,
     ast.arg: Arg.Item,
     ast.keyword: Keyword.Item,
-    ast.alias: Alias.Item
+    ast.alias: Alias.Item,
+    ast.withitem: WithItem.Item,
     }
 
-#most converters map to an alternative type
-reverseConverters = {t:v for v,t in converters.items()
-    if hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == "ConcreteAlternative"}
+# most converters map to an alternative type
+reverseConverters = {
+    t:v for v,t in converters.items()
+    if hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == "ConcreteAlternative"
+    }
 
 def convertAlgebraicArgs(pyAst, *members):
     members = [x for x in members if x not in ['line_number', 'col_offset']]
@@ -699,8 +711,8 @@ def convertPyAstToAlgebraic(tree,fname, keepLineInformation=True):
 
     return tree
 
-#a nasty hack to allow us to find the Ast's of functions we have deserialized
-#but for which we never had the source code.
+# a nasty hack to allow us to find the Ast's of functions we have deserialized
+# but for which we never had the source code.
 _originalAstCache = weakref.WeakKeyDictionary()
 
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
@@ -717,11 +729,10 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     except Exception as e:
         raise Exception("Failed to get source for function %s" % (f.__qualname__))
 
-
     try:
         return convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
     except Exception as e:
-        raise Exception("Failed to convert function at %s:%s:\n%s" % (fname, lineno, e))
+        raise Exception("Failed to convert function at %s:%s:\n%s" % (fname, lineno, repr(e)))
 
 def evaluateFunctionPyAst(pyAst):
     assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef))
