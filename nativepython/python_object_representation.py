@@ -2,10 +2,12 @@ from nativepython.typed_expression import TypedExpression
 import nativepython.native_ast as native_ast
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
-from nativepython.type_wrappers.python_type_wrappers import PythonTypeObjectWrapper
+from nativepython.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
+from nativepython.type_wrappers.module_wrapper import ModuleWrapper
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
+from nativepython.type_wrappers.pointer_to_wrapper import PointerToWrapper
 from nativepython.type_wrappers.list_of_wrapper import ListOfWrapper
 from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
 from nativepython.type_wrappers.class_wrapper import ClassWrapper
@@ -14,11 +16,13 @@ from nativepython.type_wrappers.tuple_wrapper import TupleWrapper, NamedTupleWra
 from nativepython.type_wrappers.alternative_wrapper import makeAlternativeWrapper
 from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.len_wrapper import LenWrapper
+from nativepython.type_wrappers.bytecount_wrapper import BytecountWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.type_wrappers.string_wrapper import StringWrapper
 from nativepython.type_wrappers.bytes_wrapper import BytesWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
-from typed_python._types import TypeFor
+from types import ModuleType
+from typed_python._types import TypeFor, bytecount
 from typed_python import *
 
 _type_to_type_wrapper_cache = {}
@@ -75,6 +79,9 @@ def _typedPythonTypeToTypeWrapper(t):
     if t.__typed_python_category__ == "ListOf":
         return ListOfWrapper(t)
 
+    if t.__typed_python_category__ == "PointerTo":
+        return PointerToWrapper(t)
+
     if t.__typed_python_category__ == "Function":
         return PythonTypedFunctionWrapper(t)
 
@@ -95,6 +102,9 @@ def _typedPythonTypeToTypeWrapper(t):
 def pythonObjectRepresentation(context, f):
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)
+
+    if f is bytecount:
+        return TypedExpression(context, native_ast.nullExpr, BytecountWrapper(), False)
 
     if f is None:
         return TypedExpression(
@@ -156,5 +166,8 @@ def pythonObjectRepresentation(context, f):
 
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)
+
+    if isinstance(f, ModuleType):
+        return TypedExpression(context, native_ast.nullExpr, ModuleWrapper(f), False)
 
     assert False, f

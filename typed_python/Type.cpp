@@ -626,6 +626,13 @@ void TupleOrListOf::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
+
+void ListOf::setSizeUnsafe(instance_ptr self, size_t count) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    self_layout->count = count;
+}
+
 void ListOf::append(instance_ptr self, instance_ptr other) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 

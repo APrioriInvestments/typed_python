@@ -43,6 +43,24 @@ PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTupl
     return typeObj;
 }
 
+PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo takes 1 positional argument.");
+        return NULL;
+    }
+
+    Type* t = native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0));
+
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo needs a type.");
+        return NULL;
+    }
+
+    PyObject* typeObj = (PyObject*)native_instance_wrapper::typeObj(PointerTo::Make(t));
+    Py_INCREF(typeObj);
+    return typeObj;
+}
+
 PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
     return MakeTupleOrListOfType(nullValue, args, true);
 }
@@ -1157,6 +1175,7 @@ static PyMethodDef module_methods[] = {
     {"String", (PyCFunction)MakeStringType, METH_VARARGS, NULL},
     {"Bytes", (PyCFunction)MakeBytesType, METH_VARARGS, NULL},
     {"TupleOf", (PyCFunction)MakeTupleOfType, METH_VARARGS, NULL},
+    {"PointerTo", (PyCFunction)MakePointerToType, METH_VARARGS, NULL},
     {"ListOf", (PyCFunction)MakeListOfType, METH_VARARGS, NULL},
     {"Tuple", (PyCFunction)MakeTupleType, METH_VARARGS, NULL},
     {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},

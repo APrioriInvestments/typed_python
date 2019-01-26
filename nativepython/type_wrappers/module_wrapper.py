@@ -15,21 +15,35 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
 import nativepython.native_ast as native_ast
+import nativepython
+from nativepython.type_wrappers.exceptions import generateThrowException
 
-class LenWrapper(Wrapper):
+typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+class ModuleWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
 
-    def __init__(self):
-        super().__init__(len)
+    def __init__(self, f):
+        super().__init__(f)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_call(self, context, expr, args):
-        if len(args) == 1:
-            return args[0].convert_len()
+    def convert_attribute(self, context, instance, attribute):
+        if not hasattr(self.typeRepresentation, attribute):
+            return context.pushException(
+                AttributeError,
+                "module '%s' has no attribute '%s'" % (
+                    self.typeRepresentation.__name__,
+                    attribute
+                    )
+                )
 
-        return super().convert_call(context, expr, args)
+        res = nativepython.python_object_representation.pythonObjectRepresentation(
+            context,
+            getattr(self.typeRepresentation, attribute)
+            )
 
+        return res

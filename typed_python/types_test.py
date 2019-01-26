@@ -15,7 +15,7 @@
 from typed_python import (
     Int8, Int64, NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple,
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member,
-    TypeFilter
+    TypeFilter, UndefinedBehaviorException
 )
 
 import typed_python._types as _types
@@ -1215,4 +1215,78 @@ class NativeTypesTests(unittest.TestCase):
         a < b
 
         print(repr(a))
+
+    def test_unsafe_pointers_to_list_internals(self):
+        x = ListOf(int)()
+        x.resize(100)
+        for i in range(len(x)):
+            x[i] = i
+
+        aPointer = x.pointerUnsafe(0)
+        self.assertTrue(str(aPointer).startswith("(Int64*)0x"))
+
+        self.assertEqual(aPointer.get(), x[0])
+        aPointer.set(100)
+        self.assertEqual(aPointer.get(), 100)
+        self.assertEqual(x[0], 100)
+
+        aPointer = aPointer + 10
+
+        self.assertEqual(aPointer.get(), x[10])
+        aPointer.set(20)
+        self.assertEqual(aPointer.get(), 20)
+        self.assertEqual(x[10], 20)
+
+        #this is OK because ints are POD.
+        aPointer.initialize(30)
+        self.assertEqual(x[10], 30)
+
+    def test_unsafe_pointers_to_uninitialized_list_items(self):
+        #because this is testing unsafe operations, the test is
+        #really just that we don't segfault!
+        for _ in range(100):
+            x = ListOf(TupleOf(int))()
+            x.reserve(10)
+
+            for i in range(x.reserved()):
+                x.pointerUnsafe(i).initialize((i,))
+
+            x.setSizeUnsafe(10)
+
+        #now check that if we fail to set the size we'll leak the tuple
+        aLeakedTuple = TupleOf(int)((1,2,3))
+        x = ListOf(TupleOf(int))()
+        x.reserve(1)
+        x.pointerUnsafe(0).initialize(aLeakedTuple)
+        x = None
+
+        self.assertEqual(_types.refcount(aLeakedTuple), 2)
+
+    def test_unsafe_list_operations(self):
+        x = ListOf(str)()
+        x.resize(5)
+        x.reserve(10)
+
+        #the python implementation knows that setting outside of the reserved range will crash
+        with self.assertRaises(UndefinedBehaviorException):
+            x.getUnsafe(-1)
+
+        with self.assertRaises(UndefinedBehaviorException):
+            x.setUnsafe(-1, "hi")
+
+        with self.assertRaises(UndefinedBehaviorException):
+            x.getUnsafe(10)
+
+        with self.assertRaises(UndefinedBehaviorException):
+            x.setUnsafe(10, "hi")
+
+        self.assertEqual(x.getUnsafe(3), "")
+
+        with self.assertRaises(UndefinedBehaviorException):
+            #as does setting a negative size
+            x.setSizeUnsafe(-1)
+
+        #this is valid as long as we don't destroy the string
+        x.initializeUnsafe(5, "anotherString")
+        x.setSizeUnsafe(6)
 

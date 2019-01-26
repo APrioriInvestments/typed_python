@@ -85,6 +85,24 @@ struct native_instance_wrapper {
 
     static PyObject* listPop(PyObject* o, PyObject* args);
 
+    static PyObject* listGetUnsafe(PyObject* o, PyObject* args);
+
+    static PyObject* listSetUnsafe(PyObject* o, PyObject* args);
+
+    static PyObject* listSetSizeUnsafe(PyObject* o, PyObject* args);
+
+    static PyObject* listInitializeUnsafe(PyObject* o, PyObject* args);
+
+    static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
+
+    static PyObject* pointerInitialize(PyObject* o, PyObject* args);
+
+    static PyObject* pointerSet(PyObject* o, PyObject* args);
+
+    static PyObject* pointerGet(PyObject* o, PyObject* args);
+
+    static PyObject* pointerCast(PyObject* o, PyObject* args);
+
     static PyObject* constDictItems(PyObject *o);
 
     static PyObject* constDictKeys(PyObject *o);
@@ -127,6 +145,8 @@ struct native_instance_wrapper {
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix);
 
     static PyTypeObject* typeObj(Type* inType);
+
+    static PyObject* undefinedBehaviorException();
 
     static PySequenceMethods* sequenceMethodsFor(Type* t);
 

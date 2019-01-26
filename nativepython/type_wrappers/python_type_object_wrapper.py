@@ -28,8 +28,31 @@ class PythonTypeObjectWrapper(Wrapper):
     def __init__(self, f):
         super().__init__(f)
 
+    def __repr__(self):
+        return "Wrapper(TypeObject(%s))" % self.typeRepresentation.__qualname__
+
+    def __str__(self):
+        return "TypeObject(%s)" % self.typeRepresentation.__qualname__
+
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
     def convert_call(self, context, left, args):
+        if self.typeRepresentation is type:
+            if len(args) != 1:
+                return super().convert_call(context, left, args)
+
+            argtype = args[0].expr_type
+            if isinstance(argtype, PythonTypeObjectWrapper):
+                res = nativepython.python_object_representation.pythonObjectRepresentation(
+                    context,
+                    type
+                    )
+            else:
+                res = nativepython.python_object_representation.pythonObjectRepresentation(
+                    context,
+                    argtype.typeRepresentation
+                    )
+            return res
+
         return typeWrapper(self.typeRepresentation).convert_type_call(context, left, args)

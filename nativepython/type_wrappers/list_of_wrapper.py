@@ -19,7 +19,7 @@ from nativepython.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, Int64
+from typed_python import NoneType, Int64, PointerTo
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -45,7 +45,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
         return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0,3).load().cast(native_ast.Int64))
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("resize","reserve","reserved","append","clear","pop","getUnsafe", "setUnsafe", "setSizeUnsafe", "initializeUnsafe"):
+        if attr in ("resize","reserve","reserved","append","clear","pop","getUnsafe", "setUnsafe", "setSizeUnsafe", "initializeUnsafe", "pointerUnsafe"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -85,6 +85,20 @@ class ListOfWrapper(TupleOrListOfWrapper):
                     return
 
                 return instance.convert_getitem_unsafe(count)
+
+        if methodname == "pointerUnsafe":
+            if len(args) == 1:
+                count = args[0].toInt64()
+                if count is None:
+                    return
+
+                return context.pushPod(
+                    PointerTo(self.typeRepresentation.ElementType),
+                    instance.nonref_expr.ElementPtrIntegers(0,4).load().cast(
+                        self.underlyingWrapperType.getNativeLayoutType().pointer()
+                        ).elemPtr(count.nonref_expr)
+                    )
+
         if methodname == "setSizeUnsafe":
             if len(args) == 1:
                 count = args[0].toInt64()
@@ -206,10 +220,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         ).call(instance)
                     )
 
-        return context.pushException(TypeError, "Can't call %s.%s with args of type (%s)" % (
-            self.typeRepresentation.__qualname__, methodname,
-            ",".join([a.expr_type.typeRepresentation.__qualname__ for a in args])
-            ))
+        super().convert_method_call(context, instance, methodname, args)
 
     def generatePop(self, context, out, inst, ix):
         ix = context.push(int, lambda tgt: tgt.expr.store(ix.nonref_expr))

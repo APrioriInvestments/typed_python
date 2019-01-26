@@ -118,6 +118,142 @@ PyObject* native_instance_wrapper::constDictValues(PyObject *o) {
     return NULL;
 }
 
+//static
+PyObject* native_instance_wrapper::undefinedBehaviorException() {
+    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* t = PyObject_GetAttrString(module, "UndefinedBehaviorException");
+    return t;
+}
+
+//static
+PyObject* native_instance_wrapper::listGetUnsafe(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 1 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.getUnsafe takes one integer argument");
+        return NULL;
+    }
+
+    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+
+    int64_t count = listT->reserved(self_w->dataPtr());
+
+    if (ix >= count || ix < 0) {
+        PyErr_SetString(undefinedBehaviorException(), "getUnsafe index out of range");
+        return NULL;
+    }
+
+    return extractPythonObject(
+        listT->eltPtr(self_w->dataPtr(), ix),
+        listT->getEltType()
+        );
+}
+
+//static
+PyObject* native_instance_wrapper::listSetUnsafe(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 2 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.setUnsafe takes one integer argument and a value");
+        return NULL;
+    }
+
+    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+
+    int64_t count = listT->reserved(self_w->dataPtr());
+
+    if (ix >= count || ix < 0) {
+        PyErr_SetString(undefinedBehaviorException(), "setUnsafe index out of range");
+        return NULL;
+    }
+
+    instance_ptr tempObj = (instance_ptr)malloc(listT->getEltType()->bytecount());
+    try {
+        copyConstructFromPythonInstance(listT->getEltType(), tempObj, PyTuple_GetItem(args,1));
+    } catch(std::exception& e) {
+        free(tempObj);
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+
+    listT->getEltType()->assign(listT->eltPtr(self_w->dataPtr(), ix), tempObj);
+
+    listT->getEltType()->destroy(tempObj);
+
+    free(tempObj);
+
+    return incref(Py_None);
+}
+
+//static
+PyObject* native_instance_wrapper::listSetSizeUnsafe(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 1 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.getUnsafe takes one integer argument");
+        return NULL;
+    }
+
+    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+
+    if (ix < 0) {
+        PyErr_SetString(undefinedBehaviorException(), "setSizeUnsafe passed negative index");
+        return NULL;
+    }
+
+    listT->setSizeUnsafe(self_w->dataPtr(), ix);
+
+    return incref(Py_None);
+}
+
+//static
+PyObject* native_instance_wrapper::listInitializeUnsafe(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 2 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.initializeUnsafe takes one integer argument and a value");
+        return NULL;
+    }
+
+    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+
+    int64_t count = listT->reserved(self_w->dataPtr());
+
+    if (ix >= count || ix < 0) {
+        PyErr_SetString(undefinedBehaviorException(), "initializeUnsafe index out of range");
+        return NULL;
+    }
+
+    try {
+        copyConstructFromPythonInstance(listT->getEltType(), listT->eltPtr(self_w->dataPtr(), ix), PyTuple_GetItem(args, 1));
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+
+    return incref(Py_None);
+}
+
+//static
+PyObject* native_instance_wrapper::listPointerUnsafe(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 1 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.pointerUnsafe takes one integer argument");
+        return NULL;
+    }
+
+    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+
+    void* ptr = (void*)listT->eltPtr(self_w->dataPtr(), ix);
+
+    return extractPythonObject((instance_ptr)&ptr, PointerTo::Make(listT->getEltType()));
+}
 
 // static
 PyObject* native_instance_wrapper::listAppend(PyObject* o, PyObject* args) {
@@ -329,6 +465,102 @@ PyObject* native_instance_wrapper::listPop(PyObject* o, PyObject* args) {
     return result;
 }
 
+//static
+PyObject* native_instance_wrapper::pointerInitialize(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 0 && PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo.initialize takes zero or one argument");
+        return NULL;
+    }
+
+    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
+
+    if (PyTuple_Size(args) == 0) {
+        if (!pointerT->getEltType()->is_default_constructible()) {
+            PyErr_Format(PyExc_TypeError, "%s is not default initializable", pointerT->getEltType()->name().c_str());
+            return NULL;
+        }
+
+        pointerT->getEltType()->constructor(target);
+        return incref(Py_None);
+    } else {
+        try {
+            copyConstructFromPythonInstance(pointerT->getEltType(), target, PyTuple_GetItem(args, 0));
+            return incref(Py_None);
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return NULL;
+        }
+    }
+}
+
+//static
+PyObject* native_instance_wrapper::pointerSet(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo.set takes one argument");
+        return NULL;
+    }
+
+    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
+
+    instance_ptr tempObj = (instance_ptr)malloc(pointerT->getEltType()->bytecount());
+    try {
+        copyConstructFromPythonInstance(pointerT->getEltType(), tempObj, PyTuple_GetItem(args, 0));
+    } catch(std::exception& e) {
+        free(tempObj);
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }
+
+    pointerT->getEltType()->assign(target, tempObj);
+    pointerT->getEltType()->destroy(tempObj);
+    free(tempObj);
+
+    return incref(Py_None);
+}
+
+//static
+PyObject* native_instance_wrapper::pointerGet(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo.get takes one argument");
+        return NULL;
+    }
+
+    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
+
+    return extractPythonObject(target, pointerT->getEltType());
+}
+
+//static
+PyObject* native_instance_wrapper::pointerCast(PyObject* o, PyObject* args) {
+    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
+    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
+
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo.cast takes one argument");
+        return NULL;
+    }
+
+    Type* targetType = native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0));
+
+    if (!targetType) {
+        PyErr_SetString(PyExc_TypeError, "PointerTo.cast requires a type argument");
+        return NULL;
+    }
+
+    Type* newType = PointerTo::Make(targetType);
+
+    return extractPythonObject(self_w->dataPtr(), newType);
+}
+
 // static
 PyObject* native_instance_wrapper::constDictGet(PyObject* o, PyObject* args) {
     native_instance_wrapper* self_w = (native_instance_wrapper*)o;
@@ -402,13 +634,28 @@ PyMethodDef* native_instance_wrapper::typeMethods(Type* t) {
     }
 
     if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
-        return new PyMethodDef [7] {
+        return new PyMethodDef [12] {
             {"append", (PyCFunction)native_instance_wrapper::listAppend, METH_VARARGS, NULL},
             {"clear", (PyCFunction)native_instance_wrapper::listClear, METH_VARARGS, NULL},
             {"reserved", (PyCFunction)native_instance_wrapper::listReserved, METH_VARARGS, NULL},
             {"reserve", (PyCFunction)native_instance_wrapper::listReserve, METH_VARARGS, NULL},
             {"resize", (PyCFunction)native_instance_wrapper::listResize, METH_VARARGS, NULL},
             {"pop", (PyCFunction)native_instance_wrapper::listPop, METH_VARARGS, NULL},
+            {"getUnsafe", (PyCFunction)native_instance_wrapper::listGetUnsafe, METH_VARARGS, NULL},
+            {"setUnsafe", (PyCFunction)native_instance_wrapper::listSetUnsafe, METH_VARARGS, NULL},
+            {"setSizeUnsafe", (PyCFunction)native_instance_wrapper::listSetSizeUnsafe, METH_VARARGS, NULL},
+            {"initializeUnsafe", (PyCFunction)native_instance_wrapper::listInitializeUnsafe, METH_VARARGS, NULL},
+            {"pointerUnsafe", (PyCFunction)native_instance_wrapper::listPointerUnsafe, METH_VARARGS, NULL},
+            {NULL, NULL}
+        };
+    }
+
+    if (t->getTypeCategory() == Type::TypeCategory::catPointerTo) {
+        return new PyMethodDef [5] {
+            {"initialize", (PyCFunction)native_instance_wrapper::pointerInitialize, METH_VARARGS, NULL},
+            {"set", (PyCFunction)native_instance_wrapper::pointerSet, METH_VARARGS, NULL},
+            {"get", (PyCFunction)native_instance_wrapper::pointerGet, METH_VARARGS, NULL},
+            {"cast", (PyCFunction)native_instance_wrapper::pointerCast, METH_VARARGS, NULL},
             {NULL, NULL}
         };
     }
@@ -1233,6 +1480,15 @@ std::pair<bool, PyObject*> native_instance_wrapper::checkForPyOperator(PyObject*
 
 // static
 PyObject* native_instance_wrapper::nb_add(PyObject* lhs, PyObject* rhs) {
+    Type* lhs_type = extractTypeFrom(lhs->ob_type);
+
+    if (lhs_type->getTypeCategory() == Type::TypeCategory::catPointerTo && PyLong_Check(rhs)) {
+        int64_t ix = PyLong_AsLong(rhs);
+        void* output;
+        ((PointerTo*)lhs_type)->offsetBy((instance_ptr)&output, ((native_instance_wrapper*)lhs)->dataPtr(), ix);
+        return extractPythonObject((instance_ptr)&output, lhs_type);
+    }
+
     std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__add__");
     if (res.first) {
         return res.second;
@@ -1565,7 +1821,8 @@ PyNumberMethods* native_instance_wrapper::numberMethods(Type* t) {
             //only enable this for the types that it operates on. Otherwise it disables the concatenation functions
             //we should probably just unify them
             t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
-                t->getTypeCategory() == Type::TypeCategory::catAlternative
+                t->getTypeCategory() == Type::TypeCategory::catAlternative ||
+                t->getTypeCategory() == Type::TypeCategory::catPointerTo
                 ? nb_add : 0, //binaryfunc nb_add
             nb_subtract, //binaryfunc nb_subtract
             0, //binaryfunc nb_multiply
@@ -3022,6 +3279,17 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
                 );
     }
 
+    if (inType->getTypeCategory() == Type::TypeCategory::catPointerTo) {
+        PointerTo* pointerT = (PointerTo*)inType;
+
+        //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(
+                pyType->tp_dict,
+                "ElementType",
+                typePtrToPyTypeRepresentation(pointerT->getEltType())
+                );
+    }
+
     if (inType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         ConstDict* constDictT = (ConstDict*)inType;
 
@@ -3219,6 +3487,7 @@ PyObject* native_instance_wrapper::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catValue) { static PyObject* res = PyUnicode_FromString("Value"); return res; }
     if (cat == Type::TypeCategory::catOneOf) { static PyObject* res = PyUnicode_FromString("OneOf"); return res; }
     if (cat == Type::TypeCategory::catTupleOf) { static PyObject* res = PyUnicode_FromString("TupleOf"); return res; }
+    if (cat == Type::TypeCategory::catPointerTo) { static PyObject* res = PyUnicode_FromString("PointerTo"); return res; }
     if (cat == Type::TypeCategory::catListOf) { static PyObject* res = PyUnicode_FromString("ListOf"); return res; }
     if (cat == Type::TypeCategory::catNamedTuple) { static PyObject* res = PyUnicode_FromString("NamedTuple"); return res; }
     if (cat == Type::TypeCategory::catTuple) { static PyObject* res = PyUnicode_FromString("Tuple"); return res; }

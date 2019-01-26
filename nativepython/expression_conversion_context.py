@@ -518,6 +518,9 @@ class ExpressionConversionContext(object):
             attr = ast.attr
             val = self.convert_expression_ast(ast.value)
 
+            if val is None:
+                return None
+
             return val.convert_attribute(attr)
 
         if ast.matches.Name:

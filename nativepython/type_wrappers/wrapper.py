@@ -106,7 +106,10 @@ class Wrapper(object):
         raise NotImplementedError(self)
 
     def convert_call(self, context, left, args):
-        raise NotImplementedError(self)
+        return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
+            self.typeRepresentation.__qualname__,
+            ",".join([str(a.expr_type) for a in args])
+            ))
 
     def convert_len(self, context, expr):
         return context.pushTerminal(
@@ -154,3 +157,8 @@ class Wrapper(object):
             "%s() takes at most 1 argument" % str(self)
             )
 
+    def convert_method_call(self, context, instance, methodname, args):
+        return context.pushException(TypeError, "Can't call %s.%s with args of type (%s)" % (
+            self.typeRepresentation.__qualname__, methodname,
+            ",".join([a.expr_type.typeRepresentation.__qualname__ for a in args])
+            ))

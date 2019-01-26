@@ -1,4 +1,4 @@
-#   Copyright 2018 Braxton Mckee
+#   Copyright 2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -14,22 +14,23 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
+from nativepython.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 import nativepython.native_ast as native_ast
+from typed_python._types import bytecount
 
-class LenWrapper(Wrapper):
+class BytecountWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
 
     def __init__(self):
-        super().__init__(len)
+        super().__init__(bytecount)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
     def convert_call(self, context, expr, args):
-        if len(args) == 1:
-            return args[0].convert_len()
+        if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper):
+            return context.constant(bytecount(args[0].expr_type.typeRepresentation))
 
         return super().convert_call(context, expr, args)
-

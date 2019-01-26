@@ -268,7 +268,18 @@ class TestListOfCompilation(unittest.TestCase):
             return out
 
         @Compiled
-        def add(x: T, y: T):
+        def addSafe(x: T, y: T):
+            out = T()
+
+            i = 0
+            while i < len(x):
+                out.append(x[i] + y[i])
+                i = i + 1
+
+            return out
+
+        @Compiled
+        def addUnsafe(x: T, y: T):
             out = T()
             out.reserve(len(x))
 
@@ -283,27 +294,57 @@ class TestListOfCompilation(unittest.TestCase):
 
             return out
 
-        x = range(1000000)
-        y = range(1000000)
+        @Compiled
+        def addPointers(x: T, y: T):
+            out = T()
+            out.reserve(len(x))
 
-        xnumpy = numpy.arange(1000000)
-        ynumpy = numpy.arange(1000000)
+            dest_ptr = out.pointerUnsafe(0)
+            max_ptr = out.pointerUnsafe(len(x))
+            x_ptr = x.pointerUnsafe(0)
+            y_ptr = y.pointerUnsafe(0)
 
-        t0 = time.time()
-        for _ in range(10):
-            y = add(x,y)
-        t1 = time.time()
-        for _ in range(10):
-            ynumpy = xnumpy+ynumpy
-        t2 = time.time()
+            while dest_ptr < max_ptr:
+                dest_ptr.initialize(x_ptr.get() + y_ptr.get())
+                dest_ptr += 1
+                x_ptr += 1
+                y_ptr += 1
 
-        slowerThan = (t1 - t0) / (t2 - t1)
+                dest_ptr.initialize(x_ptr.get() + y_ptr.get())
+                dest_ptr += 1
+                x_ptr += 1
+                y_ptr += 1
 
-        #right now, about 1.8x
-        print(slowerThan, "times slower than numpy.")
+            out.setSizeUnsafe(len(x))
 
-        self.assertEqual(y[10], x[10] * 11)
-        self.assertLess(slowerThan, 2.5)
+            return out
+
+        def timingComparison(addFun):
+            x = range(10000000)
+            y = range(10000000)
+
+            xnumpy = numpy.arange(10000000)
+            ynumpy = numpy.arange(10000000)
+
+            t0 = time.time()
+            for _ in range(10):
+                y = addFun(x,y)
+            t1 = time.time()
+            for _ in range(10):
+                ynumpy = xnumpy+ynumpy
+            t2 = time.time()
+
+            slowerThanNumpyRatio = (t1 - t0) / (t2 - t1)
+
+            self.assertEqual(y[10], x[10] * 11)
+
+            print("Performance of ", addFun, "vs numpy is", slowerThanNumpyRatio, "times slower")
+
+            return slowerThanNumpyRatio
+
+        self.assertLess(timingComparison(addSafe), 10) #2.0 for me
+        self.assertLess(timingComparison(addUnsafe), 2.5) #1.27 for me
+        self.assertLess(timingComparison(addPointers), 1.3) #1.07 for me
 
 
 

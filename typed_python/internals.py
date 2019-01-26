@@ -26,6 +26,14 @@ from typed_python._types import (
     Int16, Int32, UInt8, UInt32, UInt64, NoneType, Function, TypeFor
 )
 
+class UndefinedBehaviorException(BaseException):
+    """An unsafe operation with known undefined behavior was performed.
+
+    This Exception is deliberately not a subclass of Exception because by
+    default it should not be caught by normal exception handlers. In compiled
+    code, the operation that raised this exception is likely to segfault.
+    """
+
 #needed by the C api
 object=object
 
