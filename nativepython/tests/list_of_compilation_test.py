@@ -21,7 +21,7 @@ import numpy
 import psutil
 
 def Compiled(f):
-    f = TypedFunction(f)
+    f = Function(f)
     return Runtime.singleton().compile(f)
 
 class TestListOfCompilation(unittest.TestCase):
@@ -111,7 +111,7 @@ class TestListOfCompilation(unittest.TestCase):
             f((1,2,3),1000000000)
 
     def test_list_refcounting(self):
-        @TypedFunction
+        @Function
         def f(x: ListOf(int), y: ListOf(int)) -> ListOf(int):
             return x
 

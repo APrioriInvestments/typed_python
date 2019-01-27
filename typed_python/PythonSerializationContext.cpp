@@ -259,7 +259,6 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
                 );
         }
 
-
         //we did nothing interesting
         b.write_uint8(T_OBJECT_TYPEANDDICT);
         serializePythonObject((PyObject*)o->ob_type, b);
@@ -271,20 +270,24 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         serializePyDict(d, b);
         Py_DECREF(d);
     } else {
-        if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
-            Py_DECREF(representation);
-            throw std::runtime_error("representationFor should return None or a tuple with 3 things");
-        }
-        if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
-            Py_DECREF(representation);
-            throw std::runtime_error("representationFor second arguments should be a tuple");
-        }
         b.write_uint8(T_OBJECT_REPRESENTATION);
-        serializePythonObject(PyTuple_GetItem(representation, 0), b);
-        serializePythonObject(PyTuple_GetItem(representation, 1), b);
-        serializePythonObject(PyTuple_GetItem(representation, 2), b);
+        serializePyRepresentation(representation, b);
     }
     Py_DECREF(representation);
+}
+
+void PythonSerializationContext::serializePyRepresentation(PyObject* representation, SerializationBuffer& b) const {
+    if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
+        Py_DECREF(representation);
+        throw std::runtime_error("representationFor should return None or a tuple with 3 things");
+    }
+    if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
+        Py_DECREF(representation);
+        throw std::runtime_error("representationFor second arguments should be a tuple");
+    }
+    serializePythonObject(PyTuple_GetItem(representation, 0), b);
+    serializePythonObject(PyTuple_GetItem(representation, 1), b);
+    serializePythonObject(PyTuple_GetItem(representation, 2), b);
 }
 
 PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(DeserializationBuffer& b) const {
@@ -319,37 +322,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
         return result;
     } else
     if (code == T_OBJECT_REPRESENTATION) {
-        PyObject* t = deserializePythonObject(b);
-        PyObject* tArgs = deserializePythonObject(b);
-
-        if (!PyTuple_Check(tArgs)) {
-            throw std::runtime_error("corrupt data: second reconstruction argument is not a tuple.");
-        }
-
-        PyObject* instance = PyObject_Call(t, tArgs, NULL);
-        Py_DECREF(t);
-        Py_DECREF(tArgs);
-
-        if (!instance) {
-            throw PythonExceptionSet();
-        }
-
-        b.addCachedPointer(id, incref(instance), true);
-
-        PyObject* rep = deserializePythonObject(b);
-        PyObject* res = PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", instance, rep);
-        Py_DECREF(rep);
-
-        if (!res) {
-            throw PythonExceptionSet();
-        }
-        if (res != Py_True) {
-            Py_DECREF(res);
-            throw std::runtime_error("setInstanceStateFromRepresentation didn't return True.");
-        }
-        Py_DECREF(res);
-
-        return instance;
+        return deserializePyRepresentation(b, id);
     } else
     if (code == T_OBJECT_NAMED) {
         std::string name = b.readString();
@@ -368,6 +341,42 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
     }
 }
 
+PyObject* PythonSerializationContext::deserializePyRepresentation(DeserializationBuffer& b, int32_t id) const {
+    PyObject* t = deserializePythonObject(b);
+    PyObject* tArgs = deserializePythonObject(b);
+
+    if (!PyTuple_Check(tArgs)) {
+        throw std::runtime_error("corrupt data: second reconstruction argument is not a tuple.");
+    }
+
+    PyObject* instance = PyObject_Call(t, tArgs, NULL);
+    Py_DECREF(t);
+    Py_DECREF(tArgs);
+
+    if (!instance) {
+        throw PythonExceptionSet();
+    }
+
+    if (id >= 0) {
+        b.addCachedPointer(id, incref(instance), true);
+    }
+
+    PyObject* rep = deserializePythonObject(b);
+    PyObject* res = PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", instance, rep);
+    Py_DECREF(rep);
+
+    if (!res) {
+        throw PythonExceptionSet();
+    }
+    if (res != Py_True) {
+        Py_DECREF(res);
+        throw std::runtime_error("setInstanceStateFromRepresentation didn't return True.");
+    }
+    Py_DECREF(res);
+
+    return instance;
+}
+
 void PythonSerializationContext::serializeNativeType(Type* nativeType, SerializationBuffer& b, bool allowCaching) const {
     PyObject* nameForObject = PyObject_CallMethod(mContextObj, "nameForObject", "O", native_instance_wrapper::typeObj(nativeType));
 
@@ -381,7 +390,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
             throw std::runtime_error("nameForObject returned something other than None or a string.");
         }
 
-        b.write_uint8(0);
+        b.write_uint8(T_OBJECT_NAMED);
         b.write_string(std::string(PyUnicode_AsUTF8(nameForObject)));
         Py_DECREF(nameForObject);
         return;
@@ -389,7 +398,24 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 
     Py_DECREF(nameForObject);
 
-    b.write_uint8(1);
+    PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", native_instance_wrapper::typeObj(nativeType));
+
+    if (!representation) {
+        throw PythonExceptionSet();
+    }
+
+    if (representation != Py_None) {
+        b.write_uint8(T_OBJECT_REPRESENTATION);
+
+        serializePyRepresentation(representation, b);
+
+        Py_DECREF(representation);
+        return;
+    }
+
+    Py_DECREF(representation);
+
+    b.write_uint8(T_NATIVETYPE_BY_CATEGORY);
 
     if (allowCaching) {
         std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(nativeType);
@@ -475,7 +501,9 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 }
 
 Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, bool allowCaching) const {
-    if (b.read_uint8() == 0) {
+    uint8_t style = b.read_uint8();
+
+    if (style == T_OBJECT_NAMED) {
         //it's a named type
         std::string name = b.readString();
         PyObject* res = PyObject_CallMethod(mContextObj, "objectFromName", "s", name.c_str());
@@ -497,6 +525,25 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
         }
         return resultType;
+    }
+
+    if (style == T_OBJECT_REPRESENTATION) {
+        //the -1 code indicates we don't want to memoize this. That should have happened at an outer layer.
+        PyObject* res = deserializePyRepresentation(b, -1);
+
+        Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res, true);
+
+        Py_DECREF(res);
+
+        if (!resultType) {
+            throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
+        }
+
+        return resultType;
+    }
+
+    if (style != T_NATIVETYPE_BY_CATEGORY) {
+        throw std::runtime_error("corrupt data: expected a valid code for native type deserialization");
     }
 
     if (!allowCaching) {

@@ -19,10 +19,10 @@ import unittest
 import time
 
 def Compiled(f):
-    f = TypedFunction(f)
+    f = Function(f)
     return Runtime.singleton().compile(f)
 
-class TestOneOfOfCompilation(unittest.TestCase):    
+class TestOneOfOfCompilation(unittest.TestCase):
     def test_one_of_basic(self):
         @Compiled
         def f(x: OneOf(int, float)) -> OneOf(int, float):
@@ -152,4 +152,3 @@ class TestOneOfOfCompilation(unittest.TestCase):
         self.assertEqual(f(10.5), 10.5)
         self.assertIs(f(None), None)
 
-    

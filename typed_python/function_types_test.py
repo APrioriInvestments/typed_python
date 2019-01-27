@@ -13,11 +13,11 @@
 #   limitations under the License.
 import unittest
 from typed_python import Int8, Int64, Float64, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction
+    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function
 
 class NativeFunctionTypesTests(unittest.TestCase):
     def test_create_simple_function(self):
-        @TypedFunction
+        @Function
         def f(x: int) -> int:
             return x + 1
 
@@ -39,7 +39,7 @@ class NativeFunctionTypesTests(unittest.TestCase):
         self.assertEqual(o.args[0].isKwarg, False)
 
     def test_create_function_with_kwargs_and_star_args_and_defaults(self):
-        @TypedFunction
+        @Function
         def f(x: int, y = 30, z: None=None, *args: TupleOf(float), **kwargs: ConstDict(str, float)) -> int:
             return x + 1
 

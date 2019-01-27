@@ -30,7 +30,7 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python import (
     Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64,
     String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
-    Value, Class, Member, _types, TypedFunction, SerializationContext
+    Value, Class, Member, _types, Function, SerializationContext
 )
 
 module_level_testfun = dummy_test_module.testfunction

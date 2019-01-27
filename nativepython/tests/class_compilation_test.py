@@ -19,7 +19,7 @@ import unittest
 import time
 
 def Compiled(f):
-    f = TypedFunction(f)
+    f = Function(f)
     return Runtime.singleton().compile(f)
 
 AClass = lambda: AClass

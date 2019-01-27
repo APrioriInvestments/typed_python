@@ -19,7 +19,7 @@ import unittest
 import time
 
 def Compiled(f):
-    f = TypedFunction(f)
+    f = Function(f)
     return Runtime.singleton().compile(f)
 
 class TestCompilationStructures(unittest.TestCase):
@@ -92,7 +92,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.checkFunctionOfIntegers(f)
 
     def test_call_untyped_function(self):
-        @TypedFunction
+        @Function
         def f(x):
             return x
 
@@ -106,7 +106,7 @@ class TestCompilationStructures(unittest.TestCase):
         def g(x):
             return x
 
-        @TypedFunction
+        @Function
         def f(x):
             return g(x)
 
@@ -178,7 +178,7 @@ class TestCompilationStructures(unittest.TestCase):
                 return z(f(x-1)) * z(2) + f(x-2)
             return 1
 
-        g_typed = TypedFunction(g)
+        g_typed = Function(g)
 
         Runtime.singleton().compile(g_typed, {'x': int})
         Runtime.singleton().compile(g_typed, {'x': float})
@@ -201,11 +201,11 @@ class TestCompilationStructures(unittest.TestCase):
             print("for ", input, " speedup is ", speedup)
 
     def test_call_typed_function(self):
-        @TypedFunction
+        @Function
         def f(x):
             return x
 
-        @TypedFunction
+        @Function
         def g(x: int):
             return f(x+1)
 
@@ -215,7 +215,7 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(g(10), 11)
 
     def test_adding_with_nones_throws(self):
-        @TypedFunction
+        @Function
         def g():
             return None + None
 
@@ -225,7 +225,7 @@ class TestCompilationStructures(unittest.TestCase):
             g()
 
     def test_exception_before_return_propagated(self):
-        @TypedFunction
+        @Function
         def g():
             None+None
             return None
@@ -236,7 +236,7 @@ class TestCompilationStructures(unittest.TestCase):
             g()
 
     def test_call_function_with_none(self):
-        @TypedFunction
+        @Function
         def g(x: None):
             return None
 
@@ -248,7 +248,7 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x):
             return x
 
-        @TypedFunction
+        @Function
         def g(x: int):
             return f(None)
 
@@ -261,11 +261,11 @@ class TestCompilationStructures(unittest.TestCase):
             x+z
             return y
 
-        @TypedFunction
+        @Function
         def works(x: int):
             return f(x,None,x)
 
-        @TypedFunction
+        @Function
         def throws(x: int):
             return f(None,None,x)
 
@@ -280,7 +280,7 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x):
             return x
 
-        @TypedFunction
+        @Function
         def g(x: int):
             y = f(None)
             z = y

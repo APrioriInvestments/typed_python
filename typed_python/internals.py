@@ -16,14 +16,14 @@ from types import FunctionType
 
 import threading
 import numpy
-import typed_python._types
+import typed_python._types as _types
 import typed_python.inspect_override as inspect
 
 from typed_python.hash import sha_hash
 from typed_python._types import (
     TupleOf, Tuple, NamedTuple, OneOf, ConstDict,
     Alternative, Value, serialize, deserialize, Int8,
-    Int16, Int32, UInt8, UInt32, UInt64, NoneType, Function, TypeFor
+    Int16, Int32, UInt8, UInt32, UInt64, NoneType, TypeFor
 )
 
 class UndefinedBehaviorException(BaseException):
@@ -48,19 +48,30 @@ def forwardToName(fwdLambda):
         if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
             return fwdLambda.__code__.co_freevars[0]
 
-    return "UnknownForward"
+    if fwdLambda.__name__ == "<lambda>":
+        return "UnknownForward"
+    else:
+        return fwdLambda.__name__
 
 class Member:
+    """A member of a Class object."""
     def __init__(self, t, default_value=None):
-        self.t = t
-        self.v = default_value
-        if self.v is not None:
-            assert isinstance(self.v, self.t)
+        self._type = t
+        self._default_value = default_value
+        if self._default_value is not None:
+            assert isinstance(self._default_value, self._type)
+
+    @property
+    def type(self):
+        if isinstance(self._type, FunctionType):
+            #resolve the function type.
+            self._type = self._type()
+        return self._type
 
     def __eq__(self, other):
         if not isinstance(other, Member):
             return False
-        return self.t == other.t
+        return self._type == other._type
 
 
 class ClassMetaNamespace:
@@ -122,7 +133,7 @@ def makeFunction(name, f, firstArgType=None):
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
-    return Function(name, return_type, f, tuple(arg_types))
+    return _types.Function(name, return_type, f, tuple(arg_types))
 
 
 class ClassMetaclass(type):
@@ -141,22 +152,22 @@ class ClassMetaclass(type):
 
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
-                members.append((eltName, elt.t, elt.v))
+                members.append((eltName, elt._type, elt._default_value))
                 classMembers.append((eltName, elt))
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:
                     staticFunctions[eltName] = makeFunction(eltName, elt.__func__)
                 else:
-                    staticFunctions[eltName] = Function(staticFunctions[eltName], makeFunction(eltName, elt.__func__))
+                    staticFunctions[eltName] = _types.Function(staticFunctions[eltName], makeFunction(eltName, elt.__func__))
             elif isinstance(elt, FunctionType):
                 if eltName not in memberFunctions:
                     memberFunctions[eltName] = makeFunction(eltName, elt, lambda: actualClass)
                 else:
-                    memberFunctions[eltName] = Function(memberFunctions[eltName], makeFunction(eltName, elt, lambda: actualClass))
+                    memberFunctions[eltName] = _types.Function(memberFunctions[eltName], makeFunction(eltName, elt, lambda: actualClass))
             else:
                 classMembers.append((eltName, elt))
 
-        actualClass = typed_python._types.Class(
+        actualClass = _types.Class(
             name,
             tuple(members),
             tuple(memberFunctions.items()),
@@ -171,9 +182,9 @@ class Class(metaclass=ClassMetaclass):
     pass
 
 
-def TypedFunction(f):
+def Function(f):
+    """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
     return makeFunction(f.__name__, f)()
-
 
 class FunctionOverloadArg:
     def __init__(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
@@ -200,7 +211,7 @@ class FunctionOverload:
         """Do the types in 'argTypes' match our argument typeFilters at a binary level"""
         if len(argTypes) == len(self.args) and not any(x.isStarArg or x.isKwarg for x in self.args):
             for i in range(len(argTypes)):
-                if self.args[i].typeFilter is not None and not typed_python._types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i]):
+                if self.args[i].typeFilter is not None and not _types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i]):
                     return False
 
             return True
@@ -211,7 +222,7 @@ class FunctionOverload:
         return "FunctionOverload(%s->%s, %s)" % (self.f, self.returnType, self.args)
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
-        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
+        _types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
 
 
 class DisableCompiledCode:
@@ -219,7 +230,7 @@ class DisableCompiledCode:
         pass
 
     def __enter__(self):
-        typed_python._types.disableNativeDispatch()
+        _types.disableNativeDispatch()
 
     def __exit__(self, *args):
-        typed_python._types.enableNativeDispatch()
+        _types.enableNativeDispatch()

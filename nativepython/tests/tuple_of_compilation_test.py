@@ -20,7 +20,7 @@ import time
 import psutil
 
 def Compiled(f):
-    f = TypedFunction(f)
+    f = Function(f)
     return Runtime.singleton().compile(f)
 
 class TestTupleOfCompilation(unittest.TestCase):
@@ -110,7 +110,7 @@ class TestTupleOfCompilation(unittest.TestCase):
             f((1,2,3),1000000000)
 
     def test_tuple_refcounting(self):
-        @TypedFunction
+        @Function
         def f(x: TupleOf(int), y: TupleOf(int)) -> TupleOf(int):
             return x
 

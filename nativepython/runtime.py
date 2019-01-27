@@ -17,7 +17,7 @@ import nativepython.native_ast as native_ast
 import nativepython.llvm_compiler as llvm_compiler
 import nativepython
 from typed_python import _types
-from typed_python import TypedFunction
+from typed_python import Function
 from typed_python.internals import FunctionOverload
 
 _singleton = [None]
@@ -97,7 +97,7 @@ class Runtime:
             return f
 
         if callable(f):
-            result = TypedFunction(f)
+            result = Function(f)
             self.compile(result, argument_types)
             return result
 

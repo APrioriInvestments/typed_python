@@ -61,7 +61,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertTrue(Runtime.singleton() is Runtime.singleton())
 
     def test_compile_simple(self):
-        @TypedFunction
+        @Function
         def f(x: int) -> int:
             return x+x+x
 

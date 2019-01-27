@@ -10,7 +10,7 @@
 #   distributed under the License is distributed on an "AS IS" BASIS,
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or imp lied.
 #   See the License for the specific language governing permissions and
-#   limitations under the License.  
+#   limitations under the License.
 
 from typed_python import *
 from nativepython.runtime import Runtime
@@ -18,7 +18,7 @@ import unittest
 import time
 
 def Compiled(f):
-    f = TypedFunction(f)
+    f = Function(f)
     return Runtime.singleton().compile(f)
 
 class HoldsAnA:

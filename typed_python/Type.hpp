@@ -780,9 +780,8 @@ public:
         if (*(void**)left > *(void**)right) {
             return 1;
         }
-        if (*(void**)left == *(void**)right) {
-            return 0;
-        }
+
+        return 0;
     }
 
     Type* getEltType() const {
@@ -1567,6 +1566,10 @@ public:
                          const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
                          );
 
+    Alternative* renamed(std::string newName) {
+        return Make(newName, m_subtypes, m_methods);
+    }
+
     const std::vector<std::pair<std::string, NamedTuple*> >& subtypes() const {
         return m_subtypes;
     }
@@ -2251,6 +2254,15 @@ public:
         return new HeldClass(inName, members, memberFunctions, staticFunctions, classMembers);
     }
 
+    HeldClass* renamed(std::string newName) {
+        return Make(newName,
+            m_members,
+            m_memberFunctions,
+            m_staticFunctions,
+            m_classMembers
+            );
+    }
+
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
         return self + m_byte_offsets[ix];
     }
@@ -2419,6 +2431,10 @@ public:
             )
     {
         return new Class(HeldClass::Make(inName, members, memberFunctions, staticFunctions, classMembers));
+    }
+
+    Class* renamed(std::string newName) {
+        return new Class(m_heldClass->renamed(newName));
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const;

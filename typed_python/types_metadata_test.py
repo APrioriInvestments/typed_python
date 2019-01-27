@@ -13,7 +13,7 @@
 #   limitations under the License.
 import unittest
 from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, TypedFunction
+    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function
 
 class TypesMetadataTest(unittest.TestCase):
     def test_tupleOf(self):

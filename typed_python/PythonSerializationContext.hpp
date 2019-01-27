@@ -59,7 +59,8 @@ public:
         T_NATIVETYPE,
         T_OBJECT_NAMED,
         T_OBJECT_TYPEANDDICT,
-        T_OBJECT_REPRESENTATION
+        T_OBJECT_REPRESENTATION,
+        T_NATIVETYPE_BY_CATEGORY
     };
 
     PythonSerializationContext(PyObject* typeSetObj) :
@@ -87,6 +88,9 @@ public:
 
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const;
 
+    void serializePyRepresentation(PyObject* representation, SerializationBuffer& b) const;
+
+    PyObject* deserializePyRepresentation(DeserializationBuffer& b, int32_t objectId) const;
 
 private:
     template<class Size_Fn, class GetItem_Fn>

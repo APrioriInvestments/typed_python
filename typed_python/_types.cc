@@ -252,6 +252,30 @@ PyObject *MakeNoneTypeType(PyObject* nullValue, PyObject* args) {
     return res;
 }
 
+PyObject *RenameType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2
+            || !native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))
+            || !PyUnicode_Check(PyTuple_GetItem(args,1)))
+    {
+        PyErr_SetString(PyExc_TypeError, "RenameType takes 2 positional arguments (a type and a name)");
+        return NULL;
+    }
+
+    Type* type = native_instance_wrapper::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
+
+    std::string newName(PyUnicode_AsUTF8(PyTuple_GetItem(args,1)));
+
+    if (type->getTypeCategory() == Type::TypeCategory::catClass) {
+        return incref((PyObject*)native_instance_wrapper::typeObj(((Class*)type)->renamed(newName)));
+    }
+    if (type->getTypeCategory() == Type::TypeCategory::catAlternative) {
+        return incref((PyObject*)native_instance_wrapper::typeObj(((Alternative*)type)->renamed(newName)));
+    }
+
+    PyErr_Format(PyExc_TypeError, "Can't rename type %s", type->name().c_str());
+    return NULL;
+}
+
 PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "TypeFor takes 1 positional argument");
@@ -1187,6 +1211,7 @@ static PyMethodDef module_methods[] = {
     {"Function", (PyCFunction)MakeFunctionType, METH_VARARGS, NULL},
     {"BoundMethod", (PyCFunction)MakeBoundMethodType, METH_VARARGS, NULL},
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
+    {"RenameType", (PyCFunction)RenameType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},

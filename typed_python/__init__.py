@@ -14,7 +14,8 @@
 
 __version__="0.2"
 
-from typed_python.internals import Class, Member, TypedFunction, UndefinedBehaviorException
+from typed_python.internals import Class, Member, Function, UndefinedBehaviorException
+from typed_python.type_function import TypeFunction
 from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter

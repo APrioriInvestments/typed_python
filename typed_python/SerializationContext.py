@@ -15,6 +15,7 @@
 from typed_python._types import serialize, deserialize, resolveForwards
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
 from typed_python.hash import sha_hash
+from typed_python.type_function import TypeFunction, ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
 from types import FunctionType, ModuleType
 import numpy
 import lz4.frame
@@ -77,7 +78,7 @@ class SerializationContext(object):
             modulename = module.__name__
 
             for membername, member in module.__dict__.items():
-                if isinstance(member, (type, FunctionType)):
+                if isinstance(member, (type, FunctionType, ConcreteTypeFunction)):
                     nameToObject[modulename + "." + membername] = member
                 elif isinstance(member, ModuleType):
                     nameToObject[".modules." + member.__name__] = member
@@ -92,7 +93,7 @@ class SerializationContext(object):
                 if isinstance(member, type) and hasattr(member, '__dict__'):
                     for sub_name, sub_obj in member.__dict__.items():
                         if not (sub_name[:2] == "__" and sub_name[-2:] == "__"):
-                            if isinstance(sub_obj, (type, FunctionType)):
+                            if isinstance(sub_obj, (type, FunctionType, ConcreteTypeFunction)):
                                 nameToObject[modulename + "." + membername + "." + sub_name] = sub_obj
                             elif isinstance(sub_obj, ModuleType):
                                 nameToObject[".modules." + sub_obj.__name__] = sub_obj
@@ -119,8 +120,8 @@ class SerializationContext(object):
 
         if res is not None:
             return res
-        else:
-            return _builtin_value_to_name.get(tid)
+
+        return _builtin_value_to_name.get(tid)
 
     def objectFromName(self, name):
         ''' Return an object for an input name(string), or None if not found. '''
@@ -147,9 +148,24 @@ class SerializationContext(object):
             For those types, we return a representation object and for other
             types we return None.
 
+            The representation consists of a tuple (factory, args, representation).
+
+            During reconstruction, we call factory(*args) to produce an emnpty
+            'skeleton' object, and then call `setInstanceStateFromRepresentation`
+            with the resulting object and the 'representation'. The values returned
+            for  'factory' and 'args' may not have circular dependencies with the current
+            object - we deserialize those first, call factory(*args) to get the
+            resulting object, and that object gets returned to any objects inside of
+            'representation' that have references to the original object.
+
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
+        if isinstance(inst, type):
+            isTF = isTypeFunctionType(inst)
+            if isTF is not None:
+                return (reconstructTypeFunctionType,isTF,None)
+
         if isinstance(inst, numpy.ndarray):
             result = inst.__reduce__()
             #compress the numpy data
@@ -191,6 +207,9 @@ class SerializationContext(object):
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
+        if isinstance(instance, type):
+            return True
+
         if isinstance(instance, numpy.dtype):
             return True
 
