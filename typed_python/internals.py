@@ -219,7 +219,7 @@ class FunctionOverload:
         return False
 
     def __str__(self):
-        return "FunctionOverload(%s->%s, %s)" % (self.f, self.returnType, self.args)
+        return "FunctionOverload(%s->%s, %s)" % (self.functionTypeObject, self.returnType, self.args)
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
         _types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))

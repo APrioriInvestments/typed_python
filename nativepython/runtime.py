@@ -18,6 +18,7 @@ import nativepython.llvm_compiler as llvm_compiler
 import nativepython
 from typed_python import _types
 from typed_python import Function
+from typed_python import Codebase
 from typed_python.internals import FunctionOverload
 
 _singleton = [None]
@@ -32,17 +33,17 @@ class Runtime:
         return _singleton[0]
 
     def __init__(self):
-        self.compiler = llvm_compiler.Compiler()
+        self.llvm_compiler = llvm_compiler.Compiler()
         self.converter = python_to_native_converter.PythonToNativeConverter()
 
     def verboselyDisplayNativeCode(self):
-        self.compiler.mark_converter_verbose()
-        self.compiler.mark_llvm_codegen_verbose()
+        self.llvm_compiler.mark_converter_verbose()
+        self.llvm_compiler.mark_llvm_codegen_verbose()
 
     def compile(self, f, argument_types=None):
         """Compile a single FunctionOverload and install the pointer
 
-        if provided, 'argument_types' can be a dictionary from variablename to a type.
+        If provided, 'argument_types' can be a dictionary from variable name to a type.
         this will take precedence over any types specified on the function. Keep in mind
         that function overloads already filter by type, so if you specify a type that's
         not compatible with the type argument of the existing overload, the resulting
@@ -71,7 +72,7 @@ class Runtime:
 
             targets = self.converter.extract_new_function_definitions()
 
-            function_pointers = self.compiler.add_functions(targets)
+            function_pointers, _ = self.llvm_compiler.add_functions(targets)
 
             fp = function_pointers[wrappingCallTargetName]
 
@@ -92,7 +93,6 @@ class Runtime:
             for o in f.Function.overloads:
                 arg_types = dict(argument_types)
                 arg_types[o.args[0].name] = typeWrapper(f.Class)
-                print(arg_types)
                 self.compile(o, arg_types)
             return f
 

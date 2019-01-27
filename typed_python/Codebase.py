@@ -35,12 +35,21 @@ class Codebase:
     """
     def __init__(self, rootDirectory, filesToContents, modules):
         self.rootDirectory = rootDirectory
-        filesToContents = filesToContents
+        self.filesToContents = filesToContents
         self.modules = modules
 
         self.serializationContext = Codebase.coreSerializationContext().union(
             SerializationContext.FromModules(modules.values())
             )
+
+    def getIsolatedSerializationContext(self):
+        return SerializationContext.FromModules(self.modules.values())
+
+    def allModuleLevelValues(self):
+        """Iterate over all module-level values. Yields (name, object) pairs."""
+        for mname, module in self.modules.items():
+            for item in dir(module):
+                yield (mname + "." + item, getattr(module, item))
 
     def getModuleByName(self, module_name):
         if module_name not in self.modules:

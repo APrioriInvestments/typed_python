@@ -17,6 +17,7 @@ import llvmlite.ir
 import nativepython.native_ast_to_llvm as native_ast_to_llvm
 import sys
 import ctypes
+import time
 from typed_python import _types
 
 llvm.initialize()
@@ -26,6 +27,7 @@ llvm.initialize_native_asmprinter()  # yes, even this one
 target_triple = llvm.get_process_triple()
 target = llvm.Target.from_triple(target_triple)
 target_machine = target.create_target_machine()
+target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
 
 #we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
 if sys.platform == "darwin":
@@ -52,8 +54,12 @@ def sizeof_native_type(native_type):
             .get_abi_size(target_machine.target_data)
         )
 
-
+#there can be only one llvm engine alive at once.
+_engineCache = []
 def create_execution_engine():
+    if _engineCache:
+        return _engineCache[0]
+
     pmb = llvm.create_pass_manager_builder()
     pmb.opt_level = 3
 
@@ -65,6 +71,8 @@ def create_execution_engine():
     # And an execution engine with an empty backing module
     backing_mod = llvm.parse_assembly("")
     engine = llvm.create_mcjit_compiler(backing_mod, target_machine)
+
+    _engineCache.append((engine, pass_manager))
 
     return engine, pass_manager
 
@@ -79,13 +87,8 @@ class NativeFunctionPointer:
         return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" \
             % (self.fname, self.fp, [str(x) for x in self.input_types], str(self.output_type))
 
-_all_compilers_ever = []
 class Compiler:
     def __init__(self):
-        #we need to keep this object alive - some bug in llvmlite causes
-        #us to segfault if we release it
-        _all_compilers_ever.append(self)
-
         self.engine, self.module_pass_manager = create_execution_engine()
         self.converter = native_ast_to_llvm.Converter()
         self.functions_by_name = {}
@@ -97,6 +100,46 @@ class Compiler:
 
     def mark_llvm_codegen_verbose(self):
         self.verbose = True
+
+    def optimize_functions(self, functions):
+        """Add native definitions and return the text of a new module."""
+        module = self.converter.add_functions(functions)
+
+        try:
+            mod = llvm.parse_assembly(module)
+            mod.verify()
+        except Exception:
+            print("failing: ", module)
+            raise
+
+        # Now add the module and make sure it is ready for execution
+        self.engine.add_module(mod)
+
+        if self.optimize:
+            self.module_pass_manager.run(mod)
+
+        return mod.as_bitcode()
+
+    def compile_from_bitcode(self, bitcode, functions):
+        """Compile a module from pre-optimized text."""
+        mod = llvmlite.binding.parse_bitcode(bitcode)
+        self.engine.add_module(mod)
+        self.engine.finalize_object()
+
+        # Look up the function pointer (a Python int)
+        native_function_pointers = {}
+
+        for fname in functions:
+            func_ptr = self.engine.get_function_address(fname)
+            input_types = [x[1] for x in functions[fname].args]
+            output_type = functions[fname].output_type
+
+            native_function_pointers[fname] = NativeFunctionPointer(fname, func_ptr,
+                                                  input_types, output_type)
+
+            self.functions_by_name[fname] = native_function_pointers[fname]
+
+        return native_function_pointers
 
     def add_functions(self, functions):
         if not functions:
@@ -123,17 +166,17 @@ class Compiler:
         self.engine.finalize_object()
 
         # Look up the function pointer (a Python int)
-        result = {}
+        native_function_pointers = {}
 
         for fname in functions:
             func_ptr = self.engine.get_function_address(fname)
             input_types = [x[1] for x in functions[fname].args]
             output_type = functions[fname].output_type
 
-            result[fname] = NativeFunctionPointer(fname, func_ptr,
+            native_function_pointers[fname] = NativeFunctionPointer(fname, func_ptr,
                                                   input_types, output_type)
 
-            self.functions_by_name[fname] = result[fname]
+            self.functions_by_name[fname] = native_function_pointers[fname]
 
-        return result
+        return (native_function_pointers, str(mod))
 

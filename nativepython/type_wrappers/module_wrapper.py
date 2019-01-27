@@ -41,9 +41,7 @@ class ModuleWrapper(Wrapper):
                     )
                 )
 
-        res = nativepython.python_object_representation.pythonObjectRepresentation(
+        return nativepython.python_object_representation.pythonObjectRepresentation(
             context,
             getattr(self.typeRepresentation, attribute)
             )
-
-        return res
