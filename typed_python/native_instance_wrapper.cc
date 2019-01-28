@@ -1077,6 +1077,22 @@ void native_instance_wrapper::constructFromPythonArguments(uint8_t* data, Type* 
         return;
     }
 
+    if (cat == Type::TypeCategory::catListOf) {
+        if (PyTuple_Size(args) == 1 && !kwargs) {
+            PyObject* arg = PyTuple_GetItem(args, 0);
+            Type* argType = extractTypeFrom(arg->ob_type);
+
+            if (argType && argType->isBinaryCompatibleWith(t)) {
+                //following python semantics, this needs to produce a new object
+                //that's a copy of the original list. We can't just incref it and return
+                //the original object because it has state.
+                ListOf* listT = (ListOf*)t;
+                listT->copyListObject(data, ((native_instance_wrapper*)arg)->dataPtr());
+                return;
+            }
+        }
+    }
+
     if (cat == Type::TypeCategory::catClass) {
         Class* classT = (Class*)t;
 
@@ -1261,7 +1277,9 @@ PyObject* native_instance_wrapper::extractPythonObject(instance_ptr data, Type* 
 PyObject* native_instance_wrapper::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
     Type* eltType = extractTypeFrom(subtype);
 
-    if (!guaranteeForwardsResolved(eltType)) { return nullptr; }
+    if (!guaranteeForwardsResolved(eltType)) {
+        return nullptr;
+    }
 
     if (isSubclassOfNativeType(subtype)) {
         native_instance_wrapper* self = (native_instance_wrapper*)subtype->tp_alloc(subtype, 0);

@@ -5,6 +5,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from nativepython.type_wrappers.module_wrapper import ModuleWrapper
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
+from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from nativepython.type_wrappers.pointer_to_wrapper import PointerToWrapper
@@ -170,4 +171,4 @@ def pythonObjectRepresentation(context, f):
     if isinstance(f, ModuleType):
         return TypedExpression(context, native_ast.nullExpr, ModuleWrapper(f), False)
 
-    assert False, f
+    return TypedExpression(context, native_ast.nullExpr, PythonFreeObjectWrapper(f), False)

@@ -45,7 +45,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
         return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0,3).load().cast(native_ast.Int64))
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("resize","reserve","reserved","append","clear","pop","setSizeUnsafe","pointerUnsafe"):
+        if attr in ("copy", "resize","reserve","reserved","append","clear","pop","setSizeUnsafe","pointerUnsafe"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -152,6 +152,19 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         None,
                         self.generateAppend
                         ).call(instance, val)
+                    )
+        if methodname == "copy":
+            if len(args) == 0:
+                return context.push(
+                    self,
+                    lambda out:
+                        context.converter.defineNativeFunction(
+                            'copy(' + self.typeRepresentation.__name__ + ")",
+                            ('util', self, 'copy'),
+                            [self],
+                            self,
+                            self.generateCopy
+                            ).call(out, instance)
                     )
         if methodname == "clear":
             if len(args) == 0:
@@ -269,6 +282,19 @@ class ListOfWrapper(TupleOrListOfWrapper):
             listInst.nonref_expr.ElementPtrIntegers(0,2).store((listInst.convert_len()+1).nonref_expr.cast(native_ast.Int32))
             )
 
+    def generateCopy(self, context, out, listInst):
+        self.convert_default_initialize(context, out)
+
+        self.convert_method_call(context, out, "reserve", (listInst.convert_len(),))
+
+        with context.loop(listInst.convert_len()) as i:
+            result = listInst.convert_getitem_unsafe(i).convert_to_type(typeWrapper(self.typeRepresentation.ElementType))
+            if result is None:
+                return None
+            out.convert_getitem_unsafe(i).convert_copy_initialize(result)
+
+        self.convert_method_call(context, out, "setSizeUnsafe", (listInst.convert_len(),))
+
     def generateReserve(self, context, out, listInst, countInst):
         countInst = context.push(int, lambda target: target.expr.store(countInst.nonref_expr))
 
@@ -321,3 +347,19 @@ class ListOfWrapper(TupleOrListOfWrapper):
         expr.convert_getitem(index).convert_assign(item)
 
         return context.pushVoid()
+
+    def convert_type_call(self, context, typeInst, args):
+        if len(args) == 1 and args[0].expr_type == self:
+            return context.push(
+                self,
+                lambda out:
+                    context.converter.defineNativeFunction(
+                        'copy(' + str(self) + "," + str(args[0].expr_type) + ")",
+                        ('util', self, 'copy'),
+                        [args[0].expr_type],
+                        self,
+                        self.generateCopy
+                        ).call(out, args[0])
+                )
+
+        return super().convert_type_call(context, typeInst, args)

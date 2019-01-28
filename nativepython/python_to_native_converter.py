@@ -182,7 +182,7 @@ class PythonToNativeConverter(object):
         output_type = typeWrapper(output_type)
         input_types = [typeWrapper(x) for x in input_types]
 
-        identity = ("native", identity)
+        identity = ("native", identity, tuple(input_types))
 
         if identity in self._names_for_identifier:
             return self._targets[self._names_for_identifier[identity]]

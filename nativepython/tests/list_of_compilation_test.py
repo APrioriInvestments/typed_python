@@ -324,6 +324,14 @@ class TestListOfCompilation(unittest.TestCase):
         self.assertLess(timingComparison(addSafe), 10) #2.0 for me
         self.assertLess(timingComparison(addUnsafe), 1.3) #1.07 for me
 
+    def test_list_duplicate_operation(self):
+        @Compiled
+        def dupList(x: ListOf(int)):
+            return ListOf(int)(x)
 
+        x = ListOf(int)([1,2,3])
+        y = dupList(x)
+        x[0] = 100
+        self.assertEqual(y[0], 1)
 
 

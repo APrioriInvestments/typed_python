@@ -17,25 +17,16 @@ from typed_python import NoneType
 import nativepython.native_ast as native_ast
 import nativepython
 from nativepython.type_wrappers.exceptions import generateThrowException
+from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-class PythonTypeObjectWrapper(Wrapper):
-    is_pod = True
-    is_empty = False
-    is_pass_by_ref = False
-
-    def __init__(self, f):
-        super().__init__(f)
-
+class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def __repr__(self):
         return "Wrapper(TypeObject(%s))" % self.typeRepresentation.__qualname__
 
     def __str__(self):
         return "TypeObject(%s)" % self.typeRepresentation.__qualname__
-
-    def getNativeLayoutType(self):
-        return native_ast.Type.Void()
 
     def convert_call(self, context, left, args):
         if self.typeRepresentation is type:

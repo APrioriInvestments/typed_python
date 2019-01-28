@@ -1262,5 +1262,13 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aLeakedTuple), 2)
 
+    def test_list_copy_operation_duplicates_list(self):
+        T = ListOf(int)
 
+        x = T([1,2,3])
+        y = T(x)
+
+        x[0] = 100
+
+        self.assertNotEqual(y[0], 100)
 

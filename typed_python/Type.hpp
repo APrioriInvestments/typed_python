@@ -904,6 +904,9 @@ public:
 
     int64_t refcount(instance_ptr self) const;
 
+    //construct a new list at 'selfPtr' with 'count' items, each initialized by calling
+    //'allocator(target_object, k)', where 'target_object' is a pointer to the memory location
+    //to be filled and 'k' is the index in the list.
     template<class sub_constructor>
     void constructor(instance_ptr selfPtr, int64_t count, const sub_constructor& allocator) {
         layout_ptr& self = *(layout_ptr*)selfPtr;
@@ -970,6 +973,8 @@ public:
     void resize(instance_ptr self, size_t count);
 
     void resize(instance_ptr self, size_t count, instance_ptr value);
+
+    void copyListObject(instance_ptr target, instance_ptr src);
 };
 
 class TupleOf : public TupleOrListOf {

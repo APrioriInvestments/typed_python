@@ -627,6 +627,13 @@ void TupleOrListOf::assign(instance_ptr self, instance_ptr other) {
 }
 
 
+//static
+void ListOf::copyListObject(instance_ptr target, instance_ptr src) {
+    constructor(target, count(src), [&](instance_ptr tgt, long k) {
+        return m_element_type->copy_constructor(tgt, eltPtr(src,k));
+    });
+}
+
 void ListOf::setSizeUnsafe(instance_ptr self, size_t count) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 
