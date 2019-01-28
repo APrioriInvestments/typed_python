@@ -68,15 +68,20 @@ class ServiceManager(object):
             service.service_class_name = serviceClass.__qualname__
 
             if not service.service_module_name.startswith("object_database."):
-                #find the root of the codebase
+                # find the root of the codebase
                 module = sys.modules[serviceClass.__module__]
 
+                # an absolute path that ends in '/__init__.py'
                 module_path = os.path.abspath(module.__file__)
 
+                # drop as many parts of the module_path as there are parts to the
+                # module name (at least one)
                 for _ in module.__name__.split("."):
                     module_path = os.path.dirname(module_path)
 
-                service.setCodebase(service_schema.Codebase.create([module_path]))
+                service.setCodebase(
+                    service_schema.Codebase.createFromRootlevelPath(module_path)
+                )
 
         if target_count is not None:
             service.target_count = target_count

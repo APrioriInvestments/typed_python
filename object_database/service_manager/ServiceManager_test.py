@@ -484,8 +484,6 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.assertTrue(i1 is i12)
             self.assertTrue(i2 is i22)
 
-
-
     def test_redeploy_hanging_services(self):
         with self.database.transaction():
             ServiceManager.createOrUpdateService(HangingService, "HangingService", target_count=10)

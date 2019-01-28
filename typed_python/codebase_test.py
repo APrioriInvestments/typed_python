@@ -16,6 +16,7 @@ import unittest
 
 from typed_python.Codebase import Codebase
 
+
 class CodebaseTest(unittest.TestCase):
     def test_instantiated_codebase(self):
         codebase = Codebase.Instantiate({
@@ -24,9 +25,7 @@ class CodebaseTest(unittest.TestCase):
                 })
         self.assertEqual(codebase.getClassByName('test_module.inner.f')(), 10)
 
-        codebase2 = Codebase.FromModule(codebase.getModuleByName("test_module"))
+        codebase2 = Codebase._FromModule(codebase.getModuleByName("test_module"))
         self.assertEqual(codebase2.getClassByName('test_module.inner.f')(), 10)
 
         self.assertEqual(codebase.filesToContents, codebase2.filesToContents)
-
-
