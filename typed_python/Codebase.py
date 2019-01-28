@@ -155,6 +155,8 @@ class Codebase:
         """Instantiate a codebase on disk and import the modules."""
         with _lock:
             if rootDirectory is None:
+                # this works, despite the fact that we immediately destroy
+                # the directory, becauuse we use 'makedirs' below to repopulate.
                 rootDirectory = tempfile.TemporaryDirectory().name
 
             for fpath, fcontents in filesToContents.items():

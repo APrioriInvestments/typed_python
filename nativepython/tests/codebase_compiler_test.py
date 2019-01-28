@@ -61,4 +61,4 @@ class TestCodebaseCompiler(unittest.TestCase):
         f_time_second = time.time() - t0
 
         self.assertTrue(f_time_second < f_time_first * .1)
-        self.assertTrue(install_time < compilation_time)
+        self.assertTrue(install_time < compilation_time * 0.1)

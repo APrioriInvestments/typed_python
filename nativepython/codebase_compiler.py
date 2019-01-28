@@ -27,15 +27,20 @@ from typed_python.internals import FunctionOverload
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
 class CompiledCodebase:
-    def __init__(self, bitcode, nativeTargets, typedTargets):
-        self.bitcode = bitcode
+    def __init__(self, codebase, sharedObject, nativeTargets, typedTargets):
+        self.codebase = codebase
+        self.sharedObject = sharedObject
         self.nativeTargets = nativeTargets
         self.typedTargets = typedTargets
 
     def install(self):
         compiler = llvm_compiler.Compiler()
 
-        function_pointers = compiler.compile_from_bitcode(self.bitcode, self.nativeTargets)
+        function_pointers = compiler.link_binary_shared_object(
+            self.sharedObject,
+            self.nativeTargets,
+            os.path.join(self.codebase.rootDirectory, "__pycache__", "nativepython")
+            )
 
         for wrappingCallTargetName, (f,callTarget) in self.typedTargets.items():
             fp = function_pointers[wrappingCallTargetName]
@@ -83,9 +88,9 @@ class CodebaseCompiler:
 
     def compileModule(self):
         native_targets = self.converter.extract_new_function_definitions()
-        bitcode = self.llvm_compiler.optimize_functions(native_targets)
+        sharedObject = self.llvm_compiler.compile_functions_and_return_shared_object(native_targets)
 
-        return CompiledCodebase(bitcode, native_targets, self.targets)
+        return CompiledCodebase(self.codebase, sharedObject, native_targets, self.targets)
 
     def _convert(self, f, argument_types):
         argument_types = argument_types or {}

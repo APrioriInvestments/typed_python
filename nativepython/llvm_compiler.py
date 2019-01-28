@@ -1,4 +1,4 @@
-#   Copyright 2017 Braxton Mckee
+#   Copyright 2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -18,7 +18,11 @@ import nativepython.native_ast_to_llvm as native_ast_to_llvm
 import sys
 import ctypes
 import time
-from typed_python import _types
+import struct
+import tempfile
+import os
+import subprocess
+from typed_python import _types, sha_hash
 
 llvm.initialize()
 llvm.initialize_native_target()
@@ -87,6 +91,54 @@ class NativeFunctionPointer:
         return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" \
             % (self.fname, self.fp, [str(x) for x in self.input_types], str(self.output_type))
 
+class BinarySharedObject:
+    """Models a shared object library (.so) loadable on linux systems."""
+    def __init__(self, binaryForm):
+        self.binaryForm = binaryForm
+
+    @staticmethod
+    def fromModule(module):
+        #returns the contents of a '.o' file coming out of a c++ compiler like clang
+        o_file_contents = target_machine_shared_object.emit_object(module)
+
+        # we have to run it through 'ld' to link it. if we want to support windows,
+        # we should use 'llvm' directly instead of 'llmvlite', in which case this
+        # kind of linking operation would be easier to express directly without
+        # resorting to subprocesses.
+        with tempfile.TemporaryDirectory() as tf:
+            with open(os.path.join(tf, "module.o"), "wb") as o_file:
+                o_file.write(o_file_contents)
+
+            subprocess.check_call(
+                ["ld", "-shared", "-fPIC", os.path.join(tf,"module.o"), "-o", os.path.join(tf,"module.so")]
+                )
+
+            with open(os.path.join(tf, "module.so"), "rb") as so_file:
+                return BinarySharedObject(so_file.read())
+
+    def loadAndReturnFunctionPointers(self, symbolsToReturn, storageDir):
+        """Instantiate this .so in temporary storage and return a dict from symbol -> integer function pointer"""
+        if not os.path.exists(storageDir):
+            os.makedirs(storageDir)
+
+        modulename = sha_hash(self.binaryForm).hexdigest + "_module.so"
+        modulePath = os.path.join(storageDir, modulename)
+
+        with open(modulePath, "wb") as f:
+            f.write(self.binaryForm)
+
+        dll = ctypes.CDLL(modulePath)
+
+        output = {}
+
+        for symbol in symbolsToReturn:
+            #if you ask for 'bytes' on a ctypes function you get the function pointer
+            #encoded as a bytearray.
+            output[symbol] = struct.unpack("q", bytes(dll[symbol]))[0]
+
+        return output
+
+
 class Compiler:
     def __init__(self):
         self.engine, self.module_pass_manager = create_execution_engine()
@@ -101,8 +153,8 @@ class Compiler:
     def mark_llvm_codegen_verbose(self):
         self.verbose = True
 
-    def optimize_functions(self, functions):
-        """Add native definitions and return the text of a new module."""
+    def compile_functions_and_return_shared_object(self, functions):
+        """Add native definitions and return a BinarySharedObject representing the compiled code."""
         module = self.converter.add_functions(functions)
 
         try:
@@ -118,19 +170,18 @@ class Compiler:
         if self.optimize:
             self.module_pass_manager.run(mod)
 
-        return mod.as_bitcode()
+        return BinarySharedObject.fromModule(mod)
 
-    def compile_from_bitcode(self, bitcode, functions):
+    def link_binary_shared_object(self, binarySO, functions, storageDir):
         """Compile a module from pre-optimized text."""
-        mod = llvmlite.binding.parse_bitcode(bitcode)
-        self.engine.add_module(mod)
-        self.engine.finalize_object()
+        integerFuncPtrs = binarySO.loadAndReturnFunctionPointers(functions.keys(), storageDir)
 
         # Look up the function pointer (a Python int)
         native_function_pointers = {}
 
         for fname in functions:
-            func_ptr = self.engine.get_function_address(fname)
+            func_ptr = integerFuncPtrs[fname]
+
             input_types = [x[1] for x in functions[fname].args]
             output_type = functions[fname].output_type
 
