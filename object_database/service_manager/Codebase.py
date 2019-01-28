@@ -106,6 +106,12 @@ class Codebase:
         return Codebase.createFromFiles(files)
 
     @staticmethod
+    def createFromRootlevelPath(rootPath):
+        return Codebase.createFromCodebase(
+            TypedPythonCodebase.FromRootlevelPath(rootPath)
+        )
+
+    @staticmethod
     def  createFromCodebase(codebase:TypedPythonCodebase):
         return Codebase.createFromFiles(codebase.filesToContents)
 

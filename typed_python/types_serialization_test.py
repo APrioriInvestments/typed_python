@@ -955,7 +955,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(g2(10), g(10))
 
     def test_serialize_modules(self):
-        codebase = Codebase.FromModule(dummy_test_module)
+        codebase = Codebase._FromModule(dummy_test_module)
         sc = codebase.serializationContext
 
         self.assertIn('.modules.pytz', sc.nameToObject)
@@ -964,7 +964,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(pytz, sc.deserialize(sc.serialize(pytz)))
 
     def test_serialize_lambdas_with_references_in_list_comprehensions(self):
-        codebase = Codebase.FromModule(dummy_test_module)
+        codebase = Codebase._FromModule(dummy_test_module)
         sc = codebase.serializationContext
 
         #note that it matters that the 'module_level_testfun' is at the module level,

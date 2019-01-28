@@ -28,6 +28,7 @@ _lock = threading.RLock()
 _root_level_module_codebase_cache = {}
 _coreSerializationContext = [None]
 
+
 class Codebase:
     """Represents a bundle of code and objects on disk somewhere.
 
@@ -67,10 +68,10 @@ class Codebase:
                 allModules = []
 
                 context1 = SerializationContext.FromModules(
-                    Codebase.walkModuleDiskRepresentation(typed_python)[2].values()
+                    Codebase._walkModuleDiskRepresentation(typed_python)[2].values()
                     )
                 context2 = SerializationContext.FromModules(
-                    Codebase.walkModuleDiskRepresentation(object_database)[2].values()
+                    Codebase._walkModuleDiskRepresentation(object_database)[2].values()
                     )
 
                 _coreSerializationContext[0] = context1.union(context2)
@@ -78,12 +79,12 @@ class Codebase:
             return _coreSerializationContext[0]
 
     @staticmethod
-    def FromRootlevelModule(module):
+    def FromRootlevelModule(module, **kwargs):
         assert '.' not in module.__name__
-        return Codebase.FromModule(module)
+        return Codebase._FromModule(module, **kwargs)
 
     @staticmethod
-    def FromModule(module):
+    def _FromModule(module, **kwargs):
         if '.' in module.__name__:
             prefix = module.__name__.rsplit(".",1)[0]
         else:
@@ -95,7 +96,7 @@ class Codebase:
 
             assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
 
-            root, files, modules = Codebase.walkModuleDiskRepresentation(module, prefix)
+            root, files, modules = Codebase._walkModuleDiskRepresentation(module, prefix=prefix, **kwargs)
 
             codebase = Codebase(root, files, modules)
 
@@ -103,14 +104,33 @@ class Codebase:
 
             return _root_level_module_codebase_cache[module]
 
+    @staticmethod
+    def FromRootlevelPath(rootPath, **kwargs):
+        root, files, modules = Codebase._walkDiskRepresentation(rootPath, **kwargs)
+        codebase = Codebase(root, files, modules)
+        return codebase
 
     @staticmethod
-    def walkModuleDiskRepresentation(module, prefix=None):
-        dirpart = os.path.dirname(module.__file__)
-        root, moduleDir = os.path.split(dirpart)
+    def _walkDiskRepresentation(rootPath, prefix=None, extensions=('.py',), maxTotalBytes = 100 * 1024 * 1024):
+        """ Utility method that collects the code for a given root module.
+
+            Parameters:
+            -----------
+            rootPath : str
+                the root path for which to gather code
+
+            Returns:
+            --------
+            tuple(parentDir:str, files:dict(str->str), modules:dict(str->module))
+                parentDir:str is the path of the parent directory of the module
+                files:dict(str->str) maps file paths (relative to the parentDir) to their contents
+                modules:dict(str->module) maps module names to modules
+        """
+        parentDir, moduleDir = os.path.split(rootPath)
 
         # map: path:str -> contents:str
         files = {}
+        total_bytes = [0]
 
         def walkDisk(path, so_far):
             if so_far.startswith("."):
@@ -122,18 +142,30 @@ class Codebase:
                 if os.path.isdir(fullpath):
                     walkDisk(fullpath, so_far_with_name)
                 else:
-                    if os.path.splitext(name)[1] == ".py":
+                    if os.path.splitext(name)[1] in extensions:
                         with open(fullpath, "r") as f:
                             contents = f.read()
 
+                        total_bytes[0] += len(contents)
+
+                        if total_bytes[0] > maxTotalBytes:
+                            raise Exception(
+                                "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
+                            )
+
                         files[so_far_with_name] = contents
 
-        walkDisk(os.path.abspath(dirpart), moduleDir)
+        walkDisk(os.path.abspath(rootPath), moduleDir)
 
         modules_by_name = Codebase.filesToModuleNames(files, prefix)
         modules = Codebase.importModulesByName(modules_by_name)
 
-        return root, files, modules
+        return parentDir, files, modules
+
+    @staticmethod
+    def _walkModuleDiskRepresentation(module, **kwargs):
+        dirpart = os.path.dirname(module.__file__)
+        return Codebase._walkDiskRepresentation(dirpart, **kwargs)
 
     @staticmethod
     def filesToModuleNames(files, prefix=None):
