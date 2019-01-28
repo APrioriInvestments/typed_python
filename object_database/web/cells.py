@@ -162,7 +162,7 @@ class Cells:
                     del self._subscribedCells[k]
 
     def _addCell(self, cell, parent):
-        assert isinstance(cell, Cell)
+        assert isinstance(cell, Cell), type(cell)
         assert cell.cells is None
 
         cell.cells = self
@@ -269,11 +269,20 @@ class Cells:
                             break
                         except SubscribeAndRetry as e:
                             e.callback(self.db)
+
+                    for childname, child_cell in n.children.items():
+                        if not isinstance(child_cell, Cell):
+                            raise Exception("Cell of type %s had a non-cell child %s of type %s != Cell." % (
+                                type(n),
+                                childname,
+                                type(child_cell)
+                                ))
+
                 except Exception:
                     self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
                     self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(traceback.format_exc())}
-
+                    n.contents = "____contents__"
                 finally:
                     _cur_cell.cell = None
 
@@ -347,6 +356,7 @@ class Cell:
         self.children = {}  # local node def to global node def
         self.contents = ""  # some contents containing a local node def
         self._identity = None
+        self._tag = None
         self.postscript = None
         self.garbageCollected = False
         self.subscriptions = set()
@@ -357,6 +367,51 @@ class Cell:
         self.serializationContext = None
 
         self._logger = logging.getLogger(__name__)
+
+    def tagged(self, tag):
+        """Give a tag to the cell, which can help us find interesting cells during test."""
+        self._tag = tag
+        return self
+
+    def findChildrenByTag(self, tag, stopSearchingAtTag=True, isRoot=True):
+        """Search the cell and its children for all cells with the given tag.
+
+        If `stopSearchingAtTag`, then if we encounter a non-None tag that doesn't
+        match, stop searching immediately.
+        """
+        cells = []
+
+        if self._tag == tag:
+            cells.append(self)
+
+        if self._tag is not None and stopSearchingAtTag and not isRoot:
+            return cells
+
+        for child in self.children:
+            cells.extend(self.children[child].findChildrenByTag(tag,stopSearchingAtTag,False))
+
+        return cells
+
+    def visitAllChildren(self, visitor):
+        visitor(self)
+        for child in self.children.values():
+            child.visitAllChildren(visitor)
+
+    def findChildrenMatching(self, filter):
+        res = []
+        def visitor(cell):
+            if filter(cell):
+                res.append(cell)
+
+        self.visitAllChildren(visitor)
+
+        return res
+
+    def childByIndex(self, ix):
+        return self.children[sorted(self.children)[ix]]
+
+    def childrenWithExceptions(self):
+        return self.findChildrenMatching(lambda cell: isinstance(cell, Traceback))
 
     def onMessageWithTransaction(self, *args):
         """Call our inner 'onMessage' function with a transaction and a revision conflict retry loop."""
@@ -543,6 +598,21 @@ class Octicon(Cell):
         self.contents = (
             '<span class="octicon octicon-%s" aria-hidden="true" __style__></span>' % self.whichOcticon
             ).replace('__style__', self._divStyle())
+
+class Badge(Cell):
+    def __init__(self, inner, style='primary'):
+        super().__init__()
+        self.inner = self.makeCell(inner)
+        self.style = style
+
+    def sortsAs(self):
+        return self.inner.sortsAs()
+
+    def recalculate(self):
+        self.contents = """<span class="badge badge-__style__">____child__</span>""".replace(
+            "__style__", self.style
+            )
+        self.children = {'____child__': self.inner}
 
 class Text(Cell):
     def __init__(self, text, sortAs=None):
@@ -870,6 +940,7 @@ class Subscribed(Cell):
                 raise
             except Exception:
                 self.children = {'____contents__': Traceback(traceback.format_exc())}
+                self._logger.error("Subscribed inner function threw exception:\n%s", traceback.format_exc())
 
             self._resetSubscriptionsToViewReads(v)
 
@@ -911,7 +982,7 @@ class SubscribedSequence(Cell):
                     new_children["____child_%s__" % ix] = self.existingItems[s]
                 else:
                     try:
-                        self.existingItems[s] = new_children["____child_%s__" % ix] = self.rendererFun(s)
+                        self.existingItems[s] = new_children["____child_%s__" % ix] = Cell.makeCell(self.rendererFun(s))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
