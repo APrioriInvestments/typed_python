@@ -57,7 +57,7 @@ class Codebase:
         return self.modules[module_name]
 
     def getClassByName(self, qualifiedName):
-        modulename, classname = qualifiedName.rsplit(".")
+        modulename, classname = qualifiedName.rsplit(".", 1)
         return getattr(self.getModuleByName(modulename), classname)
 
     @staticmethod
@@ -183,7 +183,16 @@ class Codebase:
                 sys.path.pop(0)
                 Codebase.removeUserModules([rootDirectory])
 
-            return Codebase(rootDirectory, filesToContents, modules)
+            codebase = Codebase(rootDirectory, filesToContents, modules)
+
+            #now make sure we install these modules in our cache so that later
+            #we can walk them if we need to.
+            for m in modules:
+                if "." not in m:
+                    _root_level_module_codebase_cache[modules[m]] = codebase
+
+            return codebase
+
 
     @staticmethod
     def importModulesByName(modules_by_name):
