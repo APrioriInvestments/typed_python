@@ -17,4 +17,13 @@ install:
 
 script:
   - make testcert.cert
-  - ./test.py -s
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
+  - ./test.py -s -v --filter=test_matching_recursively
