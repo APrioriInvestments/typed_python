@@ -28,7 +28,8 @@ _codebase_lock = threading.Lock()
 _codebase_cache = {}
 _codebase_instantiation_dir = None
 
-def setCodebaseInstantiationDirectory(dir, forceReset=False):
+
+def setCodebaseInstantiationDirectory(directory, forceReset=False):
     """Called at program invocation to specify where we can instantiate codebases."""
     with _codebase_lock:
         global _codebase_instantiation_dir
@@ -38,15 +39,15 @@ def setCodebaseInstantiationDirectory(dir, forceReset=False):
             _codebase_instantiation_dir = None
             _codebase_cache = {}
 
-        if _codebase_instantiation_dir == dir:
+        if _codebase_instantiation_dir == directory:
             return
 
         assert _codebase_instantiation_dir is None, "Can't modify the codebase instantiation location. (%s != %s)" % (
             _codebase_instantiation_dir,
-            dir
+            directory
             )
 
-        _codebase_instantiation_dir = os.path.abspath(dir)
+        _codebase_instantiation_dir = os.path.abspath(directory)
 
 @service_schema.define
 @SubscribeLazilyByDefault
@@ -92,7 +93,10 @@ class Codebase:
 
                         total_bytes[0] += len(contents)
 
-                        assert total_bytes[0] < maxTotalBytes, "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
+                        if total_bytes[0] > maxTotalBytes:
+                            raise Exception(
+                                "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
+                            )
 
                         files[so_far_with_name] = File.create(contents)
 
@@ -100,6 +104,10 @@ class Codebase:
             walk(path, '')
 
         return Codebase.createFromFiles(files)
+
+    @staticmethod
+    def  createFromCodebase(codebase:TypedPythonCodebase):
+        return Codebase.createFromFiles(codebase.filesToContents)
 
     @staticmethod
     def createFromFiles(files):
@@ -118,12 +126,16 @@ class Codebase:
     def instantiate(self, module_name=None):
         """Instantiate a codebase on disk and load it."""
         with _codebase_lock:
+            assert _codebase_instantiation_dir is not None
             if self.hash not in _codebase_cache:
                 try:
                     if not os.path.exists(_codebase_instantiation_dir):
                         os.makedirs(_codebase_instantiation_dir)
-                except Exception:
-                    logging.getLogger(__name__).warn("Exception trying to make directory %s", _codebase_instantiation_dir)
+                except Exception as e:
+                    logging.getLogger(__name__).warn(
+                        "Exception trying to make directory '%s'", _codebase_instantiation_dir)
+                    logging.getLogger(__name__).warn(
+                        "Exception: %s", e)
 
                 disk_path = os.path.join(_codebase_instantiation_dir, self.hash)
 
