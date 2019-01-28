@@ -73,39 +73,6 @@ class Codebase:
     files = ConstDict(str, service_schema.File)
 
     @staticmethod
-    def create(root_paths, extensions=('.py',), maxTotalBytes = 100 * 1024 * 1024):
-        files = {}
-        total_bytes = [0]
-
-        def walk(path, so_far):
-            if so_far.startswith("."):
-                return  # skip hidden directories
-
-            for name in os.listdir(path):
-                fullpath = os.path.join(path, name)
-                so_far_with_name = os.path.join(so_far, name) if so_far else name
-                if os.path.isdir(fullpath):
-                    walk(fullpath, so_far_with_name)
-                else:
-                    if os.path.splitext(name)[1] in extensions:
-                        with open(fullpath, "r") as f:
-                            contents = f.read()
-
-                        total_bytes[0] += len(contents)
-
-                        if total_bytes[0] > maxTotalBytes:
-                            raise Exception(
-                                "exceeded bytecount with %s of size %s" % (fullpath, len(contents))
-                            )
-
-                        files[so_far_with_name] = File.create(contents)
-
-        for path in root_paths:
-            walk(path, '')
-
-        return Codebase.createFromFiles(files)
-
-    @staticmethod
     def createFromRootlevelPath(rootPath):
         return Codebase.createFromCodebase(
             TypedPythonCodebase.FromRootlevelPath(rootPath)
