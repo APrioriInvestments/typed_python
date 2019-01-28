@@ -1445,22 +1445,7 @@ class Clickable(Cell):
         return self.content.sortsAs()
 
     def onMessage(self, msgFrame):
-        t0 = time.time()
-        tries = 0
-
-        while True:
-            try:
-                with self.transaction():
-                    self.f()
-                    return
-            except RevisionConflictException as e:
-                tries += 1
-                if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
-                    self._logger.error("Button click timed out. This should really fail.")
-                    return
-            except Exception:
-                self._logger.error("Exception in button logic:\n%s", traceback.format_exc())
-                return
+        self.f()
 
 class Button(Clickable):
     def __init__(self, *args, small=False, **kwargs):
