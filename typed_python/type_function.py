@@ -60,9 +60,9 @@ class ConcreteTypeFunction(object):
             ) + ")"
 
     def applyNameChangesToType(self, type, name):
-        if hasattr(type, '__typed_python_category__'):
-            if type.__typed_python_category__ == "Alternative" or type.__typed_python_category__ == "Class":
-                return _types.RenameType(type, name)
+        # if hasattr(type, '__typed_python_category__'):
+        #     if type.__typed_python_category__ == "Alternative" or type.__typed_python_category__ == "Class":
+        #         return _types.RenameType(type, name)
         return type
 
     def mapArg(self, arg):
