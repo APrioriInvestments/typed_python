@@ -163,7 +163,7 @@ class Cells:
 
     def _addCell(self, cell, parent):
         assert isinstance(cell, Cell), type(cell)
-        assert cell.cells is None
+        assert cell.cells is None, cell
 
         cell.cells = self
         cell.parent = parent
@@ -182,6 +182,7 @@ class Cells:
             self._cellOutOfScope(c)
 
         self.markToDiscard(cell)
+
         if cell.cells is not None:
             assert cell.cells == self
             del self._cells[cell.identity]
@@ -477,13 +478,13 @@ class Cell:
             res.append("display:inline-block")
 
         if self._width is not None:
-            if self._width.isdigit():
+            if isinstance(self._width, int) or self._width.isdigit():
                 res.append("width:%spx" % self._width)
             else:
                 res.append("width:%s" % self._width)
 
         if self._height is not None:
-            if self._height.isdigit():
+            if isinstance(self._height, int) or self._height.isdigit():
                 res.append("height:%spx" % self._height)
             else:
                 res.append("height:%s" % self._height)
@@ -521,6 +522,9 @@ class Cell:
         self.garbageCollected = False
         self._identity = None
         self.parent = None
+
+        for c in self.children.values():
+            c.prepareForReuse()
 
         return True
 

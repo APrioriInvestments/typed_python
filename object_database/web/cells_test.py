@@ -14,7 +14,7 @@
 
 from object_database.web.cells import (
     Cells, Sequence, Container, Subscribed, Span, SubscribedSequence,
-    ensureSubscribedType
+    Card, Text, Slot, ensureSubscribedType
 )
 from object_database import InMemServer, Schema, Indexed, connect
 from object_database.util import genToken, configureLogging
@@ -110,6 +110,23 @@ class CellsTests(unittest.TestCase):
 
         # a new message for the child, and also for 'pair[0]'
         self.assertEqual(len(self.cells.renderMessages()), 3)
+
+    def test_cells_reusable(self):
+        c1 = Card(Text("HI"))
+        c2 = Card(Text("HI2"))
+        slot = Slot(0)
+
+        self.cells.root.setChild(
+            Subscribed(lambda: c1 if slot.get() else c2)
+            )
+
+        self.cells.renderMessages()
+        slot.set(1)
+        self.cells.renderMessages()
+        slot.set(0)
+        self.cells.renderMessages()
+
+        self.assertFalse(self.cells.root.childrenWithExceptions())
 
     def test_cells_subscriptions(self):
         self.cells.root.setChild(
