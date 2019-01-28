@@ -33,15 +33,28 @@ class PythonFreeObjectWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_call(self, context, left, args):
-        if all([isinstance(x.expr_type, PythonFreeObjectWrapper) for x in args]):
+    def convert_call(self, context, left, args, kwargs):
+        if all([isinstance(x.expr_type, PythonFreeObjectWrapper) for x in list(args) + list(kwargs.values())]):
             try:
                 return nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
-                    self.typeRepresentation(*[a.expr_type.typeRepresentation for a in args])
+                    self.typeRepresentation(
+                        *[a.expr_type.typeRepresentation for a in args],
+                        **{k:v.expr_type.typeRepresentation for k,v in kwargs.items()}
+                        )
                     )
             except Exception as e:
                 context.pushException(type(e), str(e))
                 return
 
-        return context.call_py_function(self.typeRepresentation, args)
+        return context.call_py_function(self.typeRepresentation, args, kwargs)
+
+    def convert_attribute(self, context, instance, attribute):
+        try:
+            return nativepython.python_object_representation.pythonObjectRepresentation(
+                context,
+                getattr(self.typeRepresentation, attribute)
+                )
+        except Exception as e:
+            context.pushException(type(e), str(e))
+            return

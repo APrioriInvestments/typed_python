@@ -175,7 +175,9 @@ class ClassWrapper(RefcountedWrapper):
 
             return native_ast.nullExpr
 
-    def convert_type_call(self, context, typeInst, args):
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if kwargs:
+            raise NotImplementedError("can't kwargs-initialize a class yet")
         return context.push(
             self,
             lambda new_class:
@@ -220,7 +222,7 @@ class ClassWrapper(RefcountedWrapper):
 
         if '__init__' in self.typeRepresentation.MemberFunctions:
             initFuncType = typeWrapper(self.typeRepresentation.MemberFunctions['__init__'])
-            initFuncType.convert_call(context, context.pushVoid(initFuncType), (out,) + args)
+            initFuncType.convert_call(context, context.pushVoid(initFuncType), (out,) + args, {})
         else:
             if len(args):
                 context.pushException(TypeError, "Can't construct a " + self.typeRepresentation.__qualname__ +

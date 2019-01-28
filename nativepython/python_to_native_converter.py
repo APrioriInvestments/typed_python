@@ -234,7 +234,11 @@ class PythonToNativeConverter(object):
 
         if f.__closure__:
             for i in range(len(f.__closure__)):
-                freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
+                try:
+                    freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
+                except:
+                    print("BAD IS ", f)
+                    raise
 
         return pyast, freevars
 

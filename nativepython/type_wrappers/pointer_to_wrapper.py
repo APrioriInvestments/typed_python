@@ -81,7 +81,10 @@ class PointerToWrapper(Wrapper):
 
         return super().convert_attribute(context, instance, attr)
 
-    def convert_method_call(self, context, instance, methodname, args):
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if kwargs:
+            return super().convert_method_call(context, instance, methodname, args, kwargs)
+
         if methodname == "set":
             if len(args) == 1:
                 context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_assign(args[0])
@@ -105,4 +108,4 @@ class PointerToWrapper(Wrapper):
                 tgtType = typeWrapper(PointerTo(args[0].expr_type.typeRepresentation))
                 return context.pushPod(tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType()))
 
-        return super().convert_method_call(context, instance, methodname, args)
+        return super().convert_method_call(context, instance, methodname, args, kwargs)

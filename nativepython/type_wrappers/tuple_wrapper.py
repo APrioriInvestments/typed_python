@@ -51,6 +51,11 @@ class TupleWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
+    def convert_initialize_from_args(self, context, target, *args):
+        assert len(args) == len(self.byteOffsets)
+        for i in range(len(args)):
+            self.refAs(context, target, i).convert_copy_initialize(args[i])
+
     def convert_default_initialize(self, context, target):
         if not self.is_default_constructible:
             context.pushException(TypeError, "Can't default-initialize any subtypes of %s" % self.typeRepresentation.__qualname__)
@@ -88,6 +93,7 @@ class NamedTupleWrapper(TupleWrapper):
         super().__init__(t)
 
         self.namesToIndices = {n:i for i,n in enumerate(t.ElementNames)}
+        self.namesToTypes = {n:t.ElementTypes[i] for i,n in enumerate(t.ElementNames)}
 
     def convert_attribute(self, context, instance, attribute):
         ix = self.namesToIndices.get(attribute)

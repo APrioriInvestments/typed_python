@@ -28,10 +28,10 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def __str__(self):
         return "TypeObject(%s)" % self.typeRepresentation.__qualname__
 
-    def convert_call(self, context, left, args):
+    def convert_call(self, context, left, args, kwargs):
         if self.typeRepresentation is type:
-            if len(args) != 1:
-                return super().convert_call(context, left, args)
+            if len(args) != 1 or kwargs:
+                return super().convert_call(context, left, args, kwargs)
 
             argtype = args[0].expr_type
             if isinstance(argtype, PythonTypeObjectWrapper):
@@ -46,4 +46,4 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     )
             return res
 
-        return typeWrapper(self.typeRepresentation).convert_type_call(context, left, args)
+        return typeWrapper(self.typeRepresentation).convert_type_call(context, left, args, kwargs)

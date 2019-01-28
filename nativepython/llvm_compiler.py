@@ -229,5 +229,5 @@ class Compiler:
 
             self.functions_by_name[fname] = native_function_pointers[fname]
 
-        return (native_function_pointers, str(mod))
+        return native_function_pointers
 

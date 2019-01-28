@@ -3107,8 +3107,20 @@ void native_instance_wrapper::mirrorTypeInformationIntoPyType(Type* inType, PyTy
 
         PyDict_SetItemString(
             pyType->tp_dict,
+            "Alternative",
+            (PyObject*)typeObjInternal(alt->getAlternative())
+            );
+
+        PyDict_SetItemString(
+            pyType->tp_dict,
             "Index",
             PyLong_FromLong(alt->which())
+            );
+
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            "Name",
+            PyUnicode_FromString(alt->getAlternative()->subtypes()[alt->which()].first.c_str())
             );
 
         PyDict_SetItemString(

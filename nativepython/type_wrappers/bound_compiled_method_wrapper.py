@@ -51,12 +51,13 @@ class BoundCompiledMethodWrapper(Wrapper):
             toStore.changeType(self.wrapped_type)
             )
 
-    def convert_call(self, context, left, args):
+    def convert_call(self, context, left, args, kwargs):
         clsType = self.wrapped_type
 
         return self.wrapped_type.convert_method_call(
                 context,
                 left.changeType(self.wrapped_type),
                 self.method_name,
-                args
+                args,
+                kwargs
                 )

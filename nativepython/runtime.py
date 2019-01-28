@@ -72,7 +72,7 @@ class Runtime:
 
             targets = self.converter.extract_new_function_definitions()
 
-            function_pointers, _ = self.llvm_compiler.add_functions(targets)
+            function_pointers = self.llvm_compiler.add_functions(targets)
 
             fp = function_pointers[wrappingCallTargetName]
 

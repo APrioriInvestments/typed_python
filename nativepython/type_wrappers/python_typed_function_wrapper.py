@@ -27,13 +27,16 @@ class PythonTypedFunctionWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_call(self, context, left, args):
-        for a in args:
+    def convert_call(self, context, left, args, kwargs):
+        for a in list(args) + list(kwargs.items()):
             if not hasattr(a.expr_type.typeRepresentation, '__typed_python_category__'):
                 #we don't know how to push around non-typed-python argument types yet. Eventually we should
                 #defer to the interpreter in these cases.
                 context.pushException(TypeError, "Can't pass arguments of type %s yet" % a.typeRepresentation)
                 return
+
+        if kwargs:
+            raise NotImplementedError("can't dispatch to native code with kwargs yet as our matcher doesn't understand it")
 
         f = self.typeRepresentation
 
@@ -42,6 +45,7 @@ class PythonTypedFunctionWrapper(Wrapper):
                 return context.call_py_function(
                     overload.functionObj,
                     args,
+                    kwargs,
                     overload.returnType
                     )
 

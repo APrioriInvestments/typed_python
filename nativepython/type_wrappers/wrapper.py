@@ -75,12 +75,12 @@ class Wrapper(object):
 
     def convert_attribute(self, context, instance, attribute):
         return context.pushTerminal(
-            generateThrowException(context, AttributeError("object has no attribute " + attribute))
+            generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
             )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         return context.pushTerminal(
-            generateThrowException(context, AttributeError("object has no attribute " + attribute))
+            generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
             )
 
     def convert_getitem(self, context, instance, item):
@@ -105,10 +105,10 @@ class Wrapper(object):
     def convert_destroy(self, context, instance):
         raise NotImplementedError(self)
 
-    def convert_call(self, context, left, args):
+    def convert_call(self, context, left, args, kwargs):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
             self.typeRepresentation.__qualname__,
-            ",".join([str(a.expr_type) for a in args])
+            ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k,str(v.expr_type)) for k,v in kwargs.items()])
             ))
 
     def convert_len(self, context, expr):
@@ -145,20 +145,21 @@ class Wrapper(object):
                 (op, str(l.expr_type), str(r.expr_type))))
             )
 
-    def convert_type_call(self, context, typeInst, args):
-        if len(args) == 0:
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
 
-        if len(args) == 1:
+        if len(args) == 1 and not kwargs:
             return args[0].convert_to_type(self)
 
         return context.pushException(
             TypeError,
-            "%s() takes at most 1 argument" % str(self)
+            "%s() takes at most 1 positional argument" % str(self)
             )
 
-    def convert_method_call(self, context, instance, methodname, args):
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(TypeError, "Can't call %s.%s with args of type (%s)" % (
             self.typeRepresentation.__qualname__, methodname,
-            ",".join([a.expr_type.typeRepresentation.__qualname__ for a in args])
+            ",".join([str(a.expr_type) for a in args] +
+                ["%s=%s" % (k, str(v.expr_type)) for k,v in kwargs.items()])
             ))

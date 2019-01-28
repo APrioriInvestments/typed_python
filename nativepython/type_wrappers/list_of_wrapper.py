@@ -50,7 +50,10 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         return super().convert_attribute(context, instance, attr)
 
-    def convert_method_call(self, context, instance, methodname, args):
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if kwargs:
+            return super().convert_method_call(context, instance, methodname, args, kwargs)
+
         if methodname == "pop":
             if len(args) == 0:
                 args = (context.constant(-1),)
@@ -168,7 +171,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                     )
         if methodname == "clear":
             if len(args) == 0:
-                return self.convert_method_call(context, instance, "resize", (context.constant(0),))
+                return self.convert_method_call(context, instance, "resize", (context.constant(0),), {})
 
         if methodname == "reserve":
             if len(args) == 1:
@@ -199,7 +202,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         ).call(instance)
                     )
 
-        super().convert_method_call(context, instance, methodname, args)
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
 
     def generatePop(self, context, out, inst, ix):
         ix = context.push(int, lambda tgt: tgt.expr.store(ix.nonref_expr))
@@ -255,7 +258,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
             with if_bigger:
                 with context.ifelse(listInst.convert_reserved() < countInst) as (if_needs_reserve, _):
                     with if_needs_reserve:
-                        self.convert_method_call(context, listInst, "reserve", (countInst,))
+                        self.convert_method_call(context, listInst, "reserve", (countInst,), {})
 
                 with context.loop(countInst - listInst.convert_len()) as i:
                     if arg is None:
@@ -274,7 +277,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
     def generateAppend(self, context, out, listInst, arg):
         with context.ifelse(listInst.convert_reserved() < listInst.convert_len()+1) as (if_needs_reserve, _):
             with if_needs_reserve:
-                self.convert_method_call(context, listInst, "reserve", ((listInst.convert_len() * 5) / 4 + 1,))
+                self.convert_method_call(context, listInst, "reserve", ((listInst.convert_len() * 5) / 4 + 1,), {})
 
         listInst.convert_getitem_unsafe(listInst.convert_len()).convert_copy_initialize(arg)
 
@@ -285,7 +288,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
     def generateCopy(self, context, out, listInst):
         self.convert_default_initialize(context, out)
 
-        self.convert_method_call(context, out, "reserve", (listInst.convert_len(),))
+        self.convert_method_call(context, out, "reserve", (listInst.convert_len(),), {})
 
         with context.loop(listInst.convert_len()) as i:
             result = listInst.convert_getitem_unsafe(i).convert_to_type(typeWrapper(self.typeRepresentation.ElementType))
@@ -293,7 +296,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 return None
             out.convert_getitem_unsafe(i).convert_copy_initialize(result)
 
-        self.convert_method_call(context, out, "setSizeUnsafe", (listInst.convert_len(),))
+        self.convert_method_call(context, out, "setSizeUnsafe", (listInst.convert_len(),), {})
 
     def generateReserve(self, context, out, listInst, countInst):
         countInst = context.push(int, lambda target: target.expr.store(countInst.nonref_expr))
@@ -348,8 +351,8 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
         return context.pushVoid()
 
-    def convert_type_call(self, context, typeInst, args):
-        if len(args) == 1 and args[0].expr_type == self:
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 1 and args[0].expr_type == self and not kwargs:
             return context.push(
                 self,
                 lambda out:
@@ -362,4 +365,4 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         ).call(out, args[0])
                 )
 
-        return super().convert_type_call(context, typeInst, args)
+        return super().convert_type_call(context, typeInst, args, kwargs)

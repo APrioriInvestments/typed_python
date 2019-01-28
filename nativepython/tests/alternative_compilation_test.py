@@ -56,3 +56,93 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(c), 2)
         self.assertEqual(_types.refcount(c2), 1)
+
+    def test_construct_alternative(self):
+        A = Alternative("A", X={'x': int})
+
+        @Compiled
+        def f():
+            return A.X(x=10)
+
+        self.assertTrue(f().matches.X)
+        self.assertEqual(f().x, 10)
+
+    def test_alternative_matches(self):
+        A = Alternative("A", X={'x': int}, Y={'x': int})
+
+        @Compiled
+        def f(x: A):
+            return x.matches.X
+
+        self.assertTrue(f(A.X()))
+        self.assertFalse(f(A.Y()))
+
+    def test_alternative_member_homogenous(self):
+        A = Alternative("A", X={'x': int}, Y={'x': int})
+
+        @Compiled
+        def f(x: A):
+            return x.x
+
+        self.assertEqual(f(A.X(x=10)), 10)
+        self.assertEqual(f(A.Y(x=10)), 10)
+
+    def test_alternative_member_diverse(self):
+        A = Alternative("A", X={'x': int}, Y={'x': float})
+
+        @Compiled
+        def f(x: A):
+            return x.x
+
+        self.assertEqual(f(A.X(x=10)), 10)
+        self.assertEqual(f(A.Y(x=10.5)), 10.5)
+
+    def test_alternative_member_distinct(self):
+        A = Alternative("A", X={'x': int}, Y={'y': float})
+
+        @Compiled
+        def f(x: A):
+            if x.matches.X:
+                return x.x
+            if x.matches.Y:
+                return x.y
+
+        self.assertEqual(f(A.X(x=10)), 10)
+        self.assertEqual(f(A.Y(y=10.5)), 10.5)
+
+    def test_matching_recursively(self):
+        @TypeFunction
+        def Tree(T):
+            return Alternative("Tree",
+                Leaf={'value': T},
+                Node={'left': Tree(T), 'right': Tree(T)}
+                )
+
+        def treeSum(x: Tree(int)):
+            matches = x.matches.Leaf
+            if matches:
+                return x.value
+            if x.matches.Node:
+                return treeSum(x.left) + treeSum(x.right)
+            return 0
+
+        def buildTree(depth: int, offset: int) -> Tree(int):
+            if depth > 0:
+                return Tree(int).Node(
+                    left=buildTree(depth-1, offset),
+                    right=buildTree(depth-1, offset+1),
+                    )
+            return Tree(int).Leaf(value=offset)
+
+        aTree = Compiled(buildTree)(15, 0)
+        treeSumCompiled = Compiled(treeSum)
+
+        t0 = time.time()
+        sum = treeSum(aTree)
+        t1 = time.time()
+        sumCompiled = treeSumCompiled(aTree)
+        t2 = time.time()
+
+        self.assertEqual(sum, sumCompiled)
+        speedup = (t1-t0)/(t2-t1)
+        self.assertGreater(speedup, 20) #I get about 50

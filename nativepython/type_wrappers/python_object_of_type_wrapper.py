@@ -30,8 +30,8 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void().pointer()
 
-    def convert_call(self, context, expr, args):
-        assert False
+    def convert_call(self, context, expr, args, kwargs):
+        raise NotImplementedError()
 
     def convert_incref(self, context, expr):
         context.pushEffect(

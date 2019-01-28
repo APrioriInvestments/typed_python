@@ -83,6 +83,9 @@ class TypedExpression(object):
     def convert_assign(self, toStore):
         return self.expr_type.convert_assign(self.context, self, toStore)
 
+    def convert_initialize_from_args(self, *args):
+        return self.expr_type.convert_initialize_from_args(self.context, self, *args)
+
     def convert_default_initialize(self):
         return self.expr_type.convert_default_initialize(self.context, self)
 
@@ -116,8 +119,8 @@ class TypedExpression(object):
     def convert_bin_op(self, op, rhs):
         return self.expr_type.convert_bin_op(self.context, self, op, rhs)
 
-    def convert_call(self, args):
-        return self.expr_type.convert_call(self.context, self, args)
+    def convert_call(self, args, kwargs):
+        return self.expr_type.convert_call(self.context, self, args, kwargs)
 
     def convert_to_type(self, target_type):
         return self.expr_type.convert_to_type(self.context, self, target_type)

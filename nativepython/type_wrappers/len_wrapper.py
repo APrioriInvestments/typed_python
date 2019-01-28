@@ -27,9 +27,9 @@ class LenWrapper(Wrapper):
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
-    def convert_call(self, context, expr, args):
-        if len(args) == 1:
+    def convert_call(self, context, expr, args, kwargs):
+        if len(args) == 1 and not kwargs:
             return args[0].convert_len()
 
-        return super().convert_call(context, expr, args)
+        return super().convert_call(context, expr, args, kwargs)
 

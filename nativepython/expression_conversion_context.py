@@ -60,6 +60,8 @@ class ExpressionConversionContext(object):
         return TypedExpression(self, native_ast.Expression.Variable(name), type, type.is_pass_by_ref)
 
     def constant(self, x):
+        if isinstance(x, bool):
+            return TypedExpression(self, native_ast.const_bool_expr(x), bool, False)
         if isinstance(x, int):
             return TypedExpression(self, native_ast.const_int_expr(x), int, False)
         if isinstance(x, float):
@@ -436,7 +438,10 @@ class ExpressionConversionContext(object):
 
         return native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
-    def call_py_function(self, f, args, returnTypeOverload=None):
+    def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
+        if kwargs:
+            raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
+
         #force arguments to a type appropriate for argpassing
         native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
@@ -655,19 +660,25 @@ class ExpressionConversionContext(object):
             if l is None:
                 return None
 
-            ast_args = ast.args
-            stararg = None
-
-            for a in ast_args:
+            for a in ast.args:
                 assert not a.matches.Starred, "not implemented yet"
 
             args = []
-            for a in ast_args:
+            kwargs = {}
+
+            for a in ast.args:
                 args.append(self.convert_expression_ast(a))
                 if args[-1] is None:
                     return None
 
-            return l.convert_call(args)
+            for keywordArg in ast.keywords:
+                argname = keywordArg.arg
+
+                kwargs[argname] = self.convert_expression_ast(keywordArg.value)
+                if kwargs[argname] is None:
+                    return None
+
+            return l.convert_call(args, kwargs)
 
         if ast.matches.Compare:
             assert len(ast.comparators) == 1, "multi-comparison not implemented yet"

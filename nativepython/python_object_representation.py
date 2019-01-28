@@ -23,7 +23,7 @@ from nativepython.type_wrappers.string_wrapper import StringWrapper
 from nativepython.type_wrappers.bytes_wrapper import BytesWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from types import ModuleType
-from typed_python._types import TypeFor, bytecount
+from typed_python._types import TypeFor, bytecount, resolveForwards
 from typed_python import *
 
 _type_to_type_wrapper_cache = {}
@@ -40,6 +40,8 @@ def _typedPythonTypeToTypeWrapper(t):
     if not hasattr(t, '__typed_python_category__'):
         t = TypeFor(t)
         assert hasattr(t, '__typed_python_category__'), t
+
+    resolveForwards(t)
 
     if t is Int64():
         return Int64Wrapper()
