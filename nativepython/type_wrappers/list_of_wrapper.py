@@ -45,7 +45,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
         return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0,3).load().cast(native_ast.Int64))
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("resize","reserve","reserved","append","clear","pop","getUnsafe", "setUnsafe", "setSizeUnsafe", "initializeUnsafe", "pointerUnsafe"):
+        if attr in ("resize","reserve","reserved","append","clear","pop","setSizeUnsafe","pointerUnsafe"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -78,14 +78,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
                         native.call(instance, count)
                         )
 
-        if methodname == "getUnsafe":
-            if len(args) == 1:
-                count = args[0].toInt64()
-                if count is None:
-                    return
-
-                return instance.convert_getitem_unsafe(count)
-
         if methodname == "pointerUnsafe":
             if len(args) == 1:
                 count = args[0].toInt64()
@@ -107,32 +99,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
                 context.pushEffect(instance.nonref_expr.ElementPtrIntegers(0, 2).store(count.nonref_expr.cast(native_ast.Int32)))
 
-                return context.pushVoid()
-
-        if methodname == "initializeUnsafe":
-            if len(args) == 2:
-                count = args[0].toInt64()
-                if count is None:
-                    return
-
-                val = args[1].convert_to_type(self.underlyingWrapperType)
-                if val is None:
-                    return
-
-                instance.convert_getitem_unsafe(count).convert_copy_initialize(val)
-                return context.pushVoid()
-
-        if methodname == "setUnsafe":
-            if len(args) == 2:
-                count = args[0].toInt64()
-                if count is None:
-                    return
-
-                val = args[1].convert_to_type(self.underlyingWrapperType)
-                if val is None:
-                    return
-
-                instance.convert_getitem_unsafe(count).convert_assign(val)
                 return context.pushVoid()
 
         if methodname == "resize":

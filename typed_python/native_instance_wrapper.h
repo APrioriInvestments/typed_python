@@ -85,13 +85,7 @@ struct native_instance_wrapper {
 
     static PyObject* listPop(PyObject* o, PyObject* args);
 
-    static PyObject* listGetUnsafe(PyObject* o, PyObject* args);
-
-    static PyObject* listSetUnsafe(PyObject* o, PyObject* args);
-
     static PyObject* listSetSizeUnsafe(PyObject* o, PyObject* args);
-
-    static PyObject* listInitializeUnsafe(PyObject* o, PyObject* args);
 
     static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
 

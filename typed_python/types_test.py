@@ -1262,31 +1262,5 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aLeakedTuple), 2)
 
-    def test_unsafe_list_operations(self):
-        x = ListOf(str)()
-        x.resize(5)
-        x.reserve(10)
 
-        #the python implementation knows that setting outside of the reserved range will crash
-        with self.assertRaises(UndefinedBehaviorException):
-            x.getUnsafe(-1)
-
-        with self.assertRaises(UndefinedBehaviorException):
-            x.setUnsafe(-1, "hi")
-
-        with self.assertRaises(UndefinedBehaviorException):
-            x.getUnsafe(10)
-
-        with self.assertRaises(UndefinedBehaviorException):
-            x.setUnsafe(10, "hi")
-
-        self.assertEqual(x.getUnsafe(3), "")
-
-        with self.assertRaises(UndefinedBehaviorException):
-            #as does setting a negative size
-            x.setSizeUnsafe(-1)
-
-        #this is valid as long as we don't destroy the string
-        x.initializeUnsafe(5, "anotherString")
-        x.setSizeUnsafe(6)
 

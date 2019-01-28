@@ -126,68 +126,6 @@ PyObject* native_instance_wrapper::undefinedBehaviorException() {
 }
 
 //static
-PyObject* native_instance_wrapper::listGetUnsafe(PyObject* o, PyObject* args) {
-    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
-    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 1 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.getUnsafe takes one integer argument");
-        return NULL;
-    }
-
-    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
-
-    int64_t count = listT->reserved(self_w->dataPtr());
-
-    if (ix >= count || ix < 0) {
-        PyErr_SetString(undefinedBehaviorException(), "getUnsafe index out of range");
-        return NULL;
-    }
-
-    return extractPythonObject(
-        listT->eltPtr(self_w->dataPtr(), ix),
-        listT->getEltType()
-        );
-}
-
-//static
-PyObject* native_instance_wrapper::listSetUnsafe(PyObject* o, PyObject* args) {
-    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
-    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 2 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.setUnsafe takes one integer argument and a value");
-        return NULL;
-    }
-
-    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
-
-    int64_t count = listT->reserved(self_w->dataPtr());
-
-    if (ix >= count || ix < 0) {
-        PyErr_SetString(undefinedBehaviorException(), "setUnsafe index out of range");
-        return NULL;
-    }
-
-    instance_ptr tempObj = (instance_ptr)malloc(listT->getEltType()->bytecount());
-    try {
-        copyConstructFromPythonInstance(listT->getEltType(), tempObj, PyTuple_GetItem(args,1));
-    } catch(std::exception& e) {
-        free(tempObj);
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
-
-    listT->getEltType()->assign(listT->eltPtr(self_w->dataPtr(), ix), tempObj);
-
-    listT->getEltType()->destroy(tempObj);
-
-    free(tempObj);
-
-    return incref(Py_None);
-}
-
-//static
 PyObject* native_instance_wrapper::listSetSizeUnsafe(PyObject* o, PyObject* args) {
     native_instance_wrapper* self_w = (native_instance_wrapper*)o;
     ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
@@ -205,35 +143,6 @@ PyObject* native_instance_wrapper::listSetSizeUnsafe(PyObject* o, PyObject* args
     }
 
     listT->setSizeUnsafe(self_w->dataPtr(), ix);
-
-    return incref(Py_None);
-}
-
-//static
-PyObject* native_instance_wrapper::listInitializeUnsafe(PyObject* o, PyObject* args) {
-    native_instance_wrapper* self_w = (native_instance_wrapper*)o;
-    ListOf* listT = (ListOf*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 2 || !PyLong_Check(PyTuple_GetItem(args, 0))) {
-        PyErr_SetString(PyExc_TypeError, "ListOf.initializeUnsafe takes one integer argument and a value");
-        return NULL;
-    }
-
-    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
-
-    int64_t count = listT->reserved(self_w->dataPtr());
-
-    if (ix >= count || ix < 0) {
-        PyErr_SetString(undefinedBehaviorException(), "initializeUnsafe index out of range");
-        return NULL;
-    }
-
-    try {
-        copyConstructFromPythonInstance(listT->getEltType(), listT->eltPtr(self_w->dataPtr(), ix), PyTuple_GetItem(args, 1));
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
 
     return incref(Py_None);
 }
@@ -641,10 +550,7 @@ PyMethodDef* native_instance_wrapper::typeMethods(Type* t) {
             {"reserve", (PyCFunction)native_instance_wrapper::listReserve, METH_VARARGS, NULL},
             {"resize", (PyCFunction)native_instance_wrapper::listResize, METH_VARARGS, NULL},
             {"pop", (PyCFunction)native_instance_wrapper::listPop, METH_VARARGS, NULL},
-            {"getUnsafe", (PyCFunction)native_instance_wrapper::listGetUnsafe, METH_VARARGS, NULL},
-            {"setUnsafe", (PyCFunction)native_instance_wrapper::listSetUnsafe, METH_VARARGS, NULL},
             {"setSizeUnsafe", (PyCFunction)native_instance_wrapper::listSetSizeUnsafe, METH_VARARGS, NULL},
-            {"initializeUnsafe", (PyCFunction)native_instance_wrapper::listInitializeUnsafe, METH_VARARGS, NULL},
             {"pointerUnsafe", (PyCFunction)native_instance_wrapper::listPointerUnsafe, METH_VARARGS, NULL},
             {NULL, NULL}
         };

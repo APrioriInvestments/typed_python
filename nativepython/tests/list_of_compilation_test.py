@@ -283,33 +283,12 @@ class TestListOfCompilation(unittest.TestCase):
             out = T()
             out.reserve(len(x))
 
-            i = 0
-            ct = len(x)
-
-            while i < ct:
-                out.initializeUnsafe(i, x.getUnsafe(i) + y.getUnsafe(i))
-                i = i + 1
-
-            out.setSizeUnsafe(ct)
-
-            return out
-
-        @Compiled
-        def addPointers(x: T, y: T):
-            out = T()
-            out.reserve(len(x))
-
             dest_ptr = out.pointerUnsafe(0)
             max_ptr = out.pointerUnsafe(len(x))
             x_ptr = x.pointerUnsafe(0)
             y_ptr = y.pointerUnsafe(0)
 
             while dest_ptr < max_ptr:
-                dest_ptr.initialize(x_ptr.get() + y_ptr.get())
-                dest_ptr += 1
-                x_ptr += 1
-                y_ptr += 1
-
                 dest_ptr.initialize(x_ptr.get() + y_ptr.get())
                 dest_ptr += 1
                 x_ptr += 1
@@ -343,8 +322,7 @@ class TestListOfCompilation(unittest.TestCase):
             return slowerThanNumpyRatio
 
         self.assertLess(timingComparison(addSafe), 10) #2.0 for me
-        self.assertLess(timingComparison(addUnsafe), 2.5) #1.27 for me
-        self.assertLess(timingComparison(addPointers), 1.3) #1.07 for me
+        self.assertLess(timingComparison(addUnsafe), 1.3) #1.07 for me
 
 
 
