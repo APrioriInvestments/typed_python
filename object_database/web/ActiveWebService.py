@@ -502,7 +502,7 @@ class ActiveWebService(ServiceBase):
                             cell_id = jsonMsg.get('target_cell')
                             cell = cells[cell_id]
                             if cell is not None:
-                                cell.onMessage(jsonMsg)
+                                cell.onMessageWithTransaction(jsonMsg)
                         except Exception:
                             self._logger.error("Exception in inbound message: %s", traceback.format_exc())
                         cells.triggerIfHasDirty()

@@ -24,9 +24,9 @@ _cur_cell = threading.local()
 
 def quoteForJs(string, quoteType):
     if quoteType == "'":
-        return string.replace("\\", "\\\\").replace("'", "\\'")
+        return string.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
     else:
-        return string.replace("\\", "\\\\").replace('"', '\\"')
+        return string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 def multiReplace(msg, replacements):
     for k,v in replacements.items():
@@ -324,6 +324,9 @@ class Slot:
     def setter(self, val):
         return lambda: self.set(val)
 
+    def getWithoutRegisteringDependency(self):
+        return self._value
+
     def get(self):
         if _cur_cell.cell:
             self._subscribedCells.add(_cur_cell.cell)
@@ -354,6 +357,23 @@ class Cell:
         self.serializationContext = None
 
         self._logger = logging.getLogger(__name__)
+
+    def onMessageWithTransaction(self, *args):
+        """Call our inner 'onMessage' function with a transaction and a revision conflict retry loop."""
+        while True:
+            try:
+                with self.transaction() as t:
+                    self.onMessage(*args)
+                    return
+            except RevisionConflictException as e:
+                tries += 1
+                if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
+                    self._logger.error("OnMessage timed out. This should really fail.")
+                    return
+            except Exception:
+                self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
+                return
+
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -402,10 +422,16 @@ class Cell:
             res.append("display:inline-block")
 
         if self._width is not None:
-            res.append("width:%spx" % self._width)
+            if self._width.isdigit():
+                res.append("width:%spx" % self._width)
+            else:
+                res.append("width:%s" % self._width)
 
         if self._height is not None:
-            res.append("height:%spx" % self._height)
+            if self._height.isdigit():
+                res.append("height:%spx" % self._height)
+            else:
+                res.append("height:%s" % self._height)
 
         if self._color is not None:
             res.append("color:%s" % self._color)
@@ -564,6 +590,37 @@ class Sequence(Cell):
             return Sequence(self.elements + other.elements)
         else:
             return Sequence(self.elements + [other])
+
+    def sortsAs(self):
+        if self.elements:
+            return self.elements[0].sortsAs()
+        return None
+
+class Columns(Cell):
+    def __init__(self, *elements):
+        super().__init__()
+        elements = [Cell.makeCell(x) for x in elements]
+
+        self.elements = elements
+        self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
+        self.contents = """
+            <div class="container-fluid" __style__>
+            <div class="row">
+                __contents__
+            </div>
+            </div>
+        """.replace("__style__", self._divStyle()).replace("__contents__",
+            "\n".join(
+                """<div class="col-sm"> ____c_%s__ </div>""" % i
+                for i in range(len(elements)))
+            )
+
+    def __add__(self, other):
+        other = Cell.makeCell(other)
+        if isinstance(other, Columns):
+            return Columns(*(self.elements + other.elements))
+        else:
+            return super().__add__(other)
 
     def sortsAs(self):
         if self.elements:
@@ -730,23 +787,8 @@ class Dropdown(Cell):
             """.replace("__identity__", self.identity).replace("__dropdown_items__", "\n".join(items))
 
     def onMessage(self, msgFrame):
-        t0 = time.time()
-        tries = 0
         fun = self.headersAndLambdas[msgFrame['ix']][1]
-
-        while True:
-            try:
-                with self.transaction() as t:
-                    fun()
-                    return
-            except RevisionConflictException as e:
-                tries += 1
-                if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
-                    self._logger.error("Button click timed out. This should really fail.")
-                    return
-            except Exception:
-                self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
-                return
+        fun()
 
 class Container(Cell):
     def __init__(self, child=None):
@@ -1441,6 +1483,110 @@ class Expands(Cell):
         self.isExpanded = not self.isExpanded
         self.markDirty()
 
+class CodeEditor(Cell):
+    """Produce a code editor."""
+    def __init__(self, onmessage=lambda msg: None, keybindings=None):
+        """Create a code editor
+
+        onmessage - receives messages from the user as they type
+        keybindings - map from keycode to a lambda function that will receive
+            the current buffer and the current selection range
+
+        You may call 'setContents' to override the current contents.
+        """
+        super().__init__()
+        self._slot = Slot((0,""))
+        self._onmessage = onmessage
+        self.keybindings = keybindings or {}
+
+    def setContents(self, contents):
+        self._slot.set((self._slot.getWithoutRegisteringDependency()[0]+1, contents))
+
+    def onMessage(self, msgFrame):
+        if msgFrame['event'] == 'keybinding':
+            self.keybindings[msgFrame['key']](msgFrame['buffer'], msgFrame['selection'])
+        else:
+            self._onmessage(msgFrame['data'])
+
+    def recalculate(self):
+        self.children = {'____child__': Subscribed(lambda: CodeEditorTrigger(self))}
+        self.contents = """
+            <div __style__>
+            <div id="editor__identity__" style="width:100%;height:100%;margin:auto;border:1px solid lightgray"></div>
+
+                <div style="display:none">
+                    ____child__
+                </div>
+
+            </div>
+        """.replace("__identity__", self.identity).replace("__style__", self._divStyle()) + ";"
+
+        self.postscript = """
+            var editor = ace.edit("editor__identity__");
+            aceEditors["editor__identity__"] = editor
+
+            console.log("setting up editor")
+            editor.setTheme("ace/theme/textmate");
+            editor.session.setMode("ace/mode/python");
+            editor.setAutoScrollEditorIntoView(true);
+            editor.session.setUseSoftTabs(true);
+        """
+
+        if self._onmessage is not None:
+            self.postscript += """
+                editor.session.on('change', function(delta) {
+                    websocket.send(
+                        JSON.stringify(
+                            {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta}
+                            )
+                        )
+                });
+            """
+
+        for kb in self.keybindings:
+            self.postscript += """
+            editor.commands.addCommand({
+                name: 'cmd___key__',
+                bindKey: {win: 'Ctrl-__key__',  mac: 'Command-__key__'},
+                exec: function(editor) {
+                    websocket.send(
+                        JSON.stringify(
+                            {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
+                            'buffer': editor.getValue(), 'selection': editor.selection.getRange()}
+                            )
+                        )
+                },
+                readOnly: true // false if this command should not apply in readOnly mode
+            });
+            """.replace("__key__", kb)
+
+        self.postscript = self.postscript.replace("__identity__", self.identity)
+
+
+class CodeEditorTrigger(Cell):
+    def __init__(self, editor):
+        super().__init__()
+        self.editor = editor
+
+    def recalculate(self):
+        self.contents = """<div></div>"""
+        self.postscript = """
+            var editor = aceEditors["editor__identity__"]
+            console.log("setting contents")
+
+            curRange = editor.selection.getRange()
+            var Range=require('ace/range').Range
+            var range = new Range(curRange.start.row,curRange.start.column,curRange.end.row,curRange.end.column)
+            console.log(range)
+
+            editor.setValue("__text__")
+            editor.selection.setRange(range)
+
+            """.replace("__identity__", self.editor.identity).replace(
+                "__text__", quoteForJs(self.editor._slot.get()[1], '"')
+                )
+
+
 class Plot(Cell):
     """Produce some reactive line plots."""
     def __init__(self, namedDataSubscriptions):
@@ -1453,20 +1599,24 @@ class Plot(Cell):
 
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = Slot(None)
+        self.error = Slot(None)
 
     def recalculate(self):
         self.contents = """
-            <div __style__></div>
-            ____chart_updater__
-
-            """.replace("__style__", self._divStyle())
+            <div>
+                <div __style__ id="plot__identity__"></div>
+                ____chart_updater__
+                ____error__
+            </div>
+            """.replace("__style__", self._divStyle()).replace("__identity__", self.identity)
 
         self.children = {
-            '____chart_updater__': _PlotUpdater(self)
+            '____chart_updater__': _PlotUpdater(self),
+            '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
             }
 
         self.postscript = """
-            plotDiv = document.getElementById('__identity__');
+            plotDiv = document.getElementById('plot__identity__');
             Plotly.plot(
                 plotDiv,
                 [],
@@ -1550,13 +1700,16 @@ class _PlotUpdater(Cell):
     def recalculate(self):
         with self.view() as v:
             #we only exist to run our postscript
-            self.contents = """<div style='display:none'>"""
+            self.contents = """<div style="display:none">"""
+            hadChildren = len(self.children) > 0
+            self.children = {}
+            self.postscript = ""
+            self.linePlot.error.set(None)
 
             try:
                 jsonDataToDraw = self.calculatedDataJson()
-
                 self.postscript = """
-                    plotDiv = document.getElementById('__identity__');
+                    plotDiv = document.getElementById('plot__identity__');
                     data = __data__.map(mapPlotlyData)
 
                     Plotly.react(
@@ -1572,7 +1725,11 @@ class _PlotUpdater(Cell):
                 raise
             except Exception:
                 self._logger.error(traceback.format_exc())
-                self.contents = """<div>____contents__</div>"""
-                self.children = {'____contents__': Traceback(traceback.format_exc())}
+                self.linePlot.error.set(traceback.format_exc())
+                self.postscript = """
+                    plotDiv = document.getElementById('plot__identity__');
+                    Plotly.purge(plotDiv)
+                    """.replace("__identity__", self.chartId)
+
 
             self._resetSubscriptionsToViewReads(v)

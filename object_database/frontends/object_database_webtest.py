@@ -25,6 +25,7 @@ import time
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceManager_test import (
     GraphDisplayService,
+    TextEditorService,
     HappyService,
     UninitializableService
 )
@@ -85,7 +86,8 @@ def main(argv=None):
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(GraphDisplayService, "GraphDisplayService", target_count=1)
 
-
+            with database.transaction():
+                service = ServiceManager.createOrUpdateService(TextEditorService, "TextEditorService", target_count=1)
 
             while True:
                 time.sleep(.1)

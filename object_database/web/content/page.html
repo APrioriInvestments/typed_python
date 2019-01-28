@@ -3,9 +3,11 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" 
-      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" 
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css"
+      integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm"
     crossorigin="anonymous">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ace.js"></script>
 
 <link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,400italic' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/octicons/4.4.0/font/octicons.min.css"/>
@@ -15,6 +17,8 @@
 
 <script>
     var websocket;
+
+    var aceEditors = {}
 
     function mapPlotlyData(d) {
       if (d.timestamp !== undefined) {
@@ -55,9 +59,9 @@
     }
     new_uri += "//" + loc.host;
     new_uri += "/socket" + loc.pathname + loc.search;
-    
-    if (window.WebSocket) { 
-        websocket = new WebSocket(new_uri); 
+
+    if (window.WebSocket) {
+        websocket = new WebSocket(new_uri);
     }
     else if (window.MozWebSocket) {
         websocket = MozWebSocket(new_uri);
@@ -170,7 +174,7 @@
                 source.id = replacements[replacementKeys[i]]
                 cells['holding_pen'].appendChild(source)
               } else {
-                //not a new node. 
+                //not a new node.
                 source = cells[replacements[replacementKeys[i]]]
               }
 
@@ -210,7 +214,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
 
-<script> 
+<script>
 $(function () {
   $('[data-toggle="tooltip"]').tooltip({
     template: '<div class="tooltip" role="tooltip"><div class="tooltip-arrow"></div><div class="tooltip-inner large"></div></div>'

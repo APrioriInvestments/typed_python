@@ -31,6 +31,7 @@ from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.util import genToken
 from object_database.test_util import autoconfigure_and_start_service_manager
+from object_database.web.cells import *
 
 from object_database import (
     Schema, Indexed, core_schema,
@@ -122,6 +123,48 @@ class UninitializableService(ServiceBase):
 
     def doWork(self, shouldStop):
         time.sleep(120)
+
+
+@schema.define
+class TextEditor:
+    code = str
+
+
+class TextEditorService(ServiceBase):
+    def initialize(self):
+        self.db.subscribeToSchema(core_schema, service_schema, schema)
+        self.db.subscribeToType(TextEditor)
+
+        with self.db.transaction():
+            code = TextEditor.lookupAny()
+
+            if not code:
+                code = TextEditor()
+                code.code = "{'x': [1,2,3,4,5], 'y': [1,5,1,5,1]}"
+
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        ensureSubscribedType(TextEditor)
+        contents = Slot("")
+
+        def onEnter(buffer, selection):
+            contents.set(buffer)
+            TextEditor.lookupAny().code = buffer
+
+        ed = CodeEditor(None, {'Enter': onEnter}).height("calc(100vh - 72px)")
+
+        def makePlotData():
+            import numpy
+            res = eval(contents.get())
+            res = {'data': res}
+            return res
+
+        def onCodeChange():
+            if contents.getWithoutRegisteringDependency() != TextEditor.lookupAny().code:
+                contents.set(TextEditor.lookupAny().code)
+                ed.setContents(TextEditor.lookupAny().code)
+
+        return Columns(ed, Card(Plot(makePlotData).height("100%").width("100%"))) + Subscribed(onCodeChange)
 
 
 class GraphDisplayService(ServiceBase):
