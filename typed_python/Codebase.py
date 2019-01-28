@@ -95,7 +95,7 @@ class Codebase:
 
             assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")
 
-            root,files,modules = Codebase.walkModuleDiskRepresentation(module, prefix)
+            root, files, modules = Codebase.walkModuleDiskRepresentation(module, prefix)
 
             codebase = Codebase(root, files, modules)
 
@@ -109,9 +109,13 @@ class Codebase:
         dirpart = os.path.dirname(module.__file__)
         root, moduleDir = os.path.split(dirpart)
 
+        # map: path:str -> contents:str
         files = {}
 
         def walkDisk(path, so_far):
+            if so_far.startswith("."):
+                return  # skip hidden directories
+
             for name in os.listdir(path):
                 fullpath = os.path.join(path, name)
                 so_far_with_name = os.path.join(so_far, name) if so_far else name
@@ -161,7 +165,6 @@ class Codebase:
 
             for fpath, fcontents in filesToContents.items():
                 path, name = os.path.split(fpath)
-
                 fullpath = os.path.join(rootDirectory, path)
 
                 if not os.path.exists(fullpath):
@@ -196,13 +199,14 @@ class Codebase:
 
     @staticmethod
     def importModulesByName(modules_by_name):
+        """ Returns a dict mapping module names (str) to modules. """
         modules = {}
         for mname in modules_by_name:
             try:
                 modules[mname] = importlib.import_module(mname)
             except Exception as e:
                 logging.getLogger(__name__).warn(
-                    "Error importing module %s from codebase: %s", mname,  e)
+                    "Error importing module '%s' from codebase: %s", mname,  e)
         return modules
 
     @staticmethod
