@@ -118,7 +118,7 @@ class DatabaseObject(_base):
 
     @classmethod
     def _define(cls, **types):
-        assert cls.__types__ is None, "already defined"
+        assert cls.__types__ is None, "'{}' already defined".format(cls)
         assert isinstance(types, dict)
 
         cls.__types__ = types

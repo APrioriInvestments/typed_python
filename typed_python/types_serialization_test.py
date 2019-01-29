@@ -791,7 +791,6 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_reduce(self):
         inst = AAA()
         loaded = ping_pong(inst, sc)
-        import pdb; pdb.set_trace()
         self.assertEqual(loaded, REDUCE_A)
 
     # FAILS with: TypeError: tp_new threw an exception
@@ -825,7 +824,6 @@ class TypesSerializationTest(unittest.TestCase):
         import os
 
         t = time.localtime()
-        import pdb; pdb.set_trace()
         u = ping_pong(t)
         self.assert_is_copy(t, u)
         if hasattr(os, "stat"):
