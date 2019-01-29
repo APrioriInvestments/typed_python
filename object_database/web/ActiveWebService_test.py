@@ -20,15 +20,15 @@ import unittest
 
 from bs4 import BeautifulSoup
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.web.ActiveWebService import (
-    active_webservice_schema,
-    ActiveWebService,
-    User
-)
+from object_database.web.AuthPlugin import PermissiveAuthPlugin
+from object_database.web.LoginPlugin import LoginIpPlugin, User
+from object_database.web.ActiveWebServiceSchema import active_webservice_schema
+from object_database.web.ActiveWebService import ActiveWebService
 
 from object_database import core_schema, connect, service_schema
 from object_database.util import configureLogging, genToken
 from object_database.test_util import autoconfigure_and_start_service_manager, currentMemUsageMb
+from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
@@ -43,15 +43,21 @@ class ActiveWebServiceTest(unittest.TestCase):
     def setUpClass(cls):
         cls.cleanupFn = lambda error=None: None
 
-        cls.base_url = "http://localhost:{port}".format(port=WEB_SERVER_PORT)
         configureLogging("aws_test")
         cls._logger = logging.getLogger(__name__)
+        cls.login_config = dict(company_name="Testing Company")
 
-    def configurableSetUp(self, auth_type="LDAP",
-                          auth_hostname=None, authorized_groups=(),
-                          ldap_base_dn=None, ldap_ntlm_domain=None,
-                          company_name=None):
+    def configurableSetUp(self, hostname='localhost',
+                          login_plugin_factory=None,  # default: LoginIpPlugin,
+                          login_config=None,
+                          auth_plugins=(None), module=None,
+                          db_init_fun=None):
 
+        self.base_url = "http://{host}:{port}".format(
+            host=hostname,
+            port=WEB_SERVER_PORT
+        )
+        login_plugin_factory = login_plugin_factory or LoginIpPlugin
         self.token = genToken()
         log_level = self._logger.getEffectiveLevel()
         loglevel_name = logging.getLevelName(log_level)
@@ -59,41 +65,51 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.server, self.cleanupFn = autoconfigure_and_start_service_manager(
             port=DATABASE_SERVER_PORT,
             auth_token=self.token,
-            loglevel_name=loglevel_name)
+            loglevel_name=loglevel_name,
+            own_hostname=hostname,
+            db_hostname=hostname
+        )
 
         try:
-            self.database = connect("localhost", DATABASE_SERVER_PORT, self.token, retry=True)
-
+            self.database = connect(hostname, DATABASE_SERVER_PORT, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
+            if db_init_fun is not None:
+                db_init_fun(self.database)
+
+            codebase = None
+            if module is not None and not module.__name__.startswith("object_database."):
+                self.database.serializeFromModule(module)
+
+                root_path = TypedPythonCodebase.rootlevelPathFromModule(module)
+
+                tpcodebase = TypedPythonCodebase.FromRootlevelPath(root_path)
+
+                with self.database.transaction():
+                    codebase = service_schema.Codebase.createFromCodebase(tpcodebase)
 
             with self.database.transaction():
                 service = ServiceManager.createOrUpdateService(ActiveWebService, "ActiveWebService", target_count=0)
-
-            optional_args = []
-            if len(authorized_groups) > 0:
-                optional_args.extend(['--authorized-groups', *authorized_groups])
-
-            if auth_hostname:
-                optional_args.extend(['--auth-hostname', auth_hostname])
-
-            if ldap_base_dn:
-                optional_args.extend(['--ldap-base-dn', ldap_base_dn])
-
-            if ldap_ntlm_domain:
-                optional_args.extend(['--ldap-ntlm-domain', ldap_ntlm_domain])
-
-            if company_name:
-                optional_args.extend(['--company-name', company_name])
 
             ActiveWebService.configureFromCommandline(
                 self.database,
                 service,
                 [
                     '--port', str(WEB_SERVER_PORT),
-                    '--host', 'localhost',
+                    '--host', hostname,
                     '--log-level', loglevel_name,
-                    '--auth', auth_type
-                ] + optional_args
+                ]
+            )
+
+            if login_config is None:
+                login_config = self.login_config
+
+            ActiveWebService.setLoginPlugin(
+                self.database,
+                service,
+                login_plugin_factory,
+                auth_plugins,
+                codebase=codebase,
+                config=login_config
             )
 
             with self.database.transaction():
@@ -104,17 +120,17 @@ class ActiveWebServiceTest(unittest.TestCase):
             self.cleanupFn(error=True)
             raise
 
-    def waitUntilUp(self, timeout = 2.0):
+    def waitUntilUp(self, timeout = 4.0):
         t0 = time.time()
 
         while time.time() - t0 < timeout:
             try:
-                res = requests.get(self.base_url + "/login")
+                res = requests.get(self.base_url + "/status")
                 return
             except Exception:
                 time.sleep(.5)
 
-        raise Exception("Webservice never came up.")
+        raise Exception("Webservice failed to come up after {} seconds.".format(timeout))
 
     def tearDown(self):
         self.cleanupFn()
@@ -138,7 +154,7 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.assertTrue('login' not in res.url)
 
     def test_web_service_no_auth(self):
-        self.configurableSetUp(auth_type="NONE")
+        self.configurableSetUp(auth_plugins=[None])
         url = self.base_url + "/content/object_database.css"
         client = requests.Session()
 
@@ -152,7 +168,7 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.assertEqual(res.url, url)
 
     def test_web_service_login_and_access(self):
-        self.configurableSetUp(auth_type="PERMISSIVE")
+        self.configurableSetUp(auth_plugins=[PermissiveAuthPlugin()])
         url = self.base_url + "/content/object_database.css"
         client = requests.Session()
         username = 'anonymous'
@@ -185,3 +201,30 @@ class ActiveWebServiceTest(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertTrue('login' in res.url)
 
+    def test_web_service_login_ip(self):
+        self.configurableSetUp(auth_plugins=[PermissiveAuthPlugin()])
+        url = self.base_url + "/content/object_database.css"
+        client = requests.Session()
+        username = 'anonymous'
+
+        # we can access our target page after login
+        self.login(client, username)
+        res = client.get(url)
+        self.assertFalse(res.history)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.url, url)
+
+        # change the login_ip of the logged-in user, then check we have to re-login
+        with self.database.transaction():
+            users = User.lookupAll(username=username)
+            self.assertEqual(len(users), 1)
+            user = users[0]
+            user.login_ip = ""
+
+        # we get redirected to login because the login_ip does not match
+        res = requests.get(url)
+        self.assertTrue(res.history)
+        self.assertEqual(len(res.history), 1)
+        self.assertEqual(res.status_code, 200)
+        self.assertNotEqual(res.url, url)
+        self.assertTrue('login' in res.url)
