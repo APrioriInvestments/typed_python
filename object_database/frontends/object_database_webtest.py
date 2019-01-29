@@ -45,6 +45,7 @@ from object_database import (
 )
 from object_database.test_util import start_service_manager
 from object_database.util import tokenFromString, genToken
+from object_database.web.LoginPlugin import LoginIpPlugin
 
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
@@ -70,8 +71,15 @@ def main(argv=None):
                 database, service,
                 ['--port', '8000',
                 '--host', '0.0.0.0',
-                '--auth', 'NONE',
                 '--log-level', 'INFO']
+            )
+
+            ActiveWebService.setLoginPlugin(
+                database,
+                service,
+                LoginIpPlugin,
+                [None],
+                config={'company_name': 'A Testing Company'}
             )
 
             with database.transaction():

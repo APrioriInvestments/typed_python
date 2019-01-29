@@ -192,7 +192,7 @@ class Codebase:
         with _lock:
             if rootDirectory is None:
                 # this works, despite the fact that we immediately destroy
-                # the directory, becauuse we use 'makedirs' below to repopulate.
+                # the directory, because we use 'makedirs' below to repopulate.
                 rootDirectory = tempfile.TemporaryDirectory().name
 
             for fpath, fcontents in filesToContents.items():
@@ -209,7 +209,7 @@ class Codebase:
 
             sys.path = [rootDirectory] + sys.path
 
-            #get a list of all modules and import each one
+            # get a list of all modules and import each one
             modules_by_name = Codebase.filesToModuleNames(filesToContents)
 
             try:
@@ -220,8 +220,8 @@ class Codebase:
 
             codebase = Codebase(rootDirectory, filesToContents, modules)
 
-            #now make sure we install these modules in our cache so that later
-            #we can walk them if we need to.
+            # now make sure we install these modules in our cache so that later
+            # we can walk them if we need to.
             for m in modules:
                 if "." not in m:
                     _root_level_module_codebase_cache[modules[m]] = codebase
