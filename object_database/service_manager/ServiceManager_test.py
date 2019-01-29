@@ -58,6 +58,7 @@ class PointsToShow:
 @schema.define
 class Feigenbaum:
     y = float
+    density = int
 
 
 @schema.define
@@ -151,7 +152,7 @@ class TextEditorService(ServiceBase):
             contents.set(buffer)
             TextEditor.lookupAny().code = buffer
 
-        ed = CodeEditor(None, {'Enter': onEnter}).height("calc(100vh - 72px)")
+        ed = CodeEditor(None, {'Enter': onEnter}, noScroll=True, minLines=50)
 
         def makePlotData():
             import numpy
@@ -172,7 +173,8 @@ class GraphDisplayService(ServiceBase):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
         with self.db.transaction():
             if not Feigenbaum.lookupAny():
-                Feigenbaum(y=2.0)
+                Feigenbaum(y=2.0, density = 800)
+
 
     @staticmethod
     def addAPoint():
@@ -197,12 +199,13 @@ class GraphDisplayService(ServiceBase):
             feigenbaum=
                 Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
                 Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
+                Dropdown("Density", list(range(100,10000,100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
                 Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
             )
 
 
     @staticmethod
-    def chartData():
+    def chartData(linePlot):
         points = sorted(PointsToShow.lookupAll(), key=lambda p: p.timestamp)
 
         return {'PointsToShow': {'timestamp': [p.timestamp for p in points], 'y': [p.y for p in points]}}
@@ -218,16 +221,18 @@ class GraphDisplayService(ServiceBase):
             left = min(left,right - 1e-6)
             right = max(left + 1e-6,right)
 
-        values = numpy.linspace(left,right,1500,endpoint=True)
+        values = numpy.linspace(left,right, Feigenbaum.lookupAny().density,endpoint=True)
+
+        y = Feigenbaum.lookupAny().y
 
         def feigenbaum(values):
             x = numpy.ones(len(values)) * .5
             for _ in range(10000):
-                x = (values * x * (1-x)) ** ((Feigenbaum.lookupAny().y) ** .5)
+                x = (values * x * (1-x)) ** ((y) ** .5)
 
             its = []
             for _ in range(depth):
-                x = (values * x * (1-x)) ** ((Feigenbaum.lookupAny().y) ** .5)
+                x = (values * x * (1-x)) ** ((y) ** .5)
                 its.append(x)
 
             return numpy.concatenate(its)

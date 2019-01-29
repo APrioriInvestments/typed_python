@@ -26,6 +26,7 @@ import datetime
 import os
 import json
 import gevent.socket
+import gevent.queue
 
 from object_database.view import revisionConflictRetry
 from object_database.util import genToken, checkLogLevelValidity
@@ -451,20 +452,14 @@ class ActiveWebService(ServiceBase):
                             [(s.name, "/services/" + s.name) for
                                 s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
-                    ),
-                Dropdown(
-                    Octicon("three-bars"),
-                    [
-                        (Sequence([Octicon('person'),
-                                   Span('Logged in as: {}'.format(current_username))]),
-                         lambda: None),
-                        (Sequence([Octicon('organization'),
-                                   Span('Authorized Groups: {}'.format(self.authorized_groups_text))]),
-                         lambda: None),
-                        (Sequence([Octicon('sign-out'),
-                                   Span('Logout')]),
-                         '/logout')
-                    ])
+                    )
+                ],
+                (),
+                [
+                LargePendingDownloadDisplay(),
+                Octicon('person') + Span(current_username),
+                Span('Authorized Groups: {}'.format(self.authorized_groups_text)),
+                Button(Octicon('sign-out'),'/logout')
                 ]) +
             Main(display)
             )
@@ -490,6 +485,12 @@ class ActiveWebService(ServiceBase):
             lastDumpFrames = 0
             lastDumpTimeSpentCalculating = 0.0
 
+            FRAME_SIZE = 32 * 1024
+            FRAMES_PER_ACK = 10 #this HAS to line up with the constant in page.html for our ad-hoc protocol to function.
+
+            #large messages (more than FRAMES_PER_ACK frames) send an ack after every FRAMES_PER_ACKth message
+            largeMessageAck = gevent.queue.Queue()
+
             def readThread():
                 while not ws.closed:
                     msg = ws.receive()
@@ -498,16 +499,66 @@ class ActiveWebService(ServiceBase):
                     else:
                         try:
                             jsonMsg = json.loads(msg)
-
-                            cell_id = jsonMsg.get('target_cell')
-                            cell = cells[cell_id]
-                            if cell is not None:
-                                cell.onMessageWithTransaction(jsonMsg)
+                            if 'ACK' in jsonMsg:
+                                largeMessageAck.put(jsonMsg['ACK'])
+                            else:
+                                cell_id = jsonMsg.get('target_cell')
+                                cell = cells[cell_id]
+                                if cell is not None:
+                                    cell.onMessageWithTransaction(jsonMsg)
                         except Exception:
                             self._logger.error("Exception in inbound message: %s", traceback.format_exc())
+
                         cells.triggerIfHasDirty()
 
+                largeMessageAck.put(StopIteration)
+
             reader = Greenlet.spawn(readThread)
+
+            def writeJsonMessage(message):
+                """Send a message over the websocket. We have to chunk in 64kb frames
+                to keep the websocket from disconnecting on chrome for very large messages.
+                This appears to be a bug in the implementation?
+                """
+                msg = json.dumps(message)
+
+                #split msg int 64kb frames
+                frames = []
+                i = 0
+                while i < len(msg):
+                    frames.append(msg[i:i+FRAME_SIZE])
+                    i += FRAME_SIZE
+
+                if len(frames) >= FRAMES_PER_ACK:
+                    self._logger.info("Sending large message of %s bytes over %s frames", len(msg), len(frames))
+
+                ws.send(json.dumps(len(frames)))
+
+                for index, frame in enumerate(frames):
+                    ws.send(frame)
+
+                    #block until we get the ack for FRAMES_PER_ACK frames ago. That way we always
+                    #have FRAMES_PER_ACK frames in the buffer.
+                    framesSent = index+1
+                    if framesSent % FRAMES_PER_ACK == 0 and framesSent > FRAMES_PER_ACK:
+                        ack = largeMessageAck.get()
+                        if ack is StopIteration:
+                            return
+                        else:
+                            assert ack == framesSent - FRAMES_PER_ACK, (ack, framesSent - FRAMES_PER_ACK)
+
+
+                framesSent = len(frames)
+
+                if framesSent >= FRAMES_PER_ACK:
+                    finalAckIx = framesSent - (framesSent % FRAMES_PER_ACK)
+
+                    ack = largeMessageAck.get()
+                    if ack is StopIteration:
+                        return
+                    else:
+                        assert ack == finalAckIx, (ack, finalAckIx)
+
 
             while not ws.closed:
                 t0 = time.time()
@@ -523,7 +574,8 @@ class ActiveWebService(ServiceBase):
                 for message in messages:
                     gevent.socket.wait_write(ws.stream.handler.socket.fileno())
 
-                    ws.send(json.dumps(message))
+                    writeJsonMessage(message)
+
                     lastDumpMessages += 1
 
                 lastDumpFrames += 1
@@ -540,7 +592,7 @@ class ActiveWebService(ServiceBase):
                     lastDumpTimeSpentCalculating = 0
                     lastDumpTimestamp = time.time()
 
-                ws.send(json.dumps("postscripts"))
+                writeJsonMessage("postscripts")
 
                 cells.wait()
 

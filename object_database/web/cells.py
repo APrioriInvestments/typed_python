@@ -363,6 +363,7 @@ class Cell:
         self.subscriptions = set()
         self._nowrap = False
         self._width = None
+        self._overflow = None
         self._color = None
         self._height = None
         self.serializationContext = None
@@ -492,6 +493,9 @@ class Cell:
         if self._color is not None:
             res.append("color:%s" % self._color)
 
+        if self._overflow is not None:
+            res.append("overflow:%s" % self._overflow)
+
         if not res:
             return ""
         else:
@@ -503,6 +507,10 @@ class Cell:
 
     def width(self, width):
         self._width = width
+        return self
+
+    def overflow(self, overflow):
+        self._overflow = overflow
         return self
 
     def height(self, height):
@@ -679,7 +687,7 @@ class Columns(Cell):
         self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
         self.contents = """
             <div class="container-fluid" __style__>
-            <div class="row">
+            <div class="row flex-nowrap">
                 __contents__
             </div>
             </div>
@@ -701,17 +709,50 @@ class Columns(Cell):
             return self.elements[0].sortsAs()
         return None
 
-class HeaderBar(Cell):
-    def __init__(self, navbarItems):
+class LargePendingDownloadDisplay(Cell):
+    def __init__(self):
         super().__init__()
 
         self.contents = """
-            <div class="p-2 bg-light mr-auto tl-navbar">
-                %s
+            <div>
+                <span id="object_database_large_pending_download_text"></span>
             </div>
-        """ % "".join(["<span class='tl-navbar-item px-2'>____child_%s__</span>" % i for i in range(len(navbarItems))])
+        """
 
-        self.children = {'____child_%s__' % i: navbarItems[i] for i in range(len(navbarItems))}
+class HeaderBar(Cell):
+    def __init__(self, leftItems, centerItems=(), rightItems=()):
+        super().__init__()
+        self.leftItems = leftItems
+        self.centerItems = centerItems
+        self.rightItems = rightItems
+
+        self.contents = """
+            <div class="p-2 bg-light flex-container" style="display:flex;align-items:baseline">
+                <div class="flex-item" style="flex-grow:0">
+                    <div class="flex-container" style="display:flex;justify-content:flex-center;align-items:baseline">
+                        %s
+                    </div>
+                </div>
+                <div class="flex-item" style="flex-grow:1">
+                    <div class="flex-container" style="display:flex;justify-content:flex-center;align-items:baseline">
+                        %s
+                    </div>
+                </div>
+                <div class="flex-item" style="flex-grow:0">
+                    <div class="flex-container" style="display:flex;justify-content:flex-center;align-items:baseline">
+                        %s
+                    </div>
+                </div>
+            </div>
+        """ % (
+            "".join(["<span class='flex-item px-3'>____left_%s__</span>" % i for i in range(len(self.leftItems))]),
+            "".join(["<span class='flex-item px-3'>____center_%s__</span>" % i for i in range(len(self.centerItems))]),
+            "".join(["<span class='flex-item px-3'>____right_%s__</span>" % i for i in range(len(self.rightItems))]),
+            )
+
+        self.children = {'____left_%s__' % i: self.leftItems[i] for i in range(len(self.leftItems))}
+        self.children.update({'____center_%s__' % i: self.centerItems[i] for i in range(len(self.centerItems))})
+        self.children.update({'____right_%s__' % i: self.rightItems[i] for i in range(len(self.rightItems))})
 
 class Main(Cell):
     def __init__(self, child):
@@ -764,6 +805,9 @@ class Tabs(Cell):
     def sortsAs(self):
         return None
 
+    def setSlot(self, index):
+        self.whichSlot.set(index)
+
     def recalculate(self):
         items = []
 
@@ -793,7 +837,7 @@ class Tabs(Cell):
         self.whichSlot.set(int(msgFrame['ix']))
 
 class Dropdown(Cell):
-    def __init__(self, title, headersAndLambdas, singleLambda=None):
+    def __init__(self, title, headersAndLambdas, singleLambda=None, rightSide=False):
         """
         Initialize a Dropdown menu.
 
@@ -805,7 +849,6 @@ class Dropdown(Cell):
             title - a cell containing the current value.
             headersAndLambdas - a list of pairs containing cells for each item
             callback - a primary callback to call with the selected cell
-
         """
         super().__init__()
 
@@ -881,6 +924,11 @@ class Container(Cell):
         self.contents = newContents
         self.children = newChildren
         self.markDirty()
+
+class Scrollable(Container):
+    def __init__(self, child=None):
+        super().__init__(child)
+        self.overflow('auto')
 
 class RootCell(Container):
     def setRootSerializationContext(self, context):
@@ -1545,7 +1593,7 @@ class Expands(Cell):
 
 class CodeEditor(Cell):
     """Produce a code editor."""
-    def __init__(self, onmessage=lambda msg: None, keybindings=None):
+    def __init__(self, onmessage=lambda msg: None, keybindings=None, noScroll=False, minLines=None):
         """Create a code editor
 
         onmessage - receives messages from the user as they type
@@ -1558,6 +1606,8 @@ class CodeEditor(Cell):
         self._slot = Slot((0,""))
         self._onmessage = onmessage
         self.keybindings = keybindings or {}
+        self.noScroll = noScroll
+        self.minLines = minLines
 
     def setContents(self, contents):
         self._slot.set((self._slot.getWithoutRegisteringDependency()[0]+1, contents))
@@ -1591,6 +1641,17 @@ class CodeEditor(Cell):
             editor.setAutoScrollEditorIntoView(true);
             editor.session.setUseSoftTabs(true);
         """
+
+        if self.minLines is not None:
+            self.postscript += """
+                editor.setOption("minLines", __minlines__);
+            """.replace("__minlines__", str(self.minLines))
+
+        if self.noScroll:
+            self.postscript += """
+                editor.setOption("maxLines", Infinity);
+            """
+
 
         if self._onmessage is not None:
             self.postscript += """
@@ -1687,6 +1748,14 @@ class Plot(Cell):
                 );
             plotDiv.on('plotly_relayout',
                 function(eventdata){
+                    //if we're sending a string, then its a date object, and we want to send
+                    // a timestamp
+                    if (typeof(eventdata['xaxis.range[0]']) === 'string') {
+                        eventdata = Object.assign({},eventdata)
+                        eventdata["xaxis.range[0]"] = Date.parse(eventdata["xaxis.range[0]"]) / 1000.0
+                        eventdata["xaxis.range[1]"] = Date.parse(eventdata["xaxis.range[1]"]) / 1000.0
+                    }
+
                     websocket.send(JSON.stringify(
                         {'event':'plot_layout',
                          'target_cell': '__identity__',

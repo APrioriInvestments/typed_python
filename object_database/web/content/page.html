@@ -16,6 +16,8 @@
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
 <script>
+    var FRAMES_PER_ACK = 10;
+
     var websocket;
 
     var aceEditors = {}
@@ -23,10 +25,11 @@
     function mapPlotlyData(d) {
       if (d.timestamp !== undefined) {
         d.timestamp = unpackHexFloats(d.timestamp)
-        d.timestamp = d.timestamp.map(ts => new Date(ts * 1000))
+        d.x = Array.from(d.timestamp).map(ts => new Date(ts * 1000))
+      } else {
+        d.x = unpackHexFloats(d.x)
       }
 
-      d.x = unpackHexFloats(d.x)
       d.y = unpackHexFloats(d.y)
 
       return d
@@ -79,6 +82,20 @@
     cells = {}
     postscripts = []
 
+    var currentBuffer = {'remaining': null, 'buffer': null, 'hasDisplay': false}
+
+    function setLargeDownloadDisplay(msg) {
+      if (msg.length == 0 && !currentBuffer.hasDisplay) {
+        return
+      }
+
+      currentBuffer.hasDisplay = msg.length != 0
+
+      domElement = document.getElementById("object_database_large_pending_download_text")
+      if (domElement != undefined) {
+        domElement.innerHTML = msg
+      }
+    }
     function htmlToDomElt(contents) {
         elt = document.createElement("div")
         elt.innerHTML = contents
@@ -112,12 +129,47 @@
             </div>
       </main>`
     }
+
     websocket.onerror = function(event) {
       console.log("SOCKET ERRORED: ", event)
     }
 
     websocket.onmessage = function(event) {
-        update = JSON.parse(event.data)
+        if (currentBuffer.remaining === null) {
+          currentBuffer.remaining = JSON.parse(event.data)
+          currentBuffer.buffer = []
+          if (currentBuffer.hasDisplay && currentBuffer.remaining == 1) {
+            setLargeDownloadDisplay("")
+          }
+          return
+        }
+
+        currentBuffer.remaining -= 1
+        currentBuffer.buffer.push(event.data)
+
+        if (currentBuffer.buffer.length % FRAMES_PER_ACK == 0) {
+          //ACK every tenth message. We have to do active pushback
+          //because the websocket disconnects on Chrome if you jam too
+          //much in at once
+          sendString_(JSON.stringify({"ACK": currentBuffer.buffer.length}))
+          setLargeDownloadDisplay(
+            "(Downloaded " +
+              Math.round(100 * currentBuffer.buffer.length / (currentBuffer.remaining + currentBuffer.buffer.length)) + " % of " +
+              Math.round((currentBuffer.remaining + currentBuffer.buffer.length) / (1024 / 32)) + "MB"
+              + ")"
+            )
+        }
+
+        if (currentBuffer.remaining > 0) {
+          return;
+        }
+
+        setLargeDownloadDisplay("")
+
+        update = JSON.parse(currentBuffer.buffer.join(''))
+
+        currentBuffer.remaining = null
+        currentBuffer.buffer = null
 
         if (update === "postscripts") {
           updatePopovers()
