@@ -1,4 +1,4 @@
-#   Copyright 2019
+#   Copyright 2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -99,7 +99,8 @@ def log_cells_stats(cells, logger, indentation=0):
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
-def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="INFO", timeout=1.0, verbose=True):
+def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="INFO", timeout=1.0,
+                          verbose=True, own_hostname='localhost', db_hostname='localhost'):
     if not verbose:
         kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
@@ -107,7 +108,7 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
 
     server = subprocess.Popen(
         [sys.executable, os.path.join(ownDir, 'frontends', 'service_manager.py'),
-            'localhost', 'localhost', str(port), '--run_db',
+            own_hostname, db_hostname, str(port), '--run_db',
             '--source', os.path.join(tempDirectoryName,'source'),
             '--storage', os.path.join(tempDirectoryName,'storage'),
             '--service-token', auth_token,

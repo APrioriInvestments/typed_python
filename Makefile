@@ -61,7 +61,7 @@ docker-test:
 .PHONY: docker-web
 docker-web:
 	#run a dummy webframework
-	docker run -it --rm -p 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
+	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
 
 .PHONY: lint
 lint:
