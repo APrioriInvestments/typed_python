@@ -12,6 +12,22 @@ public:
 class PyListOfInstance : public PyTupleOrListOfInstance {
 public:
     ListOf* type();
+
+    static PyObject* listAppend(PyObject* o, PyObject* args);
+
+    static PyObject* listResize(PyObject* o, PyObject* args);
+
+    static PyObject* listReserve(PyObject* o, PyObject* args);
+
+    static PyObject* listClear(PyObject* o, PyObject* args);
+
+    static PyObject* listReserved(PyObject* o, PyObject* args);
+
+    static PyObject* listPop(PyObject* o, PyObject* args);
+
+    static PyObject* listSetSizeUnsafe(PyObject* o, PyObject* args);
+
+    static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
 };
 
 class PyTupleOfInstance : public PyTupleOrListOfInstance {
