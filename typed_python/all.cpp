@@ -10,8 +10,11 @@ compile the entire group all at once.
 #include "_types.cpp"
 #include "_runtime.cpp"
 #include "Instance.cpp"
-#include "PyInstance.cpp"
 #include "util.cpp"
+
+#include "PyInstance.cpp"
+#include "PyConstDictInstance.cpp"
+#include "PyTupleOrListOfInstance.cpp"
 
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"
@@ -27,3 +30,4 @@ compile the entire group all at once.
 #include "StringType.cpp"
 #include "TupleOrListOfType.cpp"
 #include "Type.cpp"
+

@@ -14,7 +14,12 @@ class InternalPyException {};
 //throw to indicate we set a python error already.
 class PythonExceptionSet {};
 
-struct PyInstance {
+class PyListOfInstance;
+class PyTupleOfInstance;
+class PyConstDictInstance;
+
+class PyInstance {
+public:
     PyObject_HEAD
 
     bool mIsInitialized;
@@ -23,6 +28,76 @@ struct PyInstance {
     int64_t mIteratorOffset; //-1 if we're not an iterator
 
     Instance mContainingInstance;
+
+    template<class T>
+    static auto check(PyObject* obj, const T& f) {
+        switch (extractTypeFrom(obj->ob_type)->getTypeCategory()) {
+            // case catNone:
+            //     return f(*(None*)this);
+            // case catBool:
+            //     return f(*(Bool*)this);
+            // case catUInt8:
+            //     return f(*(UInt8*)this);
+            // case catUInt16:
+            //     return f(*(UInt16*)this);
+            // case catUInt32:
+            //     return f(*(UInt32*)this);
+            // case catUInt64:
+            //     return f(*(UInt64*)this);
+            // case catInt8:
+            //     return f(*(Int8*)this);
+            // case catInt16:
+            //     return f(*(Int16*)this);
+            // case catInt32:
+            //     return f(*(Int32*)this);
+            // case catInt64:
+            //     return f(*(Int64*)this);
+            // case catString:
+            //     return f(*(String*)this);
+            // case catBytes:
+            //     return f(*(Bytes*)this);
+            // case catFloat32:
+            //     return f(*(Float32*)this);
+            // case catFloat64:
+            //     return f(*(Float64*)this);
+            // case catValue:
+            //     return f(*(Value*)this);
+            // case catOneOf:
+            //     return f(*(OneOf*)this);
+            case Type::TypeCategory::catTupleOf:
+                return f(*(PyTupleOfInstance*)obj);
+            // case catPointerTo:
+            //     return f(*(PointerTo*)this);
+            case Type::TypeCategory::catListOf:
+                return f(*(PyListOfInstance*)obj);
+            // case catNamedTuple:
+            //     return f(*(NamedTuple*)this);
+            // case catTuple:
+            //     return f(*(Tuple*)this);
+            case Type::TypeCategory::catConstDict:
+                return f(*(PyConstDictInstance*)obj);
+            // case catAlternative:
+            //     return f(*(Alternative*)this);
+            // case catConcreteAlternative:
+            //     return f(*(ConcreteAlternative*)this);
+            // case catPythonSubclass:
+            //     return f(*(PythonSubclass*)this);
+            // case catPythonObjectOfType:
+            //     return f(*(PythonObjectOfType*)this);
+            // case catClass:
+            //     return f(*(Class*)this);
+            // case catHeldClass:
+            //     return f(*(HeldClass*)this);
+            // case catFunction:
+            //     return f(*(Function*)this);
+            // case catBoundMethod:
+            //     return f(*(BoundMethod*)this);
+            // case catForward:
+            //     return f(*(Forward*)this);
+            default:
+                throw std::runtime_error("Invalid type found");
+        }
+    }
 
     static bool guaranteeForwardsResolved(Type* t);
 
@@ -136,6 +211,8 @@ struct PyInstance {
     static PyObject* nb_subtract(PyObject* lhs, PyObject* rhs);
 
     static PyObject* sq_concat(PyObject* lhs, PyObject* rhs);
+
+    //PyObject* sq_concat_concrete(PyObject* rhs);
 
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix);
 

@@ -2,6 +2,8 @@
 #include "AllTypes.hpp"
 #include "_runtime.h"
 #include "PyInstance.hpp"
+#include "PyConstDictInstance.hpp"
+#include "PyTupleOrListOfInstance.hpp"
 
 // static
 bool PyInstance::guaranteeForwardsResolved(Type* t) {
@@ -1499,137 +1501,19 @@ PyObject* PyInstance::nb_subtract(PyObject* lhs, PyObject* rhs) {
 
 // static
 PyObject* PyInstance::sq_concat(PyObject* lhs, PyObject* rhs) {
-    Type* lhs_type = extractTypeFrom(lhs->ob_type);
-    Type* rhs_type = extractTypeFrom(rhs->ob_type);
-
-    if (lhs_type) {
-        PyInstance* w_lhs = (PyInstance*)lhs;
-
-        if (lhs_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-            if (lhs_type == rhs_type) {
-                PyInstance* w_rhs = (PyInstance*)rhs;
-
-                PyInstance* self =
-                    (PyInstance*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
-
-                self->initialize([&](instance_ptr data) {
-                    ((ConstDict*)lhs_type)->addDicts(w_lhs->dataPtr(), w_rhs->dataPtr(), data);
-                });
-
-                return (PyObject*)self;
-            } else {
-                //attempt to convert rhs to a relevant dict type.
-                instance_ptr tempObj = (instance_ptr)malloc(lhs_type->bytecount());
-
-                try {
-                    copyConstructFromPythonInstance(lhs_type, tempObj, rhs);
-                } catch(std::exception& e) {
-                    free(tempObj);
-                    PyErr_SetString(PyExc_TypeError, e.what());
-                    return NULL;
-                }
-
-                PyInstance* self =
-                    (PyInstance*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
-
-                self->initialize([&](instance_ptr data) {
-                    ((ConstDict*)lhs_type)->addDicts(w_lhs->dataPtr(), tempObj, data);
-                });
-
-                lhs_type->destroy(tempObj);
-
-                free(tempObj);
-
-                return (PyObject*)self;
-            }
-        }
-        if (lhs_type->getTypeCategory() == Type::TypeCategory::catTupleOf || lhs_type->getTypeCategory() == Type::TypeCategory::catListOf) {
-            //TupleOrListOf(X) + TupleOrListOf(X) fastpath
-            if (lhs_type == rhs_type) {
-                PyInstance* w_rhs = (PyInstance*)rhs;
-
-                TupleOrListOf* tupT = (TupleOrListOf*)lhs_type;
-                Type* eltType = tupT->getEltType();
-                PyInstance* self =
-                    (PyInstance*)typeObj(tupT)
-                        ->tp_alloc(typeObj(tupT), 0);
-
-                int count_lhs = tupT->count(w_lhs->dataPtr());
-                int count_rhs = tupT->count(w_rhs->dataPtr());
-
-                self->initialize([&](instance_ptr data) {
-                    tupT->constructor(data, count_lhs + count_rhs,
-                        [&](uint8_t* eltPtr, int64_t k) {
-                            eltType->copy_constructor(
-                                eltPtr,
-                                k < count_lhs ? tupT->eltPtr(w_lhs->dataPtr(), k) :
-                                    tupT->eltPtr(w_rhs->dataPtr(), k - count_lhs)
-                                );
-                            }
-                        );
-                });
-
-                return (PyObject*)self;
-            }
-            //generic path to add any kind of iterable.
-            if (PyObject_Length(rhs) != -1) {
-                TupleOrListOf* tupT = (TupleOrListOf*)lhs_type;
-                Type* eltType = tupT->getEltType();
-
-                PyInstance* self =
-                    (PyInstance*)typeObj(tupT)
-                        ->tp_alloc(typeObj(tupT), 0);
-
-                int count_lhs = tupT->count(w_lhs->dataPtr());
-                int count_rhs = PyObject_Length(rhs);
-
-                try {
-                    self->initialize([&](instance_ptr data) {
-                        tupT->constructor(data, count_lhs + count_rhs,
-                            [&](uint8_t* eltPtr, int64_t k) {
-                                if (k < count_lhs) {
-                                    eltType->copy_constructor(
-                                        eltPtr,
-                                        tupT->eltPtr(w_lhs->dataPtr(), k)
-                                        );
-                                } else {
-                                    PyObject* kval = PyLong_FromLong(k - count_lhs);
-                                    PyObject* o = PyObject_GetItem(rhs, kval);
-                                    Py_DECREF(kval);
-
-                                    if (!o) {
-                                        throw InternalPyException();
-                                    }
-
-                                    try {
-                                        copyConstructFromPythonInstance(eltType, eltPtr, o);
-                                    } catch(...) {
-                                        Py_DECREF(o);
-                                        throw;
-                                    }
-
-                                    Py_DECREF(o);
-                                }
-                            });
-                    });
-                } catch(std::exception& e) {
-                    typeObj(tupT)->tp_dealloc((PyObject*)self);
-                    PyErr_SetString(PyExc_TypeError, e.what());
-                    return NULL;
-                }
-
-                return (PyObject*)self;
-            }
-        }
+    try {
+        return check(lhs, [&](auto& subtype) {
+            return subtype.sq_concat_concrete(rhs);
+        });
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
     }
-
-    PyErr_SetString(
-        PyExc_TypeError,
-        (std::string("cannot concatenate ") + lhs->ob_type->tp_name + " and "
-                + rhs->ob_type->tp_name).c_str()
-        );
-    return NULL;
 }
+
+//PyObject* PyInstance::sq_concat_concrete(PyObject* rhs) {
+//    throw std::runtime_error("Subclasses implement");
+//}
 
 // static
 PyObject* PyInstance::sq_item(PyObject* o, Py_ssize_t ix) {
