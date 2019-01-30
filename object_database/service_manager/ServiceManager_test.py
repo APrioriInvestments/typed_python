@@ -628,6 +628,27 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         self.waitForCount(1)
 
+    def test_deploy_imported_module(self):
+        with tempfile.TemporaryDirectory() as tf:
+            for fname, contents in getTestServiceModule(1).items():
+                if not os.path.exists(os.path.join(tf, os.path.dirname(fname))):
+                    os.makedirs(os.path.join(tf, os.path.dirname(fname)))
+
+                with open(os.path.join(tf, fname), "w") as f:
+                    f.write(contents)
+
+            try:
+                sys.path += [tf]
+
+                test_service = __import__("test_service.service")
+
+                with self.database.transaction():
+                    ServiceManager.createOrUpdateService(test_service.service.Service, "TestService", target_count=1)
+
+                self.waitForCount(1)
+            finally:
+                sys.path = [x for x in sys.path if x != tf]
+
     def test_update_module_code(self):
         serviceName = "TestService"
 

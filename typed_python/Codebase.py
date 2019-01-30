@@ -262,7 +262,7 @@ class Codebase:
 
         # drop as many parts of the module_path as there are parts to the
         # module name (i.e., at least one)
-        for _ in module.__name__.split("."):
+        for _ in range(len(module.__name__.split("."))-1):
             module_path = os.path.dirname(module_path)
 
         return module_path

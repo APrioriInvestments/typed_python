@@ -28,6 +28,7 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database import connect, service_schema, core_schema, ServiceBase, Codebase
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
 import object_database
+from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 def findGitParent(p_root):
     p = os.path.abspath(p_root)
@@ -124,9 +125,9 @@ def _main(argv):
 
     if parsedArgs.command == 'install':
         if parsedArgs.paths:
-            paths = parsedArgs.paths
+            sys.path += parsedArgs.paths
         else:
-            paths = [findGitParent(os.getcwd())]
+            sys.path += [findGitParent(os.getcwd())]
 
         gbRamUsed = 1
         coresUsed = 1
@@ -135,64 +136,27 @@ def _main(argv):
             fullClassname = getattr(parsedArgs, 'class')
             modulename, classname = fullClassname.rsplit(".",1)
 
-            if modulename.startswith("object_database"):
-                def _getobject(modname, attribute):
-                    mod = __import__(modname, fromlist=[attribute])
-                    return mod.__dict__[attribute]
+            def _getobject(modname, attribute):
+                mod = __import__(modname, fromlist=[attribute])
+                return mod.__dict__[attribute]
 
-                actualClass = _getobject(modulename, classname)
+            actualClass = _getobject(modulename, classname)
 
+            if not isinstance(actualClass, type):
+                print("Named class %s is not a type." % fullClassname)
+                return 1
 
-                if not isinstance(actualClass, type):
-                    print("Named class %s is not a type." % fullClassname)
-                    return 1
+            if not issubclass(actualClass, ServiceBase):
+                print("Named class %s is not a ServiceBase subclass." % fullClassname)
+                return 1
 
-                if not issubclass(actualClass, ServiceBase):
-                    print("Named class %s is not a ServiceBase subclass." % fullClassname)
-                    return 1
+            coresUsed = actualClass.coresUsed
+            gbRamUsed = actualClass.gbRamUsed
 
-                coresUsed = actualClass.coresUsed
-                gbRamUsed = actualClass.gbRamUsed
-
-                ServiceManager.createOrUpdateService(actualClass, classname,
-                    placement=parsedArgs.placement, isSingleton=parsedArgs.singleton,
-                    coresUsed=coresUsed, gbRamUsed=gbRamUsed
-                    )
-            else:
-                codebase = service_schema.Codebase.create(paths)
-
-                #make sure the codebase is importable, etc
-                module = codebase.instantiate(modulename)
-
-                if module is None:
-                    print("Can't find", module, "in the codebase")
-
-                actualClass = module.__dict__.get(classname, None)
-                if actualClass is None:
-                    print("Can't find", module, "in module", modulename)
-
-                if actualClass is None:
-                    print("Can't find", classname, "in the codebase")
-                    return 1
-
-                if not isinstance(actualClass, type):
-                    print("Named class %s is not a type." % fullClassname)
-                    return 1
-
-                if not issubclass(actualClass, ServiceBase):
-                    print("Named class %s is not a ServiceBase subclass." % fullClassname)
-                    return 1
-
-                coresUsed = actualClass.coresUsed
-                gbRamUsed = actualClass.gbRamUsed
-
-                if not parsedArgs.name:
-                    name = fullClassname.split(".")[-1]
-                else:
-                    name = parsedArgs.name
-
-                ServiceManager.createOrUpdateServiceWithCodebase(codebase, fullClassname, name, targetCount=None,
-                        placement=parsedArgs.placement, coresUsed=coresUsed, gbRamUsed=gbRamUsed)
+            ServiceManager.createOrUpdateService(actualClass, classname,
+                placement=parsedArgs.placement, isSingleton=parsedArgs.singleton,
+                coresUsed=coresUsed, gbRamUsed=gbRamUsed
+                )
 
     if parsedArgs.command == 'list':
         table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount', 'Cores', 'RAM']]
