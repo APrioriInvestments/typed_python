@@ -18,86 +18,32 @@ private:
         uint8_t data[];
     };
 
-    Instance(layout* l) :
-        mLayout(l)
-    {
-    }
+    Instance(layout* l);
 
-    static layout* allocateNoneLayout() {
-        layout* result = (layout*)malloc(sizeof(layout));
-        result->refcount = 0;
-        result->type = None::Make();
+    static layout* allocateNoneLayout();
 
-        return result;
-    }
-
-    static layout* noneLayout() {
-        static layout* noneLayout = allocateNoneLayout();
-        noneLayout->refcount++;
-
-        return noneLayout;
-    }
+    static layout* noneLayout();
 
 public:
-    static Instance deserialized(Type* t, DeserializationBuffer& buf) {
-        t->assertForwardsResolved();
+    static Instance deserialized(Type* t, DeserializationBuffer& buf);
 
-        return createAndInitialize(t, [&](instance_ptr tgt) {
-            t->deserialize(tgt, buf);
-        });
-    }
+    static Instance create(bool val);
 
-    static Instance create(bool val) {
-        return create(Bool::Make(), (instance_ptr)&val);
-    }
+    static Instance create(long val);
 
-    static Instance create(long val) {
-        return create(Int64::Make(), (instance_ptr)&val);
-    }
+    static Instance create(double val);
 
-    static Instance create(double val) {
-        return create(Float64::Make(), (instance_ptr)&val);
-    }
+    static Instance create(Type*t, instance_ptr data);
 
-    static Instance create(Type*t, instance_ptr data) {
-        t->assertForwardsResolved();
+    Instance();
 
-        return createAndInitialize(t, [&](instance_ptr tgt) {
-            t->copy_constructor(tgt, data);
-        });
-    }
+    Instance(const Instance& other);
+
+    Instance(instance_ptr p, Type* t);
 
     template<class initializer_type>
     static Instance createAndInitialize(Type* t, const initializer_type& initFun) {
         return Instance(t, initFun);
-    }
-
-    Instance() {
-        // by default, None
-        mLayout = noneLayout();
-        mLayout->refcount++;
-    }
-
-    Instance(const Instance& other) : mLayout(other.mLayout) {
-        mLayout->refcount++;
-    }
-
-    Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
-        t->assertForwardsResolved();
-
-        layout* l = (layout*)malloc(sizeof(layout) + t->bytecount());
-
-        try {
-            t->copy_constructor(l->data, p);
-        } catch(...) {
-            free(l);
-            throw;
-        }
-
-        l->refcount = 1;
-        l->type = t;
-
-        mLayout = l;
     }
 
     template<class initializer_type>
@@ -119,65 +65,22 @@ public:
         mLayout = l;
     }
 
-    ~Instance() {
-        mLayout->refcount--;
-        if (mLayout->refcount == 0) {
-            mLayout->type->destroy(mLayout->data);
-            free(mLayout);
-        }
-    }
+    ~Instance();
 
-    Instance& operator=(const Instance& other) {
-        other.mLayout->refcount++;
+    Instance& operator=(const Instance& other);
 
-        mLayout->refcount--;
-        if (mLayout->refcount == 0) {
-            mLayout->type->destroy(mLayout->data);
-            free(mLayout);
-        }
+    bool operator<(const Instance& other) const;
 
-        mLayout = other.mLayout;
-        return *this;
-    }
+    std::string repr() const;
 
-    bool operator<(const Instance& other) const {
-        if (mLayout->type < other.mLayout->type) {
-            return true;
-        }
-        if (mLayout->type > other.mLayout->type) {
-            return false;
-        }
-        return mLayout->type->cmp(mLayout->data, other.mLayout->data) < 0;
-    }
+    int32_t hash32() const;
 
-    std::string repr() const {
-        std::ostringstream s;
-        ReprAccumulator accumulator(s);
+    Type* type() const;
 
-        accumulator << std::showpoint;
-        mLayout->type->repr(mLayout->data, accumulator);
-        return s.str();
-    }
+    instance_ptr data() const;
 
-    int32_t hash32() const {
-        return mLayout->type->hash32(mLayout->data);
-    }
-
-    Type* type() const {
-        return mLayout->type;
-    }
-
-    instance_ptr data() const {
-        return mLayout->data;
-    }
-
-    int64_t refcount() const {
-        return mLayout->refcount;
-    }
+    int64_t refcount() const;
 
 private:
     layout* mLayout;
 };
-
-//unusable unless you include everything
-#include "AllTypes.hpp"

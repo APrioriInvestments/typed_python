@@ -1,7 +1,7 @@
 #include <Python.h>
 #include "AllTypes.hpp"
 #include "_runtime.h"
-#include "native_instance_wrapper.h"
+#include "native_instance_wrapper.hpp"
 
 // static
 bool native_instance_wrapper::guaranteeForwardsResolved(Type* t) {

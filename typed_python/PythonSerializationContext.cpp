@@ -1,6 +1,6 @@
 #include "PythonSerializationContext.hpp"
 #include "AllTypes.hpp"
-#include "native_instance_wrapper.h"
+#include "native_instance_wrapper.hpp"
 
 // virtual
 void PythonSerializationContext::serializePythonObject(PyObject* o, SerializationBuffer& b) const {

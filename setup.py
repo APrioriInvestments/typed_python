@@ -28,9 +28,10 @@ setuptools.setup(
             sources=[
                 'typed_python/_runtime.cc',
                 'typed_python/_types.cc',
-                'typed_python/Type.cpp',
-                'typed_python/PythonSerializationContext.cpp',
-                'typed_python/native_instance_wrapper.cc',
+                'typed_python/Instance.cpp',
+                'typed_python/native_instance_wrapper.cpp',
+                'typed_python/util.cpp',
+
                 'typed_python/AlternativeType.cpp',
                 'typed_python/BytesType.cpp',
                 'typed_python/ClassType.cpp',
@@ -40,9 +41,11 @@ setuptools.setup(
                 'typed_python/HeldClassType.cpp',
                 'typed_python/OneOfType.cpp',
                 'typed_python/PythonObjectOfTypeType.cpp',
+                'typed_python/PythonSerializationContext.cpp',
                 'typed_python/PythonSubclassType.cpp',
                 'typed_python/StringType.cpp',
-                'typed_python/TupleOrListOfType.cpp'
+                'typed_python/TupleOrListOfType.cpp',
+                'typed_python/Type.cpp',
             ],
             define_macros=[
                 ("_FORTIFY_SOURCE", 2)
