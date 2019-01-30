@@ -14,7 +14,7 @@ class InternalPyException {};
 //throw to indicate we set a python error already.
 class PythonExceptionSet {};
 
-struct native_instance_wrapper {
+struct PyInstance {
     PyObject_HEAD
 
     bool mIsInitialized;
@@ -40,7 +40,7 @@ struct native_instance_wrapper {
         return extractPythonObject(instance.data(), instance.type());
     }
 
-    //initialize a native_instance_wrapper for 'eltType'. For ints, floats, etc, with
+    //initialize a PyInstance for 'eltType'. For ints, floats, etc, with
     //actual native representations, this will produce a wrapper object (maybe not what you want)
     //rather than the standard python representation.
     template<class init_func>
@@ -49,8 +49,8 @@ struct native_instance_wrapper {
             return nullptr;
         }
 
-        native_instance_wrapper* self =
-            (native_instance_wrapper*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
+        PyInstance* self =
+            (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
         try {
             self->initialize(f);

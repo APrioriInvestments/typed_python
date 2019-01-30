@@ -10,7 +10,7 @@ compile the entire group all at once.
 #include "_types.cpp"
 #include "_runtime.cpp"
 #include "Instance.cpp"
-#include "native_instance_wrapper.cpp"
+#include "PyInstance.cpp"
 #include "util.cpp"
 
 #include "AlternativeType.cpp"

@@ -1,16 +1,16 @@
 #include "PythonSerializationContext.hpp"
 #include "AllTypes.hpp"
-#include "native_instance_wrapper.hpp"
+#include "PyInstance.hpp"
 
 // virtual
 void PythonSerializationContext::serializePythonObject(PyObject* o, SerializationBuffer& b) const {
-    Type* t = native_instance_wrapper::extractTypeFrom(o->ob_type, true);
+    Type* t = PyInstance::extractTypeFrom(o->ob_type, true);
 
     if (t) {
         b.write_uint8(T_NATIVE);
         //we have a natural serialization mechanism already
         serializeNativeType(t, b);
-        t->serialize(((native_instance_wrapper*)o)->dataPtr(), b);
+        t->serialize(((PyInstance*)o)->dataPtr(), b);
     } else {
         if (o == Py_None) {
             b.write_uint8(T_NONE);
@@ -67,7 +67,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             serializePyDict(o, b);
         } else
         if (PyType_Check(o)) {
-            Type* nativeType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)o, true);
+            Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o, true);
 
             if (nativeType) {
                 b.write_uint8(T_NATIVETYPE);
@@ -380,7 +380,7 @@ PyObject* PythonSerializationContext::deserializePyRepresentation(Deserializatio
 }
 
 void PythonSerializationContext::serializeNativeType(Type* nativeType, SerializationBuffer& b, bool allowCaching) const {
-    PyObject* nameForObject = PyObject_CallMethod(mContextObj, "nameForObject", "O", native_instance_wrapper::typeObj(nativeType));
+    PyObject* nameForObject = PyObject_CallMethod(mContextObj, "nameForObject", "O", PyInstance::typeObj(nativeType));
 
     if (!nameForObject) {
         throw PythonExceptionSet();
@@ -400,7 +400,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 
     Py_DECREF(nameForObject);
 
-    PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", native_instance_wrapper::typeObj(nativeType));
+    PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", PyInstance::typeObj(nativeType));
 
     if (!representation) {
         throw PythonExceptionSet();
@@ -520,7 +520,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error(msg);
         }
 
-        Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res, true);
+        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res, true);
         Py_DECREF(res);
 
         if (!resultType) {
@@ -533,7 +533,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         //the -1 code indicates we don't want to memoize this. That should have happened at an outer layer.
         PyObject* res = deserializePyRepresentation(b, -1);
 
-        Type* resultType = native_instance_wrapper::extractTypeFrom((PyTypeObject*)res, true);
+        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res, true);
 
         Py_DECREF(res);
 
@@ -696,12 +696,12 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     } else
     if (code == T_NATIVE) {
         Type* t = deserializeNativeType(b);
-        return native_instance_wrapper::initialize(t, [&](instance_ptr selfData) {
+        return PyInstance::initialize(t, [&](instance_ptr selfData) {
             t->deserialize(selfData, b);
         });
     } else
     if (code == T_NATIVETYPE) {
-        return incref((PyObject*)native_instance_wrapper::typeObj(deserializeNativeType(b)));
+        return incref((PyObject*)PyInstance::typeObj(deserializeNativeType(b)));
     } else
     if (code == T_OBJECT) {
         return deserializePythonObjectNamedOrAsObj(b);

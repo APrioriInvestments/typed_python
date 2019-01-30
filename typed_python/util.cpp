@@ -1,6 +1,6 @@
 #include "util.hpp"
 #include "Instance.hpp"
-#include "native_instance_wrapper.hpp"
+#include "PyInstance.hpp"
 
 bool unpackTupleToTypes(PyObject* tuple, std::vector<Type*>& out) {
     if (!PyTuple_Check(tuple)) {
@@ -11,7 +11,7 @@ bool unpackTupleToTypes(PyObject* tuple, std::vector<Type*>& out) {
         PyObject* entry = PyTuple_GetItem(tuple, i);
         Type* targetType = NULL;
 
-        targetType = native_instance_wrapper::tryUnwrapPyInstanceToType(entry);
+        targetType = PyInstance::tryUnwrapPyInstanceToType(entry);
         if (!targetType) {
             PyErr_Format(PyExc_TypeError, "Expected a type in position %d of type tuple. Got %S instead.", i, entry);
             return false;
@@ -33,7 +33,7 @@ bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::str
         if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2
                 || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
                 || !(targetType =
-                    native_instance_wrapper::tryUnwrapPyInstanceToType(
+                    PyInstance::tryUnwrapPyInstanceToType(
                         PyTuple_GetItem(entry, 1)
                         ))
                 )
@@ -69,7 +69,7 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
         if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 3
                 || !PyUnicode_Check(PyTuple_GetItem(entry, 0))
                 || !(targetType =
-                    native_instance_wrapper::tryUnwrapPyInstanceToType(
+                    PyInstance::tryUnwrapPyInstanceToType(
                         PyTuple_GetItem(entry, 1)
                         ))
                 )
@@ -87,7 +87,7 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
 
         memberNames.insert(memberName);
 
-        Instance inst = native_instance_wrapper::unwrapPyObjectToInstance(PyTuple_GetItem(entry, 2));
+        Instance inst = PyInstance::unwrapPyObjectToInstance(PyTuple_GetItem(entry, 2));
 
         if (PyErr_Occurred()) {
             return false;
