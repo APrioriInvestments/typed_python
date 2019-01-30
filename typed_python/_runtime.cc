@@ -2,7 +2,9 @@
 #include <cmath>
 #include <Python.h>
 #include <iostream>
-#include "Type.hpp"
+#include "AllTypes.hpp"
+#include "StringType.hpp"
+#include "BytesType.hpp"
 
 thread_local const char* nativepython_cur_exception_value = nullptr;
 

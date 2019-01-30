@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util.hpp"
+#include "AllTypes.hpp"
 
 //extension of PyTypeObject that adds a Type* at the end.
 struct NativeTypeWrapper {

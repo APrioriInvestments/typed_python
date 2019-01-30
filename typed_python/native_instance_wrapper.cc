@@ -1,5 +1,5 @@
 #include <Python.h>
-#include "Type.hpp"
+#include "AllTypes.hpp"
 #include "_runtime.h"
 #include "native_instance_wrapper.h"
 

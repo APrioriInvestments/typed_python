@@ -1,6 +1,6 @@
 #pragma once
+
 #include "Type.hpp"
-#include "ReprAccumulator.hpp"
 
 template<class T>
 class RegisterType : public Type {

@@ -5,7 +5,7 @@
 #include <string>
 #include <iostream>
 
-#include "Type.hpp"
+#include "AllTypes.hpp"
 #include "NullSerializationContext.hpp"
 #include "util.hpp"
 #include "native_instance_wrapper.h"

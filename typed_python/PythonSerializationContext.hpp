@@ -3,7 +3,6 @@
 #include "util.hpp"
 #include "Type.hpp"
 #include "SerializationContext.hpp"
-#include "native_instance_wrapper.h"
 
 // PySet_CheckExact is missing from the CPython API for some reason
 #ifndef PySet_CheckExact

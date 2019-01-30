@@ -2,7 +2,7 @@
 
 #include <atomic>
 #include <string>
-// TODO #include "Type.hpp"
+#include "Type.hpp"
 
 class DeserializationBuffer;
 
@@ -178,3 +178,6 @@ public:
 private:
     layout* mLayout;
 };
+
+//unusable unless you include everything
+#include "AllTypes.hpp"
