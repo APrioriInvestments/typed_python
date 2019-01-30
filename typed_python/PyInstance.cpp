@@ -4,6 +4,7 @@
 #include "PyInstance.hpp"
 #include "PyConstDictInstance.hpp"
 #include "PyTupleOrListOfInstance.hpp"
+#include "PyPointerToInstance.hpp"
 
 // static
 bool PyInstance::guaranteeForwardsResolved(Type* t) {
@@ -43,81 +44,12 @@ void PyInstance::guaranteeForwardsResolvedOrThrow(Type* t) {
     });
 }
 
+Type* PyInstance::type() {
+    return extractTypeFrom(((PyObject*)this)->ob_type);
+}
+
 instance_ptr PyInstance::dataPtr() {
     return mContainingInstance.data();
-}
-
-// static
-PyObject* PyInstance::constDictItems(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-
-    PyInstance* w = (PyInstance*)o;
-
-    if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        PyInstance* self = (PyInstance*)o->ob_type->tp_alloc(o->ob_type, 0);
-
-        self->mIteratorOffset = 0;
-        self->mIteratorFlag = 2;
-        self->mIsMatcher = false;
-
-        self->initialize([&](instance_ptr data) {
-            self_type->copy_constructor(data, w->dataPtr());
-        });
-
-
-        return (PyObject*)self;
-    }
-
-    PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
-    return NULL;
-}
-
-// static
-PyObject* PyInstance::constDictKeys(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
-
-    if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        PyInstance* self = (PyInstance*)o->ob_type->tp_alloc(o->ob_type, 0);
-
-        self->mIteratorOffset = 0;
-        self->mIteratorFlag = 0;
-        self->mIsMatcher = false;
-
-        self->initialize([&](instance_ptr data) {
-            self_type->copy_constructor(data, w->dataPtr());
-        });
-
-
-        return (PyObject*)self;
-    }
-
-    PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
-    return NULL;
-}
-
-// static
-PyObject* PyInstance::constDictValues(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
-
-    if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        PyInstance* self = (PyInstance*)o->ob_type->tp_alloc(o->ob_type, 0);
-
-        self->mIteratorOffset = 0;
-        self->mIteratorFlag = 1;
-        self->mIsMatcher = false;
-
-        self->initialize([&](instance_ptr data) {
-            self_type->copy_constructor(data, w->dataPtr());
-        });
-
-
-        return (PyObject*)self;
-    }
-
-    PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
-    return NULL;
 }
 
 //static
@@ -127,171 +59,14 @@ PyObject* PyInstance::undefinedBehaviorException() {
     return t;
 }
 
-
-//static
-PyObject* PyInstance::pointerInitialize(PyObject* o, PyObject* args) {
-    PyInstance* self_w = (PyInstance*)o;
-    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 0 && PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo.initialize takes zero or one argument");
-        return NULL;
-    }
-
-    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
-
-    if (PyTuple_Size(args) == 0) {
-        if (!pointerT->getEltType()->is_default_constructible()) {
-            PyErr_Format(PyExc_TypeError, "%s is not default initializable", pointerT->getEltType()->name().c_str());
-            return NULL;
-        }
-
-        pointerT->getEltType()->constructor(target);
-        return incref(Py_None);
-    } else {
-        try {
-            copyConstructFromPythonInstance(pointerT->getEltType(), target, PyTuple_GetItem(args, 0));
-            return incref(Py_None);
-        } catch(std::exception& e) {
-            PyErr_SetString(PyExc_TypeError, e.what());
-            return NULL;
-        }
-    }
-}
-
-//static
-PyObject* PyInstance::pointerSet(PyObject* o, PyObject* args) {
-    PyInstance* self_w = (PyInstance*)o;
-    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo.set takes one argument");
-        return NULL;
-    }
-
-    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
-
-    instance_ptr tempObj = (instance_ptr)malloc(pointerT->getEltType()->bytecount());
-    try {
-        copyConstructFromPythonInstance(pointerT->getEltType(), tempObj, PyTuple_GetItem(args, 0));
-    } catch(std::exception& e) {
-        free(tempObj);
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
-
-    pointerT->getEltType()->assign(target, tempObj);
-    pointerT->getEltType()->destroy(tempObj);
-    free(tempObj);
-
-    return incref(Py_None);
-}
-
-//static
-PyObject* PyInstance::pointerGet(PyObject* o, PyObject* args) {
-    PyInstance* self_w = (PyInstance*)o;
-    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 0) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo.get takes one argument");
-        return NULL;
-    }
-
-    instance_ptr target = (instance_ptr)*(void**)self_w->dataPtr();
-
-    return extractPythonObject(target, pointerT->getEltType());
-}
-
-//static
-PyObject* PyInstance::pointerCast(PyObject* o, PyObject* args) {
-    PyInstance* self_w = (PyInstance*)o;
-    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
-
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo.cast takes one argument");
-        return NULL;
-    }
-
-    Type* targetType = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args, 0));
-
-    if (!targetType) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo.cast requires a type argument");
-        return NULL;
-    }
-
-    Type* newType = PointerTo::Make(targetType);
-
-    return extractPythonObject(self_w->dataPtr(), newType);
-}
-
-// static
-PyObject* PyInstance::constDictGet(PyObject* o, PyObject* args) {
-    PyInstance* self_w = (PyInstance*)o;
-
-    if (PyTuple_Size(args) < 1 || PyTuple_Size(args) > 2) {
-        PyErr_SetString(PyExc_TypeError, "ConstDict.get takes one or two arguments");
-        return NULL;
-    }
-
-    PyObject* item = PyTuple_GetItem(args,0);
-    PyObject* ifNotFound = (PyTuple_Size(args) == 2 ? PyTuple_GetItem(args,1) : Py_None);
-
-    Type* self_type = extractTypeFrom(o->ob_type);
-    Type* item_type = extractTypeFrom(item->ob_type);
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        ConstDict* dict_t = (ConstDict*)self_type;
-
-        if (item_type == dict_t->keyType()) {
-            PyInstance* item_w = (PyInstance*)item;
-
-            instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), item_w->dataPtr());
-
-            if (!i) {
-                Py_INCREF(ifNotFound);
-                return ifNotFound;
-            }
-
-            return extractPythonObject(i, dict_t->valueType());
-        } else {
-            instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
-            try {
-                copyConstructFromPythonInstance(dict_t->keyType(), tempObj, item);
-            } catch(std::exception& e) {
-                free(tempObj);
-                PyErr_SetString(PyExc_TypeError, e.what());
-                return NULL;
-            }
-
-            instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), tempObj);
-
-            dict_t->keyType()->destroy(tempObj);
-            free(tempObj);
-
-            if (!i) {
-                Py_INCREF(ifNotFound);
-                return ifNotFound;
-            }
-
-            return extractPythonObject(i, dict_t->valueType());
-        }
-
-        PyErr_SetString(PyExc_TypeError, "Invalid ConstDict lookup type");
-        return NULL;
-    }
-
-    PyErr_SetString(PyExc_TypeError, "Wrong type!");
-    return NULL;
-}
-
 // static
 PyMethodDef* PyInstance::typeMethods(Type* t) {
     if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
         return new PyMethodDef [5] {
-            {"get", (PyCFunction)PyInstance::constDictGet, METH_VARARGS, NULL},
-            {"items", (PyCFunction)PyInstance::constDictItems, METH_NOARGS, NULL},
-            {"keys", (PyCFunction)PyInstance::constDictKeys, METH_NOARGS, NULL},
-            {"values", (PyCFunction)PyInstance::constDictValues, METH_NOARGS, NULL},
+            {"get", (PyCFunction)PyConstDictInstance::constDictGet, METH_VARARGS, NULL},
+            {"items", (PyCFunction)PyConstDictInstance::constDictItems, METH_NOARGS, NULL},
+            {"keys", (PyCFunction)PyConstDictInstance::constDictKeys, METH_NOARGS, NULL},
+            {"values", (PyCFunction)PyConstDictInstance::constDictValues, METH_NOARGS, NULL},
             {NULL, NULL}
         };
     }
@@ -312,10 +87,10 @@ PyMethodDef* PyInstance::typeMethods(Type* t) {
 
     if (t->getTypeCategory() == Type::TypeCategory::catPointerTo) {
         return new PyMethodDef [5] {
-            {"initialize", (PyCFunction)PyInstance::pointerInitialize, METH_VARARGS, NULL},
-            {"set", (PyCFunction)PyInstance::pointerSet, METH_VARARGS, NULL},
-            {"get", (PyCFunction)PyInstance::pointerGet, METH_VARARGS, NULL},
-            {"cast", (PyCFunction)PyInstance::pointerCast, METH_VARARGS, NULL},
+            {"initialize", (PyCFunction)PyPointerToInstance::pointerInitialize, METH_VARARGS, NULL},
+            {"set", (PyCFunction)PyPointerToInstance::pointerSet, METH_VARARGS, NULL},
+            {"get", (PyCFunction)PyPointerToInstance::pointerGet, METH_VARARGS, NULL},
+            {"cast", (PyCFunction)PyPointerToInstance::pointerCast, METH_VARARGS, NULL},
             {NULL, NULL}
         };
     }
@@ -1257,15 +1032,18 @@ PyObject* PyInstance::sq_concat(PyObject* lhs, PyObject* rhs) {
         return check(lhs, [&](auto& subtype) {
             return subtype.sq_concat_concrete(rhs);
         });
+    } catch(PythonExceptionSet& e) {
+        return NULL;
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
     }
 }
 
-//PyObject* PyInstance::sq_concat_concrete(PyObject* rhs) {
-//    throw std::runtime_error("Subclasses implement");
-//}
+PyObject* PyInstance::sq_concat_concrete(PyObject* rhs) {
+    PyErr_Format(PyExc_TypeError, "Can't concatenate instances of type '%s' and '%S'", type()->name().c_str(), rhs->ob_type);
+    throw PythonExceptionSet();
+}
 
 // static
 PyObject* PyInstance::sq_item(PyObject* o, Py_ssize_t ix) {
@@ -2599,72 +2377,40 @@ PyObject* PyInstance::tp_richcompare(PyObject *a, PyObject *b, int op) {
 }
 
 // static
-PyObject* PyInstance::tp_iter(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
-
-    if (self_type && self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        PyInstance* self = (PyInstance*)o->ob_type->tp_alloc(o->ob_type, 0);
-
-        self->mIteratorOffset = 0;
-        self->mIteratorFlag = w->mIteratorFlag;
-        self->mIsMatcher = false;
-
-        self->initialize([&](instance_ptr data) {
-            self_type->copy_constructor(data, w->dataPtr());
+PyObject* PyInstance::tp_iter(PyObject *self) {
+    try {
+        return check(self, [&](auto& subtype) {
+            return subtype.tp_iter_concrete();
         });
-
-        return (PyObject*)self;
-    }
-
-    PyErr_SetString(PyExc_TypeError, ("Cannot iterate an instance of " + self_type->name()).c_str());
-    return NULL;
-}
+    } catch(PythonExceptionSet& e) {
+        return NULL;
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    }}
 
 // static
-PyObject* PyInstance::tp_iternext(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
-
-    if (self_type->getTypeCategory() != Type::TypeCategory::catConstDict) {
+PyObject* PyInstance::tp_iternext(PyObject *self) {
+    try {
+        return check(self, [&](auto& subtype) {
+            return subtype.tp_iternext_concrete();
+        });
+    } catch(PythonExceptionSet& e) {
+        return NULL;
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
     }
+}
 
-    ConstDict* dict_t = (ConstDict*)self_type;
+PyObject* PyInstance::tp_iter_concrete() {
+    PyErr_Format(PyExc_TypeError, "Cannot iterate an instance of %s", type()->name().c_str());
+    throw PythonExceptionSet();
+}
 
-    if (w->mIteratorOffset >= dict_t->size(w->dataPtr())) {
-        return NULL;
-    }
-
-    w->mIteratorOffset++;
-
-    if (w->mIteratorFlag == 2) {
-        auto t1 = extractPythonObject(
-                dict_t->kvPairPtrKey(w->dataPtr(), w->mIteratorOffset-1),
-                dict_t->keyType()
-                );
-        auto t2 = extractPythonObject(
-                dict_t->kvPairPtrValue(w->dataPtr(), w->mIteratorOffset-1),
-                dict_t->valueType()
-                );
-
-        auto res = PyTuple_Pack(2, t1, t2);
-
-        Py_DECREF(t1);
-        Py_DECREF(t2);
-
-        return res;
-    } else if (w->mIteratorFlag == 1) {
-        return extractPythonObject(
-            dict_t->kvPairPtrValue(w->dataPtr(), w->mIteratorOffset-1),
-            dict_t->valueType()
-            );
-    } else {
-        return extractPythonObject(
-            dict_t->kvPairPtrKey(w->dataPtr(), w->mIteratorOffset-1),
-            dict_t->keyType()
-            );
-    }
+PyObject* PyInstance::tp_iternext_concrete() {
+    PyErr_Format(PyExc_TypeError, "Cannot iterate an instance of %s", type()->name().c_str());
+    throw PythonExceptionSet();
 }
 
 // static

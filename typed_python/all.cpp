@@ -15,6 +15,7 @@ compile the entire group all at once.
 #include "PyInstance.cpp"
 #include "PyConstDictInstance.cpp"
 #include "PyTupleOrListOfInstance.cpp"
+#include "PyPointerToInstance.cpp"
 
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"

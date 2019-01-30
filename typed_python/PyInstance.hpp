@@ -17,6 +17,7 @@ class PythonExceptionSet {};
 class PyListOfInstance;
 class PyTupleOfInstance;
 class PyConstDictInstance;
+class PyPointerToInstance;
 
 class PyInstance {
 public:
@@ -66,8 +67,8 @@ public:
             //     return f(*(OneOf*)this);
             case Type::TypeCategory::catTupleOf:
                 return f(*(PyTupleOfInstance*)obj);
-            // case catPointerTo:
-            //     return f(*(PointerTo*)this);
+             case Type::TypeCategory::catPointerTo:
+                 return f(*(PyPointerToInstance*)obj);
             case Type::TypeCategory::catListOf:
                 return f(*(PyListOfInstance*)obj);
             // case catNamedTuple:
@@ -149,21 +150,7 @@ public:
 
     instance_ptr dataPtr();
 
-    static PyObject* pointerInitialize(PyObject* o, PyObject* args);
-
-    static PyObject* pointerSet(PyObject* o, PyObject* args);
-
-    static PyObject* pointerGet(PyObject* o, PyObject* args);
-
-    static PyObject* pointerCast(PyObject* o, PyObject* args);
-
-    static PyObject* constDictItems(PyObject *o);
-
-    static PyObject* constDictKeys(PyObject *o);
-
-    static PyObject* constDictValues(PyObject *o);
-
-    static PyObject* constDictGet(PyObject* o, PyObject* args);
+    Type* type();
 
     static PyMethodDef* typeMethods(Type* t);
 
@@ -196,7 +183,7 @@ public:
 
     static PyObject* sq_concat(PyObject* lhs, PyObject* rhs);
 
-    //PyObject* sq_concat_concrete(PyObject* rhs);
+    PyObject* sq_concat_concrete(PyObject* rhs);
 
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix);
 
@@ -258,7 +245,11 @@ public:
 
     static PyObject* tp_iter(PyObject *o);
 
+    PyObject* tp_iter_concrete();
+
     static PyObject* tp_iternext(PyObject *o);
+
+    PyObject* tp_iternext_concrete();
 
     static PyObject* tp_repr(PyObject *o);
 
