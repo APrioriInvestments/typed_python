@@ -191,11 +191,20 @@ class GraphDisplayService(ServiceBase):
                 Card(Plot(lambda: {'single_array': [1,2,3,1,2,3],
                                 'xy': {'x': [1,2,3,1,2,3], 'y': [4,5,6,7,8,9]},
                                 }
-                    ).width(600).height(400)
+                    ).width(600).height(400) + Code("HI")
                 ),
+            AGrid=
+                Grid(
+                    colFun=lambda: ['A', 'B', 'B'],
+                    rowFun=lambda: ['1', '2', '2'],
+                    headerFun=lambda x: x,
+                    rowLabelFun=None,
+                    rendererFun=lambda row,col: row+col
+                    )
+                ,
             Timestamps=
                 Button("Add a point!", GraphDisplayService.addAPoint) +
-                Card(Plot(GraphDisplayService.chartData)).width(600).height(400),
+                Card(Plot(GraphDisplayService.chartData)).width(600).height(400) + Code("BYE"),
             feigenbaum=
                 Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
                 Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +

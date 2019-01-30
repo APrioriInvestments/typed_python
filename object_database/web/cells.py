@@ -50,6 +50,18 @@ def multiReplace(msg, replacements):
 
     return "".join(outChunks)
 
+def augmentToBeUnique(listOfItems):
+    """Returns a list of [(x,index)] for each 'x' in listOfItems, where index is the number of times
+    we've seen 'x' before.
+    """
+    counts = {}
+    output = []
+    for x in listOfItems:
+        counts[x] = counts.setdefault(x, 0) + 1
+        output.append((x,counts[x]-1))
+
+    return output
+
 
 class GeventPipe:
     """A simple mechanism for triggering the gevent webserver from a thread other than
@@ -1019,7 +1031,7 @@ class SubscribedSequence(Cell):
     def recalculate(self):
         with self.view() as v:
             try:
-                self.spine = list(self.itemsFun())
+                self.spine = augmentToBeUnique(self.itemsFun())
             except SubscribeAndRetry:
                 raise
             except Exception:
@@ -1029,16 +1041,16 @@ class SubscribedSequence(Cell):
             self._resetSubscriptionsToViewReads(v)
 
             new_children = {}
-            for ix, s in enumerate(self.spine):
-                if s in self.existingItems:
-                    new_children["____child_%s__" % ix] = self.existingItems[s]
+            for ix, rowKey in enumerate(self.spine):
+                if rowKey in self.existingItems:
+                    new_children["____child_%s__" % ix] = self.existingItems[ps]
                 else:
                     try:
-                        self.existingItems[s] = new_children["____child_%s__" % ix] = Cell.makeCell(self.rendererFun(s))
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Cell.makeCell(self.rendererFun(rowKey[0]))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[s] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
 
         self.children = new_children
 
@@ -1098,7 +1110,7 @@ class Grid(Cell):
 
     def prepareForReuse(self):
         self._clearSubscriptions()
-        self.existingItems = []
+        self.existingItems = {}
         self.rows = []
         self.cols = []
         super().prepareForReuse()
@@ -1106,14 +1118,14 @@ class Grid(Cell):
     def recalculate(self):
         with self.view() as v:
             try:
-                self.rows = list(self.rowFun())
+                self.rows = augmentToBeUnique(self.rowFun())
             except SubscribeAndRetry:
                 raise
             except Exception:
                 self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
             try:
-                self.cols = list(self.colFun())
+                self.cols = augmentToBeUnique(self.colFun())
             except SubscribeAndRetry:
                 raise
             except Exception:
@@ -1131,7 +1143,7 @@ class Grid(Cell):
                 new_children["____header_%s__" % (col_ix)] = self.existingItems[(None,col)]
             else:
                 try:
-                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col))
+                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col[0]))
                 except SubscribeAndRetry:
                     raise
                 except Exception:
@@ -1144,7 +1156,7 @@ class Grid(Cell):
                     new_children["____rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
                 else:
                     try:
-                        self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row))
+                        self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row[0]))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
@@ -1158,7 +1170,7 @@ class Grid(Cell):
                     new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row,col)]
                 else:
                     try:
-                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
+                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row[0],col[0]))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
