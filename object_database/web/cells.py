@@ -202,12 +202,12 @@ class Cells:
                 del self._subscribedCells[subscription]
 
     def markDirty(self, cell):
-        assert not cell.garbageCollected
+        assert not cell.garbageCollected, (cell, cell.text if isinstance(cell, Text) else "")
 
         self._dirtyNodes.add(cell)
 
     def markToDiscard(self, cell):
-        assert not cell.garbageCollected
+        assert not cell.garbageCollected, (cell, cell.text if isinstance(cell, Text) else "")
 
         self._nodesToDiscard.add(cell)
 
