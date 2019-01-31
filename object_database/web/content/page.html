@@ -9,6 +9,14 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ace.js"></script>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/handsontable/6.2.2/handsontable.full.css"></link>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/handsontable/6.2.2/handsontable.full.js"></script>
+
+<!----
+<script src="/content/handsontable.js"></script>
+---->
+
 <link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,400italic' rel='stylesheet' type='text/css'>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/octicons/4.4.0/font/octicons.min.css"/>
 <link rel="stylesheet" href="/content/object_database.css"/>
@@ -21,6 +29,7 @@
     var websocket;
 
     var aceEditors = {}
+    var handsOnTables = {}
 
     function mapPlotlyData(d) {
       if (d.timestamp !== undefined) {
@@ -174,11 +183,16 @@
         if (update === "postscripts") {
           updatePopovers()
 
+          //run the postscripts in the reverse order they were sent to us
+          //we build the child tree from the bottom up, but execute postscripts
+          //from the top down.
           while (postscripts.length) {
             try {
-              eval(postscripts.pop())
+              postscript = postscripts.pop()
+              eval(postscript)
             } catch(e) {
-              console.log("ERROR RUNNING POSTSCRIPT:", e)
+              console.log("ERROR RUNNING POSTSCRIPT", e)
+              console.log(postscript)
             }
           }
         } else {
@@ -191,7 +205,7 @@
 
           if (update.discard !== undefined) {
             cells[update.id].remove()
-          } else {
+          } else if (update.id !== undefined) {
             replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
 
             elt = htmlToDomElt(update.contents)

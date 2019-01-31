@@ -118,6 +118,8 @@ class Cells:
         # map: db.key -> set(Cell)
         self._subscribedCells = {}
 
+        self._pendingPostscripts = []
+
         # used by _newID to generate unique identifiers
         self._id = 0
 
@@ -248,6 +250,14 @@ class Cells:
             if n.cells is not None:
                 assert n.cells == self
                 res.append({'id': n.identity, 'discard': True})
+
+        #the client reverses the order of postscripts because it wants
+        #to do parent nodes before child nodes. We want our postscripts
+        #here to happen in order, because they're triggered by messages.
+        for js in reversed(self._pendingPostscripts):
+            res.append({'postscript': js})
+
+        self._pendingPostscripts.clear()
 
         self._nodesToBroadcast = set()
         self._nodesToDiscard = set()
@@ -381,6 +391,9 @@ class Cell:
         self.serializationContext = None
 
         self._logger = logging.getLogger(__name__)
+
+    def triggerPostscript(self, javascript):
+        self.cells._pendingPostscripts.append(javascript)
 
     def tagged(self, tag):
         """Give a tag to the cell, which can help us find interesting cells during test."""
@@ -1043,7 +1056,7 @@ class SubscribedSequence(Cell):
             new_children = {}
             for ix, rowKey in enumerate(self.spine):
                 if rowKey in self.existingItems:
-                    new_children["____child_%s__" % ix] = self.existingItems[ps]
+                    new_children["____child_%s__" % ix] = self.existingItems[rowKey]
                 else:
                     try:
                         self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Cell.makeCell(self.rendererFun(rowKey[0]))
@@ -1093,6 +1106,7 @@ class Popover(Cell):
     def sortsAs(self):
         if '____title__' in self.children:
             return self.children['____title__'].sortsAs()
+
 
 
 class Grid(Cell):
@@ -1605,7 +1619,7 @@ class Expands(Cell):
 
 class CodeEditor(Cell):
     """Produce a code editor."""
-    def __init__(self, onmessage=lambda msg: None, keybindings=None, noScroll=False, minLines=None):
+    def __init__(self, onmessage=lambda msg: None, keybindings=None, noScroll=False, minLines=None, fontSize=None):
         """Create a code editor
 
         onmessage - receives messages from the user as they type
@@ -1619,6 +1633,7 @@ class CodeEditor(Cell):
         self._onmessage = onmessage
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
+        self.fontSize = fontSize
         self.minLines = minLines
 
     def setContents(self, contents):
@@ -1653,6 +1668,11 @@ class CodeEditor(Cell):
             editor.setAutoScrollEditorIntoView(true);
             editor.session.setUseSoftTabs(true);
         """
+
+        if self.fontSize is not None:
+            self.postscript += """
+            editor.setOption("fontSize", %s);
+            """ % self.fontSize
 
         if self.minLines is not None:
             self.postscript += """
@@ -1717,6 +1737,141 @@ class CodeEditorTrigger(Cell):
 
             """.replace("__identity__", self.editor.identity).replace(
                 "__text__", quoteForJs(self.editor._slot.get()[1], '"')
+                )
+
+
+class Sheet(Cell):
+    """Make a nice spreadsheet viewer. The dataset needs to be static in this implementation."""
+    def __init__(self, columnNames, rowCount, rowFun, colWidth=200):
+        super().__init__()
+
+        self.columnNames = columnNames
+        self.rowCount = rowCount
+        self.rowFun = rowFun #for a row, the value of all the columns in a list.
+        self.colWidth = colWidth
+        self.error = Slot(None)
+        self._overflow = "auto"
+        self.rowsSent = set()
+
+    def recalculate(self):
+        self.contents = """
+            <div>
+                <div id="sheet__identity__" class='handsontable' __style__></div>
+                ____error__
+            </div>
+            """.replace("__style__", self._divStyle()).replace("__identity__", self.identity)
+
+        self.children = {
+            '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
+            }
+
+        self.postscript = """
+            function model(opts) { return {} }
+
+            function property(index) {
+              return function (row) {
+                return row[index]
+              }
+            }
+
+            function SyntheticIntegerArray(size) {
+                this.length = size
+                this.cache = {}
+                this.push = function() { }
+                this.splice = function() {}
+
+                this.slice = function(low, high) {
+                    if (high === undefined) {
+                        high = this.length
+                    }
+
+                    res = Array(high-low)
+                    initLow = low
+                    while (low < high) {
+                        out = this.cache[low]
+                        if (out === undefined) {
+                            websocket.send(JSON.stringify(
+                                {'event':'sheet_needs_data',
+                                 'target_cell': '__identity__',
+                                 'data': low
+                                 }
+                                ))
+                            out = emptyRow
+                        }
+                        res[low-initLow] = out
+                        low = low + 1
+                    }
+
+                    return res
+                }
+            }
+
+            var data = new SyntheticIntegerArray(__rows__)
+            var container = document.getElementById('sheet__identity__');
+
+            var colnames = [__column_names__]
+            var columns = []
+            var emptyRow = []
+
+            for (var i = 0; i < colnames.length; i++) {
+                columns.push({data: property(i)})
+                emptyRow.push("")
+            }
+
+            var currentTable = new Handsontable(container, {
+                data: data,
+                dataSchema: model,
+                colHeaders: colnames,
+                columns: columns,
+                rowHeaders: true,
+                rowHeaderWidth: 100,
+                viewportRowRenderingOffset: 100,
+                autoColumnSize: false,
+                autoRowHeight: false,
+                manualColumnResize: true,
+                colWidths: __col_width__,
+                rowHeights: 23,
+                readOnly: true,
+                ManualRowMove: false
+                });
+
+            handsOnTables["__identity__"] = currentTable
+
+            """.replace("__identity__", self._identity
+                ).replace("__rows__", str(self.rowCount)
+                ).replace("__column_names__", ",".join('"%s"' % quoteForJs(x,'"') for x in self.columnNames)
+                ).replace("__col_width__", json.dumps(self.colWidth)
+                )
+
+    def onMessage(self, msgFrame):
+        row = msgFrame['data']
+
+        if row in self.rowsSent:
+            return
+
+        rows = []
+        for rowToRender in range(max(0,row-100), min(row+100, self.rowCount)):
+            if rowToRender not in self.rowsSent:
+                self.rowsSent.add(rowToRender)
+                rows.append(rowToRender)
+
+                rowData = self.rowFun(rowToRender)
+
+                self.triggerPostscript("""
+                    var hot = handsOnTables["__identity__"]
+
+                    hot.getSettings().data.cache[__row__] = __data__
+                    """
+                    .replace("__row__", str(rowToRender))
+                    .replace("__identity__", self._identity)
+                    .replace("__data__", json.dumps(rowData))
+                    )
+
+        if rows:
+            self.triggerPostscript("""
+                handsOnTables["__identity__"].render()
+                """
+                .replace("__identity__", self._identity)
                 )
 
 

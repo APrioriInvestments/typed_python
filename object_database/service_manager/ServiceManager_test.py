@@ -202,6 +202,11 @@ class GraphDisplayService(ServiceBase):
                     rendererFun=lambda row,col: row+col
                     )
                 ,
+            ASheet=Sheet(
+                ["A","B","C"],
+                1000000,
+                lambda rowIx: ["(%s) ts" % rowIx,rowIx,rowIx+1,rowIx+2]
+                ).width('calc(100vw - 70px)').height('calc(100vh - 150px)'),
             Timestamps=
                 Button("Add a point!", GraphDisplayService.addAPoint) +
                 Card(Plot(GraphDisplayService.chartData)).width(600).height(400) + Code("BYE"),
