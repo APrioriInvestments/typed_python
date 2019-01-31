@@ -243,3 +243,36 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
 
     return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
 }
+
+PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
+    Type* item_type = extractTypeFrom(item->ob_type);
+
+    if (item_type == type()->keyType()) {
+        PyInstance* item_w = (PyInstance*)item;
+
+        instance_ptr i = type()->lookupValueByKey(dataPtr(), item_w->dataPtr());
+
+        if (!i) {
+            PyErr_SetObject(PyExc_KeyError, item);
+            return NULL;
+        }
+
+        return extractPythonObject(i, type()->valueType());
+    } else {
+        Instance key(type()->keyType(), [&](instance_ptr data) {
+            copyConstructFromPythonInstance(type()->keyType(), data, item);
+        });
+
+        instance_ptr i = type()->lookupValueByKey(dataPtr(), key.data());
+
+        if (!i) {
+            PyErr_SetObject(PyExc_KeyError, item);
+            return NULL;
+        }
+
+        return extractPythonObject(i, type()->valueType());
+    }
+
+    PyErr_SetObject(PyExc_KeyError, item);
+    return NULL;
+}

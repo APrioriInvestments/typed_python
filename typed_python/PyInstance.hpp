@@ -246,7 +246,11 @@ public:
 
     static int mp_ass_subscript(PyObject* o, PyObject* item, PyObject* value);
 
+    int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
+
     static PyObject* mp_subscript(PyObject* o, PyObject* item);
+
+    PyObject* mp_subscript_concrete(PyObject* item);
 
     static PyMappingMethods* mappingMethods(Type* t);
 
@@ -256,25 +260,7 @@ public:
 
     static Type* extractTypeFrom(PyTypeObject* typeObj, bool exact=false);
 
-    static int classInstanceSetAttributeFromPyObject(Class* cls, uint8_t* data, PyObject* attrName, PyObject* attrVal);
-
     static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal);
-
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs);
-
-    //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
-    //returns <true, result or none> if we dispatched.
-    static std::pair<bool, PyObject*> dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs);
-
-    //attempt to dispatch to this one exact specialization by converting each arg to the relevant type. if
-    //we can't convert, then return <false, nullptr>. If we do dispatch, return <true, result or none> and set
-    //the python exception if native code returns an exception.
-    static std::pair<bool, PyObject*> dispatchFunctionCallToCompiledSpecialization(
-                                                const Function::Overload& overload,
-                                                const Function::CompiledSpecialization& specialization,
-                                                PyObject* argTuple,
-                                                PyObject *kwargs
-                                                );
 
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs);
 
@@ -312,8 +298,6 @@ public:
     static void mirrorTypeInformationIntoPyType(Type* inType, PyTypeObject* pyType);
 
     static PyTypeObject* getObjectAsTypeObject();
-
-    static PyObject* createOverloadPyRepresentation(Function* f);
 
     static Type* pyFunctionToForward(PyObject* arg);
 

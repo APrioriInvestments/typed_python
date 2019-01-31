@@ -11,6 +11,8 @@ public:
     PyObject* sq_item_concrete(Py_ssize_t ix);
 
     Py_ssize_t mp_and_sq_length_concrete();
+
+    PyObject* mp_subscript_concrete(PyObject* item);
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {
@@ -32,6 +34,8 @@ public:
     static PyObject* listSetSizeUnsafe(PyObject* o, PyObject* args);
 
     static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
+
+    int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
 };
 
 class PyTupleOfInstance : public PyTupleOrListOfInstance {

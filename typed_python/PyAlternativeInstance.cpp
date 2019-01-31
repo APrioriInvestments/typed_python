@@ -1,4 +1,5 @@
 #include "PyAlternativeInstance.hpp"
+#include "PyFunctionInstance.hpp"
 
 Alternative* PyAlternativeInstance::type() {
     return (Alternative*)extractTypeFrom(((PyObject*)this)->ob_type);
@@ -17,7 +18,7 @@ PyObject* PyAlternativeInstance::pyOperatorConcrete(PyObject* rhs, const char* o
         PyObject* argTuple = PyTuple_Pack(2, (PyObject*)this, rhs);
 
         for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, argTuple, nullptr);
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
             if (res.first) {
                 Py_DECREF(argTuple);
                 return res.second;
@@ -38,7 +39,7 @@ PyObject* PyConcreteAlternativeInstance::pyOperatorConcrete(PyObject* rhs, const
         PyObject* argTuple = PyTuple_Pack(2, (PyObject*)this, rhs);
 
         for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, argTuple, nullptr);
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
             if (res.first) {
                 Py_DECREF(argTuple);
                 return res.second;

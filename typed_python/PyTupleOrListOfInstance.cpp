@@ -321,3 +321,75 @@ Py_ssize_t PyTupleOrListOfInstance::mp_and_sq_length_concrete() {
 }
 
 
+int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
+    Type* value_type = extractTypeFrom(value->ob_type);
+
+    Type* eltType = type()->getEltType();
+
+    if (PyLong_Check(item)) {
+        int64_t ix = PyLong_AsLong(item);
+        int64_t count = type()->count(dataPtr());
+
+        if (ix < 0) {
+            ix += count;
+        }
+
+        if (ix >= count || ix < 0) {
+            PyErr_SetString(PyExc_IndexError, "index out of range");
+            return -1;
+        }
+
+        if (value_type == eltType) {
+            PyInstance* value_w = (PyInstance*)value;
+
+            eltType->assign(
+                type()->eltPtr(dataPtr(), ix),
+                value_w->dataPtr()
+                );
+        } else {
+            Instance toAssign(eltType, [&](instance_ptr data) {
+                copyConstructFromPythonInstance(eltType, data, value);
+            });
+
+            eltType->assign(
+                type()->eltPtr(dataPtr(), ix),
+                toAssign.data()
+                );
+
+            return 0;
+        }
+    }
+
+    return ((PyInstance*)this)->mp_ass_subscript_concrete(item, value);
+}
+
+PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
+    if (PySlice_Check(item)) {
+        Py_ssize_t start,stop,step,slicelength;
+
+        if (PySlice_GetIndicesEx(item, type()->count(dataPtr()), &start,
+                    &stop, &step, &slicelength) == -1) {
+            return NULL;
+        }
+
+        Type* eltType = type()->getEltType();
+
+        return PyInstance::initialize(type(), [&](instance_ptr data) {
+            type()->constructor(data, slicelength,
+                [&](uint8_t* eltPtr, int64_t k) {
+                    eltType->copy_constructor(
+                        eltPtr,
+                        type()->eltPtr(dataPtr(), start + k * step)
+                        );
+                    }
+                );
+        });
+    }
+
+    if (PyLong_Check(item)) {
+        return sq_item((PyObject*)this, PyLong_AsLong(item));
+    }
+
+    PyErr_SetObject(PyExc_KeyError, item);
+    return NULL;
+}

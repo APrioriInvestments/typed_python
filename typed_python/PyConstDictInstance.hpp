@@ -18,6 +18,8 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 
+    PyObject* mp_subscript_concrete(PyObject* item);
+
     static PyObject* constDictItems(PyObject *o);
 
     static PyObject* constDictKeys(PyObject *o);
