@@ -18,6 +18,9 @@ class PyListOfInstance;
 class PyTupleOfInstance;
 class PyConstDictInstance;
 class PyPointerToInstance;
+class PyCompositeTypeInstance;
+class PyTupleInstance;
+class PyNamedTupleInstance;
 
 class PyInstance {
 public:
@@ -31,72 +34,108 @@ public:
     Instance mContainingInstance;
 
     template<class T>
-    static auto check(PyObject* obj, const T& f) {
+    static auto specialize(PyObject* obj, const T& f) {
         switch (extractTypeFrom(obj->ob_type)->getTypeCategory()) {
             // case catNone:
-            //     return f(*(None*)this);
+            //     return f(*(None*)obj);
             // case catBool:
-            //     return f(*(Bool*)this);
+            //     return f(*(Bool*)obj);
             // case catUInt8:
-            //     return f(*(UInt8*)this);
+            //     return f(*(UInt8*)obj);
             // case catUInt16:
-            //     return f(*(UInt16*)this);
+            //     return f(*(UInt16*)obj);
             // case catUInt32:
-            //     return f(*(UInt32*)this);
+            //     return f(*(UInt32*)obj);
             // case catUInt64:
-            //     return f(*(UInt64*)this);
+            //     return f(*(UInt64*)obj);
             // case catInt8:
-            //     return f(*(Int8*)this);
+            //     return f(*(Int8*)obj);
             // case catInt16:
-            //     return f(*(Int16*)this);
+            //     return f(*(Int16*)obj);
             // case catInt32:
-            //     return f(*(Int32*)this);
+            //     return f(*(Int32*)obj);
             // case catInt64:
-            //     return f(*(Int64*)this);
-            // case catString:
-            //     return f(*(String*)this);
-            // case catBytes:
-            //     return f(*(Bytes*)this);
+            //     return f(*(Int64*)obj);
+            //case Type::TypeCategory::catString:
+            //    return f(*(PyStringString*)obj);
+            //case Type::TypeCategory::catBytes:
+            //   return f(*(Bytes*)obj);
             // case catFloat32:
-            //     return f(*(Float32*)this);
+            //     return f(*(Float32*)obj);
             // case catFloat64:
-            //     return f(*(Float64*)this);
+            //     return f(*(Float64*)obj);
             // case catValue:
-            //     return f(*(Value*)this);
+            //     return f(*(Value*)obj);
             // case catOneOf:
-            //     return f(*(OneOf*)this);
+            //     return f(*(OneOf*)obj);
             case Type::TypeCategory::catTupleOf:
                 return f(*(PyTupleOfInstance*)obj);
              case Type::TypeCategory::catPointerTo:
                  return f(*(PyPointerToInstance*)obj);
             case Type::TypeCategory::catListOf:
                 return f(*(PyListOfInstance*)obj);
-            // case catNamedTuple:
-            //     return f(*(NamedTuple*)this);
-            // case catTuple:
-            //     return f(*(Tuple*)this);
+            case Type::TypeCategory::catNamedTuple:
+                return f(*(PyNamedTupleInstance*)obj);
+            case Type::TypeCategory::catTuple:
+                return f(*(PyTupleInstance*)obj);
             case Type::TypeCategory::catConstDict:
                 return f(*(PyConstDictInstance*)obj);
             // case catAlternative:
-            //     return f(*(Alternative*)this);
+            //     return f(*(Alternative*)obj);
             // case catConcreteAlternative:
-            //     return f(*(ConcreteAlternative*)this);
+            //     return f(*(ConcreteAlternative*)obj);
             // case catPythonSubclass:
-            //     return f(*(PythonSubclass*)this);
+            //     return f(*(PythonSubclass*)obj);
             // case catPythonObjectOfType:
-            //     return f(*(PythonObjectOfType*)this);
+            //     return f(*(PythonObjectOfType*)obj);
             // case catClass:
-            //     return f(*(Class*)this);
+            //     return f(*(Class*)obj);
             // case catHeldClass:
-            //     return f(*(HeldClass*)this);
+            //     return f(*(HeldClass*)obj);
             // case catFunction:
-            //     return f(*(Function*)this);
+            //     return f(*(Function*)obj);
             // case catBoundMethod:
-            //     return f(*(BoundMethod*)this);
+            //     return f(*(BoundMethod*)obj);
             // case catForward:
-            //     return f(*(Forward*)this);
+            //     return f(*(Forward*)obj);
             default:
-                throw std::runtime_error("Invalid type found");
+                throw std::runtime_error("Invalid type category. Memory must have been corrupted.");
+        }
+    }
+
+    template<class T>
+    static int specializeForTypeReturningInt(PyObject* obj, const T& f) {
+        try {
+            return specialize(obj, f);
+        } catch(PythonExceptionSet& e) {
+            return -1;
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return -1;
+        }
+    }
+
+    template<class T>
+    static Py_ssize_t specializeForTypeReturningSizeT(PyObject* obj, const T& f) {
+        try {
+            return specialize(obj, f);
+        } catch(PythonExceptionSet& e) {
+            return -1;
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return -1;
+        }
+    }
+
+    template<class T>
+    static PyObject* specializeForType(PyObject* obj, const T& f) {
+        try {
+            return specialize(obj, f);
+        } catch(PythonExceptionSet& e) {
+            return NULL;
+        } catch(std::exception& e) {
+            PyErr_SetString(PyExc_TypeError, e.what());
+            return NULL;
         }
     }
 
@@ -171,8 +210,6 @@ public:
 
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
 
-    static Py_ssize_t sq_length(PyObject* o);
-
     static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs);
 
     static std::pair<bool, PyObject*> checkForPyOperator(PyObject* lhs, PyObject* rhs, const char* op);
@@ -187,6 +224,8 @@ public:
 
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix);
 
+    PyObject* sq_item_concrete(Py_ssize_t ix);
+
     static PyTypeObject* typeObj(Type* inType);
 
     static PyObject* undefinedBehaviorException();
@@ -195,9 +234,13 @@ public:
 
     static PyNumberMethods* numberMethods(Type* t);
 
-    static Py_ssize_t mp_length(PyObject* o);
+    static Py_ssize_t mp_and_sq_length(PyObject* o);
+
+    Py_ssize_t mp_and_sq_length_concrete();
 
     static int sq_contains(PyObject* o, PyObject* item);
+
+    int sq_contains_concrete(PyObject* item);
 
     static int mp_ass_subscript(PyObject* o, PyObject* item, PyObject* value);
 

@@ -12,6 +12,10 @@ public:
 
     PyObject* tp_iternext_concrete();
 
+    Py_ssize_t mp_and_sq_length_concrete();
+
+    int sq_contains_concrete(PyObject* item);
+
     static PyObject* constDictItems(PyObject *o);
 
     static PyObject* constDictKeys(PyObject *o);

@@ -199,4 +199,31 @@ PyObject* PyConstDictInstance::tp_iternext_concrete() {
     }
 }
 
+Py_ssize_t PyConstDictInstance::mp_and_sq_length_concrete() {
+    return type()->size(dataPtr());
+}
+
+int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
+    Type* item_type = extractTypeFrom(item->ob_type);
+
+    if (item_type == type()->keyType()) {
+        PyInstance* item_w = (PyInstance*)item;
+
+        instance_ptr i = type()->lookupValueByKey(dataPtr(), item_w->dataPtr());
+
+        if (!i) {
+            return 0;
+        }
+
+        return 1;
+    } else {
+        Instance key(type()->keyType(), [&](instance_ptr data) {
+            copyConstructFromPythonInstance(type()->keyType(), data, item);
+        });
+
+        instance_ptr i = type()->lookupValueByKey(dataPtr(), key.data());
+
+        return i ? 1 : 0;
+    }
+}
 

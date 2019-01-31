@@ -98,6 +98,7 @@ public:
 
     int64_t count(instance_ptr self) const;
 
+
     int64_t size(instance_ptr self) const;
 
     int64_t lookupIndexByKey(instance_ptr self, instance_ptr key) const;

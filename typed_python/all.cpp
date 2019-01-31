@@ -16,6 +16,7 @@ compile the entire group all at once.
 #include "PyConstDictInstance.cpp"
 #include "PyTupleOrListOfInstance.cpp"
 #include "PyPointerToInstance.cpp"
+#include "PyCompositeTypeInstance.cpp"
 
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"

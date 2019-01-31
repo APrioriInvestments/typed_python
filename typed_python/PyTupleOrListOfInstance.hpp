@@ -7,6 +7,10 @@ public:
     TupleOrListOf* type();
 
     PyObject* sq_concat_concrete(PyObject* rhs);
+
+    PyObject* sq_item_concrete(Py_ssize_t ix);
+
+    Py_ssize_t mp_and_sq_length_concrete();
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {

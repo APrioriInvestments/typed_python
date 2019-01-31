@@ -295,3 +295,29 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
 
     return result;
 }
+
+PyObject* PyTupleOrListOfInstance::sq_item_concrete(Py_ssize_t ix) {
+    int64_t count = type()->count(dataPtr());
+
+    if (ix < 0) {
+        ix += count;
+    }
+
+    if (ix >= count || ix < 0) {
+        PyErr_SetString(PyExc_IndexError, "index out of range");
+        return NULL;
+    }
+
+    Type* eltType = type()->getEltType();
+
+    return extractPythonObject(
+        type()->eltPtr(dataPtr(), ix),
+        eltType
+        );
+}
+
+Py_ssize_t PyTupleOrListOfInstance::mp_and_sq_length_concrete() {
+    return type()->count(dataPtr());
+}
+
+

@@ -5,6 +5,8 @@
 #include "PyConstDictInstance.hpp"
 #include "PyTupleOrListOfInstance.hpp"
 #include "PyPointerToInstance.hpp"
+#include "PyCompositeTypeInstance.hpp"
+
 
 // static
 bool PyInstance::guaranteeForwardsResolved(Type* t) {
@@ -859,28 +861,6 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 }
 
 // static
-Py_ssize_t PyInstance::sq_length(PyObject* o) {
-    PyInstance* w = (PyInstance*)o;
-
-    Type* t = extractTypeFrom(o->ob_type);
-
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || t->getTypeCategory() == Type::TypeCategory::catListOf) {
-        return ((TupleOrListOf*)t)->count(w->dataPtr());
-    }
-    if (t->isComposite()) {
-        return ((CompositeType*)t)->getTypes().size();
-    }
-    if (t->getTypeCategory() == Type::TypeCategory::catString) {
-        return String().count(w->dataPtr());
-    }
-    if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
-        return Bytes().count(w->dataPtr());
-    }
-
-    return 0;
-}
-
-// static
 PyObject* PyInstance::nb_rshift(PyObject* lhs, PyObject* rhs) {
     std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__rshift__");
     if (res.first) {
@@ -1028,16 +1008,9 @@ PyObject* PyInstance::nb_subtract(PyObject* lhs, PyObject* rhs) {
 
 // static
 PyObject* PyInstance::sq_concat(PyObject* lhs, PyObject* rhs) {
-    try {
-        return check(lhs, [&](auto& subtype) {
-            return subtype.sq_concat_concrete(rhs);
-        });
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
+    return specializeForType(lhs, [&](auto& subtype) {
+        return subtype.sq_concat_concrete(rhs);
+    });
 }
 
 PyObject* PyInstance::sq_concat_concrete(PyObject* rhs) {
@@ -1047,73 +1020,13 @@ PyObject* PyInstance::sq_concat_concrete(PyObject* rhs) {
 
 // static
 PyObject* PyInstance::sq_item(PyObject* o, Py_ssize_t ix) {
-    PyInstance* w = (PyInstance*)o;
-    Type* t = extractTypeFrom(o->ob_type);
+    return specializeForType(o, [&](auto& subtype) {
+        return subtype.sq_item_concrete(ix);
+    });
+}
 
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf || t->getTypeCategory() == Type::TypeCategory::catListOf) {
-        int64_t count = ((TupleOrListOf*)t)->count(w->dataPtr());
-
-        if (ix < 0) {
-            ix += count;
-        }
-
-        if (ix >= count || ix < 0) {
-            PyErr_SetString(PyExc_IndexError, "index out of range");
-            return NULL;
-        }
-
-        Type* eltType = (Type*)((TupleOrListOf*)t)->getEltType();
-        return extractPythonObject(
-            ((TupleOrListOf*)t)->eltPtr(w->dataPtr(), ix),
-            eltType
-            );
-    }
-
-    if (t->isComposite()) {
-        auto compType = (CompositeType*)t;
-
-        if (ix < 0 || ix >= (int64_t)compType->getTypes().size()) {
-            PyErr_SetString(PyExc_IndexError, "index out of range");
-            return NULL;
-        }
-
-        Type* eltType = compType->getTypes()[ix];
-
-        return extractPythonObject(
-            compType->eltPtr(w->dataPtr(), ix),
-            eltType
-            );
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
-        if (ix < 0 || ix >= (int64_t)Bytes().count(w->dataPtr())) {
-            PyErr_SetString(PyExc_IndexError, "index out of range");
-            return NULL;
-        }
-
-        return PyBytes_FromStringAndSize(
-            (const char*)Bytes().eltPtr(w->dataPtr(), ix),
-            1
-            );
-    }
-    if (t->getTypeCategory() == Type::TypeCategory::catString) {
-        if (ix < 0 || ix >= (int64_t)String().count(w->dataPtr())) {
-            PyErr_SetString(PyExc_IndexError, "index out of range");
-            return NULL;
-        }
-
-        int bytes_per_codepoint = String().bytes_per_codepoint(w->dataPtr());
-
-        return PyUnicode_FromKindAndData(
-            bytes_per_codepoint == 1 ? PyUnicode_1BYTE_KIND :
-            bytes_per_codepoint == 2 ? PyUnicode_2BYTE_KIND :
-                                       PyUnicode_4BYTE_KIND,
-            String().eltPtr(w->dataPtr(), ix),
-            1
-            );
-    }
-
-    PyErr_SetString(PyExc_TypeError, "not a __getitem__'able thing.");
+PyObject* PyInstance::sq_item_concrete(Py_ssize_t ix) {
+    PyErr_Format(PyExc_TypeError, "%S object is not subscriptable", (PyObject*)((PyObject*)this)->ob_type);
     return NULL;
 }
 
@@ -1141,7 +1054,7 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
         if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
             res->sq_contains = (objobjproc)PyInstance::sq_contains;
         } else {
-            res->sq_length = (lenfunc)PyInstance::sq_length;
+            res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
             res->sq_item = (ssizeargfunc)PyInstance::sq_item;
         }
 
@@ -1201,70 +1114,31 @@ PyNumberMethods* PyInstance::numberMethods(Type* t) {
 }
 
 // static
-Py_ssize_t PyInstance::mp_length(PyObject* o) {
-    PyInstance* w = (PyInstance*)o;
-
-    Type* t = extractTypeFrom(o->ob_type);
-
-    if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        return ((ConstDict*)t)->size(w->dataPtr());
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        return ((TupleOf*)t)->count(w->dataPtr());
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
-        return ((ListOf*)t)->count(w->dataPtr());
-    }
-
-    return 0;
+Py_ssize_t PyInstance::mp_and_sq_length(PyObject* o) {
+    return specializeForTypeReturningSizeT(o, [&](auto& subtype) {
+        return subtype.mp_and_sq_length_concrete();
+    });
 }
 
-// static
+Py_ssize_t PyInstance::mp_and_sq_length_concrete() {
+    PyErr_Format(
+        PyExc_TypeError,
+        "object of type '%S' has no len()",
+        (PyObject*)((PyObject*)this)->ob_type
+        );
+    return -1;
+}
+
+
 int PyInstance::sq_contains(PyObject* o, PyObject* item) {
-    PyInstance* self_w = (PyInstance*)o;
+    return specializeForTypeReturningInt(o, [&](auto& subtype) {
+        return subtype.sq_contains_concrete(item);
+    });
+}
 
-    Type* self_type = extractTypeFrom(o->ob_type);
-    Type* item_type = extractTypeFrom(item->ob_type);
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        ConstDict* dict_t = (ConstDict*)self_type;
-
-        if (item_type == dict_t->keyType()) {
-            PyInstance* item_w = (PyInstance*)item;
-
-            instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), item_w->dataPtr());
-
-            if (!i) {
-                return 0;
-            }
-
-            return 1;
-        } else {
-            instance_ptr tempObj = (instance_ptr)malloc(dict_t->keyType()->bytecount());
-            try {
-                copyConstructFromPythonInstance(dict_t->keyType(), tempObj, item);
-            } catch(std::exception& e) {
-                free(tempObj);
-                PyErr_SetString(PyExc_TypeError, e.what());
-                return -1;
-            }
-
-            instance_ptr i = dict_t->lookupValueByKey(self_w->dataPtr(), tempObj);
-
-            dict_t->keyType()->destroy(tempObj);
-            free(tempObj);
-
-            if (!i) {
-                return 0;
-            }
-
-            return 1;
-        }
-    }
-
-    return 0;
+int PyInstance::sq_contains_concrete(PyObject* item) {
+    PyErr_Format(PyExc_TypeError, "Argument of type '%S' is not iterable", (PyObject*)((PyObject*)this)->ob_type);
+    return -1;
 }
 
 int PyInstance::mp_ass_subscript(PyObject* o, PyObject* item, PyObject* value) {
@@ -1417,7 +1291,7 @@ PyObject* PyInstance::mp_subscript(PyObject* o, PyObject* item) {
 PyMappingMethods* PyInstance::mappingMethods(Type* t) {
     static PyMappingMethods* res =
         new PyMappingMethods {
-            PyInstance::mp_length, //mp_length
+            PyInstance::mp_and_sq_length, //mp_length
             PyInstance::mp_subscript, //mp_subscript
             PyInstance::mp_ass_subscript //mp_ass_subscript
             };
@@ -1501,9 +1375,9 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     types[inType] = new NativeTypeWrapper { {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
             .tp_name = inType->name().c_str(),          // const char*
-            .tp_basicsize = sizeof(PyInstance),    // Py_ssize_t
+            .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
-            .tp_dealloc = PyInstance::tp_dealloc,  // destructor
+            .tp_dealloc = PyInstance::tp_dealloc,       // destructor
             .tp_print = 0,                              // printfunc
             .tp_getattr = 0,                            // getattrfunc
             .tp_setattr = 0,                            // setattrfunc
@@ -1515,8 +1389,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_hash = tp_hash,                         // hashfunc
             .tp_call = tp_call,                         // ternaryfunc
             .tp_str = tp_str,                           // reprfunc
-            .tp_getattro = PyInstance::tp_getattro,    // getattrofunc
-            .tp_setattro = PyInstance::tp_setattro,    // setattrofunc
+            .tp_getattro = PyInstance::tp_getattro,     // getattrofunc
+            .tp_setattro = PyInstance::tp_setattro,     // setattrofunc
             .tp_as_buffer = bufferProcs(),              // PyBufferProcs*
             .tp_flags = typeCanBeSubclassed(inType) ?
                 Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE
@@ -2378,29 +2252,18 @@ PyObject* PyInstance::tp_richcompare(PyObject *a, PyObject *b, int op) {
 
 // static
 PyObject* PyInstance::tp_iter(PyObject *self) {
-    try {
-        return check(self, [&](auto& subtype) {
-            return subtype.tp_iter_concrete();
-        });
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }}
+    return specializeForType(self, [&](auto& subtype) {
+        return subtype.tp_iter_concrete();
+        }
+    );
+}
 
 // static
 PyObject* PyInstance::tp_iternext(PyObject *self) {
-    try {
-        return check(self, [&](auto& subtype) {
-            return subtype.tp_iternext_concrete();
-        });
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
+    return specializeForType(self, [&](auto& subtype) {
+        return subtype.tp_iternext_concrete();
+        }
+    );
 }
 
 PyObject* PyInstance::tp_iter_concrete() {
