@@ -65,18 +65,19 @@ class ServiceManager(object):
 
         if not service:
             service = service_schema.Service(name=serviceName, placement=placement or "Any")
-            service.service_module_name = serviceClass.__module__
-            service.service_class_name = serviceClass.__qualname__
 
-            if not service.service_module_name.startswith("object_database."):
-                # find the root of the codebase
-                module = sys.modules[serviceClass.__module__]
+        service.service_module_name = serviceClass.__module__
+        service.service_class_name = serviceClass.__qualname__
 
-                root_path = TypedPythonCodebase.rootlevelPathFromModule(module)
+        if not service.service_module_name.startswith("object_database."):
+            # find the root of the codebase
+            module = sys.modules[serviceClass.__module__]
 
-                service.setCodebase(
-                    service_schema.Codebase.createFromRootlevelPath(root_path)
-                )
+            root_path = TypedPythonCodebase.rootlevelPathFromModule(module)
+
+            tpCodebase = service_schema.Codebase.createFromRootlevelPath(root_path)
+
+            service.setCodebase(tpCodebase)
 
         if target_count is not None:
             service.target_count = target_count
