@@ -16,6 +16,8 @@ public:
 
     int sq_contains_concrete(PyObject* item);
 
+    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
     static PyObject* constDictItems(PyObject *o);
 
     static PyObject* constDictKeys(PyObject *o);

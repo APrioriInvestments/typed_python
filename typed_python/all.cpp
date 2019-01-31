@@ -17,6 +17,8 @@ compile the entire group all at once.
 #include "PyTupleOrListOfInstance.cpp"
 #include "PyPointerToInstance.cpp"
 #include "PyCompositeTypeInstance.cpp"
+#include "PyClassInstance.cpp"
+#include "PyAlternativeInstance.cpp"
 
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"

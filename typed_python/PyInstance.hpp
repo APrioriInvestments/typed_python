@@ -21,6 +21,8 @@ class PyPointerToInstance;
 class PyCompositeTypeInstance;
 class PyTupleInstance;
 class PyNamedTupleInstance;
+class PyAlternativeInstance;
+class PyConcreteAlternativeInstance;
 
 class PyInstance {
 public:
@@ -80,10 +82,10 @@ public:
                 return f(*(PyTupleInstance*)obj);
             case Type::TypeCategory::catConstDict:
                 return f(*(PyConstDictInstance*)obj);
-            // case catAlternative:
-            //     return f(*(Alternative*)obj);
-            // case catConcreteAlternative:
-            //     return f(*(ConcreteAlternative*)obj);
+            case Type::TypeCategory::catAlternative:
+                return f(*(PyAlternativeInstance*)obj);
+            case Type::TypeCategory::catConcreteAlternative:
+                return f(*(PyConcreteAlternativeInstance*)obj);
             // case catPythonSubclass:
             //     return f(*(PythonSubclass*)obj);
             // case catPythonObjectOfType:
@@ -199,8 +201,6 @@ public:
 
     static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
 
-    static void initializeClassWithDefaultArguments(Class* cls, uint8_t* data, PyObject* args, PyObject* kwargs);
-
     static void constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs);
 
     //produce the pythonic representation of this object. for things like integers, string, etc,
@@ -212,7 +212,9 @@ public:
 
     static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs);
 
-    static std::pair<bool, PyObject*> checkForPyOperator(PyObject* lhs, PyObject* rhs, const char* op);
+    static PyObject* pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep);
+
+    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep);
 
     static PyObject* nb_add(PyObject* lhs, PyObject* rhs);
 

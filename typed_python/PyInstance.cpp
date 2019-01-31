@@ -6,6 +6,8 @@
 #include "PyTupleOrListOfInstance.hpp"
 #include "PyPointerToInstance.hpp"
 #include "PyCompositeTypeInstance.hpp"
+#include "PyClassInstance.hpp"
+#include "PyAlternativeInstance.hpp"
 
 
 // static
@@ -534,32 +536,6 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
 }
 
 // static
-void PyInstance::initializeClassWithDefaultArguments(Class* cls, uint8_t* data, PyObject* args, PyObject* kwargs) {
-    if (PyTuple_Size(args)) {
-        PyErr_Format(PyExc_TypeError,
-            "default __init__ for instances of '%s' doesn't accept positional arguments.",
-            cls->name().c_str()
-            );
-        throw PythonExceptionSet();
-    }
-
-    if (!kwargs) {
-        return;
-    }
-
-    PyObject *key, *value;
-    Py_ssize_t pos = 0;
-
-    while (PyDict_Next(kwargs, &pos, &key, &value)) {
-        int res = classInstanceSetAttributeFromPyObject(cls, data, key, value);
-
-        if (res != 0) {
-            throw PythonExceptionSet();
-        }
-    }
-}
-
-// static
 void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
     guaranteeForwardsResolvedOrThrow(t);
 
@@ -632,7 +608,7 @@ void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* 
         auto it = classT->getMemberFunctions().find("__init__");
         if (it == classT->getMemberFunctions().end()) {
             //run the default constructor
-            initializeClassWithDefaultArguments(classT, data, args, kwargs);
+            PyClassInstance::initializeClassWithDefaultArguments(classT, data, args, kwargs);
             return;
         }
 
@@ -860,17 +836,18 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
     }
 }
 
-// static
-PyObject* PyInstance::nb_rshift(PyObject* lhs, PyObject* rhs) {
-    std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__rshift__");
-    if (res.first) {
-        return res.second;
-    }
+PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep) {
+    return specializeForType(lhs, [&](auto& subtype) {
+        return subtype.pyOperatorConcrete(rhs, op, opErrRep);
+    });
+}
 
+PyObject* PyInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep) {
     PyErr_Format(
         PyExc_TypeError,
-        "Unsupported operand type(s) for >>: %S and %S",
-        lhs->ob_type,
+        "Unsupported operand type(s) for %s: %S and %S",
+        opErrRep,
+        ((PyObject*)this)->ob_type,
         rhs->ob_type,
         NULL
         );
@@ -879,131 +856,18 @@ PyObject* PyInstance::nb_rshift(PyObject* lhs, PyObject* rhs) {
 }
 
 // static
-std::pair<bool, PyObject*> PyInstance::checkForPyOperator(PyObject* lhs, PyObject* rhs, const char* op) {
-    Type* lhs_type = extractTypeFrom(lhs->ob_type);
-
-    Alternative* alt = nullptr;
-    if (lhs_type && lhs_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        alt = ((ConcreteAlternative*)lhs_type)->getAlternative();
-    }
-    if (lhs_type && lhs_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
-        alt = ((Alternative*)lhs_type);
-    }
-    if (alt) {
-        auto it = alt->getMethods().find(op);
-        if (it != alt->getMethods().end()) {
-            Function* f = it->second;
-
-            PyObject* argTuple = PyTuple_Pack(2, lhs, rhs);
-
-            for (const auto& overload: f->getOverloads()) {
-                std::pair<bool, PyObject*> res = tryToCallOverload(overload, nullptr, argTuple, nullptr);
-                if (res.first) {
-                    Py_DECREF(argTuple);
-                    return res;
-                }
-
-            Py_DECREF(argTuple);
-            }
-        }
-    }
-
-    return std::pair<bool, PyObject*>(false, NULL);
+PyObject* PyInstance::nb_rshift(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__rshift__", ">>");
 }
 
 // static
 PyObject* PyInstance::nb_add(PyObject* lhs, PyObject* rhs) {
-    Type* lhs_type = extractTypeFrom(lhs->ob_type);
-
-    if (lhs_type->getTypeCategory() == Type::TypeCategory::catPointerTo && PyLong_Check(rhs)) {
-        int64_t ix = PyLong_AsLong(rhs);
-        void* output;
-        ((PointerTo*)lhs_type)->offsetBy((instance_ptr)&output, ((PyInstance*)lhs)->dataPtr(), ix);
-        return extractPythonObject((instance_ptr)&output, lhs_type);
-    }
-
-    std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__add__");
-    if (res.first) {
-        return res.second;
-    }
-
-    PyErr_Format(
-        PyExc_TypeError,
-        "Unsupported operand type(s) for +: %S and %S",
-        lhs->ob_type,
-        rhs->ob_type,
-        NULL
-        );
-
-    return NULL;
+    return pyOperator(lhs, rhs, "__add__", "+");
 }
 
 // static
 PyObject* PyInstance::nb_subtract(PyObject* lhs, PyObject* rhs) {
-    Type* lhs_type = extractTypeFrom(lhs->ob_type);
-    Type* rhs_type = extractTypeFrom(rhs->ob_type);
-
-    if (lhs_type) {
-        PyInstance* w_lhs = (PyInstance*)lhs;
-
-        if (lhs_type->getTypeCategory() == Type::TypeCategory::catConstDict) {
-            ConstDict* dict_t = (ConstDict*)lhs_type;
-
-            Type* tupleOfKeysType = dict_t->tupleOfKeysType();
-
-            if (lhs_type == tupleOfKeysType) {
-                PyInstance* w_rhs = (PyInstance*)rhs;
-
-                PyInstance* self =
-                    (PyInstance*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
-
-                self->initialize([&](instance_ptr data) {
-                    ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->dataPtr(), w_rhs->dataPtr(), data);
-                });
-
-                return (PyObject*)self;
-            } else {
-                //attempt to convert rhs to a relevant dict type.
-                instance_ptr tempObj = (instance_ptr)malloc(tupleOfKeysType->bytecount());
-
-                try {
-                    copyConstructFromPythonInstance(tupleOfKeysType, tempObj, rhs);
-                } catch(std::exception& e) {
-                    free(tempObj);
-                    PyErr_SetString(PyExc_TypeError, e.what());
-                    return NULL;
-                }
-
-                PyInstance* self =
-                    (PyInstance*)typeObj(lhs_type)->tp_alloc(typeObj(lhs_type), 0);
-
-                self->initialize([&](instance_ptr data) {
-                    ((ConstDict*)lhs_type)->subtractTupleOfKeysFromDict(w_lhs->dataPtr(), tempObj, data);
-                });
-
-                tupleOfKeysType->destroy(tempObj);
-
-                free(tempObj);
-
-                return (PyObject*)self;
-            }
-        }
-    }
-
-    std::pair<bool, PyObject*> res = checkForPyOperator(lhs, rhs, "__sub__");
-    if (res.first) {
-        return res.second;
-    }
-
-    PyErr_Format(
-        PyExc_TypeError,
-        "Unsupported operand type(s) for -: %S and %S",
-        lhs->ob_type,
-        rhs->ob_type,
-        NULL
-        );
-
-    return NULL;
+    return pyOperator(lhs, rhs, "__sub__", "-");
 }
 
 // static

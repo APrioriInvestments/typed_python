@@ -13,4 +13,6 @@ public:
     static PyObject* pointerGet(PyObject* o, PyObject* args);
 
     static PyObject* pointerCast(PyObject* o, PyObject* args);
+
+    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 };

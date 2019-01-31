@@ -99,3 +99,16 @@ PyObject* PyPointerToInstance::pointerCast(PyObject* o, PyObject* args) {
 
     return extractPythonObject(self_w->dataPtr(), newType);
 }
+
+PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
+    if (strcmp(op, "__add__") == 0) {
+        int64_t ix = PyLong_AsLong(rhs);
+        void* output;
+
+        type()->offsetBy((instance_ptr)&output, dataPtr(), ix);
+
+        return extractPythonObject((instance_ptr)&output, type());
+    }
+
+    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+}

@@ -227,3 +227,19 @@ int PyConstDictInstance::sq_contains_concrete(PyObject* item) {
     }
 }
 
+PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
+    if (strcmp(op, "__sub__") == 0) {
+        Type* tupleOfKeysType = type()->tupleOfKeysType();
+
+        //convert rhs to a relevant dict type.
+        Instance keys(tupleOfKeysType, [&](instance_ptr data) {
+            copyConstructFromPythonInstance(tupleOfKeysType, data, rhs);
+        });
+
+        return PyInstance::initialize(type(), [&](instance_ptr data) {
+            type()->subtractTupleOfKeysFromDict(dataPtr(), keys.data(), data);
+        });
+    }
+
+    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+}
