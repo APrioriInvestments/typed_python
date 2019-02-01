@@ -260,8 +260,11 @@ class Codebase:
     def rootlevelPathFromModule(module):
         module_path = os.path.abspath(module.__file__)
 
-        # drop as many parts of the module_path as there are parts to the
-        # module name (i.e., at least one)
+        if os.path.basename(module_path) == '__init__.py':
+            module_path = os.path.dirname(module_path)
+
+        # drop as many parts of the module_path as there dots to the
+        # module name
         for _ in range(len(module.__name__.split("."))-1):
             module_path = os.path.dirname(module_path)
 
