@@ -151,6 +151,20 @@ class ActiveWebService(ServiceBase):
         else:
             raise Exception("Unkown auth-type: {}".format(auth_type))
 
+    @staticmethod
+    def configure(db, serviceObject, hostname, port):
+        db.subscribeToType(Configuration)
+
+        with db.transaction():
+            c = Configuration.lookupAny(service=serviceObject)
+            if not c:
+                c = Configuration(service=serviceObject)
+
+            c.hostname = hostname
+            c.port = port
+            c.log_level = logging.getLevelName("INFO")
+            c.auth_type = "NONE"
+
 
     @staticmethod
     def configureFromCommandline(db, serviceObject, args):

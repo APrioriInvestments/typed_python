@@ -25,7 +25,7 @@ from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase
 from object_database.service_manager.Codebase import Codebase
 from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
-from object_database.view import revisionConflictRetry
+from object_database.view import revisionConflictRetry, RevisionConflictException, DisconnectedException, current_transaction
 from typed_python import OneOf, Alternative, ConstDict, TupleOf
 
 task_schema = Schema("core.task")
@@ -323,6 +323,8 @@ class TaskDispatchService(ServiceBase):
                 try:
                     self.checkForDeadWorkers()
                     time.sleep(5.0)
+                except DisconnectedException:
+                    return
                 except Exception:
                     self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
 
@@ -331,6 +333,8 @@ class TaskDispatchService(ServiceBase):
                 try:
                     if self.assignWork():
                         shouldStop.wait(timeout=.01)
+                except DisconnectedException:
+                    return
                 except Exception:
                     self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
 
@@ -339,6 +343,8 @@ class TaskDispatchService(ServiceBase):
                 try:
                     if self.collectResults():
                         shouldStop.wait(timeout=.01)
+                except DisconnectedException:
+                    return
                 except Exception:
                     self.logger.error("Unexpected exception in TaskDispatchService: %s", traceback.format_exc())
 
