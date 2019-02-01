@@ -12,7 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import os
 import unittest
+import sys
 
 from typed_python.Codebase import Codebase
 
@@ -29,3 +31,17 @@ class CodebaseTest(unittest.TestCase):
         self.assertEqual(codebase2.getClassByName('test_module.inner.f')(), 10)
 
         self.assertEqual(codebase.filesToContents, codebase2.filesToContents)
+
+    def test_rootlevelPathFromModule(self):
+
+        def check_module_name(mod_name):
+            mod = sys.modules[mod_name]
+            path = Codebase.rootlevelPathFromModule(mod)
+            self.assertEqual(os.path.basename(path), 'typed_python')
+
+        mod_name_parts = Codebase.__module__.split('.')
+
+        for parts in range(len(mod_name_parts)):
+            check_module_name(
+                '.'.join(mod_name_parts[:parts+1])
+            )
