@@ -13,6 +13,10 @@ public:
     Py_ssize_t mp_and_sq_length_concrete();
 
     PyObject* mp_subscript_concrete(PyObject* item);
+
+    static void copyConstructFromPythonInstance(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation);
+
+    static PyObject* toArray(PyObject* o, PyObject* args);
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {

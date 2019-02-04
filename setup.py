@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import setuptools
+import pkg_resources
 
 setuptools.setup(
     name='nativepython',
@@ -41,6 +42,9 @@ setuptools.setup(
                 '-Wno-sign-compare',
                 '-Wno-narrowing',
                 '-Wno-unused-variable'
+            ],
+            include_dirs=[
+                pkg_resources.resource_filename('numpy', 'core/include')
             ]
         )
     ],

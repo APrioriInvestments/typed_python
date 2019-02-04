@@ -62,7 +62,7 @@ PyObject* PyTupleOrListOfInstance::sq_concat_concrete(PyObject* rhs) {
                         }
 
                         try {
-                            copyConstructFromPythonInstance(eltType, eltPtr, o);
+                            PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o);
                         } catch(...) {
                             Py_DECREF(o);
                             throw;
@@ -104,6 +104,160 @@ PyObject* PyListOfInstance::listSetSizeUnsafe(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
+
+template<class dest_t, class source_t>
+void constructTupleOrListInst(TupleOrListOf* tupT, instance_ptr tgt, size_t count, uint8_t* source_data) {
+    tupT->constructor(tgt, count,
+        [&](uint8_t* eltPtr, int64_t k) {
+            ((dest_t*)eltPtr)[0] = ((source_t*)source_data)[k];
+            }
+        );
+}
+
+void PyTupleOrListOfInstance::copyConstructFromPythonInstance(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation) {
+    if (PyArray_Check(pyRepresentation)) {
+        if (!PyArray_ISBEHAVED_RO(pyRepresentation)) {
+            throw std::logic_error("Can't convert a numpy array that's not contiguous and in machine-native byte order.");
+        }
+
+        if (PyArray_NDIM(pyRepresentation) != 1) {
+            throw std::logic_error("Can't convert a numpy array with more than 1 dimension. please flatten it.");
+        }
+
+        uint8_t* data = (uint8_t*)PyArray_BYTES(pyRepresentation);
+        size_t size = PyArray_SIZE(pyRepresentation);
+
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catInt64) {
+            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(double)) {
+                constructTupleOrListInst<int64_t, double>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(float)) {
+                constructTupleOrListInst<int64_t, float>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int64_t)) {
+                constructTupleOrListInst<int64_t, int64_t>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int32_t)) {
+                constructTupleOrListInst<int64_t, int32_t>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int16_t)) {
+                constructTupleOrListInst<int64_t, int16_t>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int8_t)) {
+                constructTupleOrListInst<int64_t, int8_t>(tupT, tgt, size, data);
+                return;
+            }
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catFloat64) {
+            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(double)) {
+                constructTupleOrListInst<double, double>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(float)) {
+                constructTupleOrListInst<double, float>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int64_t)) {
+                constructTupleOrListInst<double, int64_t>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int32_t)) {
+                constructTupleOrListInst<double, int32_t>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int16_t)) {
+                constructTupleOrListInst<double, int16_t>(tupT, tgt, size, data);
+                return;
+            }
+            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int8_t)) {
+                constructTupleOrListInst<double, int8_t>(tupT, tgt, size, data);
+                return;
+            }
+        }
+    }
+
+    if (PyTuple_Check(pyRepresentation)) {
+        tupT->constructor(tgt, PyTuple_Size(pyRepresentation),
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
+                }
+            );
+        return;
+    }
+    if (PyList_Check(pyRepresentation)) {
+        tupT->constructor(tgt, PyList_Size(pyRepresentation),
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
+                }
+            );
+        return;
+    }
+    if (PySet_Check(pyRepresentation)) {
+        if (PySet_Size(pyRepresentation) == 0) {
+            tupT->constructor(tgt);
+            return;
+        }
+
+        PyObject *iterator = PyObject_GetIter(pyRepresentation);
+
+        tupT->constructor(tgt, PySet_Size(pyRepresentation),
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyObject* item = PyIter_Next(iterator);
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item);
+                Py_DECREF(item);
+                }
+            );
+
+        Py_DECREF(iterator);
+
+        return;
+    }
+
+    throw std::logic_error("Couldn't initialize internal elt of type " + tupT->name()
+            + " with a " + pyRepresentation->ob_type->tp_name);
+}
+
+PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {
+    PyListOfInstance* self_w = (PyListOfInstance*)o;
+    npy_intp dims[1] = { self_w->type()->count(self_w->dataPtr()) };
+
+    int typenum = -1;
+    int bytecount = 0;
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catInt64) {
+        typenum = NPY_INT64;
+        bytecount = sizeof(int64_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catFloat64) {
+        typenum = NPY_FLOAT64;
+        bytecount = sizeof(double);
+    }
+
+    if (bytecount) {
+        PyObject* resultArray = PyArray_SimpleNew(
+            1,
+            dims,
+            typenum
+            );
+        memcpy(
+            PyArray_BYTES(resultArray),
+            self_w->type()->eltPtr(self_w->dataPtr(), 0),
+            dims[0] * bytecount
+            );
+
+        return resultArray;
+    }
+
+    PyErr_Format(PyExc_TypeError, "Can't convert %s to a numpy array.", self_w->type()->name().c_str());
+    return NULL;
+}
+
 //static
 PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
     PyListOfInstance* self_w = (PyListOfInstance*)o;
@@ -143,7 +297,7 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
             self_w->type()->append(self_w->dataPtr(), value_w->dataPtr());
         } else {
             Instance temp(eltType, [&](instance_ptr data) {
-                copyConstructFromPythonInstance(eltType, data, value);
+                PyInstance::copyConstructFromPythonInstance(eltType, data, value);
             });
 
             self_w->type()->append(self_w->dataPtr(), temp.data());
@@ -227,7 +381,7 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
         } else {
             if (PyTuple_Size(args) == 2) {
                 Instance temp(eltType, [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(eltType, data, PyTuple_GetItem(args, 1));
+                    PyInstance::copyConstructFromPythonInstance(eltType, data, PyTuple_GetItem(args, 1));
                 });
 
                 self_w->type()->resize(self_w->dataPtr(), size, temp.data());
@@ -348,7 +502,7 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
                 );
         } else {
             Instance toAssign(eltType, [&](instance_ptr data) {
-                copyConstructFromPythonInstance(eltType, data, value);
+                PyInstance::copyConstructFromPythonInstance(eltType, data, value);
             });
 
             eltType->assign(
@@ -393,3 +547,5 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
     PyErr_SetObject(PyExc_KeyError, item);
     return NULL;
 }
+
+

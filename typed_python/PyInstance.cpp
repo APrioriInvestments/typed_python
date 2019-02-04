@@ -1,4 +1,6 @@
 #include <Python.h>
+#include <numpy/arrayobject.h>
+
 #include "AllTypes.hpp"
 #include "_runtime.h"
 #include "PyInstance.hpp"
@@ -76,8 +78,16 @@ PyMethodDef* PyInstance::typeMethods(Type* t) {
         };
     }
 
+    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
+        return new PyMethodDef [2] {
+            {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+            {NULL, NULL}
+        };
+    }
+
     if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
         return new PyMethodDef [12] {
+            {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
             {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},
             {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, NULL},
             {"reserved", (PyCFunction)PyListOfInstance::listReserved, METH_VARARGS, NULL},
@@ -431,45 +441,9 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
     }
 
     if (cat == Type::TypeCategory::catTupleOf || cat == Type::TypeCategory::catListOf) {
-        if (PyTuple_Check(pyRepresentation)) {
-            ((TupleOrListOf*)eltType)->constructor(tgt, PyTuple_Size(pyRepresentation),
-                [&](uint8_t* eltPtr, int64_t k) {
-                    copyConstructFromPythonInstance(((TupleOrListOf*)eltType)->getEltType(), eltPtr, PyTuple_GetItem(pyRepresentation,k));
-                    }
-                );
-            return;
-        }
-        if (PyList_Check(pyRepresentation)) {
-            ((TupleOrListOf*)eltType)->constructor(tgt, PyList_Size(pyRepresentation),
-                [&](uint8_t* eltPtr, int64_t k) {
-                    copyConstructFromPythonInstance(((TupleOrListOf*)eltType)->getEltType(), eltPtr, PyList_GetItem(pyRepresentation,k));
-                    }
-                );
-            return;
-        }
-        if (PySet_Check(pyRepresentation)) {
-            if (PySet_Size(pyRepresentation) == 0) {
-                ((TupleOrListOf*)eltType)->constructor(tgt);
-                return;
-            }
-
-            PyObject *iterator = PyObject_GetIter(pyRepresentation);
-
-            ((TupleOrListOf*)eltType)->constructor(tgt, PySet_Size(pyRepresentation),
-                [&](uint8_t* eltPtr, int64_t k) {
-                    PyObject* item = PyIter_Next(iterator);
-                    copyConstructFromPythonInstance(((TupleOrListOf*)eltType)->getEltType(), eltPtr, item);
-                    Py_DECREF(item);
-                    }
-                );
-
-            Py_DECREF(iterator);
-
-            return;
-        }
-
-        throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name()
-                + " with a " + pyRepresentation->ob_type->tp_name);
+        TupleOrListOf* tupT = (TupleOrListOf*)eltType;
+        PyTupleOrListOfInstance::copyConstructFromPythonInstance(tupT, tgt, pyRepresentation);
+        return;
     }
 
     if (eltType->isComposite()) {

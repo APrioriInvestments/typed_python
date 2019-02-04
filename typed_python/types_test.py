@@ -1272,3 +1272,22 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertNotEqual(y[0], 100)
 
+    def test_list_and_tuple_conversion_to_numpy(self):
+        for T in [ListOf(int), TupleOf(int)]:
+            for arr in [
+                    numpy.array([]),
+                    numpy.array([1,2,3,4,5]),
+                    numpy.array([1,2,3,4,5], 'int32'),
+                    numpy.array([1,2,3,4,5], 'int16')
+                    ]:
+                self.assertEqual(T(arr), T(arr.tolist()))
+                self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
+
+        for T in [ListOf(float), TupleOf(float)]:
+            for arr in [
+                    numpy.array([]),
+                    numpy.array([1,2,3,4,5], 'float64'),
+                    numpy.array([1,2,3,4,5], 'float32')
+                    ]:
+                self.assertEqual(T(arr), T(arr.tolist()))
+                self.assertEqual(T(arr).toArray().tolist(), arr.tolist())

@@ -1,4 +1,5 @@
 #include <Python.h>
+#include <numpy/arrayobject.h>
 #include <map>
 #include <memory>
 #include <vector>
@@ -1101,6 +1102,11 @@ void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
 PyMODINIT_FUNC
 PyInit__types(void)
 {
+    //initialize numpy. This is only OK because all the .cpp files get
+    //glommed together in a single file. If we were to change that behavior,
+    //then additional steps must be taken as per the API documentation.
+    import_array();
+
     PyObject *module = PyModule_Create(&moduledef);
 
     if (module == NULL)
