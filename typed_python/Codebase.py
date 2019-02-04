@@ -22,8 +22,6 @@ import logging
 
 from typed_python.SerializationContext import SerializationContext
 
-import object_database, typed_python
-
 _lock = threading.RLock()
 _root_level_module_codebase_cache = {}
 _coreSerializationContext = [None]
@@ -65,6 +63,8 @@ class Codebase:
     def coreSerializationContext():
         with _lock:
             if _coreSerializationContext[0] is None:
+                import object_database, typed_python
+
                 allModules = []
 
                 context1 = SerializationContext.FromModules(
