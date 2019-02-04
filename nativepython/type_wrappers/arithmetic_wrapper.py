@@ -80,6 +80,13 @@ class ArithmeticTypeWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
+    def convert_unary_op(self, context, instance, op):
+        if op.matches.USub:
+            return context.pushPod(self, instance.nonref_expr.negate())
+
+        return super().convert_unary_op(context, instance, op)
+
+
 class Int64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Int64())

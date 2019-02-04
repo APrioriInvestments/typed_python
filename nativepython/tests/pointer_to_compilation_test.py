@@ -70,3 +70,16 @@ class TestPointerToCompilation(unittest.TestCase):
         check(0.0)
         check(ListOf(int)([10]))
         check(Tuple(int,int,int)((10,10,10)))
+
+    def test_pointer_subtraction(self):
+        T = ListOf(int)
+
+        def testfun(x: T):
+            pointer = x.pointerUnsafe(0)
+
+            return (pointer + 1) - pointer
+
+        compiledFun = Compiled(testfun)
+
+        self.assertEqual(testfun(T()), 1)
+        self.assertEqual(compiledFun(T()), 1)

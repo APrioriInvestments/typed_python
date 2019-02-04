@@ -685,7 +685,14 @@ class ExpressionConversionContext(object):
             assert len(ast.ops) == 1
 
             l = self.convert_expression_ast(ast.left)
+
+            if l is None:
+                return None
+
             r = self.convert_expression_ast(ast.comparators[0])
+
+            if r is None:
+                return None
 
             return l.convert_bin_op(ast.ops[0], r)
 

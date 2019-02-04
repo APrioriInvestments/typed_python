@@ -102,3 +102,28 @@ class Runtime:
             return result
 
         assert False, f
+
+def Entrypoint(f):
+    """Indicate that a function is a natural entrypoint into compiled code.
+
+    By default, this means that if we hit an entrypoint, we'll attempt to compile
+    the code when we first execute the function.
+
+    However, the runtime can be placed into other modes, where we precompile
+    all entrypoints.
+    """
+    if not hasattr(f, '__typed_python_category__'):
+        if not callable(f):
+            raise Exception("Can only compile functions.")
+        f = Function(f)
+
+    compiled = [None]
+
+    def inner(*args, **kwargs):
+        if compiled[0] is None:
+            compiled[0] = Runtime.singleton().compile(f)
+        return compiled[0](*args, **kwargs)
+
+    inner.__qualname__ = str(f)
+
+    return inner

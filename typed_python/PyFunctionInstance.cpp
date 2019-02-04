@@ -4,7 +4,6 @@ Function* PyFunctionInstance::type() {
     return (Function*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-
 // static
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
     PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+(self?1:0));

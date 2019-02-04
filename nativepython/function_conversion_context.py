@@ -335,10 +335,10 @@ class FunctionConversionContext(object):
             cond_context = ExpressionConversionContext(self)
             cond = cond_context.convert_expression_ast(ast.test)
             if cond is None:
-                return cond.finalize(None), False
+                return cond_context.finalize(None), False
             cond = cond.toBool()
             if cond is None:
-                return cond.finalize(None), False
+                return cond_context.finalize(None), False
 
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()

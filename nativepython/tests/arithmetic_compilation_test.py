@@ -18,6 +18,10 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 
+def Compiled(f):
+    f = Function(f)
+    return Runtime.singleton().compile(f)
+
 In = OneOf(int, float)
 Out = OneOf(int, float, bool)
 
@@ -164,3 +168,16 @@ class TestArithmeticCompilation(unittest.TestCase):
             return x+y
 
         self.checkFunctionOfIntegers(f)
+
+    def test_negation(self):
+        @Compiled
+        def negate_int(x: int):
+            return -x
+
+        @Compiled
+        def negate_float(x: float):
+            return -x
+
+        self.assertEqual(negate_int(10), -10)
+        self.assertEqual(negate_float(20.5), -20.5)
+

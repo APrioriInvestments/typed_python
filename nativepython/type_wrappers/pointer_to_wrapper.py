@@ -62,6 +62,12 @@ class PointerToWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
+    def convert_to_type(self, context, e, target_type):
+        if target_type.typeRepresentation == Int64():
+            return context.pushPod(int, e.nonref_expr.cast(native_ast.Int64))
+
+        return super().convert_to_type(context, e, target_type)
+
     def convert_bin_op(self, context, left, op, right):
         if op.matches.Add:
             right = right.toInt64()
@@ -69,6 +75,20 @@ class PointerToWrapper(Wrapper):
                 return None
 
             return context.pushPod(self, left.nonref_expr.elemPtr(right.nonref_expr))
+
+        if op.matches.Sub:
+            right = right.toInt64()
+
+            if right is None:
+                return None
+
+            left = left.toInt64()
+
+            return context.pushPod(int,
+                left.nonref_expr
+                    .sub(right.nonref_expr)
+                    .div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
+                )
 
         if op.matches.Lt and right.expr_type == left.expr_type:
             return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).lt(right.nonref_expr.cast(native_ast.Int64)))

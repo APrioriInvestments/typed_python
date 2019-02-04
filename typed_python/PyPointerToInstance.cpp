@@ -110,5 +110,21 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
         return extractPythonObject((instance_ptr)&output, type());
     }
 
+    if (strcmp(op, "__sub__") == 0) {
+        PointerTo* otherPointer = (PointerTo*)extractTypeFrom(rhs->ob_type);
+
+        if (otherPointer != type()) {
+            //call 'super'
+            return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+        }
+
+        PyInstance* other_w = (PyPointerToInstance*)rhs;
+
+        uint8_t* ptr = *(uint8_t**)dataPtr();
+        uint8_t* other_ptr = *(uint8_t**)other_w->dataPtr();
+
+        return PyLong_FromLong((ptr-other_ptr) / type()->getEltType()->bytecount());
+    }
+
     return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
 }
