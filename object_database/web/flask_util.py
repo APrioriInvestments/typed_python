@@ -64,6 +64,15 @@ def next_url(fallback_url=None, fallback_endpoint='index', next_key='next',
     return target_url
 
 
+def url_with_request_parameters(url, req=None, filtr=None):
+    req = req or request
+    for k, v in req.args.items():
+        if filtr and k not in filtr:
+            continue
+        url = set_query_parameter(url, k, v)
+    return url
+
+
 def set_query_parameter(url, param_name, param_value):
     """Given a URL, set or replace a query parameter and return the result. """
     scheme, netloc, path, query_string, fragment = urlsplit(url)

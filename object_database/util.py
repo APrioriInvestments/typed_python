@@ -191,9 +191,9 @@ def closest_N_in(name, names, count):
     return [x[1] for x in sorted((distance(name, x), x) for x in names)[:count]]
 
 
-def sslContextFromCertPath(cert_path):
+def sslContextFromCertPath(cert_path, key_path=None):
     assert os.path.isfile(cert_path), "Expected path to existing SSL certificate ({})".format(cert_path)
-    key_path = os.path.splitext(cert_path)[0] + '.key'
+    key_path = key_path or os.path.splitext(cert_path)[0] + '.key'
     assert os.path.isfile(key_path), "Expected to find .key file along SSL certificate ({})".format(cert_path)
 
     ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
