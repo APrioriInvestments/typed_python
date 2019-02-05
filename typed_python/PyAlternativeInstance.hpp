@@ -9,6 +9,10 @@ public:
     Alternative* type();
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return true;
+    }
 };
 
 class PyConcreteAlternativeInstance : public PyInstance {
@@ -18,4 +22,8 @@ public:
     ConcreteAlternative* type();
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return true;
+    }
 };

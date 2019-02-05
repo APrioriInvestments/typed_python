@@ -141,70 +141,20 @@ void PyInstance::tp_dealloc(PyObject* self) {
 bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
     guaranteeForwardsResolvedOrThrow(t);
 
-    if (t->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-        int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)((PythonObjectOfType*)t)->pyType());
-
-        if (isinst == -1) {
-            isinst = 0;
-            PyErr_Clear();
-        }
-
-        return isinst > 0;
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catValue) {
-        Value* valType = (Value*)t;
-        if (compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true) == 0) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    if (argType) {
-        return argType->isBinaryCompatibleWith(argType);
+    if (argType && argType->isBinaryCompatibleWith(argType)) {
+        return true;
     }
 
-    if (t->getTypeCategory() == Type::TypeCategory::catNamedTuple ||
-            t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
-            t->getTypeCategory() == Type::TypeCategory::catListOf ||
-            t->getTypeCategory() == Type::TypeCategory::catTuple
-            ) {
-        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
-    }
+    return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
+        typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 
-    if (t->getTypeCategory() == Type::TypeCategory::catFloat64 ||
-            t->getTypeCategory() == Type::TypeCategory::catFloat32)  {
-        return PyFloat_Check(pyRepresentation);
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catInt64 ||
-            t->getTypeCategory() == Type::TypeCategory::catInt32 ||
-            t->getTypeCategory() == Type::TypeCategory::catInt16 ||
-            t->getTypeCategory() == Type::TypeCategory::catInt8 ||
-            t->getTypeCategory() == Type::TypeCategory::catUInt64 ||
-            t->getTypeCategory() == Type::TypeCategory::catUInt32 ||
-            t->getTypeCategory() == Type::TypeCategory::catUInt16 ||
-            t->getTypeCategory() == Type::TypeCategory::catUInt8
-            )  {
-        return PyLong_CheckExact(pyRepresentation);
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catBool) {
-        return PyBool_Check(pyRepresentation);
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catString) {
-        return PyUnicode_Check(pyRepresentation);
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catBytes) {
-        return PyBytes_Check(pyRepresentation);
-    }
-
-    return true;
+        return py_instance_type::pyValCouldBeOfTypeConcrete(
+            (typename py_instance_type::modeled_type*)t,
+            pyRepresentation
+            );
+    });
 }
 
 // static

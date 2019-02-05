@@ -17,4 +17,8 @@ public:
     static PyObject* pointerCast(PyObject* o, PyObject* args);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return true;
+    }
 };

@@ -23,5 +23,15 @@ public:
         return;
     }
 
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)type->pyType());
+
+        if (isinst == -1) {
+            isinst = 0;
+            PyErr_Clear();
+        }
+
+        return isinst > 0;
+    }
 };
 

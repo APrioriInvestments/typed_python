@@ -40,6 +40,10 @@ public:
 
         PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation);
     }
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
+    }
 };
 
 class PyTupleInstance : public PyCompositeTypeInstance {

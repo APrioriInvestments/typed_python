@@ -19,6 +19,10 @@ public:
     static void copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation);
 
     static PyObject* toArray(PyObject* o, PyObject* args);
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
+    }
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {

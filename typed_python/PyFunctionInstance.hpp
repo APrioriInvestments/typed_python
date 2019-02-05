@@ -8,6 +8,10 @@ public:
 
     Function* type();
 
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return true;
+    }
+
     static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs);
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.

@@ -30,6 +30,10 @@ public:
 
     static PyObject* constDictGet(PyObject* o, PyObject* args);
 
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return true;
+    }
+
     static void copyConstructFromPythonInstanceConcrete(ConstDict* dictType, instance_ptr tgt, PyObject* pyRepresentation) {
         if (PyDict_Check(pyRepresentation)) {
             dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);

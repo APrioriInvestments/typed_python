@@ -13,5 +13,9 @@ public:
         throw std::logic_error("Can't initialize a None from an instance of " +
             std::string(pyRepresentation->ob_type->tp_name));
     }
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+        return true;
+    }
 };
 

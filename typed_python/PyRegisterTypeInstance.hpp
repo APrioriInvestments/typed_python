@@ -44,5 +44,30 @@ public:
 
         PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation);
     }
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation) {
+        if (t->getTypeCategory() == Type::TypeCategory::catFloat64 ||
+                t->getTypeCategory() == Type::TypeCategory::catFloat32)  {
+            return PyFloat_Check(pyRepresentation);
+        }
+
+        if (t->getTypeCategory() == Type::TypeCategory::catInt64 ||
+                t->getTypeCategory() == Type::TypeCategory::catInt32 ||
+                t->getTypeCategory() == Type::TypeCategory::catInt16 ||
+                t->getTypeCategory() == Type::TypeCategory::catInt8 ||
+                t->getTypeCategory() == Type::TypeCategory::catUInt64 ||
+                t->getTypeCategory() == Type::TypeCategory::catUInt32 ||
+                t->getTypeCategory() == Type::TypeCategory::catUInt16 ||
+                t->getTypeCategory() == Type::TypeCategory::catUInt8
+                )  {
+            return PyLong_CheckExact(pyRepresentation);
+        }
+
+        if (t->getTypeCategory() == Type::TypeCategory::catBool) {
+            return PyBool_Check(pyRepresentation);
+        }
+
+        return true;
+    }
 };
 
