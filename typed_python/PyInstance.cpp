@@ -1,5 +1,6 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
+#include <type_traits>
 
 #include "AllTypes.hpp"
 #include "_runtime.h"
@@ -9,9 +10,19 @@
 #include "PyPointerToInstance.hpp"
 #include "PyCompositeTypeInstance.hpp"
 #include "PyClassInstance.hpp"
+#include "PyHeldClassInstance.hpp"
+#include "PyBoundMethodInstance.hpp"
 #include "PyAlternativeInstance.hpp"
 #include "PyFunctionInstance.hpp"
-
+#include "PyStringInstance.hpp"
+#include "PyBytesInstance.hpp"
+#include "PyNoneInstance.hpp"
+#include "PyRegisterTypeInstance.hpp"
+#include "PyValueInstance.hpp"
+#include "PyValueInstance.hpp"
+#include "PyPythonSubclassInstance.hpp"
+#include "PyPythonObjectOfTypeInstance.hpp"
+#include "PyOneOfInstance.hpp"
 
 // static
 bool PyInstance::guaranteeForwardsResolved(Type* t) {
@@ -210,305 +221,22 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
 
     Type::TypeCategory cat = eltType->getTypeCategory();
 
-    if (cat == Type::TypeCategory::catPythonSubclass) {
-        copyConstructFromPythonInstance((Type*)eltType->getBaseType(), tgt, pyRepresentation);
-        return;
-    }
+    //dispatch to the appropriate Py[]Instance type
+    specializeStatic(cat, [&](auto* concrete_null_ptr) {
+        typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 
-    if (cat == Type::TypeCategory::catPythonObjectOfType) {
-        int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)((PythonObjectOfType*)eltType)->pyType());
-        if (isinst == -1) {
-            isinst = 0;
-            PyErr_Clear();
-        }
+        py_instance_type::copyConstructFromPythonInstanceConcrete(
+            (typename py_instance_type::modeled_type*)eltType,
+            tgt,
+            pyRepresentation
+            );
+    });
+}
 
-        if (!isinst) {
-            throw std::logic_error("Object of type " + std::string(pyRepresentation->ob_type->tp_name) +
-                    " is not an instance of " + ((PythonObjectOfType*)eltType)->pyType()->tp_name);
-        }
-
-        Py_INCREF(pyRepresentation);
-        ((PyObject**)tgt)[0] = pyRepresentation;
-        return;
-    }
-
-    if (cat == Type::TypeCategory::catValue) {
-        Value* v = (Value*)eltType;
-
-        const Instance& elt = v->value();
-
-        if (compare_to_python(elt.type(), elt.data(), pyRepresentation, false) != 0) {
-            throw std::logic_error("Can't initialize a " + eltType->name() + " from an instance of " +
-                std::string(pyRepresentation->ob_type->tp_name));
-        } else {
-            //it's the value we want
-            return;
-        }
-    }
-
-    if (cat == Type::TypeCategory::catOneOf) {
-        OneOf* oneOf = (OneOf*)eltType;
-
-        for (long k = 0; k < oneOf->getTypes().size(); k++) {
-            Type* subtype = oneOf->getTypes()[k];
-
-            if (pyValCouldBeOfType(subtype, pyRepresentation)) {
-                try {
-                    copyConstructFromPythonInstance(subtype, tgt+1, pyRepresentation);
-                    *(uint8_t*)tgt = k;
-                    return;
-                } catch(...) {
-                }
-            }
-        }
-
-        throw std::logic_error("Can't initialize a " + eltType->name() + " from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-        return;
-    }
-
-    if (cat == Type::TypeCategory::catNone) {
-        if (pyRepresentation == Py_None) {
-            return;
-        }
-        throw std::logic_error("Can't initialize a None from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catInt64) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((int64_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an int64 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catInt32) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((int32_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an int32 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catInt16) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((int16_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an int16 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catInt8) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((int8_t*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an int8 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catUInt64) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((uint64_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an uint64 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catUInt32) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((uint32_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an uint32 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catUInt16) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((uint16_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an uint16 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catUInt8) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((uint8_t*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize an uint8 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-    if (cat == Type::TypeCategory::catBool) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((bool*)tgt)[0] = PyLong_AsLong(pyRepresentation) != 0;
-            return;
-        }
-        throw std::logic_error("Can't initialize a Bool from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catString) {
-        if (PyUnicode_Check(pyRepresentation)) {
-            auto kind = PyUnicode_KIND(pyRepresentation);
-            assert(
-                kind == PyUnicode_1BYTE_KIND ||
-                kind == PyUnicode_2BYTE_KIND ||
-                kind == PyUnicode_4BYTE_KIND
-                );
-            String().constructor(
-                tgt,
-                kind == PyUnicode_1BYTE_KIND ? 1 :
-                kind == PyUnicode_2BYTE_KIND ? 2 :
-                                                4,
-                PyUnicode_GET_LENGTH(pyRepresentation),
-                kind == PyUnicode_1BYTE_KIND ? (const char*)PyUnicode_1BYTE_DATA(pyRepresentation) :
-                kind == PyUnicode_2BYTE_KIND ? (const char*)PyUnicode_2BYTE_DATA(pyRepresentation) :
-                                               (const char*)PyUnicode_4BYTE_DATA(pyRepresentation)
-                );
-            return;
-        }
-        throw std::logic_error("Can't initialize a String from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catBytes) {
-        if (PyBytes_Check(pyRepresentation)) {
-            Bytes().constructor(
-                tgt,
-                PyBytes_GET_SIZE(pyRepresentation),
-                PyBytes_AsString(pyRepresentation)
-                );
-            return;
-        }
-        throw std::logic_error("Can't initialize a Bytes object from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catFloat64) {
-        if (PyLong_Check(pyRepresentation)) {
-            ((double*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-            return;
-        }
-        if (PyFloat_Check(pyRepresentation)) {
-            ((double*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
-            return;
-        }
-        throw std::logic_error("Can't initialize a float64 from an instance of " +
-            std::string(pyRepresentation->ob_type->tp_name));
-    }
-
-    if (cat == Type::TypeCategory::catConstDict) {
-        if (PyDict_Check(pyRepresentation)) {
-            ConstDict* dictType = ((ConstDict*)eltType);
-            dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
-
-            try {
-                PyObject *key, *value;
-                Py_ssize_t pos = 0;
-
-                int i = 0;
-
-                while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
-                    copyConstructFromPythonInstance(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
-                    try {
-                        copyConstructFromPythonInstance(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
-                    } catch(...) {
-                        dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
-                        throw;
-                    }
-                    dictType->incKvPairCount(tgt);
-                    i++;
-                }
-
-                dictType->sortKvPairs(tgt);
-            } catch(...) {
-                dictType->destroy(tgt);
-                throw;
-            }
-            return;
-        }
-
-        throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name()
-                + " with a " + pyRepresentation->ob_type->tp_name);
-    }
-
-    if (cat == Type::TypeCategory::catTupleOf || cat == Type::TypeCategory::catListOf) {
-        TupleOrListOf* tupT = (TupleOrListOf*)eltType;
-        PyTupleOrListOfInstance::copyConstructFromPythonInstance(tupT, tgt, pyRepresentation);
-        return;
-    }
-
-    if (eltType->isComposite()) {
-        if (PyTuple_Check(pyRepresentation)) {
-            if (((CompositeType*)eltType)->getTypes().size() != PyTuple_Size(pyRepresentation)) {
-                throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
-            }
-
-            ((CompositeType*)eltType)->constructor(tgt,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    copyConstructFromPythonInstance(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyTuple_GetItem(pyRepresentation,k));
-                    }
-                );
-            return;
-        }
-        if (PyList_Check(pyRepresentation)) {
-            if (((CompositeType*)eltType)->getTypes().size() != PyList_Size(pyRepresentation)) {
-                throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
-            }
-
-            ((CompositeType*)eltType)->constructor(tgt,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    copyConstructFromPythonInstance(((CompositeType*)eltType)->getTypes()[k], eltPtr, PyList_GetItem(pyRepresentation,k));
-                    }
-                );
-            return;
-        }
-    }
-
-    if (eltType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
-        NamedTuple* namedTupleT = (NamedTuple*)eltType;
-
-        if (PyDict_Check(pyRepresentation)) {
-            if (namedTupleT->getTypes().size() < PyDict_Size(pyRepresentation)) {
-                throw std::runtime_error("Couldn't initialize type of " + eltType->name() + " because supplied dictionary had too many items");
-            }
-            long actuallyUsed = 0;
-
-            namedTupleT->constructor(tgt,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    const std::string& name = namedTupleT->getNames()[k];
-                    Type* t = namedTupleT->getTypes()[k];
-
-                    PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
-                    if (o) {
-                        copyConstructFromPythonInstance(t, eltPtr, o);
-                        actuallyUsed++;
-                    }
-                    else if (eltType->is_default_constructible()) {
-                        t->constructor(eltPtr);
-                    } else {
-                        throw std::logic_error("Can't default initialize argument " + name);
-                    }
-                });
-
-            if (actuallyUsed != PyDict_Size(pyRepresentation)) {
-                throw std::runtime_error("Couldn't initialize type of " + eltType->name() + " because supplied dictionary had unused arguments");
-            }
-
-            return;
-        }
-    }
-
+void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
     throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
 }
+
 
 // static
 void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {

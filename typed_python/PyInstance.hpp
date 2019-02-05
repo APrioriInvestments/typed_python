@@ -13,7 +13,8 @@ class InternalPyException {};
 
 //throw to indicate we set a python error already.
 class PythonExceptionSet {};
-
+class PyClassInstance;
+class PyHeldClassInstance;
 class PyListOfInstance;
 class PyTupleOfInstance;
 class PyConstDictInstance;
@@ -23,6 +24,18 @@ class PyTupleInstance;
 class PyNamedTupleInstance;
 class PyAlternativeInstance;
 class PyConcreteAlternativeInstance;
+class PyStringInstance;
+class PyBytesInstance;
+class PyFunctionInstance;
+class PyBoundMethodInstance;
+class PyNoneInstance;
+class PyValueInstance;
+class PyPythonSubclassInstance;
+class PyPythonObjectOfTypeInstance;
+class PyOneOfInstance;
+
+template<class T>
+class PyRegisterTypeInstance;
 
 class PyInstance {
 public:
@@ -38,41 +51,29 @@ public:
     template<class T>
     static auto specialize(PyObject* obj, const T& f) {
         switch (extractTypeFrom(obj->ob_type)->getTypeCategory()) {
-            // case catNone:
-            //     return f(*(None*)obj);
-            // case catBool:
-            //     return f(*(Bool*)obj);
-            // case catUInt8:
-            //     return f(*(UInt8*)obj);
-            // case catUInt16:
-            //     return f(*(UInt16*)obj);
-            // case catUInt32:
-            //     return f(*(UInt32*)obj);
-            // case catUInt64:
-            //     return f(*(UInt64*)obj);
-            // case catInt8:
-            //     return f(*(Int8*)obj);
-            // case catInt16:
-            //     return f(*(Int16*)obj);
-            // case catInt32:
-            //     return f(*(Int32*)obj);
-            // case catInt64:
-            //     return f(*(Int64*)obj);
-            //case Type::TypeCategory::catString:
-            //    return f(*(PyStringString*)obj);
-            //case Type::TypeCategory::catBytes:
-            //   return f(*(Bytes*)obj);
-            // case catFloat32:
-            //     return f(*(Float32*)obj);
-            // case catFloat64:
-            //     return f(*(Float64*)obj);
-            // case catValue:
-            //     return f(*(Value*)obj);
-            // case catOneOf:
-            //     return f(*(OneOf*)obj);
+            case Type::TypeCategory::catBool:
+                return f(*(PyRegisterTypeInstance<Bool>*)obj);
+            case Type::TypeCategory::catUInt8:
+                return f(*(PyRegisterTypeInstance<UInt8>*)obj);
+            case Type::TypeCategory::catUInt16:
+                return f(*(PyRegisterTypeInstance<UInt16>*)obj);
+            case Type::TypeCategory::catUInt32:
+                return f(*(PyRegisterTypeInstance<UInt32>*)obj);
+            case Type::TypeCategory::catUInt64:
+                return f(*(PyRegisterTypeInstance<UInt64>*)obj);
+            case Type::TypeCategory::catInt8:
+                return f(*(PyRegisterTypeInstance<Int8>*)obj);
+            case Type::TypeCategory::catInt16:
+                return f(*(PyRegisterTypeInstance<Int16>*)obj);
+            case Type::TypeCategory::catInt32:
+                return f(*(PyRegisterTypeInstance<Int32>*)obj);
+            case Type::TypeCategory::catFloat32:
+                return f(*(PyRegisterTypeInstance<Float32>*)obj);
+            case Type::TypeCategory::catValue:
+               return f(*(PyValueInstance*)obj);
             case Type::TypeCategory::catTupleOf:
                 return f(*(PyTupleOfInstance*)obj);
-             case Type::TypeCategory::catPointerTo:
+            case Type::TypeCategory::catPointerTo:
                  return f(*(PyPointerToInstance*)obj);
             case Type::TypeCategory::catListOf:
                 return f(*(PyListOfInstance*)obj);
@@ -86,20 +87,95 @@ public:
                 return f(*(PyAlternativeInstance*)obj);
             case Type::TypeCategory::catConcreteAlternative:
                 return f(*(PyConcreteAlternativeInstance*)obj);
-            // case catPythonSubclass:
-            //     return f(*(PythonSubclass*)obj);
-            // case catPythonObjectOfType:
-            //     return f(*(PythonObjectOfType*)obj);
-            // case catClass:
-            //     return f(*(Class*)obj);
-            // case catHeldClass:
-            //     return f(*(HeldClass*)obj);
-            // case catFunction:
-            //     return f(*(Function*)obj);
-            // case catBoundMethod:
-            //     return f(*(BoundMethod*)obj);
-            // case catForward:
-            //     return f(*(Forward*)obj);
+            case Type::TypeCategory::catPythonSubclass:
+                return f(*(PyPythonSubclassInstance*)obj);
+            case Type::TypeCategory::catPythonObjectOfType:
+                return f(*(PyPythonObjectOfTypeInstance*)obj);
+            case Type::TypeCategory::catClass:
+                return f(*(PyClassInstance*)obj);
+            case Type::TypeCategory::catHeldClass:
+                return f(*(PyHeldClassInstance*)obj);
+            case Type::TypeCategory::catFunction:
+                return f(*(PyFunctionInstance*)obj);
+            case Type::TypeCategory::catBoundMethod:
+                return f(*(PyBoundMethodInstance*)obj);
+            case Type::TypeCategory::catNone:
+            case Type::TypeCategory::catInt64:
+            case Type::TypeCategory::catFloat64:
+            case Type::TypeCategory::catString:
+            case Type::TypeCategory::catBytes:
+            case Type::TypeCategory::catOneOf:
+                throw std::runtime_error("No python object should ever have this type.");
+            default:
+                throw std::runtime_error("Invalid type category. Memory must have been corrupted.");
+        }
+    }
+
+    //Calls 'f' with a reference to a non-valid instance of a PyInstance subclass. Clients
+    //can use decltype to extract the actual type and dispatch using that
+    template<class T>
+    static auto specializeStatic(Type::TypeCategory category, const T& f) {
+        switch (category) {
+            case Type::TypeCategory::catBool:
+                return f((PyRegisterTypeInstance<bool>*)nullptr);
+            case Type::TypeCategory::catUInt8:
+                return f((PyRegisterTypeInstance<uint8_t>*)nullptr);
+            case Type::TypeCategory::catUInt16:
+                return f((PyRegisterTypeInstance<uint16_t>*)nullptr);
+            case Type::TypeCategory::catUInt32:
+                return f((PyRegisterTypeInstance<uint32_t>*)nullptr);
+            case Type::TypeCategory::catUInt64:
+                return f((PyRegisterTypeInstance<uint64_t>*)nullptr);
+            case Type::TypeCategory::catInt8:
+                return f((PyRegisterTypeInstance<int8_t>*)nullptr);
+            case Type::TypeCategory::catInt16:
+                return f((PyRegisterTypeInstance<int16_t>*)nullptr);
+            case Type::TypeCategory::catInt32:
+                return f((PyRegisterTypeInstance<int32_t>*)nullptr);
+            case Type::TypeCategory::catFloat32:
+                return f((PyRegisterTypeInstance<float>*)nullptr);
+            case Type::TypeCategory::catInt64:
+                return f((PyRegisterTypeInstance<int64_t>*)nullptr);
+            case Type::TypeCategory::catFloat64:
+                return f((PyRegisterTypeInstance<double>*)nullptr);
+            case Type::TypeCategory::catValue:
+               return f((PyValueInstance*)nullptr);
+            case Type::TypeCategory::catTupleOf:
+                return f((PyTupleOfInstance*)nullptr);
+            case Type::TypeCategory::catPointerTo:
+                 return f((PyPointerToInstance*)nullptr);
+            case Type::TypeCategory::catListOf:
+                return f((PyListOfInstance*)nullptr);
+            case Type::TypeCategory::catNamedTuple:
+                return f((PyNamedTupleInstance*)nullptr);
+            case Type::TypeCategory::catTuple:
+                return f((PyTupleInstance*)nullptr);
+            case Type::TypeCategory::catConstDict:
+                return f((PyConstDictInstance*)nullptr);
+            case Type::TypeCategory::catAlternative:
+                return f((PyAlternativeInstance*)nullptr);
+            case Type::TypeCategory::catConcreteAlternative:
+                return f((PyConcreteAlternativeInstance*)nullptr);
+            case Type::TypeCategory::catPythonSubclass:
+                return f((PyPythonSubclassInstance*)nullptr);
+            case Type::TypeCategory::catPythonObjectOfType:
+                return f((PyPythonObjectOfTypeInstance*)nullptr);
+            case Type::TypeCategory::catClass:
+                return f((PyClassInstance*)nullptr);
+            case Type::TypeCategory::catHeldClass:
+                return f((PyHeldClassInstance*)nullptr);
+            case Type::TypeCategory::catFunction:
+                return f((PyFunctionInstance*)nullptr);
+            case Type::TypeCategory::catBoundMethod:
+                return f((PyBoundMethodInstance*)nullptr);
+            case Type::TypeCategory::catNone:
+                return f((PyNoneInstance*)nullptr);
+            case Type::TypeCategory::catString:
+                return f((PyStringInstance*)nullptr);
+            case Type::TypeCategory::catBytes:
+                return f((PyBytesInstance*)nullptr);
+            case Type::TypeCategory::catOneOf:
+                return f((PyOneOfInstance*)nullptr);
             default:
                 throw std::runtime_error("Invalid type category. Memory must have been corrupted.");
         }
@@ -200,6 +276,8 @@ public:
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation);
 
     static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
+
+    static void copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
 
     static void constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs);
 

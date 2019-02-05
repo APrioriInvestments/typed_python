@@ -114,7 +114,7 @@ void constructTupleOrListInst(TupleOrListOf* tupT, instance_ptr tgt, size_t coun
         );
 }
 
-void PyTupleOrListOfInstance::copyConstructFromPythonInstance(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation) {
+void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation) {
     if (PyArray_Check(pyRepresentation)) {
         if (!PyArray_ISBEHAVED_RO(pyRepresentation)) {
             throw std::logic_error("Can't convert a numpy array that's not contiguous and in machine-native byte order.");

@@ -20,6 +20,7 @@ compile the entire group all at once.
 #include "PyClassInstance.cpp"
 #include "PyAlternativeInstance.cpp"
 #include "PyFunctionInstance.cpp"
+#include "PyBoundMethodInstance.cpp"
 
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"

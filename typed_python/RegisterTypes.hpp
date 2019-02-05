@@ -69,6 +69,9 @@ public:
     void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write_bytes(self, m_size);
     }
+
+
+
 };
 
 class Bool : public RegisterType<bool> {

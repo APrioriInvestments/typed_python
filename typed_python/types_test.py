@@ -1291,3 +1291,4 @@ class NativeTypesTests(unittest.TestCase):
                     ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
+

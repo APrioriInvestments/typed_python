@@ -4,6 +4,8 @@
 
 class PyPointerToInstance : public PyInstance {
 public:
+    typedef PointerTo modeled_type;
+
     PointerTo* type();
 
     static PyObject* pointerInitialize(PyObject* o, PyObject* args);

@@ -4,6 +4,8 @@
 
 class PyClassInstance : public PyInstance {
 public:
+    typedef Class modeled_type;
+
     Class* type();
 
     static void initializeClassWithDefaultArguments(Class* cls, uint8_t* data, PyObject* args, PyObject* kwargs);

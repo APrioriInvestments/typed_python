@@ -4,6 +4,8 @@
 
 class PyFunctionInstance : public PyInstance {
 public:
+    typedef Function modeled_type;
+
     Function* type();
 
     static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs);

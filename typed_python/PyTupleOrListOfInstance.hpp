@@ -4,6 +4,8 @@
 
 class PyTupleOrListOfInstance : public PyInstance {
 public:
+    typedef TupleOrListOf modeled_type;
+
     TupleOrListOf* type();
 
     PyObject* sq_concat_concrete(PyObject* rhs);
@@ -14,13 +16,15 @@ public:
 
     PyObject* mp_subscript_concrete(PyObject* item);
 
-    static void copyConstructFromPythonInstance(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation);
+    static void copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation);
 
     static PyObject* toArray(PyObject* o, PyObject* args);
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {
 public:
+    typedef ListOf modeled_type;
+
     ListOf* type();
 
     static PyObject* listAppend(PyObject* o, PyObject* args);
@@ -44,5 +48,7 @@ public:
 
 class PyTupleOfInstance : public PyTupleOrListOfInstance {
 public:
+    typedef TupleOf modeled_type;
+
     TupleOf* type();
 };
