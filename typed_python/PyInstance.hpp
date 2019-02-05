@@ -12,7 +12,6 @@ struct NativeTypeWrapper {
 class InternalPyException {};
 
 //throw to indicate we set a python error already.
-class PythonExceptionSet {};
 class PyClassInstance;
 class PyHeldClassInstance;
 class PyListOfInstance;
@@ -294,13 +293,11 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep);
 
+    PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep);
+
     static PyObject* nb_add(PyObject* lhs, PyObject* rhs);
 
     static PyObject* nb_subtract(PyObject* lhs, PyObject* rhs);
-
-    static PyObject* sq_concat(PyObject* lhs, PyObject* rhs);
-
-    PyObject* sq_concat_concrete(PyObject* rhs);
 
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix);
 

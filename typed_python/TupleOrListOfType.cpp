@@ -188,6 +188,17 @@ void TupleOrListOf::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
+void TupleOrListOf::reserve(instance_ptr self, size_t target) {
+    layout_ptr& self_layout = *(layout_ptr*)self;
+
+    if (target < self_layout->count) {
+        target = self_layout->count;
+    }
+
+    self_layout->data = (uint8_t*)realloc(self_layout->data, getEltType()->bytecount() * target);
+    self_layout->reserved = target;
+}
+
 
 //static
 void ListOf::copyListObject(instance_ptr target, instance_ptr src) {
@@ -231,17 +242,6 @@ size_t ListOf::reserved(instance_ptr self) {
 
     return self_layout->reserved;
 }
-void ListOf::reserve(instance_ptr self, size_t target) {
-    layout_ptr& self_layout = *(layout_ptr*)self;
-
-    if (target < self_layout->count) {
-        target = self_layout->count;
-    }
-
-    self_layout->data = (uint8_t*)realloc(self_layout->data, getEltType()->bytecount() * target);
-    self_layout->reserved = target;
-}
-
 void ListOf::remove(instance_ptr self, size_t index) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 

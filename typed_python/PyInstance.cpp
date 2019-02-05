@@ -90,7 +90,7 @@ PyMethodDef* PyInstance::typeMethods(Type* t) {
     }
 
     if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        return new PyMethodDef [2] {
+        return new PyMethodDef [3] {
             {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
             {NULL, NULL}
         };
@@ -490,9 +490,18 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 }
 
 PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep) {
-    return specializeForType(lhs, [&](auto& subtype) {
-        return subtype.pyOperatorConcrete(rhs, op, opErrRep);
-    });
+    if (extractTypeFrom(lhs->ob_type)) {
+        return specializeForType(lhs, [&](auto& subtype) {
+            return subtype.pyOperatorConcrete(rhs, op, opErrRep);
+        });
+    }
+
+    if (extractTypeFrom(rhs->ob_type)) {
+        return specializeForType(rhs, [&](auto& subtype) {
+            return subtype.pyOperatorConcreteReverse(lhs, op, opErrRep);
+        });
+    }
+
 }
 
 PyObject* PyInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep) {
@@ -502,6 +511,19 @@ PyObject* PyInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const ch
         opErrRep,
         ((PyObject*)this)->ob_type,
         rhs->ob_type,
+        NULL
+        );
+
+    return NULL;
+}
+
+PyObject* PyInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep) {
+    PyErr_Format(
+        PyExc_TypeError,
+        "Unsupported operand type(s) for %s: %S and %S",
+        opErrRep,
+        lhs->ob_type,
+        ((PyObject*)this)->ob_type,
         NULL
         );
 
@@ -521,18 +543,6 @@ PyObject* PyInstance::nb_add(PyObject* lhs, PyObject* rhs) {
 // static
 PyObject* PyInstance::nb_subtract(PyObject* lhs, PyObject* rhs) {
     return pyOperator(lhs, rhs, "__sub__", "-");
-}
-
-// static
-PyObject* PyInstance::sq_concat(PyObject* lhs, PyObject* rhs) {
-    return specializeForType(lhs, [&](auto& subtype) {
-        return subtype.sq_concat_concrete(rhs);
-    });
-}
-
-PyObject* PyInstance::sq_concat_concrete(PyObject* rhs) {
-    PyErr_Format(PyExc_TypeError, "Can't concatenate instances of type '%s' and '%S'", type()->name().c_str(), rhs->ob_type);
-    throw PythonExceptionSet();
 }
 
 // static
@@ -575,8 +585,6 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
             res->sq_item = (ssizeargfunc)PyInstance::sq_item;
         }
 
-        res->sq_concat = PyInstance::sq_concat;
-
         return res;
     }
 
@@ -588,10 +596,7 @@ PyNumberMethods* PyInstance::numberMethods(Type* t) {
     return new PyNumberMethods {
             //only enable this for the types that it operates on. Otherwise it disables the concatenation functions
             //we should probably just unify them
-            t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative ||
-                t->getTypeCategory() == Type::TypeCategory::catAlternative ||
-                t->getTypeCategory() == Type::TypeCategory::catPointerTo
-                ? nb_add : 0, //binaryfunc nb_add
+            nb_add, //binaryfunc nb_add
             nb_subtract, //binaryfunc nb_subtract
             0, //binaryfunc nb_multiply
             0, //binaryfunc nb_remainder
@@ -691,7 +696,8 @@ PyMappingMethods* PyInstance::mappingMethods(Type* t) {
 
     if (t->getTypeCategory() == Type::TypeCategory::catConstDict ||
         t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
-        t->getTypeCategory() == Type::TypeCategory::catListOf) {
+        t->getTypeCategory() == Type::TypeCategory::catListOf ||
+        t->getTypeCategory() == Type::TypeCategory::catClass) {
         return res;
     }
 
@@ -1319,9 +1325,19 @@ PyObject* PyInstance::tp_richcompare(PyObject *a, PyObject *b, int op) {
     Type* own = extractTypeFrom(a->ob_type);
     Type* other = extractTypeFrom(b->ob_type);
 
+    if (!own && !other) {
+        PyErr_Format(PyExc_TypeError, "Can't call tp_richcompare where neither object is a typed_python object!");
+        return NULL;
+    }
 
-    if (!other) {
-        char cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false);
+    if (!own || !other) {
+        char cmp;
+
+        if (own) {
+            cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false);
+        } else {
+            cmp = -compare_to_python(other, ((PyInstance*)b)->dataPtr(), a, false);
+        }
 
         PyObject* res;
         if (op == Py_EQ) {

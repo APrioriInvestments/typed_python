@@ -8,8 +8,6 @@ public:
 
     TupleOrListOf* type();
 
-    PyObject* sq_concat_concrete(PyObject* rhs);
-
     PyObject* sq_item_concrete(Py_ssize_t ix);
 
     Py_ssize_t mp_and_sq_length_concrete();
@@ -18,11 +16,17 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation);
 
+    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    PyObject* pyOperatorAdd(PyObject* rhs, const char* op, const char* opErr, bool reversed);
+
+    PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep);
+
     static PyObject* toArray(PyObject* o, PyObject* args);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
-        return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
-    }
+    static PyObject* rAdd(PyObject* o, PyObject* args);
+
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation);
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {

@@ -8,8 +8,6 @@ public:
 
     ConstDict* type();
 
-    PyObject* sq_concat_concrete(PyObject* rhs);
-
     PyObject* tp_iter_concrete();
 
     PyObject* tp_iternext_concrete();

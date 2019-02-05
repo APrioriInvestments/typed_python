@@ -102,6 +102,7 @@ char ConstDict::cmp(instance_ptr left, instance_ptr right) {
     }
 
     int ct = count(left);
+
     for (long k = 0; k < ct; k++) {
         char res = m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k));
         if (res) {

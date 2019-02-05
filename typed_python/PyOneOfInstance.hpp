@@ -15,6 +15,8 @@ public:
                     copyConstructFromPythonInstance(subtype, tgt+1, pyRepresentation);
                     *(uint8_t*)tgt = k;
                     return;
+                } catch(PythonExceptionSet& e) {
+                    PyErr_Clear();
                 } catch(...) {
                 }
             }

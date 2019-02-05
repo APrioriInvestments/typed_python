@@ -12,24 +12,59 @@ ListOf* PyListOfInstance::type() {
     return (ListOf*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-PyObject* PyTupleOrListOfInstance::sq_concat_concrete(PyObject* rhs) {
+bool PyTupleOrListOfInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    return
+        PyTuple_Check(pyRepresentation) ||
+        PyList_Check(pyRepresentation) ||
+        PyDict_Check(pyRepresentation) ||
+        PyIter_Check(pyRepresentation)
+        ;
+}
+
+PyObject* PyTupleOrListOfInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep) {
+    if (strcmp(op, "__add__") == 0) {
+        return pyOperatorAdd(lhs, op, opErrRep, true);
+    }
+
+    return PyInstance::pyOperatorConcreteReverse(lhs, op, opErrRep);
+}
+
+PyObject* PyTupleOrListOfInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
+    if (strcmp(op, "__add__") == 0) {
+        return pyOperatorAdd(rhs, op, opErr, false);
+    }
+
+    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
+}
+
+PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, const char* opErr, bool reversed) {
     Type* rhs_type = extractTypeFrom(rhs->ob_type);
 
     //TupleOrListOf(X) + TupleOrListOf(X) fastpath
     if (type() == rhs_type) {
-        PyTupleOrListOfInstance* w_rhs = (PyTupleOrListOfInstance*)rhs;
+        PyTupleOrListOfInstance* w_lhs;
+        PyTupleOrListOfInstance* w_rhs;
+
+        if (reversed) {
+            w_lhs = (PyTupleOrListOfInstance*)rhs;
+            w_rhs = (PyTupleOrListOfInstance*)this;
+        } else {
+            w_lhs = (PyTupleOrListOfInstance*)this;
+            w_rhs = (PyTupleOrListOfInstance*)rhs;
+        }
 
         Type* eltType = type()->getEltType();
 
         return PyInstance::initialize(type(), [&](instance_ptr data) {
-            int count_lhs = type()->count(dataPtr());
+            int count_lhs = type()->count(w_lhs->dataPtr());
             int count_rhs = type()->count(w_rhs->dataPtr());
 
             type()->constructor(data, count_lhs + count_rhs,
                 [&](uint8_t* eltPtr, int64_t k) {
                     eltType->copy_constructor(
                         eltPtr,
-                        k < count_lhs ? type()->eltPtr(dataPtr(), k) :
+                        k < count_lhs ?
+                            type()->eltPtr(w_lhs->dataPtr(), k) :
                             type()->eltPtr(w_rhs->dataPtr(), k - count_lhs)
                         );
                     }
@@ -47,13 +82,13 @@ PyObject* PyTupleOrListOfInstance::sq_concat_concrete(PyObject* rhs) {
 
             type()->constructor(data, count_lhs + count_rhs,
                 [&](uint8_t* eltPtr, int64_t k) {
-                    if (k < count_lhs) {
+                    if (!reversed && k < count_lhs || reversed && k >= count_rhs) {
                         eltType->copy_constructor(
                             eltPtr,
-                            type()->eltPtr(dataPtr(), k)
+                            type()->eltPtr(dataPtr(), reversed ? k - count_rhs : k)
                             );
                     } else {
-                        PyObject* kval = PyLong_FromLong(k - count_lhs);
+                        PyObject* kval = PyLong_FromLong(reversed ? k : k - count_lhs);
                         PyObject* o = PyObject_GetItem(rhs, kval);
                         Py_DECREF(kval);
 
@@ -82,6 +117,7 @@ PyObject* PyTupleOrListOfInstance::sq_concat_concrete(PyObject* rhs) {
 
     return NULL;
 }
+
 
 //static
 PyObject* PyListOfInstance::listSetSizeUnsafe(PyObject* o, PyObject* args) {
@@ -203,23 +239,56 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
             return;
         }
 
-        PyObject *iterator = PyObject_GetIter(pyRepresentation);
+        PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
 
         tupT->constructor(tgt, PySet_Size(pyRepresentation),
             [&](uint8_t* eltPtr, int64_t k) {
-                PyObject* item = PyIter_Next(iterator);
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item);
-                Py_DECREF(item);
-                }
-            );
+                PyObjectStealer item(PyIter_Next(iterator));
 
-        Py_DECREF(iterator);
+                if (!item) {
+                    throw std::logic_error("Set ran out of elements.");
+                }
+
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item);
+            });
+
+        return;
+    }
+
+    if (PyIter_Check(pyRepresentation)) {
+        PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
+
+        if (!iterator) {
+            throw PythonExceptionSet();
+        }
+
+        tupT->constructorUnbounded(tgt,
+            [&](uint8_t* eltPtr, int64_t k) {
+                PyObjectStealer item(PyIter_Next(iterator));
+
+                if (!item) {
+                    if (PyErr_Occurred()) {
+                        throw PythonExceptionSet();
+                    }
+
+                    return false;
+                }
+
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item);
+
+                return true;
+            });
 
         return;
     }
 
     throw std::logic_error("Couldn't initialize internal elt of type " + tupT->name()
             + " with a " + pyRepresentation->ob_type->tp_name);
+}
+
+PyObject* PyTupleOrListOfInstance::rAdd(PyObject* o, PyObject* args) {
+    PyErr_Format(PyExc_TypeError, "boo!");
+    return NULL;
 }
 
 PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {

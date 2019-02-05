@@ -15,4 +15,10 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
+
+    PyObject* mp_subscript_concrete(PyObject* item);
+
+    Py_ssize_t mp_and_sq_length_concrete();
+
+    std::pair<bool, PyObject*> callMemberFunction(const char* name, PyObject* arg=nullptr);
 };

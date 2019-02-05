@@ -1093,6 +1093,7 @@ class NativeTypesTests(unittest.TestCase):
 
                 self.assertTrue(type(v2) is type(v))
                 self.assertEqual(ser,ser2)
+                self.assertEqual(str(v), str(v2))
                 self.assertEqual(v, v2)
 
     def test_serialize_doesnt_leak(self):
@@ -1291,4 +1292,30 @@ class NativeTypesTests(unittest.TestCase):
                     ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
+
+    def test_list_of_equality(self):
+        x = ListOf(int)([1,2,3,4])
+        y = ListOf(int)([1,2,3,5])
+
+        self.assertEqual(x,x)
+        self.assertNotEqual(x,y)
+
+    def test_tuple_r_add(self):
+        self.assertEqual(
+            (1,2,4,5,6) + TupleOf(int)([1,2]),
+            (1,2,4,5,6,1,2)
+            )
+
+        self.assertEqual(
+            [1,2,4,5,6] + TupleOf(int)([1,2]),
+            (1,2,4,5,6,1,2)
+            )
+
+        with self.assertRaises(TypeError):
+            [1,2,"hi",5,6] + TupleOf(int)([1,2])
+
+    def test_tuple_r_cmp(self):
+        self.assertEqual(
+            (1,2,3), TupleOf(int)([1,2,3])
+            )
 

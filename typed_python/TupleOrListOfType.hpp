@@ -124,6 +124,46 @@ public:
             }
         }
     }
+    //construct a new list at 'selfPtr'. We call 'allocator(target_object, k)' repeatedly.
+    //we stop when it returns 'false'
+    template<class sub_constructor>
+    void constructorUnbounded(instance_ptr selfPtr, const sub_constructor& allocator) {
+        layout_ptr& self = *(layout_ptr*)selfPtr;
+
+        self = (layout*)malloc(sizeof(layout));
+
+        self->count = 0;
+        self->refcount = 1;
+        self->reserved = 1;
+        self->hash_cache = -1;
+        self->data = (uint8_t*)malloc(getEltType()->bytecount() * self->reserved);
+
+        while(true) {
+            try {
+                if (!allocator(eltPtr(self, self->count), self->count)) {
+                    if (m_is_tuple && self->count == 0) {
+                        //tuples need to be the nullptr
+                        free(self->data);
+                        free(self);
+                        self = nullptr;
+                    }
+                    return;
+                }
+
+                self->count++;
+                if (self->count >= self->reserved) {
+                    reserve(selfPtr, self->reserved * 1.25 + 1);
+                }
+            } catch(...) {
+                for (long k2 = (long)self->count-1; k2 >= 0; k2--) {
+                    m_element_type->destroy(eltPtr(self,k2));
+                }
+                free(self->data);
+                free(self);
+                throw;
+            }
+        }
+    }
 
     void constructor(instance_ptr self);
 
@@ -132,6 +172,8 @@ public:
     void copy_constructor(instance_ptr self, instance_ptr other);
 
     void assign(instance_ptr self, instance_ptr other);
+
+    void reserve(instance_ptr self, size_t count);
 
 protected:
     Type* m_element_type;
@@ -152,8 +194,6 @@ public:
     void append(instance_ptr self, instance_ptr other);
 
     size_t reserved(instance_ptr self);
-
-    void reserve(instance_ptr self, size_t count);
 
     void remove(instance_ptr self, size_t count);
 

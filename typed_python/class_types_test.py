@@ -428,4 +428,36 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(x.f(NormalPyClass()), "NormalPyClass")
         self.assertEqual(x.f(10), "object")
 
+    def test_class_with_getitem(self):
+        class WithGetitem(Class):
+            def __getitem__(self, x:int):
+                return "Int"
+
+            def __getitem__(self, x:str):
+                return "Str"
+
+        self.assertEqual(WithGetitem()[0], "Int")
+        self.assertEqual(WithGetitem()["hi"], "Str")
+
+        with self.assertRaises(TypeError):
+            WithGetitem()[1.2]
+
+    def test_class_with_len(self):
+        class WithLen(Class):
+            x = Member(int)
+
+            def __init__(self, x):
+                self.x = x
+
+            def __len__(self):
+                return self.x
+
+        self.assertEqual(len(WithLen(10)), 10)
+        self.assertEqual(len(WithLen(0)), 0)
+
+        with self.assertRaises(ValueError):
+            len(WithLen(-1))
+
+        with self.assertRaises(ValueError):
+            len(WithLen(-2))
 
