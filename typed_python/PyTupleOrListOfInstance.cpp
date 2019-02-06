@@ -438,6 +438,8 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
+    }catch(PythonExceptionSet& e) {
+        return NULL;
     }
 }
 
@@ -530,6 +532,8 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
         return incref(Py_None);
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
         return NULL;
     }
 }

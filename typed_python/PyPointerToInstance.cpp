@@ -31,6 +31,8 @@ PyObject* PyPointerToInstance::pointerInitialize(PyObject* o, PyObject* args) {
         } catch(std::exception& e) {
             PyErr_SetString(PyExc_TypeError, e.what());
             return NULL;
+        } catch(PythonExceptionSet& e) {
+            return NULL;
         }
     }
 }
@@ -53,6 +55,8 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
     } catch(std::exception& e) {
         free(tempObj);
         PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
         return NULL;
     }
 

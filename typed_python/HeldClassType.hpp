@@ -10,12 +10,14 @@ public:
           const std::vector<std::tuple<std::string, Type*, Instance> >& members,
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
+          const std::map<std::string, Function*>& propertyFunctions,
           const std::map<std::string, PyObject*>& classMembers
           ) :
             Type(catHeldClass),
             m_members(members),
             m_memberFunctions(memberFunctions),
             m_staticFunctions(staticFunctions),
+            m_propertyFunctions(propertyFunctions),
             m_classMembers(classMembers),
             m_hasComparisonOperators(false)
     {
@@ -64,10 +66,11 @@ public:
             const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
+            const std::map<std::string, Function*>& propertyFunctions,
             const std::map<std::string, PyObject*>& classMembers
             )
     {
-        return new HeldClass(inName, members, memberFunctions, staticFunctions, classMembers);
+        return new HeldClass(inName, members, memberFunctions, staticFunctions, propertyFunctions, classMembers);
     }
 
     HeldClass* renamed(std::string newName) {
@@ -75,6 +78,7 @@ public:
             m_members,
             m_memberFunctions,
             m_staticFunctions,
+            m_propertyFunctions,
             m_classMembers
             );
     }
@@ -187,6 +191,10 @@ public:
         return m_classMembers;
     }
 
+    const std::map<std::string, Function*>& getPropertyFunctions() const {
+        return m_propertyFunctions;
+    }
+
     const std::vector<size_t>& getOffsets() const {
         return m_byte_offsets;
     }
@@ -204,6 +212,7 @@ private:
 
     std::map<std::string, Function*> m_memberFunctions;
     std::map<std::string, Function*> m_staticFunctions;
+    std::map<std::string, Function*> m_propertyFunctions;
     std::map<std::string, PyObject*> m_classMembers;
 
     bool m_hasComparisonOperators;

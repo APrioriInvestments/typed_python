@@ -43,10 +43,11 @@ public:
             const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
+            const std::map<std::string, Function*>& propertyFunctions,
             const std::map<std::string, PyObject*>& classMembers
             )
     {
-        return new Class(HeldClass::Make(inName, members, memberFunctions, staticFunctions, classMembers));
+        return new Class(HeldClass::Make(inName, members, memberFunctions, staticFunctions, propertyFunctions, classMembers));
     }
 
     Class* renamed(std::string newName) {
@@ -130,6 +131,10 @@ public:
 
     const std::map<std::string, PyObject*>& getClassMembers() const {
         return m_heldClass->getClassMembers();
+    }
+
+    const std::map<std::string, Function*>& getPropertyFunctions() const {
+        return m_heldClass->getPropertyFunctions();
     }
 
     int memberNamed(const char* c) const {

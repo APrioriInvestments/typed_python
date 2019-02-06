@@ -149,11 +149,14 @@ class ClassMetaclass(type):
         memberFunctions = {}
         staticFunctions = {}
         classMembers = []
+        properties = {}
 
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
                 members.append((eltName, elt._type, elt._default_value))
                 classMembers.append((eltName, elt))
+            elif isinstance(elt, property):
+                properties[eltName] = makeFunction(eltName, elt.fget)
             elif isinstance(elt, staticmethod):
                 if eltName not in staticFunctions:
                     staticFunctions[eltName] = makeFunction(eltName, elt.__func__)
@@ -172,6 +175,7 @@ class ClassMetaclass(type):
             tuple(members),
             tuple(memberFunctions.items()),
             tuple(staticFunctions.items()),
+            tuple(properties.items()),
             tuple(classMembers)
             )
         return actualClass

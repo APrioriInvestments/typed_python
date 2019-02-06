@@ -26,7 +26,13 @@ bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyCompar
     PyObject* l = *(PyObject**)left;
     PyObject* r = *(PyObject**)right;
 
-    return PyObject_RichCompareBool(l, r, pyComparisonOp);
+    int res = PyObject_RichCompareBool(l, r, pyComparisonOp);
+
+    if (res == -1) {
+        throw PythonExceptionSet();
+    }
+
+    return res;
 }
 
 // static

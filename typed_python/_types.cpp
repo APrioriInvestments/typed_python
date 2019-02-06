@@ -515,7 +515,7 @@ Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
 }
 
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
-    int expected_args = 5;
+    int expected_args = 6;
     if (PyTuple_Size(args) != expected_args) {
         PyErr_Format(PyExc_TypeError, "Class takes %S arguments", expected_args);
         return NULL;
@@ -533,7 +533,8 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     PyObject* memberTuple = PyTuple_GetItem(args,1);
     PyObject* memberFunctionTuple = PyTuple_GetItem(args,2);
     PyObject* staticFunctionTuple = PyTuple_GetItem(args,3);
-    PyObject* classMemberTuple = PyTuple_GetItem(args,4);
+    PyObject* propertyFunctionTuple = PyTuple_GetItem(args,4);
+    PyObject* classMemberTuple = PyTuple_GetItem(args,5);
 
     if (!PyTuple_Check(memberTuple)) {
         PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, member_type) in the second argument");
@@ -550,14 +551,20 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    if (!PyTuple_Check(classMemberTuple)) {
+    if (!PyTuple_Check(propertyFunctionTuple)) {
         PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the fifth argument");
+        return NULL;
+    }
+
+    if (!PyTuple_Check(classMemberTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the sixth argument");
         return NULL;
     }
 
     std::vector<std::tuple<std::string, Type*, Instance> > members;
     std::vector<std::pair<std::string, Type*> > memberFunctions;
     std::vector<std::pair<std::string, Type*> > staticFunctions;
+    std::vector<std::pair<std::string, Type*> > propertyFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;
 
     if (!unpackTupleToStringTypesAndValues(memberTuple, members)) {
@@ -569,12 +576,16 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     if (!unpackTupleToStringAndTypes(staticFunctionTuple, staticFunctions)) {
         return NULL;
     }
+    if (!unpackTupleToStringAndTypes(propertyFunctionTuple, propertyFunctions)) {
+        return NULL;
+    }
     if (!unpackTupleToStringAndObjects(classMemberTuple, classMembers)) {
         return NULL;
     }
 
     std::map<std::string, Function*> memberFuncs;
     std::map<std::string, Function*> staticFuncs;
+    std::map<std::string, Function*> propertyFuncs;
 
     for (auto mf: memberFunctions) {
         if (mf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
@@ -587,6 +598,18 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
             return NULL;
         }
         memberFuncs[mf.first] = (Function*)mf.second;
+    }
+    for (auto pf: propertyFunctions) {
+        if (pf.second->getTypeCategory() != Type::TypeCategory::catFunction) {
+            PyErr_Format(PyExc_TypeError, "Class member %s is not a function.", pf.first.c_str());
+            return NULL;
+        }
+        if (propertyFuncs.find(pf.first) != propertyFuncs.end()) {
+            PyErr_Format(PyExc_TypeError, "Class member %s repeated. This should have"
+                                    " been compressed as an overload.", pf.first.c_str());
+            return NULL;
+        }
+        propertyFuncs[pf.first] = (Function*)pf.second;
     }
 
     for (auto mf: staticFunctions) {
@@ -609,7 +632,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
     }
 
     PyObject* typeObj = (PyObject*)PyInstance::typeObj(
-        Class::Make(name, members, memberFuncs, staticFuncs, clsMembers)
+        Class::Make(name, members, memberFuncs, staticFuncs, propertyFuncs, clsMembers)
         );
 
     Py_INCREF(typeObj);

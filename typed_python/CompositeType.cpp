@@ -38,6 +38,20 @@ void CompositeType::_forwardTypesMayHaveChanged() {
 }
 
 bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    if (pyComparisonOp == Py_NE) {
+        return !cmp(left, right, Py_EQ);
+    }
+
+    if (pyComparisonOp == Py_EQ) {
+        for (long k = 0; k < m_types.size(); k++) {
+            if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     for (long k = 0; k < m_types.size(); k++) {
         if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE)) {
             if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_LT)) {

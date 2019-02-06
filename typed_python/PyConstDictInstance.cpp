@@ -117,6 +117,8 @@ PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
                 }
 
                 return extractPythonObject(i, self_w->type()->valueType());
+            } catch(PythonExceptionSet& e) {
+                return NULL;
             } catch(std::exception& e) {
                 PyErr_SetString(PyExc_TypeError, e.what());
                 return NULL;

@@ -1383,3 +1383,14 @@ class NativeTypesTests(unittest.TestCase):
                     #  numpy.int16(numpy.float64(10000000000))
                     pass
 
+
+    def test_comparing_arbitrary_objects(self):
+        x = TupleOf(object)(["a"])
+        y = TupleOf(object)([1])
+
+        with self.assertRaises(TypeError):
+            x < y
+
+        self.assertEqual(x,x)
+        self.assertEqual(y,y)
+        self.assertNotEqual(x,y)

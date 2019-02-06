@@ -80,7 +80,26 @@ bool TupleOrListOf::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
+    if (pyComparisonOp == Py_NE) {
+        return !cmp(left, right, Py_EQ);
+    }
+
     size_t bytesPer = m_element_type->bytecount();
+
+    if (pyComparisonOp == Py_EQ) {
+        if (left_layout.count != right_layout.count) {
+            return false;
+        }
+
+        for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
+            if (m_element_type->cmp(left_layout.data + bytesPer * k,
+                                           right_layout.data + bytesPer * k, Py_NE)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
         if (m_element_type->cmp(left_layout.data + bytesPer * k,

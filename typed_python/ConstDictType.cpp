@@ -90,6 +90,11 @@ int32_t ConstDict::hash32(instance_ptr left) {
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
 bool ConstDict::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    if (pyComparisonOp == Py_NE) {
+        return !cmp(left, right, Py_EQ);
+    }
+
+
     if (size(left) < size(right)) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
@@ -103,25 +108,36 @@ bool ConstDict::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
 
     int ct = count(left);
 
-    for (long k = 0; k < ct; k++) {
-        if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE)) {
-            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_LT)) {
-                return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+    if (pyComparisonOp == Py_EQ) {
+        for (long k = 0; k < ct; k++) {
+            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE) ||
+                    m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
+                return true;
             }
-            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
-    }
 
-    for (long k = 0; k < ct; k++) {
-        if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
-            if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT)) {
-                return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        return true;
+    } else {
+        for (long k = 0; k < ct; k++) {
+            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE)) {
+                if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_LT)) {
+                    return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+                }
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
             }
-            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
-    }
 
-    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+        for (long k = 0; k < ct; k++) {
+            if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
+                if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT)) {
+                    return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+                }
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+            }
+        }
+
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+    }
 }
 
 void ConstDict::addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {

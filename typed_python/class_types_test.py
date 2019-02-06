@@ -698,6 +698,25 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(repr(ClassWithReprAndStr()), "repr")
         self.assertEqual(str(ClassWithReprAndStr()), "str")
 
+    def test_missing_inplace_operators_fall_back(self):
+        class ClassWithoutInplaceOp(Class):
+            def __add__(self, other):
+                return "worked"
 
+        c = ClassWithoutInplaceOp()
+        c += 10
 
+        self.assertEqual(c, "worked")
 
+    def test_class_with_property(self):
+        class ClassWithProperty(Class):
+            _x = Member(int)
+
+            def __init__(self, x):
+                self._x = x
+
+            @property
+            def x(self):
+                return self._x + 1
+
+        self.assertEqual(ClassWithProperty(10).x, 11)

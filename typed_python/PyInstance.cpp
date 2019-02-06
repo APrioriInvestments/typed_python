@@ -30,6 +30,8 @@ bool PyInstance::guaranteeForwardsResolved(Type* t) {
     try {
         guaranteeForwardsResolvedOrThrow(t);
         return true;
+    } catch(PythonExceptionSet& e) {
+        return false;
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return false;
@@ -255,13 +257,13 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
             });
 
             return (PyObject*)self;
+        } catch(PythonExceptionSet& e) {
+            subtype->tp_dealloc((PyObject*)self);
+            return NULL;
         } catch(std::exception& e) {
             subtype->tp_dealloc((PyObject*)self);
 
             PyErr_SetString(PyExc_TypeError, e.what());
-            return NULL;
-        } catch(PythonExceptionSet& e) {
-            subtype->tp_dealloc((PyObject*)self);
             return NULL;
         }
 
@@ -336,64 +338,19 @@ PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* 
 }
 
 PyObject* PyInstance::pyUnaryOperatorConcrete(const char* op, const char* opErrRep) {
-    PyErr_Format(
-        PyExc_TypeError,
-        "bad operand type for unary %s: '%S'",
-        opErrRep,
-        ((PyObject*)this)->ob_type
-        );
-
-    return NULL;
+    return incref(Py_NotImplemented);
 }
 
-
 PyObject* PyInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep) {
-    PyErr_Format(
-        PyExc_TypeError,
-        "Unsupported operand type(s) for %s: %S and %S",
-        opErrRep,
-        ((PyObject*)this)->ob_type,
-        rhs->ob_type,
-        NULL
-        );
-
-    return NULL;
+    return incref(Py_NotImplemented);
 }
 
 PyObject* PyInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep) {
-    PyErr_Format(
-        PyExc_TypeError,
-        "Unsupported operand type(s) for %s: %S and %S",
-        opErrRep,
-        lhs->ob_type,
-        ((PyObject*)this)->ob_type,
-        NULL
-        );
-
-    return NULL;
+    return incref(Py_NotImplemented);
 }
 
 PyObject* PyInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErrRep) {
-    if (third != Py_None) {
-        PyErr_Format(
-            PyExc_TypeError,
-            "unsupported operand type(s) for ** or pow() %s: '%S', '%S', '%S'",
-            opErrRep,
-            ((PyObject*)this)->ob_type,
-            ((PyObject*)rhs)->ob_type,
-            ((PyObject*)third)->ob_type
-            );
-    } else {
-        PyErr_Format(
-            PyExc_TypeError,
-            "unsupported operand type for pow() %s: '%S' and '%S'",
-            opErrRep,
-            ((PyObject*)this)->ob_type,
-            ((PyObject*)rhs)->ob_type
-            );
-    }
-
-    return NULL;
+    return incref(Py_NotImplemented);
 }
 
 PyObject* PyInstance::nb_inplace_add(PyObject* lhs, PyObject* rhs) {
@@ -1009,6 +966,7 @@ PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
 
     if (t->getTypeCategory() == Type::TypeCategory::catClass) {
         Class* nt = (Class*)t;
+
         for (long k = 0; k < nt->getMembers().size();k++) {
             if (nt->getMemberName(k) == attr_name) {
                 Type* eltType = nt->getMemberType(k);
@@ -1026,6 +984,23 @@ PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
                     nt->eltPtr(w->dataPtr(), k),
                     eltType
                     );
+            }
+        }
+
+        {
+            auto it = nt->getPropertyFunctions().find(attr_name);
+            if (it != nt->getPropertyFunctions().end()) {
+                std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(it->second, o);
+                if (res.first) {
+                    return res.second;
+                }
+
+                PyErr_Format(
+                    PyExc_TypeError,
+                    "Found a property for %s but failed to call it with 'self'",
+                    attr_name
+                    );
+                return NULL;
             }
         }
 
