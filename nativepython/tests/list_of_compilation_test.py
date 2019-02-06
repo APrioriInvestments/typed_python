@@ -252,6 +252,20 @@ class TestListOfCompilation(unittest.TestCase):
 
         self.assertEqual(aList, [2,4])
 
+    def test_list_of_oneOf(self):
+        T = ListOf(OneOf(None, float))
+        @Compiled
+        def f():
+            x = T()
+            x.resize(2)
+            x[0] = 10.0
+            x[1] = None
+            x.append(10.0)
+            x.append(None)
+            return x
+
+        self.assertEqual(f(), [10.0,None,10.0,None])
+
     def test_lists_add_perf(self):
         T = ListOf(int)
 
@@ -333,5 +347,4 @@ class TestListOfCompilation(unittest.TestCase):
         y = dupList(x)
         x[0] = 100
         self.assertEqual(y[0], 1)
-
 

@@ -347,6 +347,10 @@ class ListOfWrapper(TupleOrListOfWrapper):
             )
 
     def convert_setitem(self, context, expr, index, item):
+        item = item.convert_to_type(self.underlyingWrapperType)
+        if item is None:
+            return None
+
         expr.convert_getitem(index).convert_assign(item)
 
         return context.pushVoid()
