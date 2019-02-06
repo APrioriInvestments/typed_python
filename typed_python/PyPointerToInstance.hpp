@@ -8,6 +8,8 @@ public:
 
     PointerTo* type();
 
+    PyObject* sq_item_concrete(Py_ssize_t ix);
+
     static PyObject* pointerInitialize(PyObject* o, PyObject* args);
 
     static PyObject* pointerSet(PyObject* o, PyObject* args);

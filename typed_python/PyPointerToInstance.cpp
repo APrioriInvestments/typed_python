@@ -67,13 +67,21 @@ PyObject* PyPointerToInstance::pointerSet(PyObject* o, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject* PyPointerToInstance::sq_item_concrete(Py_ssize_t ix) {
+    instance_ptr output;
+
+    type()->offsetBy((instance_ptr)&output, dataPtr(), ix);
+
+    return extractPythonObject(output, type()->getEltType());
+}
+
 //static
 PyObject* PyPointerToInstance::pointerGet(PyObject* o, PyObject* args) {
     PyInstance* self_w = (PyInstance*)o;
     PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
 
     if (PyTuple_Size(args) != 0) {
-        PyErr_SetString(PyExc_TypeError, "PointerTo.get takes one argument");
+        PyErr_SetString(PyExc_TypeError, "PointerTo.get takes zero arguments");
         return NULL;
     }
 

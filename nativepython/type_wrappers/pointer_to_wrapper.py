@@ -68,6 +68,9 @@ class PointerToWrapper(Wrapper):
 
         return super().convert_to_type(context, e, target_type)
 
+    def convert_getitem(self, context, expr, item):
+        return (expr + item).convert_method_call("get", (), None)
+
     def convert_bin_op(self, context, left, op, right):
         if op.matches.Add:
             right = right.toInt64()

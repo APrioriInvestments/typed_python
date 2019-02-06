@@ -550,6 +550,14 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
 
         return res;
     }
+    if (    t->getTypeCategory() == Type::TypeCategory::catPointerTo) {
+        PySequenceMethods* res =
+            new PySequenceMethods {0,0,0,0,0,0,0,0};
+
+        res->sq_item = (ssizeargfunc)PyInstance::sq_item;
+
+        return res;
+    }
 
     return 0;
 }

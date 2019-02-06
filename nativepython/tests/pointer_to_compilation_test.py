@@ -37,14 +37,15 @@ class TestPointerToCompilation(unittest.TestCase):
             (pointer+3).initialize((pointer+2).get())
 
             (pointer+4).cast(float).set(1.0)
+            return pointer[3]
 
         compiledFun = Compiled(testfun)
 
         l1 = T(list(range(10)))
         l2 = T(list(range(10)))
 
-        testfun(l1)
-        compiledFun(l2)
+        self.assertEqual(testfun(l1), l1[3])
+        self.assertEqual(compiledFun(l2), l2[3])
 
         self.assertEqual(l1, l2)
 

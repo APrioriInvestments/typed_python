@@ -122,6 +122,9 @@ class TypedExpression(object):
     def convert_call(self, args, kwargs):
         return self.expr_type.convert_call(self.context, self, args, kwargs)
 
+    def convert_method_call(self, methodname, args, kwargs):
+        return self.expr_type.convert_method_call(self.context, self, methodname, args, kwargs)
+
     def convert_to_type(self, target_type):
         return self.expr_type.convert_to_type(self.context, self, target_type)
 

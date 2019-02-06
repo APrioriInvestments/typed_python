@@ -1261,6 +1261,7 @@ class NativeTypesTests(unittest.TestCase):
         aPointer = aPointer + 10
 
         self.assertEqual(aPointer.get(), x[10])
+        self.assertEqual(aPointer[10], x[20])
         aPointer.set(20)
         self.assertEqual(aPointer.get(), 20)
         self.assertEqual(x[10], 20)
