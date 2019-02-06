@@ -744,7 +744,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
 
     types[inType] = new NativeTypeWrapper { {
             PyVarObject_HEAD_INIT(NULL, 0)              // TYPE (c.f., Type Objects)
-            .tp_name = inType->name().c_str(),          // const char*
+            .tp_name = (new std::string(inType->name()))->c_str(),          // const char*
             .tp_basicsize = sizeof(PyInstance),         // Py_ssize_t
             .tp_itemsize = 0,                           // Py_ssize_t
             .tp_dealloc = PyInstance::tp_dealloc,       // destructor

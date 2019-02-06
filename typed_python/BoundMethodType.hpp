@@ -10,7 +10,7 @@ public:
         m_function = inFunc;
         m_is_default_constructible = false;
         m_first_arg = inFirstArg;
-
+        m_size = inFirstArg->bytecount();
         forwardTypesMayHaveChanged();
     }
 
@@ -33,6 +33,7 @@ public:
 
     void _forwardTypesMayHaveChanged() {
         m_name = "BoundMethod(" + m_first_arg->name() + "." + m_function->name() + ")";
+        m_size = m_first_arg->bytecount();
     }
 
     static BoundMethod* Make(Type* c, Function* f) {
@@ -75,6 +76,10 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         return m_first_arg->cmp(left,right,pyComparisonOp);
+    }
+
+    void constructor(instance_ptr self) {
+        m_first_arg->constructor(self);
     }
 
     void destroy(instance_ptr self) {

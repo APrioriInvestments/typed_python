@@ -131,6 +131,11 @@ void NamedTuple::_forwardTypesMayHaveChanged() {
     std::string oldName = m_name;
 
     m_name = "NamedTuple(";
+
+    if (m_types.size() != m_names.size()) {
+        throw std::logic_error("Names mismatched with types!");
+    }
+
     for (long k = 0; k < m_types.size();k++) {
         if (k) {
             m_name += ", ";
