@@ -34,7 +34,7 @@ public:
         return true;
     }
 
-    static void copyConstructFromPythonInstanceConcrete(ConstDict* dictType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(ConstDict* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyDict_Check(pyRepresentation)) {
             dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
 
@@ -64,7 +64,7 @@ public:
             return;
         }
 
-        PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation);
+        PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, isExplicit);
     }
 
 };

@@ -22,6 +22,6 @@ from typed_python.type_filter import TypeFilter
 from typed_python._types import (
 	TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
 	Alternative, Value, serialize, deserialize, Int8,
-	Bool, Int16, Int32, Int64, UInt8, UInt32, UInt64,
+	Bool, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64,
 	Float32, Float64, NoneType, String, Bytes, PointerTo
 )

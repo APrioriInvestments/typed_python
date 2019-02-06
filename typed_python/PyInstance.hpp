@@ -52,23 +52,23 @@ public:
     static auto specialize(PyObject* obj, const T& f) {
         switch (extractTypeFrom(obj->ob_type)->getTypeCategory()) {
             case Type::TypeCategory::catBool:
-                return f(*(PyRegisterTypeInstance<Bool>*)obj);
+                return f(*(PyRegisterTypeInstance<bool>*)obj);
             case Type::TypeCategory::catUInt8:
-                return f(*(PyRegisterTypeInstance<UInt8>*)obj);
+                return f(*(PyRegisterTypeInstance<uint8_t>*)obj);
             case Type::TypeCategory::catUInt16:
-                return f(*(PyRegisterTypeInstance<UInt16>*)obj);
+                return f(*(PyRegisterTypeInstance<uint16_t>*)obj);
             case Type::TypeCategory::catUInt32:
-                return f(*(PyRegisterTypeInstance<UInt32>*)obj);
+                return f(*(PyRegisterTypeInstance<uint32_t>*)obj);
             case Type::TypeCategory::catUInt64:
-                return f(*(PyRegisterTypeInstance<UInt64>*)obj);
+                return f(*(PyRegisterTypeInstance<uint64_t>*)obj);
             case Type::TypeCategory::catInt8:
-                return f(*(PyRegisterTypeInstance<Int8>*)obj);
+                return f(*(PyRegisterTypeInstance<int8_t>*)obj);
             case Type::TypeCategory::catInt16:
-                return f(*(PyRegisterTypeInstance<Int16>*)obj);
+                return f(*(PyRegisterTypeInstance<int16_t>*)obj);
             case Type::TypeCategory::catInt32:
-                return f(*(PyRegisterTypeInstance<Int32>*)obj);
+                return f(*(PyRegisterTypeInstance<int32_t>*)obj);
             case Type::TypeCategory::catFloat32:
-                return f(*(PyRegisterTypeInstance<Float32>*)obj);
+                return f(*(PyRegisterTypeInstance<float>*)obj);
             case Type::TypeCategory::catValue:
                return f(*(PyValueInstance*)obj);
             case Type::TypeCategory::catTupleOf:
@@ -279,9 +279,14 @@ public:
 
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation);
 
-    static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
+    /**
+     construct an 'eltType' from a python object at 'tgt'. If 'isExplicit' then we're invoked from an explicit
+     copy constructor, so more liberal conversion is allowed than if 'isExplicit' is false, which happens
+     when we're attempting to convert for purposes of method dispatch.
+     */
+    static void copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit=false);
 
-    static void copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation);
+    static void copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     static void constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs);
 

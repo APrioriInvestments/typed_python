@@ -6,7 +6,7 @@ class PyOneOfInstance : public PyInstance {
 public:
     typedef OneOf modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(OneOf* oneOf, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(OneOf* oneOf, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         for (long k = 0; k < oneOf->getTypes().size(); k++) {
             Type* subtype = oneOf->getTypes()[k];
 

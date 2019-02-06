@@ -6,7 +6,7 @@ class PyPythonSubclassInstance : public PyInstance {
 public:
     typedef PythonSubclass modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(PythonSubclass* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(PythonSubclass* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         copyConstructFromPythonInstance(eltType->getBaseType(), tgt, pyRepresentation);
     }
 

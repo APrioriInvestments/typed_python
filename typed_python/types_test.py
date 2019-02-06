@@ -13,7 +13,11 @@
 #   limitations under the License.
 
 from typed_python import (
-    Int8, Int64, NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple,
+    Bool,
+    Int8, Int16, Int32, Int64,
+    UInt8, UInt16, UInt32, UInt64,
+    Float32, Float64,
+    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple,
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member,
     TypeFilter, UndefinedBehaviorException
 )
@@ -1318,4 +1322,40 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(
             (1,2,3), TupleOf(int)([1,2,3])
             )
+
+    def test_other_bitness_ints(self):
+        #verify we can cast around non-64-bit values in a way that matches numpy
+        typeAndNumpyType = [
+                (Bool(), numpy.bool),
+                (Int8(), numpy.int8),
+                (Int16(), numpy.int16),
+                (Int32(), numpy.int32),
+                (Int64(), numpy.int64),
+                (UInt8(), numpy.uint8),
+                (UInt16(), numpy.uint16),
+                (UInt32(), numpy.uint32),
+                (UInt64(), numpy.uint64),
+                (Float32(), numpy.float32),
+                (Float64(), numpy.float64)
+                ]
+
+        for ourType, numpyType in typeAndNumpyType:
+            for candValue in [-1,0,1,10,100,1000,100000,10000000,10000000000]:
+                self.assertEqual(int(ourType(candValue)), int(numpyType(candValue)), (ourType, candValue))
+                self.assertEqual(float(ourType(candValue)), float(numpyType(candValue)), (ourType, candValue))
+
+            for ourType2, numpyType2 in typeAndNumpyType:
+                zeroOrTwoFloatTypes = sum([1 if 'float' in str(t) else 0 for t in [numpyType, numpyType2]]) in [0,2]
+
+                if zeroOrTwoFloatTypes:
+                    for candValue in [-1,0,1,10,100,1000,100000,10000000,10000000000]:
+                        self.assertEqual(int(ourType(ourType2(candValue))), int(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
+                        self.assertEqual(float(ourType(ourType2(candValue))), float(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
+                else:
+                    #we convert from float to int as c++, which is different than numpy, which clips
+                    #floats in a bizarre way. e.g.
+                    #  numpy.int16(numpy.int64(numpy.float64(10000000000)))
+                    #is not
+                    #  numpy.int16(numpy.float64(10000000000))
+                    pass
 

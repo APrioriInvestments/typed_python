@@ -12,7 +12,7 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
-    static void copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(CompositeType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyTuple_Check(pyRepresentation)) {
             if (eltType->getTypes().size() != PyTuple_Size(pyRepresentation)) {
                 throw std::runtime_error("Wrong number of arguments to construct " + eltType->name());
@@ -38,7 +38,7 @@ public:
             return;
         }
 
-        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation);
+        PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
     }
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
@@ -59,7 +59,7 @@ public:
 
     NamedTuple* type();
 
-    static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation);
+    static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     static void constructFromPythonArgumentsConcrete(NamedTuple* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 };

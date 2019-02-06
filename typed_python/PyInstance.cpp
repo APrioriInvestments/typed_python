@@ -125,7 +125,7 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
 }
 
 // static
-void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
     guaranteeForwardsResolvedOrThrow(eltType);
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
@@ -145,13 +145,14 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
         py_instance_type::copyConstructFromPythonInstanceConcrete(
             (typename py_instance_type::modeled_type*)eltType,
             tgt,
-            pyRepresentation
+            pyRepresentation,
+            isExplicit
             );
     });
 }
 
-void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
-    throw std::logic_error("Couldn't initialize internal elt of type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
+void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    throw std::logic_error("Couldn't initialize type " + eltType->name() + " from " + pyRepresentation->ob_type->tp_name);
 }
 
 
@@ -183,7 +184,7 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
     if (kwargs == NULL && PyTuple_Size(args) == 1) {
         PyObject* argTuple = PyTuple_GetItem(args, 0);
 
-        copyConstructFromPythonInstance(t, data, argTuple);
+        copyConstructFromPythonInstance(t, data, argTuple, true /* mark isExplicit */);
 
         return;
     }

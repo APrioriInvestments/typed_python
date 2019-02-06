@@ -67,7 +67,7 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
     } else {
         instance_ptr tempObj = (instance_ptr)malloc(eltType->bytecount());
         try {
-            copyConstructFromPythonInstance(eltType, tempObj, attrVal);
+            copyConstructFromPythonInstance(eltType, tempObj, attrVal, true /* set isExplicit to True */ );
         } catch(std::exception& e) {
             free(tempObj);
             PyErr_SetString(PyExc_TypeError, e.what());

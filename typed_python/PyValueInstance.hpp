@@ -6,7 +6,7 @@ class PyValueInstance : public PyInstance {
 public:
     typedef Value modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(Value* v, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(Value* v, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         const Instance& elt = v->value();
 
         if (compare_to_python(elt.type(), elt.data(), pyRepresentation, false) != 0) {

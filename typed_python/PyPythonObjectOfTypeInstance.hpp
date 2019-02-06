@@ -6,7 +6,7 @@ class PyPythonObjectOfTypeInstance : public PyInstance {
 public:
     typedef PythonObjectOfType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(PythonObjectOfType* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(PythonObjectOfType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)eltType->pyType());
         if (isinst == -1) {
             isinst = 0;

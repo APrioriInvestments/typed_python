@@ -6,7 +6,7 @@ class PyBytesInstance : public PyInstance {
 public:
     typedef Bytes modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(Bytes* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(Bytes* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyBytes_Check(pyRepresentation)) {
             Bytes().constructor(
                 tgt,

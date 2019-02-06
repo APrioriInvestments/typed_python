@@ -14,7 +14,7 @@ public:
 
     PyObject* mp_subscript_concrete(PyObject* item);
 
-    static void copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation);
+    static void copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 

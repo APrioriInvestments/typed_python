@@ -29,7 +29,7 @@ Py_ssize_t PyCompositeTypeInstance::mp_and_sq_length_concrete() {
 }
 
 
-void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation) {
+void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyDict_Check(pyRepresentation)) {
         if (namedTupleT->getTypes().size() < PyDict_Size(pyRepresentation)) {
             throw std::runtime_error("Couldn't initialize type of " + namedTupleT->name() + " because supplied dictionary had too many items");
@@ -60,7 +60,7 @@ void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* n
         return;
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation);
+    PyInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation, isExplicit);
 }
 
 void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs) {

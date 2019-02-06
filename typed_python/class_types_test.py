@@ -18,7 +18,7 @@ import gc
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, ConstDict,
+    Int8, NoneType, ListOf, TupleOf, OneOf, Tuple, NamedTuple, ConstDict,
     Alternative, serialize, deserialize, Value, Class, Member, _types
 )
 
@@ -620,3 +620,16 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(operator.iand(c,0), (c,"iand",0))
         self.assertEqual(operator.ixor(c,0), (c,"ixor",0))
         self.assertEqual(operator.imatmul(c,0), (c,"imatmul",0))
+
+    def test_class_dispatch_on_tuple_vs_list(self):
+        class WithTwoFunctions(Class):
+            def f(self, x: TupleOf(int)):
+                return "Tuple"
+
+            def f(self, x: ListOf(int)):
+                return "List"
+
+        c = WithTwoFunctions()
+        self.assertEqual(c.f(TupleOf(int)((1,2,3))), "Tuple")
+        self.assertEqual(c.f(ListOf(int)((1,2,3))), "Tuple")
+

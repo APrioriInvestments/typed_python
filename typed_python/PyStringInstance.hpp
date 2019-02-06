@@ -6,7 +6,7 @@ class PyStringInstance : public PyInstance {
 public:
     typedef String modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(String* eltType, instance_ptr tgt, PyObject* pyRepresentation) {
+    static void copyConstructFromPythonInstanceConcrete(String* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyUnicode_Check(pyRepresentation)) {
             auto kind = PyUnicode_KIND(pyRepresentation);
             assert(
