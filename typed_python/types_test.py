@@ -1420,3 +1420,27 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "argname="):
             f(argname=1)
+
+    def test_named_tuple_comparison(self):
+        N = NamedTuple(x=OneOf(None,int), y=OneOf(None,int))
+
+        class S(N):
+            pass
+
+        self.assertEqual(N(x=1,y=2),N(x=1,y=2))
+        self.assertNotEqual(N(x=1,y=2),N(x=1,y=3))
+        self.assertFalse(N(x=1,y=2) == N(x=1,y=3))
+
+        self.assertEqual(S(x=1,y=2),S(x=1,y=2))
+        self.assertNotEqual(S(x=1,y=2),S(x=1,y=3))
+        self.assertFalse(S(x=1,y=2) == S(x=1,y=3))
+
+    def test_const_dict_comparison(self):
+        N = NamedTuple(x=OneOf(None,int), y=OneOf(None,int))
+        D = ConstDict(str, N)
+
+        n1 = N(x=1,y=2)
+        n2 = N(x=1,y=3)
+
+        self.assertEqual(D({'a': n1}), D({'a': n1}))
+        self.assertNotEqual(D({'a': n1}), D({'a': n2}))

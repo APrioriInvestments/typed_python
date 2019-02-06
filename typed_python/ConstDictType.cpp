@@ -112,7 +112,7 @@ bool ConstDict::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         for (long k = 0; k < ct; k++) {
             if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE) ||
                     m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
-                return true;
+                return false;
             }
         }
 
