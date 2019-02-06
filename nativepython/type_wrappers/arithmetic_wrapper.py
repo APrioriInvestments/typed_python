@@ -152,6 +152,14 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                         false=generateThrowException(context, ValueError("negative shift count"))
                         )
                     )
+            if op.matches.FloorDiv:
+                res = left.toFloat64()
+                if res is None:
+                    return None
+                res = res.convert_bin_op(python_ast.BinaryOp.Div(), right)
+                if res is None:
+                    return None
+                return res.toInt64()
 
             if op in pyOpToNative:
                 return context.pushPod(

@@ -868,8 +868,40 @@ PyObject* PyInstance::tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
             }
         }
 
-        PyErr_Format(PyExc_TypeError, "'%s' cannot find a valid overload with these arguments", o->ob_type->tp_name);
-        return 0;
+        std::ostringstream outTypes;
+        outTypes << "(";
+        bool first = true;
+        for (long k = 0; k < PyTuple_Size(args); k++) {
+            if (!first) {
+                outTypes << ",";
+            } else {
+                first = false;
+            }
+            outTypes << PyTuple_GetItem(args,k)->ob_type->tp_name;
+        }
+        if (kwargs) {
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            while (kwargs && PyDict_Next(kwargs, &pos, &key, &value)) {
+                if (!first) {
+                    outTypes << ",";
+                } else {
+                    first = false;
+                }
+                outTypes << PyUnicode_AsUTF8(key) << "=" << value->ob_type->tp_name;
+            }
+        }
+
+        outTypes << ")";
+
+        PyErr_Format(
+            PyExc_TypeError, "'%s' cannot find a valid overload with arguments of type %s",
+            o->ob_type->tp_name,
+            outTypes.str().c_str()
+            );
+
+        return NULL;
     }
 
 

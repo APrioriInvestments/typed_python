@@ -150,6 +150,36 @@ void constructTupleOrListInst(TupleOrListOf* tupT, instance_ptr tgt, size_t coun
         );
 }
 
+template<class dest_t>
+bool constructTupleOrListInstFromNumpy(TupleOrListOf* tupT, instance_ptr tgt, size_t size, uint8_t* data, int numpyType) {
+    if (numpyType == NPY_FLOAT64) {
+        constructTupleOrListInst<dest_t, double>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_FLOAT32) {
+        constructTupleOrListInst<dest_t, float>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_INT64) {
+        constructTupleOrListInst<dest_t, int64_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_INT32) {
+        constructTupleOrListInst<dest_t, int32_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_INT16) {
+        constructTupleOrListInst<dest_t, int16_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_INT8) {
+        constructTupleOrListInst<dest_t, int8_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_UINT64) {
+        constructTupleOrListInst<dest_t, uint64_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_UINT32) {
+        constructTupleOrListInst<dest_t, uint32_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_UINT16) {
+        constructTupleOrListInst<dest_t, uint16_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_UINT8) {
+        constructTupleOrListInst<dest_t, uint8_t>(tupT, tgt, size, data);
+    } else if (numpyType == NPY_BOOL) {
+        constructTupleOrListInst<dest_t, dest_t>(tupT, tgt, size, data);
+    } else {
+        return false;
+    }
+
+    return true;
+}
 void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrListOf* tupT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyArray_Check(pyRepresentation)) {
         if (!PyArray_ISBEHAVED_RO(pyRepresentation)) {
@@ -163,55 +193,58 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         uint8_t* data = (uint8_t*)PyArray_BYTES(pyRepresentation);
         size_t size = PyArray_SIZE(pyRepresentation);
 
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catBool) {
+            if (constructTupleOrListInstFromNumpy<bool>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
+                return;
+            }
+        }
         if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catInt64) {
-            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(double)) {
-                constructTupleOrListInst<int64_t, double>(tupT, tgt, size, data);
+            if (constructTupleOrListInstFromNumpy<int64_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
-            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(float)) {
-                constructTupleOrListInst<int64_t, float>(tupT, tgt, size, data);
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt64) {
+            if (constructTupleOrListInstFromNumpy<uint64_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int64_t)) {
-                constructTupleOrListInst<int64_t, int64_t>(tupT, tgt, size, data);
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catInt32) {
+            if (constructTupleOrListInstFromNumpy<int32_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int32_t)) {
-                constructTupleOrListInst<int64_t, int32_t>(tupT, tgt, size, data);
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt32) {
+            if (constructTupleOrListInstFromNumpy<uint32_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int16_t)) {
-                constructTupleOrListInst<int64_t, int16_t>(tupT, tgt, size, data);
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catInt16) {
+            if (constructTupleOrListInstFromNumpy<int16_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int8_t)) {
-                constructTupleOrListInst<int64_t, int8_t>(tupT, tgt, size, data);
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt16) {
+            if (constructTupleOrListInstFromNumpy<uint16_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
+                return;
+            }
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catInt8) {
+            if (constructTupleOrListInstFromNumpy<int8_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
+                return;
+            }
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt8) {
+            if (constructTupleOrListInstFromNumpy<uint8_t>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
         }
         if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catFloat64) {
-            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(double)) {
-                constructTupleOrListInst<double, double>(tupT, tgt, size, data);
+            if (constructTupleOrListInstFromNumpy<double>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
-            if (PyArray_ISFLOAT(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(float)) {
-                constructTupleOrListInst<double, float>(tupT, tgt, size, data);
-                return;
-            }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int64_t)) {
-                constructTupleOrListInst<double, int64_t>(tupT, tgt, size, data);
-                return;
-            }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int32_t)) {
-                constructTupleOrListInst<double, int32_t>(tupT, tgt, size, data);
-                return;
-            }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int16_t)) {
-                constructTupleOrListInst<double, int16_t>(tupT, tgt, size, data);
-                return;
-            }
-            if (PyArray_ISSIGNED(pyRepresentation) && PyArray_ITEMSIZE(pyRepresentation) == sizeof(int8_t)) {
-                constructTupleOrListInst<double, int8_t>(tupT, tgt, size, data);
+        }
+        if (tupT->getEltType()->getTypeCategory() == Type::TypeCategory::catFloat32) {
+            if (constructTupleOrListInstFromNumpy<float>(tupT, tgt, size, data, PyArray_TYPE(pyRepresentation))) {
                 return;
             }
         }
@@ -286,17 +319,17 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
             + " with a " + pyRepresentation->ob_type->tp_name);
 }
 
-PyObject* PyTupleOrListOfInstance::rAdd(PyObject* o, PyObject* args) {
-    PyErr_Format(PyExc_TypeError, "boo!");
-    return NULL;
-}
-
 PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {
     PyListOfInstance* self_w = (PyListOfInstance*)o;
     npy_intp dims[1] = { self_w->type()->count(self_w->dataPtr()) };
 
     int typenum = -1;
     int bytecount = 0;
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catBool) {
+        typenum = NPY_BOOL;
+        bytecount = sizeof(bool);
+    }
 
     if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catInt64) {
         typenum = NPY_INT64;
@@ -376,6 +409,21 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
 
     if (PyLong_Check(item)) {
         return sq_item((PyObject*)this, PyLong_AsLong(item));
+    }
+
+    if (PyIndex_Check(item)) {
+        PyObjectStealer res(PyNumber_Index(item));
+
+        if (!res) {
+            return NULL;
+        }
+
+        if (!PyLong_Check(res)) {
+            PyErr_Format(PyExc_TypeError, "__index__ returned a non int for %S", item);
+            return NULL;
+        }
+
+        return sq_item((PyObject*)this, PyLong_AsLong(res));
     }
 
     PyErr_SetObject(PyExc_KeyError, item);

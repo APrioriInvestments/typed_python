@@ -19,12 +19,11 @@ from typed_python import (
     Float32, Float64,
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple,
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member,
-    TypeFilter, UndefinedBehaviorException
+    TypeFilter, UndefinedBehaviorException, Function
 )
 
 import typed_python._types as _types
 import psutil
-import numpy
 import unittest
 import traceback
 import time
@@ -1302,6 +1301,17 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(y[0], 100)
 
     def test_list_and_tuple_conversion_to_numpy(self):
+        for T in [ListOf(bool), TupleOf(bool)]:
+            for arr in [
+                    numpy.array([]),
+                    numpy.array([0,1,2,3,4,5]),
+                    numpy.array([0,1,2,3,4,5], 'int32'),
+                    numpy.array([0,1,2,3,4,5], 'int16'),
+                    numpy.array([0,1,2,3,4,5], 'bool')
+                    ]:
+                self.assertEqual(T(arr), T(arr.tolist()))
+                self.assertEqual(T(arr).toArray().tolist(), [bool(x) for x in arr.tolist()])
+
         for T in [ListOf(int), TupleOf(int)]:
             for arr in [
                     numpy.array([]),
@@ -1394,3 +1404,18 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(x,x)
         self.assertEqual(y,y)
         self.assertNotEqual(x,y)
+
+    def test_list_of_indexing_with_numpy_ints(self):
+        x = ListOf(ListOf(int))([[1,2,3],[4,5,6]])
+        self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
+
+    def test_error_message_on_bad_dispatch(self):
+        @Function
+        def f(x: int):
+            return x
+
+        with self.assertRaisesRegex(TypeError, "str"):
+            f("hi")
+
+        with self.assertRaisesRegex(TypeError, "argname="):
+            f(argname=1)
