@@ -19,8 +19,8 @@ public:
     void _forwardTypesMayHaveChanged() {
     }
 
-    char cmp(instance_ptr left, instance_ptr right) {
-        return 0;
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     int32_t hash32(instance_ptr left) {

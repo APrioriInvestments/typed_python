@@ -73,8 +73,8 @@ public:
         m_first_arg->serialize(self,buffer);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) {
-        return m_first_arg->cmp(left,right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+        return m_first_arg->cmp(left,right,pyComparisonOp);
     }
 
     void destroy(instance_ptr self) {

@@ -61,7 +61,7 @@ public:
 
     int32_t hash32(instance_ptr left);
 
-    char cmp(instance_ptr left, instance_ptr right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     static Bytes* Make() { static Bytes res; return &res; }
 

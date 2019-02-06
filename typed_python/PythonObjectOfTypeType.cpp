@@ -22,43 +22,11 @@ void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     Py_DECREF(o);
 }
 
-char PythonObjectOfType::cmp(instance_ptr left, instance_ptr right) {
+bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     PyObject* l = *(PyObject**)left;
     PyObject* r = *(PyObject**)right;
 
-    int res = PyObject_RichCompareBool(l, r, Py_EQ);
-    if (res == -1) {
-        PyErr_Clear();
-        if (l < r) {
-            return -1;
-        }
-        if (l > r) {
-            return 1;
-        }
-        return 0;
-    }
-
-    if (res) {
-        return 0;
-    }
-
-    res = PyObject_RichCompareBool(l, r, Py_LT);
-
-    if (res == -1) {
-        PyErr_Clear();
-        if (l < r) {
-            return -1;
-        }
-        if (l > r) {
-            return 1;
-        }
-        return 0;
-    }
-
-    if (res) {
-        return -1;
-    }
-    return 1;
+    return PyObject_RichCompareBool(l, r, pyComparisonOp);
 }
 
 // static

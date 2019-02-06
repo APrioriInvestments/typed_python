@@ -251,8 +251,8 @@ char typedArrayCompare(T1* l, T2* r, size_t count) {
     return 0;
 }
 
-char String::cmp(instance_ptr left, instance_ptr right) {
-    return cmpStatic(*(layout**)left, *(layout**)right);
+bool String::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpStatic(*(layout**)left, *(layout**)right));
 }
 
 char String::cmpStatic(layout* left, layout* right) {

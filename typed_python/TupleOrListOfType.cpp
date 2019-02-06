@@ -62,43 +62,46 @@ int32_t TupleOrListOf::hash32(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
-char TupleOrListOf::cmp(instance_ptr left, instance_ptr right) {
+bool TupleOrListOf::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if (!(*(layout**)left) && (*(layout**)right)) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
     if (!(*(layout**)right) && (*(layout**)left)) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
     if (!(*(layout**)right) && !(*(layout**)left)) {
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
+
     layout& left_layout = **(layout**)left;
     layout& right_layout = **(layout**)right;
 
     if (&left_layout == &right_layout) {
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     size_t bytesPer = m_element_type->bytecount();
 
     for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
-        char res = m_element_type->cmp(left_layout.data + bytesPer * k,
-                                       right_layout.data + bytesPer * k);
-
-        if (res != 0) {
-            return res;
+        if (m_element_type->cmp(left_layout.data + bytesPer * k,
+                                       right_layout.data + bytesPer * k, Py_NE)) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp,
+                m_element_type->cmp(left_layout.data + bytesPer * k,
+                                       right_layout.data + bytesPer * k, Py_LT)
+                    ? -1 : 1
+                );
         }
     }
 
     if (left_layout.count < right_layout.count) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp,-1);
     }
 
     if (left_layout.count > right_layout.count) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp,1);
     }
 
-    return 0;
+    return cmpResultToBoolForPyOrdering(pyComparisonOp,0);
 }
 
 // static

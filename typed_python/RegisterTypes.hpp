@@ -27,15 +27,15 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
 
-    char cmp(instance_ptr left, instance_ptr right) {
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         if ( (*(T*)left) < (*(T*)right) ) {
-            return -1;
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
         }
         if ( (*(T*)left) > (*(T*)right) ) {
-            return 1;
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
 
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     int32_t hash32(instance_ptr left) {

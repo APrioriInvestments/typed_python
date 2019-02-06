@@ -141,6 +141,27 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
     return std::make_pair(true, result);
 }
 
+std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
+    PyObjectStealer argTuple(
+        (arg0 && arg1 && arg2) ?
+            PyTuple_Pack(3, arg0, arg1, arg2) :
+        (arg0 && arg1) ?
+            PyTuple_Pack(2, arg0, arg1) :
+        arg0 ?
+            PyTuple_Pack(1, arg0) :
+            PyTuple_Pack(0)
+        );
+
+    for (const auto& overload: f->getOverloads()) {
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res;
+        }
+    }
+
+    return std::pair<bool, PyObject*>(false, NULL);
+}
+
 // static
 std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToNative(const Function::Overload& overload, PyObject* argTuple, PyObject *kwargs) {
     for (const auto& spec: overload.getCompiledSpecializations()) {

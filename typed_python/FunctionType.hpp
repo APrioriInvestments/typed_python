@@ -255,8 +255,8 @@ public:
         return new Function(f1->m_name, overloads);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) {
-        return 0;
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     template<class buf_t>

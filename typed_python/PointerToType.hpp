@@ -68,15 +68,15 @@ public:
         return acc.get();
     }
 
-    char cmp(instance_ptr left, instance_ptr right) {
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         if (*(void**)left < *(void**)right) {
-            return -1;
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
         }
         if (*(void**)left > *(void**)right) {
-            return 1;
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
 
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     Type* getEltType() const {

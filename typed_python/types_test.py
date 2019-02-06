@@ -897,6 +897,27 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, "immutable"):
             a.x = 20
 
+    def test_alternatives_comparison(self):
+        empty = Alternative("X", A={}, B={})
+
+        self.assertEqual(empty.A(), empty.A())
+        self.assertEqual(empty.B(), empty.B())
+        self.assertNotEqual(empty.A(), empty.B())
+
+        a = Alternative("X",
+            A={'a': int},
+            B={'b': int},
+            C={'c': str},
+            D={'d': bytes},
+            )
+
+        self.assertEqual(a.A(a=10), a.A(a=10))
+        self.assertNotEqual(a.A(a=10), a.A(a=11))
+
+        self.assertNotEqual(a.C(c=""), a.C(c="hi"))
+        self.assertFalse(a.C(c="") == a.C(c="hi"))
+        self.assertNotEqual(a.D(d=b""), a.D(d=b"hi"))
+
     def test_alternatives_add_operator(self):
         alt = Alternative(
             "Alt",
@@ -935,8 +956,13 @@ class NativeTypesTests(unittest.TestCase):
 
             for v1 in values:
                 for v2 in values:
+                    if hash(v1) != hash(v2) and v1 == v2:
+                        print(v1,v2, type(v1), type(v2))
+
+            for v1 in values:
+                for v2 in values:
                     if type(v1) == type(v2) and v1 == v2:
-                        self.assertEqual(hash(v1), hash(v2))
+                        self.assertEqual(hash(v1), hash(v2), (v1, v2))
                         if type(v1) is type(v2):
                             self.assertEqual(repr(v1), repr(v2), (v1, v2, type(v1),type(v2)))
 
@@ -1216,8 +1242,6 @@ class NativeTypesTests(unittest.TestCase):
 
         b = ASelfRecursiveClass()
         b.x = b
-
-        a < b
 
         print(repr(a))
 

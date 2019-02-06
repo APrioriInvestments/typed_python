@@ -16,9 +16,18 @@ public:
             m_members(members),
             m_memberFunctions(memberFunctions),
             m_staticFunctions(staticFunctions),
-            m_classMembers(classMembers)
+            m_classMembers(classMembers),
+            m_hasComparisonOperators(false)
     {
         m_name = inName;
+
+        if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__ne__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__lt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+        if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
+
         forwardTypesMayHaveChanged();
     }
 
@@ -74,7 +83,7 @@ public:
         return self + m_byte_offsets[ix];
     }
 
-    char cmp(instance_ptr left, instance_ptr right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
@@ -184,6 +193,10 @@ public:
 
     int memberNamed(const char* c) const;
 
+    bool hasAnyComparisonOperators() const {
+        return m_hasComparisonOperators;
+    }
+
 private:
     std::vector<size_t> m_byte_offsets;
 
@@ -192,5 +205,7 @@ private:
     std::map<std::string, Function*> m_memberFunctions;
     std::map<std::string, Function*> m_staticFunctions;
     std::map<std::string, PyObject*> m_classMembers;
+
+    bool m_hasComparisonOperators;
 };
 

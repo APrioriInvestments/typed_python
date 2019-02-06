@@ -56,8 +56,8 @@ class Hash:
     def __hash__(self):
         return hash(self.digest)
 
-    def __cmp__(self, other):
-        return cmp(self.digest, other.digest)
+    def __lt__(self, other):
+        return self.digest < other.digest
 
     def __eq__(self, other):
         return self.digest == other.digest

@@ -633,3 +633,71 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(TupleOf(int)((1,2,3))), "Tuple")
         self.assertEqual(c.f(ListOf(int)((1,2,3))), "Tuple")
 
+    def test_class_comparison_operators(self):
+        class ClassWithComparisons(Class):
+            x = Member(int)
+
+            def __init__(self, x):
+                self.x = x
+
+            def __eq__(self, other):
+                return self.x == other.x
+
+            def __ne__(self, other):
+                return self.x != other.x
+
+            def __lt__(self, other):
+                return self.x < other.x
+
+            def __gt__(self, other):
+                return self.x > other.x
+
+            def __le__(self, other):
+                return self.x <= other.x
+
+            def __ge__(self, other):
+                return self.x >= other.x
+
+        for i in [0,1,2,3]:
+            for j in [0,1,2,3]:
+                self.assertEqual(
+                    ClassWithComparisons(i) < ClassWithComparisons(j),
+                    i < j
+                    )
+                self.assertEqual(
+                    ClassWithComparisons(i) > ClassWithComparisons(j),
+                    i > j
+                    )
+                self.assertEqual(
+                    ClassWithComparisons(i) <= ClassWithComparisons(j),
+                    i <= j
+                    )
+                self.assertEqual(
+                    ClassWithComparisons(i) >= ClassWithComparisons(j),
+                    i >= j
+                    )
+                self.assertEqual(
+                    ClassWithComparisons(i) == ClassWithComparisons(j),
+                    i == j
+                    )
+                self.assertEqual(
+                    ClassWithComparisons(i) != ClassWithComparisons(j),
+                    i != j
+                    )
+
+    def test_class_repr_and_str_and_hash(self):
+        class ClassWithReprAndStr(Class):
+            def __repr__(self):
+                return "repr"
+            def __str__(self):
+                return "str"
+            def __hash__(self):
+                return 300
+
+        self.assertEqual(hash(ClassWithReprAndStr()), 300)
+        self.assertEqual(repr(ClassWithReprAndStr()), "repr")
+        self.assertEqual(str(ClassWithReprAndStr()), "str")
+
+
+
+

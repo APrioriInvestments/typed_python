@@ -65,15 +65,15 @@ int32_t OneOf::hash32(instance_ptr left) {
     return acc.get();
 }
 
-char OneOf::cmp(instance_ptr left, instance_ptr right) {
+bool OneOf::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if (((uint8_t*)left)[0] < ((uint8_t*)right)[0]) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
     if (((uint8_t*)left)[0] > ((uint8_t*)right)[0]) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
-    return m_types[*((uint8_t*)left)]->cmp(left+1,right+1);
+    return m_types[*((uint8_t*)left)]->cmp(left+1,right+1, pyComparisonOp);
 }
 
 size_t OneOf::computeBytecount() const {

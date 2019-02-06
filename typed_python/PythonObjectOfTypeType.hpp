@@ -60,7 +60,7 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    char cmp(instance_ptr left, instance_ptr right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     void constructor(instance_ptr self) {
         *(PyObject**)self = Py_None;

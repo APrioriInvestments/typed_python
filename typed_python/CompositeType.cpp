@@ -37,15 +37,17 @@ void CompositeType::_forwardTypesMayHaveChanged() {
     }
 }
 
-char CompositeType::cmp(instance_ptr left, instance_ptr right) {
+bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     for (long k = 0; k < m_types.size(); k++) {
-        char res = m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k]);
-        if (res != 0) {
-            return res;
+        if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE)) {
+            if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_LT)) {
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+            }
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
     }
 
-    return 0;
+    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
 void CompositeType::repr(instance_ptr self, ReprAccumulator& stream) {

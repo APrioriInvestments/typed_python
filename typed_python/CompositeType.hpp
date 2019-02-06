@@ -36,7 +36,7 @@ public:
         return self + m_byte_offsets[ix];
     }
 
-    char cmp(instance_ptr left, instance_ptr right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {

@@ -51,8 +51,8 @@ public:
         m_alternative->serialize(self,buffer);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) {
-        return m_alternative->cmp(left,right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+        return m_alternative->cmp(left,right, pyComparisonOp);
     }
 
     void constructor(instance_ptr self);

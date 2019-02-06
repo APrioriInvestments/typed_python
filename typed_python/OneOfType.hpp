@@ -53,7 +53,7 @@ public:
 
     int32_t hash32(instance_ptr left);
 
-    char cmp(instance_ptr left, instance_ptr right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     std::pair<Type*, instance_ptr> unwrap(instance_ptr self) {
         return std::make_pair(m_types[*(uint8_t*)self], self+1);

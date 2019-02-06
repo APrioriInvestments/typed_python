@@ -34,17 +34,18 @@ void HeldClass::_forwardTypesMayHaveChanged() {
     }
 }
 
-char HeldClass::cmp(instance_ptr left, instance_ptr right) {
+bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     uint64_t leftPtr = *(uint64_t*)left;
     uint64_t rightPtr = *(uint64_t*)right;
+
     if (leftPtr < rightPtr) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
     if (leftPtr > rightPtr) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
-    return 0;
+    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
 void HeldClass::repr(instance_ptr self, ReprAccumulator& stream) {

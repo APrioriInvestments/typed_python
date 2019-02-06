@@ -21,35 +21,35 @@ int32_t Bytes::hash32(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
-char Bytes::cmp(instance_ptr left, instance_ptr right) {
+bool Bytes::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if ( !(*(layout**)left) && !(*(layout**)right) ) {
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
     if ( !(*(layout**)left) && (*(layout**)right) ) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
     if ( (*(layout**)left) && !(*(layout**)right) ) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
     if ( (*(layout**)left) == (*(layout**)right) ) {
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     char res = byteCompare(eltPtr(left, 0), eltPtr(right, 0), std::min(count(left), count(right)));
 
     if (res) {
-        return res;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, res);
     }
 
     if (count(left) < count(right)) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
 
     if (count(left) > count(right)) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
-    return 0;
+    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
 Bytes::layout* Bytes::concatenate(layout* lhs, layout* rhs) {

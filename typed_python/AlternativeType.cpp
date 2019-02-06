@@ -64,32 +64,32 @@ void Alternative::_forwardTypesMayHaveChanged() {
     m_size = (m_all_alternatives_empty ? 1 : sizeof(void*));
 }
 
-char Alternative::cmp(instance_ptr left, instance_ptr right) {
+bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if (m_all_alternatives_empty) {
         if (*(uint8_t*)left < *(uint8_t*)right) {
-            return -1;
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
         }
         if (*(uint8_t*)left > *(uint8_t*)right) {
-            return 1;
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     layout& record_l = **(layout**)left;
     layout& record_r = **(layout**)right;
 
     if ( &record_l == &record_r ) {
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     if (record_l.which < record_r.which) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
     if (record_l.which > record_r.which) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
-    return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data);
+    return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data, pyComparisonOp);
 }
 
 void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {

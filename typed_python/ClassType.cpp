@@ -30,23 +30,148 @@ bool Class::checkInitializationFlag(instance_ptr self, int64_t ix) const {
     return m_heldClass->checkInitializationFlag(l.data, ix);
 }
 
-char Class::cmp(instance_ptr left, instance_ptr right) {
-    layout& l = **(layout**)left;
-    layout& r = **(layout**)right;
-
-    if ( &l == &r ) {
-        return 0;
+bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    const char* method = nullptr;
+    switch (pyComparisonOp) {
+        case Py_EQ:
+            method = "__eq__";
+            break;
+        case Py_NE:
+            method = "__ne__";
+            break;
+        case Py_LT:
+            method = "__lt__";
+            break;
+        case Py_GT:
+            method = "__gt__";
+            break;
+        case Py_LE:
+            method = "__le__";
+            break;
+        case Py_GE:
+            method = "__ge__";
+            break;
     }
 
-    return m_heldClass->cmp(l.data,r.data);
+    auto it = m_heldClass->getMemberFunctions().find(method);
+
+    if (it != m_heldClass->getMemberFunctions().end()) {
+        //we found a user-defined method for this comparison function.
+        PyObjectStealer leftAsPyObj(PyInstance::extractPythonObject(left, this));
+        PyObjectStealer rightAsPyObj(PyInstance::extractPythonObject(right, this));
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+            it->second,
+            leftAsPyObj,
+            rightAsPyObj
+            );
+
+        if (res.first && !res.second) {
+            throw PythonExceptionSet();
+        }
+
+        bool result = res.second == Py_True;
+        Py_DECREF(res.second);
+        return result;
+    }
+
+    if (pyComparisonOp == Py_NE) {
+        return !cmp(left, right, Py_EQ);
+    }
+
+    if (pyComparisonOp == Py_EQ) {
+        //if these operators are not implemented, we defer to the class pointer
+        uint64_t leftPtr = *(uint64_t*)left;
+        uint64_t rightPtr = *(uint64_t*)right;
+
+        return leftPtr == rightPtr;
+    }
+
+    PyErr_Format(
+        PyExc_TypeError,
+        "'%s' not defined between instances of '%s' and '%s'",
+        pyComparisonOp == Py_EQ ? "==" :
+        pyComparisonOp == Py_NE ? "!=" :
+        pyComparisonOp == Py_LT ? "<" :
+        pyComparisonOp == Py_LE ? "<=" :
+        pyComparisonOp == Py_GT ? ">" :
+        pyComparisonOp == Py_GE ? ">=" : "?",
+        name().c_str(),
+        name().c_str()
+        );
+    throw PythonExceptionSet();
 }
 
 void Class::repr(instance_ptr self, ReprAccumulator& stream) {
+    auto it = m_heldClass->getMemberFunctions().find(stream.isStrCall() ? "__str__" : "__repr__");
+
+    if (it != m_heldClass->getMemberFunctions().end()) {
+        PyObjectStealer selfAsPyObj(PyInstance::extractPythonObject(self, this));
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+            it->second,
+            selfAsPyObj
+            );
+
+        if (res.first) {
+            if (!res.second) {
+                throw PythonExceptionSet();
+            }
+            if (!PyUnicode_Check(res.second)) {
+                Py_DECREF(res.second);
+                throw std::runtime_error(
+                    stream.isStrCall() ? "__str__ returned a non-string" : "__repr__ returned a non-string"
+                    );
+            }
+
+            stream << PyUnicode_AsUTF8(res.second);
+            Py_DECREF(res.second);
+
+            return;
+        }
+
+        throw std::runtime_error(
+            stream.isStrCall() ? "Found a __str__ method but failed to call it with 'self'"
+                : "Found a __repr__ method but failed to call it with 'self'"
+            );
+    }
+
+
     layout& l = **(layout**)self;
     m_heldClass->repr(l.data, stream);
 }
 
 int32_t Class::hash32(instance_ptr left) {
+    auto it = m_heldClass->getMemberFunctions().find("__hash__");
+
+    if (it != m_heldClass->getMemberFunctions().end()) {
+        PyObjectStealer leftAsPyObj(PyInstance::extractPythonObject(left, this));
+
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
+            it->second,
+            leftAsPyObj
+            );
+        if (res.first) {
+            if (!res.second) {
+                throw PythonExceptionSet();
+            }
+            if (!PyLong_Check(res.second)) {
+                Py_DECREF(res.second);
+                throw std::runtime_error("__hash__ returned a non-int");
+            }
+
+            int32_t retval = PyLong_AsLong(res.second);
+            Py_DECREF(res.second);
+            if (retval == -1) {
+                retval = -2;
+            }
+
+            return retval;
+        }
+
+        throw std::runtime_error("Found a __hash__ method but failed to call it with 'self'");
+    }
+
     layout& l = **(layout**)left;
     return m_heldClass->hash32(l.data);
 }

@@ -5,8 +5,9 @@
 
 class ReprAccumulator {
 public:
-    ReprAccumulator(std::ostringstream& stream) :
-        m_stream(stream)
+    ReprAccumulator(std::ostringstream& stream, bool isStr=false) :
+        m_stream(stream),
+        m_isStr(isStr)
     {
     }
 
@@ -27,10 +28,17 @@ public:
         return *this;
     }
 
+    //if true, then this was invoked by a 'str' call, not a 'repr'.
+    bool isStrCall() const {
+        return m_isStr;
+    }
+
 private:
     std::ostringstream& m_stream;
 
     std::map<void*, int64_t> m_seen_objects;
+
+    bool m_isStr;
 };
 
 class PushReprState {

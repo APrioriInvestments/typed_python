@@ -1109,31 +1109,33 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
 }
 
 // static
-char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact) {
+bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
     if (t->getTypeCategory() == Type::TypeCategory::catValue) {
         Value* valType = (Value*)t;
-        return compare_to_python(valType->value().type(), valType->value().data(), other, exact);
+        return compare_to_python(valType->value().type(), valType->value().data(), other, exact, pyComparisonOp);
     }
+
+    auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
 
     Type* otherT = extractTypeFrom(other->ob_type);
 
     if (otherT) {
         if (otherT < t) {
-            return 1;
+            return convert(1);
         }
         if (otherT > t) {
-            return -1;
+            return convert(-1);
         }
-        return t->cmp(self, ((PyInstance*)other)->dataPtr());
+        return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp);
     }
 
     if (t->getTypeCategory() == Type::TypeCategory::catOneOf) {
         std::pair<Type*, instance_ptr> child = ((OneOf*)t)->unwrap(self);
-        return compare_to_python(child.first, child.second, other, exact);
+        return compare_to_python(child.first, child.second, other, exact, pyComparisonOp);
     }
 
     if (other == Py_None) {
-        return (t->getTypeCategory() == Type::TypeCategory::catNone ? 0 : 1);
+        return convert((t->getTypeCategory() == Type::TypeCategory::catNone ? 0 : 1));
     }
 
     if (PyBool_Check(other)) {
@@ -1143,12 +1145,12 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
         if (t->getTypeCategory() == Type::TypeCategory::catBool) {
             self_l = (*(bool*)self) ? 1 : 0;
         } else {
-            return -1;
+            return convert(-1);
         }
 
-        if (other_l < self_l) { return -1; }
-        if (other_l > self_l) { return 1; }
-        return 0;
+        if (other_l < self_l) { return convert(-1); }
+        if (other_l > self_l) { return convert(1); }
+        return convert(0);
     }
 
     if (PyLong_Check(other)) {
@@ -1175,25 +1177,25 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             self_l = (*(uint8_t*)self);
         } else if (t->getTypeCategory() == Type::TypeCategory::catFloat32) {
             if (exact) {
-                return -1;
+                return convert(-1);
             }
-            if (other_l < *(float*)self) { return -1; }
-            if (other_l > *(float*)self) { return 1; }
-            return 0;
+            if (other_l < *(float*)self) { return convert(-1); }
+            if (other_l > *(float*)self) { return convert(1); }
+            return convert(0);
         } else if (t->getTypeCategory() == Type::TypeCategory::catFloat64) {
             if (exact) {
-                return -1;
+                return convert(-1);
             }
-            if (other_l < *(double*)self) { return -1; }
-            if (other_l > *(double*)self) { return 1; }
-            return 0;
+            if (other_l < *(double*)self) { return convert(-1); }
+            if (other_l > *(double*)self) { return convert(1); }
+            return convert(0);
         } else {
-            return -1;
+            return convert(-1);
         }
 
-        if (other_l < self_l) { return -1; }
-        if (other_l > self_l) { return 1; }
-        return 0;
+        if (other_l < self_l) { return convert(-1); }
+        if (other_l > self_l) { return convert(1); }
+        return convert(0);
     }
 
     if (PyFloat_Check(other)) {
@@ -1206,7 +1208,7 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             self_d = (*(double*)self);
         } else {
             if (exact) {
-                return -1;
+                return convert(-1);
             }
             if (t->getTypeCategory() == Type::TypeCategory::catInt64) {
                 self_d = (*(int64_t*)self);
@@ -1227,13 +1229,13 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             } else if (t->getTypeCategory() == Type::TypeCategory::catUInt8) {
                 self_d = (*(uint8_t*)self);
             } else {
-                return -1;
+                return convert(-1);
             }
         }
 
-        if (other_d < self_d) { return -1; }
-        if (other_d > self_d) { return 1; }
-        return 0;
+        if (other_d < self_d) { return convert(-1); }
+        if (other_d > self_d) { return convert(1); }
+        return convert(0);
     }
 
     if (PyTuple_Check(other)) {
@@ -1241,16 +1243,19 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             TupleOf* tupT = (TupleOf*)t;
             int lenO = PyTuple_Size(other);
             int lenS = tupT->count(self);
+
             for (long k = 0; k < lenO && k < lenS; k++) {
-                char res = compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact);
-                if (res) {
-                    return res;
+                if (!compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_EQ)) {
+                    if (compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_LT)) {
+                        return convert(-1);
+                    }
+                    return convert(1);
                 }
             }
 
-            if (lenS < lenO) { return -1; }
-            if (lenS > lenO) { return 1; }
-            return 0;
+            if (lenS < lenO) { return convert(-1); }
+            if (lenS > lenO) { return convert(1); }
+            return convert(0);
         }
         if (t->getTypeCategory() == Type::TypeCategory::catTuple ||
                     t->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
@@ -1259,16 +1264,18 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             int lenS = tupT->getTypes().size();
 
             for (long k = 0; k < lenO && k < lenS; k++) {
-                char res = compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact);
-                if (res) {
-                    return res;
+                if (!compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_EQ)) {
+                    if (compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_LT)) {
+                        return convert(-1);
+                    }
+                    return convert(1);
                 }
             }
 
-            if (lenS < lenO) { return -1; }
-            if (lenS > lenO) { return 1; }
+            if (lenS < lenO) { return convert(-1); }
+            if (lenS > lenO) { return convert(1); }
 
-            return 0;
+            return convert(0);
         }
     }
 
@@ -1278,15 +1285,17 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             int lenO = PyList_Size(other);
             int lenS = listT->count(self);
             for (long k = 0; k < lenO && k < lenS; k++) {
-                char res = compare_to_python(listT->getEltType(), listT->eltPtr(self, k), PyList_GetItem(other,k), exact);
-                if (res) {
-                    return res;
+                if (!compare_to_python(listT->getEltType(), listT->eltPtr(self, k), PyList_GetItem(other,k), exact, Py_EQ)) {
+                    if (compare_to_python(listT->getEltType(), listT->eltPtr(self, k), PyList_GetItem(other,k), exact, Py_LT)) {
+                        return convert(-1);
+                    }
+                    return convert(1);
                 }
             }
 
-            if (lenS < lenO) { return -1; }
-            if (lenS > lenO) { return 1; }
-            return 0;
+            if (lenS < lenO) { return convert(-1); }
+            if (lenS > lenO) { return convert(1); }
+            return convert(0);
         }
     }
 
@@ -1296,100 +1305,93 @@ char PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
             kind == PyUnicode_2BYTE_KIND ? 2 : 4;
 
         if (bytesPer != ((String*)t)->bytes_per_codepoint(self)) {
-            return -1;
+            return convert(-1);
         }
 
         if (PyUnicode_GET_LENGTH(other) != ((String*)t)->count(self)) {
-            return -1;
+            return convert(-1);
         }
 
-        return memcmp(
+        return convert(memcmp(
             kind == PyUnicode_1BYTE_KIND ? (const char*)PyUnicode_1BYTE_DATA(other) :
             kind == PyUnicode_2BYTE_KIND ? (const char*)PyUnicode_2BYTE_DATA(other) :
                                            (const char*)PyUnicode_4BYTE_DATA(other),
             ((String*)t)->eltPtr(self, 0),
             PyUnicode_GET_LENGTH(other) * bytesPer
-            ) == 0 ? 0 : 1;
+            ));
     }
+
     if (PyBytes_Check(other) && t->getTypeCategory() == Type::TypeCategory::catBytes) {
         if (PyBytes_GET_SIZE(other) != ((Bytes*)t)->count(self)) {
-            return -1;
+            return convert(-1);
         }
 
-        return memcmp(
+        return convert(memcmp(
             PyBytes_AsString(other),
             ((Bytes*)t)->eltPtr(self, 0),
             PyBytes_GET_SIZE(other)
-            ) == 0 ? 0 : 1;
+            ));
     }
 
-    return -1;
+    return convert(-1);
+}
+
+int PyInstance::reversePyOpOrdering(int op) {
+    if (op == Py_LT) {
+        return Py_GT;
+    }
+    if (op == Py_LE) {
+        return Py_GE;
+    }
+    if (op == Py_GT) {
+        return Py_LT;
+    }
+    if (op == Py_GE) {
+        return Py_LE;
+    }
+
+    return op;
 }
 
 // static
 PyObject* PyInstance::tp_richcompare(PyObject *a, PyObject *b, int op) {
-    Type* own = extractTypeFrom(a->ob_type);
-    Type* other = extractTypeFrom(b->ob_type);
+    try {
+        Type* own = extractTypeFrom(a->ob_type);
+        Type* other = extractTypeFrom(b->ob_type);
 
-    if (!own && !other) {
-        PyErr_Format(PyExc_TypeError, "Can't call tp_richcompare where neither object is a typed_python object!");
-        return NULL;
-    }
-
-    if (!own || !other) {
-        char cmp;
-
-        if (own) {
-            cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false);
-        } else {
-            cmp = -compare_to_python(other, ((PyInstance*)b)->dataPtr(), a, false);
-        }
-
-        PyObject* res;
-        if (op == Py_EQ) {
-            res = cmp == 0 ? Py_True : Py_False;
-        } else if (op == Py_NE) {
-            res = cmp != 0 ? Py_True : Py_False;
-        } else {
-            PyErr_SetString(PyExc_TypeError, "invalid comparison");
+        if (!own && !other) {
+            PyErr_Format(PyExc_TypeError, "Can't call tp_richcompare where neither object is a typed_python object!");
             return NULL;
         }
 
-        Py_INCREF(res);
+        if (!own || !other) {
+            bool cmp;
 
-        return res;
-    } else {
-        char cmp = 0;
+            if (own) {
+                cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false, op);
+            } else {
+                cmp = compare_to_python(other, ((PyInstance*)b)->dataPtr(), a, false, reversePyOpOrdering(op));
+            }
 
-        if (own == other) {
-            cmp = own->cmp(((PyInstance*)a)->dataPtr(), ((PyInstance*)b)->dataPtr());
-        } else if (own < other) {
-            cmp = -1;
+            return incref(cmp ? Py_True : Py_False);
         } else {
-            cmp = 1;
+            bool result;
+
+            if (own < other) {
+                result = cmpResultToBoolForPyOrdering(op, -1);
+            } else if (own > other) {
+                result = cmpResultToBoolForPyOrdering(op, 1);
+            } else {
+                result = own->cmp(((PyInstance*)a)->dataPtr(), ((PyInstance*)b)->dataPtr(), op);
+            }
+
+            return incref(result ? Py_True : Py_False);
         }
-
-        PyObject* res;
-
-        if (op == Py_LT) {
-            res = (cmp < 0 ? Py_True : Py_False);
-        } else if (op == Py_LE) {
-            res = (cmp <= 0 ? Py_True : Py_False);
-        } else if (op == Py_EQ) {
-            res = (cmp == 0 ? Py_True : Py_False);
-        } else if (op == Py_NE) {
-            res = (cmp != 0 ? Py_True : Py_False);
-        } else if (op == Py_GT) {
-            res = (cmp > 0 ? Py_True : Py_False);
-        } else if (op == Py_GE) {
-            res = (cmp >= 0 ? Py_True : Py_False);
-        } else {
-            res = Py_NotImplemented;
-        }
-
-        Py_INCREF(res);
-
-        return res;
+    } catch(PythonExceptionSet& e) {
+        return NULL;
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
     }
 }
 
@@ -1437,6 +1439,7 @@ PyObject* PyInstance::tp_repr(PyObject *o) {
 // static
 PyObject* PyInstance::tp_str(PyObject *o) {
     Type* self_type = extractTypeFrom(o->ob_type);
+    PyInstance* self_w = (PyInstance*)o;
 
     if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
         self_type = self_type->getBaseType();
@@ -1454,7 +1457,14 @@ PyObject* PyInstance::tp_str(PyObject *o) {
         }
     }
 
-    return tp_repr(o);
+    std::ostringstream str;
+    ReprAccumulator accumulator(str, true);
+
+    str << std::showpoint;
+
+    self_type->repr(self_w->dataPtr(), accumulator);
+
+    return PyUnicode_FromString(str.str().c_str());
 }
 
 // static

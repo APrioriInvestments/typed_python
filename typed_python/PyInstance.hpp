@@ -183,6 +183,8 @@ public:
         }
     }
 
+    static int reversePyOpOrdering(int op);
+
     template<class T>
     static int specializeForTypeReturningInt(PyObject* obj, const T& f) {
         try {
@@ -431,7 +433,7 @@ public:
 
     static Py_hash_t tp_hash(PyObject *o);
 
-    static char compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact);
+    static bool compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op);
 

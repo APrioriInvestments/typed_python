@@ -8,11 +8,11 @@ void Type::repr(instance_ptr self, ReprAccumulator& out) {
     });
 }
 
-char Type::cmp(instance_ptr left, instance_ptr right) {
+bool Type::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     assertForwardsResolved();
 
     return this->check([&](auto& subtype) {
-        return subtype.cmp(left, right);
+        return subtype.cmp(left, right, pyComparisonOp);
     });
 }
 

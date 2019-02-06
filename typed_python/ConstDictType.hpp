@@ -71,8 +71,7 @@ public:
 
     int32_t hash32(instance_ptr left);
 
-    //to make this fast(er), we do dict size comparison first, then keys, then values
-    char cmp(instance_ptr left, instance_ptr right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
 

@@ -49,8 +49,8 @@ public:
         m_base->repr(self,stream);
     }
 
-    char cmp(instance_ptr left, instance_ptr right) {
-        return m_base->cmp(left,right);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+        return m_base->cmp(left,right,pyComparisonOp);
     }
 
     void constructor(instance_ptr self) {

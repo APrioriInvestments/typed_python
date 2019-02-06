@@ -89,39 +89,39 @@ int32_t ConstDict::hash32(instance_ptr left) {
 }
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
-char ConstDict::cmp(instance_ptr left, instance_ptr right) {
+bool ConstDict::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if (size(left) < size(right)) {
-        return -1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
     if (size(left) > size(right)) {
-        return 1;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
     if (*(layout**)left == *(layout**)right) {
-        return 0;
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
     int ct = count(left);
 
     for (long k = 0; k < ct; k++) {
-        char res = m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k));
-        if (res) {
-            return res;
+        if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE)) {
+            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_LT)) {
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+            }
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
     }
 
     for (long k = 0; k < ct; k++) {
-        char res = m_value->cmp(
-            kvPairPtrValue(left,k),
-            kvPairPtrValue(right,k)
-            );
-
-        if (res) {
-            return res;
+        if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
+            if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT)) {
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+            }
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
         }
     }
 
-    return 0;
+    return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
 void ConstDict::addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const {
@@ -225,7 +225,7 @@ void ConstDict::sortKvPairs(instance_ptr self) const {
         return;
     }
     else if (record.count == 2) {
-        if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1)) > 0) {
+        if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1), Py_GT)) {
             m_key->swap(kvPairPtrKey(self,0), kvPairPtrKey(self,1));
             m_value->swap(kvPairPtrValue(self,0), kvPairPtrValue(self,1));
         }
@@ -237,8 +237,7 @@ void ConstDict::sortKvPairs(instance_ptr self) const {
         }
 
         std::sort(indices.begin(), indices.end(), [&](int l, int r) {
-            char res = m_key->cmp(kvPairPtrKey(self,l),kvPairPtrKey(self,r));
-            return res < 0;
+            return m_key->cmp(kvPairPtrKey(self,l),kvPairPtrKey(self,r), Py_LT);
             });
 
         //create a temporary buffer
@@ -325,11 +324,10 @@ int64_t ConstDict::lookupIndexByKey(instance_ptr self, instance_ptr key) const {
 
     while (low < high) {
         long mid = (low+high)/2;
-        char res = m_key->cmp(kvPairPtrKey(self, mid), key);
 
-        if (res == 0) {
+        if (m_key->cmp(kvPairPtrKey(self, mid), key, Py_EQ)) {
             return mid;
-        } else if (res < 0) {
+        } else if (m_key->cmp(kvPairPtrKey(self, mid), key, Py_LT)) {
             low = mid+1;
         } else {
             high = mid;
