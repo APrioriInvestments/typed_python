@@ -25,5 +25,9 @@ public:
             return false;
         }
     }
+
+    static PyObject* extractPythonObjectConcrete(Value* valueType, instance_ptr data) {
+        return extractPythonObject(valueType->value().data(), valueType->value().type());
+    }
 };
 

@@ -28,6 +28,8 @@ public:
 
     static PyObject* constDictGet(PyObject* o, PyObject* args);
 
+    static PyMethodDef* typeMethodsConcrete();
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }

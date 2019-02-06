@@ -327,6 +327,68 @@ PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {
     return NULL;
 }
 
+PyObject* PyTupleOrListOfInstance::sq_item_concrete(Py_ssize_t ix) {
+    int64_t count = type()->count(dataPtr());
+
+    if (ix < 0) {
+        ix += count;
+    }
+
+    if (ix >= count || ix < 0) {
+        PyErr_SetString(PyExc_IndexError, "index out of range");
+        return NULL;
+    }
+
+    Type* eltType = type()->getEltType();
+
+    return extractPythonObject(
+        type()->eltPtr(dataPtr(), ix),
+        eltType
+        );
+}
+
+Py_ssize_t PyTupleOrListOfInstance::mp_and_sq_length_concrete() {
+    return type()->count(dataPtr());
+}
+
+PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
+    if (PySlice_Check(item)) {
+        Py_ssize_t start,stop,step,slicelength;
+
+        if (PySlice_GetIndicesEx(item, type()->count(dataPtr()), &start,
+                    &stop, &step, &slicelength) == -1) {
+            return NULL;
+        }
+
+        Type* eltType = type()->getEltType();
+
+        return PyInstance::initialize(type(), [&](instance_ptr data) {
+            type()->constructor(data, slicelength,
+                [&](uint8_t* eltPtr, int64_t k) {
+                    eltType->copy_constructor(
+                        eltPtr,
+                        type()->eltPtr(dataPtr(), start + k * step)
+                        );
+                    }
+                );
+        });
+    }
+
+    if (PyLong_Check(item)) {
+        return sq_item((PyObject*)this, PyLong_AsLong(item));
+    }
+
+    PyErr_SetObject(PyExc_KeyError, item);
+    return NULL;
+}
+
+PyMethodDef* PyTupleOfInstance::typeMethodsConcrete() {
+    return new PyMethodDef [3] {
+        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+        {NULL, NULL}
+    };
+}
+
 //static
 PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
     PyListOfInstance* self_w = (PyListOfInstance*)o;
@@ -519,30 +581,6 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
     return result;
 }
 
-PyObject* PyTupleOrListOfInstance::sq_item_concrete(Py_ssize_t ix) {
-    int64_t count = type()->count(dataPtr());
-
-    if (ix < 0) {
-        ix += count;
-    }
-
-    if (ix >= count || ix < 0) {
-        PyErr_SetString(PyExc_IndexError, "index out of range");
-        return NULL;
-    }
-
-    Type* eltType = type()->getEltType();
-
-    return extractPythonObject(
-        type()->eltPtr(dataPtr(), ix),
-        eltType
-        );
-}
-
-Py_ssize_t PyTupleOrListOfInstance::mp_and_sq_length_concrete() {
-    return type()->count(dataPtr());
-}
-
 
 int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
     Type* value_type = extractTypeFrom(value->ob_type);
@@ -586,35 +624,35 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
     return ((PyInstance*)this)->mp_ass_subscript_concrete(item, value);
 }
 
-PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
-    if (PySlice_Check(item)) {
-        Py_ssize_t start,stop,step,slicelength;
-
-        if (PySlice_GetIndicesEx(item, type()->count(dataPtr()), &start,
-                    &stop, &step, &slicelength) == -1) {
-            return NULL;
-        }
-
-        Type* eltType = type()->getEltType();
-
-        return PyInstance::initialize(type(), [&](instance_ptr data) {
-            type()->constructor(data, slicelength,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    eltType->copy_constructor(
-                        eltPtr,
-                        type()->eltPtr(dataPtr(), start + k * step)
-                        );
-                    }
-                );
-        });
-    }
-
-    if (PyLong_Check(item)) {
-        return sq_item((PyObject*)this, PyLong_AsLong(item));
-    }
-
-    PyErr_SetObject(PyExc_KeyError, item);
-    return NULL;
+PyMethodDef* PyListOfInstance::typeMethodsConcrete() {
+    return new PyMethodDef [12] {
+        {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
+        {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},
+        {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, NULL},
+        {"reserved", (PyCFunction)PyListOfInstance::listReserved, METH_VARARGS, NULL},
+        {"reserve", (PyCFunction)PyListOfInstance::listReserve, METH_VARARGS, NULL},
+        {"resize", (PyCFunction)PyListOfInstance::listResize, METH_VARARGS, NULL},
+        {"pop", (PyCFunction)PyListOfInstance::listPop, METH_VARARGS, NULL},
+        {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, NULL},
+        {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, NULL},
+        {NULL, NULL}
+    };
 }
 
+void PyListOfInstance::constructFromPythonArgumentsConcrete(ListOf* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
+    if (PyTuple_Size(args) == 1 && !kwargs) {
+        PyObject* arg = PyTuple_GetItem(args, 0);
+        Type* argType = extractTypeFrom(arg->ob_type);
 
+        if (argType && argType->isBinaryCompatibleWith(t)) {
+            //following python semantics, this needs to produce a new object
+            //that's a copy of the original list. We can't just incref it and return
+            //the original object because it has state.
+            ListOf* listT = (ListOf*)t;
+            listT->copyListObject(data, ((PyInstance*)arg)->dataPtr());
+            return;
+        }
+    }
+
+    PyInstance::constructFromPythonArgumentsConcrete(t, data, args, kwargs);
+}

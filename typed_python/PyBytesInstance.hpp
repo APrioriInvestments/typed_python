@@ -22,5 +22,13 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return PyBytes_Check(pyRepresentation);
     }
+
+    static PyObject* extractPythonObjectConcrete(Bytes* bytesType, instance_ptr data) {
+        return PyBytes_FromStringAndSize(
+            (const char*)Bytes().eltPtr(data, 0),
+            Bytes().count(data)
+            );
+    }
+
 };
 

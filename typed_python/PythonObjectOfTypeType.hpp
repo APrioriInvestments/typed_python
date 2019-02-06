@@ -1,5 +1,6 @@
 #pragma once
 
+#include "util.hpp"
 #include "Type.hpp"
 
 //wraps an actual python instance. Note that we assume we're holding the GIL whenever

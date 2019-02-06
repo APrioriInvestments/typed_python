@@ -33,5 +33,9 @@ public:
 
         return isinst > 0;
     }
+
+    static PyObject* extractPythonObjectConcrete(PythonObjectOfType* valueType, instance_ptr data) {
+        return incref(*(PyObject**)data);
+    }
 };
 

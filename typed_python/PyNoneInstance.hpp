@@ -17,5 +17,9 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
+
+    static PyObject* extractPythonObjectConcrete(None* valueType, instance_ptr data) {
+        return incref(Py_None);
+    }
 };
 

@@ -59,37 +59,7 @@ public:
 
     NamedTuple* type();
 
-    static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation) {
-        if (PyDict_Check(pyRepresentation)) {
-            if (namedTupleT->getTypes().size() < PyDict_Size(pyRepresentation)) {
-                throw std::runtime_error("Couldn't initialize type of " + namedTupleT->name() + " because supplied dictionary had too many items");
-            }
-            long actuallyUsed = 0;
+    static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation);
 
-            namedTupleT->constructor(tgt,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    const std::string& name = namedTupleT->getNames()[k];
-                    Type* t = namedTupleT->getTypes()[k];
-
-                    PyObject* o = PyDict_GetItemString(pyRepresentation, name.c_str());
-                    if (o) {
-                        copyConstructFromPythonInstance(t, eltPtr, o);
-                        actuallyUsed++;
-                    }
-                    else if (namedTupleT->is_default_constructible()) {
-                        t->constructor(eltPtr);
-                    } else {
-                        throw std::logic_error("Can't default initialize argument " + name);
-                    }
-                });
-
-            if (actuallyUsed != PyDict_Size(pyRepresentation)) {
-                throw std::runtime_error("Couldn't initialize type of " + namedTupleT->name() + " because supplied dictionary had unused arguments");
-            }
-
-            return;
-        }
-
-        PyInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation);
-    }
+    static void constructFromPythonArgumentsConcrete(NamedTuple* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 };

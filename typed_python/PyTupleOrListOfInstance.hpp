@@ -52,6 +52,10 @@ public:
     static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
 
     int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
+
+    static PyMethodDef* typeMethodsConcrete();
+
+    static void constructFromPythonArgumentsConcrete(ListOf* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 };
 
 class PyTupleOfInstance : public PyTupleOrListOfInstance {
@@ -59,4 +63,6 @@ public:
     typedef TupleOf modeled_type;
 
     TupleOf* type();
+
+    static PyMethodDef* typeMethodsConcrete();
 };

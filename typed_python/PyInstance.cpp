@@ -23,6 +23,7 @@
 #include "PyPythonSubclassInstance.hpp"
 #include "PyPythonObjectOfTypeInstance.hpp"
 #include "PyOneOfInstance.hpp"
+#include "PyForwardInstance.hpp"
 
 // static
 bool PyInstance::guaranteeForwardsResolved(Type* t) {
@@ -79,52 +80,18 @@ PyObject* PyInstance::undefinedBehaviorException() {
 
 // static
 PyMethodDef* PyInstance::typeMethods(Type* t) {
-    if (t->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        return new PyMethodDef [5] {
-            {"get", (PyCFunction)PyConstDictInstance::constDictGet, METH_VARARGS, NULL},
-            {"items", (PyCFunction)PyConstDictInstance::constDictItems, METH_NOARGS, NULL},
-            {"keys", (PyCFunction)PyConstDictInstance::constDictKeys, METH_NOARGS, NULL},
-            {"values", (PyCFunction)PyConstDictInstance::constDictValues, METH_NOARGS, NULL},
-            {NULL, NULL}
-        };
-    }
+    return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
+        typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 
-    if (t->getTypeCategory() == Type::TypeCategory::catTupleOf) {
-        return new PyMethodDef [3] {
-            {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
-            {NULL, NULL}
-        };
-    }
+        return py_instance_type::typeMethodsConcrete();
+    });
+}
 
-    if (t->getTypeCategory() == Type::TypeCategory::catListOf) {
-        return new PyMethodDef [12] {
-            {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
-            {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},
-            {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, NULL},
-            {"reserved", (PyCFunction)PyListOfInstance::listReserved, METH_VARARGS, NULL},
-            {"reserve", (PyCFunction)PyListOfInstance::listReserve, METH_VARARGS, NULL},
-            {"resize", (PyCFunction)PyListOfInstance::listResize, METH_VARARGS, NULL},
-            {"pop", (PyCFunction)PyListOfInstance::listPop, METH_VARARGS, NULL},
-            {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, NULL},
-            {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, NULL},
-            {NULL, NULL}
-        };
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catPointerTo) {
-        return new PyMethodDef [5] {
-            {"initialize", (PyCFunction)PyPointerToInstance::pointerInitialize, METH_VARARGS, NULL},
-            {"set", (PyCFunction)PyPointerToInstance::pointerSet, METH_VARARGS, NULL},
-            {"get", (PyCFunction)PyPointerToInstance::pointerGet, METH_VARARGS, NULL},
-            {"cast", (PyCFunction)PyPointerToInstance::pointerCast, METH_VARARGS, NULL},
-            {NULL, NULL}
-        };
-    }
-
+PyMethodDef* PyInstance::typeMethodsConcrete() {
     return new PyMethodDef [2] {
         {NULL, NULL}
     };
-};
+}
 
 // static
 void PyInstance::tp_dealloc(PyObject* self) {
@@ -192,245 +159,79 @@ void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance
 void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
     guaranteeForwardsResolvedOrThrow(t);
 
-    Type::TypeCategory cat = t->getTypeCategory();
+    //dispatch to the appropriate PyInstance subclass
+    specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
+        typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 
-    if (cat == Type::TypeCategory::catPythonSubclass) {
-        constructFromPythonArguments(data, (Type*)t->getBaseType(), args, kwargs);
-        return;
-    }
-
-    if (cat == Type::TypeCategory::catConcreteAlternative) {
-        ConcreteAlternative* alt = (ConcreteAlternative*)t;
-        alt->constructor(data, [&](instance_ptr p) {
-            if ((kwargs == nullptr || PyDict_Size(kwargs) == 0) && PyTuple_Size(args) == 1) {
-                //construct an alternative from a single argument.
-                //if it's a binary compatible subtype of the alternative we're constructing, then
-                //invoke the copy constructor.
-                PyObject* arg = PyTuple_GetItem(args, 0);
-                Type* argType = extractTypeFrom(arg->ob_type);
-
-                if (argType && argType->isBinaryCompatibleWith(alt)) {
-                    //it's already the right kind of instance, so we can copy-through the underlying element
-                    alt->elementType()->copy_constructor(p, alt->eltPtr(((PyInstance*)arg)->dataPtr()));
-                    return;
-                }
-
-                //otherwise, if we have exactly one subelement, attempt to construct from that
-                if (alt->elementType()->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
-                    throw std::runtime_error("ConcreteAlternatives are supposed to only contain NamedTuples");
-                }
-
-                NamedTuple* alternativeEltType = (NamedTuple*)alt->elementType();
-
-                if (alternativeEltType->getTypes().size() != 1) {
-                    throw std::logic_error("Can't initialize " + t->name() + " with positional arguments because it doesn't have only one field.");
-                }
-
-                PyInstance::copyConstructFromPythonInstance(alternativeEltType->getTypes()[0], p, arg);
-            } else if (PyTuple_Size(args) == 0) {
-                //construct an alternative from Kwargs
-                constructFromPythonArguments(p, alt->elementType(), args, kwargs);
-            } else {
-                throw std::logic_error("Can only initialize " + t->name() + " from python with kwargs or a single in-place argument");
-            }
-        });
-        return;
-    }
-
-    if (cat == Type::TypeCategory::catListOf) {
-        if (PyTuple_Size(args) == 1 && !kwargs) {
-            PyObject* arg = PyTuple_GetItem(args, 0);
-            Type* argType = extractTypeFrom(arg->ob_type);
-
-            if (argType && argType->isBinaryCompatibleWith(t)) {
-                //following python semantics, this needs to produce a new object
-                //that's a copy of the original list. We can't just incref it and return
-                //the original object because it has state.
-                ListOf* listT = (ListOf*)t;
-                listT->copyListObject(data, ((PyInstance*)arg)->dataPtr());
-                return;
-            }
-        }
-    }
-
-    if (cat == Type::TypeCategory::catClass) {
-        Class* classT = (Class*)t;
-
-        classT->constructor(data);
-
-        auto it = classT->getMemberFunctions().find("__init__");
-        if (it == classT->getMemberFunctions().end()) {
-            //run the default constructor
-            PyClassInstance::initializeClassWithDefaultArguments(classT, data, args, kwargs);
-            return;
-        }
-
-        Function* initMethod = it->second;
-
-        PyObject* selfAsObject = PyInstance::initialize(classT, [&](instance_ptr selfData) {
-            classT->copy_constructor(selfData, data);
-        });
-
-        PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+1);
-
-        PyTuple_SetItem(targetArgTuple, 0, selfAsObject); //steals the reference to the new 'selfAsObject'
-
-        for (long k = 0; k < PyTuple_Size(args); k++) {
-            PyTuple_SetItem(targetArgTuple, k+1, incref(PyTuple_GetItem(args, k))); //have to incref because of stealing
-        }
-
-        bool threw = false;
-        bool ran = false;
-
-        for (const auto& overload: initMethod->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, targetArgTuple, kwargs);
-            if (res.first) {
-                //res.first is true if we matched and tried to call this function
-                if (res.second) {
-                    //don't need the result.
-                    Py_DECREF(res.second);
-                    ran = true;
-                } else {
-                    //it threw an exception
-                    ran = true;
-                    threw = true;
-                }
-
-                break;
-            }
-        }
-
-        Py_DECREF(targetArgTuple);
-
-        if (!ran) {
-            throw std::runtime_error("Cannot find a valid overload of __init__ with these arguments.");
-        }
-
-        if (threw) {
-            throw PythonExceptionSet();
-        }
-
-        return;
-    }
-
-    if (kwargs == NULL) {
-        if (args == NULL || PyTuple_Size(args) == 0) {
-            if (t->is_default_constructible()) {
-                t->constructor(data);
-                return;
-            }
-        }
-
-        if (PyTuple_Size(args) == 1) {
-            PyObject* argTuple = PyTuple_GetItem(args, 0);
-
-            copyConstructFromPythonInstance(t, data, argTuple);
-
-            return;
-        }
-
-        throw std::logic_error("Can't initialize " + t->name() + " with these in-place arguments.");
-    } else {
-        if (cat == Type::TypeCategory::catNamedTuple) {
-            long actuallyUsed = 0;
-
-            CompositeType* compositeT = ((CompositeType*)t);
-
-            compositeT->constructor(
-                data,
-                [&](uint8_t* eltPtr, int64_t k) {
-                    Type* eltType = compositeT->getTypes()[k];
-                    PyObject* o = PyDict_GetItemString(kwargs, compositeT->getNames()[k].c_str());
-                    if (o) {
-                        copyConstructFromPythonInstance(eltType, eltPtr, o);
-                        actuallyUsed++;
-                    }
-                    else if (eltType->is_default_constructible()) {
-                        eltType->constructor(eltPtr);
-                    } else {
-                        throw std::logic_error("Can't default initialize argument " + compositeT->getNames()[k]);
-                    }
-                });
-
-            if (actuallyUsed != PyDict_Size(kwargs)) {
-                throw std::runtime_error("Couldn't initialize type of " + t->name() + " because supplied dictionary had unused arguments");
-            }
-
-            return;
-        }
-
-        throw std::logic_error("Can't initialize " + t->name() + " from python with kwargs.");
-    }
+        py_instance_type::constructFromPythonArgumentsConcrete(
+            (typename py_instance_type::modeled_type*)t,
+            data,
+            args,
+            kwargs
+            );
+    });
 }
 
+void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
+    if (kwargs == NULL && (args == NULL || PyTuple_Size(args) == 0)) {
+        if (t->is_default_constructible()) {
+            t->constructor(data);
+            return;
+        }
+    }
+
+    if (kwargs == NULL && PyTuple_Size(args) == 1) {
+        PyObject* argTuple = PyTuple_GetItem(args, 0);
+
+        copyConstructFromPythonInstance(t, data, argTuple);
+
+        return;
+    }
+
+    throw std::logic_error("Can't initialize " + t->name() + " with this signature.");
+}
 
 /**
- *  produce the pythonic representation of this object. for things like integers, string, etc,
- *  convert them back to their python-native form. otherwise, a pointer back into a native python
- *  structure
+ * produce the pythonic representation of this object. for values that have a direct python representation,
+ * such as integers, strings, bools, or None, we return an actual python object. Otherwise,
+ * we return a pointer to a PyInstance representing the object.
  */
 // static
 PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
-    if (eltType->getTypeCategory() == Type::TypeCategory::catPythonObjectOfType) {
-        PyObject* res = *(PyObject**)data;
-        Py_INCREF(res);
-        return res;
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catValue) {
-        Value* valueType = (Value*)eltType;
-        return extractPythonObject(valueType->value().data(), valueType->value().type());
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catNone) {
-        Py_INCREF(Py_None);
-        return Py_None;
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catInt64) {
-        return PyLong_FromLong(*(int64_t*)data);
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catBool) {
-        PyObject* res = *(bool*)data ? Py_True : Py_False;
-        Py_INCREF(res);
-        return res;
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catFloat64) {
-        return PyFloat_FromDouble(*(double*)data);
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catFloat32) {
-        return PyFloat_FromDouble(*(float*)data);
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catBytes) {
-        return PyBytes_FromStringAndSize(
-            (const char*)Bytes().eltPtr(data, 0),
-            Bytes().count(data)
+    //dispatch to the appropriate Py[]Instance type
+    PyObject* result = specializeStatic(eltType->getTypeCategory(), [&](auto* concrete_null_ptr) {
+        typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
+
+        return py_instance_type::extractPythonObjectConcrete(
+            (typename py_instance_type::modeled_type*)eltType,
+            data
             );
-    }
-    if (eltType->getTypeCategory() == Type::TypeCategory::catString) {
-        int bytes_per_codepoint = String().bytes_per_codepoint(data);
+    });
 
-        return PyUnicode_FromKindAndData(
-            bytes_per_codepoint == 1 ? PyUnicode_1BYTE_KIND :
-            bytes_per_codepoint == 2 ? PyUnicode_2BYTE_KIND :
-                                       PyUnicode_4BYTE_KIND,
-            String().eltPtr(data, 0),
-            String().count(data)
-            );
+    if (result) {
+        return result;
     }
 
-    if (eltType->getTypeCategory() == Type::TypeCategory::catOneOf) {
-        std::pair<Type*, instance_ptr> child = ((OneOf*)eltType)->unwrap(data);
-        return extractPythonObject(child.second, child.first);
+    if (!result && PyErr_Occurred()) {
+        return NULL;
     }
-
-    Type* concreteT = eltType->pickConcreteSubclass(data);
 
     try {
+        Type* concreteT = eltType->pickConcreteSubclass(data);
+
         return PyInstance::initialize(concreteT, [&](instance_ptr selfData) {
             concreteT->copy_constructor(selfData, data);
         });
+    } catch(PythonExceptionSet& e) {
+        return NULL;
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
     }
+}
+
+PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
+    return NULL;
 }
 
 // static

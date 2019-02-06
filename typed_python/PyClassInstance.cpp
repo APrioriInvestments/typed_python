@@ -169,3 +169,62 @@ Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
 
     return result;
 }
+
+
+
+
+void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_t* data, PyObject* args, PyObject* kwargs) {
+    classT->constructor(data);
+
+    auto it = classT->getMemberFunctions().find("__init__");
+    if (it == classT->getMemberFunctions().end()) {
+        //run the default constructor
+        PyClassInstance::initializeClassWithDefaultArguments(classT, data, args, kwargs);
+        return;
+    }
+
+    Function* initMethod = it->second;
+
+    PyObject* selfAsObject = PyInstance::initialize(classT, [&](instance_ptr selfData) {
+        classT->copy_constructor(selfData, data);
+    });
+
+    PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+1);
+
+    PyTuple_SetItem(targetArgTuple, 0, selfAsObject); //steals the reference to the new 'selfAsObject'
+
+    for (long k = 0; k < PyTuple_Size(args); k++) {
+        PyTuple_SetItem(targetArgTuple, k+1, incref(PyTuple_GetItem(args, k))); //have to incref because of stealing
+    }
+
+    bool threw = false;
+    bool ran = false;
+
+    for (const auto& overload: initMethod->getOverloads()) {
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, targetArgTuple, kwargs);
+        if (res.first) {
+            //res.first is true if we matched and tried to call this function
+            if (res.second) {
+                //don't need the result.
+                Py_DECREF(res.second);
+                ran = true;
+            } else {
+                //it threw an exception
+                ran = true;
+                threw = true;
+            }
+
+            break;
+        }
+    }
+
+    Py_DECREF(targetArgTuple);
+
+    if (!ran) {
+        throw std::runtime_error("Cannot find a valid overload of __init__ with these arguments.");
+    }
+
+    if (threw) {
+        throw PythonExceptionSet();
+    }
+}

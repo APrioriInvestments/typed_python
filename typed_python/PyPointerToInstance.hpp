@@ -21,4 +21,6 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
+
+    static PyMethodDef* typeMethodsConcrete();
 };

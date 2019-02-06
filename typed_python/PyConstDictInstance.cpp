@@ -275,3 +275,13 @@ PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
     PyErr_SetObject(PyExc_KeyError, item);
     return NULL;
 }
+
+PyMethodDef* PyConstDictInstance::typeMethodsConcrete() {
+    return new PyMethodDef [5] {
+        {"get", (PyCFunction)PyConstDictInstance::constDictGet, METH_VARARGS, NULL},
+        {"items", (PyCFunction)PyConstDictInstance::constDictItems, METH_NOARGS, NULL},
+        {"keys", (PyCFunction)PyConstDictInstance::constDictKeys, METH_NOARGS, NULL},
+        {"values", (PyCFunction)PyConstDictInstance::constDictValues, METH_NOARGS, NULL},
+        {NULL, NULL}
+    };
+}

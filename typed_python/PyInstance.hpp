@@ -32,6 +32,7 @@ class PyValueInstance;
 class PyPythonSubclassInstance;
 class PyPythonObjectOfTypeInstance;
 class PyOneOfInstance;
+class PyForwardInstance;
 
 template<class T>
 class PyRegisterTypeInstance;
@@ -175,6 +176,8 @@ public:
                 return f((PyBytesInstance*)nullptr);
             case Type::TypeCategory::catOneOf:
                 return f((PyOneOfInstance*)nullptr);
+            case Type::TypeCategory::catForward:
+                return f((PyForwardInstance*)nullptr);
             default:
                 throw std::runtime_error("Invalid type category. Memory must have been corrupted.");
         }
@@ -270,6 +273,8 @@ public:
 
     static PyMethodDef* typeMethods(Type* t);
 
+    static PyMethodDef* typeMethodsConcrete();
+
     static void tp_dealloc(PyObject* self);
 
     static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation);
@@ -280,10 +285,16 @@ public:
 
     static void constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs);
 
-    //produce the pythonic representation of this object. for things like integers, string, etc,
-    //convert them back to their python-native form. otherwise, a pointer back into a native python
-    //structure
+    static void constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, PyObject* args, PyObject* kwargs);
+
+    //produce the pythonic representation of this object. for values that have a direct python representation,
+    //such as integers, strings, bools, or None, we return an actual python object. Otherwise,
+    //we return a pointer to a PyInstance representing the object.
     static PyObject* extractPythonObject(instance_ptr data, Type* eltType);
+
+    //if we have a python representation that we want to use for this object, override and return not-NULL.
+    //otherwise, this version takes over and returns a PyInstance wrapper for the object
+    static PyObject* extractPythonObjectConcrete(Type* eltType, instance_ptr data);
 
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
 

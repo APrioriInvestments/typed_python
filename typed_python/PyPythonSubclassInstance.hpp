@@ -13,5 +13,9 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
+
+    static void constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
+        constructFromPythonArguments(data, (Type*)t->getBaseType(), args, kwargs);
+    }
 };
 

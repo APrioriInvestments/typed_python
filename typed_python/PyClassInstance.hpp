@@ -16,6 +16,8 @@ public:
         return true;
     }
 
+    static void constructFromPythonArgumentsConcrete(Class* t, uint8_t* data, PyObject* args, PyObject* kwargs);
+
     PyObject* mp_subscript_concrete(PyObject* item);
 
     Py_ssize_t mp_and_sq_length_concrete();

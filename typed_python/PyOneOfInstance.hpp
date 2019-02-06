@@ -30,5 +30,10 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
+
+    static PyObject* extractPythonObjectConcrete(modeled_type* oneofT, instance_ptr data) {
+        std::pair<Type*, instance_ptr> child = oneofT->unwrap(data);
+        return extractPythonObject(child.second, child.first);
+    }
 };
 

@@ -69,5 +69,18 @@ public:
 
         return true;
     }
+
+    static PyObject* extractPythonObjectConcrete(RegisterType<T>* t, instance_ptr data) {
+        if (t->getTypeCategory() == Type::TypeCategory::catInt64) {
+            return PyLong_FromLong(*(int64_t*)data);
+        }
+        if (t->getTypeCategory() == Type::TypeCategory::catFloat64) {
+            return PyFloat_FromDouble(*(double*)data);
+        }
+        if (t->getTypeCategory() == Type::TypeCategory::catBool) {
+            return incref(*(bool*)data ? Py_True : Py_False);
+        }
+        return NULL;
+    }
 };
 
