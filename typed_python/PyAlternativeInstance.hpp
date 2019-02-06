@@ -8,7 +8,11 @@ public:
 
     Alternative* type();
 
+    PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* ternary, const char* op, const char* opErr);
+
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
@@ -21,7 +25,11 @@ public:
 
     ConcreteAlternative* type();
 
+    PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* ternary, const char* op, const char* opErr);
+
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;

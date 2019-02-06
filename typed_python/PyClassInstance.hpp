@@ -22,5 +22,13 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
-    std::pair<bool, PyObject*> callMemberFunction(const char* name, PyObject* arg=nullptr);
+    std::pair<bool, PyObject*> callMemberFunction(const char* name, PyObject* arg0=nullptr, PyObject* arg1=nullptr);
+
+    PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
+
+    PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
+
+    PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErr);
+
+    PyObject* pyTernaryUnaryOperatorConcrete(PyObject* rhs, PyObject* ternaryArg, const char* op, const char* opErr);
 };

@@ -300,15 +300,85 @@ public:
 
     static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs);
 
+    static PyObject* pyUnaryOperator(PyObject* lhs, const char* op, const char* opErrRep);
+
     static PyObject* pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep);
+
+    static PyObject* pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* ternary, const char* op, const char* opErrRep);
+
+    PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErrRep);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep);
 
     PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep);
 
+    PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErrRep);
+
+    static PyObject* nb_inplace_add(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_subtract(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_multiply(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_remainder(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_power(PyObject* lhs, PyObject* rhs, PyObject* modOrNone);
+
+    static PyObject* nb_inplace_lshift(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_rshift(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_and(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_xor(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_or(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_floor_divide(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_true_divide(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_floor_divide(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_true_divide(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_inplace_matrix_multiply(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_power(PyObject* lhs, PyObject* rhs, PyObject* modOrNone);
+
+    static PyObject* nb_negative(PyObject* lhs);
+
+    static PyObject* nb_positive(PyObject* lhs);
+
+    static PyObject* nb_absolute(PyObject* lhs);
+
+    static PyObject* nb_invert(PyObject* lhs);
+
+    static PyObject* nb_int(PyObject* lhs);
+
+    static PyObject* nb_float(PyObject* lhs);
+
+    static PyObject* nb_index(PyObject* lhs);
+
     static PyObject* nb_add(PyObject* lhs, PyObject* rhs);
 
     static PyObject* nb_subtract(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_multiply(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_remainder(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_lshift(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_and(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_or(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_xor(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_matmul(PyObject* lhs, PyObject* rhs);
+
+    static PyObject* nb_divmod(PyObject* lhs, PyObject* rhs);
 
     static PyObject* sq_item(PyObject* o, Py_ssize_t ix);
 

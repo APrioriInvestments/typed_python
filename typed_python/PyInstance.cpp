@@ -290,6 +290,12 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
     }
 }
 
+PyObject* PyInstance::pyUnaryOperator(PyObject* lhs, const char* op, const char* opErrRep) {
+    return specializeForType(lhs, [&](auto& subtype) {
+        return subtype.pyUnaryOperatorConcrete(op, opErrRep);
+    });
+}
+
 PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep) {
     if (extractTypeFrom(lhs->ob_type)) {
         return specializeForType(lhs, [&](auto& subtype) {
@@ -303,7 +309,42 @@ PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, c
         });
     }
 
+    PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to binary operator %s",
+        lhs->ob_type,
+        rhs->ob_type,
+        op
+        );
+
+    return NULL;
 }
+
+PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* thirdArg, const char* op, const char* opErrRep) {
+    if (extractTypeFrom(lhs->ob_type)) {
+        return specializeForType(lhs, [&](auto& subtype) {
+            return subtype.pyTernaryOperatorConcrete(rhs, thirdArg, op, opErrRep);
+        });
+    }
+
+    PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to binary operator %s",
+        lhs->ob_type,
+        rhs->ob_type,
+        op
+        );
+
+    return NULL;
+}
+
+PyObject* PyInstance::pyUnaryOperatorConcrete(const char* op, const char* opErrRep) {
+    PyErr_Format(
+        PyExc_TypeError,
+        "bad operand type for unary %s: '%S'",
+        opErrRep,
+        ((PyObject*)this)->ob_type
+        );
+
+    return NULL;
+}
+
 
 PyObject* PyInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep) {
     PyErr_Format(
@@ -331,9 +372,162 @@ PyObject* PyInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, c
     return NULL;
 }
 
+PyObject* PyInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErrRep) {
+    if (third != Py_None) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "unsupported operand type(s) for ** or pow() %s: '%S', '%S', '%S'",
+            opErrRep,
+            ((PyObject*)this)->ob_type,
+            ((PyObject*)rhs)->ob_type,
+            ((PyObject*)third)->ob_type
+            );
+    } else {
+        PyErr_Format(
+            PyExc_TypeError,
+            "unsupported operand type for pow() %s: '%S' and '%S'",
+            opErrRep,
+            ((PyObject*)this)->ob_type,
+            ((PyObject*)rhs)->ob_type
+            );
+    }
+
+    return NULL;
+}
+
+PyObject* PyInstance::nb_inplace_add(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__iadd__", "+=");
+}
+
+PyObject* PyInstance::nb_inplace_subtract(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__isub__", "-=");
+}
+
+PyObject* PyInstance::nb_inplace_multiply(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__imul__", "*=");
+}
+
+PyObject* PyInstance::nb_inplace_remainder(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__imod__", "%=");
+}
+
+PyObject* PyInstance::nb_inplace_power(PyObject* lhs, PyObject* rhs, PyObject* modOrNone) {
+    return pyOperator(lhs, rhs, "__ipow__", "**=");
+}
+
+PyObject* PyInstance::nb_inplace_lshift(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__ilshift__", "<<=");
+}
+
+PyObject* PyInstance::nb_inplace_rshift(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__irshift__", ">>=");
+}
+
+PyObject* PyInstance::nb_inplace_and(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__iand__", "&=");
+}
+
+PyObject* PyInstance::nb_inplace_xor(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__ixor__", "^=");
+}
+
+PyObject* PyInstance::nb_inplace_or(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__ior__", "|=");
+}
+
+PyObject* PyInstance::nb_floor_divide(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__floordiv__", "//");
+}
+
+PyObject* PyInstance::nb_true_divide(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__div__", ".");
+}
+
+PyObject* PyInstance::nb_inplace_floor_divide(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__ifloordiv__", "//=");
+}
+
+PyObject* PyInstance::nb_inplace_true_divide(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__itruediv__", "/=");
+}
+
+PyObject* PyInstance::nb_inplace_matrix_multiply(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__imatmul__", "@=");
+}
+
+// static
+PyObject* PyInstance::nb_negative(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__neg__", "-");
+}
+
+// static
+PyObject* PyInstance::nb_positive(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__pos__", "+");
+}
+
+// static
+PyObject* PyInstance::nb_absolute(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__abs__", "+");
+}
+
+// static
+PyObject* PyInstance::nb_invert(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__invert__", "~");
+}
+
+// static
+PyObject* PyInstance::nb_int(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__int__", "+");
+}
+
+// static
+PyObject* PyInstance::nb_float(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__float__", "+");
+}
+
+// static
+PyObject* PyInstance::nb_index(PyObject* lhs) {
+    return pyUnaryOperator(lhs, "__index__", "+");
+}
+
+// static
+PyObject* PyInstance::nb_matmul(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__matmul__", "@");
+}
+
+// static
+PyObject* PyInstance::nb_divmod(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "divmod", "divmod");
+}
+
+// static
+PyObject* PyInstance::nb_power(PyObject* lhs, PyObject* rhs, PyObject* modOrNone) {
+    return pyTernaryOperator(lhs, rhs, modOrNone, "__pow__", "**");
+}
+
+// static
+PyObject* PyInstance::nb_and(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__and__", "&");
+}
+
+// static
+PyObject* PyInstance::nb_xor(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__xor__", "^");
+}
+
+// static
+PyObject* PyInstance::nb_or(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__or__", "|");
+}
+
 // static
 PyObject* PyInstance::nb_rshift(PyObject* lhs, PyObject* rhs) {
     return pyOperator(lhs, rhs, "__rshift__", ">>");
+}
+
+// static
+PyObject* PyInstance::nb_lshift(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__lshift__", "<<");
 }
 
 // static
@@ -344,6 +538,16 @@ PyObject* PyInstance::nb_add(PyObject* lhs, PyObject* rhs) {
 // static
 PyObject* PyInstance::nb_subtract(PyObject* lhs, PyObject* rhs) {
     return pyOperator(lhs, rhs, "__sub__", "-");
+}
+
+// static
+PyObject* PyInstance::nb_multiply(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__mul__", "*");
+}
+
+// static
+PyObject* PyInstance::nb_remainder(PyObject* lhs, PyObject* rhs) {
+    return pyOperator(lhs, rhs, "__mod__", "%");
 }
 
 // static
@@ -399,40 +603,40 @@ PyNumberMethods* PyInstance::numberMethods(Type* t) {
             //we should probably just unify them
             nb_add, //binaryfunc nb_add
             nb_subtract, //binaryfunc nb_subtract
-            0, //binaryfunc nb_multiply
-            0, //binaryfunc nb_remainder
-            0, //binaryfunc nb_divmod
-            0, //ternaryfunc nb_power
-            0, //unaryfunc nb_negative
-            0, //unaryfunc nb_positive
-            0, //unaryfunc nb_absolute
+            nb_multiply, //binaryfunc nb_multiply
+            nb_remainder, //binaryfunc nb_remainder
+            nb_divmod, //binaryfunc nb_divmod
+            nb_power, //ternaryfunc nb_power
+            nb_negative, //unaryfunc nb_negative
+            nb_positive, //unaryfunc nb_positive
+            nb_absolute, //unaryfunc nb_absolute
             0, //inquiry nb_bool
-            0, //unaryfunc nb_invert
-            0, //binaryfunc nb_lshift
+            nb_invert, //unaryfunc nb_invert
+            nb_lshift, //binaryfunc nb_lshift
             nb_rshift, //binaryfunc nb_rshift
-            0, //binaryfunc nb_and
-            0, //binaryfunc nb_xor
-            0, //binaryfunc nb_or
-            0, //unaryfunc nb_int
+            nb_and, //binaryfunc nb_and
+            nb_xor, //binaryfunc nb_xor
+            nb_or, //binaryfunc nb_or
+            nb_int, //unaryfunc nb_int
             0, //void *nb_reserved
-            0, //unaryfunc nb_float
-            0, //binaryfunc nb_inplace_add
-            0, //binaryfunc nb_inplace_subtract
-            0, //binaryfunc nb_inplace_multiply
-            0, //binaryfunc nb_inplace_remainder
-            0, //ternaryfunc nb_inplace_power
-            0, //binaryfunc nb_inplace_lshift
-            0, //binaryfunc nb_inplace_rshift
-            0, //binaryfunc nb_inplace_and
-            0, //binaryfunc nb_inplace_xor
-            0, //binaryfunc nb_inplace_or
-            0, //binaryfunc nb_floor_divide
-            0, //binaryfunc nb_true_divide
-            0, //binaryfunc nb_inplace_floor_divide
-            0, //binaryfunc nb_inplace_true_divide
-            0, //unaryfunc nb_index
-            0, //binaryfunc nb_matrix_multiply
-            0  //binaryfunc nb_inplace_matrix_multiply
+            nb_float, //unaryfunc nb_float
+            nb_inplace_add, //binaryfunc nb_inplace_add
+            nb_inplace_subtract, //binaryfunc nb_inplace_subtract
+            nb_inplace_multiply, //binaryfunc nb_inplace_multiply
+            nb_inplace_remainder, //binaryfunc nb_inplace_remainder
+            nb_inplace_power, //ternaryfunc nb_inplace_power
+            nb_inplace_lshift, //binaryfunc nb_inplace_lshift
+            nb_inplace_rshift, //binaryfunc nb_inplace_rshift
+            nb_inplace_and, //binaryfunc nb_inplace_and
+            nb_inplace_xor, //binaryfunc nb_inplace_xor
+            nb_inplace_or, //binaryfunc nb_inplace_or
+            nb_floor_divide, //binaryfunc nb_floor_divide
+            nb_true_divide, //binaryfunc nb_true_divide
+            nb_inplace_floor_divide, //binaryfunc nb_inplace_floor_divide
+            nb_inplace_true_divide, //binaryfunc nb_inplace_true_divide
+            nb_index, //unaryfunc nb_index
+            nb_matmul, //binaryfunc nb_matrix_multiply
+            nb_inplace_matrix_multiply  //binaryfunc nb_inplace_matrix_multiply
             };
 }
 

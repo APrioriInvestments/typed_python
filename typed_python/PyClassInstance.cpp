@@ -84,7 +84,59 @@ int PyClassInstance::classInstanceSetAttributeFromPyObject(Class* cls, instance_
     }
 }
 
-std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name, PyObject* arg0) {
+PyObject* PyClassInstance::pyUnaryOperatorConcrete(const char* op, const char* opErr) {
+    std::pair<bool, PyObject*> res = callMemberFunction(op);
+
+    if (!res.first) {
+        return PyInstance::pyUnaryOperatorConcrete(op, opErr);
+    }
+
+    return res.second;
+}
+
+PyObject* PyClassInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
+    std::pair<bool, PyObject*> res = callMemberFunction(op, rhs);
+
+    if (!res.first) {
+        return PyInstance::pyOperatorConcrete(rhs, op, opErr);
+    }
+
+    return res.second;
+}
+
+PyObject* PyClassInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErr) {
+    char buf[50];
+    strncpy(buf+1, op, 45);
+    buf[0] = '_';
+    buf[2] = 'r';
+
+    std::pair<bool, PyObject*> res = callMemberFunction(buf, lhs);
+
+    if (!res.first) {
+        return PyInstance::pyOperatorConcreteReverse(lhs, buf, opErr);
+    }
+
+    return res.second;
+}
+
+PyObject* PyClassInstance::pyTernaryUnaryOperatorConcrete(PyObject* rhs, PyObject* ternaryArg, const char* op, const char* opErr) {
+    if (ternaryArg == Py_None) {
+        //if you pass 'None' as the third argument, python calls your class
+        //__pow__ function with two arguments. This is the behavior for
+        //'instance ** b' as well as if you write 'pow(instance,b,None)'
+        return pyOperatorConcrete(rhs, op, opErr);
+    }
+
+    std::pair<bool, PyObject*> res = callMemberFunction(op, rhs, ternaryArg);
+
+    if (!res.first) {
+        return PyInstance::pyTernaryOperatorConcrete(rhs, ternaryArg, op, opErr);
+    }
+
+    return res.second;
+}
+
+std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name, PyObject* arg0, PyObject* arg1) {
     auto it = type()->getMemberFunctions().find(name);
 
     if (it == type()->getMemberFunctions().end()) {
@@ -97,6 +149,9 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
     if (arg0) {
         argCount += 1;
     }
+    if (arg1) {
+        argCount += 1;
+    }
 
     PyObject* targetArgTuple = PyTuple_New(argCount);
 
@@ -104,6 +159,10 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
 
     if (arg0) {
         PyTuple_SetItem(targetArgTuple, 1, incref(arg0)); //steals a reference
+    }
+
+    if (arg1) {
+        PyTuple_SetItem(targetArgTuple, 2, incref(arg1)); //steals a reference
     }
 
     bool threw = false;
