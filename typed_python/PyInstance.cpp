@@ -837,30 +837,21 @@ int PyInstance::tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal) 
         return -1;
     }
 
-    Type* type = extractTypeFrom(o->ob_type);
-    Type::TypeCategory cat = type->getTypeCategory();
-
-    if (cat == Type::TypeCategory::catClass) {
-        PyInstance* self_w = (PyInstance*)o;
-
-        return PyClassInstance::classInstanceSetAttributeFromPyObject((Class*)type, self_w->dataPtr(), attrName, attrVal);
-    } else if (cat == Type::TypeCategory::catNamedTuple ||
-               cat == Type::TypeCategory::catConcreteAlternative) {
-        PyErr_Format(
-            PyExc_AttributeError,
-            "Cannot set attributes on instance of type '%S' because it is immutable",
-            o->ob_type
-        );
-        return -1;
-    } else {
-        PyErr_Format(
-            PyExc_AttributeError,
-            "Instances of type '%S' do not accept attributes",
-            attrName, o->ob_type
-        );
-        return -1;
-    }
+    return specializeForTypeReturningInt(o, [&](auto& subtype) {
+        return subtype.tp_setattr_concrete(attrName, attrVal);
+    });
 }
+
+int PyInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
+    PyErr_Format(
+        PyExc_AttributeError,
+        "Instances of type '%s' do not accept attributes",
+        attrName,
+        type()->name().c_str()
+    );
+    return -1;
+}
+
 // static
 PyObject* PyInstance::tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
     return specializeForType(o, [&](auto& subtype) {

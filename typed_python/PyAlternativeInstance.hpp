@@ -18,6 +18,8 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Alternative* alt, PyTypeObject* pyType);
 
+    int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
@@ -36,6 +38,8 @@ public:
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
+
+    int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;

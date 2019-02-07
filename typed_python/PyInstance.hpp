@@ -431,6 +431,8 @@ public:
 
     static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal);
 
+    int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
+
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs);
 
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);

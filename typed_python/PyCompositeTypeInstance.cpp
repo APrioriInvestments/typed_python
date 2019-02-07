@@ -135,3 +135,12 @@ void PyNamedTupleInstance::mirrorTypeInformationIntoPyTypeConcrete(NamedTuple* t
     PyDict_SetItemString(pyType->tp_dict, "ElementTypes", types);
     PyDict_SetItemString(pyType->tp_dict, "ElementNames", names);
 }
+
+int PyNamedTupleInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
+    PyErr_Format(
+        PyExc_AttributeError,
+        "Cannot set attributes on instance of type '%s' because it is immutable",
+        type()->name().c_str()
+    );
+    return -1;
+}

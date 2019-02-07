@@ -413,4 +413,9 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     }
 }
 
+int PyClassInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
+    return PyClassInstance::classInstanceSetAttributeFromPyObject(type(), dataPtr(), attrName, attrVal);
+}
+
+
 

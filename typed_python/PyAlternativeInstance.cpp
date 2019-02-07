@@ -299,3 +299,22 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
 }
 
 
+int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
+    PyErr_Format(
+        PyExc_AttributeError,
+        "Cannot set attributes on instance of type '%s' because it is immutable",
+        type()->name().c_str()
+    );
+    return -1;
+}
+
+
+int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
+    PyErr_Format(
+        PyExc_AttributeError,
+        "Cannot set attributes on instance of type '%s' because it is immutable",
+        type()->name().c_str()
+    );
+    return -1;
+}
+

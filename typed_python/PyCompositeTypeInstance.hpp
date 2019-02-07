@@ -68,4 +68,6 @@ public:
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(NamedTuple* tupleT, PyTypeObject* pyType);
+
+    int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
 };
