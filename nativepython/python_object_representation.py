@@ -17,6 +17,7 @@ from nativepython.type_wrappers.tuple_wrapper import TupleWrapper, NamedTupleWra
 from nativepython.type_wrappers.alternative_wrapper import makeAlternativeWrapper
 from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.len_wrapper import LenWrapper
+from nativepython.type_wrappers.range_wrapper import _RangeWrapper
 from nativepython.type_wrappers.bytecount_wrapper import BytecountWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper, Float64Wrapper, BoolWrapper
 from nativepython.type_wrappers.string_wrapper import StringWrapper
@@ -105,6 +106,9 @@ def _typedPythonTypeToTypeWrapper(t):
 def pythonObjectRepresentation(context, f):
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)
+
+    if f is range:
+        return TypedExpression(context, native_ast.nullExpr, _RangeWrapper, False)
 
     if f is bytecount:
         return TypedExpression(context, native_ast.nullExpr, BytecountWrapper(), False)

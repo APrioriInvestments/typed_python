@@ -298,6 +298,34 @@ class TestCompilationStructures(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "name 'this_variable_name_is_undefined' is not defined"):
             f()
 
+    def test_iterating(self):
+        @Compiled
+        def sumDirectly(x: int):
+            y = 0.0
+            i = 0
+            while i < x:
+                y += i
+                i += 1
+            return y
+
+        @Compiled
+        def sumUsingRange(x: int):
+            y = 0.0
+            for i in range(x):
+                y += i
+            return y
+
+        for i in range(10):
+            self.assertEqual(sumDirectly(i), sumUsingRange(i))
+
+        t0 = time.time()
+        sumDirectly(1000000)
+        t1 = time.time()
+        sumUsingRange(1000000)
+        t2 = time.time()
+
+        print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0))) #I get 1.00
+        self.assertTrue((t1-t0) < (t2 - t1) * 1.1)
 
 
 

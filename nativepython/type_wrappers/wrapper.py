@@ -36,10 +36,16 @@ class Wrapper(object):
     is_pass_by_ref = True
 
     def __repr__(self):
-        return "Wrapper(%s)" % self.typeRepresentation.__qualname__
+        return "Wrapper(%s)" % str(self)
 
     def __str__(self):
-        return self.typeRepresentation.__qualname__
+        rep = self.typeRepresentation
+
+        if isinstance(rep, type):
+            return rep.__qualname__
+        if isinstance(rep, tuple) and len(rep) == 2 and isinstance(rep[0], type):
+            return "(" + rep[0].__qualname__ + "," + str(rep[1]) + ")"
+        return str(rep)
 
     def __init__(self, typeRepresentation):
         super().__init__()
@@ -73,6 +79,16 @@ class Wrapper(object):
 
         raise NotImplementedError(self)
 
+    def convert_next(self):
+        """Return a pair of typed_expressions (next_value, continue_iteration) for the result of __next__.
+
+        If continue_iteration is False, then next_value will be ignored. It should be a reference.
+        """
+        return context.pushTerminal(
+            generateThrowException(context, AttributeError("%s object cannot be iterated" % self))
+            )
+
+
     def convert_attribute(self, context, instance, attribute):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
@@ -94,20 +110,35 @@ class Wrapper(object):
             )
 
     def convert_assign(self, context, target, toStore):
-        raise NotImplementedError(self)
+        if self.is_pod:
+            assert target.isReference
+            context.pushEffect(
+                target.expr.store(toStore.nonref_expr)
+                )
+        else:
+            raise NotImplementedError()
+
+    def convert_copy_initialize(self, context, target, toStore):
+        assert target.isReference
+        if self.is_pod:
+            context.pushEffect(
+                target.expr.store(toStore.nonref_expr)
+                )
+        else:
+            raise NotImplementedError()
+
+    def convert_destroy(self, context, instance):
+        if self.is_pod:
+            pass
+        else:
+            raise NotImplementedError()
 
     def convert_default_initialize(self, context, target):
         raise NotImplementedError(self)
 
-    def convert_copy_initialize(self, context, target, toStore):
-        raise NotImplementedError(self)
-
-    def convert_destroy(self, context, instance):
-        raise NotImplementedError(self)
-
     def convert_call(self, context, left, args, kwargs):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
-            self.typeRepresentation.__qualname__,
+            self,
             ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k,str(v.expr_type)) for k,v in kwargs.items()])
             ))
 
@@ -159,7 +190,8 @@ class Wrapper(object):
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(TypeError, "Can't call %s.%s with args of type (%s)" % (
-            self.typeRepresentation.__qualname__, methodname,
+            self,
+            methodname,
             ",".join([str(a.expr_type) for a in args] +
                 ["%s=%s" % (k, str(v.expr_type)) for k,v in kwargs.items()])
             ))

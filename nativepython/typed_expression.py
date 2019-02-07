@@ -128,6 +128,9 @@ class TypedExpression(object):
     def convert_to_type(self, target_type):
         return self.expr_type.convert_to_type(self.context, self, target_type)
 
+    def convert_next(self):
+        return self.expr_type.convert_next(self.context, self)
+
     def toFloat64(self):
         return self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64()))
 

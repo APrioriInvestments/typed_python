@@ -46,6 +46,7 @@ class FunctionConversionContext(object):
         self._free_variable_lookup = free_variable_lookup
         self._temp_let_var = 0
         self._temp_stack_var = 0
+        self._temp_iter_var = 0
         self._typesAreUnstable = False
         self._functionOutputTypeKnown = False
         self._star_args_name = None
@@ -148,13 +149,16 @@ class FunctionConversionContext(object):
     def resetTypeInstabilityFlag(self):
         self._typesAreUnstable = False
 
+    def markTypesAreUnstable(self):
+        self._typesAreUnstable = True
+
     def let_varname(self):
         self._temp_let_var += 1
-        return ".letvar.%s" % (self._temp_let_var-1)
+        return "letvar.%s" % (self._temp_let_var-1)
 
     def stack_varname(self):
         self._temp_stack_var += 1
-        return ".stackvar.%s" % (self._temp_stack_var-1)
+        return "stackvar.%s" % (self._temp_stack_var-1)
 
     def upsizeVariableType(self, varname, new_type):
         if self._varname_to_type.get(varname) is None:
@@ -162,7 +166,7 @@ class FunctionConversionContext(object):
                 return
 
             self._varname_to_type[varname] = new_type
-            self._typesAreUnstable = True
+            self.markTypesAreUnstable()
             return
 
         existingType = self._varname_to_type[varname].typeRepresentation
@@ -177,8 +181,33 @@ class FunctionConversionContext(object):
 
         final_type = OneOf(new_type.typeRepresentation, existingType)
 
-        self._typesAreUnstable = True
+        self.markTypesAreUnstable()
+
         self._varname_to_type[varname] = typeWrapper(final_type)
+
+    def generateAssignmentExpr(self, varname, val_to_store):
+        """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
+        subcontext = val_to_store.context
+
+        self.upsizeVariableType(varname, val_to_store.expr_type)
+        slot_ref = subcontext.named_var_expr(varname)
+
+        #convert the value to the target type now that we've upsized it
+        val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
+
+        assert val_to_store is not None, "We should always be able to upsize"
+
+        if slot_ref.expr_type.is_pod:
+            slot_ref.convert_copy_initialize(val_to_store)
+            subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+        else:
+            with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
+                with true_block:
+                    slot_ref.convert_assign(val_to_store)
+                with false_block:
+                    slot_ref.convert_copy_initialize(val_to_store)
+                    subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+
 
     def convert_statement_ast(self, ast):
         if ast.matches.Assign or ast.matches.AugAssign:
@@ -213,24 +242,7 @@ class FunctionConversionContext(object):
                         if val_to_store is None:
                             return subcontext.finalize(None), False
 
-                self.upsizeVariableType(varname, val_to_store.expr_type)
-                slot_ref = subcontext.named_var_expr(varname)
-
-                #convert the value to the target type now that we've upsized it
-                val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
-
-                assert val_to_store is not None, "We should always be able to upsize"
-
-                if slot_ref.expr_type.is_pod:
-                    slot_ref.convert_copy_initialize(val_to_store)
-                    subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
-                else:
-                    with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
-                        with true_block:
-                            slot_ref.convert_assign(val_to_store)
-                        with false_block:
-                            slot_ref.convert_copy_initialize(val_to_store)
-                            subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+                self.generateAssignmentExpr(varname, val_to_store)
 
                 return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
 
@@ -298,7 +310,7 @@ class FunctionConversionContext(object):
 
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
-                    self._typesAreUnstable = True
+                    self.markTypesAreUnstable()
                     self._varname_to_type[FunctionOutput] = e.expr_type
                 else:
                     self.upsizeVariableType(FunctionOutput, e.expr_type)
@@ -382,7 +394,40 @@ class FunctionConversionContext(object):
             raise NotImplementedError()
 
         if ast.matches.For:
-            raise NotImplementedError()
+            if not ast.target.matches.Name:
+                raise NotImplementedError("Can't handle multi-variable loop expressions")
+
+            target_var_name = ast.target.id
+
+            #create a variable to hold the iterator, and instantiate it there
+            iter_varname = target_var_name + ".iter." + str(ast.line_number)
+
+            iterator_setup_context = ExpressionConversionContext(self)
+            to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
+            if to_iterate is None:
+                return iterator_setup_context.finalize(to_iterate), False
+            iterator_object = to_iterate.convert_method_call("__iter__", (), {})
+            if iterator_object is None:
+                return iterator_setup_context.finalize(iterator_object), False
+            self.generateAssignmentExpr(iter_varname, iterator_object)
+
+            cond_context = ExpressionConversionContext(self)
+            iter_obj = cond_context.named_var_expr(iter_varname)
+            next_ptr, is_populated = iter_obj.convert_next() #this conversion is special - it returns two values
+
+            with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                with if_true:
+                    self.generateAssignmentExpr(target_var_name, next_ptr)
+
+            true, true_returns = self.convert_statement_list_ast(ast.body)
+
+            false, false_returns = self.convert_statement_list_ast(ast.orelse)
+
+            return (
+                iterator_setup_context.finalize(None) >>
+                native_ast.Expression.While(cond=cond_context.finalize(is_populated),while_true=true,orelse=false),
+                true_returns or false_returns
+                )
 
         if ast.matches.Raise:
             raise NotImplementedError()
@@ -411,7 +456,7 @@ class FunctionConversionContext(object):
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
                     self._varname_to_type[FunctionOutput] = NoneWrapper()
-                    self._typesAreUnstable = True
+                    self.markTypesAreUnstable()
                 else:
                     self.upsizeVariableType(FunctionOutput, NoneWrapper())
 
