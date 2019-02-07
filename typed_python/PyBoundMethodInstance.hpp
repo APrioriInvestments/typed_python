@@ -8,6 +8,8 @@ public:
 
     BoundMethod* type();
 
+    PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }

@@ -863,80 +863,13 @@ int PyInstance::tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal) 
 }
 // static
 PyObject* PyInstance::tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
+    return specializeForType(o, [&](auto& subtype) {
+        return subtype.tp_call_concrete(args, kwargs);
+    });
+}
 
-    if (self_type->getTypeCategory() == Type::TypeCategory::catFunction) {
-        Function* methodType = (Function*)self_type;
-
-        for (const auto& overload: methodType->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, args, kwargs);
-            if (res.first) {
-                return res.second;
-            }
-        }
-
-        std::ostringstream outTypes;
-        outTypes << "(";
-        bool first = true;
-        for (long k = 0; k < PyTuple_Size(args); k++) {
-            if (!first) {
-                outTypes << ",";
-            } else {
-                first = false;
-            }
-            outTypes << PyTuple_GetItem(args,k)->ob_type->tp_name;
-        }
-        if (kwargs) {
-            PyObject *key, *value;
-            Py_ssize_t pos = 0;
-
-            while (kwargs && PyDict_Next(kwargs, &pos, &key, &value)) {
-                if (!first) {
-                    outTypes << ",";
-                } else {
-                    first = false;
-                }
-                outTypes << PyUnicode_AsUTF8(key) << "=" << value->ob_type->tp_name;
-            }
-        }
-
-        outTypes << ")";
-
-        PyErr_Format(
-            PyExc_TypeError, "'%s' cannot find a valid overload with arguments of type %s",
-            o->ob_type->tp_name,
-            outTypes.str().c_str()
-            );
-
-        return NULL;
-    }
-
-
-    if (self_type->getTypeCategory() == Type::TypeCategory::catBoundMethod) {
-        BoundMethod* methodType = (BoundMethod*)self_type;
-
-        Function* f = methodType->getFunction();
-        Type* c = methodType->getFirstArgType();
-
-        PyObject* objectInstance = PyInstance::initializePythonRepresentation(c, [&](instance_ptr d) {
-            c->copy_constructor(d, w->dataPtr());
-        });
-
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, objectInstance, args, kwargs);
-            if (res.first) {
-                Py_DECREF(objectInstance);
-                return res.second;
-            }
-        }
-
-        Py_DECREF(objectInstance);
-        PyErr_Format(PyExc_TypeError, "'%s' cannot find a valid overload with these arguments", o->ob_type->tp_name);
-        return 0;
-    }
-
-    PyErr_Format(PyExc_TypeError, "'%s' object is not callable", o->ob_type->tp_name);
+PyObject* PyInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
+    PyErr_Format(PyExc_TypeError, "'%s' object is not callable", type()->name().c_str());
     return 0;
 }
 

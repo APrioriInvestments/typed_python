@@ -31,4 +31,8 @@ public:
                                                 );
 
     static PyObject* createOverloadPyRepresentation(Function* f);
+
+    PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
+
+    static std::string argTupleTypeDescription(PyObject* args, PyObject* kwargs);
 };

@@ -427,6 +427,8 @@ public:
 
     static PyObject* tp_call(PyObject* o, PyObject* args, PyObject* kwargs);
 
+    PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
+
     static PyObject* tp_getattro(PyObject *o, PyObject* attrName);
 
     static PyObject* getattr(Type* type, instance_ptr data, char* attr_name);

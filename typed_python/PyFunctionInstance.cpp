@@ -300,3 +300,53 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
 
     return overloadTuple;
 }
+
+PyObject* PyFunctionInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
+    for (const auto& overload: type()->getOverloads()) {
+        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, args, kwargs);
+        if (res.first) {
+            return res.second;
+        }
+    }
+
+    std::string argTupleTypeDesc = argTupleTypeDescription(args, kwargs);
+
+    PyErr_Format(
+        PyExc_TypeError, "'%s' cannot find a valid overload with arguments of type %s",
+        type()->name().c_str(),
+        argTupleTypeDesc.c_str()
+        );
+
+    return NULL;
+}
+
+std::string PyFunctionInstance::argTupleTypeDescription(PyObject* args, PyObject* kwargs) {
+    std::ostringstream outTypes;
+    outTypes << "(";
+    bool first = true;
+    for (long k = 0; k < PyTuple_Size(args); k++) {
+        if (!first) {
+            outTypes << ",";
+        } else {
+            first = false;
+        }
+        outTypes << PyTuple_GetItem(args,k)->ob_type->tp_name;
+    }
+    if (kwargs) {
+        PyObject *key, *value;
+        Py_ssize_t pos = 0;
+
+        while (kwargs && PyDict_Next(kwargs, &pos, &key, &value)) {
+            if (!first) {
+                outTypes << ",";
+            } else {
+                first = false;
+            }
+            outTypes << PyUnicode_AsUTF8(key) << "=" << value->ob_type->tp_name;
+        }
+    }
+
+    outTypes << ")";
+
+    return outTypes.str();
+}
