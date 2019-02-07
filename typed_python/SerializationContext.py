@@ -66,8 +66,21 @@ class SerializationContext(object):
             if id(v) not in self.objToName or k < self.objToName[id(v)]:
                 self.objToName[id(v)] = k
 
-        self.numpyCompressionEnabled = True
+        self.compressionEnabled = True
         self.encodeLineInformationForCode = True
+
+    def compress(self, bytes):
+        if self.compressionEnabled:
+            res = lz4.frame.compress(bytes)
+            return res
+        else:
+            return bytes
+
+    def decompress(self, bytes):
+        if self.compressionEnabled:
+            return lz4.frame.decompress(bytes)
+        else:
+            return bytes
 
     @staticmethod
     def FromModules(modules):
@@ -167,11 +180,7 @@ class SerializationContext(object):
                 return (reconstructTypeFunctionType,isTF,None)
 
         if isinstance(inst, numpy.ndarray):
-            result = inst.__reduce__()
-            #compress the numpy data
-            if self.numpyCompressionEnabled:
-                result = (result[0], result[1], result[2][:-1] + (lz4.frame.compress(result[2][-1]),))
-            return result
+            return inst.__reduce__()
 
         if isinstance(inst, numpy.number):
             return inst.__reduce__() + (None,)
@@ -217,8 +226,6 @@ class SerializationContext(object):
             return True
 
         if isinstance(instance, _ndarray):
-            if self.numpyCompressionEnabled:
-                representation = representation[:-1] + (lz4.frame.decompress(representation[-1]),)
             instance.__setstate__(representation)
             return True
 

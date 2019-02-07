@@ -77,7 +77,7 @@ public:
                 + std::to_string(bytes_per) + " " + std::to_string(ct) + ". pos is " + std::to_string(buffer.pos()));
         }
 
-        if (ct > buffer.remaining()) {
+        if (!buffer.canConsume(ct)) {
             throw std::runtime_error("Corrupt data (stringsize)");
         }
 

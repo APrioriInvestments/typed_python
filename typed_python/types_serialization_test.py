@@ -28,7 +28,7 @@ from typed_python.Codebase import Codebase
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64,
+    Int8, NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64,
     String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Value, Class, Member, _types, Function, SerializationContext
 )
@@ -405,7 +405,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         sizeCompressed = len(ts.serialize(x))
 
-        ts.numpyCompressionEnabled=False
+        ts.compressionEnabled=False
 
         self.assertTrue(numpy.all(x == ts.deserialize(ts.serialize(x))))
 
@@ -976,4 +976,23 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(sc.deserialize(sc.serialize(f))(), "testfunction")
 
+    def test_serialize_large_lists(self):
+        x = SerializationContext({})
 
+        l = ListOf(ListOf(int))()
+
+        l.resize(100)
+        for sublist in l:
+            sublist.resize(1000000)
+
+        l2 = x.deserialize(x.serialize(l))
+
+        self.assertEqual(l, l2)
+
+    def test_serialize_large_numpy_arrays(self):
+        x = SerializationContext({})
+
+        a = numpy.arange(100000000)
+        a2 = x.deserialize(x.serialize(a))
+
+        self.assertTrue(numpy.all(a == a2))

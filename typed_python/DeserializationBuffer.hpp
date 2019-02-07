@@ -10,10 +10,13 @@ class SerializationContext;
 class DeserializationBuffer {
 public:
     DeserializationBuffer(uint8_t* ptr, size_t sz, const SerializationContext& context) :
-            m_buffer(ptr),
-            m_size(sz),
-            m_orig_size(sz),
-            m_context(context)
+            m_context(context),
+            m_read_head(nullptr),
+            m_read_head_offset(0),
+            m_size(0),
+            m_compressed_blocks(ptr),
+            m_compressed_block_data_remaining(sz),
+            m_pos(0)
     {
     }
 
@@ -46,24 +49,33 @@ public:
 
     template<class initfun>
     auto read_bytes_fun(size_t bytecount, const initfun& f) -> decltype(f((uint8_t*)nullptr)) {
-        if (m_size < bytecount) {
-            throw std::runtime_error("out of data");
+        while (m_size < bytecount) {
+            if (!decompress()) {
+                throw std::runtime_error("out of data");
+            }
         }
 
         m_size -= bytecount;
-        m_buffer += bytecount;
+        m_read_head += bytecount;
+        m_read_head_offset += bytecount;
+        m_pos += bytecount;
 
-        return f(m_buffer - bytecount);
+        return f(m_read_head - bytecount);
     }
 
     void read_bytes(uint8_t* ptr, size_t bytecount) {
-        if (m_size < bytecount) {
-            throw std::runtime_error("out of data");
+        while (m_size < bytecount) {
+            if (!decompress()) {
+                throw std::runtime_error("out of data");
+            }
         }
-        memcpy(ptr,m_buffer,bytecount);
+
+        memcpy(ptr,m_read_head,bytecount);
 
         m_size -= bytecount;
-        m_buffer += bytecount;
+        m_read_head += bytecount;
+        m_read_head_offset += bytecount;
+        m_pos += bytecount;
     }
 
     std::string readString() {
@@ -73,12 +85,18 @@ public:
         });
     }
 
-    size_t remaining() const {
-        return m_size;
+    bool canConsume(size_t ct) {
+        while (m_size < ct) {
+            if (!decompress()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     size_t pos() const {
-        return m_orig_size - m_size;
+        return m_pos;
     }
 
     const SerializationContext& getContext() const {
@@ -124,25 +142,77 @@ public:
         return ptr;
     }
 
-private:
+    template<class T>
+    void readInto(T* out) {
+        *out = read<T>();
+    }
+
     template<class T>
     T read() {
-        if (m_size < sizeof(T)) {
-            throw std::runtime_error("out of data");
+        while (m_size < sizeof(T)) {
+            if (!decompress()) {
+                throw std::runtime_error("out of data");
+            }
         }
-        T* ptr = (T*)m_buffer;
+
+        T* ptr = (T*)m_read_head;
 
         m_size -= sizeof(T);
-        m_buffer += sizeof(T);
+        m_read_head += sizeof(T);
+        m_read_head_offset += sizeof(T);
+        m_pos += sizeof(T);
 
         return *ptr;
     }
 
+private:
+    bool decompress() {
+        if (m_compressed_block_data_remaining < sizeof(uint32_t)) {
+            return false;
+        }
 
-    uint8_t* m_buffer;
-    size_t m_size;
-    size_t m_orig_size;
+        uint32_t bytesToDecompress = *((uint32_t*)m_compressed_blocks);
+
+        if (bytesToDecompress + sizeof(uint32_t) > m_compressed_block_data_remaining) {
+            throw std::runtime_error("Corrupt data: can't decompress this large of a block");
+        }
+
+        m_compressed_blocks += sizeof(uint32_t);
+        m_compressed_block_data_remaining -= sizeof(uint32_t);
+
+        std::string toDecompress(m_compressed_blocks, m_compressed_blocks + bytesToDecompress);
+        m_compressed_blocks += bytesToDecompress;
+        m_compressed_block_data_remaining -= bytesToDecompress;
+
+        std::string decompressed = m_context.decompress(toDecompress);
+
+        pushStringIntoDecompressedBuffer(decompressed);
+
+        return true;
+    }
+
+    void pushStringIntoDecompressedBuffer(std::string decompressed) {
+        std::vector<uint8_t> newData(m_decompressed_buffer.begin() + m_read_head_offset, m_decompressed_buffer.end());
+        m_read_head_offset = 0;
+
+        newData.insert(newData.end(), decompressed.begin(), decompressed.end());
+        m_size += decompressed.size();
+
+        std::swap(newData, m_decompressed_buffer);
+        m_read_head = &m_decompressed_buffer[0];
+    }
+
     const SerializationContext& m_context;
+
+    std::vector<uint8_t> m_decompressed_buffer;
+    uint8_t* m_read_head;
+    size_t m_read_head_offset;
+    size_t m_size;
+
+    uint8_t* m_compressed_blocks;
+    size_t m_compressed_block_data_remaining;
+
+    size_t m_pos;
 
     // These two vectors implement the pointer-cache datastructure. They map
     // ids (indices) to pointers and to the whether they need decref-ing

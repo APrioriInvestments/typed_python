@@ -8,14 +8,14 @@
 class Type;
 class SerializationContext;
 
-
 class SerializationBuffer {
 public:
     SerializationBuffer(const SerializationContext& context) :
+            m_context(context),
             m_buffer(nullptr),
             m_size(0),
             m_reserved(0),
-            m_context(context)
+            m_last_compression_point(0)
     {
     }
 
@@ -72,9 +72,22 @@ public:
 
     void ensure(size_t t) {
         if (m_size + t > m_reserved) {
-            m_reserved = m_size + t + 1024 * 128;
-            m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
+            reserve(m_size + t + 1024 * 128);
+
+            //compress every 10 megs or so
+            if (m_size - m_last_compression_point > 10 * 1024 * 1024) {
+                compress();
+            }
         }
+    }
+
+    void reserve(size_t new_reserved) {
+        if (new_reserved < m_reserved) {
+            throw std::runtime_error("Can't make reserved size smaller");
+        }
+
+        m_reserved = new_reserved;
+        m_buffer = (uint8_t*)::realloc(m_buffer, m_reserved);
     }
 
     const SerializationContext& getContext() const {
@@ -110,7 +123,25 @@ public:
         return std::pair<uint32_t, bool>(it->second, false);
     }
 
-private:
+    void finalize() {
+        compress();
+    }
+
+    void compress() {
+        if (m_last_compression_point == m_size) {
+            return;
+        }
+
+        //replace the data we have here with a block of 4 bytes of size of compressed data and
+        //then the data stream
+        std::string data(m_buffer + m_last_compression_point, m_buffer + m_size);
+
+        data = m_context.compress(data);
+
+        m_size = m_last_compression_point;
+        write_string(data);
+        m_last_compression_point = m_size;
+    }
     template< class T>
     void write(T i) {
         ensure(sizeof(i));
@@ -118,10 +149,14 @@ private:
         m_size += sizeof(i);
     }
 
+
+private:
+    const SerializationContext& m_context;
+
     uint8_t* m_buffer;
     size_t m_size;
     size_t m_reserved;
-    const SerializationContext& m_context;
+    size_t m_last_compression_point;
 
     std::map<void*, int32_t> m_idToPointerCache;
     std::set<void*> m_pointersNeedingDecref;

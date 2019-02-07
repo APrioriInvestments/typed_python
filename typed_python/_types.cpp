@@ -764,6 +764,8 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
+    b.finalize();
+
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
 

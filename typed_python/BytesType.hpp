@@ -34,7 +34,7 @@ public:
     void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
 
-        if (ct > buffer.remaining()) {
+        if (!buffer.canConsume(ct)) {
             throw std::runtime_error("Corrupt data (bytes)");
         }
 

@@ -67,6 +67,12 @@ public:
     {
     }
 
+    std::string compress(std::string bytes) const;
+
+    std::string decompress(std::string bytes) const;
+
+    std::string compressOrDecompress(std::string bytes, bool compress) const;
+
     virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const;
 
     void serializePyDict(PyObject* o, SerializationBuffer& b) const;

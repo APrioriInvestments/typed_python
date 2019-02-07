@@ -446,7 +446,7 @@ class NativeTypesTests(unittest.TestCase):
 
         typedInts = t(ints)
 
-        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 4)
+        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 8) #4 bytes for size of list, 4 bytes for frame size
         self.assertEqual(tuple(typedInts), ints)
 
     def test_tuple_of_one_of_multi(self):
@@ -458,7 +458,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(
             len(serialize(t, typedThings)),
-            sum(2 if isinstance(t,bool) else 9 for t in someThings) + 4
+            sum(2 if isinstance(t,bool) else 9 for t in someThings) + 8
             )
 
         self.assertEqual(tuple(typedThings), someThings)
@@ -1098,13 +1098,13 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(
             len(serialize(TupleOf(int), ints)),
-            36
+            40
             )
 
         while len(ints) < 1000000:
             ints = ints + ints
             t0 = time.time()
-            self.assertEqual(len(serialize(TupleOf(int), ints)), len(ints) * 8 + 4)
+            self.assertEqual(len(serialize(TupleOf(int), ints)), len(ints) * 8 + 8)
             print(time.time() - t0, " for ", len(ints))
 
     def test_serialization_roundtrip(self):

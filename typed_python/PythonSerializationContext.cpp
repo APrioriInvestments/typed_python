@@ -879,4 +879,54 @@ void PythonSerializationContext::serializePyFrozenSet(PyObject* o, Serialization
     serializeIterable(o, b, PySet_Size);
 }
 
+std::string PythonSerializationContext::compressOrDecompress(std::string bytes, bool compress) const {
+    if (!mContextObj) {
+        return bytes;
+    }
+
+    PyObjectStealer pyBytes(
+        PyBytes_FromStringAndSize(bytes.c_str(), bytes.size())
+        );
+
+    PyObjectStealer outBytes(
+        PyObject_CallMethod(
+            mContextObj,
+            compress ? "compress" : "decompress",
+            "O",
+            (PyObject*)pyBytes //without this cast, the actual "Stealer" object gets passed
+                               //because this is a C varargs function and it doesn't know
+                               //that the intended type is PyObject*.
+            )
+        );
+
+    if (!outBytes) {
+        throw PythonExceptionSet();
+    }
+
+    if (!PyBytes_Check(outBytes)) {
+        PyErr_Format(PyExc_TypeError,
+            compress ?
+                    "'compress' method didn't return bytes object."
+                :   "'decompress' method didn't return bytes object."
+            );
+        throw PythonExceptionSet();
+    }
+
+    char* bufPtr;
+    Py_ssize_t len;
+
+    if (PyBytes_AsStringAndSize(outBytes, &bufPtr, &len) == -1) {
+        throw PythonExceptionSet();
+    }
+
+    return std::string(bufPtr, bufPtr + len);
+}
+
+std::string PythonSerializationContext::compress(std::string bytes) const {
+    return compressOrDecompress(bytes, true);
+}
+
+std::string PythonSerializationContext::decompress(std::string bytes) const {
+    return compressOrDecompress(bytes, false);
+}
 

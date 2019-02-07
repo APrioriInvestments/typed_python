@@ -53,7 +53,7 @@ public:
     void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();
 
-        if (ct > buffer.remaining() && m_bytes_per_key_value_pair) {
+        if (!buffer.canConsume(ct) && m_bytes_per_key_value_pair) {
             throw std::runtime_error("Corrupt data (dictcount)");
         }
 
