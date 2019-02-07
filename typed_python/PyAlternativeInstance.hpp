@@ -16,6 +16,8 @@ public:
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
+    static void mirrorTypeInformationIntoPyTypeConcrete(Alternative* alt, PyTypeObject* pyType);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
@@ -38,6 +40,8 @@ public:
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(ConcreteAlternative* alt, PyTypeObject* pyType);
 
     static void constructFromPythonArgumentsConcrete(ConcreteAlternative* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 

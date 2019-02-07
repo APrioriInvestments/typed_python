@@ -34,3 +34,10 @@ PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwar
 
     return NULL;
 }
+
+void PyBoundMethodInstance::mirrorTypeInformationIntoPyTypeConcrete(BoundMethod* methodT, PyTypeObject* pyType) {
+    PyDict_SetItemString(pyType->tp_dict, "FirstArgType", typePtrToPyTypeRepresentation(methodT->getFirstArgType()));
+    PyDict_SetItemString(pyType->tp_dict, "Function", typePtrToPyTypeRepresentation(methodT->getFunction()));
+}
+
+

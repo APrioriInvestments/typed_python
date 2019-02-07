@@ -20,6 +20,8 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 
+    static void mirrorTypeInformationIntoPyTypeConcrete(PointerTo* pointerT, PyTypeObject* pyType);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }

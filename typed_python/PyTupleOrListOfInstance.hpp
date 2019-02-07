@@ -25,6 +25,8 @@ public:
     static PyObject* toArray(PyObject* o, PyObject* args);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation);
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(TupleOrListOf* inType, PyTypeObject* pyType);
 };
 
 class PyListOfInstance : public PyTupleOrListOfInstance {

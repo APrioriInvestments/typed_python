@@ -35,5 +35,16 @@ public:
         std::pair<Type*, instance_ptr> child = oneofT->unwrap(data);
         return extractPythonObject(child.second, child.first);
     }
-};
 
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(OneOf* oneOfT, PyTypeObject* pyType) {
+        PyObjectStealer types(PyTuple_New(oneOfT->getTypes().size()));
+
+        for (long k = 0; k < oneOfT->getTypes().size(); k++) {
+            PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(oneOfT->getTypes()[k])));
+        }
+
+        //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(pyType->tp_dict, "Types", types);
+    }
+};

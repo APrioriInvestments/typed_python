@@ -30,6 +30,8 @@ public:
 
     static PyMethodDef* typeMethodsConcrete();
 
+    static void mirrorTypeInformationIntoPyTypeConcrete(ConstDict* constDictT, PyTypeObject* pyType);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }

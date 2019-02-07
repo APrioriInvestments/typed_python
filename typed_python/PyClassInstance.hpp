@@ -33,4 +33,6 @@ public:
     PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErr);
 
     PyObject* pyTernaryUnaryOperatorConcrete(PyObject* rhs, PyObject* ternaryArg, const char* op, const char* opErr);
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType);
 };

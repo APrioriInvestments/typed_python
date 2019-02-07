@@ -51,6 +51,8 @@ public:
     typedef Tuple modeled_type;
 
     Tuple* type();
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(Tuple* tupleT, PyTypeObject* pyType);
 };
 
 class PyNamedTupleInstance : public PyCompositeTypeInstance {
@@ -64,4 +66,6 @@ public:
     static void constructFromPythonArgumentsConcrete(NamedTuple* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(NamedTuple* tupleT, PyTypeObject* pyType);
 };

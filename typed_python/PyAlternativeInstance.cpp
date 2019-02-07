@@ -249,3 +249,53 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
     return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
 }
 
+void PyAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Alternative* alt, PyTypeObject* pyType) {
+    PyObjectStealer alternatives(PyTuple_New(alt->subtypes().size()));
+
+    for (long k = 0; k < alt->subtypes().size(); k++) {
+        ConcreteAlternative* concrete = ConcreteAlternative::Make(alt, k);
+
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            alt->subtypes()[k].first.c_str(),
+            (PyObject*)typeObjInternal(concrete)
+            );
+
+        PyTuple_SetItem(alternatives, k, incref((PyObject*)typeObjInternal(concrete)));
+    }
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "__typed_python_alternatives__",
+        alternatives
+        );
+}
+
+void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(ConcreteAlternative* alt, PyTypeObject* pyType) {
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "Alternative",
+        (PyObject*)typeObjInternal(alt->getAlternative())
+        );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "Index",
+        PyLong_FromLong(alt->which())
+        );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "Name",
+        PyUnicode_FromString(alt->getAlternative()->subtypes()[alt->which()].first.c_str())
+        );
+
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "ElementType",
+        (PyObject*)typeObjInternal(alt->elementType())
+        );
+
+}
+
+

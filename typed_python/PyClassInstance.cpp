@@ -347,3 +347,70 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
     return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
 }
 
+void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType) {
+    PyObjectStealer types(PyTuple_New(classT->getMembers().size()));
+
+    for (long k = 0; k < classT->getMembers().size(); k++) {
+        PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(std::get<1>(classT->getMembers()[k]))));
+    }
+
+    PyObjectStealer names(PyTuple_New(classT->getMembers().size()));
+    for (long k = 0; k < classT->getMembers().size(); k++) {
+        PyObject* namePtr = PyUnicode_FromString(std::get<0>(classT->getMembers()[k]).c_str());
+        PyTuple_SetItem(names, k, namePtr);
+    }
+
+    PyObjectStealer defaults(PyDict_New());
+
+    for (long k = 0; k < classT->getMembers().size(); k++) {
+
+        if (classT->getHeldClass()->memberHasDefaultValue(k)) {
+            const Instance& i = classT->getHeldClass()->getMemberDefaultValue(k);
+
+            PyObject* defaultVal = PyInstance::extractPythonObject(i.data(), i.type());
+
+            PyDict_SetItemString(
+                defaults,
+                classT->getHeldClass()->getMemberName(k).c_str(),
+                defaultVal
+                );
+
+            Py_DECREF(defaultVal);
+        }
+    }
+
+    PyObjectStealer memberFunctions(PyDict_New());
+
+    for (auto p: classT->getMemberFunctions()) {
+        PyDict_SetItemString(memberFunctions, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+        PyDict_SetItemString(pyType->tp_dict, p.first.c_str(), typePtrToPyTypeRepresentation(p.second));
+    }
+
+    //expose 'ElementType' as a member of the type object
+    PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
+    PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
+    PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
+    PyDict_SetItemString(pyType->tp_dict, "MemberDefaultValues", defaults);
+
+    PyDict_SetItemString(pyType->tp_dict, "MemberFunctions", memberFunctions);
+
+    for (auto nameAndObj: classT->getClassMembers()) {
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            nameAndObj.first.c_str(),
+            nameAndObj.second
+            );
+    }
+
+    for (auto nameAndObj: classT->getStaticFunctions()) {
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            nameAndObj.first.c_str(),
+            PyInstance::initializePythonRepresentation(nameAndObj.second, [&](instance_ptr data){
+                //nothing to do - functions like this are just types.
+            })
+            );
+    }
+}
+
+

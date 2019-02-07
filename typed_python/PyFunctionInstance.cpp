@@ -350,3 +350,14 @@ std::string PyFunctionInstance::argTupleTypeDescription(PyObject* args, PyObject
 
     return outTypes.str();
 }
+
+void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inType, PyTypeObject* pyType) {
+    //expose a list of overloads
+    PyObjectStealer overloads(createOverloadPyRepresentation(inType));
+
+    PyDict_SetItemString(
+            pyType->tp_dict,
+            "overloads",
+            overloads
+            );
+}

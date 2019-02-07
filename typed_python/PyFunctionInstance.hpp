@@ -35,4 +35,6 @@ public:
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
 
     static std::string argTupleTypeDescription(PyObject* args, PyObject* kwargs);
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(Function* inType, PyTypeObject* pyType);
 };

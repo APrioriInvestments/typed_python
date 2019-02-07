@@ -708,3 +708,13 @@ void PyListOfInstance::constructFromPythonArgumentsConcrete(ListOf* t, uint8_t* 
 
     PyInstance::constructFromPythonArgumentsConcrete(t, data, args, kwargs);
 }
+
+void PyTupleOrListOfInstance::mirrorTypeInformationIntoPyTypeConcrete(TupleOrListOf* inType, PyTypeObject* pyType) {
+    //expose 'ElementType' as a member of the type object
+    PyDict_SetItemString(
+        pyType->tp_dict,
+        "ElementType",
+        typePtrToPyTypeRepresentation(inType->getEltType())
+        );
+}
+

@@ -287,3 +287,13 @@ PyMethodDef* PyConstDictInstance::typeMethodsConcrete() {
         {NULL, NULL}
     };
 }
+
+void PyConstDictInstance::mirrorTypeInformationIntoPyTypeConcrete(ConstDict* constDictT, PyTypeObject* pyType) {
+    //expose 'ElementType' as a member of the type object
+    PyDict_SetItemString(pyType->tp_dict, "KeyType",
+            typePtrToPyTypeRepresentation(constDictT->keyType())
+            );
+    PyDict_SetItemString(pyType->tp_dict, "ValueType",
+            typePtrToPyTypeRepresentation(constDictT->valueType())
+            );
+}

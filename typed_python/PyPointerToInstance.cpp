@@ -150,3 +150,14 @@ PyMethodDef* PyPointerToInstance::typeMethodsConcrete() {
         {NULL, NULL}
     };
 }
+
+void PyPointerToInstance::mirrorTypeInformationIntoPyTypeConcrete(PointerTo* pointerT, PyTypeObject* pyType) {
+    //expose 'ElementType' as a member of the type object
+    PyDict_SetItemString(
+            pyType->tp_dict,
+            "ElementType",
+            typePtrToPyTypeRepresentation(pointerT->getEltType())
+            );
+}
+
+

@@ -108,4 +108,30 @@ PyObject* PyNamedTupleInstance::tp_getattr_concrete(PyObject* pyAttrName, const 
     return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
 }
 
+void PyTupleInstance::mirrorTypeInformationIntoPyTypeConcrete(Tuple* tupleT, PyTypeObject* pyType) {
+    PyObject* res = PyTuple_New(tupleT->getTypes().size());
+    for (long k = 0; k < tupleT->getTypes().size(); k++) {
+        PyTuple_SetItem(res, k, incref(typePtrToPyTypeRepresentation(tupleT->getTypes()[k])));
+    }
+    //expose 'ElementType' as a member of the type object
+    PyDict_SetItemString(pyType->tp_dict, "ElementTypes", res);
+}
 
+void PyNamedTupleInstance::mirrorTypeInformationIntoPyTypeConcrete(NamedTuple* tupleT, PyTypeObject* pyType) {
+    PyObjectStealer types(PyTuple_New(tupleT->getTypes().size()));
+
+    for (long k = 0; k < tupleT->getTypes().size(); k++) {
+        PyTuple_SetItem(types, k, incref(typePtrToPyTypeRepresentation(tupleT->getTypes()[k])));
+    }
+
+    PyObjectStealer names(PyTuple_New(tupleT->getNames().size()));
+
+    for (long k = 0; k < tupleT->getNames().size(); k++) {
+        PyObject* namePtr = PyUnicode_FromString(tupleT->getNames()[k].c_str());
+        PyTuple_SetItem(names, k, namePtr);
+    }
+
+    //expose 'ElementType' as a member of the type object
+    PyDict_SetItemString(pyType->tp_dict, "ElementTypes", types);
+    PyDict_SetItemString(pyType->tp_dict, "ElementNames", names);
+}

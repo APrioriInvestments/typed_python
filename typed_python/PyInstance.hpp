@@ -468,6 +468,8 @@ public:
 
     static void mirrorTypeInformationIntoPyType(Type* inType, PyTypeObject* pyType);
 
+    static void mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObject* pyType);
+
     static PyTypeObject* getObjectAsTypeObject();
 
     static Type* pyFunctionToForward(PyObject* arg);
