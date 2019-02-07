@@ -24,6 +24,8 @@ public:
 
     std::pair<bool, PyObject*> callMemberFunction(const char* name, PyObject* arg0=nullptr, PyObject* arg1=nullptr);
 
+    PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
+
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);

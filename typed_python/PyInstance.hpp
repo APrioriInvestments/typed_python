@@ -269,6 +269,12 @@ public:
         mIsInitialized = true;
     }
 
+    PyInstance* duplicate() {
+        return (PyInstance*)initialize(type(), [&](instance_ptr out) {
+            type()->copy_constructor(out, dataPtr());
+        });
+    }
+
     instance_ptr dataPtr();
 
     Type* type();
@@ -431,7 +437,7 @@ public:
 
     static PyObject* tp_getattro(PyObject *o, PyObject* attrName);
 
-    static PyObject* getattr(Type* type, instance_ptr data, char* attr_name);
+    PyObject* tp_getattr_concrete(PyObject* attrPyObj, const char* attrName);
 
     static Py_hash_t tp_hash(PyObject *o);
 

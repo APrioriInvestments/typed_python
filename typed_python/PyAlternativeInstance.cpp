@@ -167,3 +167,85 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
         }
     });
 }
+
+
+PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    if (mIsMatcher) {
+        if (type()->subtypes()[type()->which(dataPtr())].first == attrName) {
+            return incref(Py_True);
+        }
+        return incref(Py_False);
+    }
+
+    if (strcmp(attrName,"matches") == 0) {
+        PyInstance* self = duplicate();
+
+        self->mIteratorOffset = -1;
+        self->mIsMatcher = true;
+
+        return (PyObject*)self;
+    }
+
+    //see if its a method
+    Alternative* toCheck = type();
+
+    auto it = toCheck->getMethods().find(attrName);
+    if (it != toCheck->getMethods().end()) {
+        return PyMethod_New((PyObject*)it->second->getOverloads()[0].getFunctionObj(), (PyObject*)this);
+    }
+
+    //see if its a member of our held type
+    NamedTuple* heldT = (NamedTuple*)type()->subtypes()[type()->which(dataPtr())].second;
+    instance_ptr heldData = type()->eltPtr(dataPtr());
+
+    int ix = heldT->indexOfName(attrName);
+    if (ix >= 0) {
+        return extractPythonObject(
+            heldT->eltPtr(heldData, ix),
+            heldT->getTypes()[ix]
+            );
+    }
+
+    return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+}
+
+PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    if (mIsMatcher) {
+        if (type()->getAlternative()->subtypes()[type()->getAlternative()->which(dataPtr())].first == attrName) {
+            return incref(Py_True);
+        }
+        return incref(Py_False);
+    }
+
+    if (strcmp(attrName,"matches") == 0) {
+        PyInstance* self = duplicate();
+
+        self->mIteratorOffset = -1;
+        self->mIsMatcher = true;
+
+        return (PyObject*)self;
+    }
+
+    //see if its a method
+    Alternative* toCheck = type()->getAlternative();
+
+    auto it = toCheck->getMethods().find(attrName);
+    if (it != toCheck->getMethods().end()) {
+        return PyMethod_New((PyObject*)it->second->getOverloads()[0].getFunctionObj(), (PyObject*)this);
+    }
+
+    //see if its a member of our held type
+    NamedTuple* heldT = (NamedTuple*)type()->getAlternative()->subtypes()[type()->which()].second;
+    instance_ptr heldData = type()->getAlternative()->eltPtr(dataPtr());
+
+    int ix = heldT->indexOfName(attrName);
+    if (ix >= 0) {
+        return extractPythonObject(
+            heldT->eltPtr(heldData, ix),
+            heldT->getTypes()[ix]
+            );
+    }
+
+    return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+}
+

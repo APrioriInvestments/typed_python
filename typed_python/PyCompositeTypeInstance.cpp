@@ -93,3 +93,19 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* name
 
     return PyInstance::constructFromPythonArgumentsConcrete(namedTupleT, data, args, kwargs);
 }
+
+PyObject* PyNamedTupleInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    //see if its a member of our held type
+    int ix = type()->indexOfName(attrName);
+
+    if (ix >= 0) {
+        return extractPythonObject(
+            type()->eltPtr(dataPtr(), ix),
+            type()->getTypes()[ix]
+            );
+    }
+
+    return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+}
+
+

@@ -873,6 +873,10 @@ PyObject* PyInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     return 0;
 }
 
+PyObject* PyInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    return PyObject_GenericGetAttr((PyObject*)this, pyAttrName);
+}
+
 // static
 PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
     if (!PyUnicode_Check(attrName)) {
@@ -882,165 +886,9 @@ PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
 
     char *attr_name = PyUnicode_AsUTF8(attrName);
 
-    Type* t = extractTypeFrom(o->ob_type);
-
-    PyInstance* w = (PyInstance*)o;
-
-    Type::TypeCategory cat = t->getTypeCategory();
-
-    if (w->mIsMatcher) {
-        PyObject* res;
-
-        if (cat == Type::TypeCategory::catAlternative) {
-            Alternative* a = (Alternative*)t;
-            if (a->subtypes()[a->which(w->dataPtr())].first == attr_name) {
-                res = Py_True;
-            } else {
-                res = Py_False;
-            }
-        } else {
-            ConcreteAlternative* a = (ConcreteAlternative*)t;
-            if (a->getAlternative()->subtypes()[a->which()].first == attr_name) {
-                res = Py_True;
-            } else {
-                res = Py_False;
-            }
-        }
-
-        Py_INCREF(res);
-        return res;
-    }
-
-    if (cat == Type::TypeCategory::catAlternative ||
-            cat == Type::TypeCategory::catConcreteAlternative) {
-        if (strcmp(attr_name,"matches") == 0) {
-            PyInstance* self = (PyInstance*)o->ob_type->tp_alloc(o->ob_type, 0);
-
-            self->mIteratorOffset = -1;
-            self->mIsMatcher = true;
-
-            self->initialize([&](instance_ptr data) {
-                t->copy_constructor(data, w->dataPtr());
-            });
-
-            return (PyObject*)self;
-        }
-
-        //see if its a method
-        Alternative* toCheck =
-            (Alternative*)(cat == Type::TypeCategory::catConcreteAlternative ? t->getBaseType() : t)
-            ;
-
-        auto it = toCheck->getMethods().find(attr_name);
-        if (it != toCheck->getMethods().end()) {
-            return PyMethod_New((PyObject*)it->second->getOverloads()[0].getFunctionObj(), o);
-        }
-    }
-
-    if (t->getTypeCategory() == Type::TypeCategory::catClass) {
-        Class* nt = (Class*)t;
-
-        for (long k = 0; k < nt->getMembers().size();k++) {
-            if (nt->getMemberName(k) == attr_name) {
-                Type* eltType = nt->getMemberType(k);
-
-                if (!nt->checkInitializationFlag(w->dataPtr(),k)) {
-                    PyErr_Format(
-                        PyExc_AttributeError,
-                        "Attribute '%S' is not initialized",
-                        attrName
-                    );
-                    return NULL;
-                }
-
-                return extractPythonObject(
-                    nt->eltPtr(w->dataPtr(), k),
-                    eltType
-                    );
-            }
-        }
-
-        {
-            auto it = nt->getPropertyFunctions().find(attr_name);
-            if (it != nt->getPropertyFunctions().end()) {
-                std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(it->second, o);
-                if (res.first) {
-                    return res.second;
-                }
-
-                PyErr_Format(
-                    PyExc_TypeError,
-                    "Found a property for %s but failed to call it with 'self'",
-                    attr_name
-                    );
-                return NULL;
-            }
-        }
-
-        {
-            auto it = nt->getMemberFunctions().find(attr_name);
-            if (it != nt->getMemberFunctions().end()) {
-                BoundMethod* bm = BoundMethod::Make(nt, it->second);
-
-                return PyInstance::initializePythonRepresentation(bm, [&](instance_ptr data) {
-                    bm->copy_constructor(data, w->dataPtr());
-                });
-            }
-        }
-
-        {
-            auto it = nt->getClassMembers().find(attr_name);
-            if (it != nt->getClassMembers().end()) {
-                PyObject* res = it->second;
-                Py_INCREF(res);
-                return res;
-            }
-        }
-    }
-
-    PyObject* result = getattr(t, w->dataPtr(), attr_name);
-
-    if (result) {
-        return result;
-    }
-
-    return PyObject_GenericGetAttr(o, attrName);
-}
-
-// static
-PyObject* PyInstance::getattr(Type* type, instance_ptr data, char* attr_name) {
-    if (type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
-        ConcreteAlternative* t = (ConcreteAlternative*)type;
-
-        return getattr(
-            t->getAlternative()->subtypes()[t->which()].second,
-            t->getAlternative()->eltPtr(data),
-            attr_name
-            );
-    }
-    if (type->getTypeCategory() == Type::TypeCategory::catAlternative) {
-        Alternative* t = (Alternative*)type;
-
-        return getattr(
-            t->subtypes()[t->which(data)].second,
-            t->eltPtr(data),
-            attr_name
-            );
-    }
-
-    if (type->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
-        NamedTuple* nt = (NamedTuple*)type;
-        for (long k = 0; k < nt->getNames().size();k++) {
-            if (nt->getNames()[k] == attr_name) {
-                return extractPythonObject(
-                    nt->eltPtr(data, k),
-                    nt->getTypes()[k]
-                    );
-            }
-        }
-    }
-
-    return NULL;
+    return specializeForType(o, [&](auto& subtype) {
+        return subtype.tp_getattr_concrete(attrName, attr_name);
+    });
 }
 
 // static

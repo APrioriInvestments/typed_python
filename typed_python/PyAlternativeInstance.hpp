@@ -14,6 +14,8 @@ public:
 
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
+    PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
@@ -30,6 +32,8 @@ public:
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
+
+    PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;

@@ -62,4 +62,6 @@ public:
     static void copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     static void constructFromPythonArgumentsConcrete(NamedTuple* t, uint8_t* data, PyObject* args, PyObject* kwargs);
+
+    PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 };

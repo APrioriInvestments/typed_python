@@ -78,6 +78,15 @@ public:
 
     void assign(instance_ptr self, instance_ptr other);
 
+    int64_t indexOfName(const char* name) {
+        for (int64_t i = 0; i < m_names.size(); i++) {
+            if (m_names[i] == name) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     const std::vector<Type*>& getTypes() const {
         return m_types;
     }

@@ -82,7 +82,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
 
             type()->constructor(data, count_lhs + count_rhs,
                 [&](uint8_t* eltPtr, int64_t k) {
-                    if (!reversed && k < count_lhs || reversed && k >= count_rhs) {
+                    if ((!reversed && k < count_lhs) || (reversed && k >= count_rhs)) {
                         eltType->copy_constructor(
                             eltPtr,
                             type()->eltPtr(dataPtr(), reversed ? k - count_rhs : k)

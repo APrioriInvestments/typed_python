@@ -290,3 +290,60 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
         throw PythonExceptionSet();
     }
 }
+
+PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    for (long k = 0; k < type()->getMembers().size();k++) {
+        if (type()->getMemberName(k) == attrName) {
+            Type* eltType = type()->getMemberType(k);
+
+            if (!type()->checkInitializationFlag(dataPtr(),k)) {
+                PyErr_Format(
+                    PyExc_AttributeError,
+                    "Attribute '%S' is not initialized",
+                    pyAttrName
+                );
+                return NULL;
+            }
+
+            return extractPythonObject(type()->eltPtr(dataPtr(), k), eltType);
+        }
+    }
+
+    {
+        auto it = type()->getPropertyFunctions().find(attrName);
+        if (it != type()->getPropertyFunctions().end()) {
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(it->second, (PyObject*)this);
+            if (res.first) {
+                return res.second;
+            }
+
+            PyErr_Format(
+                PyExc_TypeError,
+                "Found a property for %s but failed to call it with 'self'",
+                attrName
+                );
+            return NULL;
+        }
+    }
+
+    {
+        auto it = type()->getMemberFunctions().find(attrName);
+        if (it != type()->getMemberFunctions().end()) {
+            BoundMethod* bm = BoundMethod::Make(type(), it->second);
+
+            return PyInstance::initializePythonRepresentation(bm, [&](instance_ptr data) {
+                bm->copy_constructor(data, dataPtr());
+            });
+        }
+    }
+
+    {
+        auto it = type()->getClassMembers().find(attrName);
+        if (it != type()->getClassMembers().end()) {
+            return incref(it->second);
+        }
+    }
+
+    return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+}
+
