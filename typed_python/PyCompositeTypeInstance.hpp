@@ -41,6 +41,32 @@ public:
         PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
     }
 
+    static bool compare_to_python_concrete(CompositeType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
+
+        if (!PyTuple_Check(other)) {
+            return convert(-1);
+        }
+
+        int lenO = PyTuple_Size(other);
+        int lenS = tupT->getTypes().size();
+
+        for (long k = 0; k < lenO && k < lenS; k++) {
+            if (!compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_EQ)) {
+                if (compare_to_python(tupT->getTypes()[k], tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_LT)) {
+                    return convert(-1);
+                }
+                return convert(1);
+            }
+        }
+
+        if (lenS < lenO) { return convert(-1); }
+        if (lenS > lenO) { return convert(1); }
+
+        return convert(0);
+    }
+
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return PyTuple_Check(pyRepresentation) || PyList_Check(pyRepresentation) || PyDict_Check(pyRepresentation);
     }

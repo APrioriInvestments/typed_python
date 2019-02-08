@@ -403,7 +403,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(o(b"hi2") == b"hi2")
         self.assertTrue(o(1.5) == 1.5)
         self.assertTrue(o(1) is 1)
-        self.assertTrue(o(True) is True)
+        self.assertIs(o(True), True)
 
         with self.assertRaises(TypeError):
             o("hi2")
@@ -413,6 +413,11 @@ class NativeTypesTests(unittest.TestCase):
             o(3)
         with self.assertRaises(TypeError):
             o(False)
+
+    def test_ordering(self):
+        o = OneOf(None, "hi", 1.5, 1, True, b"hi2")
+
+        self.assertIs(o(True), True)
 
     def test_one_of_flattening(self):
         self.assertEqual(OneOf(OneOf(None, 1.0), OneOf(2.0, 3.0)), OneOf(None, 1.0, 2.0, 3.0))

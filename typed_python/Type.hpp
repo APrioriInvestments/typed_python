@@ -17,6 +17,7 @@
 #include "HashAccumulator.hpp"
 #include "SerializationBuffer.hpp"
 #include "DeserializationBuffer.hpp"
+#include "util.hpp"
 
 class Type;
 class None;
@@ -421,20 +422,4 @@ protected:
     std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
 
 };
-
-//given a python richcompare flag, such as Py_LT, and a c-style 'cmp' result, compute
-//the resulting boolean value
-inline bool cmpResultToBoolForPyOrdering(int pyComparisonOp, char cmpResult) {
-    switch (pyComparisonOp) {
-        case Py_EQ: return cmpResult == 0;
-        case Py_NE: return cmpResult != 0;
-        case Py_LT: return cmpResult < 0;
-        case Py_GT: return cmpResult > 0;
-        case Py_LE: return cmpResult <= 0;
-        case Py_GE: return cmpResult >= 0;
-    }
-
-    throw std::logic_error("Invalid pyComparisonOp");
-}
-
 

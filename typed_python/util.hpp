@@ -92,3 +92,20 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
 
 bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::string, PyObject*> >& out);
 
+//given a python richcompare flag, such as Py_LT, and a c-style 'cmp' result, compute
+//the resulting boolean value
+inline bool cmpResultToBoolForPyOrdering(int pyComparisonOp, char cmpResult) {
+    switch (pyComparisonOp) {
+        case Py_EQ: return cmpResult == 0;
+        case Py_NE: return cmpResult != 0;
+        case Py_LT: return cmpResult < 0;
+        case Py_GT: return cmpResult > 0;
+        case Py_LE: return cmpResult <= 0;
+        case Py_GE: return cmpResult >= 0;
+    }
+
+    throw std::logic_error("Invalid pyComparisonOp");
+}
+
+
+

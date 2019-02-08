@@ -46,5 +46,39 @@ public:
             );
     }
 
+    static bool compare_to_python_concrete(String* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        if (!PyUnicode_Check(other)) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        }
+
+        auto kind = PyUnicode_KIND(other);
+
+        int bytesPer = kind == PyUnicode_1BYTE_KIND ? 1 :
+            kind == PyUnicode_2BYTE_KIND ? 2 : 4;
+
+        if (bytesPer != t->bytes_per_codepoint(self)) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        }
+
+        if (PyUnicode_GET_LENGTH(other) < t->count(self)) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        }
+
+        if (PyUnicode_GET_LENGTH(other) > t->count(self)) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+        }
+
+        return cmpResultToBoolForPyOrdering(
+            pyComparisonOp,
+            memcmp(
+                kind == PyUnicode_1BYTE_KIND ? (const char*)PyUnicode_1BYTE_DATA(other) :
+                kind == PyUnicode_2BYTE_KIND ? (const char*)PyUnicode_2BYTE_DATA(other) :
+                                               (const char*)PyUnicode_4BYTE_DATA(other),
+                ((String*)t)->eltPtr(self, 0),
+                PyUnicode_GET_LENGTH(other) * bytesPer
+                )
+            );
+    }
+
 };
 

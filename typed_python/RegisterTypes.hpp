@@ -69,9 +69,6 @@ public:
     void serialize(instance_ptr self, buf_t& buffer) {
         buffer.write(*(T*)self);
     }
-
-
-
 };
 
 class Bool : public RegisterType<bool> {

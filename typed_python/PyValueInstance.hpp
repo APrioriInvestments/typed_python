@@ -9,7 +9,7 @@ public:
     static void copyConstructFromPythonInstanceConcrete(Value* v, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         const Instance& elt = v->value();
 
-        if (compare_to_python(elt.type(), elt.data(), pyRepresentation, false, Py_NE)) {
+        if (compare_to_python(elt.type(), elt.data(), pyRepresentation, isExplicit ? false : true, Py_NE)) {
             throw std::logic_error("Can't initialize a " + v->name() + " from an instance of " +
                 std::string(pyRepresentation->ob_type->tp_name));
         } else {

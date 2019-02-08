@@ -56,6 +56,29 @@ public:
     static PyMethodDef* typeMethodsConcrete();
 
     static void constructFromPythonArgumentsConcrete(ListOf* t, uint8_t* data, PyObject* args, PyObject* kwargs);
+
+    static bool compare_to_python_concrete(ListOf* listT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
+
+        if (!PyList_Check(other)) {
+            return convert(-1);
+        }
+
+        int lenO = PyList_Size(other);
+        int lenS = listT->count(self);
+        for (long k = 0; k < lenO && k < lenS; k++) {
+            if (!compare_to_python(listT->getEltType(), listT->eltPtr(self, k), PyList_GetItem(other,k), exact, Py_EQ)) {
+                if (compare_to_python(listT->getEltType(), listT->eltPtr(self, k), PyList_GetItem(other,k), exact, Py_LT)) {
+                    return convert(-1);
+                }
+                return convert(1);
+            }
+        }
+
+        if (lenS < lenO) { return convert(-1); }
+        if (lenS > lenO) { return convert(1); }
+        return convert(0);
+    }
 };
 
 class PyTupleOfInstance : public PyTupleOrListOfInstance {
@@ -65,4 +88,29 @@ public:
     TupleOf* type();
 
     static PyMethodDef* typeMethodsConcrete();
+
+    static bool compare_to_python_concrete(TupleOf* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };
+
+        if (!PyTuple_Check(other)) {
+            return convert(-1);
+        }
+
+        int lenO = PyTuple_Size(other);
+        int lenS = tupT->count(self);
+
+        for (long k = 0; k < lenO && k < lenS; k++) {
+            if (!compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_EQ)) {
+                if (compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), PyTuple_GetItem(other,k), exact, Py_LT)) {
+                    return convert(-1);
+                }
+                return convert(1);
+            }
+        }
+
+        if (lenS < lenO) { return convert(-1); }
+        if (lenS > lenO) { return convert(1); }
+        return convert(0);
+    }
+
 };

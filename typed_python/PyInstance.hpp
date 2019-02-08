@@ -445,6 +445,8 @@ public:
 
     static bool compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
+    static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
+
     static PyObject *tp_richcompare(PyObject *a, PyObject *b, int op);
 
     static PyObject* tp_iter(PyObject *o);

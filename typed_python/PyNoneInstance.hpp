@@ -21,5 +21,12 @@ public:
     static PyObject* extractPythonObjectConcrete(None* valueType, instance_ptr data) {
         return incref(Py_None);
     }
+
+    static bool compare_to_python_concrete(None* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        return cmpResultToBoolForPyOrdering(
+            pyComparisonOp,
+            other == Py_None ? 0 : 1
+            );
+    }
 };
 

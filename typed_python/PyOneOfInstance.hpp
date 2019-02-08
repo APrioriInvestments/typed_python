@@ -36,6 +36,10 @@ public:
         return extractPythonObject(child.second, child.first);
     }
 
+    static bool compare_to_python_concrete(OneOf* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        std::pair<Type*, instance_ptr> child = t->unwrap(self);
+        return compare_to_python(child.first, child.second, other, exact, pyComparisonOp);
+    }
 
     static void mirrorTypeInformationIntoPyTypeConcrete(OneOf* oneOfT, PyTypeObject* pyType) {
         PyObjectStealer types(PyTuple_New(oneOfT->getTypes().size()));

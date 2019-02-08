@@ -188,5 +188,42 @@ public:
     }
 
 
+    static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+        if (PyBool_Check(other) && (!exact || t->getTypeCategory() == Type::TypeCategory::catBool)) {
+            bool value = (other == Py_True ? 1 : 0);
+
+            return cmpResultToBoolForPyOrdering(
+                pyComparisonOp,
+                value < *(T*)self ? -1 :
+                value > *(T*)self ? 1 :
+                    0
+                );
+        }
+
+        if (PyLong_CheckExact(other) && (!exact || t->getTypeCategory() == Type::TypeCategory::catInt64)) {
+            int64_t value = PyLong_AsLong(other);
+
+            return cmpResultToBoolForPyOrdering(
+                pyComparisonOp,
+                value < *(T*)self ? -1 :
+                value > *(T*)self ? 1 :
+                    0
+                );
+        }
+
+        if (PyFloat_Check(other) && (!exact || t->getTypeCategory() == Type::TypeCategory::catFloat64)) {
+            float value = PyFloat_AsDouble(other);
+
+            return cmpResultToBoolForPyOrdering(
+                pyComparisonOp,
+                value < *(T*)self ? -1 :
+                value > *(T*)self ? 1 :
+                    0
+                );
+        }
+
+        return cmpResultToBoolForPyOrdering(pyComparisonOp,-1);
+    }
+
 };
 
