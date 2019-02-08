@@ -175,14 +175,14 @@ class NativeTypesTests(unittest.TestCase):
             )
 
     def test_objects_are_singletons(self):
-        self.assertTrue(Int8() is Int8())
-        self.assertTrue(NoneType() is NoneType())
+        self.assertTrue(Int8 is Int8)
+        self.assertTrue(NoneType is NoneType)
 
     def test_object_binary_compatibility(self):
         ibc = _types.isBinaryCompatible
 
-        self.assertTrue(ibc(NoneType(), NoneType()))
-        self.assertTrue(ibc(Int8(), Int8()))
+        self.assertTrue(ibc(NoneType, NoneType))
+        self.assertTrue(ibc(Int8, Int8))
 
         NT = NamedTuple(a=int,b=int)
 
@@ -234,9 +234,9 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.Y, A2.X))
 
     def test_object_bytecounts(self):
-        self.assertEqual(_types.bytecount(NoneType()), 0)
-        self.assertEqual(_types.bytecount(Int8()), 1)
-        self.assertEqual(_types.bytecount(Int64()), 8)
+        self.assertEqual(_types.bytecount(NoneType), 0)
+        self.assertEqual(_types.bytecount(Int8), 1)
+        self.assertEqual(_types.bytecount(Int64), 8)
 
     def test_type_stringification(self):
         for t in ['Int8', 'NoneType']:
@@ -1363,20 +1363,20 @@ class NativeTypesTests(unittest.TestCase):
             (1,2,3), TupleOf(int)([1,2,3])
             )
 
-    def test_other_bitness_ints(self):
+    def test_other_bitness_types(self):
         #verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
-                (Bool(), numpy.bool),
-                (Int8(), numpy.int8),
-                (Int16(), numpy.int16),
-                (Int32(), numpy.int32),
-                (Int64(), numpy.int64),
-                (UInt8(), numpy.uint8),
-                (UInt16(), numpy.uint16),
-                (UInt32(), numpy.uint32),
-                (UInt64(), numpy.uint64),
-                (Float32(), numpy.float32),
-                (Float64(), numpy.float64)
+                (Bool, numpy.bool),
+                (Int8, numpy.int8),
+                (Int16, numpy.int16),
+                (Int32, numpy.int32),
+                (Int64, numpy.int64),
+                (UInt8, numpy.uint8),
+                (UInt16, numpy.uint16),
+                (UInt32, numpy.uint32),
+                (UInt64, numpy.uint64),
+                (Float32, numpy.float32),
+                (Float64, numpy.float64)
                 ]
 
         for ourType, numpyType in typeAndNumpyType:
@@ -1399,6 +1399,44 @@ class NativeTypesTests(unittest.TestCase):
                     #  numpy.int16(numpy.float64(10000000000))
                     pass
 
+    def test_other_bitness_types_operators(self):
+        def add(x,y): return x+y
+        def div(x,y): return x/y
+        def mul(x,y): return x*y
+        def sub(x,y): return x-y
+        def bitand(x,y): return x&y
+        def bitor(x,y): return x|y
+        def bitxor(x,y): return x^y
+
+
+        otherTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+        for t1 in otherTypes:
+            for t2 in otherTypes:
+                for op in [add,mul,div,sub,bitand,bitor,bitxor]:
+                    if not ((t1.IsFloat or t2.IsFloat) and op in (bitand, bitor,bitxor)):
+                        res = op(t1(10),t2(10))
+                        resType = type(res)
+                        resType = {bool:Bool,int:Int64,float:Float64}.get(resType,resType)
+
+                        if t1.IsFloat and t2.IsFloat:
+                            self.assertTrue(resType.IsFloat)
+                            self.assertEqual(resType.Bits, max(t1.Bits, t2.Bits))
+                            self.assertEqual(res, op(10,10))
+                        elif t1.IsFloat or t2.IsFloat:
+                            self.assertTrue(resType.IsFloat)
+                            self.assertEqual(resType.Bits, t1.Bits if t1.IsFloat else t2.Bits)
+                            if t1.Bits > 1 and t2.Bits > 1:
+                                self.assertEqual(res, op(10,10))
+                        elif t1 is Bool and t2 is Bool:
+                            self.assertEqual(resType, Bool if op in (bitor,bitand,bitxor) else Int64 if op is not div else Float64)
+                        else:
+                            self.assertEqual(resType.Bits, max(t1.Bits, t2.Bits))
+
+                            if op is not div:
+                                self.assertEqual(resType.IsSignedInt, t1.IsSignedInt or t2.IsSignedInt)
+
+                            if t1.Bits > 1 and t2.Bits > 1:
+                                self.assertEqual(res, op(10,10))
 
     def test_comparing_arbitrary_objects(self):
         x = TupleOf(object)(["a"])

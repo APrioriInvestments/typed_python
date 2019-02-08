@@ -85,7 +85,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             )
 
     def convert_to_type(self, context, expr, target_type):
-        if target_type.typeRepresentation == Int64():
+        if target_type.typeRepresentation == Int64:
             return context.pushPod(
                 target_type,
                 runtime_functions.pyobj_to_int.call(expr.nonref_expr)
@@ -94,7 +94,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         return super().convert_to_type(context, expr, target_type)
 
     def convert_to_self(self, context, expr):
-        if expr.expr_type.typeRepresentation == Int64():
+        if expr.expr_type.typeRepresentation == Int64:
             return context.push(
                 self,
                 lambda targetSlot:

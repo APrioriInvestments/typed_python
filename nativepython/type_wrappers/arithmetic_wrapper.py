@@ -89,7 +89,7 @@ class ArithmeticTypeWrapper(Wrapper):
 
 class Int64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
-        super().__init__(Int64())
+        super().__init__(Int64)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=64,signed=True)
@@ -104,7 +104,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             )
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Float64():
+        if target_type.typeRepresentation == Float64:
             return context.pushPod(
                 float,
                 native_ast.Expression.Cast(
@@ -112,9 +112,9 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     to_type=native_ast.Type.Float(bits=64)
                     )
                 )
-        elif target_type.typeRepresentation == Int64():
+        elif target_type.typeRepresentation == Int64:
             return e
-        elif target_type.typeRepresentation == Bool():
+        elif target_type.typeRepresentation == Bool:
             return e != 0
 
         return super().convert_to_type(context, e, target_type)
@@ -187,13 +187,13 @@ class Int64Wrapper(ArithmeticTypeWrapper):
 
 class BoolWrapper(ArithmeticTypeWrapper):
     def __init__(self):
-        super().__init__(Bool())
+        super().__init__(Bool)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=1,signed=False)
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Float64():
+        if target_type.typeRepresentation == Float64:
             return context.pushPod(
                 float,
                 native_ast.Expression.Cast(
@@ -201,7 +201,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     to_type=native_ast.Type.Float(bits=64)
                     )
                 )
-        elif target_type.typeRepresentation == Int64():
+        elif target_type.typeRepresentation == Int64:
             return context.pushPod(
                 int,
                 native_ast.Expression.Cast(
@@ -209,7 +209,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     to_type=native_ast.Type.Int(bits=64, signed=True)
                     )
                 )
-        elif target_type.typeRepresentation == Bool():
+        elif target_type.typeRepresentation == Bool:
             return e
 
         return super().convert_to_type(context, e, target_type)
@@ -230,15 +230,15 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):
-        super().__init__(Float64())
+        super().__init__(Float64)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Float(bits=64)
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Float64():
+        if target_type.typeRepresentation == Float64:
             return e
-        elif target_type.typeRepresentation == Int64():
+        elif target_type.typeRepresentation == Int64:
             return context.pushPod(
                 int,
                 native_ast.Expression.Cast(
@@ -246,7 +246,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                     to_type=native_ast.Type.Int(bits=64, signed=True)
                     )
                 )
-        elif target_type.typeRepresentation == Bool():
+        elif target_type.typeRepresentation == Bool:
             return e != 0.0
 
         return super().convert_to_type(context, e, target_type)

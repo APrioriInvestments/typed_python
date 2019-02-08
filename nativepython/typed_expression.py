@@ -132,13 +132,13 @@ class TypedExpression(object):
         return self.expr_type.convert_next(self.context, self)
 
     def toFloat64(self):
-        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64()))
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Float64))
 
     def toInt64(self):
-        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Int64()))
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Int64))
 
     def toBool(self):
-        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Bool()))
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(Bool))
 
     def __str__(self):
         return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")

@@ -63,7 +63,7 @@ class PointerToWrapper(Wrapper):
         pass
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Int64():
+        if target_type.typeRepresentation == Int64:
             return context.pushPod(int, e.nonref_expr.cast(native_ast.Int64))
 
         return super().convert_to_type(context, e, target_type)

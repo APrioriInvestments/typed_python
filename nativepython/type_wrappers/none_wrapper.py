@@ -22,7 +22,7 @@ class NoneWrapper(Wrapper):
     is_pass_by_ref = False
 
     def __init__(self):
-        super().__init__(NoneType())
+        super().__init__(NoneType)
 
     def convert_default_initialize(self, context, target):
         pass

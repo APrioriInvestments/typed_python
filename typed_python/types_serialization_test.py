@@ -320,7 +320,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_primitive_native_types(self):
         for t in [Int64, Float64, Bool, NoneType, String, Bytes]:
-            self.assertIs(ping_pong(t()), t())
+            self.assertIs(ping_pong(t), t)
 
     def test_serialize_primitive_compound_types(self):
         class A:

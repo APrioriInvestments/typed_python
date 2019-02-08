@@ -77,7 +77,7 @@ USER_LOGIN_DURATION = 24 * 60 * 60  # 24 hours
 @active_webservice_schema.define
 class User:
     username = Indexed(str)
-    login_expiration = Float64()
+    login_expiration = Float64
 
     def login(self):
         self.login_expiration = time.time() + USER_LOGIN_DURATION

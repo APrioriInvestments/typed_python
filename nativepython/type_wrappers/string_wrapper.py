@@ -32,7 +32,7 @@ class StringWrapper(RefcountedWrapper):
     is_pass_by_ref = True
 
     def __init__(self):
-        super().__init__(String())
+        super().__init__(String)
 
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),

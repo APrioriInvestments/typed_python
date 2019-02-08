@@ -56,7 +56,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 "destructor_" + str(self.typeRepresentation),
                 ('destructor', self),
                 [self],
-                typeWrapper(NoneType()),
+                typeWrapper(NoneType),
                 self.generateNativeDestructorFunction
                 )
             .call(instance)

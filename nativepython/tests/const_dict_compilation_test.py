@@ -33,12 +33,12 @@ def makeSomeValues(dtype, count=10):
     res = dtype()
 
     for i in range(count):
-        if res.KeyType is String():
+        if res.KeyType is String:
             k = str(i)
         else:
             k = i
 
-        if res.ValueType is String():
+        if res.ValueType is String:
             v = str(i)
         else:
             v = i

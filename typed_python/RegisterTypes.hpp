@@ -225,3 +225,18 @@ public:
 
     static Float64* Make() { static Float64 res; return &res; }
 };
+
+template<class T>
+class GetRegisterType {};
+
+template<> class GetRegisterType<bool> { public: Type* operator()() const { return Bool::Make(); } };
+template<> class GetRegisterType<int8_t> { public: Type* operator()() const { return Int8::Make(); } };
+template<> class GetRegisterType<int16_t> { public: Type* operator()() const { return Int16::Make(); } };
+template<> class GetRegisterType<int32_t> { public: Type* operator()() const { return Int32::Make(); } };
+template<> class GetRegisterType<int64_t> { public: Type* operator()() const { return Int64::Make(); } };
+template<> class GetRegisterType<uint8_t> { public: Type* operator()() const { return UInt8::Make(); } };
+template<> class GetRegisterType<uint16_t> { public: Type* operator()() const { return UInt16::Make(); } };
+template<> class GetRegisterType<uint32_t> { public: Type* operator()() const { return UInt32::Make(); } };
+template<> class GetRegisterType<uint64_t> { public: Type* operator()() const { return UInt64::Make(); } };
+template<> class GetRegisterType<float> { public: Type* operator()() const { return Float32::Make(); } };
+template<> class GetRegisterType<double> { public: Type* operator()() const { return Float64::Make(); } };

@@ -21,7 +21,26 @@ from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
 from typed_python._types import (
 	TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
-	Alternative, Value, serialize, deserialize, Int8,
-	Bool, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64,
-	Float32, Float64, NoneType, String, Bytes, PointerTo
+	Alternative, Value, serialize, deserialize,
+    PointerTo
 )
+
+import typed_python._types as _types
+
+#in the c module, these are functions, but because they're not parametrized,
+#we want them to be actual values. Otherwise, we'll have 'Float64()'
+#where we would have written 'Float64' etc.
+Bool = _types.Bool()
+Int8 = _types.Int8()
+Int16 = _types.Int16()
+Int32 = _types.Int32()
+Int64 = _types.Int64()
+UInt8 = _types.UInt8()
+UInt16 = _types.UInt16()
+UInt32 = _types.UInt32()
+UInt64 = _types.UInt64()
+Float32 = _types.Float32()
+Float64 = _types.Float64()
+NoneType = _types.NoneType()
+String = _types.String()
+Bytes = _types.Bytes()

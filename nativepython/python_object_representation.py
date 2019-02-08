@@ -44,22 +44,22 @@ def _typedPythonTypeToTypeWrapper(t):
 
     resolveForwards(t)
 
-    if t is Int64():
+    if t is Int64:
         return Int64Wrapper()
 
-    if t is Float64():
+    if t is Float64:
         return Float64Wrapper()
 
-    if t is Bool():
+    if t is Bool:
         return BoolWrapper()
 
-    if t is NoneType():
+    if t is NoneType:
         return NoneWrapper()
 
-    if t is String():
+    if t is String:
         return StringWrapper()
 
-    if t is Bytes():
+    if t is Bytes:
         return BytesWrapper()
 
     if t.__typed_python_category__ == "Class":

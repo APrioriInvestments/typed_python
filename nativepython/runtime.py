@@ -17,7 +17,7 @@ import nativepython.native_ast as native_ast
 import nativepython.llvm_compiler as llvm_compiler
 import nativepython
 from typed_python import _types
-from typed_python import Function
+from typed_python import Function, NoneType
 from typed_python import Codebase
 from typed_python.internals import FunctionOverload
 
@@ -78,7 +78,7 @@ class Runtime:
 
             f._installNativePointer(
                 fp.fp,
-                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else _types.NoneType(),
+                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
                 [i.typeRepresentation for i in input_wrappers]
                 )
 

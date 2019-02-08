@@ -216,7 +216,7 @@ class ExpressionConversionContext(object):
             expr = native_ast.nullExpr
 
         if isinstance(expr, TypedExpression):
-            assert expr.expr_type.typeRepresentation is NoneType(), expr.expr_type
+            assert expr.expr_type.typeRepresentation is NoneType, expr.expr_type
             expr = expr.expr
         else:
             assert isinstance(expr, native_ast.Expression)
