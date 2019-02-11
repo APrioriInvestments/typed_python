@@ -20,6 +20,8 @@ import threading
 import time
 import unittest
 import numpy
+import datetime
+import pytz
 import gc
 import tempfile
 import typed_python.dummy_test_module as dummy_test_module
@@ -998,6 +1000,33 @@ class TypesSerializationTest(unittest.TestCase):
         a2 = x.deserialize(x.serialize(a))
 
         self.assertTrue(numpy.all(a == a2))
+
+    def test_serialize_datetime_objects(self):
+        x = SerializationContext({})
+        
+        d = datetime.date.today()
+        d2 = x.deserialize(x.serialize(d))
+        self.assertEqual(d,d2,(d, type(d)))
+        
+        d = datetime.datetime.now()
+        d2 = x.deserialize(x.serialize(d))
+        self.assertEqual(d,d2,(d, type(d)))
+        
+        d = datetime.timedelta(days = 1)
+        d2 = x.deserialize(x.serialize(d))
+        self.assertEqual(d,d2,(d, type(d)))
+        
+        d = datetime.datetime.now().time()
+        d2 = x.deserialize(x.serialize(d))
+        self.assertEqual(d,d2,(d, type(d)))
+        
+        d = pytz.timezone("America/New_York")
+        d2 = x.deserialize(x.serialize(d))
+        self.assertEqual(d,d2,(d, type(d)))
+        
+        d = pytz.timezone("America/New_York").localize(datetime.datetime.now())
+        d2 = x.deserialize(x.serialize(d))
+        self.assertEqual(d,d2,(d, type(d)))
 
     def test_serialize_dict(self):
         x = SerializationContext({})
