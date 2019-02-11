@@ -36,6 +36,33 @@ inline void PyTuple_Set_Item_No_Checks(PyObject* o, long k, PyObject* item) {
     PyTuple_SET_ITEM(o, k, item);
 }
 
+//models bytes held in a python 'bytes' object.
+class PyBytesByteBuffer : public ByteBuffer {
+public:
+    explicit PyBytesByteBuffer(PyObject* obj) : m_obj(incref(obj)) {
+        if (!PyObject_CheckBuffer(obj)) {
+            PyErr_Format(PyExc_TypeError, "Not a buffer object.");
+            throw PythonExceptionSet();
+        }
+
+        if (PyObject_GetBuffer(obj, &m_buffer, PyBUF_SIMPLE | PyBUF_ANY_CONTIGUOUS) == -1) {
+            throw PythonExceptionSet();
+        }
+    }
+
+    virtual ~PyBytesByteBuffer() {
+        PyBuffer_Release(&m_buffer);
+        Py_DECREF(m_obj);
+    }
+
+    virtual std::pair<uint8_t*, uint8_t*> range() {
+        return std::make_pair((uint8_t*)m_buffer.buf, (uint8_t*)m_buffer.buf + m_buffer.len);
+    }
+
+private:
+    PyObject* m_obj;
+    Py_buffer m_buffer;
+};
 
 class PythonSerializationContext : public SerializationContext {
 public:
@@ -67,11 +94,11 @@ public:
     {
     }
 
-    std::string compress(std::string bytes) const;
+    std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const;
 
-    std::string decompress(std::string bytes) const;
+    std::shared_ptr<ByteBuffer> decompress(uint8_t* begin, uint8_t* end) const;
 
-    std::string compressOrDecompress(std::string bytes, bool compress) const;
+    std::shared_ptr<ByteBuffer> compressOrDecompress(uint8_t* begin, uint8_t* end, bool compress) const;
 
     virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const;
 

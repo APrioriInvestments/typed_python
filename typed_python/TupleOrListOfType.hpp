@@ -47,9 +47,11 @@ public:
     void serialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = count(self);
         buffer.write_uint32(ct);
-        for (long k = 0; k < ct;k++) {
-            m_element_type->serialize(eltPtr(self,k),buffer);
-        }
+        m_element_type->check([&](auto& concrete_type) {
+            for (long k = 0; k < ct;k++) {
+                concrete_type.serialize(eltPtr(self,k),buffer);
+            }
+        });
     }
 
     template<class buf_t>

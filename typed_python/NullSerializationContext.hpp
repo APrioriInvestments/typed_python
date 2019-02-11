@@ -11,10 +11,10 @@ public:
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const {
         throw std::runtime_error("No serialization plugin provided, so we can't deserialize arbitrary python objects.");
     }
-    virtual std::string compress(std::string bytes) const {
-        return bytes;
+    virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const {
+        return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin, end));
     }
-    virtual std::string decompress(std::string bytes) const {
-        return bytes;
+    virtual std::shared_ptr<ByteBuffer> decompress(uint8_t* begin, uint8_t* end) const {
+        return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin, end));
     }
 };

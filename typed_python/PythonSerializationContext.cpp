@@ -913,13 +913,13 @@ void PythonSerializationContext::serializePyFrozenSet(PyObject* o, Serialization
     serializeIterable(o, b, PySet_Size);
 }
 
-std::string PythonSerializationContext::compressOrDecompress(std::string bytes, bool compress) const {
+std::shared_ptr<ByteBuffer> PythonSerializationContext::compressOrDecompress(uint8_t* begin, uint8_t* end, bool compress) const {
     if (!mContextObj) {
-        return bytes;
+        return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin,end));
     }
 
     PyObjectStealer pyBytes(
-        PyBytes_FromStringAndSize(bytes.c_str(), bytes.size())
+        PyBytes_FromStringAndSize((const char*)begin, end-begin)
         );
 
     PyObjectStealer outBytes(
@@ -946,21 +946,14 @@ std::string PythonSerializationContext::compressOrDecompress(std::string bytes, 
         throw PythonExceptionSet();
     }
 
-    char* bufPtr;
-    Py_ssize_t len;
-
-    if (PyBytes_AsStringAndSize(outBytes, &bufPtr, &len) == -1) {
-        throw PythonExceptionSet();
-    }
-
-    return std::string(bufPtr, bufPtr + len);
+    return std::shared_ptr<ByteBuffer>(new PyBytesByteBuffer(outBytes));
 }
 
-std::string PythonSerializationContext::compress(std::string bytes) const {
-    return compressOrDecompress(bytes, true);
+std::shared_ptr<ByteBuffer> PythonSerializationContext::compress(uint8_t* begin, uint8_t* end) const {
+    return compressOrDecompress(begin, end, true);
 }
 
-std::string PythonSerializationContext::decompress(std::string bytes) const {
-    return compressOrDecompress(bytes, false);
+std::shared_ptr<ByteBuffer> PythonSerializationContext::decompress(uint8_t* begin, uint8_t* end) const {
+    return compressOrDecompress(begin, end, false);
 }
 

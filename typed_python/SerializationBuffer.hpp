@@ -56,8 +56,9 @@ public:
     void write_double(double i) {
         write<double>(i);
     }
-    void write_bytes(uint8_t* ptr, size_t bytecount) {
-        ensure(bytecount);
+
+    void write_bytes(uint8_t* ptr, size_t bytecount, bool allowCompression = true) {
+        ensure(bytecount, allowCompression);
         memcpy(m_buffer+m_size, ptr, bytecount);
         m_size += bytecount;
     }
@@ -75,12 +76,12 @@ public:
         return m_size;
     }
 
-    void ensure(size_t t) {
+    void ensure(size_t t, bool allowCompression=true) {
         if (m_size + t > m_reserved) {
             reserve(m_size + t + 1024 * 128);
 
             //compress every 10 megs or so
-            if (m_size - m_last_compression_point > 10 * 1024 * 1024) {
+            if (allowCompression && m_size - m_last_compression_point > 10 * 1024 * 1024) {
                 compress();
             }
         }
@@ -154,13 +155,29 @@ public:
 
         //replace the data we have here with a block of 4 bytes of size of compressed data and
         //then the data stream
-        std::string data(m_buffer + m_last_compression_point, m_buffer + m_size);
+        std::shared_ptr<ByteBuffer> buf = m_context.compress(m_buffer + m_last_compression_point, m_buffer + m_size);
+        std::pair<uint8_t*, uint8_t*> range = buf->range();
 
-        data = m_context.compress(data);
+        if (range.first == m_buffer + m_last_compression_point) {
+            //we got back the original range
+            ensure(sizeof(uint32_t), false);
+            memmove(
+                m_buffer + m_last_compression_point + sizeof(uint32_t),
+                m_buffer + m_last_compression_point,
+                m_size - m_last_compression_point
+                );
+            *(uint32_t*)(m_buffer + m_last_compression_point) = (range.second - range.first);
 
-        m_size = m_last_compression_point;
-        write_string(data);
-        m_last_compression_point = m_size;
+            m_size += sizeof(uint32_t);
+            m_last_compression_point = m_size;
+        } else {
+            m_size = m_last_compression_point;
+
+            write_uint32(range.second - range.first);
+            write_bytes(range.first, range.second - range.first, false);
+
+            m_last_compression_point = m_size;
+        }
     }
     template< class T>
     void write(T i) {

@@ -182,28 +182,23 @@ private:
             throw std::runtime_error("Corrupt data: can't decompress this large of a block");
         }
 
-        m_compressed_blocks += sizeof(uint32_t);
-        m_compressed_block_data_remaining -= sizeof(uint32_t);
+        m_compressed_blocks += sizeof(uint32_t) + bytesToDecompress;
+        m_compressed_block_data_remaining -= sizeof(uint32_t) + bytesToDecompress;
 
-        std::string toDecompress(m_compressed_blocks, m_compressed_blocks + bytesToDecompress);
-        m_compressed_blocks += bytesToDecompress;
-        m_compressed_block_data_remaining -= bytesToDecompress;
+        std::shared_ptr<ByteBuffer> buf = m_context.decompress(m_compressed_blocks - bytesToDecompress, m_compressed_blocks);
 
-        std::string decompressed = m_context.decompress(toDecompress);
-
-        pushStringIntoDecompressedBuffer(decompressed);
+        pushDecompressedBuffer(buf);
 
         return true;
     }
 
-    void pushStringIntoDecompressedBuffer(std::string decompressed) {
-        std::vector<uint8_t> newData(m_decompressed_buffer.begin() + m_read_head_offset, m_decompressed_buffer.end());
+    void pushDecompressedBuffer(std::shared_ptr<ByteBuffer> buf) {
+        m_decompressed_buffer.erase(m_decompressed_buffer.begin(), m_decompressed_buffer.begin() + m_read_head_offset);
         m_read_head_offset = 0;
 
-        newData.insert(newData.end(), decompressed.begin(), decompressed.end());
-        m_size += decompressed.size();
+        m_decompressed_buffer.insert(m_decompressed_buffer.end(), buf->range().first, buf->range().second);
+        m_size += buf->range().second - buf->range().first;
 
-        std::swap(newData, m_decompressed_buffer);
         m_read_head = &m_decompressed_buffer[0];
     }
 

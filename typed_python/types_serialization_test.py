@@ -985,7 +985,9 @@ class TypesSerializationTest(unittest.TestCase):
         for sublist in l:
             sublist.resize(1000000)
 
+        t0 = time.time()
         l2 = x.deserialize(x.serialize(l))
+        print(time.time() - t0, " to roundtrip")
 
         self.assertEqual(l, l2)
 
