@@ -18,6 +18,8 @@ from typed_python.hash import sha_hash
 from typed_python.type_function import TypeFunction, ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
 from types import FunctionType, ModuleType
 import numpy
+import datetime
+import pytz
 import lz4.frame
 
 _reconstruct = numpy.array([1,2,3]).__reduce__()[0]
@@ -36,6 +38,11 @@ _builtin_name_to_value[".builtin._ndarray"] = _ndarray
 _builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0] #the 'scalar' function
 _builtin_name_to_value[".builtin.dtype"] = numpy.dtype
 _builtin_name_to_value[".builtin.numpy"] = numpy
+_builtin_name_to_value[".builtin.datetime.datetime"] = datetime.datetime
+_builtin_name_to_value[".builtin.datetime.date"] = datetime.date
+_builtin_name_to_value[".builtin.datetime.time"] = datetime.time
+_builtin_name_to_value[".builtin.datetime.timedelta"] = datetime.timedelta
+_builtin_name_to_value[".builtin.pytz"] = pytz
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
 
@@ -174,6 +181,7 @@ class SerializationContext(object):
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
+        
         if isinstance(inst, type):
             isTF = isTypeFunctionType(inst)
             if isTF is not None:
@@ -187,6 +195,21 @@ class SerializationContext(object):
 
         if isinstance(inst, numpy.dtype):
             return (numpy.dtype, (str(inst),), None)
+
+        if isinstance(inst, datetime.datetime):
+            return inst.__reduce__() + (None,)
+        
+        if isinstance(inst, datetime.date):
+            return inst.__reduce__() + (None,)
+        
+        if isinstance(inst, datetime.time):
+            return inst.__reduce__() + (None,)
+        
+        if isinstance(inst, datetime.timedelta):
+            return inst.__reduce__() + (None,)
+        
+        if isinstance(inst, datetime.tzinfo):
+            return inst.__reduce__() + (None,)
 
         if isinstance(inst, FunctionType):
             representation = {}
@@ -216,15 +239,30 @@ class SerializationContext(object):
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
-        if isinstance(instance, type):
+        if isinstance(instance, datetime.datetime):
+            return True
+        
+        if isinstance(instance, datetime.date):
+            return True
+        
+        if isinstance(instance, datetime.time):
+            return True
+        
+        if isinstance(instance, datetime.timedelta):
+            return True
+        
+        if isinstance(instance, datetime.tzinfo):
             return True
 
+        if isinstance(instance, type):
+            return True
+        
         if isinstance(instance, numpy.dtype):
             return True
 
         if isinstance(instance, numpy.number):
             return True
-
+        
         if isinstance(instance, _ndarray):
             instance.__setstate__(representation)
             return True
