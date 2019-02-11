@@ -169,8 +169,8 @@ Statement = Alternative("Statement",
         'filename': str
         },
     ImportFrom = {
-        "module": TupleOf(str),
-        "names": TupleOf(Alias),
+        "module": OneOf(str,TupleOf(str)),
+        "names": OneOf(Alias,TupleOf(Alias)),
         "level": OneOf(int, None),
         'line_number': int,
         'col_offset': int,
