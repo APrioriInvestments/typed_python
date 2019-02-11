@@ -16,6 +16,7 @@ class PyClassInstance;
 class PyHeldClassInstance;
 class PyListOfInstance;
 class PyTupleOfInstance;
+class PyDictInstance;
 class PyConstDictInstance;
 class PyPointerToInstance;
 class PyCompositeTypeInstance;
@@ -83,6 +84,8 @@ public:
                 return f(*(PyTupleInstance*)obj);
             case Type::TypeCategory::catConstDict:
                 return f(*(PyConstDictInstance*)obj);
+            case Type::TypeCategory::catDict:
+                return f(*(PyDictInstance*)obj);
             case Type::TypeCategory::catAlternative:
                 return f(*(PyAlternativeInstance*)obj);
             case Type::TypeCategory::catConcreteAlternative:
@@ -152,6 +155,8 @@ public:
                 return f((PyTupleInstance*)nullptr);
             case Type::TypeCategory::catConstDict:
                 return f((PyConstDictInstance*)nullptr);
+            case Type::TypeCategory::catDict:
+                return f((PyDictInstance*)nullptr);
             case Type::TypeCategory::catAlternative:
                 return f((PyAlternativeInstance*)nullptr);
             case Type::TypeCategory::catConcreteAlternative:
@@ -273,6 +278,18 @@ public:
         return (PyInstance*)initialize(type(), [&](instance_ptr out) {
             type()->copy_constructor(out, dataPtr());
         });
+    }
+
+    PyObject* createIteratorToSelf(int32_t iterTypeFlag) {
+        PyInstance* result = (PyInstance*)initialize(type(), [&](instance_ptr out) {
+            type()->copy_constructor(out, dataPtr());
+        });
+
+        result->mIsMatcher = false;
+        result->mIteratorOffset = 0;
+        result->mIteratorFlag = iterTypeFlag;
+
+        return (PyObject*)result;
     }
 
     instance_ptr dataPtr();
@@ -473,8 +490,6 @@ public:
     static void mirrorTypeInformationIntoPyType(Type* inType, PyTypeObject* pyType);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObject* pyType);
-
-    static PyTypeObject* getObjectAsTypeObject();
 
     static Type* pyFunctionToForward(PyObject* arg);
 

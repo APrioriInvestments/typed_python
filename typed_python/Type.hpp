@@ -15,9 +15,10 @@
 #include "ReprAccumulator.hpp"
 #include "SerializationContext.hpp"
 #include "HashAccumulator.hpp"
-#include "SerializationBuffer.hpp"
-#include "DeserializationBuffer.hpp"
 #include "util.hpp"
+
+class SerializationBuffer;
+class DeserializationBuffer;
 
 class Type;
 class None;
@@ -41,6 +42,7 @@ class PointerTo;
 class ListOf;
 class NamedTuple;
 class Tuple;
+class Dict;
 class ConstDict;
 class Alternative;
 class ConcreteAlternative;
@@ -82,6 +84,7 @@ public:
         catListOf,
         catNamedTuple,
         catTuple,
+        catDict,
         catConstDict,
         catAlternative,
         catConcreteAlternative, //concrete Alternative subclass
@@ -198,6 +201,8 @@ public:
                 return f(*(NamedTuple*)this);
             case catTuple:
                 return f(*(Tuple*)this);
+            case catDict:
+                return f(*(Dict*)this);
             case catConstDict:
                 return f(*(ConstDict*)this);
             case catAlternative:

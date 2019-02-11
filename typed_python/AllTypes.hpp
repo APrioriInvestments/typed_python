@@ -11,6 +11,7 @@
 #include "PointerToType.hpp"
 #include "TupleOrListOfType.hpp"
 #include "ConstDictType.hpp"
+#include "DictType.hpp"
 #include "NoneType.hpp"
 #include "Instance.hpp"
 #include "StringType.hpp"

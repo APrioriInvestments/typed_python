@@ -635,6 +635,11 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
 
 
 int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
+    if (!value) {
+        PyErr_SetString(PyExc_TypeError, "Item deletion is not implemented yet");
+        throw PythonExceptionSet();
+    }
+
     Type* value_type = extractTypeFrom(value->ob_type);
 
     Type* eltType = type()->getEltType();

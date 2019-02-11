@@ -17,11 +17,12 @@ from typed_python import (
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64,
-    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple,
+    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member,
     TypeFilter, UndefinedBehaviorException, Function
 )
 
+from typed_python.test_util import currentMemUsageMb
 import typed_python._types as _types
 import psutil
 import unittest
@@ -1487,3 +1488,132 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(D({'a': n1}), D({'a': n1}))
         self.assertNotEqual(D({'a': n1}), D({'a': n2}))
+
+    def test_mutable_dict(self):
+        T = Dict(int, int)
+
+        d = T()
+
+        self.assertEqual(len(d), 0)
+
+        with self.assertRaises(KeyError):
+            d[0]
+
+        d[0] = 10
+
+        self.assertEqual(len(d), 1)
+        self.assertEqual(d[0], 10)
+
+        d[0] = 20
+
+        self.assertEqual(len(d), 1)
+        self.assertEqual(d[0], 20)
+
+        for i in range(2000):
+            d[i] = i
+
+            if i % 100 == 0 and i:
+                for x in range(len(d)):
+                    self.assertEqual(d[x], x)
+
+        for i in range(2000):
+            if i % 100 == 0 and i:
+                for x in range(i):
+                    assert x not in d
+
+                for x in range(i, 2000):
+                    self.assertEqual(d[x], x)
+
+            del d[i]
+
+        #verify that adding and removing elements doesn't leak memory
+        usage = currentMemUsageMb()
+        for i in range(1000000):
+            d[0] = i
+            del d[0]
+        self.assertLess(currentMemUsageMb(), usage+1)
+
+    def test_mutable_dict_fuzz(self):
+        native_d = Dict(int, int)()
+        py_d = {}
+
+        for dictSize in [10,100,1000,10000]:
+            for i in range(100000):
+                z = numpy.random.choice(dictSize)
+
+                self.assertEqual(z in py_d, z in native_d)
+
+                if i % 3 == 0 or (i % 1000) > 900:
+                    if z in py_d:
+                        del py_d[z]
+                        del native_d[z]
+                else:
+                    py_d[z] = i
+                    native_d[z] = i
+
+            for i in range(dictSize):
+                self.assertEqual(z in py_d, z in native_d)
+
+    def test_mutable_dict_refcounts(self):
+        native_d = Dict(str, ListOf(int))()
+        i = ListOf(int)()
+
+        native_d["a"] = i
+
+        self.assertEqual(_types.refcount(i), 2)
+
+        native_d["b"] = i
+
+        self.assertEqual(_types.refcount(i), 3)
+
+        del native_d["a"]
+
+        self.assertEqual(_types.refcount(i), 2)
+
+        native_d["b"] = ListOf(int)()
+
+        self.assertEqual(_types.refcount(i), 1)
+
+        native_d["b"] = i
+
+        self.assertEqual(_types.refcount(i), 2)
+
+        native_d = None
+
+        self.assertEqual(_types.refcount(i), 1)
+
+    def test_mutable_dict_create_many(self):
+        for ct in range(100):
+            d = Dict(int,int)()
+            for i in range(ct):
+                d[i] = i + 1
+
+    def test_mutable_dict_methods(self):
+        d = Dict(int,int)({i:i+1 for i in range(10)})
+
+        self.assertEqual(list(d.keys()), list(range(10)))
+        self.assertEqual(list(d.values()), list(range(1, 11)))
+        self.assertEqual(list(d.items()), [(i,i+1) for i in range(10)])
+
+        for i in range(10):
+            self.assertEqual(d.get(i), i+1)
+            self.assertEqual(d.get(i, None), i+1)
+
+        self.assertEqual(d.get(1000), None)
+        self.assertEqual(d.get(1000, 123), 123)
+
+        with self.assertRaises(TypeError):
+            self.assertEqual(d.get("1000"), None)
+
+
+    def test_mutable_dict_iteration_order(self):
+        d = Dict(int,int)()
+
+        d[10] = 10
+        d[1] = 1
+        d[2] = 2
+
+        self.assertEqual(list(d), [10,1,2])
+        del d[1]
+        self.assertEqual(list(d), [10,2])
+

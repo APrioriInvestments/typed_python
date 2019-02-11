@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <map>
 #include <set>
+#include "Type.hpp"
 
 class Type;
 class SerializationContext;
@@ -24,8 +25,12 @@ public:
             free(m_buffer);
         }
 
-        for (auto p: m_pointersNeedingDecref) {
-            Py_DECREF(p);
+        for (auto& typeAndList: m_pointersNeedingDecref) {
+            typeAndList.first->check([&](auto& concreteType) {
+                for (auto ptr: typeAndList.second) {
+                    concreteType.destroy((instance_ptr)&ptr);
+                }
+            });
         }
     }
 
@@ -95,25 +100,40 @@ public:
     }
 
     /**
-        Keep track of whether we've seen this pointer before
+        Keep track of whether we've seen this pointer before.
 
-        @param t A PyObject pointer to be cached
-        @return an std::pair containing its cache ID (the size of the cache)
-                and 'false' if the pointer was already in the cache
+        @param t - A PyObject pointer to be cached
+        @param objType - a pointer to the appropriate type object. if populated,
+            and this is the first time we've seen the object, we'll incref it
+            before we put it in the cache, and decref it when the buffer
+            is destroyed. The type object _must_ be a pointer-layout-style
+            object (PyObject, Dict, ConstDict, Class, etc.) since we assume
+            the pointer is the actual held representation.
+        @return - an std::pair containing its cache ID (the size of the cache)
+                and 'false' if the pointer was already in the cache.
     */
-    std::pair<uint32_t, bool> cachePointer(PyObject* t) {
+    std::pair<uint32_t, bool> cachePointer(void* t, Type* objType) {
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
-            Py_INCREF(t);
-            m_pointersNeedingDecref.insert(t);
+            void* otherPointer;
+            objType->copy_constructor((instance_ptr)&otherPointer, (instance_ptr)&t);
+
+            if (otherPointer != t) {
+                throw std::runtime_error("Pointer-copy stash semantics didn't work with type " + objType->name());
+            }
+
+            m_pointersNeedingDecref[objType].push_back(otherPointer);
+
             uint32_t id = m_idToPointerCache.size();
             m_idToPointerCache[t] = id;
+
             return std::pair<uint32_t, bool>(id, true);
         }
+
         return std::pair<uint32_t, bool>(it->second, false);
     }
 
-    std::pair<uint32_t, bool> cachePointer(Type* t) {
+    std::pair<uint32_t, bool> cachePointerToType(Type* t) {
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
             uint32_t id = m_idToPointerCache.size();
@@ -159,5 +179,6 @@ private:
     size_t m_last_compression_point;
 
     std::map<void*, int32_t> m_idToPointerCache;
-    std::set<void*> m_pointersNeedingDecref;
+
+    std::map<Type*, std::vector<void*>> m_pointersNeedingDecref;
 };

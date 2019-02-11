@@ -29,7 +29,7 @@ from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
     Int8, NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64,
-    String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
+    String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Dict,
     Value, Class, Member, _types, Function, SerializationContext
 )
 
@@ -996,3 +996,39 @@ class TypesSerializationTest(unittest.TestCase):
         a2 = x.deserialize(x.serialize(a))
 
         self.assertTrue(numpy.all(a == a2))
+
+    def test_serialize_dict(self):
+        x = SerializationContext({})
+
+        d = Dict(str,str)()
+        d["hi"] = "hi"
+        d["a"] = "a"
+
+        d2 = x.deserialize(x.serialize(d))
+
+        self.assertEqual(d,d2)
+
+    def test_serialize_recursive_dict(self):
+        D = Dict(str, OneOf(str, lambda: D))
+        x = SerializationContext({"D":D})
+
+        d = D()
+
+        d["hi"] = "bye"
+        d["recurses"] = d
+
+        d2 = x.deserialize(x.serialize(d))
+
+        self.assertEqual(d2['recurses']['recurses']['hi'], 'bye')
+
+    def test_serialize_dict_doesnt_leak(self):
+        d = Dict(int,int)({i:i+1 for i in range(100)})
+        x = SerializationContext({})
+
+        usage = currentMemUsageMb()
+        for _ in range(20000):
+            x.deserialize(x.serialize(d))
+
+        self.assertLess(currentMemUsageMb(), usage+1)
+
+

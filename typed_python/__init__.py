@@ -22,7 +22,7 @@ from typed_python.type_filter import TypeFilter
 from typed_python._types import (
 	TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
 	Alternative, Value, serialize, deserialize,
-    PointerTo
+    PointerTo, Dict
 )
 
 import typed_python._types as _types

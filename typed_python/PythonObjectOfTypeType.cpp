@@ -56,3 +56,11 @@ PythonObjectOfType* PythonObjectOfType::Make(PyTypeObject* pyType) {
     return it->second;
 }
 
+PythonObjectOfType* PythonObjectOfType::AnyPyObject() {
+    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* t = PyObject_GetAttrString(module, "object");
+
+    return Make((PyTypeObject*)t);
+}
+
+

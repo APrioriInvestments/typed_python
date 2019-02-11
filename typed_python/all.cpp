@@ -14,6 +14,7 @@ compile the entire group all at once.
 
 #include "PyInstance.cpp"
 #include "PyConstDictInstance.cpp"
+#include "PyDictInstance.cpp"
 #include "PyTupleOrListOfInstance.cpp"
 #include "PyPointerToInstance.cpp"
 #include "PyCompositeTypeInstance.cpp"
@@ -27,6 +28,7 @@ compile the entire group all at once.
 #include "ClassType.cpp"
 #include "CompositeType.cpp"
 #include "ConcreteAlternativeType.cpp"
+#include "DictType.cpp"
 #include "ConstDictType.cpp"
 #include "HeldClassType.cpp"
 #include "OneOfType.cpp"

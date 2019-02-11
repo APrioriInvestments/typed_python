@@ -85,9 +85,11 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
 }
 
 void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffer& b) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o);
+    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
     b.write_uint32(id);
 
     if (isNew) {
@@ -115,7 +117,9 @@ PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b
 
     res = PyDict_New();
 
-    b.addCachedPointer(id, incref(res), true);
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
+    b.addCachedPointer(id, incref(res), anyPyObjType);
 
     size_t sz = b.read_uint32();
 
@@ -155,7 +159,10 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
         throw std::runtime_error(
             std::string("Failed to allocate memory for frozen set deserialization"));
     }
-    b.addCachedPointer(id, incref(res), true);
+
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
+    b.addCachedPointer(id, incref(res), anyPyObjType);
 
     try {
         for (long k = 0; k < sz; k++) {
@@ -189,9 +196,11 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
 }
 
 void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o);
+    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
     b.write_uint32(id);
 
     if (!isNew) {
@@ -293,6 +302,8 @@ void PythonSerializationContext::serializePyRepresentation(PyObject* representat
 }
 
 PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(DeserializationBuffer& b) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id = b.read_uint32();
     PyObject* p = (PyObject*)b.lookupCachedPointer(id);
     if (p) {
@@ -316,11 +327,10 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
             throw std::runtime_error("tp_new for " + std::string(((PyTypeObject*)t)->tp_name) + " threw an exception");
         }
 
-        b.addCachedPointer(id, incref(result), true);
+        b.addCachedPointer(id, incref(result), anyPyObjType);
 
-        PyObject* d = deserializePydict(b);
+        PyObjectStealer d(deserializePydict(b));
         PyObject_GenericSetDict(result, d, nullptr);
-        Py_DECREF(d);
         return result;
     } else
     if (code == T_OBJECT_REPRESENTATION) {
@@ -335,7 +345,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
             throw PythonExceptionSet();
         }
 
-        b.addCachedPointer(id, incref(res), true);
+        b.addCachedPointer(id, incref(res), anyPyObjType);
 
         return res;
     } else {
@@ -360,7 +370,9 @@ PyObject* PythonSerializationContext::deserializePyRepresentation(Deserializatio
     }
 
     if (id >= 0) {
-        b.addCachedPointer(id, incref(instance), true);
+        static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
+        b.addCachedPointer(id, incref(instance), anyPyObjType);
     }
 
     PyObject* rep = deserializePythonObject(b);
@@ -420,7 +432,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     b.write_uint8(T_NATIVETYPE_BY_CATEGORY);
 
     if (allowCaching) {
-        std::pair<uint32_t, bool> idAndIsNew = b.cachePointer(nativeType);
+        std::pair<uint32_t, bool> idAndIsNew = b.cachePointerToType(nativeType);
         b.write_uint32(idAndIsNew.first);
 
         if (!idAndIsNew.second) {
@@ -449,6 +461,12 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     if (nativeType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         serializeNativeType(((ConstDict*)nativeType)->keyType(), b);
         serializeNativeType(((ConstDict*)nativeType)->valueType(), b);
+        return;
+    }
+
+    if (nativeType->getTypeCategory() == Type::TypeCategory::catDict) {
+        serializeNativeType(((Dict*)nativeType)->keyType(), b);
+        serializeNativeType(((Dict*)nativeType)->valueType(), b);
         return;
     }
 
@@ -610,6 +628,13 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
     }
 
 
+    if (category == Type::TypeCategory::catDict) {
+        Type* keyType = deserializeNativeType(b);
+        Type* valueType = deserializeNativeType(b);
+
+        return ::Dict::Make(keyType, valueType);
+    }
+
     if (category == Type::TypeCategory::catConstDict) {
         Type* keyType = deserializeNativeType(b);
         Type* valueType = deserializeNativeType(b);
@@ -746,9 +771,11 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
 
 template<class Size_Fn, class GetItem_Fn>
 inline void PythonSerializationContext::serializeIndexable(PyObject* o, SerializationBuffer& b, Size_Fn size_fn, GetItem_Fn get_item_fn) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o);
+    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
     b.write_uint32(id);
 
     if (isNew) {
@@ -764,6 +791,8 @@ inline void PythonSerializationContext::serializeIndexable(PyObject* o, Serializ
 
 template<class Factory_Fn, class SetItem_Fn>
 inline PyObject* PythonSerializationContext::deserializeIndexable(DeserializationBuffer& b, Factory_Fn factory_fn, SetItem_Fn set_item_fn) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id = b.read_uint32();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
@@ -774,7 +803,7 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(Deserializatio
     size_t sz = b.read_uint32();
 
     res = factory_fn(sz);
-    b.addCachedPointer(id, incref(res), true);
+    b.addCachedPointer(id, incref(res), anyPyObjType);
 
     try {
         for (long k = 0; k < sz; k++) {
@@ -790,9 +819,11 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(Deserializatio
 
 template<class Size_Fn>
 inline void PythonSerializationContext::serializeIterable(PyObject* o, SerializationBuffer& b, Size_Fn size_fn) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id;
     bool isNew;
-    std::tie(id, isNew) = b.cachePointer(o);
+    std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
     b.write_uint32(id);
 
     if (isNew) {
@@ -815,6 +846,8 @@ inline void PythonSerializationContext::serializeIterable(PyObject* o, Serializa
 
 template<class Factory_Fn, class AddItem_Fn, class Clear_Fn>
 inline PyObject* PythonSerializationContext::deserializeIterable(DeserializationBuffer &b, Factory_Fn factory_fn, AddItem_Fn add_item_fn, Clear_Fn clear_fn) const {
+    static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
+
     uint32_t id = b.read_uint32();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
@@ -830,7 +863,8 @@ inline PyObject* PythonSerializationContext::deserializeIterable(Deserialization
         throw std::runtime_error(std::string(
             "Failed to allocate storage into which to deserialize iterable"));
     }
-    b.addCachedPointer(id, incref(res), true);
+
+    b.addCachedPointer(id, incref(res), anyPyObjType);
 
     try {
         for (long k = 0; k < sz; k++) {

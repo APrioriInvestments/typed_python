@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Type.hpp"
 #include <stdexcept>
 #include <stdlib.h>
 #include <vector>
@@ -21,10 +22,12 @@ public:
     }
 
     ~DeserializationBuffer() {
-        for (long k = 0; k < m_needsPyDecref.size(); k++) {
-            if (m_needsPyDecref[k]) {
-                Py_DECREF((PyObject*)m_cachedPointers[k]);
-            }
+        for (auto& typeAndList: m_needs_decref) {
+            typeAndList.first->check([&](auto& concreteType) {
+                for (auto ptr: typeAndList.second) {
+                    concreteType.destroy((instance_ptr)&ptr);
+                }
+            });
         }
     }
 
@@ -125,19 +128,21 @@ public:
     }
 
     template<class T>
-    T* addCachedPointer(int32_t which, T* ptr, bool needsPyDecref=false) {
+    T* addCachedPointer(int32_t which, T* ptr, Type* decrefType=nullptr) {
         if (!ptr) {
             throw std::runtime_error("Corrupt data: can't write a null cache pointer.");
         }
         while (which >= m_cachedPointers.size()) {
             m_cachedPointers.push_back(nullptr);
-            m_needsPyDecref.push_back(false);
         }
         if (m_cachedPointers[which]) {
             throw std::runtime_error("Corrupt data: tried to write a recursive object multiple times");
         }
         m_cachedPointers[which] = ptr;
-        m_needsPyDecref[which] = needsPyDecref;
+
+        if (decrefType) {
+            m_needs_decref[decrefType].push_back(ptr);
+        }
 
         return ptr;
     }
@@ -214,8 +219,12 @@ private:
 
     size_t m_pos;
 
-    // These two vectors implement the pointer-cache datastructure. They map
-    // ids (indices) to pointers and to the whether they need decref-ing
+    // maps indices to the pointers we've cached under that index.
     std::vector<void*> m_cachedPointers;
-    std::vector<bool> m_needsPyDecref;
+
+    //a map from the object type to each object that needs decreffing.
+    //it must be the case that a pointer is the _natural_ layout of the
+    //object (e.g. PyObject, Dict, etc). We pass a pointer to this
+    //as the actual instance to the 'destroy' operation
+    std::map<Type*, std::vector<void*> > m_needs_decref;
 };

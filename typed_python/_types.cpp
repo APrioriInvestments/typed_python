@@ -97,6 +97,27 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
     return typeObj;
 }
 
+PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
+    std::vector<Type*> types;
+    for (long k = 0; k < PyTuple_Size(args); k++) {
+        types.push_back(PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,k)));
+        if (not types.back()) {
+            return NULL;
+        }
+    }
+
+    if (types.size() != 2) {
+        PyErr_SetString(PyExc_TypeError, "Dict accepts two arguments");
+        return NULL;
+    }
+
+    return incref(
+        (PyObject*)PyInstance::typeObj(
+            Dict::Make(types[0],types[1])
+            )
+        );
+}
+
 PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
@@ -654,6 +675,7 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
             actualType->getTypeCategory() != Type::TypeCategory::catListOf &&
             actualType->getTypeCategory() != Type::TypeCategory::catClass &&
             actualType->getTypeCategory() != Type::TypeCategory::catConstDict &&
+            actualType->getTypeCategory() != Type::TypeCategory::catDict &&
             actualType->getTypeCategory() != Type::TypeCategory::catAlternative &&
             actualType->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
             )) {
@@ -686,6 +708,11 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (actualType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         return PyLong_FromLong(
             ((::ConstDict*)actualType)->refcount(((PyInstance*)a1)->dataPtr())
+            );
+    }
+    if (actualType->getTypeCategory() == Type::TypeCategory::catDict) {
+        return PyLong_FromLong(
+            ((::Dict*)actualType)->refcount(((PyInstance*)a1)->dataPtr())
             );
     }
     if (actualType->getTypeCategory() == Type::TypeCategory::catAlternative) {
@@ -1082,6 +1109,7 @@ static PyMethodDef module_methods[] = {
     {"Tuple", (PyCFunction)MakeTupleType, METH_VARARGS, NULL},
     {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"OneOf", (PyCFunction)MakeOneOfType, METH_VARARGS, NULL},
+    {"Dict", (PyCFunction)MakeDictType, METH_VARARGS, NULL},
     {"ConstDict", (PyCFunction)MakeConstDictType, METH_VARARGS, NULL},
     {"Alternative", (PyCFunction)MakeAlternativeType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"Value", (PyCFunction)MakeValueType, METH_VARARGS, NULL},

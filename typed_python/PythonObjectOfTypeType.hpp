@@ -84,6 +84,8 @@ public:
 
     static PythonObjectOfType* Make(PyTypeObject* pyType);
 
+    static PythonObjectOfType* AnyPyObject();
+
     PyTypeObject* pyType() const {
         return mPyTypePtr;
     }
