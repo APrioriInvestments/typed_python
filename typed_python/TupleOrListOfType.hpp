@@ -49,7 +49,7 @@ public:
         buffer.write_uint32(ct);
         m_element_type->check([&](auto& concrete_type) {
             for (long k = 0; k < ct;k++) {
-                concrete_type.serialize(eltPtr(self,k),buffer);
+                concrete_type.serialize(this->eltPtr(self,k),buffer);
             }
         });
     }
