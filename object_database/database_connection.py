@@ -370,7 +370,7 @@ class TransactionListener:
         self._db = db
         self._db.registerOnTransactionHandler(self._onTransaction)
         self._queue = queue.Queue()
-        self.serializationContext = None
+        self.serializationContext = TypedPythonCodebase.coreSerializationContext()
         self.handler = handler
 
     def setSerializationContext(self, context):
