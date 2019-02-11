@@ -117,9 +117,9 @@ class TestPythonAst(unittest.TestCase):
             return x+x
 
         self.reverseParseAndEvalCheck(f, (10, ownName))
-        
+
     def test_reverse_parse_eval_import(self):
         def f(x):
-            from scipy.stats import norm
-            return float(norm.cdf(x))
+            from numpy import float64
+            return float(float64(x))
         self.reverseParseAndEvalCheck(f, 10)
