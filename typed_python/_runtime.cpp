@@ -45,6 +45,8 @@ extern "C" {
     }
 
     void nativepython_runtime_incref_pyobj(PyObject* p) {
+        PyEnsureGilAcquired getTheGil;
+
         Py_INCREF(p);
     }
 
@@ -53,6 +55,8 @@ extern "C" {
     }
 
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
+        PyEnsureGilAcquired getTheGil;
+
         PyObject* res = PyObject_GetAttrString(p, a);
 
         if (!res) {
@@ -64,6 +68,8 @@ extern "C" {
     }
 
     void nativepython_runtime_decref_pyobj(PyObject* p) {
+        PyEnsureGilAcquired getTheGil;
+
         Py_DECREF(p);
     }
 

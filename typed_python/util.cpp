@@ -2,6 +2,10 @@
 #include "Instance.hpp"
 #include "PyInstance.hpp"
 
+thread_local int64_t native_dispatch_disabled = 0;
+
+thread_local PyThreadState* curPyThreadState = 0;
+
 bool unpackTupleToTypes(PyObject* tuple, std::vector<Type*>& out) {
     if (!PyTuple_Check(tuple)) {
         PyErr_SetString(PyExc_TypeError, "Argument to type tuple was not a tuple");

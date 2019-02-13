@@ -225,6 +225,8 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
                 args.push_back(i.data());
             }
 
+            PyEnsureGilReleased releaseTheGIL;
+
             specialization.getFuncPtr()(returnData, &args[0]);
         });
 
