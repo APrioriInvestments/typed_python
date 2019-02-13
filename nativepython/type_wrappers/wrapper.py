@@ -19,7 +19,16 @@ from typed_python import _types
 from nativepython.type_wrappers.exceptions import generateThrowException
 
 class Wrapper(object):
-    #properties of all objects:
+    """Represents a code-generation wrapper for objects of a particular type.
+
+    For each type we can represent in typed python, and for types that have
+    an injection into compiled code but don't take on runtime values
+    (types whose values are known, or singleton functions like 'len' or 'range'),
+    we have a corresponding 'wrapper' type.
+
+    The wrapper type is responsible for controlling how we generate code
+    to perform the relevant operations on objects of the wrapped type.
+    """
 
     #is this 'plain old data' with no constructor/destructor semantics?
     #if so, we can dispense with destructors entirely.
