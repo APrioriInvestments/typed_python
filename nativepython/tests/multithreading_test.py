@@ -18,6 +18,7 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 import threading
+import os
 
 def thread_apply(f, argtuples):
     threads = []
@@ -61,8 +62,12 @@ class TestMultithreading(unittest.TestCase):
         first = t1 - t0
         second = t2 - t1
 
-        #expect the ratio to be close to 1, but have some error margin
-        self.assertTrue(first / second >= .8 and first/second < 1.2, first/second)
+        #expect the ratio to be close to 1, but have some error margin, especially on Travis
+        #where we don't really get two cores
+        if os.environ.get('TRAVIS_CI', None):
+            self.assertTrue(first / second >= .8 and first/second < 1.75, first/second)
+        else:
+            self.assertTrue(first / second >= .9 and first/second < 1.1, first/second)
 
     def test_refcounts_of_objects_across_boundary(self):
         class Object:
