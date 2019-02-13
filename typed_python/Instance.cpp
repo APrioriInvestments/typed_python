@@ -73,8 +73,7 @@ Instance::Instance(instance_ptr p, Type* t) : mLayout(nullptr) {
 }
 
 Instance::~Instance() {
-    mLayout->refcount--;
-    if (mLayout->refcount == 0) {
+    if (mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
         free(mLayout);
     }
@@ -83,8 +82,7 @@ Instance::~Instance() {
 Instance& Instance::operator=(const Instance& other) {
     other.mLayout->refcount++;
 
-    mLayout->refcount--;
-    if (mLayout->refcount == 0) {
+    if (mLayout->refcount.fetch_sub(1) == 1) {
         mLayout->type->destroy(mLayout->data);
         free(mLayout);
     }

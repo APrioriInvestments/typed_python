@@ -125,9 +125,7 @@ void Bytes::destroy(instance_ptr self) {
         return;
     }
 
-    (*(layout**)self)->refcount--;
-
-    if ((*(layout**)self)->refcount == 0) {
+    if ((*(layout**)self)->refcount.fetch_sub(1) == 1) {
         free((*(layout**)self));
     }
 }

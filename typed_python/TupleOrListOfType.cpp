@@ -182,9 +182,7 @@ void TupleOrListOf::destroy(instance_ptr selfPtr) {
         return;
     }
 
-    self->refcount--;
-
-    if (self->refcount == 0) {
+    if (self->refcount.fetch_sub(1) == 1) {
         m_element_type->destroy(self->count, [&](int64_t k) {return eltPtr(self,k);});
         free(self->data);
         free(self);

@@ -390,8 +390,7 @@ void ConstDict::destroy(instance_ptr self) {
 
     layout& record = **(layout**)self;
 
-    record.refcount--;
-    if (record.refcount == 0) {
+    if (record.refcount.fetch_sub(1) == 1) {
         if (record.subpointers == 0) {
             m_key->destroy(record.count, [&](long ix) {
                 return record.data + m_bytes_per_key_value_pair * ix;

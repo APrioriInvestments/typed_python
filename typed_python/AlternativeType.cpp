@@ -140,9 +140,7 @@ void Alternative::destroy(instance_ptr self) {
 
     layout& record = **(layout**)self;
 
-    record.refcount--;
-
-    if (record.refcount == 0) {
+    if (record.refcount.fetch_sub(1) == 1) {
         m_subtypes[record.which].second->destroy(record.data);
         free(*(layout**)self);
     }

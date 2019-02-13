@@ -209,9 +209,8 @@ int64_t Class::refcount(instance_ptr self) {
 
 void Class::destroy(instance_ptr self) {
     layout& l = **(layout**)self;
-    l.refcount--;
 
-    if (l.refcount == 0) {
+    if (l.refcount.fetch_sub(1) == 1) {
         m_heldClass->destroy(l.data);
         free(*(layout**)self);
     }
