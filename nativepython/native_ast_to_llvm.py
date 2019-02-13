@@ -601,6 +601,15 @@ class FunctionConverter:
 
             return TypedLLVMValue(None, native_ast.Type.Void())
 
+        if expr.matches.AtomicAdd:
+            ptr = self.convert(expr.ptr)
+            val = self.convert(expr.val)
+
+            return TypedLLVMValue(
+                self.builder.atomic_rmw("add", ptr.llvm_value, val.llvm_value, "monotonic"),
+                val.native_type
+                )
+
         if expr.matches.Load:
             ptr = self.convert(expr.ptr)
 

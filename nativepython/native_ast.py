@@ -230,6 +230,8 @@ def expr_str(self):
         return "(" + str(self.ptr) + ").load"
     if self.matches.Store:
         return "(" + str(self.ptr) + ")[0]=" + str(self.val)
+    if self.matches.AtomicAdd:
+        return "atomic_add(" + str(self.ptr) + "," + str(self.val) + ")"
     if self.matches.Alloca:
         return "alloca(" + str(self.type) + ")"
     if self.matches.Cast:
@@ -345,6 +347,7 @@ Expression = Alternative("Expression",
     Comment = {'comment': str, 'expr': Expression},
     Load = {'ptr': Expression},
     Store = {'ptr': Expression, 'val': Expression},
+    AtomicAdd = {'ptr': Expression, 'val': Expression},
     Alloca = {'type': Type},
     Cast = {'left': Expression, 'to_type': Type},
     Binop = {'op': BinaryOp, 'l': Expression, 'r': Expression},
@@ -414,6 +417,7 @@ Expression = Alternative("Expression",
     bitor = lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self,r=ensureExpr(other)),
     load = lambda self: Expression.Load(ptr=self),
     store = lambda self, val: Expression.Store(ptr=self, val=ensureExpr(val)),
+    atomic_add = lambda self, val: Expression.AtomicAdd(ptr=self, val=ensureExpr(val)),
     cast = lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
     with_comment = lambda self, c: Expression.Comment(comment=c, expr=self),
     elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=[ensureExpr(e) for e in exprs]),

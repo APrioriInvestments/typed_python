@@ -33,13 +33,7 @@ class RefcountedWrapper(Wrapper):
             native_ast.Expression.Branch(
                 cond=expr.nonref_expr,
                 false=native_ast.nullExpr,
-                true=expr.nonref_expr.ElementPtrIntegers(0,0).store(
-                        native_ast.Expression.Binop(
-                            l=expr.nonref_expr.ElementPtrIntegers(0,0).load(),
-                            op=native_ast.BinaryOp.Add(),
-                            r=native_ast.const_int_expr(1)
-                        )
-                    )
+                true=expr.nonref_expr.ElementPtrIntegers(0,0).atomic_add(1) >> native_ast.nullExpr
                 )
             )
 
@@ -63,9 +57,8 @@ class RefcountedWrapper(Wrapper):
                 false=expr.store(other),
                 true=
                     expr.store(other) >>
-                    expr.load().ElementPtrIntegers(0,0).store(
-                        expr.load().ElementPtrIntegers(0,0).load().add(native_ast.const_int_expr(1))
-                        )
+                    expr.load().ElementPtrIntegers(0,0).atomic_add(1) >>
+                    native_ast.nullExpr
                 )
             )
 
@@ -75,11 +68,6 @@ class RefcountedWrapper(Wrapper):
 
         with context.ifelse(targetExpr) as (true, false):
             with true:
-                context.pushEffect(
-                    targetExpr.ElementPtrIntegers(0,0).store(
-                        targetExpr.ElementPtrIntegers(0,0).load().sub(native_ast.const_int_expr(1))
-                        )
-                    )
-                with context.ifelse(targetExpr.ElementPtrIntegers(0,0).load()) as (subtrue, subfalse):
-                    with subfalse:
+                with context.ifelse(targetExpr.ElementPtrIntegers(0,0).atomic_add(-1).eq(1)) as (subtrue, subfalse):
+                    with subtrue:
                         context.pushEffect(self.on_refcount_zero(context, target))
