@@ -53,21 +53,29 @@ class TestMultithreading(unittest.TestCase):
                 res += i
             return res
 
-        t0 = time.time()
-        res1 = thread_apply(f, [(1000000000,)])
-        t1 = time.time()
-        res2 = thread_apply(f, [(1000000000,),(1000000001,)])
-        t2 = time.time()
+        ratios = []
+        for _ in range(10):
+            t0 = time.time()
+            res1 = thread_apply(f, [(100000000,)])
+            t1 = time.time()
+            res2 = thread_apply(f, [(100000000,),(100000001,)])
+            t2 = time.time()
 
-        first = t1 - t0
-        second = t2 - t1
+            first = t1 - t0
+            second = t2 - t1
+
+            ratios.append(second/first)
+
+        ratios = sorted(ratios)
+
+        ratio = ratios[5]
 
         #expect the ratio to be close to 1, but have some error margin, especially on Travis
-        #where we don't really get two cores
+        #where we may be running in a multitenant environment
         if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(second/first >= .8 and second/first < 1.75, second/first)
+            self.assertTrue(ratio >= .8 and ratio < 1.75, ratio)
         else:
-            self.assertTrue(second/first >= .9 and second/first < 1.1, second/first)
+            self.assertTrue(ratio >= .9 and ratio < 1.1, ratio)
 
     def test_refcounts_of_objects_across_boundary(self):
         class Object:
@@ -125,14 +133,14 @@ class TestMultithreading(unittest.TestCase):
 
         ratios = sorted(ratios)
 
-        bestRatio = ratios[0]
+        ratio = ratios[5]
 
         #expect the ratio to be close to 1, but have some error margin, especially on Travis
         #where we don't really get two cores
         if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(bestRatio >= .8 and bestRatio < 1.75, bestRatio)
+            self.assertTrue(ratio >= .8 and ratio < 1.75, ratios)
         else:
-            self.assertTrue(bestRatio >= .9 and bestRatio < 1.1, bestRatio)
+            self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
 
 
 
