@@ -174,13 +174,13 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
             // currently being deserialized. In that case PySet_Add will fail, so we temporarily
             // decref it.
             auto refcount = Py_REFCNT(res);
-            for (int i = 1; i < refcount; i++) Py_DECREF(res);
+            for (int i = 1; i < refcount; i++) decref(res);
 
             int success = PySet_Add(res, item);
 
-            for (int i = 1; i < refcount; i++) Py_INCREF(res);
+            for (int i = 1; i < refcount; i++) incref(res);
 
-            Py_DECREF(item);
+            decref(item);
             if (success < 0) {
                 PyErr_PrintEx(1);
                 throw std::runtime_error(std::string("Call to PySet_Add failed"));
@@ -188,7 +188,7 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
         }
     } catch(...) {
         PySet_Clear(res);
-        Py_DECREF(res);
+        decref(res);
         throw;
     }
 

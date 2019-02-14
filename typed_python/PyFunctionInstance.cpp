@@ -6,14 +6,13 @@ Function* PyFunctionInstance::type() {
 
 // static
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
-    PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+(self?1:0));
+    PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+(self?1:0)));
     Function::Matcher matcher(f);
 
     int write_slot = 0;
 
     if (self) {
-        Py_INCREF(self);
-        PyTuple_SetItem(targetArgTuple, write_slot++, self);
+        PyTuple_SetItem(targetArgTuple, write_slot++, incref(self));
         matcher.requiredTypeForArg(nullptr);
     }
 
@@ -24,12 +23,11 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
         Type* targetType = matcher.requiredTypeForArg(nullptr);
 
         if (!matcher.stillMatches()) {
-            Py_DECREF(targetArgTuple);
             return std::make_pair(false, nullptr);
         }
 
         if (!targetType) {
-            Py_INCREF(elt);
+            incref(elt);
             PyTuple_SetItem(targetArgTuple, write_slot++, elt);
         }
         else {
@@ -42,24 +40,21 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
                 PyTuple_SetItem(targetArgTuple, write_slot++, targetObj);
             } catch(...) {
                 //not a valid conversion, but keep going
-                Py_DECREF(targetArgTuple);
                 return std::make_pair(false, nullptr);
             }
         }
     }
 
-    PyObject* newKwargs = nullptr;
+    PyObjectHolder newKwargs;
 
     if (kwargs) {
-        newKwargs = PyDict_New();
+        newKwargs.steal(PyDict_New());
 
         PyObject *key, *value;
         Py_ssize_t pos = 0;
 
         while (PyDict_Next(kwargs, &pos, &key, &value)) {
             if (!PyUnicode_Check(key)) {
-                Py_DECREF(targetArgTuple);
-                Py_DECREF(newKwargs);
                 PyErr_SetString(PyExc_TypeError, "Keywords arguments must be strings.");
                 return std::make_pair(false, nullptr);
             }
@@ -68,8 +63,6 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
             Type* targetType = matcher.requiredTypeForArg(PyUnicode_AsUTF8(key));
 
             if (!matcher.stillMatches()) {
-                Py_DECREF(targetArgTuple);
-                Py_DECREF(newKwargs);
                 return std::make_pair(false, nullptr);
             }
 
@@ -78,16 +71,15 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
             }
             else {
                 try {
-                    PyObject* convertedValue = PyInstance::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                        copyConstructFromPythonInstance(targetType, data, value);
-                    });
+                    PyObjectStealer convertedValue(
+                        PyInstance::initializePythonRepresentation(targetType, [&](instance_ptr data) {
+                            copyConstructFromPythonInstance(targetType, data, value);
+                        })
+                    );
 
                     PyDict_SetItem(newKwargs, key, convertedValue);
-                    Py_DECREF(convertedValue);
                 } catch(...) {
                     //not a valid conversion
-                    Py_DECREF(targetArgTuple);
-                    Py_DECREF(newKwargs);
                     return std::make_pair(false, nullptr);
                 }
             }
@@ -95,27 +87,21 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
     }
 
     if (!matcher.definitelyMatches()) {
-        Py_DECREF(targetArgTuple);
         return std::make_pair(false, nullptr);
     }
 
-    PyObject* result;
+    PyObjectHolder result;
 
     bool hadNativeDispatch = false;
 
     if (!native_dispatch_disabled) {
         auto tried_and_result = dispatchFunctionCallToNative(f, targetArgTuple, newKwargs);
         hadNativeDispatch = tried_and_result.first;
-        result = tried_and_result.second;
+        result.steal(tried_and_result.second);
     }
 
     if (!hadNativeDispatch) {
-        result = PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs);
-    }
-
-    Py_DECREF(targetArgTuple);
-    if (newKwargs) {
-        Py_DECREF(newKwargs);
+        result.steal(PyObject_Call((PyObject*)f.getFunctionObj(), targetArgTuple, newKwargs));
     }
 
     //exceptions pass through directly
@@ -129,16 +115,14 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
             PyObject* newRes = PyInstance::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
                     copyConstructFromPythonInstance(f.getReturnType(), data, result);
                 });
-            Py_DECREF(result);
             return std::make_pair(true, newRes);
         } catch (std::exception& e) {
-            Py_DECREF(result);
             PyErr_SetString(PyExc_TypeError, e.what());
             return std::make_pair(true, (PyObject*)nullptr);
         }
     }
 
-    return std::make_pair(true, result);
+    return std::make_pair(true, incref(result));
 }
 
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
@@ -295,8 +279,7 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
             PyTuple_SetItem(overloadTuple, k, pyOverloadInst);
         } else {
             PyErr_PrintEx(0);
-            Py_INCREF(Py_None);
-            PyTuple_SetItem(overloadTuple, k, Py_None);
+            PyTuple_SetItem(overloadTuple, k, incref(Py_None));
         }
     }
 

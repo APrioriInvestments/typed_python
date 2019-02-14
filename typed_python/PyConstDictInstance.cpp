@@ -98,8 +98,7 @@ PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
             instance_ptr i = self_w->type()->lookupValueByKey(self_w->dataPtr(), item_w->dataPtr());
 
             if (!i) {
-                Py_INCREF(ifNotFound);
-                return ifNotFound;
+                return incref(ifNotFound);
             }
 
             return extractPythonObject(i, self_w->type()->valueType());
@@ -112,8 +111,7 @@ PyObject* PyConstDictInstance::constDictGet(PyObject* o, PyObject* args) {
                 instance_ptr i = self_w->type()->lookupValueByKey(self_w->dataPtr(), key.data());
 
                 if (!i) {
-                    Py_INCREF(ifNotFound);
-                    return ifNotFound;
+                    return incref(ifNotFound);
                 }
 
                 return extractPythonObject(i, self_w->type()->valueType());

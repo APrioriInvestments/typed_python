@@ -63,22 +63,20 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     void constructor(instance_ptr self) {
-        *(PyObject**)self = Py_None;
-        Py_INCREF(Py_None);
+        *(PyObject**)self = incref(Py_None);
     }
 
     void destroy(instance_ptr self) {
-        Py_DECREF(*(PyObject**)self);
+        decref(*(PyObject**)self);
     }
 
     void copy_constructor(instance_ptr self, instance_ptr other) {
-        Py_INCREF(*(PyObject**)other);
-        *(PyObject**)self = *(PyObject**)other;
+        *(PyObject**)self = incref(*(PyObject**)other);
     }
 
     void assign(instance_ptr self, instance_ptr other) {
-        Py_INCREF(*(PyObject**)other);
-        Py_DECREF(*(PyObject**)self);
+        incref(*(PyObject**)other);
+        decref(*(PyObject**)self);
         *(PyObject**)self = *(PyObject**)other;
     }
 

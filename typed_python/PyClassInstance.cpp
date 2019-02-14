@@ -251,7 +251,7 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
         classT->copy_constructor(selfData, data);
     });
 
-    PyObject* targetArgTuple = PyTuple_New(PyTuple_Size(args)+1);
+    PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+1));
 
     PyTuple_SetItem(targetArgTuple, 0, selfAsObject); //steals the reference to the new 'selfAsObject'
 
@@ -268,7 +268,7 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
             //res.first is true if we matched and tried to call this function
             if (res.second) {
                 //don't need the result.
-                Py_DECREF(res.second);
+                decref(res.second);
                 ran = true;
             } else {
                 //it threw an exception
@@ -279,8 +279,6 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
             break;
         }
     }
-
-    Py_DECREF(targetArgTuple);
 
     if (!ran) {
         throw std::runtime_error("Cannot find a valid overload of __init__ with these arguments.");

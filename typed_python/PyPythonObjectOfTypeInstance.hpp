@@ -18,8 +18,7 @@ public:
                     " is not an instance of " + ((PythonObjectOfType*)eltType)->pyType()->tp_name);
         }
 
-        Py_INCREF(pyRepresentation);
-        ((PyObject**)tgt)[0] = pyRepresentation;
+        ((PyObject**)tgt)[0] = incref(pyRepresentation);
         return;
     }
 

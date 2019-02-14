@@ -807,7 +807,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     // we will return the correct entry.
     if (inType->getBaseType()) {
         types[inType]->typeObj.tp_base = typeObjInternal((Type*)inType->getBaseType());
-        Py_INCREF(types[inType]->typeObj.tp_base);
+        incref((PyObject*)types[inType]->typeObj.tp_base);
     }
 
     PyType_Ready((PyTypeObject*)types[inType]);
@@ -1102,7 +1102,9 @@ Type* PyInstance::pyFunctionToForward(PyObject* arg) {
         throw std::runtime_error("Internal error: couldn't find typed_python.internals.makeFunction");
     }
 
-    PyObject* fRes = PyObject_CallFunctionObjArgs(forwardToName, arg, NULL);
+    PyObjectStealer fRes(
+        PyObject_CallFunctionObjArgs(forwardToName, arg, NULL)
+        );
 
     std::string fwdName;
 
@@ -1112,15 +1114,12 @@ Type* PyInstance::pyFunctionToForward(PyObject* arg) {
     } else {
         if (!PyUnicode_Check(fRes)) {
             fwdName = "<Internal Error>";
-            Py_DECREF(fRes);
         } else {
             fwdName = PyUnicode_AsUTF8(fRes);
-            Py_DECREF(fRes);
         }
     }
 
-    Py_INCREF(arg);
-    return new Forward(arg, fwdName);
+    return new Forward(incref(arg), fwdName);
 }
 
 /**
@@ -1309,7 +1308,7 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
             }
 
             //this is now a permanent object
-            Py_INCREF(typearg);
+            incref(typearg);
 
             return PythonSubclass::Make(nativeT, pyType);
         } else {

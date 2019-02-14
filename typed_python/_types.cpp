@@ -51,9 +51,7 @@ PyObject *MakePointerToType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(PointerTo::Make(t));
-    Py_INCREF(typeObj);
-    return typeObj;
+    return incref((PyObject*)PyInstance::typeObj(PointerTo::Make(t)));
 }
 
 PyObject *MakeTupleOfType(PyObject* nullValue, PyObject* args) {
@@ -91,8 +89,7 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
         ConstDict::Make(types[0],types[1])
         );
 
-    Py_INCREF(typeObj);
-    return typeObj;
+    return incref(typeObj);
 }
 
 PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
@@ -133,8 +130,7 @@ PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
 
     PyObject* typeObj = (PyObject*)PyInstance::typeObj(OneOf::Make(types));
 
-    Py_INCREF(typeObj);
-    return typeObj;
+    return incref(typeObj);
 }
 
 PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -183,83 +179,52 @@ PyObject *MakeNamedTupleType(PyObject* nullValue, PyObject* args, PyObject* kwar
         types.push_back(p.second);
     }
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(NamedTuple::Make(types, names));
-
-    Py_INCREF(typeObj);
-    return typeObj;
+    return incref((PyObject*)PyInstance::typeObj(NamedTuple::Make(types, names)));
 }
 
 
 PyObject *MakeBoolType(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Bool::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Bool::Make()));
 }
 PyObject *MakeInt8Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Int8::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Int8::Make()));
 }
 PyObject *MakeInt16Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Int16::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Int16::Make()));
 }
 PyObject *MakeInt32Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Int32::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Int32::Make()));
 }
 PyObject *MakeInt64Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Int64::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Int64::Make()));
 }
 PyObject *MakeFloat32Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Float32::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Float32::Make()));
 }
 PyObject *MakeFloat64Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Float64::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Float64::Make()));
 }
 PyObject *MakeUInt8Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::UInt8::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::UInt8::Make()));
 }
 PyObject *MakeUInt16Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::UInt16::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::UInt16::Make()));
 }
 PyObject *MakeUInt32Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::UInt32::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::UInt32::Make()));
 }
 PyObject *MakeUInt64Type(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::UInt64::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::UInt64::Make()));
 }
 PyObject *MakeStringType(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::String::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::String::Make()));
 }
 PyObject *MakeBytesType(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::Bytes::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::Bytes::Make()));
 }
 
 PyObject *MakeNoneTypeType(PyObject* nullValue, PyObject* args) {
-    PyObject* res = (PyObject*)PyInstance::typeObj(::None::Make());
-    Py_INCREF(res);
-    return res;
+    return incref((PyObject*)PyInstance::typeObj(::None::Make()));
 }
 
 PyObject *RenameType(PyObject* nullValue, PyObject* args) {
@@ -306,9 +271,7 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     Type* type = PyInstance::unwrapTypeArgToTypePtr(arg);
 
     if (type) {
-        PyObject* typeObj = (PyObject*)PyInstance::typeObj(type);
-        Py_INCREF(typeObj);
-        return typeObj;
+        return incref((PyObject*)PyInstance::typeObj(type));
     }
 
     PyErr_Format(PyExc_TypeError, "Couldn't convert %S to a Type", arg);
@@ -331,9 +294,7 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
     Type* type = PyInstance::tryUnwrapPyInstanceToValueType(arg);
 
     if (type) {
-        PyObject* typeObj = (PyObject*)PyInstance::typeObj(type);
-        Py_INCREF(typeObj);
-        return typeObj;
+        return incref((PyObject*)PyInstance::typeObj(type));
     }
 
     PyErr_SetString(PyExc_TypeError, "Couldn't convert this to a value");
@@ -363,9 +324,7 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
 
     Type* resType = BoundMethod::Make((Class*)t0, (Function*)t1);
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(resType);
-    Py_INCREF(typeObj);
-    return typeObj;
+    return incref((PyObject*)PyInstance::typeObj(resType));
 }
 
 PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
@@ -471,9 +430,9 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
 
             if (val) {
-                Py_INCREF(val);
+                incref(val);
             }
-            Py_INCREF(funcObj);
+            incref(funcObj);
 
             argList.push_back(Function::FunctionArg(
                 PyUnicode_AsUTF8(k0),
@@ -492,9 +451,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         resType = new Function(PyUnicode_AsUTF8(nameObj), overloads);
     }
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(resType);
-    Py_INCREF(typeObj);
-    return typeObj;
+    return incref((PyObject*)PyInstance::typeObj(resType));
 }
 
 Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
@@ -650,12 +607,11 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         clsMembers[mf.first] = mf.second;
     }
 
-    PyObject* typeObj = (PyObject*)PyInstance::typeObj(
-        Class::Make(name, members, memberFuncs, staticFuncs, propertyFuncs, clsMembers)
+    return incref(
+        (PyObject*)PyInstance::typeObj(
+            Class::Make(name, members, memberFuncs, staticFuncs, propertyFuncs, clsMembers)
+            )
         );
-
-    Py_INCREF(typeObj);
-    return typeObj;
 }
 
 PyObject *refcount(PyObject* nullValue, PyObject* args) {
@@ -1016,9 +972,7 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    PyObject* res = t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False;
-    Py_INCREF(res);
-    return res;
+    return incref(t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False);
 }
 
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -1078,12 +1032,9 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         std::sort(definitions.begin(), definitions.end());
     }
 
-    PyObject* res = (PyObject*)PyInstance::typeObj(
+    return incref((PyObject*)PyInstance::typeObj(
         ::Alternative::Make(name, definitions, functions)
-        );
-
-    Py_INCREF(res);
-    return res;
+        ));
 }
 
 static PyMethodDef module_methods[] = {

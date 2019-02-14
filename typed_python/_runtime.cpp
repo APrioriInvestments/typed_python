@@ -47,7 +47,7 @@ extern "C" {
     void nativepython_runtime_incref_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
 
-        Py_INCREF(p);
+        incref(p);
     }
 
     PyObject* nativepython_runtime_get_pyobj_None() {
@@ -70,7 +70,7 @@ extern "C" {
     void nativepython_runtime_decref_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
 
-        Py_DECREF(p);
+        decref(p);
     }
 
     double nativepython_runtime_pow_float64_float64(double l, double r) {

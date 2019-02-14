@@ -133,11 +133,8 @@ bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::s
 
         memberNames.insert(memberName);
 
-        PyObject* item = PyTuple_GetItem(entry, 1);
-        Py_INCREF(item);
-
         out.push_back(
-            std::make_pair(memberName, item)
+            std::make_pair(memberName, incref(PyTuple_GetItem(entry, 1)))
             );
     }
 
