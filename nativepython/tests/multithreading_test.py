@@ -65,9 +65,9 @@ class TestMultithreading(unittest.TestCase):
         #expect the ratio to be close to 1, but have some error margin, especially on Travis
         #where we don't really get two cores
         if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(first / second >= .8 and first/second < 1.75, first/second)
+            self.assertTrue(second/first >= .8 and second/first < 1.75, second/first)
         else:
-            self.assertTrue(first / second >= .9 and first/second < 1.1, first/second)
+            self.assertTrue(second/first >= .9 and second/first < 1.1, second/first)
 
     def test_refcounts_of_objects_across_boundary(self):
         class Object:
@@ -110,22 +110,29 @@ class TestMultithreading(unittest.TestCase):
             for i in range(10):
                 sc.deserialize(sc.serialize(x))
 
+        ratios = []
+        for i in range(10):
+            t0 = time.time()
+            thread_apply(f, [()])
+            t1 = time.time()
+            thread_apply(f, [(),()])
+            t2 = time.time()
 
-        t0 = time.time()
-        thread_apply(f, [()])
-        t1 = time.time()
-        thread_apply(f, [(),()])
-        t2 = time.time()
+            first = t1 - t0
+            second = t2 - t1
 
-        first = t1 - t0
-        second = t2 - t1
+            ratios.append(second/first)
+
+        ratios = sorted(ratios)
+
+        bestRatio = ratios[0]
 
         #expect the ratio to be close to 1, but have some error margin, especially on Travis
         #where we don't really get two cores
         if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(first / second >= .8 and first/second < 1.75, first/second)
+            self.assertTrue(bestRatio >= .8 and bestRatio < 1.75, bestRatio)
         else:
-            self.assertTrue(first / second >= .9 and first/second < 1.1, first/second)
+            self.assertTrue(bestRatio >= .9 and bestRatio < 1.1, bestRatio)
 
 
 
