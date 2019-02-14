@@ -4,13 +4,18 @@
 
 // virtual
 void PythonSerializationContext::serializePythonObject(PyObject* o, SerializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     Type* t = PyInstance::extractTypeFrom(o->ob_type, true);
 
     if (t) {
         b.write_uint8(T_NATIVE);
         //we have a natural serialization mechanism already
         serializeNativeType(t, b);
+
+        PyEnsureGilReleased releaseTheGil;
         t->serialize(((PyInstance*)o)->dataPtr(), b);
+
     } else {
         if (o == Py_None) {
             b.write_uint8(T_NONE);
@@ -85,6 +90,8 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
 }
 
 void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id;
@@ -108,6 +115,8 @@ void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffe
 }
 
 PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     uint32_t id = b.read_uint32();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
@@ -132,11 +141,11 @@ PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b
                 throw PythonExceptionSet();
             }
 
-            Py_DECREF(key);
-            Py_DECREF(value);
+            decref(key);
+            decref(value);
         }
     } catch(...) {
-        Py_DECREF(res);
+        decref(res);
         throw;
     }
 
@@ -144,6 +153,8 @@ PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b
 }
 
 PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuffer &b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     uint32_t id = b.read_uint32();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
@@ -196,6 +207,8 @@ PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuff
 }
 
 void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id;
@@ -208,25 +221,22 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     }
 
     //see if the object has a name
-    PyObject* typeName = PyObject_CallMethod(mContextObj, "nameForObject", "O", o);
+    PyObjectStealer typeName(PyObject_CallMethod(mContextObj, "nameForObject", "O", o));
     if (!typeName) {
         throw PythonExceptionSet();
     }
     if (typeName != Py_None) {
         if (!PyUnicode_Check(typeName)) {
-            Py_DECREF(typeName);
             throw std::runtime_error(std::string("nameForObject returned a non-string"));
         }
 
         b.write_uint8(T_OBJECT_NAMED);
         b.write_string(std::string(PyUnicode_AsUTF8(typeName)));
-        Py_DECREF(typeName);
         return;
     }
-    Py_DECREF(typeName);
 
     //give the plugin a chance to convert the instance to something else
-    PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", o);
+    PyObjectStealer representation(PyObject_CallMethod(mContextObj, "representationFor", "O", o));
     if (!representation) {
         throw PythonExceptionSet();
     }
@@ -274,26 +284,26 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         b.write_uint8(T_OBJECT_TYPEANDDICT);
         serializePythonObject((PyObject*)o->ob_type, b);
 
-        PyObject* d = PyObject_GenericGetDict(o, nullptr);
+        PyObjectStealer d(PyObject_GenericGetDict(o, nullptr));
         if (!d) {
             throw std::runtime_error(std::string("Object of type ") + o->ob_type->tp_name + " had no dict.");
         }
         serializePyDict(d, b);
-        Py_DECREF(d);
     } else {
         b.write_uint8(T_OBJECT_REPRESENTATION);
         serializePyRepresentation(representation, b);
     }
-    Py_DECREF(representation);
 }
 
 void PythonSerializationContext::serializePyRepresentation(PyObject* representation, SerializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     if (!PyTuple_Check(representation) || PyTuple_Size(representation) != 3) {
-        Py_DECREF(representation);
+        decref(representation);
         throw std::runtime_error("representationFor should return None or a tuple with 3 things");
     }
     if (!PyTuple_Check(PyTuple_GetItem(representation, 1))) {
-        Py_DECREF(representation);
+        decref(representation);
         throw std::runtime_error("representationFor second arguments should be a tuple");
     }
     serializePythonObject(PyTuple_GetItem(representation, 0), b);
@@ -302,6 +312,8 @@ void PythonSerializationContext::serializePyRepresentation(PyObject* representat
 }
 
 PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(DeserializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id = b.read_uint32();
@@ -317,7 +329,7 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
         PyObject* t = deserializePythonObject(b);
         if (!PyType_Check(t)) {
             std::string tname = t->ob_type->tp_name;
-            Py_DECREF(t);
+            decref(t);
             throw std::runtime_error("Expected a type object. Got " + tname + " instead");
         }
 
@@ -354,6 +366,8 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
 }
 
 PyObject* PythonSerializationContext::deserializePyRepresentation(DeserializationBuffer& b, int32_t id) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     PyObject* t = deserializePythonObject(b);
     PyObject* tArgs = deserializePythonObject(b);
 
@@ -362,8 +376,8 @@ PyObject* PythonSerializationContext::deserializePyRepresentation(Deserializatio
     }
 
     PyObject* instance = PyObject_Call(t, tArgs, NULL);
-    Py_DECREF(t);
-    Py_DECREF(tArgs);
+    decref(t);
+    decref(tArgs);
 
     if (!instance) {
         throw PythonExceptionSet();
@@ -377,22 +391,24 @@ PyObject* PythonSerializationContext::deserializePyRepresentation(Deserializatio
 
     PyObject* rep = deserializePythonObject(b);
     PyObject* res = PyObject_CallMethod(mContextObj, "setInstanceStateFromRepresentation", "OO", instance, rep);
-    Py_DECREF(rep);
+    decref(rep);
 
     if (!res) {
         throw PythonExceptionSet();
     }
     if (res != Py_True) {
-        Py_DECREF(res);
+        decref(res);
         throw std::runtime_error("setInstanceStateFromRepresentation didn't return True.");
     }
-    Py_DECREF(res);
+    decref(res);
 
     return instance;
 }
 
 void PythonSerializationContext::serializeNativeType(Type* nativeType, SerializationBuffer& b, bool allowCaching) const {
-    PyObject* nameForObject = PyObject_CallMethod(mContextObj, "nameForObject", "O", PyInstance::typeObj(nativeType));
+    PyEnsureGilAcquired acquireTheGil;
+
+    PyObjectStealer nameForObject(PyObject_CallMethod(mContextObj, "nameForObject", "O", PyInstance::typeObj(nativeType)));
 
     if (!nameForObject) {
         throw PythonExceptionSet();
@@ -400,19 +416,18 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 
     if (nameForObject != Py_None) {
         if (!PyUnicode_Check(nameForObject)) {
-            Py_DECREF(nameForObject);
+            decref(nameForObject);
             throw std::runtime_error("nameForObject returned something other than None or a string.");
         }
 
         b.write_uint8(T_OBJECT_NAMED);
         b.write_string(std::string(PyUnicode_AsUTF8(nameForObject)));
-        Py_DECREF(nameForObject);
         return;
     }
 
-    Py_DECREF(nameForObject);
-
-    PyObject* representation = PyObject_CallMethod(mContextObj, "representationFor", "O", PyInstance::typeObj(nativeType));
+    PyObjectStealer representation(
+        PyObject_CallMethod(mContextObj, "representationFor", "O", PyInstance::typeObj(nativeType))
+        );
 
     if (!representation) {
         throw PythonExceptionSet();
@@ -423,11 +438,8 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 
         serializePyRepresentation(representation, b);
 
-        Py_DECREF(representation);
         return;
     }
-
-    Py_DECREF(representation);
 
     b.write_uint8(T_NATIVETYPE_BY_CATEGORY);
 
@@ -513,7 +525,10 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     if (nativeType->getTypeCategory() == Type::TypeCategory::catValue) {
         Instance i = ((Value*)nativeType)->value();
         serializeNativeType(i.type(), b);
+
+        PyEnsureGilReleased releaseTheGil;
         i.type()->serialize(i.data(), b);
+
         return;
     }
 
@@ -521,6 +536,8 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 }
 
 Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, bool allowCaching) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     uint8_t style = b.read_uint8();
 
     if (style == T_OBJECT_NAMED) {
@@ -534,12 +551,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
         if (!PyType_Check(res)) {
             std::string msg = "objectFromName returned a non-type for name " + name + ". it has type " + res->ob_type->tp_name;
-            Py_DECREF(res);
+            decref(res);
             throw std::runtime_error(msg);
         }
 
         Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res, true);
-        Py_DECREF(res);
+        decref(res);
 
         if (!resultType) {
             throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
@@ -553,7 +570,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 
         Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res, true);
 
-        Py_DECREF(res);
+        decref(res);
 
         if (!resultType) {
             throw std::runtime_error("we expected objectFromName to return a native type in this context, but it didn't.");
@@ -592,6 +609,8 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 }
 
 Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     uint8_t category = b.read_uint8();
     if (category == Type::TypeCategory::catInt64) {
         return ::Int64::Make();
@@ -692,6 +711,8 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
         Type* t = deserializeNativeType(b);
 
         Instance i = Instance::createAndInitialize(t, [&](instance_ptr p) {
+            PyEnsureGilReleased releaseTheGil;
+
             t->deserialize(p, b);
         });
 
@@ -703,6 +724,8 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
 
 // virtual
 PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuffer& b) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     uint8_t code = b.read_uint8();
     if (code == T_LIST) {
         return deserializePyList(b);
@@ -722,6 +745,8 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     if (code == T_NATIVE) {
         Type* t = deserializeNativeType(b);
         return PyInstance::initialize(t, [&](instance_ptr selfData) {
+            PyEnsureGilReleased releaseTheGil;
+
             t->deserialize(selfData, b);
         });
     } else
@@ -771,6 +796,8 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
 
 template<class Size_Fn, class GetItem_Fn>
 inline void PythonSerializationContext::serializeIndexable(PyObject* o, SerializationBuffer& b, Size_Fn size_fn, GetItem_Fn get_item_fn) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id;
@@ -791,6 +818,8 @@ inline void PythonSerializationContext::serializeIndexable(PyObject* o, Serializ
 
 template<class Factory_Fn, class SetItem_Fn>
 inline PyObject* PythonSerializationContext::deserializeIndexable(DeserializationBuffer& b, Factory_Fn factory_fn, SetItem_Fn set_item_fn) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id = b.read_uint32();
@@ -810,7 +839,7 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(Deserializatio
             set_item_fn(res, k, deserializePythonObject(b));
         }
     } catch(...) {
-        Py_DECREF(res);
+        decref(res);
         throw;
     }
 
@@ -819,6 +848,8 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(Deserializatio
 
 template<class Size_Fn>
 inline void PythonSerializationContext::serializeIterable(PyObject* o, SerializationBuffer& b, Size_Fn size_fn) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id;
@@ -837,15 +868,17 @@ inline void PythonSerializationContext::serializeIterable(PyObject* o, Serializa
         PyObject* item = PyIter_Next(iter);
         while (item) {
             serializePythonObject(item, b);
-            Py_DECREF(item);
+            decref(item);
             item = PyIter_Next(iter);
         }
-        Py_DECREF(iter);
+        decref(iter);
     }
 }
 
 template<class Factory_Fn, class AddItem_Fn, class Clear_Fn>
 inline PyObject* PythonSerializationContext::deserializeIterable(DeserializationBuffer &b, Factory_Fn factory_fn, AddItem_Fn add_item_fn, Clear_Fn clear_fn) const {
+    PyEnsureGilAcquired acquireTheGil;
+
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
     uint32_t id = b.read_uint32();
@@ -870,7 +903,7 @@ inline PyObject* PythonSerializationContext::deserializeIterable(Deserialization
         for (long k = 0; k < sz; k++) {
             PyObject* item = deserializePythonObject(b);
             int success = add_item_fn(res, item);
-            Py_DECREF(item);
+            decref(item);
             if (success < 0) {
                 PyErr_PrintEx(1);
                 throw std::runtime_error(std::string("Call to add_item_fn failed"));
@@ -878,7 +911,7 @@ inline PyObject* PythonSerializationContext::deserializeIterable(Deserialization
         }
     } catch(...) {
         clear_fn(res);
-        Py_DECREF(res);
+        decref(res);
         throw;
     }
 
@@ -914,6 +947,8 @@ void PythonSerializationContext::serializePyFrozenSet(PyObject* o, Serialization
 }
 
 std::shared_ptr<ByteBuffer> PythonSerializationContext::compressOrDecompress(uint8_t* begin, uint8_t* end, bool compress) const {
+    assertHoldingTheGil();
+
     if (!mContextObj) {
         return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin,end));
     }

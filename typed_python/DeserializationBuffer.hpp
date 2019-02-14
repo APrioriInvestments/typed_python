@@ -22,6 +22,8 @@ public:
     }
 
     ~DeserializationBuffer() {
+        PyEnsureGilAcquired acquireTheGil;
+
         for (auto& typeAndList: m_needs_decref) {
             typeAndList.first->check([&](auto& concreteType) {
                 for (auto ptr: typeAndList.second) {
@@ -175,6 +177,9 @@ private:
         if (m_compressed_block_data_remaining < sizeof(uint32_t)) {
             return false;
         }
+
+        //hold the GIL because we use python to do this
+        PyEnsureGilAcquired acquireTheGil;
 
         uint32_t bytesToDecompress = *((uint32_t*)m_compressed_blocks);
 

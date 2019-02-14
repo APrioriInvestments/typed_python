@@ -729,12 +729,16 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     try{
         if (actualType == serializeType) {
             //the simple case
+            PyEnsureGilReleased releaseTheGil;
+
             actualType->serialize(((PyInstance*)a2)->dataPtr(), b);
         } else {
             //try to construct a 'serialize type' from the argument and then serialize that
             Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
                 PyInstance::copyConstructFromPythonInstance(serializeType, p, a2);
             });
+
+            PyEnsureGilReleased releaseTheGil;
 
             i.type()->serialize(i.data(), b);
         }
@@ -779,6 +783,7 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
 
     try {
         Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
+            PyEnsureGilReleased releaseTheGil;
             serializeType->deserialize(p, buf);
         });
 

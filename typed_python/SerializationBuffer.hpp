@@ -21,6 +21,8 @@ public:
     }
 
     ~SerializationBuffer() {
+        PyEnsureGilAcquired acquireTheGil;
+
         if (m_buffer) {
             free(m_buffer);
         }
@@ -152,6 +154,9 @@ public:
         if (m_last_compression_point == m_size) {
             return;
         }
+
+        //make sure we're holding the GIL because we use python to do the serialization
+        PyEnsureGilAcquired acquireTheGil;
 
         //replace the data we have here with a block of 4 bytes of size of compressed data and
         //then the data stream

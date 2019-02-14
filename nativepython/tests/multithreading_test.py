@@ -100,3 +100,32 @@ class TestMultithreading(unittest.TestCase):
         thread_apply(rapidlyIncAndDecref, [(instance,)] * 10)
 
         self.assertEqual(_types.refcount(instance),1)
+
+    def test_serialize_is_parallel(self):
+        x = ListOf(int)()
+        x.resize(1000000)
+        sc = SerializationContext({})
+
+        def f():
+            for i in range(10):
+                sc.deserialize(sc.serialize(x))
+
+
+        t0 = time.time()
+        thread_apply(f, [()])
+        t1 = time.time()
+        thread_apply(f, [(),()])
+        t2 = time.time()
+
+        first = t1 - t0
+        second = t2 - t1
+
+        #expect the ratio to be close to 1, but have some error margin, especially on Travis
+        #where we don't really get two cores
+        if os.environ.get('TRAVIS_CI', None):
+            self.assertTrue(first / second >= .8 and first/second < 1.75, first/second)
+        else:
+            self.assertTrue(first / second >= .9 and first/second < 1.1, first/second)
+
+
+
