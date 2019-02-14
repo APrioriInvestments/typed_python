@@ -241,49 +241,52 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
         throw std::runtime_error("Internal error: couldn't find typed_python.internals.FunctionOverload");
     }
 
-    PyObject* overloadTuple = PyTuple_New(f->getOverloads().size());
+    PyObjectStealer overloadTuple(PyTuple_New(f->getOverloads().size()));
 
     for (long k = 0; k < f->getOverloads().size(); k++) {
         auto& overload = f->getOverloads()[k];
 
-        PyObject* pyIndex = PyLong_FromLong(k);
+        PyObjectStealer pyIndex(PyLong_FromLong(k));
 
-        PyObject* pyOverloadInst = PyObject_CallFunctionObjArgs(
-            funcOverload,
-            typePtrToPyTypeRepresentation(f),
-            pyIndex,
-            (PyObject*)overload.getFunctionObj(),
-            overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None,
-            NULL
+        PyObjectStealer pyOverloadInst(
+            PyObject_CallFunctionObjArgs(
+                funcOverload,
+                typePtrToPyTypeRepresentation(f),
+                (PyObject*)pyIndex,
+                (PyObject*)overload.getFunctionObj(),
+                overload.getReturnType() ? (PyObject*)typePtrToPyTypeRepresentation(overload.getReturnType()) : Py_None,
+                NULL
+                )
             );
-
-        Py_DECREF(pyIndex);
 
         if (pyOverloadInst) {
             for (auto arg: f->getOverloads()[k].getArgs()) {
-                PyObject* res = PyObject_CallMethod(pyOverloadInst, "addArg", "sOOOO",
-                    arg.getName().c_str(),
-                    arg.getDefaultValue() ? PyTuple_Pack(1, arg.getDefaultValue()) : Py_None,
-                    arg.getTypeFilter() ? (PyObject*)typePtrToPyTypeRepresentation(arg.getTypeFilter()) : Py_None,
-                    arg.getIsStarArg() ? Py_True : Py_False,
-                    arg.getIsKwarg() ? Py_True : Py_False
+                PyObjectStealer res(
+                    PyObject_CallMethod(
+                        (PyObject*)pyOverloadInst,
+                        "addArg",
+                        "sOOOO",
+                        arg.getName().c_str(),
+                        arg.getDefaultValue() ? PyTuple_Pack(1, arg.getDefaultValue()) : Py_None,
+                        arg.getTypeFilter() ? (PyObject*)typePtrToPyTypeRepresentation(arg.getTypeFilter()) : Py_None,
+                        arg.getIsStarArg() ? Py_True : Py_False,
+                        arg.getIsKwarg() ? Py_True : Py_False
+                        )
                     );
 
                 if (!res) {
                     PyErr_PrintEx(0);
-                } else {
-                    Py_DECREF(res);
                 }
             }
 
-            PyTuple_SetItem(overloadTuple, k, pyOverloadInst);
+            PyTuple_SetItem(overloadTuple, k, incref(pyOverloadInst));
         } else {
             PyErr_PrintEx(0);
             PyTuple_SetItem(overloadTuple, k, incref(Py_None));
         }
     }
 
-    return overloadTuple;
+    return incref(overloadTuple);
 }
 
 PyObject* PyFunctionInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {

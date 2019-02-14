@@ -71,7 +71,7 @@ bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         }
 
         bool result = res.second == Py_True;
-        Py_DECREF(res.second);
+        decref(res.second);
         return result;
     }
 
@@ -106,6 +106,8 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream) {
     auto it = m_heldClass->getMemberFunctions().find(stream.isStrCall() ? "__str__" : "__repr__");
 
     if (it != m_heldClass->getMemberFunctions().end()) {
+        PyEnsureGilAcquired acquireTheGil;
+
         PyObjectStealer selfAsPyObj(PyInstance::extractPythonObject(self, this));
 
         std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
@@ -118,14 +120,14 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream) {
                 throw PythonExceptionSet();
             }
             if (!PyUnicode_Check(res.second)) {
-                Py_DECREF(res.second);
+                decref(res.second);
                 throw std::runtime_error(
                     stream.isStrCall() ? "__str__ returned a non-string" : "__repr__ returned a non-string"
                     );
             }
 
             stream << PyUnicode_AsUTF8(res.second);
-            Py_DECREF(res.second);
+            decref(res.second);
 
             return;
         }
@@ -145,6 +147,8 @@ int32_t Class::hash32(instance_ptr left) {
     auto it = m_heldClass->getMemberFunctions().find("__hash__");
 
     if (it != m_heldClass->getMemberFunctions().end()) {
+        PyEnsureGilAcquired acquireTheGil;
+
         PyObjectStealer leftAsPyObj(PyInstance::extractPythonObject(left, this));
 
         std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCall(
@@ -156,12 +160,12 @@ int32_t Class::hash32(instance_ptr left) {
                 throw PythonExceptionSet();
             }
             if (!PyLong_Check(res.second)) {
-                Py_DECREF(res.second);
+                decref(res.second);
                 throw std::runtime_error("__hash__ returned a non-int");
             }
 
             int32_t retval = PyLong_AsLong(res.second);
-            Py_DECREF(res.second);
+            decref(res.second);
             if (retval == -1) {
                 retval = -2;
             }

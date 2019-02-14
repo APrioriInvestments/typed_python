@@ -88,22 +88,14 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
                             type()->eltPtr(dataPtr(), reversed ? k - count_rhs : k)
                             );
                     } else {
-                        PyObject* kval = PyLong_FromLong(reversed ? k : k - count_lhs);
-                        PyObject* o = PyObject_GetItem(rhs, kval);
-                        Py_DECREF(kval);
+                        PyObjectStealer kval(PyLong_FromLong(reversed ? k : k - count_lhs));
+                        PyObjectStealer o(PyObject_GetItem(rhs, kval));
 
                         if (!o) {
                             throw InternalPyException();
                         }
 
-                        try {
-                            PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o);
-                        } catch(...) {
-                            Py_DECREF(o);
-                            throw;
-                        }
-
-                        Py_DECREF(o);
+                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o);
                     }
                 });
         });

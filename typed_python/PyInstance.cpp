@@ -42,20 +42,21 @@ bool PyInstance::guaranteeForwardsResolved(Type* t) {
 // static
 void PyInstance::guaranteeForwardsResolvedOrThrow(Type* t) {
     t->guaranteeForwardsResolved([&](PyObject* o) {
-        PyObject* result = PyObject_CallFunctionObjArgs(o, NULL);
+        PyObjectStealer result(
+            PyObject_CallFunctionObjArgs(o, NULL)
+            );
+
         if (!result) {
             PyErr_Clear();
             throw std::runtime_error("Python type callback threw an exception.");
         }
 
         if (!PyType_Check(result)) {
-            Py_DECREF(result);
             throw std::runtime_error("Python type callback didn't return a type: got " +
                 std::string(result->ob_type->tp_name));
         }
 
         Type* resType = unwrapTypeArgToTypePtr(result);
-        Py_DECREF(result);
 
         if (!resType) {
             throw std::runtime_error("Python type callback didn't return a native type: got " +

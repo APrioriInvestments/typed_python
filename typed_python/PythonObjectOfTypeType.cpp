@@ -1,9 +1,11 @@
 #include "AllTypes.hpp"
 
 void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
+    PyEnsureGilAcquired acquireTheGil;
+
     PyObject* p = *(PyObject**)self;
 
-    PyObject* o = PyObject_Repr(p);
+    PyObjectStealer o(PyObject_Repr(p));
 
     if (!o) {
         stream << "<EXCEPTION>";
@@ -13,16 +15,15 @@ void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
 
     if (!PyUnicode_Check(o)) {
         stream << "<EXCEPTION>";
-        Py_DECREF(o);
         return;
     }
 
     stream << PyUnicode_AsUTF8(o);
-
-    Py_DECREF(o);
 }
 
 bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    PyEnsureGilAcquired acquireTheGil;
+
     PyObject* l = *(PyObject**)left;
     PyObject* r = *(PyObject**)right;
 

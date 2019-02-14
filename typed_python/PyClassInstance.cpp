@@ -156,7 +156,7 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
         argCount += 1;
     }
 
-    PyObject* targetArgTuple = PyTuple_New(argCount);
+    PyObjectStealer targetArgTuple(PyTuple_New(argCount));
 
     PyTuple_SetItem(targetArgTuple, 0, incref((PyObject*)this)); //steals a reference
 
@@ -177,11 +177,9 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
             //res.first is true if we matched and tried to call this function
             if (res.second) {
                 //don't need the result.
-                Py_DECREF(targetArgTuple);
                 return std::make_pair(true, res.second);
             } else {
                 //it threw an exception
-                Py_DECREF(targetArgTuple);
                 return std::make_pair(true, (PyObject*)nullptr);
             }
         }
@@ -365,15 +363,15 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
         if (classT->getHeldClass()->memberHasDefaultValue(k)) {
             const Instance& i = classT->getHeldClass()->getMemberDefaultValue(k);
 
-            PyObject* defaultVal = PyInstance::extractPythonObject(i.data(), i.type());
+            PyObjectStealer defaultVal(
+                PyInstance::extractPythonObject(i.data(), i.type())
+                );
 
             PyDict_SetItemString(
                 defaults,
                 classT->getHeldClass()->getMemberName(k).c_str(),
                 defaultVal
                 );
-
-            Py_DECREF(defaultVal);
         }
     }
 

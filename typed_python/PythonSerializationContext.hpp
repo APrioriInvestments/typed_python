@@ -52,10 +52,11 @@ public:
 
     virtual ~PyBytesByteBuffer() {
         PyBuffer_Release(&m_buffer);
-        Py_DECREF(m_obj);
+        decref(m_obj);
     }
 
     virtual std::pair<uint8_t*, uint8_t*> range() {
+        assertHoldingTheGil();
         return std::make_pair((uint8_t*)m_buffer.buf, (uint8_t*)m_buffer.buf + m_buffer.len);
     }
 

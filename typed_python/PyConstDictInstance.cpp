@@ -162,8 +162,8 @@ PyObject* PyConstDictInstance::tp_iternext_concrete() {
 
         auto res = PyTuple_Pack(2, t1, t2);
 
-        Py_DECREF(t1);
-        Py_DECREF(t2);
+        decref(t1);
+        decref(t2);
 
         return res;
     } else if (mIteratorFlag == 1) {
