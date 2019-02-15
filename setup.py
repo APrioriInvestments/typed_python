@@ -73,6 +73,7 @@ setuptools.setup(
         'lz4',
         'numpy',
         'psutil',
+        'pytz',
         'pyyaml',
         'redis',
         'requests',
