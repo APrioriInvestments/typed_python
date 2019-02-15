@@ -15,6 +15,16 @@
 import setuptools
 import pkg_resources
 
+
+def is_numpy_installed():
+    try:
+        import numpy
+        numpy_installed = True
+    except ImportError:
+        numpy_installed = False
+    return numpy_installed
+
+
 setuptools.setup(
     name='nativepython',
     version='0.0.1',
@@ -43,9 +53,13 @@ setuptools.setup(
                 '-Wno-narrowing',
                 '-Wno-unused-variable'
             ],
+            # pkg_resources.resouce_filename raises an exception if numpy is
+            # not installed, so we check if it is installed. This works because
+            # setup.py is called first to collect and install dependencies, 
+            # and then to install the package itself.
             include_dirs=[
                 pkg_resources.resource_filename('numpy', 'core/include')
-            ]
+            ] if is_numpy_installed() else []
         )
     ],
     install_requires=[
