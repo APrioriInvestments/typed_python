@@ -29,4 +29,4 @@ flask-login = "*"
 flask-wtf = "*"
 
 [requires]
-python_version = "3.6.7"
+python_version = "3.6"
