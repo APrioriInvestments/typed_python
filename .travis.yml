@@ -18,3 +18,4 @@ install:
 script:
   - make testcert.cert
   - ./test.py -s
+  - pipenv check
