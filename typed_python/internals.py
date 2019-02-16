@@ -238,3 +238,7 @@ class DisableCompiledCode:
 
     def __exit__(self, *args):
         _types.enableNativeDispatch()
+
+
+def makeNamedTuple(**kwargs):
+    return NamedTuple(**{k:type(v) for k,v in kwargs.items()})(kwargs)
