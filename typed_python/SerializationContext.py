@@ -21,6 +21,7 @@ import numpy
 import datetime
 import pytz
 import lz4.frame
+import logging
 
 _reconstruct = numpy.array([1,2,3]).__reduce__()[0]
 _ndarray = numpy.ndarray
@@ -147,10 +148,14 @@ class SerializationContext(object):
         ''' Return an object for an input name(string), or None if not found. '''
         res = self.nameToObject.get(name)
 
-        if res is not None:
-            return res
-        else:
-            return _builtin_name_to_value.get(name)
+        if res is None:
+            res = _builtin_name_to_value.get(name)
+
+        if res is None:
+            logging.warn("Failed to find a value for object named %s", name)
+
+        return res
+
 
     def sha_hash(self, o):
         return sha_hash(self.serialize(o))
@@ -181,7 +186,7 @@ class SerializationContext(object):
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
-        
+
         if isinstance(inst, type):
             isTF = isTypeFunctionType(inst)
             if isTF is not None:
@@ -198,16 +203,16 @@ class SerializationContext(object):
 
         if isinstance(inst, datetime.datetime):
             return inst.__reduce__() + (None,)
-        
+
         if isinstance(inst, datetime.date):
             return inst.__reduce__() + (None,)
-        
+
         if isinstance(inst, datetime.time):
             return inst.__reduce__() + (None,)
-        
+
         if isinstance(inst, datetime.timedelta):
             return inst.__reduce__() + (None,)
-        
+
         if isinstance(inst, datetime.tzinfo):
             return inst.__reduce__() + (None,)
 
@@ -241,28 +246,28 @@ class SerializationContext(object):
     def setInstanceStateFromRepresentation(self, instance, representation):
         if isinstance(instance, datetime.datetime):
             return True
-        
+
         if isinstance(instance, datetime.date):
             return True
-        
+
         if isinstance(instance, datetime.time):
             return True
-        
+
         if isinstance(instance, datetime.timedelta):
             return True
-        
+
         if isinstance(instance, datetime.tzinfo):
             return True
 
         if isinstance(instance, type):
             return True
-        
+
         if isinstance(instance, numpy.dtype):
             return True
 
         if isinstance(instance, numpy.number):
             return True
-        
+
         if isinstance(instance, _ndarray):
             instance.__setstate__(representation)
             return True

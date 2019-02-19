@@ -27,7 +27,8 @@ import gevent.queue
 
 from object_database.util import genToken, checkLogLevelValidity
 from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
-from object_database.web.AuthPlugin import AuthPluginBase
+from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
+from object_database.web.LoginPlugin import LoginIpPlugin
 from object_database.web.ActiveWebServiceSchema import active_webservice_schema
 from object_database.web.flask_util import request_ip_address
 from object_database.web.cells import *
@@ -120,18 +121,24 @@ class ActiveWebService(ServiceBase):
         """Subclasses should take the remaining args from the commandline and configure using them"""
         db.subscribeToType(Configuration)
 
+        parser = argparse.ArgumentParser("Configure a webservice")
+        parser.add_argument("--hostname", type=str)
+        parser.add_argument("--port", type=int)
+        # optional arguments
+        parser.add_argument("--log-level", type=str, required=False, default="INFO")
+
+        parser.add_argument("--ldap-hostname", type=str, required=False)
+        parser.add_argument("--ldap-base-dn", type=str, required=False)
+        parser.add_argument("--ldap-ntlm-domain", type=str, required=False)
+        parser.add_argument("--authorized-groups", type=str, required=False, nargs="+")
+        parser.add_argument("--company-name", type=str, required=False)
+
+        parsedArgs = parser.parse_args(args)
+
         with db.transaction():
             c = Configuration.lookupAny(service=serviceObject)
             if not c:
                 c = Configuration(service=serviceObject)
-
-            parser = argparse.ArgumentParser("Configure a webservice")
-            parser.add_argument("--hostname", type=str)
-            parser.add_argument("--port", type=int)
-            # optional arguments
-            parser.add_argument("--log-level", type=str, required=False, default="INFO")
-
-            parsedArgs = parser.parse_args(args)
 
             level_name = parsedArgs.log_level.upper()
             checkLogLevelValidity(level_name)
@@ -140,6 +147,20 @@ class ActiveWebService(ServiceBase):
             c.hostname = parsedArgs.hostname
 
             c.log_level = logging.getLevelName(level_name)
+
+        if parsedArgs.ldap_base_dn is not None:
+            ActiveWebService.setLoginPlugin(
+                db,
+                serviceObject,
+                LoginIpPlugin,
+                [LdapAuthPlugin(
+                    parsedArgs.ldap_hostname,
+                    parsedArgs.ldap_base_dn,
+                    parsedArgs.ldap_ntlm_domain,
+                    parsedArgs.authorized_groups
+                    )],
+                config={'company_name': parsedArgs.company_name}
+                )
 
     def initialize(self):
         self.db.subscribeToType(Configuration)
