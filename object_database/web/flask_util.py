@@ -65,6 +65,7 @@ def next_url(fallback_url=None, fallback_endpoint='index', next_key='next',
 
 
 def url_with_request_parameters(url, req=None, filtr=None):
+    """ Adds the parameters of the current Flask request to the given url. """
     req = req or request
     for k, v in req.args.items():
         if filtr and k not in filtr:
