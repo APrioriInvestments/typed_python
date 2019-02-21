@@ -199,6 +199,8 @@ class ServiceManager(object):
 
             time.sleep(self.SLEEP_INTERVAL)
 
+        self._logger.info("ServiceManager exiting work loop.")
+
     def updateServiceHostStats(self):
         with self.db.transaction():
             self.serviceHostObject.cpuUse = psutil.cpu_percent() / 100.0
