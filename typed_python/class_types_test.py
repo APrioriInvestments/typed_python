@@ -233,12 +233,16 @@ class NativeClassTypesTests(unittest.TestCase):
         class C(Class):
             def f(self):
                 return 0
+
             def f(self, i):
                 return 1
+
             def f(self, i, i2):
                 return 2
+
             def f(self, i, i2, *args):
                 return 2 + len(args)
+
             def f(self, i, i2, *args):
                 return 2 + len(args)
 
@@ -253,6 +257,7 @@ class NativeClassTypesTests(unittest.TestCase):
         class C(Class):
             def g(self, a, b):
                 assert False
+
             def f(self, a, b):
                 return 1
 
@@ -291,13 +296,16 @@ class NativeClassTypesTests(unittest.TestCase):
         class C(Class):
             def f(self, a: float):
                 return float
+
             def f(self, a):
                 return "any"
 
             def f(self, *args: int):
                 return "int list"
+
             def f(self, *args: str):
                 return "string list"
+
             def f(self, **kwargs: TupleOf(int)):
                 return "named tuple of ints"
 
@@ -500,26 +508,37 @@ class NativeClassTypesTests(unittest.TestCase):
         class WithLotsOfOperators(Class):
             def __add__(self, other):
                 return (self, "add", other)
+
             def __sub__(self, other):
                 return (self, "sub", other)
+
             def __mul__(self, other):
                 return (self, "mul", other)
+
             def __mod__(self, other):
                 return (self, "mod", other)
+
             def __div__(self, other):
                 return (self, "div", other)
+
             def __floordiv__(self, other):
                 return (self, "floordiv", other)
+
             def __lshift__(self, other):
                 return (self, "lshift", other)
+
             def __rshift__(self, other):
                 return (self, "rshift", other)
+
             def __or__(self, other):
                 return (self, "or", other)
+
             def __and__(self, other):
                 return (self, "and", other)
+
             def __xor__(self, other):
                 return (self, "xor", other)
+
             def __matmul__(self, other):
                 return (self, "matmul", other)
 
@@ -542,26 +561,37 @@ class NativeClassTypesTests(unittest.TestCase):
         class WithLotsOfOperators(Class):
             def __radd__(self, other):
                 return (self, "add", other)
+
             def __rsub__(self, other):
                 return (self, "sub", other)
+
             def __rmul__(self, other):
                 return (self, "mul", other)
+
             def __rmod__(self, other):
                 return (self, "mod", other)
+
             def __rdiv__(self, other):
                 return (self, "div", other)
+
             def __rfloordiv__(self, other):
                 return (self, "floordiv", other)
+
             def __rlshift__(self, other):
                 return (self, "lshift", other)
+
             def __rrshift__(self, other):
                 return (self, "rshift", other)
+
             def __ror__(self, other):
                 return (self, "or", other)
+
             def __rand__(self, other):
                 return (self, "and", other)
+
             def __rxor__(self, other):
                 return (self, "xor", other)
+
             def __rmatmul__(self, other):
                 return (self, "matmul", other)
 
@@ -584,26 +614,37 @@ class NativeClassTypesTests(unittest.TestCase):
         class WithLotsOfOperators(Class):
             def __iadd__(self, other):
                 return (self, "iadd", other)
+
             def __isub__(self, other):
                 return (self, "isub", other)
+
             def __imul__(self, other):
                 return (self, "imul", other)
+
             def __imod__(self, other):
                 return (self, "imod", other)
+
             def __itruediv__(self, other):
                 return (self, "itruediv", other)
+
             def __ifloordiv__(self, other):
                 return (self, "ifloordiv", other)
+
             def __ilshift__(self, other):
                 return (self, "ilshift", other)
+
             def __irshift__(self, other):
                 return (self, "irshift", other)
+
             def __ior__(self, other):
                 return (self, "ior", other)
+
             def __iand__(self, other):
                 return (self, "iand", other)
+
             def __ixor__(self, other):
                 return (self, "ixor", other)
+
             def __imatmul__(self, other):
                 return (self, "imatmul", other)
 
@@ -690,8 +731,10 @@ class NativeClassTypesTests(unittest.TestCase):
         class ClassWithReprAndStr(Class):
             def __repr__(self):
                 return "repr"
+
             def __str__(self):
                 return "str"
+
             def __hash__(self):
                 return 300
 

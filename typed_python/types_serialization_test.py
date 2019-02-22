@@ -456,6 +456,7 @@ class TypesSerializationTest(unittest.TestCase):
         ts = SerializationContext({'A': A})
 
         OK = []
+
         def thread():
             t0 = time.time()
             while time.time() - t0 < 1.0:
@@ -915,6 +916,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_nested_names(self):
         global Nested
+
         class Nested:
             class A:
                 class B:

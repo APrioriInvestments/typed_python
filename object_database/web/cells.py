@@ -430,6 +430,7 @@ class Cell:
 
     def findChildrenMatching(self, filter):
         res = []
+
         def visitor(cell):
             if filter(cell):
                 res.append(cell)
@@ -1361,6 +1362,7 @@ class Table(Cell):
             col = self.cols[sc]
 
             keymemo = {}
+
             def key(row):
                 if row not in keymemo:
                     try:
@@ -1398,6 +1400,7 @@ class Table(Cell):
             return Octicon("arrow-up" if not self.sortColumnAscending.get() else "arrow-down")
 
         cell = Cell.makeCell(self.headerFun(col)).nowrap() + Padding() + Subscribed(icon).nowrap()
+
         def onClick():
             if self.sortColumn.get() == col_ix:
                 self.sortColumnAscending.set(not self.sortColumnAscending.get())

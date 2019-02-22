@@ -224,6 +224,7 @@ class SerializationContext(object):
             representation["module"] = inst.__module__
 
             all_names = set()
+
             def walkCodeObject(code):
                 all_names.update(code.co_names)
                 #there are 'code' objects for embedded list comprehensions.

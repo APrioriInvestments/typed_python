@@ -847,6 +847,7 @@ class NativeTypesTests(unittest.TestCase):
         class X(NamedTuple(x=int, y=int)):
             def __str__(self):
                 return "str override"
+
             def __repr__(self):
                 return "repr override"
 
@@ -1070,6 +1071,7 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_subclassing(self):
         BaseTuple = NamedTuple(x=int, y=float)
+
         class NTSubclass(BaseTuple):
             def f(self):
                 return self.x + self.y

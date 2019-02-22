@@ -80,6 +80,7 @@ def sort_by_value(histogram, topK=None, filterFn=None):
 
 def log_cells_stats(cells, logger, indentation=0):
     indent = " " * indentation
+
     def log(msg):
         logger(indent + msg)
 
