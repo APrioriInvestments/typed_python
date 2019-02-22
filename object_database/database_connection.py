@@ -23,7 +23,8 @@ from typed_python.SerializationContext import SerializationContext
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 from typed_python import Alternative
 
-import typed_python, object_database
+import typed_python
+import object_database
 
 import queue
 import threading
