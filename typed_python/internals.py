@@ -84,7 +84,7 @@ class ClassMetaNamespace:
 
     def __setitem__(self, k, v):
         self.ns[k] = v
-        self.order.append((k,v))
+        self.order.append((k, v))
 
 
 def makeFunction(name, f, firstArgType=None):
@@ -143,7 +143,7 @@ class ClassMetaclass(type):
 
     def __new__(cls, name, bases, namespace, **kwds):
         if not bases:
-            return type.__new__(cls, name,bases, namespace.ns, **kwds)
+            return type.__new__(cls, name, bases, namespace.ns, **kwds)
 
         members = []
         memberFunctions = {}
@@ -241,4 +241,4 @@ class DisableCompiledCode:
 
 
 def makeNamedTuple(**kwargs):
-    return NamedTuple(**{k:type(v) for k,v in kwargs.items()})(kwargs)
+    return NamedTuple(**{k: type(v) for k, v in kwargs.items()})(kwargs)

@@ -175,7 +175,7 @@ class SubprocessServiceManager(ServiceManager):
                         with open(fpath, "r") as f:
                             f.seek(0, 2)
                             curPos = f.tell()
-                            f.seek(max(curPos-maxBytes,0))
+                            f.seek(max(curPos-maxBytes, 0))
 
                             return f.read()
 

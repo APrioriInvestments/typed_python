@@ -34,18 +34,18 @@ class ListOfWrapper(TupleOrListOfWrapper):
     def convert_len_native(self, expr):
         if isinstance(expr, TypedExpression):
             expr = expr.nonref_expr
-        return expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
+        return expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
 
     def convert_reserved_native(self, expr):
         if isinstance(expr, TypedExpression):
             expr = expr.nonref_expr
-        return expr.ElementPtrIntegers(0,3).load().cast(native_ast.Int64)
+        return expr.ElementPtrIntegers(0, 3).load().cast(native_ast.Int64)
 
     def convert_reserved(self, context, expr):
-        return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0,3).load().cast(native_ast.Int64))
+        return context.pushPod(int, expr.nonref_expr.ElementPtrIntegers(0, 3).load().cast(native_ast.Int64))
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("copy", "resize","reserve","reserved","append","clear","pop","setSizeUnsafe","pointerUnsafe"):
+        if attr in ("copy", "resize", "reserve", "reserved", "append", "clear", "pop", "setSizeUnsafe", "pointerUnsafe"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -89,7 +89,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
 
                 return context.pushPod(
                     PointerTo(self.typeRepresentation.ElementType),
-                    instance.nonref_expr.ElementPtrIntegers(0,4).load().cast(
+                    instance.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                         self.underlyingWrapperType.getNativeLayoutType().pointer()
                         ).elemPtr(count.nonref_expr)
                     )
@@ -222,18 +222,18 @@ class ListOfWrapper(TupleOrListOfWrapper):
             )
 
         context.pushEffect(
-            inst.nonref_expr.ElementPtrIntegers(0,2).store(
-                inst.nonref_expr.ElementPtrIntegers(0,2).load().add(native_ast.const_int32_expr(-1))
+            inst.nonref_expr.ElementPtrIntegers(0, 2).store(
+                inst.nonref_expr.ElementPtrIntegers(0, 2).load().add(native_ast.const_int32_expr(-1))
                 )
             )
 
-        data = inst.nonref_expr.ElementPtrIntegers(0,4).load()
+        data = inst.nonref_expr.ElementPtrIntegers(0, 4).load()
 
         context.pushEffect(
             runtime_functions.memmove.call(
                 data.elemPtr(ix * self.underlyingWrapperType.getBytecount()),
                 data.elemPtr((ix+1) * self.underlyingWrapperType.getBytecount()),
-                inst.nonref_expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64).sub(ix.nonref_expr).mul(
+                inst.nonref_expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64).sub(ix.nonref_expr).mul(
                     self.underlyingWrapperType.getBytecount()
                     )
                 )
@@ -271,7 +271,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                     listInst.convert_getitem_unsafe(i+countInst).convert_destroy()
 
         context.pushEffect(
-            listInst.nonref_expr.ElementPtrIntegers(0,2).store(countInst.nonref_expr.cast(native_ast.Int32))
+            listInst.nonref_expr.ElementPtrIntegers(0, 2).store(countInst.nonref_expr.cast(native_ast.Int32))
             )
 
     def generateAppend(self, context, out, listInst, arg):
@@ -282,7 +282,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
         listInst.convert_getitem_unsafe(listInst.convert_len()).convert_copy_initialize(arg)
 
         context.pushEffect(
-            listInst.nonref_expr.ElementPtrIntegers(0,2).store((listInst.convert_len()+1).nonref_expr.cast(native_ast.Int32))
+            listInst.nonref_expr.ElementPtrIntegers(0, 2).store((listInst.convert_len()+1).nonref_expr.cast(native_ast.Int32))
             )
 
     def generateCopy(self, context, out, listInst):
@@ -306,16 +306,16 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 context.pushEffect(countInst.expr.store(listInst.convert_len().nonref_expr))
 
         context.pushEffect(
-            listInst.nonref_expr.ElementPtrIntegers(0,4).store(
+            listInst.nonref_expr.ElementPtrIntegers(0, 4).store(
                 runtime_functions.realloc.call(
-                    listInst.nonref_expr.ElementPtrIntegers(0,4).load(),
+                    listInst.nonref_expr.ElementPtrIntegers(0, 4).load(),
                     countInst.nonref_expr.mul(self.underlyingWrapperType.getBytecount())
                     )
                 )
             )
 
         context.pushEffect(
-            listInst.nonref_expr.ElementPtrIntegers(0,3).store(countInst.nonref_expr.cast(native_ast.Int32))
+            listInst.nonref_expr.ElementPtrIntegers(0, 3).store(countInst.nonref_expr.cast(native_ast.Int32))
             )
 
     def generateReserved(self, context, out, listInst):
@@ -337,11 +337,11 @@ class ListOfWrapper(TupleOrListOfWrapper):
             out.expr.store(
                 runtime_functions.malloc.call(28).cast(self.getNativeLayoutType())
                 )
-            >> out.nonref_expr.ElementPtrIntegers(0,0).store(native_ast.const_int_expr(1)) #refcount
-            >> out.nonref_expr.ElementPtrIntegers(0,1).store(native_ast.const_int32_expr(-1)) #hash cache
-            >> out.nonref_expr.ElementPtrIntegers(0,2).store(native_ast.const_int32_expr(0)) #count
-            >> out.nonref_expr.ElementPtrIntegers(0,3).store(native_ast.const_int32_expr(1)) #reserved
-            >> out.nonref_expr.ElementPtrIntegers(0,4).store(
+            >> out.nonref_expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) #refcount
+            >> out.nonref_expr.ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) #hash cache
+            >> out.nonref_expr.ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0)) #count
+            >> out.nonref_expr.ElementPtrIntegers(0, 3).store(native_ast.const_int32_expr(1)) #reserved
+            >> out.nonref_expr.ElementPtrIntegers(0, 4).store(
                 runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())
                 ) #data
             )

@@ -25,39 +25,39 @@ def Compiled(f):
 In = OneOf(int, float)
 Out = OneOf(int, float, bool)
 
-def add(x:In,y:In)->Out:
+def add(x: In, y: In)->Out:
     return x+y
-def sub(x:In,y:In)->Out:
+def sub(x: In, y: In)->Out:
     return x-y
-def mul(x:In,y:In)->Out:
+def mul(x: In, y: In)->Out:
     return x*y
-def div(x:In,y:In)->Out:
+def div(x: In, y: In)->Out:
     return x/y
-def mod(x:In,y:In)->Out:
+def mod(x: In, y: In)->Out:
     return x%y
-def lshift(x:In,y:In)->Out:
+def lshift(x: In, y: In)->Out:
     return x << y
-def rshift(x:In,y:In)->Out:
+def rshift(x: In, y: In)->Out:
     return x >> y
-def pow(x:In,y:In)->Out:
+def pow(x: In, y: In)->Out:
     return x ** y
-def bitxor(x:In,y:In)->Out:
+def bitxor(x: In, y: In)->Out:
     return x ^ y
-def bitand(x:In,y:In)->Out:
+def bitand(x: In, y: In)->Out:
     return x&y
-def bitor(x:In,y:In)->Out:
+def bitor(x: In, y: In)->Out:
     return x|y
-def less(x:In,y:In)->Out:
+def less(x: In, y: In)->Out:
     return x<y
-def greater(x:In,y:In)->Out:
+def greater(x: In, y: In)->Out:
     return x>y
-def lessEq(x:In,y:In)->Out:
+def lessEq(x: In, y: In)->Out:
     return x<=y
-def greaterEq(x:In,y:In)->Out:
+def greaterEq(x: In, y: In)->Out:
     return x>=y
-def eq(x:In,y:In)->Out:
+def eq(x: In, y: In)->Out:
     return x == y
-def neq(x:In,y:In)->Out:
+def neq(x: In, y: In)->Out:
     return x != y
 
 class TestArithmeticCompilation(unittest.TestCase):
@@ -81,18 +81,18 @@ class TestArithmeticCompilation(unittest.TestCase):
         failures = 0
         successes = 0
 
-        for f in [add,sub,mul,div,mod,lshift,rshift,
-                    pow,bitxor,bitand,bitor,less,
-                    greater,lessEq,greaterEq,eq,neq]:
+        for f in [add, sub, mul, div, mod, lshift, rshift,
+                    pow, bitxor, bitand, bitor, less,
+                    greater, lessEq, greaterEq, eq, neq]:
             if f in [pow]:
-                lvals = range(-5,5)
+                lvals = range(-5, 5)
                 rvals = range(5)
 
                 lvals = list(lvals) + [x * 1 for x in lvals]
                 rvals = list(rvals) + [x * 1 for x in rvals]
 
             else:
-                lvals = list(range(-20,20))
+                lvals = list(range(-20, 20))
                 rvals = lvals
 
                 lvals = list(lvals) + [x / 3 for x in lvals]
@@ -103,12 +103,12 @@ class TestArithmeticCompilation(unittest.TestCase):
             for val1 in lvals:
                 for val2 in rvals:
                     try:
-                        pyVal = f(val1,val2)
+                        pyVal = f(val1, val2)
                     except Exception:
                         pyVal = "Exception"
 
                     try:
-                        llvmVal = f_fast(val1,val2)
+                        llvmVal = f_fast(val1, val2)
                     except Exception:
                         llvmVal = "Exception"
 

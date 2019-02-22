@@ -44,8 +44,8 @@ class TestBytesCompilation(unittest.TestCase):
 
         for s in someBytes:
             for s2 in someBytes:
-                self.assertEqual(s, takeFirst(s,s2))
-                self.assertEqual(s2, takeSecond(s,s2))
+                self.assertEqual(s, takeFirst(s, s2))
+                self.assertEqual(s2, takeSecond(s, s2))
 
     def test_bytes_len(self):
         @Compiled
@@ -66,8 +66,8 @@ class TestBytesCompilation(unittest.TestCase):
 
         for s in someBytes:
             for s2 in someBytes:
-                self.assertEqual(s+s2, concat(s,s2))
-                self.assertEqual(len(s+s2), concatLen(s,s2))
+                self.assertEqual(s+s2, concat(s, s2))
+                self.assertEqual(len(s+s2), concatLen(s, s2))
 
     def test_bytes_constants(self):
         def makeConstantConcatenator(s):
@@ -79,7 +79,7 @@ class TestBytesCompilation(unittest.TestCase):
             f = Compiled(makeConstantConcatenator(s))
             s_from_code = f()
 
-            self.assertEqual(s, s_from_code, (repr(s),repr(s_from_code)))
+            self.assertEqual(s, s_from_code, (repr(s), repr(s_from_code)))
 
     def test_bytes_getitem(self):
         @Compiled
@@ -94,7 +94,7 @@ class TestBytesCompilation(unittest.TestCase):
 
         for s in someBytes:
             for i in range(-20, 20):
-                self.assertEqual(callOrExcept(getitem, s,i), callOrExcept(lambda s,i: s[i], s, i), (s,i))
+                self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
     def test_bytes_perf(self):
         def bytesAdd(x: bytes):

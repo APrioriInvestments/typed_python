@@ -59,12 +59,12 @@ class TestCompilationStructures(unittest.TestCase):
         def f(x: int, y: int, z: int) -> bool:
             return x and y and z
 
-        self.assertEqual(f(0,1,1), False)
-        self.assertEqual(f(0,0,1), False)
-        self.assertEqual(f(0,0,0), False)
-        self.assertEqual(f(1,0,0), False)
-        self.assertEqual(f(1,1,0), False)
-        self.assertEqual(f(1,1,1), True)
+        self.assertEqual(f(0, 1, 1), False)
+        self.assertEqual(f(0, 0, 1), False)
+        self.assertEqual(f(0, 0, 0), False)
+        self.assertEqual(f(1, 0, 0), False)
+        self.assertEqual(f(1, 1, 0), False)
+        self.assertEqual(f(1, 1, 1), True)
 
     def test_object_to_int_conversion(self):
         @Compiled
@@ -143,17 +143,17 @@ class TestCompilationStructures(unittest.TestCase):
                 x = t
             return x
 
-        self.assertEqual(f(1, (1,2,3)), (1,2,3))
+        self.assertEqual(f(1, (1, 2, 3)), (1, 2, 3))
 
         with self.assertRaisesRegex(Exception, "local variable 'x' referenced before assignment"):
-            self.assertEqual(f(0, (1,2,3)), (1,2,3))
+            self.assertEqual(f(0, (1, 2, 3)), (1, 2, 3))
 
     def test_return_from_function_without_return_value_specified(self):
         @Compiled
         def f(t: TupleOf(int)):
             return t
 
-        self.assertEqual(f((1,2,3)), (1,2,3))
+        self.assertEqual(f((1, 2, 3)), (1, 2, 3))
 
     def test_return_from_function_with_bad_convert_throws(self):
         @Compiled
@@ -161,7 +161,7 @@ class TestCompilationStructures(unittest.TestCase):
             return t
 
         with self.assertRaisesRegex(Exception, "Can't convert"):
-            f((1,2,3))
+            f((1, 2, 3))
 
     def test_mutually_recursive_untyped_functions(self):
         def q(x):
@@ -257,17 +257,17 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(g(1), None)
 
     def test_interleaving_nones(self):
-        def f(x,y,z):
+        def f(x, y, z):
             x+z
             return y
 
         @Function
         def works(x: int):
-            return f(x,None,x)
+            return f(x, None, x)
 
         @Function
         def throws(x: int):
-            return f(None,None,x)
+            return f(None, None, x)
 
         Runtime.singleton().compile(works)
         Runtime.singleton().compile(throws)

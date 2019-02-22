@@ -29,7 +29,7 @@ def quoteForJs(string, quoteType):
         return string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
 
 def multiReplace(msg, replacements):
-    for k,v in replacements.items():
+    for k, v in replacements.items():
         assert k[:4] == "____", k
 
     chunks = msg.split("____")
@@ -58,7 +58,7 @@ def augmentToBeUnique(listOfItems):
     output = []
     for x in listOfItems:
         counts[x] = counts.setdefault(x, 0) + 1
-        output.append((x,counts[x]-1))
+        output.append((x, counts[x]-1))
 
     return output
 
@@ -415,7 +415,7 @@ class Cell:
             return cells
 
         for child in self.children:
-            cells.extend(self.children[child].findChildrenByTag(tag,stopSearchingAtTag,False))
+            cells.extend(self.children[child].findChildrenByTag(tag, stopSearchingAtTag, False))
 
         return cells
 
@@ -577,7 +577,7 @@ class Cell:
 
     @staticmethod
     def makeCell(x):
-        if isinstance(x,(str, float, int, bool)):
+        if isinstance(x, (str, float, int, bool)):
             return Text(str(x), x)
         if x is None:
             return Span("")
@@ -1153,15 +1153,15 @@ class Grid(Cell):
 
         for col_ix, col in enumerate(self.cols):
             seen.add((None, col))
-            if (None,col) in self.existingItems:
-                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None,col)]
+            if (None, col) in self.existingItems:
+                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None, col)]
             else:
                 try:
-                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col[0]))
+                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col[0]))
                 except SubscribeAndRetry:
                     raise
                 except Exception:
-                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
+                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
 
         if self.rowLabelFun is not None:
             for row_ix, row in enumerate(self.rows):
@@ -1179,16 +1179,16 @@ class Grid(Cell):
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
-                seen.add((row,col))
-                if (row,col) in self.existingItems:
-                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row,col)]
+                seen.add((row, col))
+                if (row, col) in self.existingItems:
+                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row, col)]
                 else:
                     try:
-                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row[0],col[0]))
+                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row[0], col[0]))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
+                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
 
         self.children = new_children
 
@@ -1265,7 +1265,7 @@ class SingleLineTextBox(Cell):
                 >
             """.replace("__style__", self._divStyle())
                .replace("__identity__", self.identity)
-               .replace("__contents__", quoteForJs(self.slot.get(),'"'))
+               .replace("__contents__", quoteForJs(self.slot.get(), '"'))
                .replace("__pat__", "" if not self.pattern else quoteForJs(self.pattern, '"'))
                .replace("__sytle__", self._divStyle())
             )
@@ -1302,7 +1302,7 @@ class Table(Cell):
 
     def cachedRenderFun(self, row, col):
         if (row, col) in self.existingItems:
-            return self.existingItems[row,col]
+            return self.existingItems[row, col]
         else:
             return self.rendererFun(row, col)
 
@@ -1347,7 +1347,7 @@ class Table(Cell):
 
                 return keymemo[row]
 
-            rows = sorted(rows,key=key)
+            rows = sorted(rows, key=key)
 
             if not self.sortColumnAscending.get():
                 rows = list(reversed(rows))
@@ -1418,29 +1418,29 @@ class Table(Cell):
 
         for col_ix, col in enumerate(self.cols):
             seen.add((None, col))
-            if (None,col) in self.existingItems:
-                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None,col)]
+            if (None, col) in self.existingItems:
+                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None, col)]
             else:
                 try:
-                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = self.makeHeaderCell(col_ix)
+                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = self.makeHeaderCell(col_ix)
                 except SubscribeAndRetry:
                     raise
                 except Exception:
-                    self.existingItems[(None,col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
+                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
 
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
-                seen.add((row,col))
-                if (row,col) in self.existingItems:
-                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row,col)]
+                seen.add((row, col))
+                if (row, col) in self.existingItems:
+                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row, col)]
                 else:
                     try:
-                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row,col))
+                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row, col))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[(row,col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
+                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
 
         self.children = new_children
 
@@ -1520,7 +1520,7 @@ class Clickable(Cell):
 
     def onMessage(self, msgFrame):
         val = self.f()
-        if isinstance(val,str):
+        if isinstance(val, str):
             self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(val, "'")), '"'))
         
 class Button(Clickable):
@@ -1631,7 +1631,7 @@ class CodeEditor(Cell):
         You may call 'setContents' to override the current contents.
         """
         super().__init__()
-        self._slot = Slot((0,""))
+        self._slot = Slot((0, ""))
         self._onmessage = onmessage
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
@@ -1841,7 +1841,7 @@ class Sheet(Cell):
 
             """.replace("__identity__", self._identity
                 ).replace("__rows__", str(self.rowCount)
-                ).replace("__column_names__", ",".join('"%s"' % quoteForJs(x,'"') for x in self.columnNames)
+                ).replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames)
                 ).replace("__col_width__", json.dumps(self.colWidth)
                 )
 
@@ -1852,7 +1852,7 @@ class Sheet(Cell):
             return
 
         rows = []
-        for rowToRender in range(max(0,row-100), min(row+100, self.rowCount)):
+        for rowToRender in range(max(0, row-100), min(row+100, self.rowCount)):
             if rowToRender not in self.rowsSent:
                 self.rowsSent.add(rowToRender)
                 rows.append(rowToRender)
@@ -1938,11 +1938,11 @@ class Plot(Cell):
 
     def onMessage(self, msgFrame):
         d = msgFrame['data']
-        curVal = self.curXYRanges.get() or ((None, None), (None,None))
+        curVal = self.curXYRanges.get() or ((None, None), (None, None))
 
         self.curXYRanges.set(
-            ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]',curVal[0][1])),
-             (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]',curVal[1][1])))
+            ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]', curVal[0][1])),
+             (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
             )
 
 class _PlotUpdater(Cell):
@@ -1986,7 +1986,7 @@ class _PlotUpdater(Cell):
             assert isinstance(data, dict)
             res = dict(data)
 
-            for k,v in res.items():
+            for k, v in res.items():
                 if isinstance(v, numpy.ndarray):
                     res[k] = v.astype('float64').tostring().hex()
 

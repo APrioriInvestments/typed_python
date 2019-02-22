@@ -42,7 +42,7 @@ def makeSomeValues(dtype, count=10):
             v = str(i)
         else:
             v = i
-        res = res + {k:v}
+        res = res + {k: v}
 
     return res
 
@@ -84,7 +84,7 @@ class TestConstDictCompilation(unittest.TestCase):
             bigger_d = makeSomeValues(dtype, 20)
 
             for key in bigger_d:
-                self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d,key)))
+                self.assertEqual(callOrExpr(lambda: d[key]), callOrExpr(lambda: compiledGetItem(d, key)))
 
     def test_const_dict_contains(self):
         for dtype in dictTypes:
@@ -100,11 +100,11 @@ class TestConstDictCompilation(unittest.TestCase):
             bigger_d = makeSomeValues(dtype, 20)
 
             for key in bigger_d:
-                self.assertEqual(key in d, compiledIn(d,key))
-                self.assertEqual(key not in d, compiledNotIn(d,key))
+                self.assertEqual(key in d, compiledIn(d, key))
+                self.assertEqual(key not in d, compiledNotIn(d, key))
 
     def test_const_dict_loops(self):
-        def loop(x: ConstDict(int,int)):
+        def loop(x: ConstDict(int, int)):
             res = 0
             i = 0
             while i < len(x):

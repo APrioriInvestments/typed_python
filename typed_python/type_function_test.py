@@ -96,7 +96,7 @@ class TypeFunctionTest(unittest.TestCase):
         list_of_list = List(list_of_int)
 
         l = list_of_int.Empty()
-        l_l = list_of_list.Node(head=l,tail=list_of_list.Empty())
+        l_l = list_of_list.Node(head=l, tail=list_of_list.Empty())
 
         self.assertEqual(
             context.deserialize(context.serialize(l_l)),

@@ -141,13 +141,13 @@ class CellsTests(unittest.TestCase):
         self.cells.renderMessages()
 
         with self.db.transaction():
-            Thing(x=1,k=1)
-            Thing(x=2,k=2)
+            Thing(x=1, k=1)
+            Thing(x=2, k=2)
 
         self.cells._recalculateCells()
 
         with self.db.transaction():
-            Thing(x=3,k=3)
+            Thing(x=3, k=3)
 
         # three 'Span', three 'Text', the Sequence, the Subscribed, and a delete
         self.assertEqual(len(self.cells.renderMessages()), 9)
@@ -200,7 +200,7 @@ class CellsTests(unittest.TestCase):
         for i in range(100):
             with self.db.transaction():
                 thing.k = 1
-                thing = Thing(x=i,k=0)
+                thing = Thing(x=i, k=0)
 
                 for anything in Thing.lookupAll():
                     anything.x = anything.x + 1

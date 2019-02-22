@@ -65,13 +65,13 @@ class BytesWrapper(RefcountedWrapper):
 
         len_expr = self.convert_len(context, expr)
 
-        with context.ifelse((item.nonref_expr.lt(len_expr.nonref_expr.negate())).bitor(item.nonref_expr.gte(len_expr.nonref_expr))) as (true,false):
+        with context.ifelse((item.nonref_expr.lt(len_expr.nonref_expr.negate())).bitor(item.nonref_expr.gte(len_expr.nonref_expr))) as (true, false):
             with true:
                 context.pushException(IndexError, "index out of range")
 
         return context.pushPod(
             int,
-            expr.nonref_expr.ElementPtrIntegers(0,1).elemPtr(
+            expr.nonref_expr.ElementPtrIntegers(0, 1).elemPtr(
                 native_ast.Expression.Branch(
                     cond=item.nonref_expr.lt(native_ast.const_int_expr(0)),
                     false=item.nonref_expr,
@@ -84,7 +84,7 @@ class BytesWrapper(RefcountedWrapper):
         return native_ast.Expression.Branch(
                 cond=expr,
                 false=native_ast.const_int_expr(0),
-                true=expr.ElementPtrIntegers(0,1).ElementPtrIntegers(4).cast(native_ast.Int32.pointer()).load().cast(native_ast.Int64)
+                true=expr.ElementPtrIntegers(0, 1).ElementPtrIntegers(4).cast(native_ast.Int32.pointer()).load().cast(native_ast.Int64)
                 )
 
     def convert_len(self, context, expr):

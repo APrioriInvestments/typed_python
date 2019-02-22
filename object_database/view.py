@@ -414,7 +414,7 @@ class View(object):
                 if isinstance(val, tuple) and len(val) == 2 and isinstance(val[0], type):
                     return SerializedDatabaseValue(
                         serialize(val[0], val[1], self.serializationContext),
-                        {self.serializationContext:val[1]}
+                        {self.serializationContext: val[1]}
                         )
 
                 elif val is None:
@@ -439,8 +439,8 @@ class View(object):
 
             self._db._set_versioned_object_data(
                 writes,
-                {k:v for k,v in self._set_adds.items() if v},
-                {k:v for k,v in self._set_removes.items() if v},
+                {k: v for k, v in self._set_adds.items() if v},
+                {k: v for k, v in self._set_removes.items() if v},
                 self._reads.union(set(writes)) if self._insistReadsConsistent
                     else set(writes) if self._insistWritesConsistent
                     else set(),
@@ -512,7 +512,7 @@ class Transaction(View):
         This function modifies the view, and the semantics are only in place at
         commit time.
         """
-        assert sum(int(i) for i in (reads,writes,full,none)) == 1, "Please set exactly one option"
+        assert sum(int(i) for i in (reads, writes, full, none)) == 1, "Please set exactly one option"
 
         self._insistReadsConsistent = bool(reads or full)
         self._insistWritesConsistent = bool(writes or reads or full)

@@ -78,7 +78,7 @@ class FunctionConversionContext(object):
         if return_type.is_pass_by_ref:
             return (
                 native_ast.Function(
-                    args=(('.return',return_type.getNativeLayoutType().pointer()),) + tuple(self._native_args),
+                    args=(('.return', return_type.getNativeLayoutType().pointer()),) + tuple(self._native_args),
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=native_ast.Void
                     ),
@@ -363,7 +363,7 @@ class FunctionConversionContext(object):
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
             return (
-                native_ast.Expression.Branch(cond=cond_context.finalize(cond.nonref_expr),true=true,false=false),
+                native_ast.Expression.Branch(cond=cond_context.finalize(cond.nonref_expr), true=true, false=false),
                 true_returns or false_returns
                 )
 
@@ -386,7 +386,7 @@ class FunctionConversionContext(object):
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
             return (
-                native_ast.Expression.While(cond=cond_context.finalize(cond.nonref_expr),while_true=true,orelse=false),
+                native_ast.Expression.While(cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false),
                 true_returns or false_returns
                 )
 
@@ -425,7 +425,7 @@ class FunctionConversionContext(object):
 
             return (
                 iterator_setup_context.finalize(None) >>
-                native_ast.Expression.While(cond=cond_context.finalize(is_populated),while_true=true,orelse=false),
+                native_ast.Expression.While(cond=cond_context.finalize(is_populated), while_true=true, orelse=false),
                 true_returns or false_returns
                 )
 
@@ -463,7 +463,7 @@ class FunctionConversionContext(object):
             exprAndReturns.append(self.convert_statement_ast(python_ast.Statement.Return(value=None, filename="", line_number=0, col_offset=0)))
 
         seq_expr = native_ast.Expression.Sequence(
-            vals=[expr for expr,_ in exprAndReturns]
+            vals=[expr for expr, _ in exprAndReturns]
             )
 
         return seq_expr, flows_off_end
@@ -489,7 +489,7 @@ class FunctionConversionContext(object):
                         #we can just copy this into the stackslot directly. no destructor needed
                         context.pushEffect(
                             native_ast.Expression.Store(
-                                ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
+                                ptr=native_ast.Expression.StackSlot(name=name, type=slot_type.getNativeLayoutType()),
                                 val=native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
                                     native_ast.Expression.Variable(name=name).load()
                                 )

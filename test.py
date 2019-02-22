@@ -149,14 +149,14 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             default=None
             )
 
-    def parse_args(self,toParse):
-        argholder = super(PythonTestArgumentParser,self).parse_args(toParse)
+    def parse_args(self, toParse):
+        argholder = super(PythonTestArgumentParser, self).parse_args(toParse)
 
         args = None
         if 'ordered_actions' in argholder:
             args = []
-            for arg,l in argholder.ordered_actions:
-                args.append((arg,l[0]))
+            for arg, l in argholder.ordered_actions:
+                args.append((arg, l[0]))
 
         return argholder, args
 

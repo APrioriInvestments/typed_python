@@ -70,7 +70,7 @@ class Ring:
             sum += r.k
             r = r.right
 
-        return count,sum
+        return count, sum
 
 
 class RingInvariantTest(unittest.TestCase):
@@ -98,7 +98,7 @@ class RingInvariantTest(unittest.TestCase):
             r = Ring.New()
             for i in range(10):
                 r.insert(i)
-                self.assertEqual(r.check(), (i+2,0))
+                self.assertEqual(r.check(), (i+2, 0))
 
     def test_ring_invariants_reader_writer(self):
         db = self.createNewDb()
@@ -119,8 +119,8 @@ class RingInvariantTest(unittest.TestCase):
 
             if k is not None:
                 assert lazy
-                db2.subscribeToType(schema.Ring,lazySubscription=True)
-                db2.subscribeToIndex(schema.Ring,k=k)
+                db2.subscribeToType(schema.Ring, lazySubscription=True)
+                db2.subscribeToIndex(schema.Ring, k=k)
             else:
                 db2.subscribeToSchema(schema)
 
@@ -135,7 +135,7 @@ class RingInvariantTest(unittest.TestCase):
 
             k = None if i % 5 != 3 or not isLazy else numpy.random.choice(10)
 
-            print("Pass ", i, 'isLazy=',isLazy,'k=',k)
+            print("Pass ", i, 'isLazy=', isLazy, 'k=', k)
 
             count, sum = checkSome(isLazy, k)
             self.assertEqual(count, i+2)

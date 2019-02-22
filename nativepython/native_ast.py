@@ -18,7 +18,7 @@ import textwrap
 def indent(x, indentBy="    "):
     return textwrap.indent(str(x), indentBy)
 
-def type_attr_ix(t,attr):
+def type_attr_ix(t, attr):
     for i in range(len(t.element_types)):
         if t.element_types[i][0] == attr:
             return i
@@ -38,7 +38,7 @@ def type_str(c):
     if c.matches.Struct:
         if c.name:
             return c.name
-        return "(" + ",".join("%s=%s"%(k,v) for k,v in c.element_types) + ")"
+        return "(" + ",".join("%s=%s"%(k, v) for k, v in c.element_types) + ")"
     if c.matches.Pointer:
         return "*" + str(c.value_type)
     if c.matches.Void:
@@ -64,9 +64,9 @@ Type = Alternative("Type",
     pointer=lambda self: Type.Pointer(value_type=self),
     zero=lambda self: Expression.Constant(
             Constant.Void() if self.matches.Void else
-            Constant.Float(val=0.0,bits=self.bits) if self.matches.Float else
-            Constant.Int(val=0,bits=self.bits,signed=self.signed) if self.matches.Int else
-            Constant.Struct(elements=[(name, t.zero()) for name,t in self.element_types]) if self.matches.Struct else
+            Constant.Float(val=0.0, bits=self.bits) if self.matches.Float else
+            Constant.Int(val=0, bits=self.bits, signed=self.signed) if self.matches.Int else
+            Constant.Struct(elements=[(name, t.zero()) for name, t in self.element_types]) if self.matches.Struct else
             Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
             raising(Exception("Can't make a zero value from %s" % self))
             )
@@ -92,7 +92,7 @@ def const_str(c):
         else:
             return str(c.val) + ("s" if c.signed else "u") + str(c.bits)
     if c.matches.Struct:
-        return "(" + ",".join("%s=%s"%(k,v) for k,v in c.elements) + ")"
+        return "(" + ",".join("%s=%s"%(k, v) for k, v in c.elements) + ")"
     if c.matches.NullPointer:
         return "nullptr"
     if c.matches.Void:
@@ -213,7 +213,7 @@ def expr_concatenate(self, other):
         return Expression.Sequence(vals=self.vals + (other,))
     if other.matches.Sequence:
         return Expression.Sequence(vals=TupleOf(Expression)((self,)) + other.vals)
-    return Expression.Sequence(vals=(self,other))
+    return Expression.Sequence(vals=(self, other))
 
 
 def expr_str(self):
@@ -266,10 +266,10 @@ def expr_str(self):
             return "if " + str(self.cond) + ":\n"\
                     + indent(t).rstrip() + ("\nelse:\n" + indent(f).rstrip() if self.false != nullExpr else "")
         else:
-            return "((%s) if %s else (%s))" % (t,str(self.cond),f)
+            return "((%s) if %s else (%s))" % (t, str(self.cond), f)
     if self.matches.MakeStruct:
         return "struct(" + \
-                ",".join("%s=%s" % (k,str(v)) for k,v in self.args)  + ")"
+                ",".join("%s=%s" % (k, str(v)) for k, v in self.args)  + ")"
     if self.matches.While:
         t = str(self.while_true)
         f = str(self.orelse)
@@ -357,7 +357,7 @@ Expression = Alternative("Expression",
     ElementPtr={'left': Expression, 'offsets': TupleOf(Expression)},
     Call={'target': CallTarget, 'args': TupleOf(Expression)},
     FunctionPointer={'target': NamedCallTarget},
-    MakeStruct={'args': TupleOf(Tuple(str,Expression))},
+    MakeStruct={'args': TupleOf(Tuple(str, Expression))},
     Branch={'cond': Expression,
                          'true': Expression,
                          'false': Expression
@@ -388,7 +388,7 @@ Expression = Alternative("Expression",
             left=self,
             offsets=tuple(
                 Expression.Constant(
-                        val=Constant.Int(bits=32,signed=True,val=index)
+                        val=Constant.Int(bits=32, signed=True, val=index)
                         )
                     for index in offsets
                 )
@@ -396,30 +396,30 @@ Expression = Alternative("Expression",
         ,
     __rshift__=expr_concatenate,
     __str__=expr_str,
-    structElt=lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
+    structElt=lambda self, ix: Expression.StructElementByIndex(left=self, index=ix),
     logical_not=lambda self: Expression.Unaryop(op=UnaryOp.LogicalNot(), operand=self),
     bitwise_not=lambda self: Expression.Unaryop(op=UnaryOp.BitwiseNot(), operand=self),
     negate=lambda self: Expression.Unaryop(op=UnaryOp.Negate(), operand=self),
-    sub=lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
-    add=lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
-    mul=lambda self, other: Expression.Binop(op=BinaryOp.Mul(), l=self,r=ensureExpr(other)),
-    div=lambda self, other: Expression.Binop(op=BinaryOp.Div(), l=self,r=ensureExpr(other)),
-    eq=lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self,r=ensureExpr(other)),
-    neq=lambda self, other: Expression.Binop(op=BinaryOp.NotEq(), l=self,r=ensureExpr(other)),
-    lt=lambda self, other: Expression.Binop(op=BinaryOp.Lt(), l=self,r=ensureExpr(other)),
-    gt=lambda self, other: Expression.Binop(op=BinaryOp.Gt(), l=self,r=ensureExpr(other)),
-    lte=lambda self, other: Expression.Binop(op=BinaryOp.LtE(), l=self,r=ensureExpr(other)),
-    gte=lambda self, other: Expression.Binop(op=BinaryOp.GtE(), l=self,r=ensureExpr(other)),
-    lshift=lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
-    rshift=lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
-    bitand=lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
-    bitor=lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self,r=ensureExpr(other)),
+    sub=lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self, r=ensureExpr(other)),
+    add=lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self, r=ensureExpr(other)),
+    mul=lambda self, other: Expression.Binop(op=BinaryOp.Mul(), l=self, r=ensureExpr(other)),
+    div=lambda self, other: Expression.Binop(op=BinaryOp.Div(), l=self, r=ensureExpr(other)),
+    eq=lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self, r=ensureExpr(other)),
+    neq=lambda self, other: Expression.Binop(op=BinaryOp.NotEq(), l=self, r=ensureExpr(other)),
+    lt=lambda self, other: Expression.Binop(op=BinaryOp.Lt(), l=self, r=ensureExpr(other)),
+    gt=lambda self, other: Expression.Binop(op=BinaryOp.Gt(), l=self, r=ensureExpr(other)),
+    lte=lambda self, other: Expression.Binop(op=BinaryOp.LtE(), l=self, r=ensureExpr(other)),
+    gte=lambda self, other: Expression.Binop(op=BinaryOp.GtE(), l=self, r=ensureExpr(other)),
+    lshift=lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self, r=ensureExpr(other)),
+    rshift=lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self, r=ensureExpr(other)),
+    bitand=lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self, r=ensureExpr(other)),
+    bitor=lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self, r=ensureExpr(other)),
     load=lambda self: Expression.Load(ptr=self),
     store=lambda self, val: Expression.Store(ptr=self, val=ensureExpr(val)),
     atomic_add=lambda self, val: Expression.AtomicAdd(ptr=self, val=ensureExpr(val)),
     cast=lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
     with_comment=lambda self, c: Expression.Comment(comment=c, expr=self),
-    elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self,offsets=[ensureExpr(e) for e in exprs]),
+    elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self, offsets=[ensureExpr(e) for e in exprs]),
     is_simple=expr_is_simple
     )
 
@@ -438,32 +438,32 @@ def ensureExpr(x):
 
 nullExpr = Expression.Constant(val=Constant.Void())
 emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
-trueExpr = Expression.Constant(val=Constant.Int(bits=1,val=1,signed=False))
-falseExpr = Expression.Constant(val=Constant.Int(bits=1,val=0,signed=False))
+trueExpr = Expression.Constant(val=Constant.Int(bits=1, val=1, signed=False))
+falseExpr = Expression.Constant(val=Constant.Int(bits=1, val=0, signed=False))
 
 def const_float_expr(f):
     return Expression.Constant(
-        val=Constant.Float(bits=64,val=f)
+        val=Constant.Float(bits=64, val=f)
         )
 
 def const_int_expr(i):
     return Expression.Constant(
-        val=Constant.Int(bits=64,val=i,signed=True)
+        val=Constant.Int(bits=64, val=i, signed=True)
         )
 
 def const_int32_expr(i):
     return Expression.Constant(
-        val=Constant.Int(bits=32,val=i,signed=True)
+        val=Constant.Int(bits=32, val=i, signed=True)
         )
 
 def const_uint8_expr(i):
     return Expression.Constant(
-        val=Constant.Int(bits=8,val=i,signed=False)
+        val=Constant.Int(bits=8, val=i, signed=False)
         )
 
 def const_bool_expr(i):
     return Expression.Constant(
-        val=Constant.Int(bits=1,val=i,signed=False)
+        val=Constant.Int(bits=1, val=i, signed=False)
         )
 
 def const_utf8_cstr(i):

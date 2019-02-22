@@ -116,7 +116,7 @@ class ConstDictWrapper(RefcountedWrapper):
             else:
                 return context.pushPod(bool, native_contains.call(left, right).logical_not())
 
-        return super().convert_bin_op(context,left,op,right)
+        return super().convert_bin_op(context, left, op, right)
 
     def convert_getitem(self, context, instance, item):
         item = item.convert_to_type(self.keyType)
@@ -197,7 +197,7 @@ class ConstDictWrapper(RefcountedWrapper):
         return native_ast.Expression.Branch(
                 cond=expr,
                 false=native_ast.const_int_expr(0),
-                true=expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
+                true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
                 )
 
     def convert_len(self, context, expr):

@@ -86,7 +86,7 @@ class Codebase:
     @staticmethod
     def _FromModule(module, **kwargs):
         if '.' in module.__name__:
-            prefix = module.__name__.rsplit(".",1)[0]
+            prefix = module.__name__.rsplit(".", 1)[0]
         else:
             prefix = None
 

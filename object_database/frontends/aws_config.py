@@ -119,8 +119,8 @@ def main(argv):
             for instance_type in sorted(set(list(booted) + list(targets))):
                 table.append([
                     instance_type,
-                    booted.get(instance_type,0),
-                    targets.get(instance_type,0)
+                    booted.get(instance_type, 0),
+                    targets.get(instance_type, 0)
                     ])
 
             print(formatTable(table))

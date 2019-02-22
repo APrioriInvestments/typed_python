@@ -38,7 +38,7 @@ class ClassWrapper(RefcountedWrapper):
         self.indexToByteOffset = {}
         self.classType = t
 
-        element_types = [('refcount', native_ast.Int64), ('data',native_ast.UInt8)]
+        element_types = [('refcount', native_ast.Int64), ('data', native_ast.UInt8)]
 
         #this follows the general layout of 'held class' which is 1 bit per field for initialization and then
         #each field packed directly according to byte size
@@ -46,13 +46,13 @@ class ClassWrapper(RefcountedWrapper):
 
         self.bytesOfInitBits = byteOffset - 8;
 
-        for i,name in enumerate(self.classType.MemberNames):
+        for i, name in enumerate(self.classType.MemberNames):
             self.nameToIndex[name] = i
             self.indexToByteOffset[i] = byteOffset
 
             byteOffset += _types.bytecount(self.classType.MemberTypes[i])
 
-        self.layoutType = native_ast.Type.Struct(element_types=element_types,name=t.__qualname__+"Layout").pointer()
+        self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -72,7 +72,7 @@ class ClassWrapper(RefcountedWrapper):
     def generateNativeDestructorFunction(self, context, out, instance):
         for i in range(len(self.typeRepresentation.MemberTypes)):
             if not typeWrapper(self.typeRepresentation.MemberTypes[i]).is_pod:
-                with context.ifelse(context.pushPod(bool,self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
+                with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, i))) as (true_block, false_block):
                     with true_block:
                         context.pushEffect(
                             self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
@@ -164,7 +164,7 @@ class ClassWrapper(RefcountedWrapper):
         else:
             member = context.pushReference(attr_type, self.memberPtr(instance, ix))
 
-            with context.ifelse(context.pushPod(bool,self.isInitializedNativeExpr(instance, ix))) as (true_block, false_block):
+            with context.ifelse(context.pushPod(bool, self.isInitializedNativeExpr(instance, ix))) as (true_block, false_block):
                 with true_block:
                     member.convert_assign(value)
                 with false_block:

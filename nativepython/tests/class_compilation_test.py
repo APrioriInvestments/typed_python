@@ -67,7 +67,7 @@ class AClassWithInit(Class):
 
 class TestClassCompilationCompilation(unittest.TestCase):
     def test_class_attribute(self):
-        a = AClass(x=10,y=20.5,z=(1,2,3))
+        a = AClass(x=10, y=20.5, z=(1, 2, 3))
 
         @Compiled
         def getX(a: AClass) -> int:
@@ -88,7 +88,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
     def test_class_set_attribute(self):
         a = AClass()
 
-        aTupleOfInt = TupleOf(int)((1,2,3))
+        aTupleOfInt = TupleOf(int)((1, 2, 3))
 
         @Compiled
         def setX(a: AClass, x: int) -> None:
@@ -112,7 +112,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aTupleOfInt), 2)
 
-        a.z = (1,2,3,4)
+        a.z = (1, 2, 3, 4)
 
         self.assertEqual(_types.refcount(aTupleOfInt), 1)
 
@@ -201,7 +201,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
     def test_compile_class_init(self):
         @Compiled
-        def f(x:int) -> AClassWithInit:
+        def f(x: int) -> AClassWithInit:
             return AClassWithInit(x, 22.0)
 
         self.assertEqual(f(10).x, 10)

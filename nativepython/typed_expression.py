@@ -148,7 +148,7 @@ class TypedExpression(object):
 
     @staticmethod
     def sugar_operator(left, right, opname):
-        if isinstance(right, (int,float,bool)):
+        if isinstance(right, (int, float, bool)):
             right = left.context.constant(right)
 
         if hasattr(BinaryOp, opname):

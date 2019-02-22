@@ -33,7 +33,7 @@ class RefcountedWrapper(Wrapper):
             native_ast.Expression.Branch(
                 cond=expr.nonref_expr,
                 false=native_ast.nullExpr,
-                true=expr.nonref_expr.ElementPtrIntegers(0,0).atomic_add(1) >> native_ast.nullExpr
+                true=expr.nonref_expr.ElementPtrIntegers(0, 0).atomic_add(1) >> native_ast.nullExpr
                 )
             )
 
@@ -56,7 +56,7 @@ class RefcountedWrapper(Wrapper):
                 cond=other,
                 false=expr.store(other),
                 true=expr.store(other) >>
-                    expr.load().ElementPtrIntegers(0,0).atomic_add(1) >>
+                    expr.load().ElementPtrIntegers(0, 0).atomic_add(1) >>
                     native_ast.nullExpr
                 )
             )
@@ -67,6 +67,6 @@ class RefcountedWrapper(Wrapper):
 
         with context.ifelse(targetExpr) as (true, false):
             with true:
-                with context.ifelse(targetExpr.ElementPtrIntegers(0,0).atomic_add(-1).eq(1)) as (subtrue, subfalse):
+                with context.ifelse(targetExpr.ElementPtrIntegers(0, 0).atomic_add(-1).eq(1)) as (subtrue, subfalse):
                     with subtrue:
                         context.pushEffect(self.on_refcount_zero(context, target))

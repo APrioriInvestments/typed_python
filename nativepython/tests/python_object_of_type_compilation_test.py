@@ -32,7 +32,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         def f(x):
             return x
 
-        for thing in [0,10,f,str]:
+        for thing in [0, 10, f, str]:
             self.assertIs(f(thing), thing)
 
     def test_can_assign(self):
@@ -41,7 +41,7 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             y = x
             return y
 
-        for thing in [0,10,f,str, HoldsAnA(10)]:
+        for thing in [0, 10, f, str, HoldsAnA(10)]:
             for i in range(10000):
                 self.assertIs(f(thing), thing)
 

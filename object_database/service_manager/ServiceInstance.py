@@ -192,7 +192,7 @@ class Service:
             self.name,
             type(obj).__schema__.name + "." + type(obj).__qualname__,
             obj._identity
-            ) + ("" if not queryParams else "?" + urllib.parse.urlencode({k:str(v) for k,v in queryParams.items()}))
+            ) + ("" if not queryParams else "?" + urllib.parse.urlencode({k: str(v) for k, v in queryParams.items()}))
 
     def findModuleSchemas(self):
         """Find all Schema objects in the same module as our type object."""

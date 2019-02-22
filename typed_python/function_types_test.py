@@ -47,8 +47,8 @@ class NativeFunctionTypesTests(unittest.TestCase):
         o = f.overloads[0]
 
         self.assertEqual(len(o.args), 5)
-        self.assertEqual([a.name for a in o.args], ['x','y','z','args','kwargs'])
-        self.assertEqual([a.typeFilter for a in o.args], [Int64, None, NoneType, TupleOf(float), ConstDict(str,float)])
+        self.assertEqual([a.name for a in o.args], ['x', 'y', 'z', 'args', 'kwargs'])
+        self.assertEqual([a.typeFilter for a in o.args], [Int64, None, NoneType, TupleOf(float), ConstDict(str, float)])
         self.assertEqual([a.defaultValue for a in o.args], [None, (30,), (None,), None, None])
         self.assertEqual([a.isStarArg for a in o.args], [False, False, False, True, False])
         self.assertEqual([a.isKwarg for a in o.args], [False, False, False, False, True])

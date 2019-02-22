@@ -112,8 +112,8 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
     server = subprocess.Popen(
         [sys.executable, os.path.join(ownDir, 'frontends', 'service_manager.py'),
             own_hostname, db_hostname, str(port), '--run_db',
-            '--source', os.path.join(tempDirectoryName,'source'),
-            '--storage', os.path.join(tempDirectoryName,'storage'),
+            '--source', os.path.join(tempDirectoryName, 'source'),
+            '--storage', os.path.join(tempDirectoryName, 'storage'),
             '--service-token', auth_token,
             '--shutdownTimeout', str(timeout / 2.0),
             '--log-level', loglevel_name

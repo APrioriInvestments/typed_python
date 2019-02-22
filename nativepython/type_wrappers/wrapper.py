@@ -148,7 +148,7 @@ class Wrapper(object):
     def convert_call(self, context, left, args, kwargs):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
             self,
-            ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k,str(v.expr_type)) for k,v in kwargs.items()])
+            ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
             ))
 
     def convert_len(self, context, expr):
@@ -202,5 +202,5 @@ class Wrapper(object):
             self,
             methodname,
             ",".join([str(a.expr_type) for a in args] +
-                ["%s=%s" % (k, str(v.expr_type)) for k,v in kwargs.items()])
+                ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
             ))

@@ -282,7 +282,7 @@ class ManyVersionedObjects:
         if key in self._versioned_objects:
             return self._versioned_objects[key].valueForVersion(version_number)
 
-        return SetWithEdits(set(),set(),set())
+        return SetWithEdits(set(), set(), set())
 
     def hasDataForKey(self, key):
         return key in self._versioned_objects
@@ -568,7 +568,7 @@ class DatabaseConnection:
         self.addSchema(t.__schema__)
 
         toSubscribe = []
-        for fieldname,fieldvalue in kwarg.items():
+        for fieldname, fieldvalue in kwarg.items():
             toSubscribe.append((
                 t.__schema__.name,
                 t.__qualname__,
@@ -674,14 +674,14 @@ class DatabaseConnection:
 
         schema = self._schemas.get(schema_name)
         if not schema:
-            return None,None
+            return None, None
 
         cls = schema._types.get(typename)
 
         if cls:
             return cls.fromIdentity(identity), fieldname
 
-        return None,None
+        return None, None
 
     def __str__(self):
         return "DatabaseConnection(%s)" % id(self)
@@ -734,7 +734,7 @@ class DatabaseConnection:
     def _suppressKey(self, k):
         keyname = schema, typename, ident, fieldname = keymapping.split_data_key(k)
 
-        subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema,typename))
+        subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema, typename))
 
         if subscriptionSet is Everything:
             return False
@@ -745,7 +745,7 @@ class DatabaseConnection:
     def _suppressIdentities(self, index_key, identities):
         schema, typename, fieldname, valhash = keymapping.split_index_key_full(index_key)
 
-        subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema,typename))
+        subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema, typename))
 
         if subscriptionSet is Everything:
             return identities
@@ -816,11 +816,11 @@ class DatabaseConnection:
                 key_value = {}
                 priors = {}
 
-                writes = {k:msg.writes[k] for k in msg.writes}
+                writes = {k: msg.writes[k] for k in msg.writes}
                 set_adds = {k: msg.set_adds[k] for k in msg.set_adds}
                 set_removes = {k: msg.set_removes[k] for k in msg.set_removes}
 
-                for k,val_serialized in writes.items():
+                for k, val_serialized in writes.items():
                     if not self._suppressKey(k):
                         key_value[k] = val_serialized
 
@@ -829,12 +829,12 @@ class DatabaseConnection:
                                     if val_serialized is not None else None
                             )
 
-                for k,a in set_adds.items():
+                for k, a in set_adds.items():
                     a = self._suppressIdentities(k, set(a))
 
                     self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, a, set())
 
-                for k,r in set_removes.items():
+                for k, r in set_removes.items():
                     r = self._suppressIdentities(k, set(r))
                     self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, set(), r)
 
@@ -869,7 +869,7 @@ class DatabaseConnection:
                 else:
                     assert not self._subscription_buildup[lookupTuple]['markedLazy'], 'received non-lazy data for a lazy subscription'
 
-                self._subscription_buildup[lookupTuple]['values'].update({k:msg.values[k] for k in msg.values})
+                self._subscription_buildup[lookupTuple]['values'].update({k: msg.values[k] for k in msg.values})
                 self._subscription_buildup[lookupTuple]['index_values'].update({k: msg.index_values[k] for k in msg.index_values})
 
                 if msg.identities is not None:
@@ -878,12 +878,12 @@ class DatabaseConnection:
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
         elif msg.matches.LazyTransactionPriors:
             with self._lock:
-                for k,v in msg.writes.items():
-                    self._versioned_data.setVersionedTailValueStringified(k,bytes.fromhex(v) if v is not None else None)
+                for k, v in msg.writes.items():
+                    self._versioned_data.setVersionedTailValueStringified(k, bytes.fromhex(v) if v is not None else None)
         elif msg.matches.LazyLoadResponse:
             with self._lock:
-                for k,v in msg.values.items():
-                    self._versioned_data.setVersionedTailValueStringified(k,bytes.fromhex(v) if v is not None else None)
+                for k, v in msg.values.items():
+                    self._versioned_data.setVersionedTailValueStringified(k, bytes.fromhex(v) if v is not None else None)
 
                 self._lazy_objects.pop(msg.identity, None)
 
@@ -950,7 +950,7 @@ class DatabaseConnection:
                     time.sleep(heartbeatInterval)
 
                 totalBytes = 0
-                for k,v in values.items():
+                for k, v in values.items():
                     if v is not None:
                         totalBytes += len(v)
 
@@ -1100,26 +1100,26 @@ class DatabaseConnection:
 
         out_writes = {}
 
-        for k,v in key_value.items():
+        for k, v in key_value.items():
             out_writes[k] = v.serializedByteRep.hex() if v.serializedByteRep is not None else None
             if len(out_writes) > 10000:
                 self._channel.write(
                     ClientToServer.TransactionData(writes=out_writes, set_adds={}, set_removes={},
-                        key_versions=(),index_versions=(), transaction_guid=transaction_guid)
+                        key_versions=(), index_versions=(), transaction_guid=transaction_guid)
                     )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_writes = {}
 
         ct = 0
         out_set_adds = {}
-        for k,v in set_adds.items():
+        for k, v in set_adds.items():
             out_set_adds[k] = tuple(v)
             ct += len(v)
 
             if len(out_set_adds) > 10000 or ct > 100000:
                 self._channel.write(
                     ClientToServer.TransactionData(writes={}, set_adds=out_set_adds, set_removes={},
-                        key_versions=(),index_versions=(), transaction_guid=transaction_guid)
+                        key_versions=(), index_versions=(), transaction_guid=transaction_guid)
                     )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_set_adds = {}
@@ -1127,14 +1127,14 @@ class DatabaseConnection:
 
         ct = 0
         out_set_removes = {}
-        for k,v in set_removes.items():
+        for k, v in set_removes.items():
             out_set_removes[k] = tuple(v)
             ct += len(v)
 
             if len(out_set_removes) > 10000 or ct > 100000:
                 self._channel.write(
                     ClientToServer.TransactionData(writes={}, set_adds={}, set_removes=out_set_removes,
-                        key_versions=(),index_versions=(), transaction_guid=transaction_guid)
+                        key_versions=(), index_versions=(), transaction_guid=transaction_guid)
                     )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_set_removes = {}
@@ -1144,7 +1144,7 @@ class DatabaseConnection:
         while len(keys_to_check_versions) > 10000:
             self._channel.write(
                 ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
-                    key_versions=keys_to_check_versions[:10000],index_versions=(), transaction_guid=transaction_guid)
+                    key_versions=keys_to_check_versions[:10000], index_versions=(), transaction_guid=transaction_guid)
                 )
             self._channel.write(ClientToServer.Heartbeat())
             keys_to_check_versions = keys_to_check_versions[10000:]
@@ -1153,7 +1153,7 @@ class DatabaseConnection:
         while len(indices_to_check_versions) > 10000:
             self._channel.write(
                 ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
-                    key_versions=(),index_versions=indices_to_check_versions[:10000], transaction_guid=transaction_guid)
+                    key_versions=(), index_versions=indices_to_check_versions[:10000], transaction_guid=transaction_guid)
                 )
             indices_to_check_versions = indices_to_check_versions[10000:]
 

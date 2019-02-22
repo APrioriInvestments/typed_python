@@ -187,8 +187,8 @@ class GraphDisplayService(ServiceBase):
         depth = Slot(50)
 
         return Tabs(
-            Overlay=Card(Plot(lambda: {'single_array': [1,2,3,1,2,3],
-                                'xy': {'x': [1,2,3,1,2,3], 'y': [4,5,6,7,8,9]},
+            Overlay=Card(Plot(lambda: {'single_array': [1, 2, 3, 1, 2, 3],
+                                'xy': {'x': [1, 2, 3, 1, 2, 3], 'y': [4, 5, 6, 7, 8, 9]},
                                 }
                     ).width(600).height(400) + Code("HI")
                 ),
@@ -197,19 +197,19 @@ class GraphDisplayService(ServiceBase):
                     rowFun=lambda: ['1', '2', '2'],
                     headerFun=lambda x: x,
                     rowLabelFun=None,
-                    rendererFun=lambda row,col: row+col
+                    rendererFun=lambda row, col: row+col
                     )
                 ,
             ASheet=Sheet(
-                ["A","B","C"],
+                ["A", "B", "C"],
                 1000000,
-                lambda rowIx: ["(%s) ts" % rowIx,rowIx,rowIx+1,rowIx+2]
+                lambda rowIx: ["(%s) ts" % rowIx, rowIx, rowIx+1, rowIx+2]
                 ).width('calc(100vw - 70px)').height('calc(100vh - 150px)'),
             Timestamps=Button("Add a point!", GraphDisplayService.addAPoint) +
                 Card(Plot(GraphDisplayService.chartData)).width(600).height(400) + Code("BYE"),
-            feigenbaum=Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
+            feigenbaum=Dropdown("Depth", [(val, depth.setter(val)) for val in [10, 50, 100, 250, 500, 750, 1000]]) +
                 Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
-                Dropdown("Density", list(range(100,10000,100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
+                Dropdown("Density", list(range(100, 10000, 100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
                 Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
             )
 
@@ -223,15 +223,15 @@ class GraphDisplayService(ServiceBase):
     @staticmethod
     def feigenbaum(linePlot, depth):
         if linePlot.curXYRanges.get() is None:
-            left,right = 0.0, 4.0
+            left, right = 0.0, 4.0
         else:
             left, right = linePlot.curXYRanges.get()[0]
-            left = max(0.0,left) if left is not None else 3
+            left = max(0.0, left) if left is not None else 3
             right = min(4.0, right) if right is not None else 4
-            left = min(left,right - 1e-6)
-            right = max(left + 1e-6,right)
+            left = min(left, right - 1e-6)
+            right = max(left + 1e-6, right)
 
-        values = numpy.linspace(left,right, Feigenbaum.lookupAny().density,endpoint=True)
+        values = numpy.linspace(left, right, Feigenbaum.lookupAny().density, endpoint=True)
 
         y = Feigenbaum.lookupAny().y
 
@@ -249,8 +249,8 @@ class GraphDisplayService(ServiceBase):
 
         fvals = feigenbaum(values)
 
-        return {"feigenbaum": {'x': numpy.concatenate([values]*(len(fvals)//len(values))), 'y': fvals, 'type':'scattergl',
-                'mode':'markers', 'opacity': .5, 'marker': {'size':2}}}
+        return {"feigenbaum": {'x': numpy.concatenate([values]*(len(fvals)//len(values))), 'y': fvals, 'type': 'scattergl',
+                'mode': 'markers', 'opacity': .5, 'marker': {'size': 2}}}
 
 
 happy = Schema("core.test.happy")
@@ -277,7 +277,7 @@ class HappyService(ServiceBase):
 
         return Card(
             Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) +
-            Expands(Text("Closed"),Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
+            Expands(Text("Closed"), Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
             ) + Button("go to google", "http://google.com/") + SubscribedSequence(
                 lambda: Happy.lookupAll(),
                 lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
@@ -591,7 +591,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         throughputs = []
 
-        for ct in [16,18,20,22,24,26,28,30,32,34,0]:
+        for ct in [16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 0]:
             with self.database.transaction():
                 ServiceManager.startService("TestService", ct)
 

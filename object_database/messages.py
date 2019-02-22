@@ -31,7 +31,7 @@ ClientToServer = Alternative(
     Subscribe={
         'schema': str,
         'typename': OneOf(None, str),
-        'fieldname_and_value': OneOf(None, Tuple(str,str)),
+        'fieldname_and_value': OneOf(None, Tuple(str, str)),
         'isLazy': bool #load values when we first request them, instead of blocking on all the data.
         },
     Flush={'guid': str},
@@ -47,7 +47,7 @@ ServerToClient = Alternative(
     SubscriptionData={
         'schema': str,
         'typename': OneOf(None, str),
-        'fieldname_and_value': OneOf(None, Tuple(str,str)),
+        'fieldname_and_value': OneOf(None, Tuple(str, str)),
         'values': ConstDict(str, OneOf(None, str)), #value
         'index_values': ConstDict(str, OneOf(None, str)),
         'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
@@ -57,20 +57,20 @@ ServerToClient = Alternative(
     LazySubscriptionData={
         'schema': str,
         'typename': OneOf(None, str),
-        'fieldname_and_value': OneOf(None, Tuple(str,str)),
+        'fieldname_and_value': OneOf(None, Tuple(str, str)),
         'identities': TupleOf(str),
         'index_values': ConstDict(str, OneOf(None, str))
         },
     SubscriptionComplete={
         'schema': str,
         'typename': OneOf(None, str),
-        'fieldname_and_value': OneOf(None, Tuple(str,str)),
+        'fieldname_and_value': OneOf(None, Tuple(str, str)),
         'tid': int #marker transaction id
         },
     SubscriptionIncrease={
         'schema': str,
         'typename': str,
-        'fieldname_and_value': Tuple(str,str),
+        'fieldname_and_value': Tuple(str, str),
         'identities': TupleOf(str)
         },
     Disconnected={},

@@ -79,10 +79,10 @@ class AlternativeWrapper(RefcountedWrapper):
     def __init__(self, t):
         super().__init__(t)
 
-        element_types = [('refcount', native_ast.Int64), ('which', native_ast.Int64), ('data',native_ast.UInt8)]
+        element_types = [('refcount', native_ast.Int64), ('which', native_ast.Int64), ('data', native_ast.UInt8)]
 
         self.alternativeType = t
-        self.layoutType = native_ast.Type.Struct(element_types=element_types,name=t.__qualname__+"Layout").pointer()
+        self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
         self.matcherType = AlternativeMatchingWrapper(self.typeRepresentation)
         self._alternatives = None
 
@@ -114,11 +114,11 @@ class AlternativeWrapper(RefcountedWrapper):
     def refAs(self, context, instance, whichIx):
         return context.pushReference(
             self.alternatives[whichIx].typeRepresentation,
-            instance.nonref_expr.ElementPtrIntegers(0,2).cast(self.alternatives[whichIx].getNativeLayoutType().pointer())
+            instance.nonref_expr.ElementPtrIntegers(0, 2).cast(self.alternatives[whichIx].getNativeLayoutType().pointer())
             )
 
     def generateNativeDestructorFunction(self, context, out, instance):
-        with context.switch(instance.nonref_expr.ElementPtrIntegers(0,1).load(), range(len(self.alternatives)), False) as indicesAndContexts:
+        with context.switch(instance.nonref_expr.ElementPtrIntegers(0, 1).load(), range(len(self.alternatives)), False) as indicesAndContexts:
             for ix, subcontext in indicesAndContexts:
                 with subcontext:
                     self.refAs(context, instance, ix).convert_destroy()
@@ -140,7 +140,7 @@ class AlternativeWrapper(RefcountedWrapper):
             return super().convert_attribute(context, instance, attribute)
 
         if len(validIndices) == 1:
-            with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0,1).load().neq(validIndices[0])) as (then, otherwise):
+            with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0, 1).load().neq(validIndices[0])) as (then, otherwise):
                 with then:
                     context.pushException(AttributeError, "Object has no attribute %s" % attribute)
             return self.refAs(context, instance, validIndices[0]).convert_attribute(attribute)
@@ -151,7 +151,7 @@ class AlternativeWrapper(RefcountedWrapper):
 
             output = context.allocateUninitializedSlot(outputType)
 
-            with context.switch(instance.nonref_expr.ElementPtrIntegers(0,1).load(), validIndices, False) as indicesAndContexts:
+            with context.switch(instance.nonref_expr.ElementPtrIntegers(0, 1).load(), validIndices, False) as indicesAndContexts:
                 for ix, subcontext in indicesAndContexts:
                     with subcontext:
                         attr = self.refAs(context, instance, ix).convert_attribute(attribute)
@@ -169,7 +169,7 @@ class AlternativeWrapper(RefcountedWrapper):
 
         if index == -1:
             return context.constant(False)
-        return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0,1).load().eq(index))
+        return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0, 1).load().eq(index))
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
     is_empty = False
@@ -179,12 +179,12 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
     def __init__(self, t):
         super().__init__(t)
 
-        element_types = [('refcount', native_ast.Int64), ('which', native_ast.Int64), ('data',native_ast.UInt8)]
+        element_types = [('refcount', native_ast.Int64), ('which', native_ast.Int64), ('data', native_ast.UInt8)]
 
         self.alternativeType = t.Alternative
         self.indexInParent = t.Index
         self.underlyingLayout = typeWrapper(t.ElementType) #a NamedTuple
-        self.layoutType = native_ast.Type.Struct(element_types=element_types,name=t.__qualname__+"Layout").pointer()
+        self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -200,7 +200,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
     def refToInner(self, context, instance):
         return context.pushReference(
             self.underlyingLayout,
-            instance.nonref_expr.ElementPtrIntegers(0,2).cast(self.underlyingLayout.getNativeLayoutType().pointer())
+            instance.nonref_expr.ElementPtrIntegers(0, 2).cast(self.underlyingLayout.getNativeLayoutType().pointer())
             )
 
     def convert_to_type(self, context, instance, otherType):
@@ -231,14 +231,14 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
         kwargs = dict(kwargs)
 
-        for eltType,eltName in zip(tupletype.ElementTypes, tupletype.ElementNames):
+        for eltType, eltName in zip(tupletype.ElementTypes, tupletype.ElementNames):
             if eltName not in kwargs and not _types.is_default_constructible(eltType):
                 context.pushException(TypeError, "Can't construct %s without an argument for %s of type %s" % (
                     self, eltName, eltType
                     ))
                 return
 
-        for eltType,eltName in zip(tupletype.ElementTypes, tupletype.ElementNames):
+        for eltType, eltName in zip(tupletype.ElementTypes, tupletype.ElementNames):
             if eltName not in kwargs:
                 kwargs[eltName] = context.push(eltType, lambda out: out.convert_default_initialize())
             else:

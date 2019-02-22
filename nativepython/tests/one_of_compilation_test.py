@@ -39,7 +39,7 @@ class TestOneOfOfCompilation(unittest.TestCase):
 
         self.assertIs(f(None), None)
 
-        aTup = TupleOf(int)((1,2,3))
+        aTup = TupleOf(int)((1, 2, 3))
         self.assertEqual(f(aTup), aTup)
 
         self.assertEqual(_types.refcount(aTup), 1)
@@ -49,71 +49,71 @@ class TestOneOfOfCompilation(unittest.TestCase):
         def f(x: OneOf(int, float), y: int) -> OneOf(int, float):
             return x + y
 
-        def check(x,y):
-            self.assertIs(type(f(x,y)), type(x+y))
-            self.assertEqual(f(x,y), x+y)
+        def check(x, y):
+            self.assertIs(type(f(x, y)), type(x+y))
+            self.assertEqual(f(x, y), x+y)
 
-        things = [0,1,2,0.0,1.0,2.0]
+        things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
-            for b in [0,1,2]:
-                check(a,b)
+            for b in [0, 1, 2]:
+                check(a, b)
 
     def test_one_of_binop_converges(self):
         @Compiled
         def f(x: OneOf(int, float), y: float) -> float:
             return x + y
 
-        def check(x,y):
-            self.assertIs(type(f(x,y)), type(x+y))
-            self.assertEqual(f(x,y), x+y)
+        def check(x, y):
+            self.assertIs(type(f(x, y)), type(x+y))
+            self.assertEqual(f(x, y), x+y)
 
-        things = [0,1,2,0.0,1.0,2.0]
+        things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
-            for b in [0.0,1.0,2.0]:
-                check(a,b)
+            for b in [0.0, 1.0, 2.0]:
+                check(a, b)
 
     def test_one_of_binop_rhs(self):
         @Compiled
         def f(x: int, y: OneOf(int, float)) -> OneOf(int, float):
             return x + y
 
-        def check(x,y):
-            self.assertIs(type(f(x,y)), type(x+y))
-            self.assertEqual(f(x,y), x+y)
+        def check(x, y):
+            self.assertIs(type(f(x, y)), type(x+y))
+            self.assertEqual(f(x, y), x+y)
 
-        things = [0,1,2,0.0,1.0,2.0]
+        things = [0, 1, 2, 0.0, 1.0, 2.0]
 
-        for a in [0,1,2]:
+        for a in [0, 1, 2]:
             for b in things:
-                check(a,b)
+                check(a, b)
 
     def test_one_of_dual_binop(self):
         @Compiled
         def f(x: OneOf(int, float), y: OneOf(int, float)) -> OneOf(int, float):
             return x + y
 
-        def check(x,y):
-            self.assertIs(type(f(x,y)), type(x+y))
-            self.assertEqual(f(x,y), x+y)
+        def check(x, y):
+            self.assertIs(type(f(x, y)), type(x+y))
+            self.assertEqual(f(x, y), x+y)
 
-        things = [0,1,2,0.0,1.0,2.0]
+        things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
             for b in things:
-                check(a,b)
+                check(a, b)
 
     def test_one_of_dual_binop_power(self):
         @Compiled
         def f(x: OneOf(int, float), y: OneOf(int, float)) -> OneOf(int, float):
             return x ** y
 
-        def check(x,y):
-            self.assertIs(type(f(x,y)), type(x**y))
-            self.assertEqual(f(x,y), x**y)
+        def check(x, y):
+            self.assertIs(type(f(x, y)), type(x**y))
+            self.assertEqual(f(x, y), x**y)
 
-        things = [0,1,2,0.0,1.0,2.0]
+        things = [0, 1, 2, 0.0, 1.0, 2.0]
         for a in things:
             for b in things:
-                check(a,b)
+                check(a, b)
 
     def test_one_of_downcast_to_primitive(self):
         @Compiled

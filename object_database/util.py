@@ -127,7 +127,7 @@ class Timer:
         self.t0 = time.time()
         return self
 
-    def __exit__(self, a,b,c):
+    def __exit__(self, a, b, c):
         t1 = time.time()
         if t1 - self.t0 > Timer.granularity:
             m = self.message

@@ -87,7 +87,7 @@ class NativeForwardTypesTests(unittest.TestCase):
 
         self.assertTrue("Unresolved" not in str(X))
 
-        anotherX = X( (anX,anX) )
+        anotherX = X( (anX, anX) )
 
         self.assertEqual(anotherX[0], anX)
 
