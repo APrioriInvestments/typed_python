@@ -234,7 +234,7 @@ def generateSslContext():
 
 
 def sslContextFromCertPathOrNone(cert_path=None):
-    return  sslContextFromCertPath(cert_path) if cert_path else generateSslContext()
+    return sslContextFromCertPath(cert_path) if cert_path else generateSslContext()
 
 
 def genToken(randomness=10000000000000000000):

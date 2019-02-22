@@ -130,7 +130,7 @@ class SerializationContext(object):
         return SerializationContext(nameToObject)
 
     def withPrefix(self, prefix):
-        return SerializationContext({prefix + "." + k: v for k, v  in self.nameToObject.items()})
+        return SerializationContext({prefix + "." + k: v for k, v in self.nameToObject.items()})
 
     def withoutLineInfoEncoded(self):
         res = SerializationContext(self.nameToObject)

@@ -81,7 +81,7 @@ class Codebase:
         )
 
     @staticmethod
-    def  createFromCodebase(codebase: TypedPythonCodebase):
+    def createFromCodebase(codebase: TypedPythonCodebase):
         return Codebase.createFromFiles(codebase.filesToContents)
 
     @staticmethod
