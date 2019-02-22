@@ -23,6 +23,7 @@ def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
 
+
 AClass = lambda: AClass
 
 

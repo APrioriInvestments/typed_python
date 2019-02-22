@@ -80,6 +80,7 @@ class FunctionTask(TaskExecutor):
     def instantiate(self):
         return RunningFunctionTask(self.f)
 
+
 TaskStatusResult = Alternative('TaskStatusResult',
     Finished={'result': object},
     Subtasks={'subtasks': ConstDict(str, TaskExecutor)},

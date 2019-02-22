@@ -75,6 +75,7 @@ def type_to_llvm_type(t):
 
     assert False, "Can't handle %s yet" % t
 
+
 strings_ever = [0]
 
 

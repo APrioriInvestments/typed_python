@@ -35,6 +35,7 @@ class VisitDone(Exception):
 def areAstsIdentical(ast1, ast2):
     return ast.dump(ast1) == ast.dump(ast2)
 
+
 _all_caches = []
 
 
@@ -68,6 +69,7 @@ def getSourceText(pyObject):
     # though `ast.parse, which means that the computed column_numbers may be
     # off and we shouldn't report them.
     return textwrap.dedent(blankLines + "".join(source))
+
 
 sourceFileCache_ = {}
 

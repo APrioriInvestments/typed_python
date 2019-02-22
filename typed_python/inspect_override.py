@@ -25,6 +25,7 @@ from inspect import *
 class InspectError(Exception):
     pass
 
+
 pathExistsOnDiskCache_ = {}
 linesCache_ = {}
 

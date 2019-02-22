@@ -718,6 +718,7 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
 
     return tree
 
+
 # a nasty hack to allow us to find the Ast's of functions we have deserialized
 # but for which we never had the source code.
 _originalAstCache = weakref.WeakKeyDictionary()

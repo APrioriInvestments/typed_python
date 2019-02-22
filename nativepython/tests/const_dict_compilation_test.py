@@ -24,6 +24,7 @@ def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
 
+
 dictTypes = [
     ConstDict(str, str),
     ConstDict(int, str),
