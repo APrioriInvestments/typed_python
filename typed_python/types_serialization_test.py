@@ -134,7 +134,7 @@ def create_data():
     x.extend([1, -1,
               uint1max, -uint1max, -uint1max-1,
               uint2max, -uint2max, -uint2max-1,
-               int4max,  -int4max,  -int4max-1])
+               int4max, -int4max, -int4max-1])
     y = ('abc', 'abc', c, c)
     x.append(y)
     x.append(y)
