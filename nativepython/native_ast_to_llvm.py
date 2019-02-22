@@ -928,7 +928,7 @@ class FunctionConverter:
                         ('BitOr', None, 'or_', 'or_'),
                         ('BitXor', None, 'xor', 'xor'),
                         ('BitAnd', None, 'and_', 'and_')
-                        ]:
+            ]:
                 if getattr(expr.op.matches, py_op):
                     assert l.native_type == r.native_type, \
                         "malformed types: expect l&r to be the same but got %s,%s,%s\n\nexpr=%s"\
@@ -1023,10 +1023,10 @@ class FunctionConverter:
             )
 
             block = self.teardown_handler.accept_incoming(
-                    self.builder.block,
-                    self.tags_initialized,
-                    False
-                    )
+                self.builder.block,
+                self.tags_initialized,
+                False
+            )
 
             self.builder.branch(block)
 

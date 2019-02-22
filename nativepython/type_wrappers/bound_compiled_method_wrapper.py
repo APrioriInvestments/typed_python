@@ -61,4 +61,4 @@ class BoundCompiledMethodWrapper(Wrapper):
                 self.method_name,
                 args,
                 kwargs
-                )
+        )

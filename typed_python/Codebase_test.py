@@ -22,9 +22,9 @@ from typed_python.Codebase import Codebase
 class CodebaseTest(unittest.TestCase):
     def test_instantiated_codebase(self):
         codebase = Codebase.Instantiate({
-                'test_module/__init__.py': '',
-                'test_module/inner.py': 'f = lambda: 10',
-                })
+            'test_module/__init__.py': '',
+            'test_module/inner.py': 'f = lambda: 10',
+        })
         self.assertEqual(codebase.getClassByName('test_module.inner.f')(), 10)
 
         codebase2 = Codebase._FromModule(codebase.getModuleByName("test_module"))

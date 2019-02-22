@@ -22,9 +22,9 @@ from object_database.util import genToken
 from object_database.service_manager.ServiceManager import ServiceManager
 
 from object_database import (
-        Schema, Indexed, core_schema,
-        connect, service_schema, current_transaction
-        )
+    Schema, Indexed, core_schema,
+    connect, service_schema, current_transaction
+)
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 

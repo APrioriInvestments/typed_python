@@ -292,7 +292,7 @@ class AwsApi:
         for x in self.ec2_client.get_paginator('describe_spot_price_history').paginate(
                     Filters=[{'Name': 'product-description', 'Values': ['Linux/UNIX']}],
                     StartTime=datetime.datetime.now() - datetime.timedelta(hours=1)
-                    ):
+        ):
             for record in x['SpotPriceHistory']:
                 ts = record['Timestamp']
                 instance_type = record['InstanceType']

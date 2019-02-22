@@ -105,12 +105,12 @@ class ConstDictWrapper(RefcountedWrapper):
                 return None
 
             native_contains = context.converter.defineNativeFunction(
-                    "dict_contains" + str(self.typeRepresentation),
-                    ('dict_contains', self),
-                    [self, self.keyType],
-                    bool,
-                    self.generateContains()
-                    )
+                "dict_contains" + str(self.typeRepresentation),
+                ('dict_contains', self),
+                [self, self.keyType],
+                bool,
+                self.generateContains()
+            )
 
             if op.matches.In:
                 return context.pushPod(bool, native_contains.call(left, right))
@@ -125,12 +125,12 @@ class ConstDictWrapper(RefcountedWrapper):
             return None
 
         native_getitem = context.converter.defineNativeFunction(
-                "dict_getitem" + str(self.typeRepresentation),
-                ('dict_getitem', self),
-                [self, self.keyType],
-                self.valueType,
-                self.generateGetitem()
-                )
+            "dict_getitem" + str(self.typeRepresentation),
+            ('dict_getitem', self),
+            [self, self.keyType],
+            self.valueType,
+            self.generateGetitem()
+        )
 
         if self.valueType.is_pass_by_ref:
             return context.push(
@@ -197,10 +197,10 @@ class ConstDictWrapper(RefcountedWrapper):
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(
-                cond=expr,
-                false=native_ast.const_int_expr(0),
-                true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
-                )
+            cond=expr,
+            false=native_ast.const_int_expr(0),
+            true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
+        )
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))

@@ -41,93 +41,104 @@ memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 
 stash_exception_ptr = externalCallTarget(
-        "nativepython_runtime_stash_const_char_ptr_for_exception",
-        Void,
-        UInt8Ptr
-        )
+    "nativepython_runtime_stash_const_char_ptr_for_exception",
+    Void,
+    UInt8Ptr
+)
 
 mod_int64_int64 = externalCallTarget(
-        "nativepython_runtime_mod_int64_int64",
-        Int64,
-        Int64, Int64
-        )
+    "nativepython_runtime_mod_int64_int64",
+    Int64,
+    Int64, Int64
+)
+
 mod_float64_float64 = externalCallTarget(
-        "nativepython_runtime_mod_float64_float64",
-        Float64,
-        Float64, Float64
-        )
+    "nativepython_runtime_mod_float64_float64",
+    Float64,
+    Float64, Float64
+)
+
 pow_int64_int64 = externalCallTarget(
-        "nativepython_runtime_pow_int64_int64",
-        Int64,
-        Int64, Int64
-        )
+    "nativepython_runtime_pow_int64_int64",
+    Int64,
+    Int64, Int64
+)
+
 pow_float64_float64 = externalCallTarget(
-        "nativepython_runtime_pow_float64_float64",
-        Float64,
-        Float64, Float64
-        )
+    "nativepython_runtime_pow_float64_float64",
+    Float64,
+    Float64, Float64
+)
+
 get_pyobj_None = externalCallTarget(
-        "nativepython_runtime_get_pyobj_None",
-        Void,
-        Void.pointer()
-        )
+    "nativepython_runtime_get_pyobj_None",
+    Void,
+    Void.pointer()
+)
+
 incref_pyobj = externalCallTarget(
-        "nativepython_runtime_incref_pyobj",
-        Void,
-        Void.pointer()
-        )
+    "nativepython_runtime_incref_pyobj",
+    Void,
+    Void.pointer()
+)
+
 decref_pyobj = externalCallTarget(
-        "nativepython_runtime_decref_pyobj",
-        Void,
-        Void.pointer()
-        )
+    "nativepython_runtime_decref_pyobj",
+    Void,
+    Void.pointer()
+)
+
 getattr_pyobj = externalCallTarget(
-        "nativepython_runtime_getattr_pyobj",
-        Void.pointer(),
-        Void.pointer(),
-        UInt8Ptr
-        )
+    "nativepython_runtime_getattr_pyobj",
+    Void.pointer(),
+    Void.pointer(),
+    UInt8Ptr
+)
 
 int_to_pyobj = externalCallTarget(
-        "nativepython_runtime_int_to_pyobj",
-        Void.pointer(),
-        Int64
-        )
+    "nativepython_runtime_int_to_pyobj",
+    Void.pointer(),
+    Int64
+)
 
 pyobj_to_int = externalCallTarget(
-        "nativepython_runtime_pyobj_to_int",
-        Int64,
-        Void.pointer()
-        )
+    "nativepython_runtime_pyobj_to_int",
+    Int64,
+    Void.pointer()
+)
 
 string_concat = externalCallTarget(
-        "nativepython_runtime_string_concat",
-        Void.pointer(),
-        Void.pointer(), Void.pointer()
-        )
+    "nativepython_runtime_string_concat",
+    Void.pointer(),
+    Void.pointer(), Void.pointer()
+)
+
 string_cmp = externalCallTarget(
-        "nativepython_runtime_string_cmp",
-        Int64,
-        Void.pointer(), Void.pointer()
-        )
+    "nativepython_runtime_string_cmp",
+    Int64,
+    Void.pointer(), Void.pointer()
+)
+
 string_getitem_int64 = externalCallTarget(
-        "nativepython_runtime_string_getitem_int64",
-        Void.pointer(),
-        Void.pointer(), Int64
-        )
+    "nativepython_runtime_string_getitem_int64",
+    Void.pointer(),
+    Void.pointer(), Int64
+)
+
 string_from_utf8_and_len = externalCallTarget(
-        "nativepython_runtime_string_from_utf8_and_len",
-        Void.pointer(),
-        UInt8Ptr, Int64
-        )
+    "nativepython_runtime_string_from_utf8_and_len",
+    Void.pointer(),
+    UInt8Ptr, Int64
+)
 
 bytes_concat = externalCallTarget(
-        "nativepython_runtime_bytes_concat",
-        Void.pointer(),
-        Void.pointer(), Void.pointer()
-        )
+    "nativepython_runtime_bytes_concat",
+    Void.pointer(),
+    Void.pointer(), Void.pointer()
+)
+
 bytes_from_ptr_and_len = externalCallTarget(
-        "nativepython_runtime_bytes_from_ptr_and_len",
-        Void.pointer(),
-        UInt8Ptr, Int64
-        )
+    "nativepython_runtime_bytes_from_ptr_and_len",
+    Void.pointer(),
+    UInt8Ptr, Int64
+)
