@@ -604,12 +604,23 @@ class NativeTypesTests(unittest.TestCase):
     def test_comparisons_equivalence(self):
         t = TupleOf(OneOf(None, str, bytes, float, int, bool, TupleOf(int)),)
 
-        def lt(a, b): return a < b
-        def le(a, b): return a <= b
-        def eq(a, b): return a == b
-        def ne(a, b): return a != b
-        def gt(a, b): return a > b
-        def ge(a, b): return a >= b
+        def lt(a, b):
+            return a < b
+
+        def le(a, b):
+            return a <= b
+
+        def eq(a, b):
+            return a == b
+
+        def ne(a, b):
+            return a != b
+
+        def gt(a, b):
+            return a > b
+
+        def ge(a, b):
+            return a >= b
 
         funcs = [lt, le, eq, ne, gt, ge]
 
@@ -1405,13 +1416,27 @@ class NativeTypesTests(unittest.TestCase):
                     pass
 
     def test_other_bitness_types_operators(self):
-        def add(x, y): return x+y
-        def div(x, y): return x/y
-        def mul(x, y): return x*y
-        def sub(x, y): return x-y
-        def bitand(x, y): return x&y
-        def bitor(x, y): return x|y
-        def bitxor(x, y): return x^y
+
+        def add(x, y):
+            return x+y
+
+        def div(x, y):
+            return x/y
+
+        def mul(x, y):
+            return x*y
+
+        def sub(x, y):
+            return x-y
+
+        def bitand(x, y):
+            return x&y
+
+        def bitor(x, y):
+            return x|y
+
+        def bitxor(x, y):
+            return x^y
 
         otherTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
         for t1 in otherTypes:
