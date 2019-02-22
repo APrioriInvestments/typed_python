@@ -68,7 +68,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 inst.convert_getitem_unsafe(i).convert_destroy()
 
         context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0,4).load())
+            runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 4).load())
             )
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
@@ -95,7 +95,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         def elt_ref(tupPtrExpr, iExpr):
             return context.pushReference(
                 self.underlyingWrapperType,
-                tupPtrExpr.ElementPtrIntegers(0,4).load().cast(
+                tupPtrExpr.ElementPtrIntegers(0, 4).load().cast(
                         self.underlyingWrapperType.getNativeLayoutType().pointer()
                         ).elemPtr(iExpr)
                 )
@@ -136,7 +136,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             self.underlyingWrapperType,
             native_ast.Expression.Branch(
                 cond=((item >= 0) & (item < self.convert_len(context, expr))).nonref_expr,
-                true=expr.nonref_expr.ElementPtrIntegers(0,4).load().cast(
+                true=expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
                     ).elemPtr(item.toInt64().nonref_expr),
                 false=generateThrowException(context, IndexError(("tuple" if self.is_tuple else "list") + " index out of range"))
@@ -146,7 +146,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
     def convert_getitem_unsafe(self, context, expr, item):
         return context.pushReference(
             self.underlyingWrapperType,
-            expr.nonref_expr.ElementPtrIntegers(0,4).load().cast(
+            expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                 self.underlyingWrapperType.getNativeLayoutType().pointer()
                 ).elemPtr(item.toInt64().nonref_expr)
             )
@@ -155,7 +155,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return native_ast.Expression.Branch(
                 cond=expr,
                 false=native_ast.const_int_expr(0),
-                true=expr.ElementPtrIntegers(0,2).load().cast(native_ast.Int64)
+                true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
                 )
 
     def convert_len(self, context, expr):

@@ -85,7 +85,7 @@ def main(argv=None):
     signal.signal(signal.SIGINT, shutdownCleanly)
     signal.signal(signal.SIGTERM, shutdownCleanly)
 
-    resource.setrlimit(resource.RLIMIT_NOFILE, (2048,4096))
+    resource.setrlimit(resource.RLIMIT_NOFILE, (2048, 4096))
 
     object_database_port = parsedArgs.port
 

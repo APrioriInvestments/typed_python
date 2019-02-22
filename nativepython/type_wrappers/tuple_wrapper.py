@@ -61,7 +61,7 @@ class TupleWrapper(Wrapper):
             context.pushException(TypeError, "Can't default-initialize any subtypes of %s" % self.typeRepresentation.__qualname__)
             return
 
-        for i,t in enumerate(self.typeRepresentation.ElementTypes):
+        for i, t in enumerate(self.typeRepresentation.ElementTypes):
             if _types.is_default_constructible(t):
                 self.refAs(context, target, i).convert_default_initialize()
 
@@ -92,8 +92,8 @@ class NamedTupleWrapper(TupleWrapper):
     def __init__(self, t):
         super().__init__(t)
 
-        self.namesToIndices = {n:i for i,n in enumerate(t.ElementNames)}
-        self.namesToTypes = {n:t.ElementTypes[i] for i,n in enumerate(t.ElementNames)}
+        self.namesToIndices = {n: i for i, n in enumerate(t.ElementNames)}
+        self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
     def convert_attribute(self, context, instance, attribute):
         ix = self.namesToIndices.get(attribute)

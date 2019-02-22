@@ -74,14 +74,14 @@ class ConnectedChannel:
 
     def sendTransactionSuccess(self, guid, success, badKey):
         self.channel.write(
-            ServerToClient.TransactionResult(transaction_guid=guid,success=success,badKey=badKey)
+            ServerToClient.TransactionResult(transaction_guid=guid, success=success, badKey=badKey)
             )
 
     def handleTransactionData(self, msg):
         guid = msg.transaction_guid
         if guid not in self.pendingTransactions:
             self.pendingTransactions[guid] = {
-                'writes':{},
+                'writes': {},
                 'set_adds': {},
                 'set_removes': {},
                 'key_versions': set(),
@@ -171,7 +171,7 @@ class Server:
 
     def stop(self):
         self._shouldStop.set()
-        self._subscriptionQueue.put((None,None))
+        self._subscriptionQueue.put((None, None))
         self._subscriptionResponseThread.join()
 
     def allocateNewIdentityRoot(self):
@@ -207,7 +207,7 @@ class Server:
 
         if oldIds:
             self._kvstore.setSeveral(
-                {keymapping.data_key(core_schema.Connection, identity, " exists"):None for identity in oldIds},
+                {keymapping.data_key(core_schema.Connection, identity, " exists"): None for identity in oldIds},
                 {},
                 {connection_index: set(oldIds)}
                 )
@@ -242,7 +242,7 @@ class Server:
             connectedChannel = self._clientChannels[channel]
 
             for schema_name, typename in connectedChannel.subscribedTypes:
-                self._type_to_channel[schema_name,typename].discard(connectedChannel)
+                self._type_to_channel[schema_name, typename].discard(connectedChannel)
 
             for index_key in connectedChannel.subscribedIndexKeys:
                 self._index_to_channel[index_key].discard(connectedChannel)
@@ -739,7 +739,7 @@ class Server:
         valsToGet = []
         for field_to_pull in typedef.fields:
             for ident in identities:
-                valsToGet.append(keymapping.data_key_from_names(schema_name,typename, ident, field_to_pull))
+                valsToGet.append(keymapping.data_key_from_names(schema_name, typename, ident, field_to_pull))
 
         results = self._kvstore.getSeveral(valsToGet)
 
@@ -760,7 +760,7 @@ class Server:
                 reverseKeys.append(keymapping.data_reverse_index_key(schema_name, typename, ident, index_name))
 
         reverseVals = self._kvstore.getSeveral(reverseKeys)
-        reverseKVMap = {reverseKeys[i]:reverseVals[i] for i in range(len(reverseKeys))}
+        reverseKVMap = {reverseKeys[i]: reverseVals[i] for i in range(len(reverseKeys))}
 
         for index_name in typedef.indices:
             for ident in newIds:
@@ -787,7 +787,7 @@ class Server:
             threshold = time.time() - interval
 
             new_ts = {}
-            for key,ts in self._version_numbers_timestamps.items():
+            for key, ts in self._version_numbers_timestamps.items():
                 if ts < threshold:
                     if keymapping.isIndexKey(key):
                         if not self._kvstore.getSetMembers(key):
@@ -829,8 +829,8 @@ class Server:
 
         t0 = time.time()
 
-        set_adds = {k:v for k,v in set_adds.items() if v}
-        set_removes = {k:v for k,v in set_removes.items() if v}
+        set_adds = {k: v for k, v in set_adds.items() if v}
+        set_removes = {k: v for k, v in set_removes.items() if v}
 
         identities_mentioned = set()
 
@@ -854,7 +854,7 @@ class Server:
             keysWritingTo.add(key)
 
             schema_name, typename, ident = keymapping.split_data_key(key)[:3]
-            schemaTypePairsWriting.add((schema_name,typename))
+            schemaTypePairsWriting.add((schema_name, typename))
 
             identities_mentioned.add(ident)
 
@@ -863,7 +863,7 @@ class Server:
                 if subset[k]:
                     schema_name, typename = keymapping.split_index_key(k)[:2]
 
-                    schemaTypePairsWriting.add((schema_name,typename))
+                    schemaTypePairsWriting.add((schema_name, typename))
 
                     setsWritingTo.add(k)
 
@@ -889,7 +889,7 @@ class Server:
         priorValues = self._kvstore.getSeveralAsDictionary(key_value)
 
         #set the json representation in the database
-        target_kvs = {k: v for k,v in key_value.items()}
+        target_kvs = {k: v for k, v in key_value.items()}
         target_kvs.update(self.indexReverseLookupKvs(set_adds, set_removes))
 
         new_sets, dropped_sets = self._kvstore.setSeveral(target_kvs, set_adds, set_removes)
@@ -909,7 +909,7 @@ class Server:
                 indexSetRemoves[index_key] = set()
             indexSetRemoves[index_key].add(index_val)
 
-        self._kvstore.setSeveral({}, indexSetAdds,indexSetRemoves)
+        self._kvstore.setSeveral({}, indexSetAdds, indexSetRemoves)
 
         t2 = time.time()
 
@@ -951,7 +951,7 @@ class Server:
         channelsTriggered = set()
 
         for schema_type_pair in schemaTypePairsWriting:
-            for channel in self._type_to_channel.get(schema_type_pair,()):
+            for channel in self._type_to_channel.get(schema_type_pair, ()):
                 if channel.subscribedTypes[schema_type_pair] >= 0:
                     #this is a lazy subscription. We're not using the transaction ID yet because
                     #we don't store it on a per-object basis here. Instead, we're always sending
@@ -967,7 +967,7 @@ class Server:
             lazy_message = ServerToClient.LazyTransactionPriors(writes=priorValues)
 
         transaction_message = ServerToClient.Transaction(
-            writes={k:v for k,v in key_value.items()},
+            writes={k: v for k, v in key_value.items()},
             set_adds=set_adds,
             set_removes=set_removes,
             transaction_id=transaction_id

@@ -169,8 +169,8 @@ Statement = Alternative("Statement",
         'filename': str
         },
     ImportFrom={
-        "module": OneOf(str,TupleOf(str)),
-        "names": OneOf(Alias,TupleOf(Alias)),
+        "module": OneOf(str, TupleOf(str)),
+        "names": OneOf(Alias, TupleOf(Alias)),
         "level": OneOf(int, None),
         'line_number': int,
         'col_offset': int,
@@ -614,7 +614,7 @@ converters = {
     ast.In: ComparisonOp.In,
     ast.NotIn: ComparisonOp.NotIn,
     ast.comprehension: Comprehension.Item,
-    ast.excepthandler: lambda x:x,
+    ast.excepthandler: lambda x: x,
     ast.ExceptHandler: ExceptionHandler.Item,
     ast.arguments: Arguments.Item,
     ast.arg: Arg.Item,
@@ -625,7 +625,7 @@ converters = {
 
 # most converters map to an alternative type
 reverseConverters = {
-    t:v for v,t in converters.items()
+    t: v for v, t in converters.items()
     if hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == "ConcreteAlternative"
     }
 
@@ -667,7 +667,7 @@ def convertAlgebraicToPyAst_(pyAst):
 
     assert False, type(pyAst)
 
-def convertPyAstToAlgebraic(tree,fname, keepLineInformation=True):
+def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
     if issubclass(type(tree), ast.AST):
         converter = converters[type(tree)]
         args = {}
@@ -701,13 +701,13 @@ def convertPyAstToAlgebraic(tree,fname, keepLineInformation=True):
                 raise UserWarning(
                     "Failed to construct %s from %s with arguments\n%s\n\n%s"
                     % (converter, type(tree),
-                       "\n".join(["\t%s:%s (from %s)" % (k,repr(v)[:50],getattr(tree, k) if hasattr(tree,k) else None) for k,v in args.items()]),
+                       "\n".join(["\t%s:%s (from %s)" % (k, repr(v)[:50], getattr(tree, k) if hasattr(tree, k) else None) for k, v in args.items()]),
                        traceback.format_exc()
                        )
                     )
 
     if isinstance(tree, list):
-        return [convertPyAstToAlgebraic(x,fname, keepLineInformation) for x in tree]
+        return [convertPyAstToAlgebraic(x, fname, keepLineInformation) for x in tree]
 
     return tree
 

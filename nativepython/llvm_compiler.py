@@ -35,11 +35,11 @@ target_machine_shared_object = target.create_target_machine(reloc='pic', codemod
 
 #we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
 if sys.platform == "darwin":
-    ctypes.CDLL("libstdc++.dylib",mode=ctypes.RTLD_GLOBAL)
+    ctypes.CDLL("libstdc++.dylib", mode=ctypes.RTLD_GLOBAL)
 else:
-    ctypes.CDLL("libstdc++.so.6",mode=ctypes.RTLD_GLOBAL)
+    ctypes.CDLL("libstdc++.so.6", mode=ctypes.RTLD_GLOBAL)
 
-ctypes.CDLL(_types.__file__,mode=ctypes.RTLD_GLOBAL)
+ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
 
 
 pointer_size = (
@@ -110,7 +110,7 @@ class BinarySharedObject:
                 o_file.write(o_file_contents)
 
             subprocess.check_call(
-                ["ld", "-shared", "-fPIC", os.path.join(tf,"module.o"), "-o", os.path.join(tf,"module.so")]
+                ["ld", "-shared", "-fPIC", os.path.join(tf, "module.o"), "-o", os.path.join(tf, "module.so")]
                 )
 
             with open(os.path.join(tf, "module.so"), "rb") as so_file:

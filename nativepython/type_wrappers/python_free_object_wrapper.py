@@ -40,7 +40,7 @@ class PythonFreeObjectWrapper(Wrapper):
                     context,
                     self.typeRepresentation(
                         *[a.expr_type.typeRepresentation for a in args],
-                        **{k:v.expr_type.typeRepresentation for k,v in kwargs.items()}
+                        **{k: v.expr_type.typeRepresentation for k, v in kwargs.items()}
                         )
                     )
             except Exception as e:

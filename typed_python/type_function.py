@@ -27,7 +27,7 @@ def isTypeFunctionType(type):
     """
     if type in _type_to_typefunction:
         (func, (args, kwargs)) = _type_to_typefunction[type]
-        return (func,args,kwargs)
+        return (func, args, kwargs)
     return None
 
 def reconstructTypeFunctionType(typeFunction, args, kwargs):
@@ -56,7 +56,7 @@ class ConcreteTypeFunction(object):
             return str(x)
 
         return self._concreteTypeFunction.__qualname__ + "(" + ",".join(
-            [toStr(x) for x in args] + ["%s=%s" % (k,v) for k,v in kwargs]
+            [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
             ) + ")"
 
     def applyNameChangesToType(self, type, name):
@@ -79,7 +79,7 @@ class ConcreteTypeFunction(object):
             return tuple(self.mapArg(x) for x in arg)
 
         if isinstance(arg, dict):
-            return tuple(sorted([(k,self.mapArg(v)) for k,v in arg.items()]))
+            return tuple(sorted([(k, self.mapArg(v)) for k, v in arg.items()]))
 
         if isinstance(arg, FunctionType):
             return self.mapArg(arg())
@@ -88,7 +88,7 @@ class ConcreteTypeFunction(object):
 
     def __call__(self, *args, **kwargs):
         args = tuple(self.mapArg(a) for a in args)
-        kwargs = tuple(sorted([(k,self.mapArg(v)) for k,v in kwargs.items()]))
+        kwargs = tuple(sorted([(k, self.mapArg(v)) for k, v in kwargs.items()]))
 
         key = (args, kwargs)
 
@@ -102,7 +102,7 @@ class ConcreteTypeFunction(object):
             if self._memoForKey[key] is forward:
                 #if this gets triggered, it means we're asking for concrete information about the type
                 #when dependent type-functions have yet to resolve.
-                raise TypeError("Forward declaration for %s has not resolved yet" % self.nameFor(args,kwargs))
+                raise TypeError("Forward declaration for %s has not resolved yet" % self.nameFor(args, kwargs))
 
             return self._memoForKey[key]
 

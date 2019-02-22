@@ -61,12 +61,12 @@ class ClassWithInit(Class):
     def __init__(self):
         pass
 
-    def __init__(self,x=1,cwi=None):
+    def __init__(self, x=1, cwi=None):
         self.x = x
         if cwi is not None:
             self.cwi = cwi
 
-    def __init__(self,x):
+    def __init__(self, x):
         self.x = x
 
 class ClassWithComplexDispatch(Class):
@@ -127,8 +127,8 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(Interior(y=10).x, 0)
         self.assertEqual(Interior(y=10).y, 10)
 
-        self.assertEqual(Interior(x=20,y=10).x, 20)
-        self.assertEqual(Interior(x=20,y=10).y, 10)
+        self.assertEqual(Interior(x=20, y=10).x, 20)
+        self.assertEqual(Interior(x=20, y=10).y, 10)
 
     def executeInLoop(self, f, duration=.25):
         memUsage = currentMemUsageMb()
@@ -151,7 +151,7 @@ class NativeClassTypesTests(unittest.TestCase):
     def test_class(self):
         with self.assertRaises(TypeError):
             class A(Class):
-                x = Member((1,2,3))
+                x = Member((1, 2, 3))
 
         class A(Class):
             x = Member(int)
@@ -247,15 +247,15 @@ class NativeClassTypesTests(unittest.TestCase):
 
     def test_class_function_exceptions(self):
         class C(Class):
-            def g(self, a,b):
+            def g(self, a, b):
                 assert False
-            def f(self, a,b):
+            def f(self, a, b):
                 return 1
 
         c = C()
 
         with self.assertRaises(AssertionError):
-            c.g(1,2)
+            c.g(1, 2)
 
 
     def test_class_function_sends_args_to_right_place(self):
@@ -274,15 +274,15 @@ class NativeClassTypesTests(unittest.TestCase):
                 takesCallable(g)
             )
 
-        assertSame(lambda formOfG: formOfG(1,2))
-        assertSame(lambda formOfG: formOfG(1,2,3))
-        assertSame(lambda formOfG: formOfG(1,b=2))
-        assertSame(lambda formOfG: formOfG(a=1,b=2))
-        assertSame(lambda formOfG: formOfG(a=1,b=2,c=20))
-        assertSame(lambda formOfG: formOfG(a=1,b=2,c=20,d=30))
-        assertSame(lambda formOfG: formOfG(1,2,3,4))
-        assertSame(lambda formOfG: formOfG(1,2,3,4,5,6))
-        assertSame(lambda formOfG: formOfG(1,2,3,4,5,6,d=10,q=20))
+        assertSame(lambda formOfG: formOfG(1, 2))
+        assertSame(lambda formOfG: formOfG(1, 2, 3))
+        assertSame(lambda formOfG: formOfG(1, b=2))
+        assertSame(lambda formOfG: formOfG(a=1, b=2))
+        assertSame(lambda formOfG: formOfG(a=1, b=2, c=20))
+        assertSame(lambda formOfG: formOfG(a=1, b=2, c=20, d=30))
+        assertSame(lambda formOfG: formOfG(1, 2, 3, 4))
+        assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6))
+        assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6, d=10, q=20))
 
 
     def test_class_function_type_dispatch(self):
@@ -302,10 +302,10 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(C().f(1), float)
         self.assertEqual(C().f("asdf"), "any")
         self.assertEqual(C().f("asdf", "asdf2"), "string list")
-        self.assertEqual(C().f(1,2), "int list")
+        self.assertEqual(C().f(1, 2), "int list")
         with self.assertRaises(TypeError):
-            C().f(1,"hi")
-        self.assertEqual(C().f(x=(1,2)), "named tuple of ints")
+            C().f(1, "hi")
+        self.assertEqual(C().f(x=(1, 2)), "named tuple of ints")
 
     def test_class_members_accessible(self):
         class C(Class):
@@ -352,10 +352,10 @@ class NativeClassTypesTests(unittest.TestCase):
             self.assertEqual(thing.f(1), float)
             self.assertEqual(thing.f("asdf"), "any")
             self.assertEqual(thing.f("asdf", "asdf2"), "string list")
-            self.assertEqual(thing.f(1,2), "int list")
+            self.assertEqual(thing.f(1, 2), "int list")
             with self.assertRaises(TypeError):
-                thing.f(1,"hi")
-            self.assertEqual(thing.f(x=(1,2)), "named tuple of ints")
+                thing.f(1, "hi")
+            self.assertEqual(thing.f(x=(1, 2)), "named tuple of ints")
 
     def test_python_objects_in_classes(self):
         class NormalPyClass(object):
@@ -431,10 +431,10 @@ class NativeClassTypesTests(unittest.TestCase):
 
     def test_class_with_getitem(self):
         class WithGetitem(Class):
-            def __getitem__(self, x:int):
+            def __getitem__(self, x: int):
                 return "Int"
 
-            def __getitem__(self, x:str):
+            def __getitem__(self, x: str):
                 return "Str"
 
         self.assertEqual(WithGetitem()[0], "Int")
@@ -493,7 +493,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(~c, "inv")
         self.assertEqual(int(c), 10203)
         self.assertEqual(float(c), 123.5)
-        self.assertEqual([1,2,3][c], 3)
+        self.assertEqual([1, 2, 3][c], 3)
 
     def test_class_binary_operators(self):
         class WithLotsOfOperators(Class):
@@ -524,18 +524,18 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = WithLotsOfOperators()
 
-        self.assertEqual(c+0, (c,"add",0))
-        self.assertEqual(c-0, (c,"sub",0))
-        self.assertEqual(c*0, (c,"mul",0))
-        self.assertEqual(c/0, (c,"div",0))
-        self.assertEqual(c%0, (c,"mod",0))
-        self.assertEqual(c//0, (c,"floordiv",0))
-        self.assertEqual(c<<0, (c,"lshift",0))
-        self.assertEqual(c>>0, (c,"rshift",0))
-        self.assertEqual(c|0, (c,"or",0))
-        self.assertEqual(c&0, (c,"and",0))
-        self.assertEqual(c^0, (c,"xor",0))
-        self.assertEqual(c@0, (c,"matmul",0))
+        self.assertEqual(c+0, (c, "add", 0))
+        self.assertEqual(c-0, (c, "sub", 0))
+        self.assertEqual(c*0, (c, "mul", 0))
+        self.assertEqual(c/0, (c, "div", 0))
+        self.assertEqual(c%0, (c, "mod", 0))
+        self.assertEqual(c//0, (c, "floordiv", 0))
+        self.assertEqual(c<<0, (c, "lshift", 0))
+        self.assertEqual(c>>0, (c, "rshift", 0))
+        self.assertEqual(c|0, (c, "or", 0))
+        self.assertEqual(c&0, (c, "and", 0))
+        self.assertEqual(c^0, (c, "xor", 0))
+        self.assertEqual(c@0, (c, "matmul", 0))
 
     def test_class_binary_operators_reverse(self):
         class WithLotsOfOperators(Class):
@@ -566,18 +566,18 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = WithLotsOfOperators()
 
-        self.assertEqual(0+c, (c,"add",0))
-        self.assertEqual(0-c, (c,"sub",0))
-        self.assertEqual(0*c, (c,"mul",0))
-        self.assertEqual(0/c, (c,"div",0))
-        self.assertEqual(0%c, (c,"mod",0))
-        self.assertEqual(0//c, (c,"floordiv",0))
-        self.assertEqual(0<<c, (c,"lshift",0))
-        self.assertEqual(0>>c, (c,"rshift",0))
-        self.assertEqual(0|c, (c,"or",0))
-        self.assertEqual(0&c, (c,"and",0))
-        self.assertEqual(0^c, (c,"xor",0))
-        self.assertEqual(0@c, (c,"matmul",0))
+        self.assertEqual(0+c, (c, "add", 0))
+        self.assertEqual(0-c, (c, "sub", 0))
+        self.assertEqual(0*c, (c, "mul", 0))
+        self.assertEqual(0/c, (c, "div", 0))
+        self.assertEqual(0%c, (c, "mod", 0))
+        self.assertEqual(0//c, (c, "floordiv", 0))
+        self.assertEqual(0<<c, (c, "lshift", 0))
+        self.assertEqual(0>>c, (c, "rshift", 0))
+        self.assertEqual(0|c, (c, "or", 0))
+        self.assertEqual(0&c, (c, "and", 0))
+        self.assertEqual(0^c, (c, "xor", 0))
+        self.assertEqual(0@c, (c, "matmul", 0))
 
     def test_class_binary_inplace_operators(self):
         class WithLotsOfOperators(Class):
@@ -608,18 +608,18 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = WithLotsOfOperators()
 
-        self.assertEqual(operator.iadd(c,0), (c,"iadd",0))
-        self.assertEqual(operator.isub(c,0), (c,"isub",0))
-        self.assertEqual(operator.imul(c,0), (c,"imul",0))
-        self.assertEqual(operator.imod(c,0), (c,"imod",0))
-        self.assertEqual(operator.itruediv(c,0), (c,"itruediv",0))
-        self.assertEqual(operator.ifloordiv(c,0), (c,"ifloordiv",0))
-        self.assertEqual(operator.ilshift(c,0), (c,"ilshift",0))
-        self.assertEqual(operator.irshift(c,0), (c,"irshift",0))
-        self.assertEqual(operator.ior(c,0), (c,"ior",0))
-        self.assertEqual(operator.iand(c,0), (c,"iand",0))
-        self.assertEqual(operator.ixor(c,0), (c,"ixor",0))
-        self.assertEqual(operator.imatmul(c,0), (c,"imatmul",0))
+        self.assertEqual(operator.iadd(c, 0), (c, "iadd", 0))
+        self.assertEqual(operator.isub(c, 0), (c, "isub", 0))
+        self.assertEqual(operator.imul(c, 0), (c, "imul", 0))
+        self.assertEqual(operator.imod(c, 0), (c, "imod", 0))
+        self.assertEqual(operator.itruediv(c, 0), (c, "itruediv", 0))
+        self.assertEqual(operator.ifloordiv(c, 0), (c, "ifloordiv", 0))
+        self.assertEqual(operator.ilshift(c, 0), (c, "ilshift", 0))
+        self.assertEqual(operator.irshift(c, 0), (c, "irshift", 0))
+        self.assertEqual(operator.ior(c, 0), (c, "ior", 0))
+        self.assertEqual(operator.iand(c, 0), (c, "iand", 0))
+        self.assertEqual(operator.ixor(c, 0), (c, "ixor", 0))
+        self.assertEqual(operator.imatmul(c, 0), (c, "imatmul", 0))
 
     def test_class_dispatch_on_tuple_vs_list(self):
         class WithTwoFunctions(Class):
@@ -630,8 +630,8 @@ class NativeClassTypesTests(unittest.TestCase):
                 return "List"
 
         c = WithTwoFunctions()
-        self.assertEqual(c.f(TupleOf(int)((1,2,3))), "Tuple")
-        self.assertEqual(c.f(ListOf(int)((1,2,3))), "Tuple")
+        self.assertEqual(c.f(TupleOf(int)((1, 2, 3))), "Tuple")
+        self.assertEqual(c.f(ListOf(int)((1, 2, 3))), "Tuple")
 
     def test_class_comparison_operators(self):
         class ClassWithComparisons(Class):
@@ -658,8 +658,8 @@ class NativeClassTypesTests(unittest.TestCase):
             def __ge__(self, other):
                 return self.x >= other.x
 
-        for i in [0,1,2,3]:
-            for j in [0,1,2,3]:
+        for i in [0, 1, 2, 3]:
+            for j in [0, 1, 2, 3]:
                 self.assertEqual(
                     ClassWithComparisons(i) < ClassWithComparisons(j),
                     i < j

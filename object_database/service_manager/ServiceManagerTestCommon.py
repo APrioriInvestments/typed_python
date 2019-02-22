@@ -49,8 +49,8 @@ class ServiceManagerTestCommon(object):
         self.tempDirectoryName = self.tempDirObj.name
         object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(self.tempDirectoryName, forceReset=True)
 
-        os.makedirs(os.path.join(self.tempDirectoryName,'source'))
-        os.makedirs(os.path.join(self.tempDirectoryName,'storage'))
+        os.makedirs(os.path.join(self.tempDirectoryName, 'source'))
+        os.makedirs(os.path.join(self.tempDirectoryName, 'storage'))
 
         if not VERBOSE:
             kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
@@ -94,5 +94,5 @@ class ServiceManagerTestCommon(object):
     def tearDown(self):
         self.server.terminate()
         self.server.wait()
-        self.tempDirObj.__exit__(None,None,None)
+        self.tempDirObj.__exit__(None, None, None)
 

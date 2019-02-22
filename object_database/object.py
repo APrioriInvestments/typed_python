@@ -49,7 +49,7 @@ class DatabaseObject(_base):
         return _base.__new__(cls, _identity=identity)
 
     def __new__(cls, *args, **kwds):
-        if args and len(args) == 1 and isinstance(args[0],cls):
+        if args and len(args) == 1 and isinstance(args[0], cls):
             return args[0]
 
         if not hasattr(_cur_view, "view"):

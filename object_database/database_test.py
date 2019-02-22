@@ -124,7 +124,7 @@ class ObjectDatabaseTests:
 
     def test_subscribe_excluding(self):
         db = self.createNewDb()
-        db.subscribeToSchema(schema,excluding=[ThingWithDicts])
+        db.subscribeToSchema(schema, excluding=[ThingWithDicts])
 
         with db.view():
             with self.assertRaises(Exception):
@@ -187,7 +187,7 @@ class ObjectDatabaseTests:
         with db.transaction():
             self.assertEqual(x.holding.x, 10)
             self.assertIsInstance(x.holding, ArbitraryBaseClass)
-            x.holding = ArbitrarySubclass(10,20)
+            x.holding = ArbitrarySubclass(10, 20)
 
         with db.transaction():
             self.assertEqual(x.holding.x, 10)
@@ -265,7 +265,7 @@ class ObjectDatabaseTests:
         self.server._lazyLoadCallback = loadedIDs.put
 
         with db.transaction():
-            c = Counter(k=2,x=3)
+            c = Counter(k=2, x=3)
 
         db2 = self.createNewDb()
         db2.subscribeToSchema(schema, lazySubscription=True)
@@ -304,7 +304,7 @@ class ObjectDatabaseTests:
         with db.transaction():
             counter = Object(k=expr.Constant(value=10))
 
-            counter2 = Object(other=counter,k=expr.Constant(value=0))
+            counter2 = Object(other=counter, k=expr.Constant(value=0))
 
             self.assertEqual(counter2.otherK, counter.k)
 
@@ -375,7 +375,7 @@ class ObjectDatabaseTests:
 
         with db.transaction():
             t = Test(i=1)
-            t2 = SubclassTesting(i=2,y=3)
+            t2 = SubclassTesting(i=2, y=3)
 
             self.assertEqual(t.f(), 1)
             self.assertEqual(t.g(), 2)
@@ -398,7 +398,7 @@ class ObjectDatabaseTests:
             numpy.random.shuffle(indices)
 
             for i in indices:
-                db.subscribeToIndex(Counter,k=i)
+                db.subscribeToIndex(Counter, k=i)
 
                 with db.transaction():
                     Counter(k=i, x=index)
@@ -434,7 +434,7 @@ class ObjectDatabaseTests:
         db2 = self.createNewDb()
 
         for i in range(count):
-            db2.subscribeToIndex(Counter,k=i)
+            db2.subscribeToIndex(Counter, k=i)
         db2.flush()
         with db2.view():
             self.assertEqual(len(Counter.lookupAll()), count*threadCount)
@@ -581,7 +581,7 @@ class ObjectDatabaseTests:
 
         views = [db.view()]
 
-        for i in [1,2,3]:
+        for i in [1, 2, 3]:
             with db.transaction():
                 root.obj = Object(k=expr.Constant(value=i))
             views.append(db.view())
@@ -594,7 +594,7 @@ class ObjectDatabaseTests:
                 else:
                     vals.append(root.obj.k.value)
 
-        self.assertEqual(vals, [None, 1,2,3])
+        self.assertEqual(vals, [None, 1, 2, 3])
 
     def test_conflicts(self):
         db = self.createNewDb()
@@ -609,7 +609,7 @@ class ObjectDatabaseTests:
             t2 = db.transaction()
 
             if ordering:
-                t1,t2 = t2,t1
+                t1, t2 = t2, t1
 
             with t1:
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
@@ -892,12 +892,12 @@ class ObjectDatabaseTests:
             x = int
             y = int
 
-            pair=Index('x','y')
+            pair=Index('x', 'y')
 
         db.subscribeToSchema(schema)
 
         with db.transaction():
-            o = Object(x=0,y=0)
+            o = Object(x=0, y=0)
 
         t1 = db.transaction()
         t2 = db.transaction()
@@ -978,11 +978,11 @@ class ObjectDatabaseTests:
             self.assertEqual(Object.lookupAll(k=10), (o1,))
             self.assertEqual(Object.lookupAll(k=20), ())
 
-            self.assertEqual(Object.lookupAll(pair_index=(10,10)), (o1,))
-            self.assertEqual(Object.lookupAll(pair_index=(10,11)), ())
+            self.assertEqual(Object.lookupAll(pair_index=(10, 10)), (o1,))
+            self.assertEqual(Object.lookupAll(pair_index=(10, 11)), ())
 
             with self.assertRaises(Exception):
-                self.assertEqual(Object.lookupAll(pair_index=(10,"hi")), (o1,))
+                self.assertEqual(Object.lookupAll(pair_index=(10, "hi")), (o1,))
 
     def test_indices_update_during_transactions(self):
         db = self.createNewDb()
@@ -1105,8 +1105,8 @@ class ObjectDatabaseTests:
             c0.x = 20
             c1.x = 30
 
-        db1.subscribeToIndex(Counter,k=0)
-        db2.subscribeToIndex(Counter,k=1)
+        db1.subscribeToIndex(Counter, k=0)
+        db2.subscribeToIndex(Counter, k=1)
 
         with db1.view():
             self.assertTrue(c0.exists())
@@ -1147,7 +1147,7 @@ class ObjectDatabaseTests:
 
         #but if we make a new database connection and subscribe, we won't see it
         db3 = self.createNewDb()
-        db3.subscribeToIndex(Counter,k=0)
+        db3.subscribeToIndex(Counter, k=0)
         db3.flush()
 
         with db3.view():
@@ -1189,7 +1189,7 @@ class ObjectDatabaseTests:
 
         with db1.transaction():
             for i in range(21000):
-                Counter(k=i,x=i)
+                Counter(k=i, x=i)
 
         with db1.transaction():
             for i in range(21000):
@@ -1208,7 +1208,7 @@ class ObjectDatabaseTests:
         with db1.transaction():
             #make sure we have values in there.
             for _ in range(10000):
-                Counter(k=123,x=-1)
+                Counter(k=123, x=-1)
 
             c1 = Counter(k=123)
             c1.x = 1
@@ -1230,7 +1230,7 @@ class ObjectDatabaseTests:
             c2 = Counter(k=123)
 
         blocker.releaseCallback()
-        for i in range(1,101):
+        for i in range(1, 101):
             self.assertEqual(blocker.waitForCallback(pfactor), i)
             blocker.releaseCallback()
 
@@ -1256,7 +1256,7 @@ class ObjectDatabaseTests:
 
         with db1.transaction():
             for _ in range(10000):
-                Counter(k=123,x=-1)
+                Counter(k=123, x=-1)
 
             c1 = Counter(k=0)
 
@@ -1266,7 +1266,7 @@ class ObjectDatabaseTests:
 
         subscriptionEvents = db2.subscribeToIndex(Counter, k=123, block=False)
 
-        for i in range(0,50):
+        for i in range(0, 50):
             self.assertEqual(blocker.waitForCallback(self.PERFORMANCE_FACTOR), i)
             blocker.releaseCallback()
 
@@ -1280,7 +1280,7 @@ class ObjectDatabaseTests:
         with db1.transaction():
             c1.k = 123
 
-        for i in range(50,101):
+        for i in range(50, 101):
             self.assertEqual(blocker.waitForCallback(self.PERFORMANCE_FACTOR), i)
             blocker.releaseCallback()
 
@@ -1366,7 +1366,7 @@ class ObjectDatabaseTests:
         counters = []
         with db2.transaction():
             for i in range(testSize):
-                c = Counter(k=0,x=i)
+                c = Counter(k=0, x=i)
                 counters.append(c)
 
         for i in range(testSize):
@@ -1498,7 +1498,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
             self.redisProcess.wait()
 
         self.redisProcess = subprocess.Popen(
-            ["/usr/bin/redis-server",'--port', '1115', '--logfile', os.path.join(self.tempDirName, "log.txt"),
+            ["/usr/bin/redis-server", '--port', '1115', '--logfile', os.path.join(self.tempDirName, "log.txt"),
                 "--dbfilename", "db.rdb", "--dir", os.path.join(self.tempDirName)]
             )
         time.sleep(.5)
@@ -1632,7 +1632,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
 
                 isOK.append(True)
 
-            threads = [threading.Thread(target=readerthread,args=(db1 if threadcount % 2 else db2,)) for _ in range(threadcount)]
+            threads = [threading.Thread(target=readerthread, args=(db1 if threadcount % 2 else db2,)) for _ in range(threadcount)]
             for t in threads:
                 t.start()
 
@@ -1683,10 +1683,10 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
             db1 = self.createNewDb()
             db1.subscribeToSchema(schema)
 
-            for ix in range(1,3):
+            for ix in range(1, 3):
                 with db1.transaction():
                     for i in range(5000):
-                        Counter(k=ix,x=i)
+                        Counter(k=ix, x=i)
 
             #now there's a lot of stuff in the database
 

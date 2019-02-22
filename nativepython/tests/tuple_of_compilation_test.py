@@ -45,7 +45,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         return t_py, t_fast
 
     def test_tuple_of_float(self):
-        def f(x: TupleOf(float), y:TupleOf(float)) -> float:
+        def f(x: TupleOf(float), y: TupleOf(float)) -> float:
             j = 0
             res = 0.0
             i = 0
@@ -62,11 +62,11 @@ class TestTupleOfCompilation(unittest.TestCase):
         aTupleOfFloat = TupleOf(float)(list(range(1000)))
         aTupleOfFloat2 = TupleOf(float)(list(range(1000)))
 
-        self.assertEqual(_types.refcount(aTupleOfFloat),1)
+        self.assertEqual(_types.refcount(aTupleOfFloat), 1)
 
-        t_py, t_fast = self.checkFunction(f, [(aTupleOfFloat,aTupleOfFloat2)])
+        t_py, t_fast = self.checkFunction(f, [(aTupleOfFloat, aTupleOfFloat2)])
 
-        self.assertEqual(_types.refcount(aTupleOfFloat),1)
+        self.assertEqual(_types.refcount(aTupleOfFloat), 1)
 
         #I get around 150x
         self.assertTrue(t_py / t_fast > 50.0)
@@ -78,14 +78,14 @@ class TestTupleOfCompilation(unittest.TestCase):
         def f(x: TupleOf(int)) -> int:
             return 0
 
-        self.assertEqual(f((1,2,3)), 0)
+        self.assertEqual(f((1, 2, 3)), 0)
 
     def test_tuple_len(self):
         @Compiled
         def f(x: TupleOf(int)) -> int:
             return len(x)
 
-        self.assertEqual(f((1,2,3)), 3)
+        self.assertEqual(f((1, 2, 3)), 3)
 
     def test_tuple_assign(self):
         @Compiled
@@ -93,21 +93,21 @@ class TestTupleOfCompilation(unittest.TestCase):
             y = x
             return y
 
-        t = TupleOf(int)((1,2,3))
+        t = TupleOf(int)((1, 2, 3))
 
         self.assertEqual(f(t), t)
 
-        self.assertEqual(_types.refcount(t),1)
+        self.assertEqual(_types.refcount(t), 1)
 
     def test_tuple_indexing(self):
         @Compiled
-        def f(x: TupleOf(int), y:int) -> int:
+        def f(x: TupleOf(int), y: int) -> int:
             return x[y]
 
-        self.assertEqual(f((1,2,3),1), 2)
+        self.assertEqual(f((1, 2, 3), 1), 2)
 
         with self.assertRaises(Exception):
-            f((1,2,3),1000000000)
+            f((1, 2, 3), 1000000000)
 
     def test_tuple_refcounting(self):
         @Function
@@ -120,23 +120,23 @@ class TestTupleOfCompilation(unittest.TestCase):
 
             intTup = TupleOf(int)(list(range(1000)))
 
-            self.assertEqual(_types.refcount(intTup),1)
+            self.assertEqual(_types.refcount(intTup), 1)
 
             res = f(intTup, intTup)
 
-            self.assertEqual(_types.refcount(intTup),2)
+            self.assertEqual(_types.refcount(intTup), 2)
 
             res = None
 
-            self.assertEqual(_types.refcount(intTup),1)
+            self.assertEqual(_types.refcount(intTup), 1)
 
     def test_bad_mod_generates_exception(self):
         @Compiled
-        def f(x: int, y:int) -> int:
+        def f(x: int, y: int) -> int:
             return x % y
 
         with self.assertRaises(Exception):
-            f(0,0)
+            f(0, 0)
 
     def test_tuple_of_adding(self):
         T = TupleOf(int)
@@ -145,8 +145,8 @@ class TestTupleOfCompilation(unittest.TestCase):
         def f(x: T, y: T) -> T:
             return x + y
 
-        t1 = T((1,2,3))
-        t2 = T((3,4))
+        t1 = T((1, 2, 3))
+        t2 = T((3, 4))
 
         res = f(t1, t2)
 
@@ -164,10 +164,10 @@ class TestTupleOfCompilation(unittest.TestCase):
         def f(x: TT) -> TT:
             return x + x + x
 
-        t1 = T((1,2,3))
-        t2 = T((4,5,5))
+        t1 = T((1, 2, 3))
+        t2 = T((4, 5, 5))
 
-        aTT = TT((t1,t2))
+        aTT = TT((t1, t2))
 
         fRes = f(aTT)
 
@@ -191,7 +191,7 @@ class TestTupleOfCompilation(unittest.TestCase):
         initMem = psutil.Process().memory_info().rss / 1024 ** 2
 
         for i in range(10000):
-            f(t1,t1)
+            f(t1, t1)
 
         finalMem = psutil.Process().memory_info().rss / 1024 ** 2
 

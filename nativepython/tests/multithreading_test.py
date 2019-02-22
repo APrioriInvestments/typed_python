@@ -27,8 +27,8 @@ def thread_apply(f, argtuples):
     def doit(f, ix, *args):
         results[ix] = f(*args)
 
-    for ix,a in enumerate(argtuples):
-        threads.append(threading.Thread(target=doit,args=(f,ix) + a))
+    for ix, a in enumerate(argtuples):
+        threads.append(threading.Thread(target=doit, args=(f, ix) + a))
 
     for t in threads:
         t.start()
@@ -58,7 +58,7 @@ class TestMultithreading(unittest.TestCase):
             t0 = time.time()
             res1 = thread_apply(f, [(100000000,)])
             t1 = time.time()
-            res2 = thread_apply(f, [(100000000,),(100000001,)])
+            res2 = thread_apply(f, [(100000000,), (100000001,)])
             t2 = time.time()
 
             first = t1 - t0
@@ -85,10 +85,10 @@ class TestMultithreading(unittest.TestCase):
         A = Alternative("A", X={'x': int}, Y={'y': int})
 
         for instance in [
-                TupleOf(int)((1,2,3)),
-                ListOf(int)((1,2,3)),
+                TupleOf(int)((1, 2, 3)),
+                ListOf(int)((1, 2, 3)),
                 #Dict(int,int)({1:2,3:4}),
-                ConstDict(int,int)({1:2,3:4}),
+                ConstDict(int, int)({1: 2, 3: 4}),
                 AClass(),
                 #anObject,
                 A.X(x=10)
@@ -107,7 +107,7 @@ class TestMultithreading(unittest.TestCase):
 
         thread_apply(rapidlyIncAndDecref, [(instance,)] * 10)
 
-        self.assertEqual(_types.refcount(instance),1)
+        self.assertEqual(_types.refcount(instance), 1)
 
     def test_serialize_is_parallel(self):
         x = ListOf(int)()
@@ -123,7 +123,7 @@ class TestMultithreading(unittest.TestCase):
             t0 = time.time()
             thread_apply(f, [()])
             t1 = time.time()
-            thread_apply(f, [(),()])
+            thread_apply(f, [(), ()])
             t2 = time.time()
 
             first = t1 - t0

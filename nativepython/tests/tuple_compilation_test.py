@@ -32,7 +32,7 @@ class TestTupleCompilation(unittest.TestCase):
             y = x
             return y
 
-        t = T((0.0,1,"hi"))
+        t = T((0.0, 1, "hi"))
         self.assertEqual(f(t), t)
 
     def test_named_tuple_passing(self):

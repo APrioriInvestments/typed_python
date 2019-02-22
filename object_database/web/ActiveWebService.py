@@ -236,7 +236,7 @@ class ActiveWebService(ServiceBase):
                 service.target_count = ct
             return f
 
-        serviceCounts = list(range(5)) + list(range(10,100,10)) + list(range(100,400,25)) + list(range(400,1001,100))
+        serviceCounts = list(range(5)) + list(range(10, 100, 10)) + list(range(100, 400, 25)) + list(range(400, 1001, 100))
 
         buttons = Sequence([
             Padding(),
@@ -256,7 +256,7 @@ class ActiveWebService(ServiceBase):
                     'Service', 'Codebase Status', 'Codebase', 'Module', 'Class',
                     'Placement', 'Active', 'TargetCount', 'Cores', 'RAM', 'Boot Status'],
                 rowFun=lambda:
-                    sorted(service_schema.Service.lookupAll(), key=lambda s:s.name),
+                    sorted(service_schema.Service.lookupAll(), key=lambda s: s.name),
                 headerFun=lambda x: x,
                 rendererFun=lambda s, field: Subscribed(lambda:
                     Clickable(s.name, "/services/" + s.name) if field == 'Service' else
@@ -282,9 +282,9 @@ class ActiveWebService(ServiceBase):
                 ),
             Hosts=Table(
                 colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
-                rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname),
+                rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s: s.hostname),
                 headerFun=lambda x: x,
-                rendererFun=lambda s,field: Subscribed(lambda:
+                rendererFun=lambda s, field: Subscribed(lambda:
                     s.connection._identity if field == "Connection" else
                     str(s.isMaster) if field == "IsMaster" else
                     s.hostname if field == "Hostname" else
@@ -365,7 +365,7 @@ class ActiveWebService(ServiceBase):
                 LargePendingDownloadDisplay(),
                 Octicon('person') + Span(current_username),
                 Span('Authorized Groups: {}'.format(self.authorized_groups_text)),
-                Button(Octicon('sign-out'),'/logout')
+                Button(Octicon('sign-out'), '/logout')
                 ]) +
             Main(display)
             )

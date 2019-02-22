@@ -53,7 +53,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.waitRunning("TaskService")
         self.waitRunning("TaskDispatchService")
 
-        with open(os.path.join(ownDir, "test_files", "TestModule1.py"),"r") as f:
+        with open(os.path.join(ownDir, "test_files", "TestModule1.py"), "r") as f:
             files = {"TestModule1.py": f.read()}
 
         with self.database.transaction():
@@ -117,7 +117,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             return localVersion(x-1) + localVersion(x-2)
 
         with self.service1Conn.transaction():
-            self.assertEqual(task.result.result,localVersion(5))
+            self.assertEqual(task.result.result, localVersion(5))
 
     def test_error_recovery(self):
         if os.getenv("TRAVIS_CI") is not None:
@@ -167,5 +167,5 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             return localVersion(x-1) + localVersion(x-2)
 
         with self.service1Conn.transaction():
-            self.assertEqual(task.result.result,localVersion(7))
+            self.assertEqual(task.result.result, localVersion(7))
 

@@ -51,8 +51,8 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for s2 in someStrings:
-                self.assertEqual(s, takeFirst(s,s2))
-                self.assertEqual(s2, takeSecond(s,s2))
+                self.assertEqual(s, takeFirst(s, s2))
+                self.assertEqual(s2, takeSecond(s, s2))
 
     def test_string_len(self):
         @Compiled
@@ -73,8 +73,8 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for s2 in someStrings:
-                self.assertEqual(s+s2, concat(s,s2))
-                self.assertEqual(len(s+s2), concatLen(s,s2))
+                self.assertEqual(s+s2, concat(s, s2))
+                self.assertEqual(len(s+s2), concatLen(s, s2))
 
     def test_string_comparison(self):
         @Compiled
@@ -103,12 +103,12 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for s2 in someStrings:
-                self.assertEqual(eq(s,s2),s==s2)
-                self.assertEqual(neq(s,s2),s!=s2)
-                self.assertEqual(gte(s,s2),s>=s2)
-                self.assertEqual(lte(s,s2),s<=s2)
-                self.assertEqual(gt(s,s2),s>s2)
-                self.assertEqual(lt(s,s2),s<s2)
+                self.assertEqual(eq(s, s2), s==s2)
+                self.assertEqual(neq(s, s2), s!=s2)
+                self.assertEqual(gte(s, s2), s>=s2)
+                self.assertEqual(lte(s, s2), s<=s2)
+                self.assertEqual(gt(s, s2), s>s2)
+                self.assertEqual(lt(s, s2), s<s2)
 
     def test_string_constants(self):
         def makeConstantConcatenator(s):
@@ -120,7 +120,7 @@ class TestStringCompilation(unittest.TestCase):
             f = Compiled(makeConstantConcatenator(s))
             s_from_code = f()
 
-            self.assertEqual(s, s_from_code, (repr(s),repr(s_from_code)))
+            self.assertEqual(s, s_from_code, (repr(s), repr(s_from_code)))
 
     def test_string_getitem(self):
         @Compiled
@@ -135,5 +135,5 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for i in range(-20, 20):
-                self.assertEqual(callOrExcept(getitem, s,i), callOrExcept(lambda s,i: s[i], s, i), (s,i))
+                self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 

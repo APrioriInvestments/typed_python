@@ -63,7 +63,7 @@ def _main(argv):
     install_parser.add_argument("--path", action='append', dest='paths')
     install_parser.add_argument("--class")
     install_parser.add_argument("--name", required=False)
-    install_parser.add_argument("--placement", required=False, default='Any', choices=['Any','Master','Worker'])
+    install_parser.add_argument("--placement", required=False, default='Any', choices=['Any', 'Master', 'Worker'])
     install_parser.add_argument("--singleton", required=False, action='store_true')
 
     reset_parser = subparsers.add_parser('reset', help='reset a service''s boot count')
@@ -134,7 +134,7 @@ def _main(argv):
 
         with db.transaction():
             fullClassname = getattr(parsedArgs, 'class')
-            modulename, classname = fullClassname.rsplit(".",1)
+            modulename, classname = fullClassname.rsplit(".", 1)
 
             def _getobject(modname, attribute):
                 mod = __import__(modname, fromlist=[attribute])
@@ -162,7 +162,7 @@ def _main(argv):
         table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount', 'Cores', 'RAM']]
 
         with db.view():
-            for s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name):
+            for s in sorted(service_schema.Service.lookupAll(), key=lambda s: s.name):
                 table.append([
                     s.name,
                     str(s.codebase),
@@ -180,7 +180,7 @@ def _main(argv):
         table = [['Service', 'Host', 'Connection', 'State']]
 
         with db.view():
-            for s in sorted(service_schema.ServiceInstance.lookupAll(), key=lambda s:(s.service.name, s.host.hostname, s.state)):
+            for s in sorted(service_schema.ServiceInstance.lookupAll(), key=lambda s: (s.service.name, s.host.hostname, s.state)):
                 table.append([
                     s.service.name,
                     s.host.hostname,
@@ -194,7 +194,7 @@ def _main(argv):
         table = [['Connection', 'IsMaster', 'Hostname', 'RAM USAGE', 'CORE USAGE', 'SERVICE COUNT']]
 
         with db.view():
-            for s in sorted(service_schema.ServiceHost.lookupAll(), key=lambda s:s.hostname):
+            for s in sorted(service_schema.ServiceHost.lookupAll(), key=lambda s: s.hostname):
                 table.append([
                     s.connection._identity,
                     str(s.isMaster),

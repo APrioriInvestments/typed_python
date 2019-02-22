@@ -354,7 +354,7 @@ class ExpressionConversionContext(object):
             def __enter__(scope):
                 return [(target, Scope(target)) for target in targets]
 
-            def __exit__(scope, t,v,traceback):
+            def __exit__(scope, t, v, traceback):
                 if t is None:
                     expr = results.get(targets[-1], native_ast.nullExpr)
 
@@ -399,7 +399,7 @@ class ExpressionConversionContext(object):
             def __enter__(scope):
                 return Scope(True), Scope(False)
 
-            def __exit__(scope, t,v,traceback):
+            def __exit__(scope, t, v, traceback):
                 if t is None:
                     true = results.get(True, native_ast.nullExpr)
                     false = results.get(False, native_ast.nullExpr)
@@ -429,7 +429,7 @@ class ExpressionConversionContext(object):
             elif i.matches.StackSlot:
                 expr = i.expr >> expr
             elif i.matches.Simple:
-                expr = native_ast.Expression.Let(var=i.name,val=i.expr,within=expr)
+                expr = native_ast.Expression.Let(var=i.name, val=i.expr, within=expr)
 
         if not self.teardowns:
             return expr
@@ -529,7 +529,7 @@ class ExpressionConversionContext(object):
         if ast.matches.Name:
             assert ast.ctx.matches.Load
             if ast.id in self.functionContext._varname_to_type:
-                with self.ifelse(self.isInitializedVarExpr(ast.id)) as (true,false):
+                with self.ifelse(self.isInitializedVarExpr(ast.id)) as (true, false):
                     with false:
                         self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % ast.id)
                 return self.named_var_expr(ast.id)
@@ -609,7 +609,7 @@ class ExpressionConversionContext(object):
                     return TypedExpression(self, native_ast.trueExpr, typeWrapper(bool), False)
 
             while len(expr_so_far) > 1:
-                l,r = expr_so_far[-2], expr_so_far[-1]
+                l, r = expr_so_far[-2], expr_so_far[-1]
                 expr_so_far.pop()
                 expr_so_far.pop()
 

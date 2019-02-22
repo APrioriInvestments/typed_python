@@ -31,7 +31,7 @@ def llvm_bool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
 
 def assertTagDictsSame(left_tags, right_tags):
-    for which in [left_tags,right_tags]:
+    for which in [left_tags, right_tags]:
         for tag in which:
             assert tag in left_tags and tag in right_tags and right_tags[tag] is left_tags[tag], "Tag %s is not the same" % tag
 
@@ -97,13 +97,13 @@ def constant_to_typed_llvm_value(module, builder, c):
         return TypedLLVMValue(llvm_c, nt)
 
     if c.matches.Struct:
-        vals = [constant_to_typed_llvm_value(module, builder, t) for _,t in c.elements]
+        vals = [constant_to_typed_llvm_value(module, builder, t) for _, t in c.elements]
 
         t = llvmlite.ir.LiteralStructType(type_to_llvm_type(t.llvm_value.type) for t in vals)
         llvm_c = llvmlite.ir.Constant(t, [t.llvm_value for t in vals])
 
         nt = native_ast.Type.Struct(
-            [(c.elements[i][0],vals[i].native_type) for i in range(len(vals))]
+            [(c.elements[i][0], vals[i].native_type) for i in range(len(vals))]
             )
 
         return TypedLLVMValue(llvm_c, nt)
@@ -120,7 +120,7 @@ def constant_to_typed_llvm_value(module, builder, c):
 
         value.initializer = llvm_c
 
-        nt = native_ast.Type.Int(bits=8,signed=False).pointer()
+        nt = native_ast.Type.Int(bits=8, signed=False).pointer()
 
         return TypedLLVMValue(
             builder.bitcast(value, llvm_i8ptr),
@@ -192,7 +192,7 @@ class TeardownOnScopeExit:
         with self.builder.goto_block(self._block):
             is_return = self.builder.phi(llvm_i1, name='is_return_flow_%s' % self.height)
 
-            for b,val in self.incoming_is_return.items():
+            for b, val in self.incoming_is_return.items():
                 if isinstance(val, bool):
                     val = llvm_bool(val)
                 is_return.add_incoming(val, b)
@@ -379,7 +379,7 @@ class FunctionConverter:
         else:
             self.return_slot = builder.alloca(type_to_llvm_type(self.output_type))
 
-        self.exception_slot = builder.alloca(llvm_i8ptr,name="exception_slot")
+        self.exception_slot = builder.alloca(llvm_i8ptr, name="exception_slot")
 
         #if populated, we are expected to write our return value to 'return_slot' and jump here
         #on return
@@ -394,7 +394,7 @@ class FunctionConverter:
 
             res.add_clause(
                 llvmlite.ir.CatchClause(
-                    llvmlite.ir.Constant(llvm_i8ptr,None)
+                    llvmlite.ir.Constant(llvm_i8ptr, None)
                     )
                 )
 
@@ -452,7 +452,7 @@ class FunctionConverter:
         exception_ptr = self.builder.bitcast(
             self.builder.call(
                 self.external_function_references["__cxa_allocate_exception"],
-                [llvmlite.ir.Constant(llvm_i64,pointer_size)],
+                [llvmlite.ir.Constant(llvm_i64, pointer_size)],
                 name="alloc_e"
                 ),
             llvm_i8ptr.as_pointer()
@@ -504,7 +504,7 @@ class FunctionConverter:
 
         self.builder.call(
             self.external_function_references["__cxa_throw"],
-            [exception_ptr] + [llvmlite.ir.Constant(llvm_i8ptr,None)] * 2
+            [exception_ptr] + [llvmlite.ir.Constant(llvm_i8ptr, None)] * 2
             )
 
         self.builder.unreachable()
@@ -513,7 +513,7 @@ class FunctionConverter:
         if expr.matches.Let:
             l = self.convert(expr.val)
 
-            prior = self.arg_assignments.get(expr.var,None)
+            prior = self.arg_assignments.get(expr.var, None)
             self.arg_assignments[expr.var] = l
 
             res = self.convert(expr.within)
@@ -528,14 +528,14 @@ class FunctionConverter:
         if expr.matches.StackSlot:
             if expr.name not in self.stack_slots:
                 if expr.type.matches.Void:
-                    llvm_type = type_to_llvm_type(native_ast.Type.Struct(element_types=(),name="void"))
+                    llvm_type = type_to_llvm_type(native_ast.Type.Struct(element_types=(), name="void"))
                 else:
                     llvm_type = type_to_llvm_type(expr.type)
 
                 with self.builder.goto_entry_block():
                     self.stack_slots[expr.name] = \
                         TypedLLVMValue(
-                            self.builder.alloca(llvm_type,name=expr.name),
+                            self.builder.alloca(llvm_type, name=expr.name),
                             native_ast.Type.Pointer(value_type=expr.type)
                             )
 
@@ -768,7 +768,7 @@ class FunctionConverter:
             self.tags_initialized = final_tags
 
             if true.native_type != false.native_type:
-                raise Exception("Expected left and right branches to have same type, but %s != %s\n\n%s" % (true,false,expr))
+                raise Exception("Expected left and right branches to have same type, but %s != %s\n\n%s" % (true, false, expr))
 
             if true.native_type.matches.Void:
                 return TypedLLVMValue(None, native_ast.Type.Void())
@@ -894,8 +894,8 @@ class FunctionConverter:
             if r is None:
                 return
 
-            for which, rep in [('Gt','>'),('Lt','<'),('GtE','>='),
-                               ('LtE','<='),('Eq',"=="),("NotEq","!=")]:
+            for which, rep in [('Gt', '>'), ('Lt', '<'), ('GtE', '>='),
+                               ('LtE', '<='), ('Eq', "=="), ("NotEq", "!=")]:
                 if getattr(expr.op.matches, which):
                     if l.native_type.matches.Float:
                         return TypedLLVMValue(
@@ -909,16 +909,16 @@ class FunctionConverter:
                             )
 
             for py_op, floatop, intop_s, intop_u in [
-                        ('Add','fadd','add','add'),
-                        ('Mul','fmul','mul','mul'),
-                        ('Div','fdiv','sdiv', 'udiv'),
-                        ('Mod','frem','srem', 'urem'),
-                        ('Sub','fsub','sub','sub'),
-                        ('LShift',None,'shl','shl'),
-                        ('RShift',None,'ashr','lshr'),
-                        ('BitOr',None,'or_','or_'),
-                        ('BitXor',None,'xor','xor'),
-                        ('BitAnd',None,'and_','and_')
+                        ('Add', 'fadd', 'add', 'add'),
+                        ('Mul', 'fmul', 'mul', 'mul'),
+                        ('Div', 'fdiv', 'sdiv', 'udiv'),
+                        ('Mod', 'frem', 'srem', 'urem'),
+                        ('Sub', 'fsub', 'sub', 'sub'),
+                        ('LShift', None, 'shl', 'shl'),
+                        ('RShift', None, 'ashr', 'lshr'),
+                        ('BitOr', None, 'or_', 'or_'),
+                        ('BitXor', None, 'xor', 'xor'),
+                        ('BitAnd', None, 'and_', 'and_')
                         ]:
                 if getattr(expr.op.matches, py_op):
                     assert l.native_type == r.native_type, \
@@ -1038,7 +1038,7 @@ class FunctionConverter:
 
             def generator(tags, resume_normal_block):
                 with self.tags_as(tags):
-                    prior = self.arg_assignments.get(expr.varname,None)
+                    prior = self.arg_assignments.get(expr.varname, None)
                     self.arg_assignments[expr.varname] = \
                         TypedLLVMValue(
                             self.builder.load(
@@ -1113,7 +1113,7 @@ def populate_needed_externals(external_function_references, module):
                 fname
                 )
     define("__cxa_allocate_exception", llvm_i8ptr, [llvm_i64])
-    define("__cxa_throw", llvm_void, [llvm_i8ptr,llvm_i8ptr,llvm_i8ptr])
+    define("__cxa_throw", llvm_void, [llvm_i8ptr, llvm_i8ptr, llvm_i8ptr])
     define("__cxa_end_catch", llvm_i8ptr, [llvm_i8ptr])
     define("__cxa_begin_catch", llvm_i8ptr, [llvm_i8ptr])
     define("__gxx_personality_v0", llvm_i32, [], vararg=True)
@@ -1155,7 +1155,7 @@ class Converter(object):
                 print()
                 print("*************")
                 print("def %s(%s): #->%s" % (name,
-                            ",".join(["%s=%s" % (k,str(t)) for k,t in definition.args]),
+                            ",".join(["%s=%s" % (k, str(t)) for k, t in definition.args]),
                             str(definition.output_type)
                             )
                     )

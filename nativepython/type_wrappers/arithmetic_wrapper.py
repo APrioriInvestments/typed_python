@@ -92,7 +92,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
         super().__init__(Int64)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Int(bits=64,signed=True)
+        return native_ast.Type.Int(bits=64, signed=True)
 
     def toFloat64(self, context, e):
         return context.pushPod(
@@ -190,7 +190,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
         super().__init__(Bool)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Int(bits=1,signed=False)
+        return native_ast.Type.Int(bits=1, signed=False)
 
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == Float64:

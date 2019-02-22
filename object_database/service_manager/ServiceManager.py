@@ -140,7 +140,7 @@ class ServiceManager(object):
                     return True
             return False
 
-        return db.waitForCondition(isRunning,timeout)
+        return db.waitForCondition(isRunning, timeout)
 
     def stopAllServices(self, timeout):
         with self.db.transaction():

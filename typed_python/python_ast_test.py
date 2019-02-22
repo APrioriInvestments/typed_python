@@ -45,8 +45,8 @@ class TestPythonAst(unittest.TestCase):
         self.reverseParseCheck(lambda x: X+1)
         self.reverseParseCheck(lambda x: 1.2)
         self.reverseParseCheck(lambda x: "hi")
-        self.reverseParseCheck(lambda x: (x,True))
-        self.reverseParseCheck(lambda x: (x,None))
+        self.reverseParseCheck(lambda x: (x, True))
+        self.reverseParseCheck(lambda x: (x, None))
         self.reverseParseCheck(lambda x: x.asdf)
         self.reverseParseCheck(lambda x: x(10))
 
@@ -65,7 +65,7 @@ class TestPythonAst(unittest.TestCase):
             class A:
                 z = 20
                 @staticmethod
-                def y(self, z:int):
+                def y(self, z: int):
                     pass
 
                 @otherDecordator
@@ -79,7 +79,7 @@ class TestPythonAst(unittest.TestCase):
     def test_reverse_parse_functions_with_keywords(self):
         def f():
             def g(x=10, y=20, *args, q=30):
-                return (x,y,args,q)
+                return (x, y, args, q)
             g(x=20, y=30)
 
         self.reverseParseCheck(f)
@@ -88,7 +88,7 @@ class TestPythonAst(unittest.TestCase):
         def f():
             [x for x in y]
             [x for x in y for z in q]
-            {k:v for k in v}
+            {k: v for k in v}
 
         self.reverseParseCheck(f)
 
@@ -108,7 +108,7 @@ class TestPythonAst(unittest.TestCase):
         def f(x):
             return x+x
         self.reverseParseAndEvalCheck(f, 10)
-        self.reverseParseAndEvalCheck(lambda x:x+x, 10)
+        self.reverseParseAndEvalCheck(lambda x: x+x, 10)
 
     def test_reverse_parse_eval_withblock(self):
         def f(x, filename):

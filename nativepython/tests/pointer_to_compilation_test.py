@@ -70,7 +70,7 @@ class TestPointerToCompilation(unittest.TestCase):
         check(0)
         check(0.0)
         check(ListOf(int)([10]))
-        check(Tuple(int,int,int)((10,10,10)))
+        check(Tuple(int, int, int)((10, 10, 10)))
 
     def test_pointer_subtraction(self):
         T = ListOf(int)

@@ -21,21 +21,21 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(TupleOf(int).ElementType, Int64)
 
         self.assertEqual(TupleOf(float).ElementType, Float64)
-        self.assertEqual(TupleOf(OneOf(10,20)).ElementType, OneOf(10,20))
+        self.assertEqual(TupleOf(OneOf(10, 20)).ElementType, OneOf(10, 20))
 
         self.assertEqual(TupleOf(object).ElementType.__typed_python_category__, "PythonObjectOfType")
         self.assertEqual(TupleOf(10).ElementType.__typed_python_category__, "Value")
 
     def test_tuple(self):
-        self.assertEqual(Tuple(int, int, OneOf(10,20)).ElementTypes, (Int64, Int64, OneOf(10,20)))
+        self.assertEqual(Tuple(int, int, OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20)))
 
     def test_named_tuple(self):
-        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10,20)).ElementTypes, (Int64, Int64, OneOf(10,20)))
-        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10,20)).ElementNames, ('x','y','z'))
+        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementTypes, (Int64, Int64, OneOf(10, 20)))
+        self.assertEqual(NamedTuple(x=int, y=int, z=OneOf(10, 20)).ElementNames, ('x', 'y', 'z'))
 
     def test_const_dict(self):
-        self.assertEqual(ConstDict(str,int).KeyType, String)
-        self.assertEqual(ConstDict(str,int).ValueType, Int64)
+        self.assertEqual(ConstDict(str, int).KeyType, String)
+        self.assertEqual(ConstDict(str, int).ValueType, Int64)
 
     def test_alternatives(self):
         X = Alternative("X",
@@ -47,13 +47,13 @@ class TypesMetadataTest(unittest.TestCase):
 
         self.assertEqual(len(X.__typed_python_alternatives__), 2)
 
-        Left,Right = X.__typed_python_alternatives__
+        Left, Right = X.__typed_python_alternatives__
 
         self.assertEqual(Left.Index, 0)
         self.assertEqual(Right.Index, 1)
 
         self.assertEqual(Left.ElementType.ElementNames, ("x", "y"))
         self.assertEqual(Left.ElementType.ElementTypes, (Int64, String))
-        self.assertEqual(Right.ElementType.ElementNames, ('x','val'))
-        self.assertEqual(Right.ElementType.ElementTypes, (X,Int64))
+        self.assertEqual(Right.ElementType.ElementNames, ('x', 'val'))
+        self.assertEqual(Right.ElementType.ElementTypes, (X, Int64))
 

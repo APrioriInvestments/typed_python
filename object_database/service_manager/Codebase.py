@@ -79,14 +79,14 @@ class Codebase:
         )
 
     @staticmethod
-    def  createFromCodebase(codebase:TypedPythonCodebase):
+    def  createFromCodebase(codebase: TypedPythonCodebase):
         return Codebase.createFromFiles(codebase.filesToContents)
 
     @staticmethod
     def createFromFiles(files):
         assert files
 
-        files = {k: File.create(v) if not isinstance(v, File) else v for k,v in files.items()}
+        files = {k: File.create(v) if not isinstance(v, File) else v for k, v in files.items()}
 
         hashval = sha_hash(files).hexdigest
 

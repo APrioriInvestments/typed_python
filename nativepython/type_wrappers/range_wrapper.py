@@ -53,8 +53,8 @@ class RangeInstanceWrapper(Wrapper):
     def convert_method_call(self, context, expr, methodname, args, kwargs):
         if methodname == "__iter__" and not args and not kwargs:
             return context.push(_RangeIteratorWrapper, lambda instance:
-                instance.expr.ElementPtrIntegers(0,0).store(0) >>
-                    instance.expr.ElementPtrIntegers(0,1).store(expr.nonref_expr)
+                instance.expr.ElementPtrIntegers(0, 0).store(0) >>
+                    instance.expr.ElementPtrIntegers(0, 1).store(expr.nonref_expr)
                 )
         return super().convert_method_call(context, expr, methodname, args, kwargs)
 
@@ -74,16 +74,16 @@ class RangeIteratorWrapper(Wrapper):
 
     def convert_next(self, context, expr):
         context.pushEffect(
-            expr.expr.ElementPtrIntegers(0,0).store(
-                expr.expr.ElementPtrIntegers(0,0).load().add(1)
+            expr.expr.ElementPtrIntegers(0, 0).store(
+                expr.expr.ElementPtrIntegers(0, 0).load().add(1)
                 )
             )
         canContinue = context.pushPod(bool,
-            expr.expr.ElementPtrIntegers(0,0).load().lt(
-                expr.expr.ElementPtrIntegers(0,1).load()
+            expr.expr.ElementPtrIntegers(0, 0).load().lt(
+                expr.expr.ElementPtrIntegers(0, 1).load()
                 )
             )
-        nextExpr = context.pushReference(int, expr.expr.ElementPtrIntegers(0,0))
+        nextExpr = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
         return nextExpr, canContinue
 

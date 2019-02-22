@@ -71,7 +71,7 @@ class LdapAuthPlugin(AuthPluginBase):
 
         return ldap3.Connection(server, ldap_username, password, **opts)
 
-    def getUserAttribute(self, connection, username:str, attributeName:str):
+    def getUserAttribute(self, connection, username: str, attributeName: str):
         if not connection.search(
                 self._base_dn,
                 '({username_key}={username})'.format(username_key=self.username_key, username=username),

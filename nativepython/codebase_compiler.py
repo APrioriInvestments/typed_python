@@ -42,7 +42,7 @@ class CompiledCodebase:
             os.path.join(self.codebase.rootDirectory, "__pycache__", "nativepython")
             )
 
-        for wrappingCallTargetName, (f,callTarget) in self.typedTargets.items():
+        for wrappingCallTargetName, (f, callTarget) in self.typedTargets.items():
             fp = function_pointers[wrappingCallTargetName]
 
             f._installNativePointer(

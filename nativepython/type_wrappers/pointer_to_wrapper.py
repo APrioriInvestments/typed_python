@@ -99,7 +99,7 @@ class PointerToWrapper(Wrapper):
         return super().convert_bin_op(context, left, op, right)
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("set","get","initialize", "cast"):
+        if attr in ("set", "get", "initialize", "cast"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)

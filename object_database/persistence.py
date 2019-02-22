@@ -61,7 +61,7 @@ class InMemoryPersistence(object):
             return
 
         with self.lock:
-            s = self.values.get(key,set())
+            s = self.values.get(key, set())
 
             for value in values:
                 assert value in s, (key, value, s)
@@ -70,7 +70,7 @@ class InMemoryPersistence(object):
                 del self.values[key]
 
     def storedStringCount(self):
-        return len([x for x in self.values.values() if isinstance(x,str)])
+        return len([x for x in self.values.values() if isinstance(x, str)])
 
     def getSetMembers(self, key):
         with self.lock:
@@ -78,13 +78,13 @@ class InMemoryPersistence(object):
             if s is None:
                 return set()
 
-            assert isinstance(s,set)
+            assert isinstance(s, set)
 
             return s
 
     def getSeveralAsDictionary(self, keys):
         keys = list(keys)
-        return {keys[i]: value for i,value in enumerate(self.getSeveral(keys))}
+        return {keys[i]: value for i, value in enumerate(self.getSeveral(keys))}
 
     def getSeveral(self, keys):
         with self.lock:
@@ -99,17 +99,17 @@ class InMemoryPersistence(object):
             for k in (removes or []):
                 assert not isinstance(self.values.get(k, None), str), k + " is already a string"
 
-            for k,v in kvs.items():
-                self.set(k,v)
+            for k, v in kvs.items():
+                self.set(k, v)
 
             if adds:
-                for k,to_add in adds.items():
+                for k, to_add in adds.items():
                     if k not in self.values:
                         new_sets.add(k)
                     self._setAdd(k, to_add)
 
             if removes:
-                for k,to_remove in removes.items():
+                for k, to_remove in removes.items():
                     self._setRemove(k, to_remove)
                     if k not in self.values:
                         dropped_sets.add(k)
@@ -168,7 +168,7 @@ class RedisPersistence(object):
 
     def getSeveralAsDictionary(self, keys):
         keys = list(keys)
-        return {keys[i]: value for i,value in enumerate(self.getSeveral(keys))}
+        return {keys[i]: value for i, value in enumerate(self.getSeveral(keys))}
 
     def getSeveral(self, keys):
         """Get the values (or None) stored in several value-style keys."""
@@ -214,7 +214,7 @@ class RedisPersistence(object):
                 return set()
 
     def setSeveral(self, kvs, setAdds=None, setRemoves=None):
-        new_sets, dropped_sets = set(),set()
+        new_sets, dropped_sets = set(), set()
         with self.lock:
             pipe = self.redis.pipeline()
 

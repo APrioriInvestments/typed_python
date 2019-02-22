@@ -23,7 +23,7 @@ import pytz
 import lz4.frame
 import logging
 
-_reconstruct = numpy.array([1,2,3]).__reduce__()[0]
+_reconstruct = numpy.array([1, 2, 3]).__reduce__()[0]
 _ndarray = numpy.ndarray
 
 def createEmptyFunction(ast):
@@ -47,7 +47,7 @@ _builtin_name_to_value[".builtin.pytz"] = pytz
 _builtin_name_to_value[".ast.Expr.Lambda"] = Expr.Lambda
 _builtin_name_to_value[".ast.Statement.FunctionDef"] = Statement.FunctionDef
 
-_builtin_value_to_name = {id(v):k for k,v in _builtin_name_to_value.items()}
+_builtin_value_to_name = {id(v): k for k, v in _builtin_name_to_value.items()}
 
 
 class SerializationContext(object):
@@ -70,7 +70,7 @@ class SerializationContext(object):
         )
 
         # take the lexically lowest name, so that we're not dependent on ordering.
-        for k,v in self.nameToObject.items():
+        for k, v in self.nameToObject.items():
             if id(v) not in self.objToName or k < self.objToName[id(v)]:
                 self.objToName[id(v)] = k
 
@@ -127,7 +127,7 @@ class SerializationContext(object):
         return SerializationContext(nameToObject)
 
     def withPrefix(self, prefix):
-        return SerializationContext({prefix + "." + k: v for k,v  in self.nameToObject.items()})
+        return SerializationContext({prefix + "." + k: v for k, v  in self.nameToObject.items()})
 
     def withoutLineInfoEncoded(self):
         res = SerializationContext(self.nameToObject)
@@ -190,7 +190,7 @@ class SerializationContext(object):
         if isinstance(inst, type):
             isTF = isTypeFunctionType(inst)
             if isTF is not None:
-                return (reconstructTypeFunctionType,isTF,None)
+                return (reconstructTypeFunctionType, isTF, None)
 
         if isinstance(inst, numpy.ndarray):
             return inst.__reduce__()
@@ -232,7 +232,7 @@ class SerializationContext(object):
 
             walkCodeObject(inst.__code__)
 
-            representation["freevars"] = {k:v for k,v in inst.__globals__.items() if k in all_names}
+            representation["freevars"] = {k: v for k, v in inst.__globals__.items() if k in all_names}
 
             for ix, x in enumerate(inst.__code__.co_freevars):
                 representation["freevars"][x] = inst.__closure__[ix].cell_contents

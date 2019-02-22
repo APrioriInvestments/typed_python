@@ -51,7 +51,7 @@ def makeTupleOf(*args):
 def makeNamedTuple(**kwargs):
     if not kwargs:
         return NamedTuple()()
-    return NamedTuple(**{k:typeFor(v) for k,v in kwargs.items()})(**kwargs)
+    return NamedTuple(**{k: typeFor(v) for k, v in kwargs.items()})(**kwargs)
 
 def makeTuple(*args):
     if not args:
@@ -60,7 +60,7 @@ def makeTuple(*args):
 
 def makeDict(d):
     if not d:
-        return ConstDict(int,int)()
+        return ConstDict(int, int)()
 
     return ConstDict(typeForSeveral(d.keys()), typeForSeveral(d.values()))(d)
 
@@ -68,7 +68,7 @@ def makeAlternative(severalDicts):
     types = list(
         set(
             tuple(
-                (k,typeFor(v)) for k,v in ntDict.items()
+                (k, typeFor(v)) for k, v in ntDict.items()
                 )
             for ntDict in severalDicts
             )
@@ -83,7 +83,7 @@ def makeAlternative(severalDicts):
         did = False
         for i in range(len(types)):
             try:
-                res.append(getattr(alt,"a_%s" % i)(**thing))
+                res.append(getattr(alt, "a_%s" % i)(**thing))
                 did = True
             except Exception:
                 pass
@@ -97,7 +97,7 @@ def makeAlternative(severalDicts):
 def choice(x):
     #numpy.random.choice([1,(1,2)]) blows up because it looks 'multidimensional'
     #so we have to pick from a list of indices
-    if not isinstance(x,list):
+    if not isinstance(x, list):
         x = list(x)
     return x[numpy.random.choice(list(range(len(x))))]
 
@@ -134,30 +134,30 @@ class RandomValueProducer:
 
         for _ in range(count):
             val = self.randomValue(picker)
-            if not isinstance(val,list):
+            if not isinstance(val, list):
                 val = [val]
             self.levels.setdefault(level, []).extend(val)
 
     def randomValue(self, picker):
         def randomTuple():
-            return makeTuple(*[picker() for i in range(choice([0,1,2,3,4]))])
+            return makeTuple(*[picker() for i in range(choice([0, 1, 2, 3, 4]))])
 
         def randomNamedTupleDict():
-            return {"x_%s" % i: picker() for i in range(choice([0,1,2,3,4]))}
+            return {"x_%s" % i: picker() for i in range(choice([0, 1, 2, 3, 4]))}
 
         def randomNamedTuple():
             return makeNamedTuple(**randomNamedTupleDict())
 
         def randomDict():
-            return makeDict({picker():picker() for i in range(choice([0,1,2,3,4]))})
+            return makeDict({picker(): picker() for i in range(choice([0, 1, 2, 3, 4]))})
 
         def randomTupleOf():
-            return makeTupleOf(*[picker() for i in range(choice([0,1,2,3,4]))])
+            return makeTupleOf(*[picker() for i in range(choice([0, 1, 2, 3, 4]))])
 
         def randomAlternative():
-            return makeAlternative([randomNamedTupleDict() for i in range(choice([1,2,3,4]))])
+            return makeAlternative([randomNamedTupleDict() for i in range(choice([1, 2, 3, 4]))])
 
-        return choice([randomTuple,randomNamedTuple,randomDict,randomTupleOf,randomAlternative,picker])()
+        return choice([randomTuple, randomNamedTuple, randomDict, randomTupleOf, randomAlternative, picker])()
 
     def pickRandomly(self):
         return choice(self.levels[choice(list(self.levels))])
@@ -185,12 +185,12 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(ibc(NoneType, NoneType))
         self.assertTrue(ibc(Int8, Int8))
 
-        NT = NamedTuple(a=int,b=int)
+        NT = NamedTuple(a=int, b=int)
 
-        class X(NamedTuple(a=int,b=int)):
+        class X(NamedTuple(a=int, b=int)):
             pass
 
-        class Y(NamedTuple(a=int,b=int)):
+        class Y(NamedTuple(a=int, b=int)):
             pass
 
         self.assertTrue(ibc(X, X))
@@ -241,15 +241,15 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_type_stringification(self):
         for t in ['Int8', 'NoneType']:
-            self.assertEqual(str(getattr(_types,t)()), "<class '%s'>" % t)
+            self.assertEqual(str(getattr(_types, t)()), "<class '%s'>" % t)
 
     def test_tuple_of(self):
         tupleOfInt = TupleOf(int)
         i = tupleOfInt(())
-        i = tupleOfInt((1,2,3))
+        i = tupleOfInt((1, 2, 3))
 
         self.assertEqual(len(i), 3)
-        self.assertEqual(tuple(i), (1,2,3))
+        self.assertEqual(tuple(i), (1, 2, 3))
 
         for x in range(10):
             self.assertEqual(
@@ -258,7 +258,7 @@ class NativeTypesTests(unittest.TestCase):
             )
 
         with self.assertRaisesRegex(AttributeError, "do not accept attributes"):
-            tupleOfInt((1,2,3)).x = 2
+            tupleOfInt((1, 2, 3)).x = 2
 
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
@@ -281,7 +281,7 @@ class NativeTypesTests(unittest.TestCase):
         tupleOfInt = TupleOf(int)
         tupleOfTupleOfInt = TupleOf(tupleOfInt)
 
-        pyVersion = (1,2,3),(1,2,3,4)
+        pyVersion = (1, 2, 3), (1, 2, 3, 4)
         nativeVersion = tupleOfTupleOfInt(pyVersion)
 
         self.assertEqual(len(nativeVersion), 2)
@@ -291,7 +291,7 @@ class NativeTypesTests(unittest.TestCase):
         bigTup = tupleOfInt(list(range(1000)))
 
         t0 = time.time()
-        t = (bigTup,bigTup,bigTup,bigTup,bigTup)
+        t = (bigTup, bigTup, bigTup, bigTup, bigTup)
         for i in range(1000000):
             tupleOfTupleOfInt(t)
 
@@ -315,15 +315,15 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_tuple_assign_fails(self):
         with self.assertRaisesRegex(TypeError, "does not support item assignment"):
-            (1,2,3)[10] = 20
+            (1, 2, 3)[10] = 20
         with self.assertRaisesRegex(TypeError, "does not support item assignment"):
-            TupleOf(int)((1,2,3))[10] = 20
+            TupleOf(int)((1, 2, 3))[10] = 20
 
     def test_list_of(self):
         L = ListOf(int)
         self.assertEqual(L.__qualname__, "ListOf(Int64)")
 
-        l = L([1,2,3,4])
+        l = L([1, 2, 3, 4])
 
         self.assertEqual(l[0], 1)
         self.assertEqual(l[-1], 4)
@@ -337,19 +337,19 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(IndexError, "index out of range"):
             l[100] = 20
 
-        l2 = L((10,2,3,11))
+        l2 = L((10, 2, 3, 11))
 
-        self.assertEqual(l,l2)
-        self.assertNotEqual(l,(10,2,3,11))
-        self.assertEqual(l,[10,2,3,11])
+        self.assertEqual(l, l2)
+        self.assertNotEqual(l, (10, 2, 3, 11))
+        self.assertEqual(l, [10, 2, 3, 11])
 
-        self.assertEqual(str(l),str([10,2,3,11]))
+        self.assertEqual(str(l), str([10, 2, 3, 11]))
 
         l3 = l + l2
-        self.assertEqual(l3, [10,2,3,11,10,2,3,11])
+        self.assertEqual(l3, [10, 2, 3, 11, 10, 2, 3, 11])
 
         l3.append(23)
-        self.assertEqual(l3, [10,2,3,11,10,2,3,11, 23])
+        self.assertEqual(l3, [10, 2, 3, 11, 10, 2, 3, 11, 23])
 
     def test_list_resize(self):
         l = ListOf(TupleOf(int))()
@@ -359,7 +359,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(len(l), 10)
 
         emptyTup = TupleOf(int)()
-        aTup = TupleOf(int)((1,2,3))
+        aTup = TupleOf(int)((1, 2, 3))
 
         self.assertEqual(list(l), [emptyTup] * 10)
         l.resize(20, aTup)
@@ -436,7 +436,7 @@ class NativeTypesTests(unittest.TestCase):
         EvenIntegers = TupleOf(EvenInt)
 
         e = EvenIntegers(())
-        e2 = e + (2,4,0)
+        e2 = e + (2, 4, 0)
 
         with self.assertRaises(TypeError):
             EvenIntegers((1,))
@@ -446,7 +446,7 @@ class NativeTypesTests(unittest.TestCase):
 
 
     def test_tuple_of_one_of_fixed_size(self):
-        t = TupleOf(OneOf(0,1,2,3,4))
+        t = TupleOf(OneOf(0, 1, 2, 3, 4))
 
         ints = tuple([x % 5 for x in range(1000000)])
 
@@ -464,7 +464,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(
             len(serialize(t, typedThings)),
-            sum(2 if isinstance(t,bool) else 9 for t in someThings) + 8
+            sum(2 if isinstance(t, bool) else 9 for t in someThings) + 8
             )
 
         self.assertEqual(tuple(typedThings), someThings)
@@ -479,7 +479,7 @@ class NativeTypesTests(unittest.TestCase):
             a = OneOf(vals[0], vals[1], type(vals[2]))
 
             for v in vals:
-                self.assertEqual(a(v), v, (a(v),v))
+                self.assertEqual(a(v), v, (a(v), v))
 
             tup = TupleOf(a)
             tupInst = tup(vals)
@@ -496,23 +496,23 @@ class NativeTypesTests(unittest.TestCase):
     def test_one_of_in_tuple(self):
         t = Tuple(OneOf(None, str), str)
 
-        self.assertEqual(t(("hi","hi2"))[0], "hi")
-        self.assertEqual(t(("hi","hi2"))[1], "hi2")
-        self.assertEqual(t((None,"hi2"))[1], "hi2")
-        self.assertEqual(t((None,"hi2"))[0], None)
+        self.assertEqual(t(("hi", "hi2"))[0], "hi")
+        self.assertEqual(t(("hi", "hi2"))[1], "hi2")
+        self.assertEqual(t((None, "hi2"))[1], "hi2")
+        self.assertEqual(t((None, "hi2"))[0], None)
         with self.assertRaises(TypeError):
-            t((None,None))
+            t((None, None))
         with self.assertRaises(IndexError):
-            t((None,"hi2"))[2]
+            t((None, "hi2"))[2]
 
     def test_one_of_composite(self):
         t = OneOf(TupleOf(str), TupleOf(float))
 
-        self.assertIsInstance(t((1.0,2.0)), TupleOf(float))
-        self.assertIsInstance(t(("1.0","2.0")), TupleOf(str))
+        self.assertIsInstance(t((1.0, 2.0)), TupleOf(float))
+        self.assertIsInstance(t(("1.0", "2.0")), TupleOf(str))
 
         with self.assertRaises(TypeError):
-            t((1.0,"2.0"))
+            t((1.0, "2.0"))
 
     def test_named_tuple(self):
         t = NamedTuple(a=int, b=int)
@@ -527,32 +527,32 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(t().a, 0)
         self.assertEqual(t()[1], 0)
 
-        self.assertEqual(t(a=1,b=2).a, 1)
-        self.assertEqual(t(a=1,b=2).b, 2)
+        self.assertEqual(t(a=1, b=2).a, 1)
+        self.assertEqual(t(a=1, b=2).b, 2)
 
     def test_named_tuple_construction(self):
         t = NamedTuple(a=int, b=int)
 
         self.assertEqual(t(a=10).a, 10)
         self.assertEqual(t(a=10).b, 0)
-        self.assertEqual(t(a=10,b=2).a, 10)
-        self.assertEqual(t(a=10,b=2).b, 2)
-        self.assertEqual(t({'a': 10,'b':2}).a, 10)
-        self.assertEqual(t({'a': 10,'b':2}).b, 2)
+        self.assertEqual(t(a=10, b=2).a, 10)
+        self.assertEqual(t(a=10, b=2).b, 2)
+        self.assertEqual(t({'a': 10, 'b': 2}).a, 10)
+        self.assertEqual(t({'a': 10, 'b': 2}).b, 2)
 
-        self.assertEqual(t({'b':2}).a, 0)
-        self.assertEqual(t({'b':2}).b, 2)
+        self.assertEqual(t({'b': 2}).a, 0)
+        self.assertEqual(t({'b': 2}).b, 2)
 
         with self.assertRaises(TypeError):
-            t({'c':10})
+            t({'c': 10})
         with self.assertRaises(TypeError):
             t(c=10)
 
     def test_named_tuple_str(self):
         t = NamedTuple(a=str, b=str)
 
-        self.assertEqual(t(a='1',b='2').a, '1')
-        self.assertEqual(t(a='1',b='2').b, '2')
+        self.assertEqual(t(a='1', b='2').a, '1')
+        self.assertEqual(t(a='1', b='2').b, '2')
 
         self.assertEqual(t(b='2').a, '')
         self.assertEqual(t(b='2').b, '2')
@@ -579,99 +579,99 @@ class NativeTypesTests(unittest.TestCase):
             else:
                 return x
 
-        lt = lambda a,b: map(a) < map(b)
-        le = lambda a,b: map(a) <= map(b)
-        eq = lambda a,b: map(a) == map(b)
-        ne = lambda a,b: map(a) != map(b)
-        gt = lambda a,b: map(a) > map(b)
-        ge = lambda a,b: map(a) >= map(b)
+        lt = lambda a, b: map(a) < map(b)
+        le = lambda a, b: map(a) <= map(b)
+        eq = lambda a, b: map(a) == map(b)
+        ne = lambda a, b: map(a) != map(b)
+        gt = lambda a, b: map(a) > map(b)
+        ge = lambda a, b: map(a) >= map(b)
 
-        funcs = [lt,le,eq,ne,gt,ge]
-        ts = [None,1.0,2.0,3.0]
+        funcs = [lt, le, eq, ne, gt, ge]
+        ts = [None, 1.0, 2.0, 3.0]
 
         for f in funcs:
             for t1 in ts:
                 for t2 in ts:
-                    self.assertTrue(f(t1,t2) is f(t(t1),t(t2)))
+                    self.assertTrue(f(t1, t2) is f(t(t1), t(t2)))
 
     def test_comparisons_equivalence(self):
         t = TupleOf(OneOf(None, str, bytes, float, int, bool, TupleOf(int)),)
 
-        def lt(a,b): return a < b
-        def le(a,b): return a <= b
-        def eq(a,b): return a == b
-        def ne(a,b): return a != b
-        def gt(a,b): return a > b
-        def ge(a,b): return a >= b
+        def lt(a, b): return a < b
+        def le(a, b): return a <= b
+        def eq(a, b): return a == b
+        def ne(a, b): return a != b
+        def gt(a, b): return a > b
+        def ge(a, b): return a >= b
 
-        funcs = [lt,le,eq,ne,gt,ge]
+        funcs = [lt, le, eq, ne, gt, ge]
 
         tgroups = [
-            [1.0,2.0,3.0],
-            [1,2,3],
-            [True,False],
-            ["a","b","ab","bb","ba","aaaaaaa","","asdf"],
-            ["1","2","3","12","13","23","24","123123", "0", ""],
-            [b"a",b"b",b"ab",b"bb",b"ba",b"aaaaaaa",b"",b"asdf"],
-            [(1,2),(1,2,3),(),(1,1),(1,)]
+            [1.0, 2.0, 3.0],
+            [1, 2, 3],
+            [True, False],
+            ["a", "b", "ab", "bb", "ba", "aaaaaaa", "", "asdf"],
+            ["1", "2", "3", "12", "13", "23", "24", "123123", "0", ""],
+            [b"a", b"b", b"ab", b"bb", b"ba", b"aaaaaaa", b"", b"asdf"],
+            [(1, 2), (1, 2, 3), (), (1, 1), (1,)]
             ]
 
         for ts in tgroups:
             for f in funcs:
                 for t1 in ts:
                     for t2 in ts:
-                        self.assertTrue(f(t1,t2) is f(t((t1,)),t((t2,))),
-                            (f, t1,t2, f(t1,t2), f(t((t1,)),t((t2,))))
+                        self.assertTrue(f(t1, t2) is f(t((t1,)), t((t2,))),
+                            (f, t1, t2, f(t1, t2), f(t((t1,)), t((t2,))))
                             )
 
     def test_const_dict(self):
-        t = ConstDict(str,str)
+        t = ConstDict(str, str)
 
         self.assertEqual(len(t()), 0)
         self.assertEqual(len(t({})), 0)
-        self.assertEqual(len(t({'a':'b'})), 1)
-        self.assertEqual(t({'a':'b'})['a'], 'b')
-        self.assertEqual(t({'a':'b','b':'c'})['b'], 'c')
+        self.assertEqual(len(t({'a': 'b'})), 1)
+        self.assertEqual(t({'a': 'b'})['a'], 'b')
+        self.assertEqual(t({'a': 'b', 'b': 'c'})['b'], 'c')
 
-        self.assertTrue("a" in deserialize(t,serialize(t, t({'a':'b'}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b'}))))
 
-        self.assertTrue("a" in deserialize(t,serialize(t, t({'a':'b','b':'c'}))))
-        self.assertTrue("a" in deserialize(t,serialize(t, t({'a':'b','b':'c','c':'d'}))))
-        self.assertTrue("a" in deserialize(t,serialize(t, t({'a':'b','b':'c','c':'d','d':'e'}))))
-        self.assertTrue("c" in deserialize(t,serialize(t, t({'a':'b','b':'c','c':'d','def':'e'}))))
-        self.assertTrue("def" in deserialize(t,serialize(t, t({'a':'b','b':'c','c':'d','def':'e'}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c'}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd'}))))
+        self.assertTrue("a" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'd': 'e'}))))
+        self.assertTrue("c" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'def': 'e'}))))
+        self.assertTrue("def" in deserialize(t, serialize(t, t({'a': 'b', 'b': 'c', 'c': 'd', 'def': 'e'}))))
 
     def test_const_dict_get(self):
-        a = ConstDict(str,str)({'a':'b','c':'d'})
+        a = ConstDict(str, str)({'a': 'b', 'c': 'd'})
 
-        self.assertEqual(a.get('a'),'b')
-        self.assertEqual(a.get('asdf'),None)
-        self.assertEqual(a.get('asdf',20),20)
+        self.assertEqual(a.get('a'), 'b')
+        self.assertEqual(a.get('asdf'), None)
+        self.assertEqual(a.get('asdf', 20), 20)
 
     def test_const_dict_items_keys_and_values(self):
-        a = ConstDict(str,str)({'a':'b','c':'d'})
+        a = ConstDict(str, str)({'a': 'b', 'c': 'd'})
 
-        self.assertEqual(sorted(a.items()), [('a','b'),('c','d')])
-        self.assertEqual(sorted(a.keys()), ['a','c'])
-        self.assertEqual(sorted(a.values()), ['b','d'])
+        self.assertEqual(sorted(a.items()), [('a', 'b'), ('c', 'd')])
+        self.assertEqual(sorted(a.keys()), ['a', 'c'])
+        self.assertEqual(sorted(a.values()), ['b', 'd'])
 
     def test_empty_string(self):
-        a = ConstDict(str,str)({'a':''})
+        a = ConstDict(str, str)({'a': ''})
 
         print(a['a'])
 
     def test_dict_to_oneof(self):
-        t = ConstDict(str,OneOf("A","B","ABCDEF"))
-        a = t({'a':'A','b':'ABCDEF'})
+        t = ConstDict(str, OneOf("A", "B", "ABCDEF"))
+        a = t({'a': 'A', 'b': 'ABCDEF'})
 
         self.assertEqual(a['a'], "A")
         self.assertEqual(a['b'], "ABCDEF")
 
-        self.assertEqual(a, deserialize(t,serialize(t,a)))
+        self.assertEqual(a, deserialize(t, serialize(t, a)))
 
     def test_deserialize_primitive(self):
         x = deserialize(str, serialize(str, "a"))
-        self.assertTrue(isinstance(x,str))
+        self.assertTrue(isinstance(x, str))
 
     def test_dict_containment(self):
         for _ in range(100):
@@ -688,7 +688,7 @@ class NativeTypesTests(unittest.TestCase):
 
 
     def test_named_tuple_from_dict(self):
-        N = NamedTuple(x=int, y=str,z=OneOf(None,"hihi"))
+        N = NamedTuple(x=int, y=str, z=OneOf(None, "hihi"))
         self.assertEqual(N().x, 0)
         self.assertEqual(N().y, "")
         self.assertEqual(N().z, None)
@@ -708,17 +708,17 @@ class NativeTypesTests(unittest.TestCase):
             N({'a': 0, 'b': 0, 'c': 0, 'd': 0})
 
     def test_const_dict_mixed(self):
-        t = ConstDict(str,int)
-        self.assertTrue(t({"a":10})["a"] == 10)
+        t = ConstDict(str, int)
+        self.assertTrue(t({"a": 10})["a"] == 10)
 
         t = ConstDict(int, str)
-        self.assertTrue(t({10:"a"})[10] == "a")
+        self.assertTrue(t({10: "a"})[10] == "a")
 
     def test_const_dict_comparison(self):
-        t = ConstDict(str,str)
+        t = ConstDict(str, str)
 
-        self.assertEqual(t({'a':'b'}), t({'a':'b'}))
-        self.assertLess(t({}), t({'a':'b'}))
+        self.assertEqual(t({'a': 'b'}), t({'a': 'b'}))
+        self.assertLess(t({}), t({'a': 'b'}))
 
     def test_const_dict_lookup(self):
         for type_to_use, vals in [
@@ -745,13 +745,13 @@ class NativeTypesTests(unittest.TestCase):
 
                 last_k = None
                 for k in typed_d:
-                    assert last_k is None or k > last_k, (k,last_k)
+                    assert last_k is None or k > last_k, (k, last_k)
                     last_k = k
 
     def test_const_dict_lookup_time(self):
         int_dict = ConstDict(int, int)
 
-        d = int_dict({k:k for k in range(1000000)})
+        d = int_dict({k: k for k in range(1000000)})
 
         for k in range(1000000):
             self.assertTrue(k in d)
@@ -759,12 +759,12 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_const_dict_of_dict(self):
         int_dict = ConstDict(int, int)
-        int_dict_2 = ConstDict(int_dict,int_dict)
+        int_dict_2 = ConstDict(int_dict, int_dict)
 
-        d = int_dict({1:2})
-        d2 = int_dict({1:2,3:4})
+        d = int_dict({1: 2})
+        d2 = int_dict({1: 2, 3: 4})
 
-        big = int_dict_2({d:d2})
+        big = int_dict_2({d: d2})
 
         self.assertTrue(d in big)
         self.assertTrue(d2 not in big)
@@ -784,7 +784,7 @@ class NativeTypesTests(unittest.TestCase):
         self.check_expected_performance(elapsed)
 
     def test_const_dict_str_perf(self):
-        t = ConstDict(str,str)
+        t = ConstDict(str, str)
 
         t0 = time.time()
         for i in range(100000):
@@ -795,41 +795,41 @@ class NativeTypesTests(unittest.TestCase):
         self.check_expected_performance(elapsed)
 
     def test_const_dict_int_perf(self):
-        t = ConstDict(int,int)
+        t = ConstDict(int, int)
 
         t0 = time.time()
         for i in range(100000):
-            t({k:k+1 for k in range(10)})
+            t({k: k+1 for k in range(10)})
 
         elapsed = time.time() - t0
         print("Took ", elapsed, " to do 1mm")
         self.check_expected_performance(elapsed)
 
     def test_const_dict_iter_int(self):
-        t = ConstDict(int,int)
+        t = ConstDict(int, int)
 
-        aDict = t({k:k+1 for k in range(100)})
+        aDict = t({k: k+1 for k in range(100)})
         for k in aDict:
             self.assertEqual(aDict[k], k+1)
 
     def test_const_dict_iter_str(self):
-        t = ConstDict(str,str)
+        t = ConstDict(str, str)
 
-        aDict = t({str(k):str(k+1) for k in range(100)})
+        aDict = t({str(k): str(k+1) for k in range(100)})
         for k in aDict:
             self.assertEqual(aDict[str(k)], str(int(k)+1))
 
     def test_alternatives_with_Bytes(self):
         alt = Alternative(
             "Alt",
-            x_0={'a':bytes}
+            x_0={'a': bytes}
             )
         self.assertEqual(alt.x_0(a=b''), alt.x_0(a=b''))
 
     def test_alternatives_with_str_func(self):
         alt = Alternative(
             "Alt",
-            x_0={'a':bytes},
+            x_0={'a': bytes},
             f=lambda self: 1,
             __str__=lambda self: "not_your_usual_str"
             )
@@ -838,7 +838,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
 
     def test_named_tuple_subclass_magic_methods(self):
-        class X(NamedTuple(x=int,y=int)):
+        class X(NamedTuple(x=int, y=int)):
             def __str__(self):
                 return "str override"
             def __repr__(self):
@@ -886,10 +886,10 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(issubclass(alt.child_ints, alt))
         self.assertTrue(issubclass(alt.child_strings, alt))
 
-        a = alt.child_ints(x=10,y=20)
-        a2 = alt.child_ints(x=10,y=20)
+        a = alt.child_ints(x=10, y=20)
+        a2 = alt.child_ints(x=10, y=20)
 
-        self.assertEqual(a,a2)
+        self.assertEqual(a, a2)
 
         self.assertTrue(isinstance(a, alt))
         self.assertTrue(isinstance(a, alt.child_ints))
@@ -927,12 +927,12 @@ class NativeTypesTests(unittest.TestCase):
         alt = Alternative(
             "Alt",
             child_ints={'x': int, 'y': int},
-            __add__=lambda l,r: (l,r)
+            __add__=lambda l, r: (l, r)
             )
 
-        a = alt.child_ints(x=0,y=2)
+        a = alt.child_ints(x=0, y=2)
 
-        self.assertEqual(a+a,(a,a))
+        self.assertEqual(a+a, (a, a))
 
     def test_alternatives_perf(self):
         alt = Alternative(
@@ -944,7 +944,7 @@ class NativeTypesTests(unittest.TestCase):
         t0 = time.time()
 
         for i in range(1000000):
-            a = alt.child_ints(x=10,y=20)
+            a = alt.child_ints(x=10, y=20)
             a.matches.child_ints
             a.x
 
@@ -962,14 +962,14 @@ class NativeTypesTests(unittest.TestCase):
             for v1 in values:
                 for v2 in values:
                     if hash(v1) != hash(v2) and v1 == v2:
-                        print(v1,v2, type(v1), type(v2))
+                        print(v1, v2, type(v1), type(v2))
 
             for v1 in values:
                 for v2 in values:
                     if type(v1) == type(v2) and v1 == v2:
                         self.assertEqual(hash(v1), hash(v2), (v1, v2))
                         if type(v1) is type(v2):
-                            self.assertEqual(repr(v1), repr(v2), (v1, v2, type(v1),type(v2)))
+                            self.assertEqual(repr(v1), repr(v2), (v1, v2, type(v1), type(v2)))
 
             values = sorted([makeTuple(v) for v in values])
 
@@ -985,7 +985,7 @@ class NativeTypesTests(unittest.TestCase):
             self.assertEqual(repr(makeTuple(someBytes)), repr((someBytes,)))
 
     def test_equality_with_native_python_objects(self):
-        tups = [(1,2,3), (), ("2",), (b"2",), (1,2,3, "b"), (2,), (None,)]
+        tups = [(1, 2, 3), (), ("2",), (b"2",), (1, 2, 3, "b"), (2,), (None,)]
 
         for tup1 in tups:
             self.assertEqual( makeTuple(*tup1), tup1 )
@@ -1005,7 +1005,7 @@ class NativeTypesTests(unittest.TestCase):
     def test_add_tuple_of(self):
         tupleOfInt = TupleOf(int)
 
-        tups = [(),(1,2),(1,),(1,2,3,4)]
+        tups = [(), (1, 2), (1,), (1, 2, 3, 4)]
 
         for tup1 in tups:
             for tup2 in tups:
@@ -1018,7 +1018,7 @@ class NativeTypesTests(unittest.TestCase):
         ints = tuple(range(20))
         aTuple = tupleOfInt(ints);
 
-        for i in range(-21,21):
+        for i in range(-21, 21):
             for i2 in range(-21, 21):
                 for step in range(-3, 3):
                     if step != 0:
@@ -1032,15 +1032,15 @@ class NativeTypesTests(unittest.TestCase):
                     aTuple[i]
 
     def test_dictionary_subtraction_basic(self):
-        intDict = ConstDict(int,int)
+        intDict = ConstDict(int, int)
 
-        self.assertEqual(intDict({1:2}) - (1,), intDict({}))
-        self.assertEqual(intDict({1:2, 3:4}) - (1,), intDict({3:4}))
-        self.assertEqual(intDict({1:2, 3:4}) - (3,), intDict({1:2}))
+        self.assertEqual(intDict({1: 2}) - (1,), intDict({}))
+        self.assertEqual(intDict({1: 2, 3: 4}) - (1,), intDict({3: 4}))
+        self.assertEqual(intDict({1: 2, 3: 4}) - (3,), intDict({1: 2}))
 
     def test_dictionary_addition_and_subtraction(self):
-        someDicts = [{i:choice([1,2,3,4,5]) for i in range(choice([4,6,10,20]))} for _ in range(20)]
-        intDict = ConstDict(int,int)
+        someDicts = [{i: choice([1, 2, 3, 4, 5]) for i in range(choice([4, 6, 10, 20]))} for _ in range(20)]
+        intDict = ConstDict(int, int)
 
         for d1 in someDicts:
             for d2 in someDicts:
@@ -1064,7 +1064,7 @@ class NativeTypesTests(unittest.TestCase):
                     self.assertEqual(res, intDict(addResult))
 
     def test_subclassing(self):
-        BaseTuple = NamedTuple(x=int,y=float)
+        BaseTuple = NamedTuple(x=int, y=float)
         class NTSubclass(BaseTuple):
             def f(self):
                 return self.x + self.y
@@ -1072,7 +1072,7 @@ class NativeTypesTests(unittest.TestCase):
             def __repr__(self):
                 return "ASDF"
 
-        inst = NTSubclass(x=10,y=20)
+        inst = NTSubclass(x=10, y=20)
 
         self.assertTrue(isinstance(inst, BaseTuple))
         self.assertTrue(isinstance(inst, NTSubclass))
@@ -1086,7 +1086,7 @@ class NativeTypesTests(unittest.TestCase):
 
         TupleOfSubclass = TupleOf(NTSubclass)
 
-        instTup = TupleOfSubclass((inst,BaseTuple(x=20,y=20.0)))
+        instTup = TupleOfSubclass((inst, BaseTuple(x=20, y=20.0)))
 
         self.assertTrue(isinstance(instTup[0], NTSubclass))
         self.assertTrue(isinstance(instTup[1], NTSubclass))
@@ -1100,7 +1100,7 @@ class NativeTypesTests(unittest.TestCase):
 
 
     def test_serialization(self):
-        ints = TupleOf(int)((1,2,3,4))
+        ints = TupleOf(int)((1, 2, 3, 4))
 
         self.assertEqual(
             len(serialize(TupleOf(int), ints)),
@@ -1127,7 +1127,7 @@ class NativeTypesTests(unittest.TestCase):
                 ser2 = serialize(type(v), v2)
 
                 self.assertTrue(type(v2) is type(v))
-                self.assertEqual(ser,ser2)
+                self.assertEqual(ser, ser2)
                 self.assertEqual(str(v), str(v2))
                 self.assertEqual(v, v2)
 
@@ -1142,13 +1142,13 @@ class NativeTypesTests(unittest.TestCase):
         for passIx in range(100):
             for i in range(1000):
                 t = T(list(range(i)))
-                deserialize(T, serialize(T,t))
+                deserialize(T, serialize(T, t))
 
             self.assertTrue(getMem() < m0 + 100)
 
     def test_const_dict_of_tuple(self):
         K = NamedTuple(a=OneOf(float, int), b=OneOf(float, int))
-        someKs = [K(a=0,b=0), K(a=1), K(a=10), K(b=10), K()]
+        someKs = [K(a=0, b=0), K(a=1), K(a=10), K(b=10), K()]
 
         T = ConstDict(K, K)
 
@@ -1171,7 +1171,7 @@ class NativeTypesTests(unittest.TestCase):
                     del indexDict[i1]
                     x = x - (someKs[i1],)
 
-            self.assertEqual(x, T({someKs[i]:someKs[v] for i,v in indexDict.items()}))
+            self.assertEqual(x, T({someKs[i]: someKs[v] for i, v in indexDict.items()}))
             for k in x:
                 self.assertTrue(k in x)
                 x[k]
@@ -1219,7 +1219,7 @@ class NativeTypesTests(unittest.TestCase):
 
         NT = NamedTuple(x=NormalPyClass, y=NormalPySubclass)
 
-        nt = NT(x=NormalPyClass(),y=NormalPySubclass())
+        nt = NT(x=NormalPyClass(), y=NormalPySubclass())
         self.assertIsInstance(nt.x, NormalPyClass)
         self.assertIsInstance(nt.y, NormalPySubclass)
 
@@ -1236,7 +1236,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(a.HasOne(hasOne), hasOne)
 
         with self.assertRaises(TypeError):
-            a.HasOne(a.HasTwo(a='1',b='b'))
+            a.HasOne(a.HasTwo(a='1', b='b'))
 
     def test_recursive_classes_repr(self):
         class ASelfRecursiveClass(Class):
@@ -1289,7 +1289,7 @@ class NativeTypesTests(unittest.TestCase):
             x.setSizeUnsafe(10)
 
         #now check that if we fail to set the size we'll leak the tuple
-        aLeakedTuple = TupleOf(int)((1,2,3))
+        aLeakedTuple = TupleOf(int)((1, 2, 3))
         x = ListOf(TupleOf(int))()
         x.reserve(1)
         x.pointerUnsafe(0).initialize(aLeakedTuple)
@@ -1300,7 +1300,7 @@ class NativeTypesTests(unittest.TestCase):
     def test_list_copy_operation_duplicates_list(self):
         T = ListOf(int)
 
-        x = T([1,2,3])
+        x = T([1, 2, 3])
         y = T(x)
 
         x[0] = 100
@@ -1311,10 +1311,10 @@ class NativeTypesTests(unittest.TestCase):
         for T in [ListOf(bool), TupleOf(bool)]:
             for arr in [
                     numpy.array([]),
-                    numpy.array([0,1,2,3,4,5]),
-                    numpy.array([0,1,2,3,4,5], 'int32'),
-                    numpy.array([0,1,2,3,4,5], 'int16'),
-                    numpy.array([0,1,2,3,4,5], 'bool')
+                    numpy.array([0, 1, 2, 3, 4, 5]),
+                    numpy.array([0, 1, 2, 3, 4, 5], 'int32'),
+                    numpy.array([0, 1, 2, 3, 4, 5], 'int16'),
+                    numpy.array([0, 1, 2, 3, 4, 5], 'bool')
                     ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), [bool(x) for x in arr.tolist()])
@@ -1322,9 +1322,9 @@ class NativeTypesTests(unittest.TestCase):
         for T in [ListOf(int), TupleOf(int)]:
             for arr in [
                     numpy.array([]),
-                    numpy.array([1,2,3,4,5]),
-                    numpy.array([1,2,3,4,5], 'int32'),
-                    numpy.array([1,2,3,4,5], 'int16')
+                    numpy.array([1, 2, 3, 4, 5]),
+                    numpy.array([1, 2, 3, 4, 5], 'int32'),
+                    numpy.array([1, 2, 3, 4, 5], 'int16')
                     ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
@@ -1332,36 +1332,36 @@ class NativeTypesTests(unittest.TestCase):
         for T in [ListOf(float), TupleOf(float)]:
             for arr in [
                     numpy.array([]),
-                    numpy.array([1,2,3,4,5], 'float64'),
-                    numpy.array([1,2,3,4,5], 'float32')
+                    numpy.array([1, 2, 3, 4, 5], 'float64'),
+                    numpy.array([1, 2, 3, 4, 5], 'float32')
                     ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
     def test_list_of_equality(self):
-        x = ListOf(int)([1,2,3,4])
-        y = ListOf(int)([1,2,3,5])
+        x = ListOf(int)([1, 2, 3, 4])
+        y = ListOf(int)([1, 2, 3, 5])
 
-        self.assertEqual(x,x)
-        self.assertNotEqual(x,y)
+        self.assertEqual(x, x)
+        self.assertNotEqual(x, y)
 
     def test_tuple_r_add(self):
         self.assertEqual(
-            (1,2,4,5,6) + TupleOf(int)([1,2]),
-            (1,2,4,5,6,1,2)
+            (1, 2, 4, 5, 6) + TupleOf(int)([1, 2]),
+            (1, 2, 4, 5, 6, 1, 2)
             )
 
         self.assertEqual(
-            [1,2,4,5,6] + TupleOf(int)([1,2]),
-            (1,2,4,5,6,1,2)
+            [1, 2, 4, 5, 6] + TupleOf(int)([1, 2]),
+            (1, 2, 4, 5, 6, 1, 2)
             )
 
         with self.assertRaises(TypeError):
-            [1,2,"hi",5,6] + TupleOf(int)([1,2])
+            [1, 2, "hi", 5, 6] + TupleOf(int)([1, 2])
 
     def test_tuple_r_cmp(self):
         self.assertEqual(
-            (1,2,3), TupleOf(int)([1,2,3])
+            (1, 2, 3), TupleOf(int)([1, 2, 3])
             )
 
     def test_other_bitness_types(self):
@@ -1381,15 +1381,15 @@ class NativeTypesTests(unittest.TestCase):
                 ]
 
         for ourType, numpyType in typeAndNumpyType:
-            for candValue in [-1,0,1,10,100,1000,100000,10000000,10000000000]:
+            for candValue in [-1, 0, 1, 10, 100, 1000, 100000, 10000000, 10000000000]:
                 self.assertEqual(int(ourType(candValue)), int(numpyType(candValue)), (ourType, candValue))
                 self.assertEqual(float(ourType(candValue)), float(numpyType(candValue)), (ourType, candValue))
 
             for ourType2, numpyType2 in typeAndNumpyType:
-                zeroOrTwoFloatTypes = sum([1 if 'float' in str(t) else 0 for t in [numpyType, numpyType2]]) in [0,2]
+                zeroOrTwoFloatTypes = sum([1 if 'float' in str(t) else 0 for t in [numpyType, numpyType2]]) in [0, 2]
 
                 if zeroOrTwoFloatTypes:
-                    for candValue in [-1,0,1,10,100,1000,100000,10000000,10000000000]:
+                    for candValue in [-1, 0, 1, 10, 100, 1000, 100000, 10000000, 10000000000]:
                         self.assertEqual(int(ourType(ourType2(candValue))), int(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
                         self.assertEqual(float(ourType(ourType2(candValue))), float(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
                 else:
@@ -1401,35 +1401,35 @@ class NativeTypesTests(unittest.TestCase):
                     pass
 
     def test_other_bitness_types_operators(self):
-        def add(x,y): return x+y
-        def div(x,y): return x/y
-        def mul(x,y): return x*y
-        def sub(x,y): return x-y
-        def bitand(x,y): return x&y
-        def bitor(x,y): return x|y
-        def bitxor(x,y): return x^y
+        def add(x, y): return x+y
+        def div(x, y): return x/y
+        def mul(x, y): return x*y
+        def sub(x, y): return x-y
+        def bitand(x, y): return x&y
+        def bitor(x, y): return x|y
+        def bitxor(x, y): return x^y
 
 
         otherTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
         for t1 in otherTypes:
             for t2 in otherTypes:
-                for op in [add,mul,div,sub,bitand,bitor,bitxor]:
-                    if not ((t1.IsFloat or t2.IsFloat) and op in (bitand, bitor,bitxor)):
-                        res = op(t1(10),t2(10))
+                for op in [add, mul, div, sub, bitand, bitor, bitxor]:
+                    if not ((t1.IsFloat or t2.IsFloat) and op in (bitand, bitor, bitxor)):
+                        res = op(t1(10), t2(10))
                         resType = type(res)
-                        resType = {bool:Bool,int:Int64,float:Float64}.get(resType,resType)
+                        resType = {bool: Bool, int: Int64, float: Float64}.get(resType, resType)
 
                         if t1.IsFloat and t2.IsFloat:
                             self.assertTrue(resType.IsFloat)
                             self.assertEqual(resType.Bits, max(t1.Bits, t2.Bits))
-                            self.assertEqual(res, op(10,10))
+                            self.assertEqual(res, op(10, 10))
                         elif t1.IsFloat or t2.IsFloat:
                             self.assertTrue(resType.IsFloat)
                             self.assertEqual(resType.Bits, t1.Bits if t1.IsFloat else t2.Bits)
                             if t1.Bits > 1 and t2.Bits > 1:
-                                self.assertEqual(res, op(10,10))
+                                self.assertEqual(res, op(10, 10))
                         elif t1 is Bool and t2 is Bool:
-                            self.assertEqual(resType, Bool if op in (bitor,bitand,bitxor) else Int64 if op is not div else Float64)
+                            self.assertEqual(resType, Bool if op in (bitor, bitand, bitxor) else Int64 if op is not div else Float64)
                         else:
                             self.assertEqual(resType.Bits, max(t1.Bits, t2.Bits))
 
@@ -1437,7 +1437,7 @@ class NativeTypesTests(unittest.TestCase):
                                 self.assertEqual(resType.IsSignedInt, t1.IsSignedInt or t2.IsSignedInt)
 
                             if t1.Bits > 1 and t2.Bits > 1:
-                                self.assertEqual(res, op(10,10))
+                                self.assertEqual(res, op(10, 10))
 
     def test_comparing_arbitrary_objects(self):
         x = TupleOf(object)(["a"])
@@ -1446,12 +1446,12 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             x < y
 
-        self.assertEqual(x,x)
-        self.assertEqual(y,y)
-        self.assertNotEqual(x,y)
+        self.assertEqual(x, x)
+        self.assertEqual(y, y)
+        self.assertNotEqual(x, y)
 
     def test_list_of_indexing_with_numpy_ints(self):
-        x = ListOf(ListOf(int))([[1,2,3],[4,5,6]])
+        x = ListOf(ListOf(int))([[1, 2, 3], [4, 5, 6]])
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
 
     def test_error_message_on_bad_dispatch(self):
@@ -1466,25 +1466,25 @@ class NativeTypesTests(unittest.TestCase):
             f(argname=1)
 
     def test_named_tuple_comparison(self):
-        N = NamedTuple(x=OneOf(None,int), y=OneOf(None,int))
+        N = NamedTuple(x=OneOf(None, int), y=OneOf(None, int))
 
         class S(N):
             pass
 
-        self.assertEqual(N(x=1,y=2),N(x=1,y=2))
-        self.assertNotEqual(N(x=1,y=2),N(x=1,y=3))
-        self.assertFalse(N(x=1,y=2) == N(x=1,y=3))
+        self.assertEqual(N(x=1, y=2), N(x=1, y=2))
+        self.assertNotEqual(N(x=1, y=2), N(x=1, y=3))
+        self.assertFalse(N(x=1, y=2) == N(x=1, y=3))
 
-        self.assertEqual(S(x=1,y=2),S(x=1,y=2))
-        self.assertNotEqual(S(x=1,y=2),S(x=1,y=3))
-        self.assertFalse(S(x=1,y=2) == S(x=1,y=3))
+        self.assertEqual(S(x=1, y=2), S(x=1, y=2))
+        self.assertNotEqual(S(x=1, y=2), S(x=1, y=3))
+        self.assertFalse(S(x=1, y=2) == S(x=1, y=3))
 
     def test_const_dict_comparison(self):
-        N = NamedTuple(x=OneOf(None,int), y=OneOf(None,int))
+        N = NamedTuple(x=OneOf(None, int), y=OneOf(None, int))
         D = ConstDict(str, N)
 
-        n1 = N(x=1,y=2)
-        n2 = N(x=1,y=3)
+        n1 = N(x=1, y=2)
+        n2 = N(x=1, y=3)
 
         self.assertEqual(D({'a': n1}), D({'a': n1}))
         self.assertNotEqual(D({'a': n1}), D({'a': n2}))
@@ -1537,7 +1537,7 @@ class NativeTypesTests(unittest.TestCase):
         native_d = Dict(int, int)()
         py_d = {}
 
-        for dictSize in [10,100,1000,10000]:
+        for dictSize in [10, 100, 1000, 10000]:
             for i in range(100000):
                 z = numpy.random.choice(dictSize)
 
@@ -1584,16 +1584,16 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_mutable_dict_create_many(self):
         for ct in range(100):
-            d = Dict(int,int)()
+            d = Dict(int, int)()
             for i in range(ct):
                 d[i] = i + 1
 
     def test_mutable_dict_methods(self):
-        d = Dict(int,int)({i:i+1 for i in range(10)})
+        d = Dict(int, int)({i: i+1 for i in range(10)})
 
         self.assertEqual(list(d.keys()), list(range(10)))
         self.assertEqual(list(d.values()), list(range(1, 11)))
-        self.assertEqual(list(d.items()), [(i,i+1) for i in range(10)])
+        self.assertEqual(list(d.items()), [(i, i+1) for i in range(10)])
 
         for i in range(10):
             self.assertEqual(d.get(i), i+1)
@@ -1607,13 +1607,13 @@ class NativeTypesTests(unittest.TestCase):
 
 
     def test_mutable_dict_iteration_order(self):
-        d = Dict(int,int)()
+        d = Dict(int, int)()
 
         d[10] = 10
         d[1] = 1
         d[2] = 2
 
-        self.assertEqual(list(d), [10,1,2])
+        self.assertEqual(list(d), [10, 1, 2])
         del d[1]
-        self.assertEqual(list(d), [10,2])
+        self.assertEqual(list(d), [10, 2])
 
