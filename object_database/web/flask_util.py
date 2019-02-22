@@ -42,7 +42,6 @@ def is_safe_url(target, require_https=None, forbid_cross_site=None):
     return test_url.scheme in allowed_schemes and cross_site_check
 
 
-
 def next_url(fallback_url=None, fallback_endpoint='index', next_key='next',
              logger=None, require_https=None, forbid_cross_site=None):
     target_url = request.args.get(next_key)

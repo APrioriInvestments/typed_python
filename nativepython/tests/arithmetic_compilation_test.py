@@ -163,7 +163,6 @@ class TestArithmeticCompilation(unittest.TestCase):
         for i in range(100):
             self.assertEqual(f_fast(i), f(i))
 
-
     def test_assignment_of_pod(self):
         def f(x: int) -> int:
             y = x

@@ -261,7 +261,6 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             c.g(1, 2)
 
-
     def test_class_function_sends_args_to_right_place(self):
         def g(a, b, c=10, *args, d=20, **kwargs):
             return (a, b, args, kwargs)
@@ -287,7 +286,6 @@ class NativeClassTypesTests(unittest.TestCase):
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4))
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6))
         assertSame(lambda formOfG: formOfG(1, 2, 3, 4, 5, 6, d=10, q=20))
-
 
     def test_class_function_type_dispatch(self):
         class C(Class):
@@ -425,7 +423,6 @@ class NativeClassTypesTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             x.pysubclass = NormalPyClass()
-
 
         self.assertEqual(x.f(NT()), "NTSubclass")
         self.assertEqual(x.f(NTSubclass()), "NTSubclass")

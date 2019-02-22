@@ -251,7 +251,6 @@ class TypesSerializationTest(unittest.TestCase):
                 self.assertEqual(getattr(obj, slot, None),
                                  getattr(objcopy, slot, None), msg=msg)
 
-
     def check_idempotence(self, obj, ser_ctx=None):
         ser_ctx = ser_ctx or SerializationContext()
 
@@ -461,7 +460,6 @@ class TypesSerializationTest(unittest.TestCase):
                 ping_pong(A(10), ts)
             OK.append(True)
 
-
         threads = [threading.Thread(target=thread) for _ in range(10)]
         for t in threads:
             t.start()
@@ -473,7 +471,6 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_named_tuple(self):
         X = NamedTuple(x=int)
         self.check_idempotence(X(x=20))
-
 
     def test_serialize_named_tuple_subclass(self):
         class X(NamedTuple(x=int)):
@@ -600,7 +597,6 @@ class TypesSerializationTest(unittest.TestCase):
 
         gc.collect()
         self.assertLess(currentMemUsageMb() - memUsage, 1.0)
-
 
     ##########################################################################
     # The Tests below are  Adapted from pickletester.py in cpython/Lib/test
@@ -824,7 +820,6 @@ class TypesSerializationTest(unittest.TestCase):
         inst = initarg(1, 2)
         loaded = ping_pong(inst)
         self.assert_is_copy(inst, loaded)
-
 
     def test_serialize_metaclass(self):
         a = use_metaclass()

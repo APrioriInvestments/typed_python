@@ -249,7 +249,6 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 out.expr.store(result.nonref_expr)
                 )
 
-
     def generateResize(self, context, out, listInst, countInst, arg=None):
         with context.ifelse(listInst.convert_len() == countInst) as (if_eq, if_neq):
             with if_eq:

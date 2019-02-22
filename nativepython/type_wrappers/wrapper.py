@@ -98,7 +98,6 @@ class Wrapper(object):
             generateThrowException(context, AttributeError("%s object cannot be iterated" % self))
             )
 
-
     def convert_attribute(self, context, instance, attribute):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))

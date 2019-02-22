@@ -205,7 +205,6 @@ class ObjectDatabaseTests:
         with db.transaction():
             self.assertEqual(x.holding, 10)
 
-
     def test_disconnecting(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
@@ -222,7 +221,6 @@ class ObjectDatabaseTests:
             db.subscribeToSchema(schema)
             db.flush()
             db.disconnect()
-
 
         usage = currentMemUsageMb(residentOnly=False)
 
@@ -255,7 +253,6 @@ class ObjectDatabaseTests:
                 lambda: not db2Connection.exists(),
                 timeout=2.0*self.PERFORMANCE_FACTOR)
             )
-
 
     def test_lazy_subscriptions(self):
         db = self.createNewDb()
@@ -471,7 +468,6 @@ class ObjectDatabaseTests:
 
         db2 = self.createNewDb()
         db2.subscribeToSchema(schema)
-
 
         with db2.view():
             self.assertEqual(root.obj.k.value, 23)
@@ -916,7 +912,6 @@ class ObjectDatabaseTests:
         with self.assertRaises(Exception):
             with db.transaction().consistency(writes=True):
                 o.y = 2
-
 
     def test_indices_of_algebraics(self):
         db = self.createNewDb()
@@ -1442,7 +1437,6 @@ class ObjectDatabaseTests:
         m1 = numpy.mean(times[:1000])
         m2 = numpy.mean(times[-1000:])
         self.assertTrue(abs(m2/m1-1) < 1, (m1, m2))
-
 
     def test_memory_growth(self):
         db1 = self.createNewDb()

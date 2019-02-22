@@ -144,7 +144,6 @@ def main(argv):
         print()
         print()
 
-
     if parsedArgs.command == 'boot':
         with db.transaction():
             AwsWorkerBootService.setBootState(parsedArgs.instance_type, parsedArgs.count)

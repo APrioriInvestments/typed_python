@@ -266,7 +266,6 @@ def expr_str(self):
             return "call(" + str(self.target.expr) + ")"\
                 + "(" + ",".join(str(r) for r in self.args) + ")"
 
-
     if self.matches.Branch:
         t = str(self.true)
         f = str(self.false)
@@ -430,7 +429,6 @@ Expression = Alternative("Expression",
     elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self, offsets=[ensureExpr(e) for e in exprs]),
     is_simple=expr_is_simple
     )
-
 
 
 def ensureExpr(x):

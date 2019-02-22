@@ -515,8 +515,6 @@ class AwsWorkerBootService(ServiceBase):
                 self._logger.error("Failed: %s", traceback.format_exc())
                 time.sleep(5.0)
 
-
-
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         cells.ensureSubscribedType(Configuration)

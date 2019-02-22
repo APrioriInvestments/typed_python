@@ -345,7 +345,6 @@ class ActiveWebService(ServiceBase):
 
         return Traceback("Invalid url path: %s" % path)
 
-
     def addMainBar(self, display):
         current_username = current_user.username
 
@@ -453,7 +452,6 @@ class ActiveWebService(ServiceBase):
                         else:
                             assert ack == framesSent - FRAMES_PER_ACK, (ack, framesSent - FRAMES_PER_ACK)
 
-
                 framesSent = len(frames)
 
                 if framesSent >= FRAMES_PER_ACK:
@@ -464,7 +462,6 @@ class ActiveWebService(ServiceBase):
                         return
                     else:
                         assert ack == finalAckIx, (ack, finalAckIx)
-
 
             while not ws.closed:
                 t0 = time.time()

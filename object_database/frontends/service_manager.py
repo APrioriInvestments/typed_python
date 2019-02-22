@@ -103,7 +103,6 @@ def main(argv=None):
                 auth_token=parsedArgs.service_token
             )
 
-
             databaseServer.start()
 
             logger.info("Started a database server on %s:%s", parsedArgs.own_hostname, object_database_port)

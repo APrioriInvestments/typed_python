@@ -144,7 +144,6 @@ class FunctionConversionContext(object):
 
         self._functionOutputTypeKnown = FunctionOutput in self._varname_to_type
 
-
     def typesAreUnstable(self):
         return self._typesAreUnstable
 
@@ -209,7 +208,6 @@ class FunctionConversionContext(object):
                 with false_block:
                     slot_ref.convert_copy_initialize(val_to_store)
                     subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
-
 
     def convert_statement_ast(self, ast):
         if ast.matches.Assign or ast.matches.AugAssign:

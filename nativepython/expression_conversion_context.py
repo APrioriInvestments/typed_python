@@ -184,7 +184,6 @@ class ExpressionConversionContext(object):
 
         return resExpr
 
-
     def markUninitializedSlotInitialized(self, slot):
         if slot.expr_type.is_pod:
             return
@@ -370,7 +369,6 @@ class ExpressionConversionContext(object):
 
         return MainScope()
 
-
     def ifelse(self, condition):
         if isinstance(condition, TypedExpression):
             condition = condition.toBool().nonref_expr
@@ -515,7 +513,6 @@ class ExpressionConversionContext(object):
                     )
                 )
             )
-
 
     def convert_expression_ast(self, ast):
         if ast.matches.Attribute:

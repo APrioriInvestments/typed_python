@@ -124,7 +124,6 @@ class EventLoopInThread:
         asyncio.set_event_loop(self.loop)
         self.loop.run_forever()
 
-
     def start(self):
         if not self.started:
             self.started = True

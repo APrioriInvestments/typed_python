@@ -175,7 +175,6 @@ class GraphDisplayService(ServiceBase):
             if not Feigenbaum.lookupAny():
                 Feigenbaum(y=2.0, density=800)
 
-
     @staticmethod
     def addAPoint():
         PointsToShow(timestamp=time.time(), y=len(PointsToShow.lookupAll()) ** 2.2)
@@ -211,7 +210,6 @@ class GraphDisplayService(ServiceBase):
                 Dropdown("Density", list(range(100, 10000, 100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
                 Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
             )
-
 
     @staticmethod
     def chartData(linePlot):
@@ -370,7 +368,6 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
     def schemasToSubscribeTo(self):
         return [schema]
 
-
     def waitForCount(self, count):
         self.assertTrue(
             self.database.waitForCondition(
@@ -417,7 +414,6 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                 10
                 )
             )
-
 
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
@@ -557,7 +553,6 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
     def test_throughput_while_adjusting_servicecount(self):
         with self.database.transaction():
             ServiceManager.createOrUpdateService(TestService, "TestService", target_count=0)
-
 
         emptyThroughputs = [self.measureThroughput(1.0)]
         fullThroughputs = []

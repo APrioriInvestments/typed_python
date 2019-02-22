@@ -93,10 +93,6 @@ class NativeFunctionConversionContext:
             )
 
 
-
-
-
-
 class TypedCallTarget(object):
     def __init__(self, named_call_target, input_types, output_type):
         super().__init__()

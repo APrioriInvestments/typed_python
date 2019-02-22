@@ -228,7 +228,6 @@ class Codebase:
 
             return codebase
 
-
     @staticmethod
     def importModulesByName(modules_by_name):
         """ Returns a dict mapping module names (str) to modules. """
