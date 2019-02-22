@@ -182,7 +182,8 @@ def findsource(pyObject):
         lnum = pyObject.co_firstlineno - 1
         pat = re.compile(r'^(\s*def\s)|(.*(?<!\w)lambda(:|\s))|^(\s*@)')
         while lnum > 0:
-            if pat.match(lines[lnum]): break
+            if pat.match(lines[lnum]):
+                break
             lnum = lnum - 1
         return lines, lnum
     raise IOError('could not find code object')
@@ -198,8 +199,10 @@ def getsourcelines(pyObject):
     raised if the source code cannot be retrieved."""
     lines, lnum = findsource(pyObject)
 
-    if ismodule(pyObject): return lines, 0
-    else: return getblock(lines[lnum:]), lnum + 1
+    if ismodule(pyObject):
+        return lines, 0
+    else:
+        return getblock(lines[lnum:]), lnum + 1
 
 
 def getsource(pyObject):
