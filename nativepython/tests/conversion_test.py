@@ -24,7 +24,7 @@ def Compiled(f):
 
 class TestCompilationStructures(unittest.TestCase):
     def checkFunctionOfIntegers(self, f):
-        r  = Runtime.singleton()
+        r = Runtime.singleton()
 
         f_fast = r.compile(f)
 

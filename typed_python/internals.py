@@ -35,7 +35,7 @@ class UndefinedBehaviorException(BaseException):
     """
 
 #needed by the C api
-object=object
+object = object
 
 def forwardToName(fwdLambda):
     """Unwrap a 'forward definition' lambda to a name.

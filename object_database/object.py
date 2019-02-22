@@ -29,7 +29,7 @@ class DatabaseObject(_base):
     __schema__ = None
 
     def __ne__(self, other):
-        return not (self==other)
+        return not (self == other)
 
     def __eq__(self, other):
         if not isinstance(other, DatabaseObject):

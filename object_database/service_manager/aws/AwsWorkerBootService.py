@@ -179,7 +179,7 @@ class Configuration:
     worker_name = str          #name of workers. This should be unique to this install.
     worker_iam_role_name = str #AIM role to boot workers into
     docker_image = str            #default linux AMI to use when booting linux workers
-    defaultStorageSize =  int  #gb of disk to mount on booted workers (if they need ebs)
+    defaultStorageSize = int  #gb of disk to mount on booted workers (if they need ebs)
     max_to_boot = int          #maximum number of workers we'll boot
 
 
@@ -366,7 +366,7 @@ class AwsApi:
         nameValue = nameValueOverride or self.config.worker_name
 
         if spotPrice:
-            InstanceMarketOptions={
+            InstanceMarketOptions = {
                 'MarketType': 'spot',
                 'SpotOptions': {
                     'SpotInstanceType': 'one-time',
@@ -574,7 +574,7 @@ class AwsWorkerBootService(ServiceBase):
                 )
 
     def pushTaskLoopForward(self):
-        if time.time()- self.lastSpotPriceRequest > 60.0:
+        if time.time() - self.lastSpotPriceRequest > 60.0:
             with self.db.transaction():
                 for instance_type, availability_zone, price in self.api.getSpotPrices():
                     state = State.lookupAny(instance_type=instance_type)

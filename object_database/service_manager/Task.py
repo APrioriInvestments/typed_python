@@ -368,8 +368,8 @@ class TaskDispatchService(ServiceBase):
 
                 worker.hasTask = True
 
-                task.worker=worker
-                task.state="Assigned"
+                task.worker = worker
+                task.state = "Assigned"
 
                 count += 1
         return count

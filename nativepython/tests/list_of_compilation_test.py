@@ -26,7 +26,7 @@ def Compiled(f):
 
 class TestListOfCompilation(unittest.TestCase):
     def checkFunction(self, f, argsToCheck):
-        r  = Runtime.singleton()
+        r = Runtime.singleton()
 
         f_fast = r.compile(f)
 

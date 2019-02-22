@@ -28,7 +28,7 @@ class InMemoryChannel:
 
         self._stopHeartbeatingSet = False
 
-        self._logger =  logging.getLogger(__name__)
+        self._logger = logging.getLogger(__name__)
 
     def _stopHeartbeating(self):
         self._stopHeartbeatingSet = True

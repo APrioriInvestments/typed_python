@@ -407,7 +407,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         sizeCompressed = len(ts.serialize(x))
 
-        ts.compressionEnabled=False
+        ts.compressionEnabled = False
 
         self.assertTrue(numpy.all(x == ts.deserialize(ts.serialize(x))))
 
@@ -425,7 +425,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         class A:
             def __init__(self, x):
-                self.x=x
+                self.x = x
 
         ts = SerializationContext({'A': A})
 

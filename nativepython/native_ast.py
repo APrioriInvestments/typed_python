@@ -269,7 +269,7 @@ def expr_str(self):
             return "((%s) if %s else (%s))" % (t, str(self.cond), f)
     if self.matches.MakeStruct:
         return "struct(" + \
-                ",".join("%s=%s" % (k, str(v)) for k, v in self.args)  + ")"
+                ",".join("%s=%s" % (k, str(v)) for k, v in self.args) + ")"
     if self.matches.While:
         t = str(self.while_true)
         f = str(self.orelse)

@@ -1144,7 +1144,7 @@ class Converter(object):
                 [type_to_llvm_type(x[1]) for x in function.args]
                 )
             self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
-            self._functions_by_name[name].linkage =  'external'
+            self._functions_by_name[name].linkage = 'external'
 
 
         if self.verbose:
