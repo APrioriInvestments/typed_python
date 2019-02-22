@@ -200,7 +200,6 @@ class Server:
             except Exception:
                 self._logger.error("Unexpected error in serviceSubscription thread:\n%s", traceback.format_exc())
 
-
     def _removeOldDeadConnections(self):
         connection_index = keymapping.index_key(core_schema.Connection, " exists", True)
         oldIds = self._kvstore.getSetMembers(keymapping.index_key(core_schema.Connection, " exists", True))
@@ -398,7 +397,6 @@ class Server:
 
         return typedef, identities
 
-
     def handleSubscriptionOnBackgroundThread(self, connectedChannel, msg):
         with Timer("Subscription requiring %s messages and produced %s objects for %s/%s/%s/isLazy=%s",
                     lambda: messageCount,
@@ -550,7 +548,6 @@ class Server:
 
         return index_vals
 
-
     def _markSubscriptionComplete(self, schema, typename, fieldname_and_value, identities, connectedChannel, isLazy):
         if fieldname_and_value is not None:
             #this is an index subscription
@@ -640,7 +637,6 @@ class Server:
                 identities=None if fieldname_and_value is None else tuple(to_send)
                 )
             )
-
 
     def onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
@@ -801,7 +797,6 @@ class Server:
             self._version_numbers_timestamps = new_ts
 
             self._last_garbage_collect_timestamp = time.time()
-
 
     def _handleNewTransaction(self,
                 sourceChannel,

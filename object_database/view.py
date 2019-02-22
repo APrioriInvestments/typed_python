@@ -428,8 +428,6 @@ class View(object):
             if (self._set_adds or self._set_removes) and not self._insistReadsConsistent:
                 raise Exception("You can't update an indexed value without read and write consistency.")
 
-
-
             if self._confirmCommitCallback is None:
                 result_queue = queue.Queue()
 
@@ -468,7 +466,6 @@ class View(object):
                     raise RevisionConflictException(res.key)
 
                 assert False, "unknown transaction result: " + str(res)
-
 
     def nocommit(self):
         class Scope:

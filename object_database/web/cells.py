@@ -460,7 +460,6 @@ class Cell:
                 self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
                 return
 
-
     def withSerializationContext(self, context):
         self.serializationContext = context
         return self
@@ -808,7 +807,6 @@ class Main(Cell):
         self.children = {'____child__': child}
 
 
-
 class _NavTab(Cell):
     def __init__(self, slot, index, target, child):
         super().__init__()
@@ -1131,7 +1129,6 @@ class Popover(Cell):
     def sortsAs(self):
         if '____title__' in self.children:
             return self.children['____title__'].sortsAs()
-
 
 
 class Grid(Cell):
@@ -1722,7 +1719,6 @@ class CodeEditor(Cell):
                 editor.setOption("maxLines", Infinity);
             """
 
-
         if self._onmessage is not None:
             self.postscript += """
                 editor.session.on('change', function(delta) {
@@ -2065,6 +2061,5 @@ class _PlotUpdater(Cell):
                     plotDiv = document.getElementById('plot__identity__');
                     Plotly.purge(plotDiv)
                     """.replace("__identity__", self.chartId)
-
 
             self._resetSubscriptionsToViewReads(v)

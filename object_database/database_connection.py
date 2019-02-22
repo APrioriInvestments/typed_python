@@ -408,7 +408,6 @@ class TransactionListener:
                 except Exception:
                     logger.error("Callback threw exception:\n%s", traceback.format_exc())
 
-
     def _onTransaction(self, key_value, priors, set_adds, set_removes, tid):
         changed = {}
 
@@ -852,7 +851,6 @@ class DatabaseConnection:
                         handler,
                         traceback.format_exc()
                         )
-
 
         elif msg.matches.SubscriptionIncrease:
             with self._lock:

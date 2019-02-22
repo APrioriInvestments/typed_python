@@ -157,7 +157,6 @@ class SerializationContext(object):
 
         return res
 
-
     def sha_hash(self, o):
         return sha_hash(self.serialize(o))
 

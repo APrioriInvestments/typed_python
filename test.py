@@ -310,7 +310,6 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
             else:
                 logAsInfo("\tfailed in %s seconds. See logs in %s", time.time() - self.testStartTime, self.fname)
 
-
         if self.stdoutFD is None:
             return
 
@@ -341,7 +340,6 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         else:
             #the test failed. Report the failure
             logAsInfo("\tfailed in %s seconds. See logs in %s", time.time() - self.testStartTime, self.fname)
-
 
     def begin(self):
         pass

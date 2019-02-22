@@ -161,7 +161,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         with self.assertRaises(Exception):
             get(anAWithAClass)
 
-
         set(anAWithAClass, ac1)
         self.assertEqual(_types.refcount(ac1), 2)
         self.assertEqual(_types.refcount(ac2), 1)

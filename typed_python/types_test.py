@@ -452,7 +452,6 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             e2 + (1,)
 
-
     def test_tuple_of_one_of_fixed_size(self):
         t = TupleOf(OneOf(0, 1, 2, 3, 4))
 
@@ -693,7 +692,6 @@ class NativeTypesTests(unittest.TestCase):
                     v = deserialize(type(v), serialize(type(v), v))
                     for k in v:
                         self.assertTrue(k in v)
-
 
     def test_named_tuple_from_dict(self):
         N = NamedTuple(x=int, y=str, z=OneOf(None, "hihi"))
@@ -1009,7 +1007,6 @@ class NativeTypesTests(unittest.TestCase):
                 if tup1 != tup2:
                     self.assertNotEqual( makeTupleOf(*tup1), tup2 )
 
-
     def test_add_tuple_of(self):
         tupleOfInt = TupleOf(int)
 
@@ -1106,7 +1103,6 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(OneOf(None, NTSubclass)(None) is None)
         self.assertTrue(OneOf(None, NTSubclass)(inst) == inst)
 
-
     def test_serialization(self):
         ints = TupleOf(int)((1, 2, 3, 4))
 
@@ -1159,7 +1155,6 @@ class NativeTypesTests(unittest.TestCase):
         someKs = [K(a=0, b=0), K(a=1), K(a=10), K(b=10), K()]
 
         T = ConstDict(K, K)
-
 
         indexDict = {}
         x = T()
@@ -1230,7 +1225,6 @@ class NativeTypesTests(unittest.TestCase):
         nt = NT(x=NormalPyClass(), y=NormalPySubclass())
         self.assertIsInstance(nt.x, NormalPyClass)
         self.assertIsInstance(nt.y, NormalPySubclass)
-
 
     def test_construct_alternatives_with_positional_arguments(self):
         a = Alternative("A", HasOne={'a': str}, HasTwo={'a': str, 'b': str})
@@ -1416,7 +1410,6 @@ class NativeTypesTests(unittest.TestCase):
         def bitand(x, y): return x&y
         def bitor(x, y): return x|y
         def bitxor(x, y): return x^y
-
 
         otherTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
         for t1 in otherTypes:
@@ -1612,7 +1605,6 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             self.assertEqual(d.get("1000"), None)
-
 
     def test_mutable_dict_iteration_order(self):
         d = Dict(int, int)()

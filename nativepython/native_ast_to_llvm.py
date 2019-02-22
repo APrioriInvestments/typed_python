@@ -946,7 +946,6 @@ class FunctionConverter:
                                 l.native_type
                                 )
 
-
         if expr.matches.Call:
             target_or_ptr = expr.target
             args = [self.convert(a) for a in expr.args]
@@ -995,7 +994,6 @@ class FunctionConverter:
                 llvm_call_result = None
 
             return TypedLLVMValue(llvm_call_result, output_type)
-
 
         if expr.matches.Sequence:
             res = TypedLLVMValue(None, native_ast.Type.Void())
@@ -1156,7 +1154,6 @@ class Converter(object):
             self._functions_by_name[name] = llvmlite.ir.Function(module, func_type, name)
             self._functions_by_name[name].linkage = 'external'
 
-
         if self.verbose:
             for name in names_to_definitions:
                 definition = names_to_definitions[name]
@@ -1214,6 +1211,5 @@ class Converter(object):
             except Exception as e:
                 print("function failing = " + name)
                 raise
-
 
         return str(module)
