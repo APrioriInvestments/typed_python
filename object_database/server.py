@@ -69,13 +69,13 @@ class ConnectedChannel:
                 transaction_num=self.initial_tid,
                 connIdentity=self.connectionObject._identity,
                 identity_root=self.identityRoot
-                )
             )
+        )
 
     def sendTransactionSuccess(self, guid, success, badKey):
         self.channel.write(
             ServerToClient.TransactionResult(transaction_guid=guid, success=success, badKey=badKey)
-            )
+        )
 
     def handleTransactionData(self, msg):
         guid = msg.transaction_guid
@@ -86,7 +86,7 @@ class ConnectedChannel:
                 'set_removes': {},
                 'key_versions': set(),
                 'index_versions': set()
-                }
+            }
 
         self.pendingTransactions[guid]['writes'].update({k: msg.writes[k] for k in msg.writes})
         self.pendingTransactions[guid]['set_adds'].update({k: set(msg.set_adds[k]) for k in msg.set_adds if msg.set_adds[k]})
@@ -209,7 +209,7 @@ class Server:
                 {keymapping.data_key(core_schema.Connection, identity, " exists"): None for identity in oldIds},
                 {},
                 {connection_index: set(oldIds)}
-                )
+            )
 
     def checkForDeadConnections(self):
         with self._lock:
@@ -225,7 +225,7 @@ class Server:
                     self._logger.info(
                         "Connection %s has not heartbeat in a long time. Killing it.",
                         self._clientChannels[c].connectionObject._identity
-                        )
+                    )
 
                     c.close()
                     self.dropConnection(c)
@@ -276,7 +276,7 @@ class Server:
             [],
             [],
             self._cur_transaction_num
-            )
+        )
 
         return core_schema.Connection.fromIdentity(identity), identityRoot
 
@@ -294,7 +294,7 @@ class Server:
             [],
             [],
             self._cur_transaction_num
-            )
+        )
 
     def addConnection(self, channel):
         try:
@@ -306,20 +306,20 @@ class Server:
                     channel,
                     connectionObject,
                     identityRoot
-                    )
+                )
 
                 self._clientChannels[channel] = connectedChannel
 
                 channel.setClientToServerHandler(
                     lambda msg: self.onClientToServerMessage(connectedChannel, msg)
-                    )
+                )
 
                 connectedChannel.sendInitializationMessage()
         except Exception:
             self._logger.error(
                 "Failed during addConnection which should never happen:\n%s",
                 traceback.format_exc()
-                )
+            )
 
     def _handleSubscriptionInForeground(self, channel, msg):
         # first see if this would be an easy subscription to handle
@@ -338,7 +338,7 @@ class Server:
                     typedef,
                     identities,
                     channel
-                    )
+                )
                 return
 
             self._sendPartialSubscription(
@@ -351,7 +351,7 @@ class Server:
                 set(identities),
                 BATCH_SIZE=None,
                 checkPending=False
-                )
+            )
 
             self._markSubscriptionComplete(
                 msg.schema,
@@ -360,7 +360,7 @@ class Server:
                 identities,
                 channel,
                 isLazy=False
-                )
+            )
 
             channel.channel.write(
                 ServerToClient.SubscriptionComplete(
@@ -368,8 +368,8 @@ class Server:
                     typename=msg.typename,
                     fieldname_and_value=msg.fieldname_and_value,
                     tid=self._cur_transaction_num
-                    )
                 )
+            )
 
     def _parseSubscriptionMsg(self, channel, msg):
         schema_name = msg.schema
@@ -424,7 +424,7 @@ class Server:
                             typedef,
                             identities,
                             connectedChannel
-                            )
+                        )
                         return True
 
                     t1 = time.time()
@@ -450,7 +450,7 @@ class Server:
                             self._logger.info(
                                 "Beginning large subscription for %s/%s/%s",
                                 msg.schema, msg.typename, msg.fieldname_and_value
-                                )
+                            )
 
                         self._sendPartialSubscription(
                             connectedChannel,
@@ -460,7 +460,7 @@ class Server:
                             typedef,
                             identities,
                             identities_left_to_send
-                            )
+                        )
 
                         self._pendingSubscriptionRecheck = []
 
@@ -472,7 +472,7 @@ class Server:
                                 identities,
                                 connectedChannel,
                                 isLazy=False
-                                )
+                            )
 
                             connectedChannel.channel.write(
                                 ServerToClient.SubscriptionComplete(
@@ -480,8 +480,8 @@ class Server:
                                     typename=msg.typename,
                                     fieldname_and_value=msg.fieldname_and_value,
                                     tid=self._cur_transaction_num
-                                    )
                                 )
+                            )
 
                             break
 
@@ -511,8 +511,8 @@ class Server:
                 fieldname_and_value=fieldname_and_value,
                 identities=identities,
                 index_values=index_vals
-                )
             )
+        )
 
         # just send the identities
         self._markSubscriptionComplete(
@@ -522,7 +522,7 @@ class Server:
             identities,
             connectedChannel,
             isLazy=True
-            )
+        )
 
         connectedChannel.channel.write(
             ServerToClient.SubscriptionComplete(
@@ -530,8 +530,8 @@ class Server:
                 typename=typename,
                 fieldname_and_value=fieldname_and_value,
                 tid=self._cur_transaction_num
-                )
             )
+        )
 
     def _buildIndexValueMap(self, typedef, schema_name, typename, identities):
         # build a map from reverse-index-key to {identity}
@@ -610,7 +610,7 @@ class Server:
                     if add_schema == schema_name and add_typename == typename and (
                             fieldname_and_value is None and add_fieldname == " exists" or
                             fieldname_and_value is not None and tuple(fieldname_and_value) == (add_fieldname, add_hashVal)
-                            ):
+                    ):
                         identities_left_to_send.update(add_index_identities)
 
         while identities_left_to_send and (BATCH_SIZE is None or len(to_send) < BATCH_SIZE):
@@ -635,8 +635,8 @@ class Server:
                 values=kvs,
                 index_values=index_vals,
                 identities=None if fieldname_and_value is None else tuple(to_send)
-                )
             )
+        )
 
     def onClientToServerMessage(self, connectedChannel, msg):
         assert isinstance(msg, ClientToServer)
@@ -690,7 +690,7 @@ class Server:
                         data['key_versions'],
                         data['index_versions'],
                         msg.as_of_version
-                        )
+                    )
             except Exception:
                 self._logger.error("Unknown error committing transaction: %s", traceback.format_exc())
                 isOK = False
@@ -726,8 +726,8 @@ class Server:
                 typename=typename,
                 fieldname_and_value=(fieldname, fieldval),
                 identities=newIds
-                )
             )
+        )
 
     def _loadValuesForObject(self, channel, schema_name, typename, identities):
         typedef = channel.definedSchemas.get(schema_name)[typename]
@@ -771,8 +771,8 @@ class Server:
             ServerToClient.LazyLoadResponse(
                 identity=msg.identity,
                 values=self._loadValuesForObject(channel, msg.schema, msg.typename, [msg.identity])
-                )
             )
+        )
 
     def _garbage_collect(self, intervalOverride=None):
         """Cleanup anything in '_version_numbers' where we have deleted the entry
@@ -966,7 +966,7 @@ class Server:
             set_adds=set_adds,
             set_removes=set_removes,
             transaction_id=transaction_id
-            )
+        )
 
         if self._pendingSubscriptionRecheck is not None:
             self._pendingSubscriptionRecheck.append(transaction_message)
@@ -978,7 +978,7 @@ class Server:
             self._logger.info("Transaction [%.2f/%.2f/%.2f] with %s writes, %s set ops: %s",
                 t1 - t0, t2 - t1, time.time() - t2,
                 len(key_value), len(set_adds) + len(set_removes), sorted(key_value)[:3]
-                )
+            )
 
         self._garbage_collect()
 

@@ -56,7 +56,7 @@ class SimpleAlternativeWrapper(Wrapper):
             context,
             target,
             nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
-            )
+        )
 
     def convert_destroy(self, context, target):
         pass
@@ -65,13 +65,13 @@ class SimpleAlternativeWrapper(Wrapper):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
 
 class AlternativeWrapper(RefcountedWrapper):
@@ -110,15 +110,15 @@ class AlternativeWrapper(RefcountedWrapper):
                 [self],
                 typeWrapper(NoneType),
                 self.generateNativeDestructorFunction
-                )
-            .call(instance)
             )
+            .call(instance)
+        )
 
     def refAs(self, context, instance, whichIx):
         return context.pushReference(
             self.alternatives[whichIx].typeRepresentation,
             instance.nonref_expr.ElementPtrIntegers(0, 2).cast(self.alternatives[whichIx].getNativeLayoutType().pointer())
-            )
+        )
 
     def generateNativeDestructorFunction(self, context, out, instance):
         with context.switch(instance.nonref_expr.ElementPtrIntegers(0, 1).load(), range(len(self.alternatives)), False) as indicesAndContexts:
@@ -150,7 +150,7 @@ class AlternativeWrapper(RefcountedWrapper):
         else:
             outputType = typeWrapper(
                 list(possibleTypes)[0] if len(possibleTypes) == 1 else OneOf(*possibleTypes)
-                )
+            )
 
             output = context.allocateUninitializedSlot(outputType)
 
@@ -199,13 +199,13 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         return altWrapper.on_refcount_zero(
             context,
             instance.changeType(altWrapper)
-            )
+        )
 
     def refToInner(self, context, instance):
         return context.pushReference(
             self.underlyingLayout,
             instance.nonref_expr.ElementPtrIntegers(0, 2).cast(self.underlyingLayout.getNativeLayoutType().pointer())
-            )
+        )
 
     def convert_to_type(self, context, instance, otherType):
         if otherType == typeWrapper(self.alternativeType):
@@ -239,7 +239,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
             if eltName not in kwargs and not _types.is_default_constructible(eltType):
                 context.pushException(TypeError, "Can't construct %s without an argument for %s of type %s" % (
                     self, eltName, eltType
-                    ))
+                ))
                 return
 
         for eltType, eltName in zip(tupletype.ElementTypes, tupletype.ElementNames):
@@ -259,8 +259,8 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                     tupletype.ElementTypes,
                     self,
                     self.generateConstructor
-                    ).call(new_alt, *[kwargs[eltName] for eltName in tupletype.ElementNames])
-            ).changeType(typeWrapper(self.alternativeType))
+                ).call(new_alt, *[kwargs[eltName] for eltName in tupletype.ElementNames])
+        ).changeType(typeWrapper(self.alternativeType))
 
     def generateConstructor(self, context, out, *args):
         tupletype = self.typeRepresentation.ElementType
@@ -269,10 +269,10 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
             out.expr.store(
                 runtime_functions.malloc.call(native_ast.const_int_expr(16 + self.underlyingLayout.getBytecount()))
                     .cast(self.getNativeLayoutType())
-                ) >>
+            ) >>
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>  # refcount
             out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int_expr(self.indexInParent))  # which
-            )
+        )
 
         assert len(args) == len(tupletype.ElementTypes)
 

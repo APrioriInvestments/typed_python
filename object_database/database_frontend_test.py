@@ -33,7 +33,7 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
                 "localhost", "8888",
                 "--service-token", token,
                 "--inmem"]
-                )
+            )
 
             time.sleep(.5)
 
@@ -43,10 +43,10 @@ class ObjectDatabaseFrontEnd(unittest.TestCase):
                 "localhost", "8888",
                 "--service-token", token,
                 "1"
-                ],
+            ],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL
-                )
+            )
 
             self.assertEqual(client.returncode, 0)
         finally:

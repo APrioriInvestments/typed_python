@@ -39,12 +39,12 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                 res = nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
                     type
-                    )
+                )
             else:
                 res = nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
                     argtype.typeRepresentation
-                    )
+                )
             return res
 
         return typeWrapper(self.typeRepresentation).convert_type_call(context, left, args, kwargs)

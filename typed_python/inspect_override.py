@@ -65,12 +65,12 @@ def _try_getfile_class(pyObject):
     members = getmembers(
         pyObject,
         lambda _: ismethod(_) or isfunction(_)
-        )
+    )
 
     if len(members) == 0:
         raise InspectError(
             "can't get source code for class %s" % pyObject
-            )
+        )
 
     # members is a list of tuples: (name, func)
     elt0 = members[0][1]

@@ -45,7 +45,7 @@ def setCodebaseInstantiationDirectory(directory, forceReset=False):
         assert _codebase_instantiation_dir is None, "Can't modify the codebase instantiation location. (%s != %s)" % (
             _codebase_instantiation_dir,
             directory
-            )
+        )
 
         _codebase_instantiation_dir = os.path.abspath(directory)
 

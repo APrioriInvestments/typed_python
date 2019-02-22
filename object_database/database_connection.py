@@ -43,7 +43,7 @@ TransactionResult = Alternative(
     Success={},
     RevisionConflict={'key': str},
     Disconnected={}
-    )
+)
 
 
 class VersionedBase:
@@ -424,7 +424,7 @@ class TransactionListener:
                         fieldname,
                         View.unwrapSerializedDatabaseValue(self.serializationContext, key_value[k], o.__types__[fieldname]),
                         View.unwrapSerializedDatabaseValue(self.serializationContext, priors[k], o.__types__[fieldname])
-                        ))
+                    ))
 
         self._queue.put(changed)
 
@@ -495,7 +495,7 @@ class DatabaseConnection:
         """Give the project root we want to serialize from."""
         self.setSerializationContext(
             TypedPythonCodebase.FromRootlevelModule(module).serializationContext
-            )
+        )
 
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
@@ -556,7 +556,7 @@ class DatabaseConnection:
         self.subscribeMultiple([
             (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity), False)
                 for t in objects
-            ])
+        ])
 
     def _lazinessForType(self, typeObj, desiredLaziness):
         if desiredLaziness is not None:
@@ -575,7 +575,7 @@ class DatabaseConnection:
                 t.__qualname__,
                 (fieldname, keymapping.index_value_to_hash(fieldvalue)),
                 self._lazinessForType(t, lazySubscription)
-                )
+            )
             )
 
         return self.subscribeMultiple(toSubscribe, block=block)
@@ -640,7 +640,7 @@ class DatabaseConnection:
 
                 self._channel.write(
                     ClientToServer.Subscribe(schema=tup[0], typename=tup[1], fieldname_and_value=tup[2], isLazy=tup[3])
-                    )
+                )
 
                 events.append(e)
 
@@ -783,7 +783,7 @@ class DatabaseConnection:
                         self._logger.error(
                             "Transaction commit callback threw an exception:\n%s",
                             traceback.format_exc()
-                            )
+                        )
 
                 self._transaction_callbacks = {}
                 self._flushEvents = {}
@@ -806,12 +806,12 @@ class DatabaseConnection:
                     self._transaction_callbacks.pop(msg.transaction_guid)(
                         TransactionResult.Success() if msg.success
                             else TransactionResult.RevisionConflict(key=msg.badKey)
-                        )
+                    )
                 except Exception:
                     self._logger.error(
                         "Transaction commit callback threw an exception:\n%s",
                         traceback.format_exc()
-                        )
+                    )
         elif msg.matches.Transaction:
             with self._lock:
                 key_value = {}
@@ -851,7 +851,7 @@ class DatabaseConnection:
                         "_onTransaction handler %s threw an exception:\n%s",
                         handler,
                         traceback.format_exc()
-                        )
+                    )
 
         elif msg.matches.SubscriptionIncrease:
             with self._lock:
@@ -859,7 +859,7 @@ class DatabaseConnection:
                 if subscribedIdentities is not Everything:
                     subscribedIdentities.update(
                         msg.identities
-                        )
+                    )
         elif msg.matches.SubscriptionData:
             with self._lock:
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
@@ -902,7 +902,7 @@ class DatabaseConnection:
                     'index_values': msg.index_values,
                     'identities': msg.identities,
                     'markedLazy': True
-                    }
+                }
 
         elif msg.matches.SubscriptionComplete:
             with self._lock:
@@ -936,7 +936,7 @@ class DatabaseConnection:
                     if subscribedIdentities is not Everything:
                         subscribedIdentities.update(
                             identities
-                            )
+                        )
 
                 t0 = time.time()
                 heartbeatInterval = getHeartbeatInterval()
@@ -946,7 +946,7 @@ class DatabaseConnection:
                 for _ in range(self._largeSubscriptionHeartbeatDelay):
                     self._channel.sendMessage(
                         ClientToServer.Heartbeat()
-                        )
+                    )
                     time.sleep(heartbeatInterval)
 
                 totalBytes = 0
@@ -971,7 +971,7 @@ class DatabaseConnection:
                         # not, 'write' which queues the message after this function finishes!
                         self._channel.sendMessage(
                             ClientToServer.Heartbeat()
-                            )
+                        )
                         t0 = time.time()
 
                 for key, setval in sets.items():
@@ -983,7 +983,7 @@ class DatabaseConnection:
                         # not, 'write' which queues the message after this function finishes!
                         self._channel.sendMessage(
                             ClientToServer.Heartbeat()
-                            )
+                        )
                         t0 = time.time()
 
                 # this should be inline with the stream of messages coming from the server
@@ -1021,7 +1021,7 @@ class DatabaseConnection:
                     # not, 'write' which queues the message after this function finishes!
                     self._channel.sendMessage(
                         ClientToServer.Heartbeat()
-                        )
+                    )
                     t0 = time.time()
         return setAdds
 
@@ -1078,8 +1078,8 @@ class DatabaseConnection:
                 identity=identity,
                 schema=self._lazy_objects[identity][0],
                 typename=self._lazy_objects[identity][1]
-                )
             )
+        )
 
         return e
 
@@ -1106,7 +1106,7 @@ class DatabaseConnection:
                 self._channel.write(
                     ClientToServer.TransactionData(writes=out_writes, set_adds={}, set_removes={},
                         key_versions=(), index_versions=(), transaction_guid=transaction_guid)
-                    )
+                )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_writes = {}
 
@@ -1120,7 +1120,7 @@ class DatabaseConnection:
                 self._channel.write(
                     ClientToServer.TransactionData(writes={}, set_adds=out_set_adds, set_removes={},
                         key_versions=(), index_versions=(), transaction_guid=transaction_guid)
-                    )
+                )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_set_adds = {}
                 ct = 0
@@ -1135,7 +1135,7 @@ class DatabaseConnection:
                 self._channel.write(
                     ClientToServer.TransactionData(writes={}, set_adds={}, set_removes=out_set_removes,
                         key_versions=(), index_versions=(), transaction_guid=transaction_guid)
-                    )
+                )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_set_removes = {}
                 ct = 0
@@ -1145,7 +1145,7 @@ class DatabaseConnection:
             self._channel.write(
                 ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
                     key_versions=keys_to_check_versions[:10000], index_versions=(), transaction_guid=transaction_guid)
-                )
+            )
             self._channel.write(ClientToServer.Heartbeat())
             keys_to_check_versions = keys_to_check_versions[10000:]
 
@@ -1154,7 +1154,7 @@ class DatabaseConnection:
             self._channel.write(
                 ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
                     key_versions=(), index_versions=indices_to_check_versions[:10000], transaction_guid=transaction_guid)
-                )
+            )
             indices_to_check_versions = indices_to_check_versions[10000:]
 
         self._channel.write(
@@ -1165,12 +1165,12 @@ class DatabaseConnection:
                 key_versions=keys_to_check_versions,
                 index_versions=indices_to_check_versions,
                 transaction_guid=transaction_guid
-                )
             )
+        )
 
         self._channel.write(
             ClientToServer.CompleteTransaction(
                 as_of_version=as_of_version,
                 transaction_guid=transaction_guid
-                )
             )
+        )

@@ -31,7 +31,7 @@ someBytes = [
     b"as\x00df",
     b"\x00\x01",
     b"\x00\x01\x02\x00\x01",
-    ]
+]
 
 
 class TestBytesCompilation(unittest.TestCase):

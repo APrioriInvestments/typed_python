@@ -33,7 +33,7 @@ def type_str(c):
             ",".join([str(x) for x in (c.args + tuple(["..."] if c.varargs else []))]),
             str(c.output),
             ",nothrow" if not c.can_throw else ""
-            )
+        )
     if c.matches.Float:
         return "float" + str(c.bits)
     if c.matches.Int:
@@ -75,7 +75,7 @@ Type = Alternative("Type",
             Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
             raising(Exception("Can't make a zero value from %s" % self))
             )
-    )
+)
 
 
 def const_truth_value(c):
@@ -116,7 +116,7 @@ Constant = Alternative("Constant",
     NullPointer={'value_type': Type},
     truth_value=const_truth_value,
     __str__=const_str
-    )
+)
 
 UnaryOp = Alternative(
     "UnaryOp",
@@ -129,7 +129,7 @@ UnaryOp = Alternative(
         "-" if o.matches.Negate else
         "!" if o.matches.LogicalNot else
         "~" if o.matches.BitwiseNot else "unknown unary op"
-    )
+)
 
 BinaryOp = Alternative("BinaryOp",
     Add={}, Sub={}, Mul={}, Div={}, Eq={},
@@ -153,7 +153,7 @@ BinaryOp = Alternative("BinaryOp",
         "&" if o.matches.BitAnd else
         "^" if o.matches.BitXor else
         "unknown binary op"
-    )
+)
 
 
 # loads and stores - no assignments
@@ -197,7 +197,7 @@ CallTarget = Alternative("CallTarget",
     Named={'target': NamedCallTarget},
     Pointer={'expr': Expression},
     call=lambda self, *args: Expression.Call(target=self, args=filterCallTargetArgs(args))
-    )
+)
 
 
 def teardown_str(self):
@@ -212,7 +212,7 @@ Teardown = Alternative("Teardown",
     ByTag={'tag': str, 'expr': Expression},
     Always={'expr': Expression},
     __str__=teardown_str
-    )
+)
 
 
 def expr_concatenate(self, other):
@@ -299,8 +299,8 @@ def expr_str(self):
                         var=self.var,
                         val=self.val.vals[-1],
                         within=self.within),)
-                    )
                 )
+            )
         valstr = str(self.val)
         if "\n" in valstr:
             return self.var + " = (\n" + indent(valstr).rstrip() + ")\n"\
@@ -313,7 +313,7 @@ def expr_str(self):
         return (
             "try:\n" + indent(str(self.expr)) + "\nfinally:\n"
                 + indent("\n".join(str(x) for x in self.teardowns))
-            )
+        )
     if self.matches.TryCatch:
         return (
             "try:\n" + indent(str(self.expr)) + "\n" +
@@ -326,7 +326,7 @@ def expr_str(self):
             str(self.target.output_type),
             ",nothrow" if not self.target.can_throw else "",
             ",intrinsic" if self.target.intrinsic else ""
-            )
+        )
         return "&func(%s)" % str(self.expr)
     if self.matches.Throw:
         return "throw (%s)" % str(self.expr)
@@ -404,8 +404,8 @@ Expression = Alternative("Expression",
                         val=Constant.Int(bits=32, signed=True, val=index)
                         )
                     for index in offsets
-                )
-            ),
+            )
+    ),
     __rshift__=expr_concatenate,
     __str__=expr_str,
     structElt=lambda self, ix: Expression.StructElementByIndex(left=self, index=ix),
@@ -433,7 +433,7 @@ Expression = Alternative("Expression",
     with_comment=lambda self, c: Expression.Comment(comment=c, expr=self),
     elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self, offsets=[ensureExpr(e) for e in exprs]),
     is_simple=expr_is_simple
-    )
+)
 
 
 def ensureExpr(x):
@@ -457,55 +457,55 @@ falseExpr = Expression.Constant(val=Constant.Int(bits=1, val=0, signed=False))
 def const_float_expr(f):
     return Expression.Constant(
         val=Constant.Float(bits=64, val=f)
-        )
+    )
 
 
 def const_int_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=64, val=i, signed=True)
-        )
+    )
 
 
 def const_int32_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=32, val=i, signed=True)
-        )
+    )
 
 
 def const_uint8_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=8, val=i, signed=False)
-        )
+    )
 
 
 def const_bool_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=1, val=i, signed=False)
-        )
+    )
 
 
 def const_utf8_cstr(i):
     return Expression.Constant(
         val=Constant.ByteArray(val=i.encode('utf-8'))
-        )
+    )
 
 
 def const_bytes_cstr(i):
     return Expression.Constant(
         val=Constant.ByteArray(val=i)
-        )
+    )
 
 
 FunctionBody = Alternative("FunctionBody",
     Internal={'body': Expression},
     External={'name': str}
-    )
+)
 
 Function = NamedTuple(
     args=TupleOf(Tuple(str, Type)),
     body=FunctionBody,
     output_type=Type
-    )
+)
 
 Void = Type.Void()
 VoidPtr = Void.pointer()

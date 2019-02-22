@@ -74,9 +74,9 @@ class FunctionConversionContext(object):
                     args=self._native_args,
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=native_ast.Void
-                    ),
+                ),
                 return_type
-                )
+            )
 
         if return_type.is_pass_by_ref:
             return (
@@ -84,18 +84,18 @@ class FunctionConversionContext(object):
                     args=(('.return', return_type.getNativeLayoutType().pointer()),) + tuple(self._native_args),
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=native_ast.Void
-                    ),
+                ),
                 return_type
-                )
+            )
         else:
             return (
                 native_ast.Function(
                     args=self._native_args,
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=return_type.getNativeLayoutType()
-                    ),
+                ),
                 return_type
-                )
+            )
 
     def _constructInitialVarnameToType(self):
         input_types = self._input_types
@@ -107,13 +107,13 @@ class FunctionConversionContext(object):
             if len(input_types) != len(self._ast_arg.args):
                 raise ConversionException(
                     "Expected %s arguments but got %s" % (len(self._ast_arg.args), len(input_types))
-                    )
+                )
         else:
             if len(input_types) < len(self._ast_arg.args):
                 raise ConversionException(
                     "Expected at least %s arguments but got %s" %
                         (len(self._ast_arg.args), len(input_types))
-                    )
+                )
 
         self._native_args = []
         for i in range(len(self._ast_arg.args)):
@@ -131,12 +131,12 @@ class FunctionConversionContext(object):
                 self._native_args.append(
                     ('.star_args.%s' % (i - len(self._ast_arg.args)),
                         input_types[i].getNativePassingType())
-                    )
+                )
 
             starargs_type = Struct(
                 [('f_%s' % i, input_types[i+len(self._ast_arg.args)])
                     for i in range(star_args_count)]
-                )
+            )
 
             self._varname_to_type[self._star_args_name] = starargs_type
 
@@ -329,11 +329,11 @@ class FunctionConversionContext(object):
 
                 subcontext.pushTerminal(
                     native_ast.Expression.Return(arg=None)
-                    )
+                )
             else:
                 subcontext.pushTerminal(
                     native_ast.Expression.Return(arg=e.nonref_expr)
-                    )
+                )
 
             return subcontext.finalize(None), False
 
@@ -366,7 +366,7 @@ class FunctionConversionContext(object):
             return (
                 native_ast.Expression.Branch(cond=cond_context.finalize(cond.nonref_expr), true=true, false=false),
                 true_returns or false_returns
-                )
+            )
 
         if ast.matches.Pass:
             return native_ast.nullExpr, True
@@ -389,7 +389,7 @@ class FunctionConversionContext(object):
             return (
                 native_ast.Expression.While(cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false),
                 true_returns or false_returns
-                )
+            )
 
         if ast.matches.Try:
             raise NotImplementedError()
@@ -428,7 +428,7 @@ class FunctionConversionContext(object):
                 iterator_setup_context.finalize(None) >>
                 native_ast.Expression.While(cond=cond_context.finalize(is_populated), while_true=true, orelse=false),
                 true_returns or false_returns
-                )
+            )
 
         if ast.matches.Raise:
             raise NotImplementedError()
@@ -465,7 +465,7 @@ class FunctionConversionContext(object):
 
         seq_expr = native_ast.Expression.Sequence(
             vals=[expr for expr, _ in exprAndReturns]
-            )
+        )
 
         return seq_expr, flows_off_end
 
@@ -493,11 +493,11 @@ class FunctionConversionContext(object):
                                 ptr=native_ast.Expression.StackSlot(name=name, type=slot_type.getNativeLayoutType()),
                                 val=native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
                                     native_ast.Expression.Variable(name=name).load()
-                                )
                             )
+                        )
                         context.pushEffect(
                             context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
-                            )
+                        )
                     else:
                         # need to make a stackslot for this variable
                         # the argument will be a pointer because it's POD
@@ -509,7 +509,7 @@ class FunctionConversionContext(object):
 
                         context.pushEffect(
                             context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
-                            )
+                        )
 
                     to_add.append(context.finalize(None))
 
@@ -527,8 +527,8 @@ class FunctionConversionContext(object):
                     destructors.append(
                         native_ast.Teardown.Always(
                             expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
-                            )
                         )
+                    )
 
                     if name not in argnames:
                         # this is a variable in the function that we assigned to. we need to ensure that
@@ -540,7 +540,7 @@ class FunctionConversionContext(object):
         if to_add:
             expr = native_ast.Expression.Sequence(
                 vals=to_add + [expr]
-                )
+            )
 
         if destructors:
             expr = native_ast.Expression.Finally(

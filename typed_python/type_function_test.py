@@ -23,7 +23,7 @@ class TypeFunctionTest(unittest.TestCase):
             return Alternative("List",
                 Node={"head": T, "tail": List(T)},
                 Empty={}
-                )
+            )
 
         self.assertIs(List(int), List(int))
         self.assertIsNot(List(float), List(int))
@@ -80,18 +80,18 @@ class TypeFunctionTest(unittest.TestCase):
             return Alternative("List",
                 Node={"head": T, "tail": List(T)},
                 Empty={}
-                )
+            )
 
         context = SerializationContext({'List': List})
 
         self.assertIs(
             context.deserialize(context.serialize(List(int))),
             List(int)
-            )
+        )
         self.assertIsInstance(
             context.deserialize(context.serialize(List(int).Empty())),
             List(int)
-            )
+        )
 
         list_of_int = List(int)
         list_of_list = List(list_of_int)
@@ -102,4 +102,4 @@ class TypeFunctionTest(unittest.TestCase):
         self.assertEqual(
             context.deserialize(context.serialize(l_l)),
             l_l
-            )
+        )

@@ -156,7 +156,7 @@ valid_instance_types = {
     'i3.4xlarge': {'RAM': 122, 'CPU': 16, 'COST': 1.248},
     'i3.8xlarge': {'RAM': 244, 'CPU': 32, 'COST': 2.496},
     'i3.16xlarge': {'RAM': 488, 'CPU': 64, 'COST': 4.992}
-    }
+}
 
 
 instance_types_to_show = set(
@@ -219,7 +219,7 @@ class AwsApi:
         filters = [{
             'Name': 'tag:Name',
             'Values': [self.config.worker_name]
-            }]
+        }]
 
         res = {}
 
@@ -235,7 +235,7 @@ class AwsApi:
         filters = [{
             'Name': 'tag:Name',
             'Values': [self.config.worker_name]
-            }]
+        }]
 
         res = {}
 
@@ -252,7 +252,7 @@ class AwsApi:
                 self.ec2_client.create_tags(
                     Resources=[srId],
                     Tags=[{'Key': 'Name', 'Value': self.config.worker_name}]
-                    )
+                )
                 return True
             else:
                 self._logger.info("srVal %s doesn't match %s", srVal, instanceId)
@@ -329,8 +329,8 @@ class AwsApi:
                 db_port=self.config.db_port,
                 image=self.config.docker_image or "nativepython/cloud:latest",
                 worker_token=authToken
-                )
             )
+        )
 
         if clientToken is None:
             clientToken = str(uuid.uuid4())
@@ -350,7 +350,7 @@ class AwsApi:
             deviceMapping = {
                 'DeviceName': '/dev/xvdb',
                 'VirtualName': "ephemeral0"
-                }
+            }
         else:
             deviceMapping = {
                 'DeviceName': '/dev/xvdb',
@@ -360,8 +360,8 @@ class AwsApi:
                     "DeleteOnTermination": True,
                     "VolumeSize": self.config.defaultStorageSize,
                     "VolumeType": "gp2"
-                    }
                 }
+            }
 
         nameValue = nameValueOverride or self.config.worker_name
 
@@ -396,9 +396,9 @@ class AwsApi:
                     'Tags': [{
                         "Key": 'Name',
                         "Value": nameValue
-                        }] + [{ "Key": k, "Value": v} for (k, v) in (extraTags or {}).items()]
+                    }] + [{ "Key": k, "Value": v} for (k, v) in (extraTags or {}).items()]
                 }]
-            )[0].id)
+        )[0].id)
 
 
 class AwsWorkerBootService(ServiceBase):
@@ -424,8 +424,8 @@ class AwsWorkerBootService(ServiceBase):
                 "Instance type %s is not a valid instance type. Did you mean one of %s?" % (
                     instance_type,
                     closest_N_in(instance_type, valid_instance_types, 3)
-                    )
                 )
+            )
 
         s = State.lookupAny(instance_type=instance_type)
         if not s:
@@ -462,7 +462,7 @@ class AwsWorkerBootService(ServiceBase):
             docker_image,
             defaultStorageSize,
             max_to_boot
-            ):
+    ):
         c = Configuration.lookupAny()
         if not c:
             c = Configuration()

@@ -35,7 +35,7 @@ ExpressionIntermediate = Alternative("ExpressionIntermediate",
     Terminal={"expr": native_ast.Expression},
     Simple={"name": str, "expr": native_ast.Expression},
     StackSlot={"name": str, "expr": native_ast.Expression}
-    )
+)
 
 
 class ExpressionConversionContext(object):
@@ -88,7 +88,7 @@ class ExpressionConversionContext(object):
 
         self.intermediates.append(
             ExpressionIntermediate.Simple(name=varname, expr=expression)
-            )
+        )
 
         return TypedExpression(self, native_ast.Expression.Variable(varname), type, False)
 
@@ -98,7 +98,7 @@ class ExpressionConversionContext(object):
 
         self.intermediates.append(
             ExpressionIntermediate.Simple(name=varname, expr=expression)
-            )
+        )
 
         return TypedExpression(self, native_ast.Expression.Variable(varname), type, isReference)
 
@@ -112,13 +112,13 @@ class ExpressionConversionContext(object):
 
         self.intermediates.append(
             ExpressionIntermediate.Effect(expression)
-            )
+        )
 
     def pushTerminal(self, expression):
         """Push a native expression that does not return control flow."""
         self.intermediates.append(
             ExpressionIntermediate.Terminal(expression)
-            )
+        )
 
     def pushMove(self, typed_expression):
         """Given a typed expression, allocate space for it on the stack and 'move' it
@@ -128,7 +128,7 @@ class ExpressionConversionContext(object):
             typed_expression.expr_type,
             lambda other: other.expr.store(typed_expression.nonref_expr),
             wantsTeardown=False
-            )
+        )
 
     def let(self, e1, e2):
         v = self.functionContext.let_varname()
@@ -137,7 +137,7 @@ class ExpressionConversionContext(object):
             var=v,
             val=e1,
             within=e2(native_ast.Expression.Variable(name=v))
-            )
+        )
 
     def pushReferenceCopy(self, type, expression):
         """Given a native expression that returns a reference, duplicate the object
@@ -156,7 +156,7 @@ class ExpressionConversionContext(object):
 
         self.intermediates.append(
             ExpressionIntermediate.Simple(name=varname, expr=expression)
-            )
+        )
 
         return TypedExpression(self, native_ast.Expression.Variable(varname), type, True)
 
@@ -170,7 +170,7 @@ class ExpressionConversionContext(object):
             native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
             type,
             True
-            )
+        )
 
         if not type.is_pod:
             with self.subcontext() as sc:
@@ -180,8 +180,8 @@ class ExpressionConversionContext(object):
                 native_ast.Teardown.ByTag(
                     tag=varname,
                     expr=sc.result
-                    )
                 )
+            )
 
         return resExpr
 
@@ -209,7 +209,7 @@ class ExpressionConversionContext(object):
             native_ast.Expression.StackSlot(name=varname, type=type.getNativeLayoutType()),
             type,
             True
-            )
+        )
 
         expr = callback(resExpr)
 
@@ -226,8 +226,8 @@ class ExpressionConversionContext(object):
             ExpressionIntermediate.StackSlot(
                 name=varname,
                 expr=expr if not wantsTeardown else expr >> native_ast.Expression.ActivatesTeardown(varname)
-                )
             )
+        )
 
         if wantsTeardown:
             with self.subcontext() as sc:
@@ -237,8 +237,8 @@ class ExpressionConversionContext(object):
                 native_ast.Teardown.ByTag(
                     tag=varname,
                     expr=sc.result
-                    )
                 )
+            )
 
         return resExpr
 
@@ -289,8 +289,8 @@ class ExpressionConversionContext(object):
                         cond=conditionExpr,
                         while_true=result,
                         orelse=native_ast.nullExpr
-                        )
                     )
+                )
         return Scope()
 
     def loop(self, countExpr):
@@ -320,8 +320,8 @@ class ExpressionConversionContext(object):
                         while_true=result >>
                             scope.counter.expr.store(scope.counter.nonref_expr.add(native_ast.const_int_expr(1))),
                         orelse=native_ast.nullExpr
-                        )
                     )
+                )
         return Scope()
 
     def switch(self, expression, targets, wantsBailout):
@@ -364,7 +364,7 @@ class ExpressionConversionContext(object):
                             cond=expression.cast(native_ast.Int64).eq(native_ast.const_int_expr(t)),
                             true=results.get(t, native_ast.nullExpr),
                             false=expr
-                            )
+                        )
 
                     self.pushEffect(expr)
 
@@ -409,8 +409,8 @@ class ExpressionConversionContext(object):
                             cond=condition,
                             true=true,
                             false=false
-                            )
                         )
+                    )
 
         return MainScope()
 
@@ -468,7 +468,7 @@ class ExpressionConversionContext(object):
             return self.pushPod(
                 call_target.output_type,
                 call_target.call(*native_args)
-                )
+            )
 
     def isInitializedVarExpr(self, name):
         return TypedExpression(
@@ -476,16 +476,16 @@ class ExpressionConversionContext(object):
             native_ast.Expression.StackSlot(
                 name=name + ".isInitialized",
                 type=native_ast.Bool
-                ),
+            ),
             bool,
             isReference=True
-            )
+        )
 
     def named_var_expr(self, name):
         if self.functionContext._varname_to_type[name] is None:
             raise ConversionException(
                 "variable %s is not in scope here" % name
-                )
+            )
 
         slot_type = self.functionContext._varname_to_type[name]
 
@@ -494,10 +494,10 @@ class ExpressionConversionContext(object):
             native_ast.Expression.StackSlot(
                 name=name,
                 type=slot_type.getNativeLayoutType()
-                ),
+            ),
             slot_type,
             isReference=True
-            )
+        )
 
     def pushComment(self, c):
         self.pushEffect(native_ast.nullExpr.with_comment(c))
@@ -507,13 +507,13 @@ class ExpressionConversionContext(object):
             # as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
             runtime_functions.stash_exception_ptr.call(
                 native_ast.const_utf8_cstr(str(value))
-                )
+            )
             >> native_ast.Expression.Throw(
                 expr=native_ast.Expression.Constant(
                     val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
-                    )
                 )
             )
+        )
 
     def convert_expression_ast(self, ast):
         if ast.matches.Attribute:
@@ -595,7 +595,7 @@ class ExpressionConversionContext(object):
                             native_ast.Expression.Sequence(expr_so_far),
                             typeWrapper(bool),
                             False
-                            )
+                        )
                     else:
                         expr_so_far.pop()
 

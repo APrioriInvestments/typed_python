@@ -193,7 +193,7 @@ class Service:
             self.name,
             type(obj).__schema__.name + "." + type(obj).__qualname__,
             obj._identity
-            ) + ("" if not queryParams else "?" + urllib.parse.urlencode({k: str(v) for k, v in queryParams.items()}))
+        ) + ("" if not queryParams else "?" + urllib.parse.urlencode({k: str(v) for k, v in queryParams.items()}))
 
     def findModuleSchemas(self):
         """Find all Schema objects in the same module as our type object."""
@@ -222,7 +222,7 @@ class Service:
                     module.__file__,
                     self.service_class_name,
                     "\n".join(["  " + x for x in sorted(module.__dict__)])
-                    ))
+                ))
 
             service_type = module.__dict__[self.service_class_name]
         else:
@@ -233,7 +233,7 @@ class Service:
             service_type = _getobject(
                 self.service_module_name,
                 self.service_class_name
-                )
+            )
 
         return service_type
 
@@ -268,7 +268,7 @@ class ServiceInstance:
             self.state in ("Running", "Initializing", "Booting")
                 and not self.shouldShutdown
                 and (self.connection is None or self.connection.exists())
-            )
+        )
 
     state = Indexed(OneOf("Booting", "Initializing", "Running", "Stopped", "FailedToStart", "Crashed"))
 

@@ -63,7 +63,7 @@ class CellsTests(unittest.TestCase):
         pair = [
             Container("HI"),
             Container("HI2")
-            ]
+        ]
         pairCell = Sequence(pair)
         self.cells.root.setChild(pairCell)
 
@@ -88,22 +88,22 @@ class CellsTests(unittest.TestCase):
         self.assertEqual(
             set(messages[pairCell.identity]['replacements'].values()),
             set([pair[0].identity, pair[1].identity])
-            )
+        )
 
         self.assertEqual(
             set(messages[self.cells.root.identity]['replacements'].values()),
             set([pairCell.identity])
-            )
+        )
 
     def test_cells_recalculation(self):
         pair = [
             Container("HI"),
             Container("HI2")
-            ]
+        ]
 
         self.cells.root.setChild(
             Sequence(pair)
-            )
+        )
 
         self.cells.renderMessages()
 
@@ -119,7 +119,7 @@ class CellsTests(unittest.TestCase):
 
         self.cells.root.setChild(
             Subscribed(lambda: c1 if slot.get() else c2)
-            )
+        )
 
         self.cells.renderMessages()
         slot.set(1)
@@ -135,9 +135,9 @@ class CellsTests(unittest.TestCase):
                 Sequence([
                     Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
                     for thing in Thing.lookupAll()
-                    ])
-                )
+                ])
             )
+        )
 
         self.cells.renderMessages()
 
@@ -191,9 +191,9 @@ class CellsTests(unittest.TestCase):
                 lambda: Thing.lookupAll(k=0),
                 lambda thing: Subscribed(
                     lambda: Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
-                    )
                 )
             )
+        )
 
         with self.db.transaction():
             thing = Thing(x=1, k=0)

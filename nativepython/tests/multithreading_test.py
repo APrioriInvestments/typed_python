@@ -96,7 +96,7 @@ class TestMultithreading(unittest.TestCase):
                 AClass(),
                 # anObject,
                 A.X(x=10)
-                ]:
+        ]:
             self.refcountsTest(instance)
 
     def refcountsTest(self, instance):

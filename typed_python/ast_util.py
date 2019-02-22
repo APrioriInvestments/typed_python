@@ -83,14 +83,14 @@ def getSourceFilenameAndText(pyObject):
     if sourceFile is None:
         raise CantGetSourceTextError(
             "can't get source lines for file %s" % sourceFile
-            )
+        )
 
     linesOrNone = inspect.getlines(sourceFile)
 
     if linesOrNone is None:
         raise CantGetSourceTextError(
             "can't get source lines for file %s" % sourceFile
-            )
+        )
 
     if sourceFile not in sourceFileCache_:
         sourceFileCache_[sourceFile] = "".join(linesOrNone)
@@ -198,11 +198,11 @@ def functionDefOrLambdaAtLineNumber(sourceAst, lineNumber):
     if len(subnodesAtLineNumber) == 0:
         raise CantGetSourceTextError(
             "can't find a function definition at line %s." % lineNumber
-            )
+        )
     if len(subnodesAtLineNumber) > 1:
         raise CantGetSourceTextError(
             "can't find a unique function definition at line %s. Do you " +
             "have two lambdas on the same line?" % lineNumber
-            )
+        )
 
     return subnodesAtLineNumber[0]

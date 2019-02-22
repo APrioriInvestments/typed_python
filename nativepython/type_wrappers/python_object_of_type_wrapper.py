@@ -37,13 +37,13 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def convert_incref(self, context, expr):
         context.pushEffect(
             runtime_functions.incref_pyobj.call(expr.nonref_expr)
-            )
+        )
 
     def convert_default_initialize(self, context, target):
         if isinstance(None, self.typeRepresentation):
             target.convert_copy_initialize(
                 TypedExpression(context, self, runtime_functions.get_pyobj_None.call(), False)
-                )
+            )
             return
 
         context.pushException(TypeError, "Can't default-initialize %s" % self.typeRepresentation.__qualname__)
@@ -56,7 +56,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
@@ -65,12 +65,12 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_destroy(self, context, instance):
         context.pushEffect(
             runtime_functions.decref_pyobj.call(instance.nonref_expr)
-            )
+        )
 
     def convert_attribute(self, context, instance, attr):
         assert isinstance(attr, str)
@@ -81,16 +81,16 @@ class PythonObjectOfTypeWrapper(Wrapper):
                     runtime_functions.getattr_pyobj.call(
                         instance.nonref_expr,
                         native_ast.const_utf8_cstr(attr)
-                        )
                     )
-            )
+                )
+        )
 
     def convert_to_type(self, context, expr, target_type):
         if target_type.typeRepresentation == Int64:
             return context.pushPod(
                 target_type,
                 runtime_functions.pyobj_to_int.call(expr.nonref_expr)
-                )
+            )
 
         return super().convert_to_type(context, expr, target_type)
 
@@ -101,7 +101,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 lambda targetSlot:
                     targetSlot.expr.store(
                         runtime_functions.int_to_pyobj.call(expr.nonref_expr)
-                        )
-                )
+                    )
+            )
 
         return super().convert_to_self(context, expr)

@@ -26,7 +26,7 @@ Message = Alternative(
     "Message",
     Ping={},
     Pong={}
-    )
+)
 
 
 class PingPongProtocol(AlgebraicProtocol):
@@ -76,7 +76,7 @@ class AlgebraicProtocolTests(unittest.TestCase):
             lambda: SendAndReturn(Message.Ping(), q),
             '127.0.0.1',
             8888
-            )
+        )
         loop.run_until_complete(clientCoro)
 
         self.assertEqual(q.get(timeout=1.0), Message.Pong())

@@ -46,7 +46,7 @@ class ConstDictWrapper(RefcountedWrapper):
             ('count', native_ast.Int32),
             ('subpointers', native_ast.Int32),
             ('data', native_ast.UInt8)
-            ), name='TupleOfLayout').pointer()
+        ), name='TupleOfLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -64,9 +64,9 @@ class ConstDictWrapper(RefcountedWrapper):
                     [self],
                     typeWrapper(NoneType),
                     self.generateNativeDestructorFunction
-                    )
-                .call(instance)
                 )
+                .call(instance)
+            )
 
     def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(inst.convert_len()) as i:
@@ -75,7 +75,7 @@ class ConstDictWrapper(RefcountedWrapper):
 
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
-            )
+        )
 
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
@@ -83,9 +83,9 @@ class ConstDictWrapper(RefcountedWrapper):
             expr.nonref_expr.ElementPtrIntegers(0, 4)
                 .elemPtr(
                     item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-                    )
-                .cast(self.keyType.getNativeLayoutType().pointer())
             )
+                .cast(self.keyType.getNativeLayoutType().pointer())
+        )
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
@@ -94,9 +94,9 @@ class ConstDictWrapper(RefcountedWrapper):
                 .elemPtr(
                     item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
                         .add(native_ast.const_int_expr(self.keyBytecount))
-                    )
-                .cast(self.valueType.getNativeLayoutType().pointer())
             )
+                .cast(self.valueType.getNativeLayoutType().pointer())
+        )
 
     def convert_bin_op_reverse(self, context, left, op, right):
         if op.matches.In or op.matches.NotIn:
@@ -137,13 +137,13 @@ class ConstDictWrapper(RefcountedWrapper):
                 self.valueType,
                 lambda output:
                     native_getitem.call(output, instance, item)
-                )
+            )
         else:
             return context.push(
                 self.valueType,
                 lambda output:
                     output.expr.store(native_getitem.call(instance, item))
-                )
+            )
 
     def generateGetitem(self):
         return self.generateLookupFun(False)
@@ -175,14 +175,14 @@ class ConstDictWrapper(RefcountedWrapper):
                                 if out is not None:
                                     context.pushEffect(
                                         out.convert_copy_initialize(result)
-                                        )
+                                    )
                                     context.pushTerminal(
                                         native_ast.Expression.Return(arg=None)
-                                        )
+                                    )
                                 else:
                                     context.pushTerminal(
                                         native_ast.Expression.Return(arg=result.nonref_expr)
-                                        )
+                                    )
 
                     with context.ifelse(isLt.nonref_expr) as (true, false):
                         with true:

@@ -41,7 +41,7 @@ class CompiledCodebase:
             self.sharedObject,
             self.nativeTargets,
             os.path.join(self.codebase.rootDirectory, "__pycache__", "nativepython")
-            )
+        )
 
         for wrappingCallTargetName, (f, callTarget) in self.typedTargets.items():
             fp = function_pointers[wrappingCallTargetName]
@@ -50,7 +50,7 @@ class CompiledCodebase:
                 fp.fp,
                 callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
                 [i.typeRepresentation for i in callTarget.input_types]
-                )
+            )
 
 
 class CodebaseCompiler:

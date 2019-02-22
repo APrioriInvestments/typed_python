@@ -35,10 +35,10 @@ def formatTable(rows):
     formattedRows = [
         "  ".join(row[col] + " " * (colWidth[col] - len(row[col])) for col in range(len(cols)))
             for row in rows
-        ]
+    ]
     formattedRows = formattedRows[:1] + [
         "  ".join("-" * colWidth[col] for col in range(len(cols)))
-        ] + formattedRows[1:]
+    ] + formattedRows[1:]
 
     return "\n".join(formattedRows)
 

@@ -100,7 +100,7 @@ def main(argv):
                 docker_image=parsedArgs.docker_image,
                 defaultStorageSize=parsedArgs.defaultStorageSize,
                 max_to_boot=parsedArgs.max_to_boot
-                )
+            )
 
     if parsedArgs.command == 'install':
         with db.transaction():
@@ -122,7 +122,7 @@ def main(argv):
                     instance_type,
                     booted.get(instance_type, 0),
                     targets.get(instance_type, 0)
-                    ])
+                ])
 
             print(formatTable(table))
 
@@ -138,7 +138,7 @@ def main(argv):
                     instance['InstanceType'],
                     instance['PrivateIpAddress'],
                     secondsToHumanReadable(time.time() - instance['LaunchTime'].timestamp())
-                    ])
+                ])
             print(formatTable(table))
 
         print()

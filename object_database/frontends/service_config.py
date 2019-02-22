@@ -175,7 +175,7 @@ def _main(argv):
                     str(s.target_count),
                     s.coresUsed,
                     s.gbRamUsed
-                    ])
+                ])
 
         print(formatTable(table))
 
@@ -189,7 +189,7 @@ def _main(argv):
                     s.host.hostname,
                     s.connection if s.connection.exists() else "<DEAD>",
                     s.state
-                    ])
+                ])
 
         print(formatTable(table))
 
@@ -205,7 +205,7 @@ def _main(argv):
                     "%.1f / %.1f" % (s.gbRamUsed, s.maxGbRam),
                     "%s / %s" % (s.coresUsed, s.maxCores),
                     str(len(service_schema.ServiceInstance.lookupAll(host=s)))
-                    ])
+                ])
 
         print(formatTable(table))
 

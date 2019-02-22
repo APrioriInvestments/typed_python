@@ -33,7 +33,7 @@ someStrings = [
     "\u0F01",
     "\u0F01",
     "\u1002"
-    ]
+]
 
 for s1 in list(someStrings):
     for s2 in list(someStrings):

@@ -38,7 +38,7 @@ class StringWrapper(RefcountedWrapper):
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
             ('data', native_ast.UInt8)
-            ), name='StringLayout').pointer()
+        ), name='StringLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -55,8 +55,8 @@ class StringWrapper(RefcountedWrapper):
                     runtime_functions.string_cmp.call(
                         left.nonref_expr.cast(VoidPtr),
                         right.nonref_expr.cast(VoidPtr)
-                        )
                     )
+                )
                 if op.matches.Eq:
                     return context.pushPod(bool,
                         cmp_res.nonref_expr.eq(0)
@@ -88,9 +88,9 @@ class StringWrapper(RefcountedWrapper):
                         runtime_functions.string_concat.call(
                             left.nonref_expr.cast(VoidPtr),
                             right.nonref_expr.cast(VoidPtr)
-                            ).cast(self.layoutType)
-                        )
+                        ).cast(self.layoutType)
                     )
+                )
 
         return super().convert_bin_op(context, left, op, right)
 
@@ -107,8 +107,8 @@ class StringWrapper(RefcountedWrapper):
             strRef.expr.store(
                 runtime_functions.string_getitem_int64.call(expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr)
                     .cast(self.layoutType)
-                )
             )
+        )
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(
@@ -126,6 +126,6 @@ class StringWrapper(RefcountedWrapper):
                 runtime_functions.string_from_utf8_and_len.call(
                     native_ast.const_utf8_cstr(s),
                     native_ast.const_int_expr(len(s))
-                    ).cast(self.layoutType)
-                )
+                ).cast(self.layoutType)
             )
+        )

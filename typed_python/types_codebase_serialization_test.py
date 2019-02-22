@@ -32,4 +32,4 @@ class TypesCodebaseSerializationTest(unittest.TestCase):
         self.assertIs(
             serializer.deserialize(serializer.serialize(thisIsAFunction)),
             thisIsAFunction
-            )
+        )

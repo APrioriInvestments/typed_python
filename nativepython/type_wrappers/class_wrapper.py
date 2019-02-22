@@ -65,9 +65,9 @@ class ClassWrapper(RefcountedWrapper):
                 [self],
                 typeWrapper(NoneType),
                 self.generateNativeDestructorFunction
-                )
-            .call(instance)
             )
+            .call(instance)
+        )
 
     def generateNativeDestructorFunction(self, context, out, instance):
         for i in range(len(self.typeRepresentation.MemberTypes)):
@@ -76,7 +76,7 @@ class ClassWrapper(RefcountedWrapper):
                     with true_block:
                         context.pushEffect(
                             self.convert_attribute(context, instance, i, nocheck=True).convert_destroy()
-                            )
+                        )
 
         context.pushEffect(runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr)))
 
@@ -85,8 +85,8 @@ class ClassWrapper(RefcountedWrapper):
             instance.nonref_expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])
                 .cast(
                     typeWrapper(self.typeRepresentation.MemberTypes[ix]).getNativeLayoutType().pointer()
-                    )
             )
+        )
 
     def isInitializedNativeExpr(self, instance, ix):
         byte = ix // 8
@@ -99,7 +99,7 @@ class ClassWrapper(RefcountedWrapper):
                 .load()
                 .rshift(native_ast.const_uint8_expr(bit))
                 .bitand(native_ast.const_uint8_expr(1))
-            )
+        )
 
     def setIsInitializedExpr(self, instance, ix):
         byte = ix // 8
@@ -126,13 +126,13 @@ class ClassWrapper(RefcountedWrapper):
         if ix is None:
             return context.pushTerminal(
                 generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)))
-                )
+            )
 
         if nocheck:
             return context.pushReference(
                 self.typeRepresentation.MemberTypes[ix],
                 self.memberPtr(instance, ix)
-                )
+            )
 
         return context.pushReference(
             self.typeRepresentation.MemberTypes[ix],
@@ -140,8 +140,8 @@ class ClassWrapper(RefcountedWrapper):
                 cond=self.isInitializedNativeExpr(instance, ix),
                 false=generateThrowException(context, AttributeError("Attribute %s is not initialized" % attribute)),
                 true=self.memberPtr(instance, ix)
-                )
             )
+        )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         if not isinstance(attribute, int):
@@ -152,7 +152,7 @@ class ClassWrapper(RefcountedWrapper):
         if ix is None:
             return context.pushTerminal(
                 generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)))
-                )
+            )
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
 
@@ -160,7 +160,7 @@ class ClassWrapper(RefcountedWrapper):
             return context.pushEffect(
                 self.memberPtr(instance, ix).store(value.nonref_expr)
                     >> self.setIsInitializedExpr(instance, ix)
-                )
+            )
         else:
             member = context.pushReference(attr_type, self.memberPtr(instance, ix))
 
@@ -171,7 +171,7 @@ class ClassWrapper(RefcountedWrapper):
                     member.convert_copy_initialize(value)
                     context.pushEffect(
                         self.setIsInitializedExpr(instance, ix)
-                        )
+                    )
 
             return native_ast.nullExpr
 
@@ -187,25 +187,25 @@ class ClassWrapper(RefcountedWrapper):
                     [a.expr_type for a in args],
                     self,
                     self.generateConstructor
-                    ).call(new_class, *args)
-            )
+                ).call(new_class, *args)
+        )
 
     def generateConstructor(self, context, out, *args):
         context.pushEffect(
             out.expr.store(
                 runtime_functions.malloc.call(native_ast.const_int_expr(_types.bytecount(self.typeRepresentation.HeldClass) + 8))
                     .cast(self.getNativeLayoutType())
-                ) >>
+            ) >>
             # store a refcount
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))
-            )
+        )
 
         # clear bits of init flags
         for byteOffset in range(self.bytesOfInitBits):
             context.pushEffect(out.nonref_expr
                 .cast(native_ast.UInt8.pointer())
                 .ElementPtrIntegers(8 + byteOffset).store(native_ast.const_uint8_expr(0))
-                )
+            )
 
         for i in range(len(self.classType.MemberTypes)):
             if _types.wantsToDefaultConstruct(self.classType.MemberTypes[i]):
@@ -215,7 +215,7 @@ class ClassWrapper(RefcountedWrapper):
                     defVal = self.classType.MemberDefaultValues.get(name)
                     context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_copy_initialize(
                         nativepython.python_object_representation.pythonObjectRepresentation(context, defVal)
-                        )
+                    )
                 else:
                     context.pushReference(self.classType.MemberTypes[i], self.memberPtr(out, i)).convert_default_initialize()
                 context.pushEffect(self.setIsInitializedExpr(out, i))

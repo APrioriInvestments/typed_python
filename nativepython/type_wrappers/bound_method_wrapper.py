@@ -36,21 +36,21 @@ class BoundMethodWrapper(Wrapper):
             context,
             target.changeType(self.firstArgType),
             toStore.changeType(self.firstArgType)
-            )
+        )
 
     def convert_copy_initialize(self, context, target, toStore):
         return self.firstArgType.convert_copy_initialize(
             context,
             target.changeType(self.firstArgType),
             toStore.changeType(self.firstArgType)
-            )
+        )
 
     def convert_destroy(self, context, instance):
         return self.firstArgType.convert_destroy(
             context,
             target.changeType(self.firstArgType),
             toStore.changeType(self.firstArgType)
-            )
+        )
 
     def convert_call(self, context, left, args, kwargs):
         clsType = typeWrapper(self.typeRepresentation.FirstArgType)
@@ -61,4 +61,4 @@ class BoundMethodWrapper(Wrapper):
             context.pushPod(funcType, native_ast.nullExpr),
             (left.changeType(clsType),) + tuple(args),
             kwargs
-            )
+        )

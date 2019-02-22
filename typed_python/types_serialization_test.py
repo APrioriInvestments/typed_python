@@ -928,7 +928,7 @@ class TypesSerializationTest(unittest.TestCase):
             'Nested.A': Nested.A,
             'Nested.A.B': Nested.A.B,
             'Nested.A.B.C': Nested.A.B.C
-            })
+        })
 
         for obj in [Nested.A, Nested.A.B, Nested.A.B.C]:
             with self.subTest(obj=obj):

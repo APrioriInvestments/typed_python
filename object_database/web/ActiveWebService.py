@@ -157,9 +157,9 @@ class ActiveWebService(ServiceBase):
                     parsedArgs.ldap_base_dn,
                     parsedArgs.ldap_ntlm_domain,
                     parsedArgs.authorized_groups
-                    )],
+                )],
                 config={'company_name': parsedArgs.company_name}
-                )
+            )
 
     def initialize(self):
         self.db.subscribeToType(Configuration)
@@ -277,9 +277,9 @@ class ActiveWebService(ServiceBase):
                     str(s.gbRamUsed) if field == 'RAM' else
                     (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
                     ""
-                    ),
-                maxRowsPerPage=50
                 ),
+                maxRowsPerPage=50
+            ),
             Hosts=Table(
                 colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
                 rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s: s.hostname),
@@ -294,10 +294,10 @@ class ActiveWebService(ServiceBase):
                     "%2.1f" % (s.cpuUse * 100) + "%" if field == "CPU USE" else
                     ("%2.1f" % s.actualMemoryUseGB) + " GB" if field == "RAM USE" else
                     ""
-                    ),
+                ),
                 maxRowsPerPage=50
-                )
             )
+        )
         return Sequence([buttons, tabs])
 
     def pathToDisplay(self, path, queryArgs):
@@ -316,7 +316,7 @@ class ActiveWebService(ServiceBase):
                 return (
                     Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
                         .withSerializationContext(serviceObj.getSerializationContext())
-                    )
+                )
 
             typename = path[2]
 
@@ -334,14 +334,14 @@ class ActiveWebService(ServiceBase):
                 return (
                     serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
                         .withSerializationContext(serviceObj.getSerializationContext())
-                    )
+                )
 
             instance = typeObj.fromIdentity(path[3])
 
             return (
                 serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
                     .withSerializationContext(serviceObj.getSerializationContext())
-                )
+            )
 
         return Traceback("Invalid url path: %s" % path)
 
@@ -367,7 +367,7 @@ class ActiveWebService(ServiceBase):
                     Button(Octicon('sign-out'), '/logout')
                 ]) +
             Main(display)
-            )
+        )
 
     @login_required
     def mainSocket(self, ws, path):
@@ -488,7 +488,7 @@ class ActiveWebService(ServiceBase):
                         lastDumpTimeSpentCalculating,
                         lastDumpMessages,
                         lastDumpFrames
-                        )
+                    )
 
                     lastDumpFrames = 0
                     lastDumpMessages = 0

@@ -35,8 +35,8 @@ class RefcountedWrapper(Wrapper):
                 cond=expr.nonref_expr,
                 false=native_ast.nullExpr,
                 true=expr.nonref_expr.ElementPtrIntegers(0, 0).atomic_add(1) >> native_ast.nullExpr
-                )
             )
+        )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference
@@ -46,7 +46,7 @@ class RefcountedWrapper(Wrapper):
 
         context.pushEffect(
             expr.expr.store(other.nonref_expr)
-            )
+        )
 
     def convert_copy_initialize(self, context, expr, other):
         expr = expr.expr
@@ -59,8 +59,8 @@ class RefcountedWrapper(Wrapper):
                 true=expr.store(other) >>
                     expr.load().ElementPtrIntegers(0, 0).atomic_add(1) >>
                     native_ast.nullExpr
-                )
             )
+        )
 
     def convert_destroy(self, context, target):
         assert target.isReference

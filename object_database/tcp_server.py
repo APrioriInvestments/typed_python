@@ -167,7 +167,7 @@ def connect(host, port, auth_token, timeout=10.0, retry=False, eventLoop=_eventL
                 host=host,
                 port=port,
                 ssl=ssl_ctx
-                )
+            )
         except Exception as e:
             if not retry or time.time() - t0 > timeout * .8:
                 raise

@@ -182,7 +182,7 @@ class ClassMetaclass(type):
             tuple(staticFunctions.items()),
             tuple(properties.items()),
             tuple(classMembers)
-            )
+        )
         return actualClass
 
 

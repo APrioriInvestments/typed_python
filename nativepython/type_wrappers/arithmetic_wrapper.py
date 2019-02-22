@@ -35,7 +35,7 @@ pyOpToNative = {
     python_ast.BinaryOp.BitOr(): native_ast.BinaryOp.BitOr(),
     python_ast.BinaryOp.BitXor(): native_ast.BinaryOp.BitXor(),
     python_ast.BinaryOp.BitAnd(): native_ast.BinaryOp.BitAnd()
-    }
+}
 
 pyOpNotForFloat = {
     python_ast.BinaryOp.LShift(),
@@ -52,7 +52,7 @@ pyCompOp = {
     python_ast.ComparisonOp.LtE(): native_ast.BinaryOp.LtE(),
     python_ast.ComparisonOp.Gt(): native_ast.BinaryOp.Gt(),
     python_ast.ComparisonOp.GtE(): native_ast.BinaryOp.GtE()
-    }
+}
 
 
 class ArithmeticTypeWrapper(Wrapper):
@@ -64,19 +64,19 @@ class ArithmeticTypeWrapper(Wrapper):
             context,
             target,
             nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
-            )
+        )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_destroy(self, context, instance):
         pass
@@ -101,8 +101,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
             native_ast.Expression.Cast(
                 left=e.nonref_expr,
                 to_type=native_ast.Type.Float(bits=64)
-                )
             )
+        )
 
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == Float64:
@@ -111,8 +111,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Float(bits=64)
-                    )
                 )
+            )
         elif target_type.typeRepresentation == Int64:
             return e
         elif target_type.typeRepresentation == Bool:
@@ -133,13 +133,13 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                         cond=right.nonref_expr,
                         true=runtime_functions.mod_int64_int64.call(left.nonref_expr, right.nonref_expr),
                         false=generateThrowException(context, ZeroDivisionError())
-                        )
                     )
+                )
             if op.matches.Pow:
                 return context.pushPod(
                     self,
                     runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr)
-                    )
+                )
             if op.matches.LShift or op.matches.RShift:
                 return context.pushPod(
                     self,
@@ -149,10 +149,10 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                             l=left.nonref_expr,
                             r=right.nonref_expr,
                             op=pyOpToNative[op]
-                            ),
+                        ),
                         false=generateThrowException(context, ValueError("negative shift count"))
-                        )
                     )
+                )
             if op.matches.FloorDiv:
                 res = left.toFloat64()
                 if res is None:
@@ -169,8 +169,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyOpToNative[op]
-                        )
                     )
+                )
             if op in pyCompOp:
                 return context.pushPod(
                     bool,
@@ -178,8 +178,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyCompOp[op]
-                        )
                     )
+                )
 
         if isinstance(right.expr_type, Float64Wrapper):
             return left.toFloat64().convert_bin_op(op, right)
@@ -201,16 +201,16 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Float(bits=64)
-                    )
                 )
+            )
         elif target_type.typeRepresentation == Int64:
             return context.pushPod(
                 int,
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Int(bits=64, signed=True)
-                    )
                 )
+            )
         elif target_type.typeRepresentation == Bool:
             return e
 
@@ -225,8 +225,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyOpToNative[op]
-                        )
                     )
+                )
 
         return super().convert_bin_op(context, left, op, right)
 
@@ -247,8 +247,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
                     to_type=native_ast.Type.Int(bits=64, signed=True)
-                    )
                 )
+            )
         elif target_type.typeRepresentation == Bool:
             return e != 0.0
 
@@ -266,8 +266,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                         cond=right.nonref_expr,
                         true=runtime_functions.mod_float64_float64.call(left.nonref_expr, right.nonref_expr),
                         false=generateThrowException(context, ZeroDivisionError())
-                        )
                     )
+                )
             if op.matches.Div:
                 return context.pushPod(
                     self,
@@ -277,17 +277,17 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                             l=left.nonref_expr,
                             r=right.nonref_expr,
                             op=pyOpToNative[op]
-                            ),
+                        ),
                         false=generateThrowException(context, ZeroDivisionError())
-                        )
                     )
+                )
             if op.matches.Pow:
                 return context.pushPod(
                     self,
                     runtime_functions.pow_float64_float64.call(
                         left.nonref_expr, right.nonref_expr
-                        )
                     )
+                )
 
             if op in pyOpToNative and op not in pyOpNotForFloat:
                 return context.pushPod(
@@ -296,8 +296,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyOpToNative[op]
-                        )
                     )
+                )
 
             if op in pyCompOp:
                 return context.pushPod(
@@ -306,7 +306,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                         l=left.nonref_expr,
                         r=right.nonref_expr,
                         op=pyCompOp[op]
-                        )
                     )
+                )
 
         return super().convert_bin_op(context, left, op, right)

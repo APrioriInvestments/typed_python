@@ -96,34 +96,34 @@ class Wrapper(object):
         """
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s object cannot be iterated" % self))
-            )
+        )
 
     def convert_attribute(self, context, instance, attribute):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
-            )
+        )
 
     def convert_set_attribute(self, context, instance, attribute, value):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
-            )
+        )
 
     def convert_getitem(self, context, instance, item):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s is not subscriptable" % str(self)))
-            )
+        )
 
     def convert_setitem(self, context, instance, index, value):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s does not support item assignment" % str(self)))
-            )
+        )
 
     def convert_assign(self, context, target, toStore):
         if self.is_pod:
             assert target.isReference
             context.pushEffect(
                 target.expr.store(toStore.nonref_expr)
-                )
+            )
         else:
             raise NotImplementedError()
 
@@ -132,7 +132,7 @@ class Wrapper(object):
         if self.is_pod:
             context.pushEffect(
                 target.expr.store(toStore.nonref_expr)
-                )
+            )
         else:
             raise NotImplementedError()
 
@@ -149,17 +149,17 @@ class Wrapper(object):
         return context.pushException(TypeError, "Can't call %s with args of type (%s)" % (
             self,
             ",".join([str(a.expr_type) for a in args] + ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
-            ))
+        ))
 
     def convert_len(self, context, expr):
         return context.pushTerminal(
             generateThrowException(context, TypeError("Can't take 'len' of instance of type '%s'" % (str(self),)))
-            )
+        )
 
     def convert_unary_op(self, context, expr, op):
         return context.pushTerminal(
             generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))
-            )
+        )
 
     def convert_to_type(self, context, expr, target_type):
         return target_type.convert_to_self(context, expr)
@@ -172,9 +172,9 @@ class Wrapper(object):
                 TypeError("Can't convert from type %s to type %s" % (
                     expr.expr_type.typeRepresentation.__name__,
                     self.typeRepresentation.__name__)
-                    )
                 )
             )
+        )
 
     def convert_bin_op(self, context, l, op, r):
         return r.expr_type.convert_bin_op_reverse(context, r, op, l)
@@ -183,7 +183,7 @@ class Wrapper(object):
         return context.pushTerminal(
             generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" %
                 (op, str(l.expr_type), str(r.expr_type))))
-            )
+        )
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
@@ -195,7 +195,7 @@ class Wrapper(object):
         return context.pushException(
             TypeError,
             "%s() takes at most 1 positional argument" % str(self)
-            )
+        )
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(TypeError, "Can't call %s.%s with args of type (%s)" % (
@@ -203,4 +203,4 @@ class Wrapper(object):
             methodname,
             ",".join([str(a.expr_type) for a in args] +
                 ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
-            ))
+        ))

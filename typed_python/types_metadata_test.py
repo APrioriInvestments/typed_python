@@ -42,7 +42,7 @@ class TypesMetadataTest(unittest.TestCase):
         X = Alternative("X",
             Left={'x': int, 'y': str},
             Right={'x': lambda: X, 'val': int}
-            )
+        )
 
         _types.resolveForwards(X)
 

@@ -90,7 +90,7 @@ class NativeFunctionConversionContext:
             args=native_args,
             output_type=native_ast.Void if output_type.is_pass_by_ref else output_type.getNativeLayoutType(),
             body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
-            )
+        )
 
 
 class TypedCallTarget(object):
@@ -113,7 +113,7 @@ class TypedCallTarget(object):
             self.name,
             [str(x) for x in self.input_types],
             str(self.output_type)
-            )
+        )
 
 
 class PythonToNativeConverter(object):
@@ -162,7 +162,7 @@ class PythonToNativeConverter(object):
                 line_number=ast.body.line_number,
                 col_offset=ast.body.col_offset,
                 filename=ast.body.filename
-                )]
+            )]
 
         return FunctionConversionContext(self, identity, pyast.args, pyast.body, input_types, output_type, freevars)
 
@@ -213,10 +213,10 @@ class PythonToNativeConverter(object):
                 varargs=False,
                 intrinsic=False,
                 can_throw=True
-                ),
+            ),
             input_types,
             output_type
-            )
+        )
 
     def _callable_to_ast_and_vars(self, f):
         pyast = ast_util.pyAstFor(f)
@@ -276,7 +276,7 @@ class PythonToNativeConverter(object):
             body = callTarget.call(
                 native_ast.var('return').cast(callTarget.output_type.getNativeLayoutType().pointer()),
                 *args
-                )
+            )
         else:
             body = callTarget.call(*args)
 
@@ -289,10 +289,10 @@ class PythonToNativeConverter(object):
             args=(
                 ('return', native_ast.Type.Void().pointer()),
                 ('input', native_ast.Type.Void().pointer().pointer())
-                ),
+            ),
             body=body,
             output_type=native_ast.Type.Void()
-            )
+        )
 
         new_name = self.new_name(callTarget.name + ".dispatch")
         self._names_for_identifier[identifier] = new_name

@@ -45,7 +45,7 @@ ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
 pointer_size = (
     llvmlite.ir.PointerType(llvmlite.ir.DoubleType())
         .get_abi_size(target_machine.target_data)
-    )
+)
 
 assert pointer_size == native_ast_to_llvm.pointer_size
 
@@ -57,7 +57,7 @@ def sizeof_native_type(native_type):
     return (
         native_ast_to_llvm.type_to_llvm_type(native_type)
             .get_abi_size(target_machine.target_data)
-        )
+    )
 
 
 # there can be only one llvm engine alive at once.
@@ -118,7 +118,7 @@ class BinarySharedObject:
 
             subprocess.check_call(
                 ["ld", "-shared", "-fPIC", os.path.join(tf, "module.o"), "-o", os.path.join(tf, "module.so")]
-                )
+            )
 
             with open(os.path.join(tf, "module.so"), "rb") as so_file:
                 return BinarySharedObject(so_file.read())

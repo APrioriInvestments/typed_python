@@ -29,7 +29,7 @@ dictTypes = [
     ConstDict(str, str),
     ConstDict(int, str),
     ConstDict(int, int)
-    ]
+]
 
 
 def makeSomeValues(dtype, count=10):
