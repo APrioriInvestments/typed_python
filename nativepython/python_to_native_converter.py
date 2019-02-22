@@ -234,7 +234,7 @@ class PythonToNativeConverter(object):
             for i in range(len(f.__closure__)):
                 try:
                     freevars[f.__code__.co_freevars[i]] = f.__closure__[i].cell_contents
-                except:
+                except Exception:
                     print("BAD IS ", f)
                     raise
 
