@@ -24,6 +24,7 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class OneOfWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = True

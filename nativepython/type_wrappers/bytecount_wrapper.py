@@ -18,6 +18,7 @@ from nativepython.type_wrappers.python_type_object_wrapper import PythonTypeObje
 import nativepython.native_ast as native_ast
 from typed_python._types import bytecount
 
+
 class BytecountWrapper(Wrapper):
     is_pod = True
     is_empty = False

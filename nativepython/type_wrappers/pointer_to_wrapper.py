@@ -27,6 +27,7 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class PointerToWrapper(Wrapper):
     is_pod = True
     is_empty = False

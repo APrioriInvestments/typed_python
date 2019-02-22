@@ -20,6 +20,7 @@ import sys
 import time
 from object_database import connect, Schema
 
+
 def main(argv):
     parser = argparse.ArgumentParser("Run a database throughput test")
 

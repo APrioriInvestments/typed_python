@@ -428,6 +428,7 @@ class TransactionListener:
 
         self._queue.put(changed)
 
+
 class DatabaseConnection:
     def __init__(self, channel):
         self._channel = channel

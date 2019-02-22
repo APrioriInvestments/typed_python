@@ -30,6 +30,7 @@ from object_database.util import configureLogging, formatTable, secondsToHumanRe
 import object_database
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
+
 def findGitParent(p_root):
     p = os.path.abspath(p_root)
     while True:
@@ -39,10 +40,12 @@ def findGitParent(p_root):
         if not p:
             raise Exception("Can't find a git worktree at " + p_root)
 
+
 def main(argv):
     with tempfile.TemporaryDirectory() as tf:
         object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(tf)
         return _main(argv)
+
 
 def _main(argv):
     configureLogging()

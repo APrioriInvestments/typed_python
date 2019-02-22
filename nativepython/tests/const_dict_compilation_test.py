@@ -19,6 +19,7 @@ import unittest
 import time
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
@@ -28,6 +29,7 @@ dictTypes = [
     ConstDict(int, str),
     ConstDict(int, int)
     ]
+
 
 def makeSomeValues(dtype, count=10):
     res = dtype()
@@ -45,6 +47,7 @@ def makeSomeValues(dtype, count=10):
         res = res + {k: v}
 
     return res
+
 
 class TestConstDictCompilation(unittest.TestCase):
     def test_const_dict_copying(self):

@@ -20,6 +20,7 @@ import time
 import threading
 import os
 
+
 def thread_apply(f, argtuples):
     threads = []
     results = {}
@@ -37,12 +38,15 @@ def thread_apply(f, argtuples):
 
     return [results.get(i) for i in range(len(argtuples))]
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
 
+
 class AClass(Class):
     x = Member(int)
+
 
 class TestMultithreading(unittest.TestCase):
     def test_gil_is_released(self):

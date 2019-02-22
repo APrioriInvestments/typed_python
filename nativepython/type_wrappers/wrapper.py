@@ -18,6 +18,7 @@ from typed_python import _types
 
 from nativepython.type_wrappers.exceptions import generateThrowException
 
+
 class Wrapper(object):
     """Represents a code-generation wrapper for objects of a particular type.
 

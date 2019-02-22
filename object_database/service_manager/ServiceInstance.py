@@ -52,6 +52,7 @@ class ServiceHost:
 class CodebaseLockedException(Exception):
     pass
 
+
 @service_schema.define
 class Service:
     name = Indexed(str)

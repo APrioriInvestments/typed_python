@@ -12,9 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+
 def indent(text, amount=4, ch=' '):
     padding = amount * ch
     return ''.join(padding+line for line in text.splitlines(True))
+
 
 def distance(s1, s2):
     """Compute the edit distance between s1 and s2"""
@@ -34,8 +36,10 @@ def distance(s1, s2):
 
     return prev[-1]
 
+
 def closest_in(name, names):
     return sorted((distance(name, x), x) for x in names)[0][1]
+
 
 def closest_N_in(name, names, count):
     return [x[1] for x in sorted((distance(name, x), x) for x in names)[:count]]

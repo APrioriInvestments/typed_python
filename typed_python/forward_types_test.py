@@ -16,6 +16,7 @@ from typed_python.internals import forwardToName
 from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types
 
+
 class NativeForwardTypesTests(unittest.TestCase):
     def test_forwardToName(self):
         X = 10

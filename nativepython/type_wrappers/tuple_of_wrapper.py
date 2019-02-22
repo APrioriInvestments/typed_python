@@ -24,6 +24,7 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class TupleOrListOfWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -160,6 +161,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
+
 
 class TupleOfWrapper(TupleOrListOfWrapper):
     def convert_default_initialize(self, context, tgt):

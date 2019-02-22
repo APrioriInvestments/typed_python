@@ -49,6 +49,7 @@ def setCodebaseInstantiationDirectory(directory, forceReset=False):
 
         _codebase_instantiation_dir = os.path.abspath(directory)
 
+
 @service_schema.define
 @SubscribeLazilyByDefault
 class File:
@@ -63,6 +64,7 @@ class File:
             return f
         else:
             return File(hash=hash, contents=contents)
+
 
 @service_schema.define
 @SubscribeLazilyByDefault

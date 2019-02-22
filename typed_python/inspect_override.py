@@ -21,11 +21,13 @@ import sys
 
 from inspect import *
 
+
 class InspectError(Exception):
     pass
 
 pathExistsOnDiskCache_ = {}
 linesCache_ = {}
+
 
 def getlines(path):
     """return a list of lines for a given path.
@@ -48,6 +50,7 @@ def getlines(path):
     else:
         return None
 
+
 def getfile(pyObject):
     try:
         return inspect.getfile(pyObject)
@@ -55,6 +58,7 @@ def getfile(pyObject):
         if isclass(pyObject):
             return _try_getfile_class(pyObject)
         raise
+
 
 def _try_getfile_class(pyObject):
     members = getmembers(
@@ -77,6 +81,7 @@ def _try_getfile_class(pyObject):
         func = elt0
 
     return inspect.getfile(func)
+
 
 def getsourcefile(pyObject):
     """Return the filename that can be used to locate an object's source.
@@ -106,6 +111,7 @@ def getsourcefile(pyObject):
     # or it is in the linecache
     if filename in linecache.cache:
         return filename
+
 
 def findsource(pyObject):
     """Return the entire source file and starting line number for an object.
@@ -180,6 +186,7 @@ def findsource(pyObject):
         return lines, lnum
     raise IOError('could not find code object')
 
+
 def getsourcelines(pyObject):
     """Return a list of source lines and starting line number for an object.
 
@@ -192,6 +199,7 @@ def getsourcelines(pyObject):
 
     if ismodule(pyObject): return lines, 0
     else: return getblock(lines[lnum:]), lnum + 1
+
 
 def getsource(pyObject):
     """Return the text of the source code for an object.

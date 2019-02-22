@@ -37,6 +37,7 @@ ExpressionIntermediate = Alternative("ExpressionIntermediate",
     StackSlot={"name": str, "expr": native_ast.Expression}
     )
 
+
 class ExpressionConversionContext(object):
     """Context class when we're converting a single compound expression.
 

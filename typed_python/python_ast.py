@@ -502,6 +502,7 @@ numericConverters = {
     float: lambda x: NumericConstant.Float(value=x)
     }
 
+
 def createPythonAstConstant(n, **kwds):
     if type(n) not in numericConverters:
         return Expr.Num(
@@ -513,6 +514,7 @@ def createPythonAstConstant(n, **kwds):
         **kwds
         )
 
+
 def createPythonAstString(s, **kwds):
     try:
         return Expr.Str(s=str(s), **kwds)
@@ -521,6 +523,7 @@ def createPythonAstString(s, **kwds):
             n=NumericConstant.Unknown(),
             **kwds
             )
+
 
 def makeNameConstant(value, **kwds):
     return Expr.Num(n=numericConverters[type(value)](value), **kwds)
@@ -629,9 +632,11 @@ reverseConverters = {
     if hasattr(t, '__typed_python_category__') and t.__typed_python_category__ == "ConcreteAlternative"
     }
 
+
 def convertAlgebraicArgs(pyAst, *members):
     members = [x for x in members if x not in ['line_number', 'col_offset']]
     return {m: convertAlgebraicToPyAst(getattr(pyAst, m)) for m in members}
+
 
 def convertAlgebraicToPyAst(pyAst):
     res = convertAlgebraicToPyAst_(pyAst)
@@ -641,6 +646,7 @@ def convertAlgebraicToPyAst(pyAst):
         res.col_offset = pyAst.col_offset
 
     return res
+
 
 def convertAlgebraicToPyAst_(pyAst):
     if pyAst is None:
@@ -666,6 +672,7 @@ def convertAlgebraicToPyAst_(pyAst):
         return reverseConverters[type(pyAst)](**convertAlgebraicArgs(pyAst, *type(pyAst).ElementType.ElementNames))
 
     assert False, type(pyAst)
+
 
 def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
     if issubclass(type(tree), ast.AST):
@@ -715,6 +722,7 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
 # but for which we never had the source code.
 _originalAstCache = weakref.WeakKeyDictionary()
 
+
 def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
     if f in _originalAstCache:
         return _originalAstCache[f]
@@ -733,6 +741,7 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         return convertPyAstToAlgebraic(pyast, fname, keepLineInformation)
     except Exception as e:
         raise Exception("Failed to convert function at %s:%s:\n%s" % (fname, lineno, repr(e)))
+
 
 def evaluateFunctionPyAst(pyAst):
     assert isinstance(pyAst, (Expr.Lambda, Statement.FunctionDef))

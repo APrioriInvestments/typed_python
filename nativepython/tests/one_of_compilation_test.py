@@ -18,9 +18,11 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
 
 class TestOneOfOfCompilation(unittest.TestCase):
     def test_one_of_basic(self):

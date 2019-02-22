@@ -12,6 +12,7 @@ class TypeFilterBase(type):
 
         return True
 
+
 def TypeFilter(base_type, filter_function):
     """TypeFilter(base_type, filter_function)
 

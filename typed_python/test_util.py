@@ -1,5 +1,6 @@
 import psutil
 
+
 def currentMemUsageMb(residentOnly=True):
     if residentOnly:
         return psutil.Process().memory_info().rss / 1024 ** 2

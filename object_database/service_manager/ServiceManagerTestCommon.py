@@ -30,6 +30,7 @@ ownDir = os.path.dirname(os.path.abspath(__file__))
 
 VERBOSE = True
 
+
 class ServiceManagerTestCommon(object):
     WAIT_FOR_COUNT_TIMEOUT = 20.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
 

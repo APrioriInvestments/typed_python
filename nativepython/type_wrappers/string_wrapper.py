@@ -26,6 +26,7 @@ from nativepython.native_ast import VoidPtr
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class StringWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False

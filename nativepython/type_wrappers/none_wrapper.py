@@ -16,6 +16,7 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
 import nativepython.native_ast as native_ast
 
+
 class NoneWrapper(Wrapper):
     is_pod = True
     is_empty = True

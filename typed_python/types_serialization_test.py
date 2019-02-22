@@ -37,22 +37,28 @@ from typed_python import (
 
 module_level_testfun = dummy_test_module.testfunction
 
+
 class C:
     def __eq__(self, other):
         return self.__dict__ == other.__dict__
+
 
 class D(C):
     def __init__(self, arg):
         pass
 
+
 class E(C):
     def __getinitargs__(self):
         return ()
+
 
 class H(object):
     pass
 
 # Hashable mutable key
+
+
 class K(object):
     def __init__(self, value):
         self.value = value
@@ -78,6 +84,7 @@ class myint(int):
     def __init__(self, x):
         self.str = str(x)
 
+
 class initarg(C):
 
     def __init__(self, a, b):
@@ -87,11 +94,14 @@ class initarg(C):
     def __getinitargs__(self):
         return self.a, self.b
 
+
 class metaclass(type):
     pass
 
+
 class use_metaclass(object, metaclass=metaclass):
     pass
+
 
 class pickling_metaclass(type):
     def __eq__(self, other):
@@ -101,10 +111,12 @@ class pickling_metaclass(type):
     def __reduce__(self):
         return (create_dynamic_class, self.reduce_args)
 
+
 def create_dynamic_class(name, bases):
     result = pickling_metaclass(name, bases, dict())
     result.reduce_args = (name, bases)
     return result
+
 
 def create_data():
     c = C()
@@ -130,35 +142,46 @@ def create_data():
 
 # Test classes for newobj
 
+
 class MyInt(int):
     sample = 1
+
 
 class MyFloat(float):
     sample = 1.0
 
+
 class MyComplex(complex):
     sample = 1.0 + 0.0j
+
 
 class MyStr(str):
     sample = "hello"
 
+
 class MyUnicode(str):
     sample = "hello \u1234"
+
 
 class MyBytes(bytes):
     sample = b"hello"
 
+
 class MyTuple(tuple):
     sample = (1, 2, 3)
+
 
 class MyList(list):
     sample = [1, 2, 3]
 
+
 class MyDict(dict):
     sample = {"a": 1, "b": 2}
 
+
 class MySet(set):
     sample = {"a", "b"}
+
 
 class MyFrozenSet(frozenset):
     sample = frozenset({"a", "b"})
@@ -170,6 +193,7 @@ myclasses = [MyInt, MyFloat,
 
 
 REDUCE_A = 'reduce_A'
+
 
 class AAA(object):
     def __reduce__(self):
@@ -199,6 +223,7 @@ sc = SerializationContext({
     'pickling_metaclass': pickling_metaclass,
     'AAA': AAA,
 })
+
 
 def ping_pong(obj, serialization_context=None):
     serialization_context = serialization_context or SerializationContext()

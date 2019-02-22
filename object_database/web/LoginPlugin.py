@@ -114,6 +114,7 @@ class LoginForm(FlaskForm):
 
 USER_LOGIN_DURATION = 24 * 60 * 60  # 24 hours
 
+
 @active_webservice_schema.define
 class User:
     username = Indexed(str)

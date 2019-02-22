@@ -26,6 +26,7 @@ from typed_python._types import (
     Int16, Int32, UInt8, UInt32, UInt64, NoneType, TypeFor
 )
 
+
 class UndefinedBehaviorException(BaseException):
     """An unsafe operation with known undefined behavior was performed.
 
@@ -36,6 +37,7 @@ class UndefinedBehaviorException(BaseException):
 
 #needed by the C api
 object = object
+
 
 def forwardToName(fwdLambda):
     """Unwrap a 'forward definition' lambda to a name.
@@ -52,6 +54,7 @@ def forwardToName(fwdLambda):
         return "UnknownForward"
     else:
         return fwdLambda.__name__
+
 
 class Member:
     """A member of a Class object."""
@@ -189,6 +192,7 @@ class Class(metaclass=ClassMetaclass):
 def Function(f):
     """Turn a normal python function into a 'typed_python.Function' which obeys type restrictions."""
     return makeFunction(f.__name__, f)()
+
 
 class FunctionOverloadArg:
     def __init__(self, name, defaultVal, typeFilter, isStarArg, isKwarg):

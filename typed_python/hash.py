@@ -16,6 +16,7 @@ import hashlib
 import struct
 from typed_python._types import serialize
 
+
 class Hash:
     def __init__(self, digest):
         self.digest = digest

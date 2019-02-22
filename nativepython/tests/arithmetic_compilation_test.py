@@ -18,6 +18,7 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
@@ -25,40 +26,74 @@ def Compiled(f):
 In = OneOf(int, float)
 Out = OneOf(int, float, bool)
 
+
 def add(x: In, y: In) -> Out:
     return x+y
+
+
 def sub(x: In, y: In) -> Out:
     return x-y
+
+
 def mul(x: In, y: In) -> Out:
     return x*y
+
+
 def div(x: In, y: In) -> Out:
     return x/y
+
+
 def mod(x: In, y: In) -> Out:
     return x%y
+
+
 def lshift(x: In, y: In) -> Out:
     return x << y
+
+
 def rshift(x: In, y: In) -> Out:
     return x >> y
+
+
 def pow(x: In, y: In) -> Out:
     return x ** y
+
+
 def bitxor(x: In, y: In) -> Out:
     return x ^ y
+
+
 def bitand(x: In, y: In) -> Out:
     return x&y
+
+
 def bitor(x: In, y: In) -> Out:
     return x|y
+
+
 def less(x: In, y: In) -> Out:
     return x < y
+
+
 def greater(x: In, y: In) -> Out:
     return x > y
+
+
 def lessEq(x: In, y: In) -> Out:
     return x <= y
+
+
 def greaterEq(x: In, y: In) -> Out:
     return x >= y
+
+
 def eq(x: In, y: In) -> Out:
     return x == y
+
+
 def neq(x: In, y: In) -> Out:
     return x != y
+
 
 class TestArithmeticCompilation(unittest.TestCase):
     def test_runtime_singleton(self):

@@ -8,14 +8,17 @@ import time
 
 schema = Schema("TestModule1")
 
+
 @schema.define
 class Record:
     x = int
+
 
 def createNewRecord(db):
     db.subscribeToNone(Record)
     with db.transaction():
         Record(x=10)
+
 
 class RunningTaskWithSubtasks(RunningTask):
     """A slow, simple task that runs for 1/20th of a second, and that fires off some subtasks.
@@ -36,12 +39,14 @@ class RunningTaskWithSubtasks(RunningTask):
         else:
             return TaskStatusResult.Finished(subtaskResults['A'].result + subtaskResults['B'].result)
 
+
 class TaskWithSubtasks(TaskExecutor):
     def __init__(self, x):
         self.x = x
 
     def instantiate(self):
         return RunningTaskWithSubtasks(self.x)
+
 
 class TestService1(ServiceBase):
     def initialize(self):

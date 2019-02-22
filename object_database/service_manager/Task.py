@@ -33,9 +33,11 @@ task_schema = Schema("core.task")
 #how many times our worker can disconnect in a row before we get marked 'Failed'
 MAX_TIMES_FAILED = 10
 
+
 @task_schema.define
 class ResourceScope:
     pass
+
 
 class TaskContext(object):
     """Placeholder for information about the current running task environment passed into tasks."""
@@ -43,6 +45,7 @@ class TaskContext(object):
         self.db = db
         self.storageRoot = storageRoot
         self.codebase = codebase
+
 
 class RunningTask(object):
     """Base class for a running Task's state. This must be serializable."""
@@ -53,11 +56,13 @@ class RunningTask(object):
         """Step the task forward. Should return a TaskStatusResult. If we asked for results, they are passed back in subtaskResults"""
         raise NotImplementedError()
 
+
 class TaskExecutor(object):
     """Base class for all Tasks. """
     def instantiate(self):
         """Return a RunningTask that represents us."""
         raise NotImplementedError()
+
 
 class RunningFunctionTask(RunningTask):
     def __init__(self, f):
@@ -65,6 +70,7 @@ class RunningFunctionTask(RunningTask):
 
     def execute(self, taskContext, subtaskResults):
         return TaskStatusResult.Finished(result=self.f(taskContext.db))
+
 
 class FunctionTask(TaskExecutor):
     """A simple task that just runs a single function."""
@@ -85,6 +91,7 @@ TaskResult = Alternative("TaskResult",
     Error={'error': str},
     Failure={}
     )
+
 
 @task_schema.define
 class Task:
@@ -113,6 +120,7 @@ class Task:
             state="Unassigned"
             ).task
 
+
 @task_schema.define
 class TaskStatus:
     task = Indexed(Task)
@@ -136,10 +144,12 @@ class TaskStatus:
         self.worker = None
         self.state = "DoneCalculating"
 
+
 @task_schema.define
 class TaskWorker:
     connection = Indexed(core_schema.Connection)
     hasTask = Indexed(bool)
+
 
 class TaskService(ServiceBase):
     coresUsed = 1
@@ -276,6 +286,7 @@ class TaskService(ServiceBase):
         except Exception:
             self.logger.error("Task %s failed with exception:\n%s", task, traceback.format_exc())
             taskStatus.finish(self.db, TaskResult.Error(error=traceback.format_exc()), time.time() - t0 if t0 is not None else 0.0)
+
 
 class TaskDispatchService(ServiceBase):
     coresUsed = 1

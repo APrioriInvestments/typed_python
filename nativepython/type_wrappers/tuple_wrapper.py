@@ -24,6 +24,7 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class TupleWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = True
@@ -87,6 +88,7 @@ class TupleWrapper(Wrapper):
         if not self.is_pod:
             for i in range(len(self.subTypeWrappers)):
                 self.refAs(context, expr, i).convert_destroy()
+
 
 class NamedTupleWrapper(TupleWrapper):
     def __init__(self, t):

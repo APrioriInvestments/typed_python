@@ -29,8 +29,10 @@ from typed_python import *
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class FunctionOutput:
     pass
+
 
 class FunctionConversionContext(object):
     """Helper function for converting a single python function."""

@@ -3,6 +3,8 @@ from object_database.schema import SchemaDefinition
 
 
 _heartbeatInterval = [5.0]
+
+
 def setHeartbeatInterval(newInterval):
     _heartbeatInterval[0] = newInterval
 

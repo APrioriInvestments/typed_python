@@ -21,6 +21,7 @@ from typed_python import NoneType, Int64
 import nativepython.native_ast as native_ast
 import nativepython
 
+
 class RefcountedWrapper(Wrapper):
     """Common functions for types which are pointers to a refcount and data."""
 

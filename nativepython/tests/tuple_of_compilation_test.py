@@ -19,9 +19,11 @@ import unittest
 import time
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
 
 class TestTupleOfCompilation(unittest.TestCase):
     def checkFunction(self, f, argsToCheck):

@@ -18,11 +18,14 @@ from nativepython.runtime import Runtime
 import unittest
 import time
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
 
 AClass = lambda: AClass
+
+
 class AClass(Class):
     x = Member(int)
     y = Member(float)
@@ -40,14 +43,17 @@ class AClass(Class):
 
         return res
 
+
 class AClassWithAnotherClass(Class):
     x = Member(int)
     y = Member(float)
     ac = Member(AClass)
 
+
 class AClassWithDefaults(Class):
     x = Member(int, 123)
     y = Member(int)
+
 
 class AClassWithInit(Class):
     x = Member(int)
@@ -64,6 +70,7 @@ class AClassWithInit(Class):
     def __init__(self, x, y):
         self.x = x
         self.y = y
+
 
 class TestClassCompilationCompilation(unittest.TestCase):
     def test_class_attribute(self):

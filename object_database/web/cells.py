@@ -22,11 +22,13 @@ MAX_FPS = 10
 
 _cur_cell = threading.local()
 
+
 def quoteForJs(string, quoteType):
     if quoteType == "'":
         return string.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
     else:
         return string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
 
 def multiReplace(msg, replacements):
     for k, v in replacements.items():
@@ -49,6 +51,7 @@ def multiReplace(msg, replacements):
     assert not replacements, "Didn't use up replacement %s in %s" % (replacements.keys(), msg)
 
     return "".join(outChunks)
+
 
 def augmentToBeUnique(listOfItems):
     """Returns a list of [(x,index)] for each 'x' in listOfItems, where index is the number of times
@@ -371,6 +374,7 @@ class Slot:
                 c.markDirty()
             self._subscribedCells = set()
 
+
 class Cell:
     def __init__(self):
         self.cells = None  # will get set when its added to a 'Cells' object
@@ -588,6 +592,7 @@ class Cell:
     def __add__(self, other):
         return Sequence([self, Cell.makeCell(other)])
 
+
 class Card(Cell):
     def __init__(self, inner, padding=None):
         super().__init__()
@@ -623,6 +628,7 @@ class CardTitle(Cell):
     def sortsAs(self):
         return self.inner.sortsAs()
 
+
 class Octicon(Cell):
     def __init__(self, which):
         super().__init__()
@@ -635,6 +641,7 @@ class Octicon(Cell):
         self.contents = (
             '<span class="octicon octicon-%s" aria-hidden="true" __style__></span>' % self.whichOcticon
             ).replace('__style__', self._divStyle())
+
 
 class Badge(Cell):
     def __init__(self, inner, style='primary'):
@@ -651,6 +658,7 @@ class Badge(Cell):
             )
         self.children = {'____child__': self.inner}
 
+
 class Text(Cell):
     def __init__(self, text, sortAs=None):
         super().__init__()
@@ -666,6 +674,7 @@ class Text(Cell):
             cgi.escape(str(self.text)) if self.text else "&nbsp;"
             )
 
+
 class Padding(Cell):
     def __init__(self):
         super().__init__()
@@ -674,6 +683,7 @@ class Padding(Cell):
     def sortsAs(self):
         return " "
 
+
 class Span(Cell):
     def __init__(self, text):
         super().__init__()
@@ -681,6 +691,7 @@ class Span(Cell):
 
     def sortsAs(self):
         return self.contents
+
 
 class Sequence(Cell):
     def __init__(self, elements):
@@ -702,6 +713,7 @@ class Sequence(Cell):
         if self.elements:
             return self.elements[0].sortsAs()
         return None
+
 
 class Columns(Cell):
     def __init__(self, *elements):
@@ -734,6 +746,7 @@ class Columns(Cell):
             return self.elements[0].sortsAs()
         return None
 
+
 class LargePendingDownloadDisplay(Cell):
     def __init__(self):
         super().__init__()
@@ -743,6 +756,7 @@ class LargePendingDownloadDisplay(Cell):
                 <span id="object_database_large_pending_download_text"></span>
             </div>
         """
+
 
 class HeaderBar(Cell):
     def __init__(self, leftItems, centerItems=(), rightItems=()):
@@ -778,6 +792,7 @@ class HeaderBar(Cell):
         self.children = {'____left_%s__' % i: self.leftItems[i] for i in range(len(self.leftItems))}
         self.children.update({'____center_%s__' % i: self.centerItems[i] for i in range(len(self.centerItems))})
         self.children.update({'____right_%s__' % i: self.rightItems[i] for i in range(len(self.rightItems))})
+
 
 class Main(Cell):
     def __init__(self, child):
@@ -818,6 +833,7 @@ class _NavTab(Cell):
             )
 
         self.children['____child__'] = Cell.makeCell(self.child)
+
 
 class Tabs(Cell):
     def __init__(self, headersAndChildren=(), **headersAndChildrenKwargs):
@@ -860,6 +876,7 @@ class Tabs(Cell):
 
     def onMessage(self, msgFrame):
         self.whichSlot.set(int(msgFrame['ix']))
+
 
 class Dropdown(Cell):
     def __init__(self, title, headersAndLambdas, singleLambda=None, rightSide=False):
@@ -932,6 +949,7 @@ class Dropdown(Cell):
         fun = self.headersAndLambdas[msgFrame['ix']][1]
         fun()
 
+
 class Container(Cell):
     def __init__(self, child=None):
         super().__init__()
@@ -950,10 +968,12 @@ class Container(Cell):
         self.children = newChildren
         self.markDirty()
 
+
 class Scrollable(Container):
     def __init__(self, child=None):
         super().__init__(child)
         self.overflow('auto')
+
 
 class RootCell(Container):
     def setRootSerializationContext(self, context):
@@ -966,6 +986,7 @@ class RootCell(Container):
     def setChild(self, child):
         self.setContents("<div>____c__</div>", {"____c__": child})
 
+
 class Traceback(Cell):
     def __init__(self, traceback):
         super().__init__()
@@ -976,6 +997,7 @@ class Traceback(Cell):
     def sortsAs(self):
         return self.traceback
 
+
 class Code(Cell):
     def __init__(self, codeContents):
         super().__init__()
@@ -985,6 +1007,7 @@ class Code(Cell):
 
     def sortsAs(self):
         return self.codeContents
+
 
 class Subscribed(Cell):
     def __init__(self, f):
@@ -1020,6 +1043,7 @@ class Subscribed(Cell):
                 self._logger.error("Subscribed inner function threw exception:\n%s", traceback.format_exc())
 
             self._resetSubscriptionsToViewReads(v)
+
 
 class SubscribedSequence(Cell):
     def __init__(self, itemsFun, rendererFun):
@@ -1076,6 +1100,7 @@ class SubscribedSequence(Cell):
             self._divStyle(),
             "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
             )
+
 
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
@@ -1218,6 +1243,7 @@ class Grid(Cell):
                     )
                 )
 
+
 class SortWrapper:
     def __init__(self, x):
         self.x = x
@@ -1246,6 +1272,7 @@ class SortWrapper:
             except Exception:
                 return True
 
+
 class SingleLineTextBox(Cell):
     def __init__(self, slot, pattern=None):
         super().__init__()
@@ -1272,6 +1299,7 @@ class SingleLineTextBox(Cell):
 
     def onMessage(self, msgFrame):
         self.slot.set(msgFrame['text'])
+
 
 class Table(Cell):
     """An active table with paging, filtering, sortable columns."""
@@ -1489,6 +1517,7 @@ class Table(Cell):
                 )
             )
 
+
 class Clickable(Cell):
     def __init__(self, content, f, makeBold=False, makeUnderling=False):
         super().__init__()
@@ -1523,6 +1552,7 @@ class Clickable(Cell):
         if isinstance(val, str):
             self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(val, "'")), '"'))
 
+
 class Button(Clickable):
     def __init__(self, *args, small=False, **kwargs):
         Clickable.__init__(self, *args, **kwargs)
@@ -1541,6 +1571,7 @@ class Button(Clickable):
             .replace('__identity__', self.identity)
             .replace("__onclick__", self.calculatedOnClick())
         )
+
 
 class LoadContentsFromUrl(Cell):
     def __init__(self, targetUrl):
@@ -1561,10 +1592,12 @@ class LoadContentsFromUrl(Cell):
                 .replace("__url__", quoteForJs(self.targetUrl, "'"))
             )
 
+
 class SubscribeAndRetry(Exception):
     def __init__(self, callback):
         super().__init__("SubscribeAndRetry")
         self.callback = callback
+
 
 def ensureSubscribedType(t, lazy=False):
     if not current_transaction().db().isSubscribedToType(t):
@@ -1574,6 +1607,7 @@ def ensureSubscribedType(t, lazy=False):
                 )
             )
 
+
 def ensureSubscribedSchema(t, lazy=False):
     if not current_transaction().db().isSubscribedToSchema(t):
         raise SubscribeAndRetry(
@@ -1581,6 +1615,7 @@ def ensureSubscribedSchema(t, lazy=False):
                 lambda db: db.subscribeToSchema(t, lazySubscription=lazy)
                 )
             )
+
 
 class Expands(Cell):
     def __init__(self, closed, open, closedIcon=Octicon("diff-added)"), openedIcon=Octicon("diff-removed"), initialState=False):
@@ -1618,6 +1653,7 @@ class Expands(Cell):
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded
         self.markDirty()
+
 
 class CodeEditor(Cell):
     """Produce a code editor."""
@@ -1944,6 +1980,7 @@ class Plot(Cell):
             ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]', curVal[0][1])),
              (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
             )
+
 
 class _PlotUpdater(Cell):
     """Helper utility to push data into an existing line plot."""

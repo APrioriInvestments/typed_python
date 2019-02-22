@@ -20,6 +20,7 @@ import typed_python._types as _types
 
 _type_to_typefunction = {}
 
+
 def isTypeFunctionType(type):
     """Is 'type' the result of a type function?
 
@@ -30,12 +31,14 @@ def isTypeFunctionType(type):
         return (func, args, kwargs)
     return None
 
+
 def reconstructTypeFunctionType(typeFunction, args, kwargs):
     """Reconstruct a type from the values returned by 'isTypeFunctionType'"""
 
     #note that our 'key' objects are dict-in-tuple-form, because dicts are
     #not hashable. So to keyword-call with them, we have to convert back to a dict...
     return typeFunction(*args, **dict(kwargs))
+
 
 class ConcreteTypeFunction(object):
     def __init__(self, concreteTypeFunction):
@@ -124,6 +127,7 @@ class ConcreteTypeFunction(object):
         except Exception as e:
             self._memoForKey[key] = e
             raise
+
 
 def TypeFunction(f):
     """Decorate 'f' to be a 'TypeFunction'.
