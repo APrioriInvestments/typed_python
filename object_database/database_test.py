@@ -67,14 +67,14 @@ schema.expr = expr
 
 @schema.define
 class Root:
-    obj=OneOf(None, schema.Object)
+    obj = OneOf(None, schema.Object)
     k = int
 
 
 @schema.define
 class Object:
-    k=Indexed(expr)
-    other=OneOf(None, schema.Object)
+    k = Indexed(expr)
+    other = OneOf(None, schema.Object)
 
     @property
     def otherK(self):
@@ -421,7 +421,7 @@ class ObjectDatabaseTests:
 
         threads = [threading.Thread(target=worker, args=(i,)) for i in range(threadCount)]
         for t in threads:
-            t.daemon=True
+            t.daemon = True
             t.start()
         for t in threads:
             t.join()
@@ -892,7 +892,7 @@ class ObjectDatabaseTests:
             x = int
             y = int
 
-            pair=Index('x', 'y')
+            pair = Index('x', 'y')
 
         db.subscribeToSchema(schema)
 
@@ -965,7 +965,7 @@ class ObjectDatabaseTests:
 
         @schema.define
         class Object:
-            k=Indexed(int)
+            k = Indexed(int)
 
             pair_index = Index('k', 'k')
 
@@ -991,7 +991,7 @@ class ObjectDatabaseTests:
 
         @schema.define
         class Object:
-            k=Indexed(int)
+            k = Indexed(int)
 
         db.subscribeToSchema(schema)
 
@@ -1018,7 +1018,7 @@ class ObjectDatabaseTests:
 
         @schema.define
         class Object:
-            k=Indexed(int)
+            k = Indexed(int)
 
         db.subscribeToSchema(schema)
 
@@ -1031,7 +1031,7 @@ class ObjectDatabaseTests:
         t2 = db.transaction().consistency(full=True)
 
         with t1.nocommit():
-            o2.k=len(Object.lookupAll(k=10))
+            o2.k = len(Object.lookupAll(k=10))
 
         with t2.nocommit():
             o1.k = 20

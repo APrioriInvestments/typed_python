@@ -25,39 +25,39 @@ def Compiled(f):
 In = OneOf(int, float)
 Out = OneOf(int, float, bool)
 
-def add(x: In, y: In)->Out:
+def add(x: In, y: In) -> Out:
     return x+y
-def sub(x: In, y: In)->Out:
+def sub(x: In, y: In) -> Out:
     return x-y
-def mul(x: In, y: In)->Out:
+def mul(x: In, y: In) -> Out:
     return x*y
-def div(x: In, y: In)->Out:
+def div(x: In, y: In) -> Out:
     return x/y
-def mod(x: In, y: In)->Out:
+def mod(x: In, y: In) -> Out:
     return x%y
-def lshift(x: In, y: In)->Out:
+def lshift(x: In, y: In) -> Out:
     return x << y
-def rshift(x: In, y: In)->Out:
+def rshift(x: In, y: In) -> Out:
     return x >> y
-def pow(x: In, y: In)->Out:
+def pow(x: In, y: In) -> Out:
     return x ** y
-def bitxor(x: In, y: In)->Out:
+def bitxor(x: In, y: In) -> Out:
     return x ^ y
-def bitand(x: In, y: In)->Out:
+def bitand(x: In, y: In) -> Out:
     return x&y
-def bitor(x: In, y: In)->Out:
+def bitor(x: In, y: In) -> Out:
     return x|y
-def less(x: In, y: In)->Out:
-    return x<y
-def greater(x: In, y: In)->Out:
-    return x>y
-def lessEq(x: In, y: In)->Out:
-    return x<=y
-def greaterEq(x: In, y: In)->Out:
-    return x>=y
-def eq(x: In, y: In)->Out:
+def less(x: In, y: In) -> Out:
+    return x < y
+def greater(x: In, y: In) -> Out:
+    return x > y
+def lessEq(x: In, y: In) -> Out:
+    return x <= y
+def greaterEq(x: In, y: In) -> Out:
+    return x >= y
+def eq(x: In, y: In) -> Out:
     return x == y
-def neq(x: In, y: In)->Out:
+def neq(x: In, y: In) -> Out:
     return x != y
 
 class TestArithmeticCompilation(unittest.TestCase):
@@ -76,7 +76,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(f(10), 30)
 
     def test_binary_operators(self):
-        r  = Runtime.singleton()
+        r = Runtime.singleton()
 
         failures = 0
         successes = 0
@@ -121,7 +121,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(failures, 0, successes)
 
     def checkFunctionOfIntegers(self, f):
-        r  = Runtime.singleton()
+        r = Runtime.singleton()
 
         f_fast = r.compile(f)
 

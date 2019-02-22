@@ -103,12 +103,12 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someStrings:
             for s2 in someStrings:
-                self.assertEqual(eq(s, s2), s==s2)
-                self.assertEqual(neq(s, s2), s!=s2)
-                self.assertEqual(gte(s, s2), s>=s2)
-                self.assertEqual(lte(s, s2), s<=s2)
-                self.assertEqual(gt(s, s2), s>s2)
-                self.assertEqual(lt(s, s2), s<s2)
+                self.assertEqual(eq(s, s2), s == s2)
+                self.assertEqual(neq(s, s2), s != s2)
+                self.assertEqual(gte(s, s2), s >= s2)
+                self.assertEqual(lte(s, s2), s <= s2)
+                self.assertEqual(gt(s, s2), s > s2)
+                self.assertEqual(lt(s, s2), s < s2)
 
     def test_string_constants(self):
         def makeConstantConcatenator(s):

@@ -354,7 +354,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         self.testStartTime = time.time()
 
         if self.nocaptureall:
-            self.hadError=False
+            self.hadError = False
             return
 
         sys.stdout.flush()
@@ -373,14 +373,14 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         os.dup2(self.outfile.fileno(), 1)
         os.dup2(self.outfile.fileno(), 2)
 
-        self.hadError=False
+        self.hadError = False
 
         setLoggingLevel(logging.INFO)
 
     def formatError(self, test, err):
         """Add captured output to error report.
         """
-        self.hadError=True
+        self.hadError = True
 
         if self.nocaptureall:
             return err
@@ -400,7 +400,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
     def formatFailure(self, test, err):
         """Add captured output to failure report.
         """
-        self.hadError=True
+        self.hadError = True
         return self.formatError(test, err)
 
     def addCaptureToErr(self, ev, tb):

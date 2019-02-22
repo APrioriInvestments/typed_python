@@ -33,9 +33,9 @@ from typed_python.Codebase import Codebase as TypedPythonCodebase
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
 
-DATABASE_SERVER_PORT=8023
+DATABASE_SERVER_PORT = 8023
 
-WEB_SERVER_PORT=8025
+WEB_SERVER_PORT = 8025
 
 
 class ActiveWebServiceTest(unittest.TestCase):

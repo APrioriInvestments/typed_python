@@ -32,11 +32,11 @@ def externalCallTarget(name, output, *inputs):
             )
         )
 
-free=externalCallTarget("free", Void, UInt8Ptr)
-malloc=externalCallTarget("malloc", UInt8Ptr, Int64)
-realloc=externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
-memcpy=externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
-memmove=externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
+free = externalCallTarget("free", Void, UInt8Ptr)
+malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
+realloc = externalCallTarget("realloc", UInt8Ptr, UInt8Ptr, Int64)
+memcpy = externalCallTarget("memcpy", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
+memmove = externalCallTarget("memmove", UInt8Ptr, UInt8Ptr, UInt8Ptr, Int64)
 
 stash_exception_ptr = externalCallTarget(
         "nativepython_runtime_stash_const_char_ptr_for_exception",
