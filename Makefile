@@ -38,6 +38,11 @@ test: testcert.cert testcert.key install
 	. $(VIRTUAL_ENV)/bin/activate; \
 	./test.py -s
 
+.PHONY: lint
+lint: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	flake8 --statistics
+
 .PHONY: lib
 lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
 
