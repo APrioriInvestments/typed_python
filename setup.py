@@ -55,7 +55,7 @@ setuptools.setup(
             ],
             # pkg_resources.resouce_filename raises an exception if numpy is
             # not installed, so we check if it is installed. This works because
-            # setup.py is called first to collect and install dependencies, 
+            # setup.py is called first to collect and install dependencies,
             # and then to install the package itself.
             include_dirs=[
                 pkg_resources.resource_filename('numpy', 'core/include')

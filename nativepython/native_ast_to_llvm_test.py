@@ -44,7 +44,7 @@ class TestNativeAstToLlvm(unittest.TestCase):
             body=FunctionBody.Internal(
                 Expression.Finally(
                     expr=ct.call() >>
-                        Expression.ActivatesTeardown('a1') >> 
+                        Expression.ActivatesTeardown('a1') >>
                         ct.call() >>
                         Expression.ActivatesTeardown('a2') >>
                         nullExpr
