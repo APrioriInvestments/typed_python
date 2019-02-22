@@ -546,7 +546,7 @@ class FunctionConversionContext(object):
             expr = native_ast.Expression.Finally(
                     teardowns=destructors,
                     expr=expr
-                    )
+            )
 
         return expr
 
@@ -559,10 +559,11 @@ class FunctionConversionContext(object):
             args_type.convert_initialize(
                 self,
                 stararg_slot,
-                [TypedExpression(
+                [
+                    TypedExpression(
                         native_ast.Expression.Variable(".star_args.%s" % i),
                         args_type.element_types[i][1]
-                        )
+                    )
                     for i in range(len(args_type.element_types))]
             ).with_comment("initialize *args slot") + res
         )

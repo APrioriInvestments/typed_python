@@ -386,10 +386,10 @@ ExprContext = Alternative("ExprContext",
 Slice = Alternative("Slice",
     Ellipsis={},
     Slice={
-         "lower": OneOf(Expr, None),
-         "upper": OneOf(Expr, None),
-         "step": OneOf(Expr, None)
-         },
+        "lower": OneOf(Expr, None),
+        "upper": OneOf(Expr, None),
+        "step": OneOf(Expr, None)
+    },
     ExtSlice={"dims": TupleOf(Slice)},
     Index={"value": Expr}
 )

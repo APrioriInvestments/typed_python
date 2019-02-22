@@ -266,17 +266,17 @@ class TaskService(ServiceBase):
 
                     for taskName, subtaskExecutor in execResult.subtasks.items():
                         newTaskStatuses[taskName] = TaskStatus(
-                                task=Task(
-                                    service=task.service,
-                                    resourceScope=task.resourceScope,
-                                    executor=subtaskExecutor,
-                                    parent=task
-                                ),
-                                parentStatus=taskStatus,
+                            task=Task(
+                                service=task.service,
                                 resourceScope=task.resourceScope,
-                                state="Unassigned",
-                                worker=None
-                                )
+                                executor=subtaskExecutor,
+                                parent=task
+                            ),
+                            parentStatus=taskStatus,
+                            resourceScope=task.resourceScope,
+                            state="Unassigned",
+                            worker=None
+                        )
 
                     logging.info("Subtask %s depends on %s", task, [str(ts.task) + "/" + str(ts) for ts in newTaskStatuses.values()])
 

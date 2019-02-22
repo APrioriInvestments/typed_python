@@ -167,8 +167,8 @@ class CellsTests(unittest.TestCase):
             ensureSubscribedType(Thing2)
 
             res = Sequence([
-                    Span("Thing(k=%s).x = %s" % (thing.k, thing.x)) for thing in Thing2.lookupAll()
-                    ])
+                Span("Thing(k=%s).x = %s" % (thing.k, thing.x)) for thing in Thing2.lookupAll()
+            ])
 
             computed.set()
 

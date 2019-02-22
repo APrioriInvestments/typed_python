@@ -74,7 +74,7 @@ Type = Alternative("Type",
             Constant.Struct(elements=[(name, t.zero()) for name, t in self.element_types]) if self.matches.Struct else
             Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
             raising(Exception("Can't make a zero value from %s" % self))
-            )
+    )
 )
 
 
@@ -168,7 +168,7 @@ NamedCallTarget = NamedTuple(
                 varargs=bool,
                 intrinsic=bool,
                 can_throw=bool
-                )
+)
 
 
 def filterCallTargetArgs(args):
@@ -401,9 +401,9 @@ Expression = Alternative("Expression",
             left=self,
             offsets=tuple(
                 Expression.Constant(
-                        val=Constant.Int(bits=32, signed=True, val=index)
-                        )
-                    for index in offsets
+                    val=Constant.Int(bits=32, signed=True, val=index)
+                )
+                for index in offsets
             )
     ),
     __rshift__=expr_concatenate,

@@ -97,8 +97,8 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             return context.pushReference(
                 self.underlyingWrapperType,
                 tupPtrExpr.ElementPtrIntegers(0, 4).load().cast(
-                        self.underlyingWrapperType.getNativeLayoutType().pointer()
-                        ).elemPtr(iExpr)
+                    self.underlyingWrapperType.getNativeLayoutType().pointer()
+                ).elemPtr(iExpr)
             )
 
         left_size = left.convert_len()
@@ -157,7 +157,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 cond=expr,
                 false=native_ast.const_int_expr(0),
                 true=expr.ElementPtrIntegers(0, 2).load().cast(native_ast.Int64)
-                )
+        )
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))

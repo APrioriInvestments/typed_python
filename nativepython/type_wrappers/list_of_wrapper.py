@@ -70,7 +70,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                             [self, int],
                             self.underlyingWrapperType,
                             self.generatePop
-                            )
+                )
 
                 if self.underlyingWrapperType.is_pass_by_ref:
                     return context.push(self.underlyingWrapperType, lambda out:

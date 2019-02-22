@@ -859,22 +859,25 @@ class Tabs(Cell):
         for i in range(len(self.headersAndChildren)):
             self.children['____header_{ix}__'.format(ix=i)] = _NavTab(self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
 
-        self.contents = """
-                <div class="container-fluid mb-3">
-                     <ul class="nav nav-tabs" role="tablist">
-                      __items__
-                    </ul>
-                    <div class="tab-content">
-                      <div class="tab-pane fade show active" role="tabpanel">____display__
-                    </div>
+        self.contents = (
+            """
+            <div class="container-fluid mb-3">
+                 <ul class="nav nav-tabs" role="tablist">
+                  __items__
+                </ul>
+                <div class="tab-content">
+                  <div class="tab-pane fade show active" role="tabpanel">____display__
                 </div>
-                """.replace(
-                    "__items__",
-                    "".join(
-                        """ ____header___ix____ """.replace('__ix__', str(i))
-                            for i in range(len(self.headersAndChildren))
-                    )
-                    ).replace("__identity__", self._identity)
+            </div>
+            """
+            .replace(
+                "__items__",
+                "".join(
+                    """ ____header___ix____ """.replace('__ix__', str(i))
+                        for i in range(len(self.headersAndChildren))
+                )
+            ).replace("__identity__", self._identity)
+        )
 
     def onMessage(self, msgFrame):
         self.whichSlot.set(int(msgFrame['ix']))
@@ -1538,15 +1541,17 @@ class Clickable(Cell):
     def recalculate(self):
         self.children = {'____contents__': self.content}
 
-        self.contents = """
+        self.contents = (
+            """
             <div onclick="__onclick__" __style__>
             ____contents__
-            </div>""".replace(
-                '__onclick__', self.calculatedOnClick()
-                ).replace(
+            </div>"""
+            .replace('__onclick__', self.calculatedOnClick())
+            .replace(
                 '__style__',
                 self._divStyle("cursor:pointer;*cursor: hand" + (";font-weight:bold" if self.bold else ""))
-                )
+            )
+        )
 
     def sortsAs(self):
         return self.content.sortsAs()
@@ -1765,7 +1770,8 @@ class CodeEditorTrigger(Cell):
 
     def recalculate(self):
         self.contents = """<div></div>"""
-        self.postscript = """
+        self.postscript = (
+            """
             var editor = aceEditors["editor__identity__"]
             console.log("setting contents")
 
@@ -1779,7 +1785,8 @@ class CodeEditorTrigger(Cell):
 
             """.replace("__identity__", self.editor.identity).replace(
                 "__text__", quoteForJs(self.editor._slot.get()[1], '"')
-                )
+            )
+        )
 
 
 class Sheet(Cell):

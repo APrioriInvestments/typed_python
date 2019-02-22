@@ -741,7 +741,7 @@ class NativeTypesTests(unittest.TestCase):
         for type_to_use, vals in [
                     (int, list(range(20))),
                     (bytes, [b'1', b'2', b'3', b'4', b'5'])
-                    ]:
+        ]:
             t = ConstDict(type_to_use, type_to_use)
 
             for _ in range(10):
@@ -1382,18 +1382,18 @@ class NativeTypesTests(unittest.TestCase):
     def test_other_bitness_types(self):
         # verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
-                (Bool, numpy.bool),
-                (Int8, numpy.int8),
-                (Int16, numpy.int16),
-                (Int32, numpy.int32),
-                (Int64, numpy.int64),
-                (UInt8, numpy.uint8),
-                (UInt16, numpy.uint16),
-                (UInt32, numpy.uint32),
-                (UInt64, numpy.uint64),
-                (Float32, numpy.float32),
-                (Float64, numpy.float64)
-                ]
+            (Bool, numpy.bool),
+            (Int8, numpy.int8),
+            (Int16, numpy.int16),
+            (Int32, numpy.int32),
+            (Int64, numpy.int64),
+            (UInt8, numpy.uint8),
+            (UInt16, numpy.uint16),
+            (UInt32, numpy.uint32),
+            (UInt64, numpy.uint64),
+            (Float32, numpy.float32),
+            (Float64, numpy.float64)
+        ]
 
         for ourType, numpyType in typeAndNumpyType:
             for candValue in [-1, 0, 1, 10, 100, 1000, 100000, 10000000, 10000000000]:

@@ -86,7 +86,7 @@ class BytesWrapper(RefcountedWrapper):
                 cond=expr,
                 false=native_ast.const_int_expr(0),
                 true=expr.ElementPtrIntegers(0, 1).ElementPtrIntegers(4).cast(native_ast.Int32.pointer()).load().cast(native_ast.Int64)
-                )
+        )
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))

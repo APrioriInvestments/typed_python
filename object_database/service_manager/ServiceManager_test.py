@@ -192,12 +192,12 @@ class GraphDisplayService(ServiceBase):
                     ).width(600).height(400) + Code("HI")
                 ),
             AGrid=Grid(
-                    colFun=lambda: ['A', 'B', 'B'],
-                    rowFun=lambda: ['1', '2', '2'],
-                    headerFun=lambda x: x,
-                    rowLabelFun=None,
-                    rendererFun=lambda row, col: row+col
-                    ),
+                colFun=lambda: ['A', 'B', 'B'],
+                rowFun=lambda: ['1', '2', '2'],
+                headerFun=lambda x: x,
+                rowLabelFun=None,
+                rendererFun=lambda row, col: row+col
+            ),
             ASheet=Sheet(
                 ["A", "B", "C"],
                 1000000,

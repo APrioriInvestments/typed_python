@@ -584,8 +584,7 @@ class Server:
                 identities,
                 identities_left_to_send,
                 BATCH_SIZE=100,
-                checkPending=True
-                ):
+                checkPending=True):
 
         # get some objects to send
         kvs = {}

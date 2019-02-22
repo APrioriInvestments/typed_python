@@ -24,11 +24,12 @@ class NativeForwardTypesTests(unittest.TestCase):
         self.assertEqual(forwardToName(lambda: X+X), "UnknownForward")
 
     def test_recursive_alternative(self):
-        List = Alternative("List",
-                Node={'head': int, 'tail': lambda: List },
-                Leaf={},
-                unpack=lambda self: () if self.matches.Leaf else (self.head,) + self.tail.unpack()
-                )
+        List = Alternative(
+            "List",
+            Node={'head': int, 'tail': lambda: List },
+            Leaf={},
+            unpack=lambda self: () if self.matches.Leaf else (self.head,) + self.tail.unpack()
+        )
 
         # ensure recursive implementation actually works
         l = List.Leaf()
