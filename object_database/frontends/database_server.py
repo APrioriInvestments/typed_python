@@ -54,10 +54,10 @@ def main(argv):
     databaseServer.start()
 
     try:
-    	while True:
-    		time.sleep(0.1)
+        while True:
+            time.sleep(0.1)
     except KeyboardInterrupt:
-    	return
+        return
 
 
 if __name__ == '__main__':

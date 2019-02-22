@@ -59,7 +59,7 @@ Statement = Alternative("Statement",
         'line_number': int,
         'col_offset': int,
         'filename': str
-  	    },
+        },
 
     ClassDef={
         "name": str,
