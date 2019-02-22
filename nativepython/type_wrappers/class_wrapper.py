@@ -44,7 +44,7 @@ class ClassWrapper(RefcountedWrapper):
         # each field packed directly according to byte size
         byteOffset = 8 + (len(self.classType.MemberNames) // 8 + 1)
 
-        self.bytesOfInitBits = byteOffset - 8;
+        self.bytesOfInitBits = byteOffset - 8
 
         for i, name in enumerate(self.classType.MemberNames):
             self.nameToIndex[name] = i

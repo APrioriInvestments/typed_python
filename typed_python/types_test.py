@@ -1033,7 +1033,7 @@ class NativeTypesTests(unittest.TestCase):
         tupleOfInt = TupleOf(int)
 
         ints = tuple(range(20))
-        aTuple = tupleOfInt(ints);
+        aTuple = tupleOfInt(ints)
 
         for i in range(-21, 21):
             for i2 in range(-21, 21):
