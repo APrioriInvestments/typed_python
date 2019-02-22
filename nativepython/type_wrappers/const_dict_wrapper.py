@@ -144,6 +144,7 @@ class ConstDictWrapper(RefcountedWrapper):
                 lambda output:
                     output.expr.store(native_getitem.call(instance, item))
                 )
+
     def generateGetitem(self):
         return self.generateLookupFun(False)
 

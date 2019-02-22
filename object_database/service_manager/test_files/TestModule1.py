@@ -25,6 +25,7 @@ class RunningTaskWithSubtasks(RunningTask):
 
     We use this for testing a task graph with dependencies.
     """
+
     def __init__(self, x):
         self.x = x
 

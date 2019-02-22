@@ -32,6 +32,7 @@ class Codebase:
 
     Also provides services for building a serialization context.
     """
+
     def __init__(self, rootDirectory, filesToContents, modules):
         self.rootDirectory = rootDirectory
         self.filesToContents = filesToContents

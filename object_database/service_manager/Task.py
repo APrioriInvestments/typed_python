@@ -41,6 +41,7 @@ class ResourceScope:
 
 class TaskContext(object):
     """Placeholder for information about the current running task environment passed into tasks."""
+
     def __init__(self, db, storageRoot, codebase):
         self.db = db
         self.storageRoot = storageRoot
@@ -49,6 +50,7 @@ class TaskContext(object):
 
 class RunningTask(object):
     """Base class for a running Task's state. This must be serializable."""
+
     def __init__(self):
         pass
 
@@ -59,6 +61,7 @@ class RunningTask(object):
 
 class TaskExecutor(object):
     """Base class for all Tasks. """
+
     def instantiate(self):
         """Return a RunningTask that represents us."""
         raise NotImplementedError()
@@ -74,6 +77,7 @@ class RunningFunctionTask(RunningTask):
 
 class FunctionTask(TaskExecutor):
     """A simple task that just runs a single function."""
+
     def __init__(self, f):
         self.f = f
 

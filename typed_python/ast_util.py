@@ -128,6 +128,7 @@ class FindEnclosingFunctionVisitor(ast.NodeVisitor):
     """"Visitor used to find the enclosing function at a given line of code.
 
     The class method 'find' is the preferred API entry point."""
+
     def __init__(self, line):
         self.targetLine = line
         self.enclosingFunction = None
@@ -167,6 +168,7 @@ def findEnclosingFunctionName(astNode, lineno):
 
 class _AtLineNumberVisitor(ast.NodeVisitor):
     """Collects various types of nodes occurring at a given line number."""
+
     def __init__(self, lineNumber):
         self.funcDefSubnodesAtLineNumber = []
         self.lambdaSubnodesAtLineNumber = []

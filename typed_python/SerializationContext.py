@@ -54,6 +54,7 @@ _builtin_value_to_name = {id(v): k for k, v in _builtin_name_to_value.items()}
 
 class SerializationContext(object):
     """Represents a collection of types with well-specified names that we can use to serialize objects."""
+
     def __init__(self, nameToObject=None):
         super().__init__()
 
