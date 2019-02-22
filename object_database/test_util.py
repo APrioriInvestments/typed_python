@@ -52,7 +52,8 @@ def diff_object_types_histograms(new_histo, old_histo):
     """ Returns a new histogram that is the difference of it inputs """
     all_keys = set(new_histo.keys()).union(old_histo.keys())
 
-    dd = {k: new_histo[k] - old_histo[k]
+    dd = {
+        k: new_histo[k] - old_histo[k]
         for k in all_keys if new_histo[k] - old_histo[k] != 0
     }
     return dd
@@ -112,7 +113,8 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
         kwargs = dict()
 
     server = subprocess.Popen(
-        [sys.executable, os.path.join(ownDir, 'frontends', 'service_manager.py'),
+        [
+            sys.executable, os.path.join(ownDir, 'frontends', 'service_manager.py'),
             own_hostname, db_hostname, str(port), '--run_db',
             '--source', os.path.join(tempDirectoryName, 'source'),
             '--storage', os.path.join(tempDirectoryName, 'storage'),

@@ -188,9 +188,10 @@ class OneOfWrapper(Wrapper):
         if otherExpr.expr_type == self:
             return otherExpr
 
-        return context.push(self, lambda result:
-            self.convert_to_self_with_target(context, result, otherExpr)
-            )
+        return context.push(
+            self,
+            lambda result: self.convert_to_self_with_target(context, result, otherExpr)
+        )
 
     def convert_to_self_with_target(self, context, result, otherExpr):
         if otherExpr.expr_type == self:

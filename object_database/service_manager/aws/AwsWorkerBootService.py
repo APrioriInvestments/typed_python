@@ -159,12 +159,11 @@ valid_instance_types = {
 }
 
 
-instance_types_to_show = set(
-    [x for x in valid_instance_types if
+instance_types_to_show = set([
+    x for x in valid_instance_types if
     ('xlarge' in x and '.xlarge' not in x) and
      x.split(".")[0] in ['m4', 'm5', 'c4', 'c5', 'r4', 'r5', 'i3', 'g2', 'x1']
-    ]
-)
+])
 
 
 @schema.define
@@ -314,15 +313,15 @@ class AwsApi:
         return to_return
 
     def bootWorker(self,
-            instanceType,
-            authToken,
-            clientToken=None,
-            amiOverride=None,
-            nameValueOverride=None,
-            extraTags=None,
-            wantsTerminateOnShutdown=True,
-            spotPrice=None
-            ):
+                   instanceType,
+                   authToken,
+                   clientToken=None,
+                   amiOverride=None,
+                   nameValueOverride=None,
+                   extraTags=None,
+                   wantsTerminateOnShutdown=True,
+                   spotPrice=None
+                   ):
         boot_script = (
             linux_bootstrap_script.format(
                 db_hostname=self.config.db_hostname,
@@ -620,33 +619,37 @@ class AwsWorkerBootService(ServiceBase):
 
             for state in State.lookupAll():
                 while state.booted > state.desired:
-                    self._logger.info("We have %s instances of type %s booted vs %s desired. Shutting one down.",
+                    self._logger.info(
+                        "We have %s instances of type %s booted vs %s desired. Shutting one down.",
                         state.booted,
                         state.instance_type,
                         state.desired
-                        )
+                    )
 
                     instance = instancesByType[state.instance_type].pop()
                     self.api.terminateInstanceById(instance["InstanceId"])
                     state.booted -= 1
 
                 while state.spot_booted > state.spot_desired:
-                    self._logger.info("We have %s spot instances of type %s requested vs %s desired. Terminating one down.",
+                    self._logger.info(
+                        "We have %s spot instances of type %s requested vs %s desired. " +
+                        "Terminating one down.",
                         state.spot_booted,
                         state.instance_type,
                         state.spot_desired
-                        )
+                    )
 
                     instance = spotInstancesByType[state.instance_type].pop()
                     self.api.terminateInstanceById(instance["InstanceId"])
                     state.spot_booted -= 1
 
                 while state.booted < state.desired:
-                    self._logger.info("We have %s instances of type %s booted vs %s desired. Booting one.",
+                    self._logger.info(
+                        "We have %s instances of type %s booted vs %s desired. Booting one.",
                         state.booted,
                         state.instance_type,
                         state.desired
-                        )
+                    )
 
                     try:
                         self.api.bootWorker(state.instance_type, self.runtimeConfig.serviceToken)
@@ -668,11 +671,12 @@ class AwsWorkerBootService(ServiceBase):
                             break
 
                 while state.spot_booted < state.spot_desired:
-                    self._logger.info("We have %s spot instances of type %s booted vs %s desired. Booting one.",
+                    self._logger.info(
+                        "We have %s spot instances of type %s booted vs %s desired. Booting one.",
                         state.spot_booted,
                         state.instance_type,
                         state.spot_desired
-                        )
+                    )
 
                     try:
                         instanceId = self.api.bootWorker(state.instance_type, self.runtimeConfig.serviceToken, spotPrice=valid_instance_types[state.instance_type]['COST'])

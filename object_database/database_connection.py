@@ -1084,14 +1084,14 @@ class DatabaseConnection:
         return e
 
     def _set_versioned_object_data(self,
-                key_value,
-                set_adds,
-                set_removes,
-                keys_to_check_versions,
-                indices_to_check_versions,
-                as_of_version,
-                confirmCallback
-                ):
+                                   key_value,
+                                   set_adds,
+                                   set_removes,
+                                   keys_to_check_versions,
+                                   indices_to_check_versions,
+                                   as_of_version,
+                                   confirmCallback
+                                   ):
         assert confirmCallback is not None
 
         transaction_guid = self.identityProducer.createIdentity()

@@ -58,29 +58,35 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
                 if op.matches.Eq:
-                    return context.pushPod(bool,
+                    return context.pushPod(
+                        bool,
                         cmp_res.nonref_expr.eq(0)
-                        )
+                    )
                 if op.matches.NotEq:
-                    return context.pushPod(bool,
+                    return context.pushPod(
+                        bool,
                         cmp_res.nonref_expr.neq(0)
-                        )
+                    )
                 if op.matches.Lt:
-                    return context.pushPod(bool,
+                    return context.pushPod(
+                        bool,
                         cmp_res.nonref_expr.lt(0)
-                        )
+                    )
                 if op.matches.LtE:
-                    return context.pushPod(bool,
+                    return context.pushPod(
+                        bool,
                         cmp_res.nonref_expr.lte(0)
-                        )
+                    )
                 if op.matches.Gt:
-                    return context.pushPod(bool,
+                    return context.pushPod(
+                        bool,
                         cmp_res.nonref_expr.gt(0)
-                        )
+                    )
                 if op.matches.GtE:
-                    return context.pushPod(bool,
+                    return context.pushPod(
+                        bool,
                         cmp_res.nonref_expr.gte(0)
-                        )
+                    )
 
             if op.matches.Add:
                 return context.push(str, lambda strRef:

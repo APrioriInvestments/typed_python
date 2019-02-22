@@ -156,10 +156,14 @@ def _main(argv):
             coresUsed = actualClass.coresUsed
             gbRamUsed = actualClass.gbRamUsed
 
-            ServiceManager.createOrUpdateService(actualClass, classname,
-                placement=parsedArgs.placement, isSingleton=parsedArgs.singleton,
-                coresUsed=coresUsed, gbRamUsed=gbRamUsed
-                )
+            ServiceManager.createOrUpdateService(
+                actualClass,
+                classname,
+                placement=parsedArgs.placement,
+                isSingleton=parsedArgs.singleton,
+                coresUsed=coresUsed,
+                gbRamUsed=gbRamUsed
+            )
 
     if parsedArgs.command == 'list':
         table = [['Service', 'Codebase', 'Module', 'Class', 'Placement', 'TargetCount', 'Cores', 'RAM']]

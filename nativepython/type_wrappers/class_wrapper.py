@@ -105,10 +105,11 @@ class ClassWrapper(RefcountedWrapper):
         byte = ix // 8
         bit = ix % 8
 
-        bytePtr = (instance.nonref_expr
-                .cast(native_ast.UInt8.pointer())
-                .ElementPtrIntegers(8 + byte)
-                )
+        bytePtr = (
+            instance.nonref_expr
+            .cast(native_ast.UInt8.pointer())
+            .ElementPtrIntegers(8 + byte)
+        )
 
         return bytePtr.store(bytePtr.load().bitor(native_ast.const_uint8_expr(1 << bit)))
 

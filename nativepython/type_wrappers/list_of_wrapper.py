@@ -218,9 +218,10 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 context.pushException(IndexError, "pop index out of range")
 
         # we are just moving this - we assume no layouts have selfpointers throughout nativepython
-        result = context.push(self.underlyingWrapperType, lambda result:
-            result.expr.store(inst.convert_getitem_unsafe(ix).nonref_expr)
-            )
+        result = context.push(
+            self.underlyingWrapperType,
+            lambda result: result.expr.store(inst.convert_getitem_unsafe(ix).nonref_expr)
+        )
 
         context.pushEffect(
             inst.nonref_expr.ElementPtrIntegers(0, 2).store(

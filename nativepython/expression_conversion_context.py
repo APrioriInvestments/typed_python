@@ -458,9 +458,10 @@ class ExpressionConversionContext(object):
             return
 
         if call_target.output_type.is_pass_by_ref:
-            return self.push(call_target.output_type, lambda output_slot:
-                call_target.call(output_slot.expr, *native_args)
-                )
+            return self.push(
+                call_target.output_type,
+                lambda output_slot: call_target.call(output_slot.expr, *native_args)
+            )
         else:
             assert call_target.output_type.is_pod
             assert len(call_target.named_call_target.arg_types) == len(native_args)

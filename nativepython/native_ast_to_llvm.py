@@ -348,14 +348,14 @@ class TeardownOnScopeExit:
 
 class FunctionConverter:
     def __init__(self,
-                module,
-                function,
-                converter,
-                builder,
-                arg_assignments,
-                output_type,
-                external_function_references
-                ):
+                 module,
+                 function,
+                 converter,
+                 builder,
+                 arg_assignments,
+                 output_type,
+                 external_function_references
+                 ):
         self.function = function
         self.module = module
         self.converter = converter
@@ -1162,11 +1162,13 @@ class Converter(object):
 
                 print()
                 print("*************")
-                print("def %s(%s): #->%s" % (name,
-                            ",".join(["%s=%s" % (k, str(t)) for k, t in definition.args]),
-                            str(definition.output_type)
-                            )
+                print(
+                    "def %s(%s): #->%s" % (
+                        name,
+                        ",".join(["%s=%s" % (k, str(t)) for k, t in definition.args]),
+                        str(definition.output_type)
                     )
+                )
                 print(native_ast.indent(str(definition.body.body)))
                 print("*************")
                 print()

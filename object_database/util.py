@@ -209,12 +209,12 @@ def generateSslContext():
         key_path = os.path.join(tempDir, 'selfsigned.key')
         try:
             proc = subprocess.run(
-                ['openssl',
-                'req', '-x509', '-newkey', 'rsa:2048',
-                '-keyout', key_path, '-nodes',
-                '-out', cert_path,
-                '-sha256', '-days', '1000',
-                '-subj', '/C=US/ST=New York/L=New York/CN=localhost'
+                [
+                    'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
+                    '-keyout', key_path, '-nodes',
+                    '-out', cert_path,
+                    '-sha256', '-days', '1000',
+                    '-subj', '/C=US/ST=New York/L=New York/CN=localhost'
                 ],
                 check=True,
                 stdout=subprocess.PIPE,

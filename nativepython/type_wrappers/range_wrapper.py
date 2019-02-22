@@ -54,10 +54,12 @@ class RangeInstanceWrapper(Wrapper):
 
     def convert_method_call(self, context, expr, methodname, args, kwargs):
         if methodname == "__iter__" and not args and not kwargs:
-            return context.push(_RangeIteratorWrapper, lambda instance:
-                instance.expr.ElementPtrIntegers(0, 0).store(0) >>
+            return context.push(
+                _RangeIteratorWrapper,
+                lambda instance:
+                    instance.expr.ElementPtrIntegers(0, 0).store(0) >>
                     instance.expr.ElementPtrIntegers(0, 1).store(expr.nonref_expr)
-                )
+            )
         return super().convert_method_call(context, expr, methodname, args, kwargs)
 
 
