@@ -98,7 +98,7 @@ def configureLogging(preamble="", level=logging.INFO):
     setupLogging(
         default_path=os.path.join(ownDir, 'logging.yaml'),
         default_level=level,
-        default_format = frmt
+        default_format=frmt
     )
 
     logging.getLogger('botocore.vendored.requests.packages.urllib3.connectionpool').setLevel(logging.CRITICAL)

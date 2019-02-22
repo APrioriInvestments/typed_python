@@ -55,7 +55,7 @@ class BlockingCallback:
         self.is_released.put(True)
 
 expr = Alternative("Expr",
-    Constant = {'value': int},
+    Constant={'value': int},
     #Add = {'l': expr, 'r': expr},
     #Sub = {'l': expr, 'r': expr},
     #Mul = {'l': expr, 'r': expr}
@@ -798,7 +798,7 @@ class ObjectDatabaseTests:
             self.assertEqual(Counter.lookupAll(k=30), ())
 
         with db.transaction():
-            o1 = Counter(k = 20)
+            o1 = Counter(k=20)
 
         with db.view() as v:
             self.assertEqual(Counter.lookupAll(k=20), (o1,))
@@ -1099,8 +1099,8 @@ class ObjectDatabaseTests:
 
         db_all.subscribeToSchema(schema)
         with db_all.transaction():
-            c0 = Counter(k = 0)
-            c1 = Counter(k = 1)
+            c0 = Counter(k=0)
+            c1 = Counter(k=1)
 
             c0.x = 20
             c1.x = 30
@@ -1210,7 +1210,7 @@ class ObjectDatabaseTests:
             for _ in range(10000):
                 Counter(k=123,x=-1)
 
-            c1 = Counter(k = 123)
+            c1 = Counter(k=123)
             c1.x = 1
 
         blocker = BlockingCallback()
@@ -1227,7 +1227,7 @@ class ObjectDatabaseTests:
         #make a transaction
         with db1.transaction():
             c1.x = 2
-            c2 = Counter(k = 123)
+            c2 = Counter(k=123)
 
         blocker.releaseCallback()
         for i in range(1,101):
@@ -1258,7 +1258,7 @@ class ObjectDatabaseTests:
             for _ in range(10000):
                 Counter(k=123,x=-1)
 
-            c1 = Counter(k = 0)
+            c1 = Counter(k=0)
 
         blocker = BlockingCallback()
 
@@ -1299,7 +1299,7 @@ class ObjectDatabaseTests:
         db2 = self.createNewDb()
 
         db1.subscribeToSchema(schema)
-        db2.subscribeToIndex(Counter, k = 123)
+        db2.subscribeToIndex(Counter, k=123)
 
         with db1.transaction():
             c = Counter(k=0)
@@ -1621,7 +1621,7 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
                     if numpy.random.uniform() < .5:
                         if c is None:
                             with db.transaction():
-                                c = Counter(k = 0)
+                                c = Counter(k=0)
                         else:
                             with db.transaction():
                                 c.delete()

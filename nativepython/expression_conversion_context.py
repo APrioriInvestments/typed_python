@@ -286,8 +286,7 @@ class ExpressionConversionContext(object):
                 self.pushEffect(
                     native_ast.Expression.While(
                         cond=conditionExpr,
-                        while_true=
-                            result,
+                        while_true=result,
                         orelse=native_ast.nullExpr
                         )
                     )
@@ -317,8 +316,7 @@ class ExpressionConversionContext(object):
                 self.pushEffect(
                     native_ast.Expression.While(
                         cond=scope.counter.nonref_expr.lt(countExpr.nonref_expr),
-                        while_true=
-                            result >>
+                        while_true=result >>
                             scope.counter.expr.store(scope.counter.nonref_expr.add(native_ast.const_int_expr(1))),
                         orelse=native_ast.nullExpr
                         )

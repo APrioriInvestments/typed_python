@@ -106,7 +106,7 @@ class Task:
     @staticmethod
     def Create(service, executor):
         return TaskStatus(
-            task = Task(
+            task=Task(
                 service=service,
                 executor=executor
                 ),

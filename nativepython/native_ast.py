@@ -59,10 +59,10 @@ Type = Alternative("Type",
     Array={'element_type': lambda: Type, 'count': int},
     Function={'output': lambda: Type, 'args': TupleOf(lambda: Type), 'varargs': bool, 'can_throw': bool},
     Pointer={'value_type': lambda: Type},
-    attr_ix = type_attr_ix,
-    __str__ = type_str,
-    pointer = lambda self: Type.Pointer(value_type=self),
-    zero = lambda self: Expression.Constant(
+    attr_ix=type_attr_ix,
+    __str__=type_str,
+    pointer=lambda self: Type.Pointer(value_type=self),
+    zero=lambda self: Expression.Constant(
             Constant.Void() if self.matches.Void else
             Constant.Float(val=0.0,bits=self.bits) if self.matches.Float else
             Constant.Int(val=0,bits=self.bits,signed=self.signed) if self.matches.Int else
@@ -107,8 +107,8 @@ Constant = Alternative("Constant",
     Struct={'elements': TupleOf(Tuple(str, lambda: Constant))},
     ByteArray={'val': bytes},
     NullPointer={'value_type': Type},
-    truth_value = const_truth_value,
-    __str__ = const_str
+    truth_value=const_truth_value,
+    __str__=const_str
     )
 
 UnaryOp = Alternative(
@@ -117,7 +117,7 @@ UnaryOp = Alternative(
     Negate={},
     LogicalNot={},
     BitwiseNot={},
-    __str__ = lambda o:
+    __str__=lambda o:
         "+" if o.matches.Add else
         "-" if o.matches.Negate else
         "!" if o.matches.LogicalNot else
@@ -129,7 +129,7 @@ BinaryOp = Alternative("BinaryOp",
     NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
     Mod={}, LShift={}, RShift={},
     BitOr={}, BitAnd={}, BitXor={},
-    __str__ = lambda o:
+    __str__=lambda o:
         "+" if o.matches.Add else
         "-" if o.matches.Sub else
         "*" if o.matches.Mul else
@@ -154,13 +154,13 @@ Expression = lambda: Expression
 Teardown = lambda: Teardown
 
 NamedCallTarget = NamedTuple(
-                name = str,
-                arg_types = TupleOf(Type),
-                output_type = Type,
-                external = bool,
-                varargs = bool,
-                intrinsic = bool,
-                can_throw = bool
+                name=str,
+                arg_types=TupleOf(Type),
+                output_type=Type,
+                external=bool,
+                varargs=bool,
+                intrinsic=bool,
+                can_throw=bool
                 )
 
 def filterCallTargetArgs(args):
@@ -185,8 +185,8 @@ def filterCallTargetArgs(args):
     return res
 
 CallTarget = Alternative("CallTarget",
-    Named = {'target': NamedCallTarget},
-    Pointer = {'expr': Expression},
+    Named={'target': NamedCallTarget},
+    Pointer={'expr': Expression},
     call=lambda self, *args: Expression.Call(target=self, args=filterCallTargetArgs(args))
     )
 
@@ -198,9 +198,9 @@ def teardown_str(self):
     assert False, type(self)
 
 Teardown = Alternative("Teardown",
-    ByTag = {'tag': str, 'expr': Expression},
-    Always = {'expr': Expression},
-    __str__ = teardown_str
+    ByTag={'tag': str, 'expr': Expression},
+    Always={'expr': Expression},
+    __str__=teardown_str
     )
 
 def expr_concatenate(self, other):
@@ -283,8 +283,7 @@ def expr_str(self):
     if self.matches.Let:
         if self.val.matches.Sequence and len(self.val.vals) > 1:
             return str(
-                Expression.Sequence(vals=
-                    self.val.vals[:-1] +
+                Expression.Sequence(vals=self.val.vals[:-1] +
                     (Expression.Let(
                         var=self.var,
                         val=self.val.vals[-1],
@@ -343,48 +342,48 @@ def expr_is_simple(expr):
     return False
 
 Expression = Alternative("Expression",
-    Constant = {'val': Constant},
-    Comment = {'comment': str, 'expr': Expression},
-    Load = {'ptr': Expression},
-    Store = {'ptr': Expression, 'val': Expression},
-    AtomicAdd = {'ptr': Expression, 'val': Expression},
-    Alloca = {'type': Type},
-    Cast = {'left': Expression, 'to_type': Type},
-    Binop = {'op': BinaryOp, 'l': Expression, 'r': Expression},
-    Unaryop = {'op': UnaryOp, 'operand': Expression},
-    Variable = {'name': str},
-    Attribute = {'left': Expression, 'attr': str},
-    StructElementByIndex = {'left': Expression, 'index': int},
-    ElementPtr = {'left': Expression, 'offsets': TupleOf(Expression)},
-    Call = {'target': CallTarget, 'args': TupleOf(Expression)},
-    FunctionPointer = {'target': NamedCallTarget},
-    MakeStruct = {'args': TupleOf(Tuple(str,Expression))},
-    Branch = {'cond': Expression,
+    Constant={'val': Constant},
+    Comment={'comment': str, 'expr': Expression},
+    Load={'ptr': Expression},
+    Store={'ptr': Expression, 'val': Expression},
+    AtomicAdd={'ptr': Expression, 'val': Expression},
+    Alloca={'type': Type},
+    Cast={'left': Expression, 'to_type': Type},
+    Binop={'op': BinaryOp, 'l': Expression, 'r': Expression},
+    Unaryop={'op': UnaryOp, 'operand': Expression},
+    Variable={'name': str},
+    Attribute={'left': Expression, 'attr': str},
+    StructElementByIndex={'left': Expression, 'index': int},
+    ElementPtr={'left': Expression, 'offsets': TupleOf(Expression)},
+    Call={'target': CallTarget, 'args': TupleOf(Expression)},
+    FunctionPointer={'target': NamedCallTarget},
+    MakeStruct={'args': TupleOf(Tuple(str,Expression))},
+    Branch={'cond': Expression,
                          'true': Expression,
                          'false': Expression
                          },
 
-    Throw = {'expr': Expression }, #throw a pointer.
+    Throw={'expr': Expression }, #throw a pointer.
 
-    TryCatch = {'expr': Expression,
+    TryCatch={'expr': Expression,
                            'varname': str, #varname is bound to a int8*
                            'handler': Expression
                            },
 
-    While = {'cond': Expression,
+    While={'cond': Expression,
                         'while_true': Expression,
                         'orelse': Expression
                         },
-    Return = {'arg': OneOf(Expression, None)},
-    Let = {'var': str, 'val': Expression, 'within': Expression},
+    Return={'arg': OneOf(Expression, None)},
+    Let={'var': str, 'val': Expression, 'within': Expression},
 
     #evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
     #clause
-    Finally = {'expr': Expression, 'teardowns': TupleOf(Teardown)},
-    Sequence = {'vals': TupleOf(Expression)},
-    ActivatesTeardown = {'name': str},
-    StackSlot = {'name': str, 'type': Type},
-    ElementPtrIntegers = lambda self, *offsets:
+    Finally={'expr': Expression, 'teardowns': TupleOf(Teardown)},
+    Sequence={'vals': TupleOf(Expression)},
+    ActivatesTeardown={'name': str},
+    StackSlot={'name': str, 'type': Type},
+    ElementPtrIntegers=lambda self, *offsets:
         Expression.ElementPtr(
             left=self,
             offsets=tuple(
@@ -395,33 +394,33 @@ Expression = Alternative("Expression",
                 )
             )
         ,
-    __rshift__ = expr_concatenate,
-    __str__ = expr_str,
-    structElt = lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
-    logical_not = lambda self: Expression.Unaryop(op=UnaryOp.LogicalNot(), operand=self),
-    bitwise_not = lambda self: Expression.Unaryop(op=UnaryOp.BitwiseNot(), operand=self),
-    negate = lambda self: Expression.Unaryop(op=UnaryOp.Negate(), operand=self),
-    sub = lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
-    add = lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
-    mul = lambda self, other: Expression.Binop(op=BinaryOp.Mul(), l=self,r=ensureExpr(other)),
-    div = lambda self, other: Expression.Binop(op=BinaryOp.Div(), l=self,r=ensureExpr(other)),
-    eq = lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self,r=ensureExpr(other)),
-    neq = lambda self, other: Expression.Binop(op=BinaryOp.NotEq(), l=self,r=ensureExpr(other)),
-    lt = lambda self, other: Expression.Binop(op=BinaryOp.Lt(), l=self,r=ensureExpr(other)),
-    gt = lambda self, other: Expression.Binop(op=BinaryOp.Gt(), l=self,r=ensureExpr(other)),
-    lte = lambda self, other: Expression.Binop(op=BinaryOp.LtE(), l=self,r=ensureExpr(other)),
-    gte = lambda self, other: Expression.Binop(op=BinaryOp.GtE(), l=self,r=ensureExpr(other)),
-    lshift = lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
-    rshift = lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
-    bitand = lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
-    bitor = lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self,r=ensureExpr(other)),
-    load = lambda self: Expression.Load(ptr=self),
-    store = lambda self, val: Expression.Store(ptr=self, val=ensureExpr(val)),
-    atomic_add = lambda self, val: Expression.AtomicAdd(ptr=self, val=ensureExpr(val)),
-    cast = lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
-    with_comment = lambda self, c: Expression.Comment(comment=c, expr=self),
-    elemPtr = lambda self, *exprs: Expression.ElementPtr(left=self,offsets=[ensureExpr(e) for e in exprs]),
-    is_simple = expr_is_simple
+    __rshift__=expr_concatenate,
+    __str__=expr_str,
+    structElt=lambda self, ix: Expression.StructElementByIndex(left=self,index=ix),
+    logical_not=lambda self: Expression.Unaryop(op=UnaryOp.LogicalNot(), operand=self),
+    bitwise_not=lambda self: Expression.Unaryop(op=UnaryOp.BitwiseNot(), operand=self),
+    negate=lambda self: Expression.Unaryop(op=UnaryOp.Negate(), operand=self),
+    sub=lambda self, other: Expression.Binop(op=BinaryOp.Sub(), l=self,r=ensureExpr(other)),
+    add=lambda self, other: Expression.Binop(op=BinaryOp.Add(), l=self,r=ensureExpr(other)),
+    mul=lambda self, other: Expression.Binop(op=BinaryOp.Mul(), l=self,r=ensureExpr(other)),
+    div=lambda self, other: Expression.Binop(op=BinaryOp.Div(), l=self,r=ensureExpr(other)),
+    eq=lambda self, other: Expression.Binop(op=BinaryOp.Eq(), l=self,r=ensureExpr(other)),
+    neq=lambda self, other: Expression.Binop(op=BinaryOp.NotEq(), l=self,r=ensureExpr(other)),
+    lt=lambda self, other: Expression.Binop(op=BinaryOp.Lt(), l=self,r=ensureExpr(other)),
+    gt=lambda self, other: Expression.Binop(op=BinaryOp.Gt(), l=self,r=ensureExpr(other)),
+    lte=lambda self, other: Expression.Binop(op=BinaryOp.LtE(), l=self,r=ensureExpr(other)),
+    gte=lambda self, other: Expression.Binop(op=BinaryOp.GtE(), l=self,r=ensureExpr(other)),
+    lshift=lambda self, other: Expression.Binop(op=BinaryOp.LShift(), l=self,r=ensureExpr(other)),
+    rshift=lambda self, other: Expression.Binop(op=BinaryOp.RShift(), l=self,r=ensureExpr(other)),
+    bitand=lambda self, other: Expression.Binop(op=BinaryOp.BitAnd(), l=self,r=ensureExpr(other)),
+    bitor=lambda self, other: Expression.Binop(op=BinaryOp.BitOr(), l=self,r=ensureExpr(other)),
+    load=lambda self: Expression.Load(ptr=self),
+    store=lambda self, val: Expression.Store(ptr=self, val=ensureExpr(val)),
+    atomic_add=lambda self, val: Expression.AtomicAdd(ptr=self, val=ensureExpr(val)),
+    cast=lambda self, targetType: Expression.Cast(left=self, to_type=targetType),
+    with_comment=lambda self, c: Expression.Comment(comment=c, expr=self),
+    elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self,offsets=[ensureExpr(e) for e in exprs]),
+    is_simple=expr_is_simple
     )
 
 
@@ -477,8 +476,8 @@ def const_bytes_cstr(i):
         )
 
 FunctionBody = Alternative("FunctionBody",
-    Internal = {'body': Expression},
-    External = {'name': str}
+    Internal={'body': Expression},
+    External={'name': str}
     )
 
 Function = NamedTuple(

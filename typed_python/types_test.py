@@ -115,7 +115,7 @@ class RandomValueProducer:
             res.extend(valueList)
         return res
 
-    def addValues(self, level, count, sublevels = None):
+    def addValues(self, level, count, sublevels=None):
         assert level > 0
 
         if sublevels is None:
@@ -1225,7 +1225,7 @@ class NativeTypesTests(unittest.TestCase):
 
 
     def test_construct_alternatives_with_positional_arguments(self):
-        a = Alternative("A", HasOne = {'a': str}, HasTwo = {'a': str, 'b': str})
+        a = Alternative("A", HasOne={'a': str}, HasTwo={'a': str, 'b': str})
 
         with self.assertRaises(TypeError):
             a.HasTwo("hi")

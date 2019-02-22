@@ -490,8 +490,7 @@ class FunctionConversionContext(object):
                         context.pushEffect(
                             native_ast.Expression.Store(
                                 ptr=native_ast.Expression.StackSlot(name=name,type=slot_type.getNativeLayoutType()),
-                                val=
-                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
+                                val=native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
                                     native_ast.Expression.Variable(name=name).load()
                                 )
                             )

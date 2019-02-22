@@ -260,7 +260,7 @@ class TeardownOnScopeExit:
 
         return tags
 
-    def generate_teardown(self, teardown_callback, return_slot = None, exception_slot = None):
+    def generate_teardown(self, teardown_callback, return_slot=None, exception_slot=None):
         if not self.incoming_is_return:
             assert self._block is None
             return

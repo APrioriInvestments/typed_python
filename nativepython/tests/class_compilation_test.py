@@ -180,7 +180,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f(c), c.f())
 
     def test_compile_class_method(self):
-        c = AClass(x = 20)
+        c = AClass(x=20)
 
         t0 = time.time()
         uncompiled_res = c.loop(100000)

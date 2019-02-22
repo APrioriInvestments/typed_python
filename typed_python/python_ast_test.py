@@ -78,7 +78,7 @@ class TestPythonAst(unittest.TestCase):
 
     def test_reverse_parse_functions_with_keywords(self):
         def f():
-            def g(x = 10, y = 20, *args, q = 30):
+            def g(x=10, y=20, *args, q=30):
                 return (x,y,args,q)
             g(x=20, y=30)
 

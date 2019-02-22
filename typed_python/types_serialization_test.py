@@ -1010,7 +1010,7 @@ class TypesSerializationTest(unittest.TestCase):
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d,d2,(d, type(d)))
         
-        d = datetime.timedelta(days = 1)
+        d = datetime.timedelta(days=1)
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d,d2,(d, type(d)))
         

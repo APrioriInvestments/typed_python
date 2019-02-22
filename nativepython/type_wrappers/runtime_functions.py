@@ -23,8 +23,8 @@ def externalCallTarget(name, output, *inputs):
     return native_ast.CallTarget.Named(
         target=native_ast.NamedCallTarget(
             name=name,
-            arg_types = inputs,
-            output_type = output,
+            arg_types=inputs,
+            output_type=output,
             external=True,
             varargs=False,
             intrinsic=False,
