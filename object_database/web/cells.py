@@ -1225,27 +1225,33 @@ class Grid(Cell):
             if i not in seen:
                 del self.existingItems[i]
 
-        self.contents = """
+        self.contents = (
+            """
             <table class="table-hscroll table-sm table-striped">
             <thead><tr>""" + ("<th></th>" if self.rowLabelFun is not None else "") + """__headers__</tr></thead>
             <tbody>
             __rows__
             </tbody>
             </table>
-            """.replace("__headers__",
+            """
+            .replace(
+                "__headers__",
                 "".join("<th>____header_%s__</th>" % (col_ix)
-                            for col_ix in range(len(self.cols)))
-                ).replace("__rows__",
-                "\n".join("<tr>" +
+                            for col_ix in range(len(self.cols))))
+            .replace(
+                "__rows__",
+                "\n".join(
+                    "<tr>" +
                     ("<td>____rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") +
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
-                    )
-                    + "</tr>"
+                    ) +
+                    "</tr>"
                         for row_ix in range(len(self.rows))
                 )
-                )
+            )
+        )
 
 
 class SortWrapper:
@@ -1500,28 +1506,35 @@ class Table(Cell):
         else:
             self.children['____right__'] = Clickable(Octicon("triangle-right"), lambda: self.curPage.set(str(int(self.curPage.get())+1))).nowrap()
 
-        self.contents = ("""
+        self.contents = (
+            """
             <table class="table-hscroll table-sm table-striped">
             <thead style="border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;""><tr>""" +
-                ('<th style="vertical-align:top"><div class="card"><div class="card-body p-1">%s</div></div></th>' % rowDisplay) + """__headers__</tr></thead>
+            f'<th style="vertical-align:top"><div class="card"><div class="card-body p-1">{rowDisplay}</div></div></th>' +
+            """
+            __headers__</tr></thead>
             <tbody>
             __rows__
             </tbody>
             </table>
-            """.replace("__headers__",
+            """
+            .replace(
+                "__headers__",
                 "".join('<th style="vertical-align:top">____header_%s__</th>' % (col_ix)
-                            for col_ix in range(len(self.cols)))
-                ).replace("__rows__",
-                "\n".join("<tr>" +
+                            for col_ix in range(len(self.cols))))
+            .replace(
+                "__rows__",
+                "\n".join(
+                    "<tr>" +
                     ("<td>%s</td>" % (row_ix+1)) +
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
-                    )
-                    + "</tr>"
+                    ) +
+                    "</tr>"
                         for row_ix in range(len(self.rows))
                 )
-                )
+            )
         )
 
 
@@ -1815,7 +1828,8 @@ class Sheet(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = """
+        self.postscript = (
+            """
             function model(opts) { return {} }
 
             function property(index) {
@@ -1887,11 +1901,12 @@ class Sheet(Cell):
 
             handsOnTables["__identity__"] = currentTable
 
-            """.replace("__identity__", self._identity
-                ).replace("__rows__", str(self.rowCount)
-                ).replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames)
-                ).replace("__col_width__", json.dumps(self.colWidth)
-                )
+            """
+            .replace("__identity__", self._identity)
+            .replace("__rows__", str(self.rowCount))
+            .replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames))
+            .replace("__col_width__", json.dumps(self.colWidth))
+        )
 
     def onMessage(self, msgFrame):
         row = msgFrame['data']

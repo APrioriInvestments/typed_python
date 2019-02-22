@@ -399,13 +399,13 @@ class Server:
 
     def handleSubscriptionOnBackgroundThread(self, connectedChannel, msg):
         with Timer("Subscription requiring %s messages and produced %s objects for %s/%s/%s/isLazy=%s",
-                    lambda: messageCount,
-                    lambda: len(identities),
-                    msg.schema,
-                    msg.typename,
-                    msg.fieldname_and_value,
-                    msg.isLazy
-                    ):
+                   lambda: messageCount,
+                   lambda: len(identities),
+                   msg.schema,
+                   msg.typename,
+                   msg.fieldname_and_value,
+                   msg.isLazy
+                   ):
             try:
                 with self._lock:
                     typedef, identities = self._parseSubscriptionMsg(connectedChannel, msg)
@@ -495,13 +495,13 @@ class Server:
                     self._pendingSubscriptionRecheck = None
 
     def _completeLazySubscription(self,
-                        schema_name,
-                        typename,
-                        fieldname_and_value,
-                        typedef,
-                        identities,
-                        connectedChannel
-                        ):
+                                  schema_name,
+                                  typename,
+                                  fieldname_and_value,
+                                  typedef,
+                                  identities,
+                                  connectedChannel
+                                  ):
         index_vals = self._buildIndexValueMap(typedef, schema_name, typename, identities)
 
         connectedChannel.channel.write(
@@ -798,14 +798,14 @@ class Server:
             self._last_garbage_collect_timestamp = time.time()
 
     def _handleNewTransaction(self,
-                sourceChannel,
-                key_value,
-                set_adds,
-                set_removes,
-                keys_to_check_versions,
-                indices_to_check_versions,
-                as_of_version
-                ):
+                              sourceChannel,
+                              key_value,
+                              set_adds,
+                              set_removes,
+                              keys_to_check_versions,
+                              indices_to_check_versions,
+                              as_of_version
+                              ):
         """Commit a transaction.
 
         key_value: a map

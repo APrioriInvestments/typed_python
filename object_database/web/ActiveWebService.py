@@ -350,12 +350,13 @@ class ActiveWebService(ServiceBase):
 
         return (
             HeaderBar(
-                [Subscribed(lambda:
-                    Dropdown(
-                        "Service",
+                [
+                    Subscribed(lambda:
+                        Dropdown(
+                            "Service",
                             [("All", "/services")] +
-                            [(s.name, "/services/" + s.name) for
-                                s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
+                            [(s.name, "/services/" + s.name)
+                             for s in sorted(service_schema.Service.lookupAll(), key=lambda s:s.name)]
                         ),
                     )
                 ],

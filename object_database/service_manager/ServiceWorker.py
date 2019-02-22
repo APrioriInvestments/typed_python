@@ -123,11 +123,12 @@ class ServiceWorker:
             self._logger.info("Starting runloop for service object %s", self.instance._identity)
             self.serviceObject.doWork(self.shouldStop)
         except Exception:
-            self._logger.error("Service %s/%s failed: %s",
+            self._logger.error(
+                "Service %s/%s failed: %s",
                 self.serviceName,
                 self.instance._identity,
                 traceback.format_exc()
-                )
+            )
 
             with self.db.transaction():
                 self.instance.state = "Crashed"

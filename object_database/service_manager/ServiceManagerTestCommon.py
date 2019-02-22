@@ -60,7 +60,8 @@ class ServiceManagerTestCommon(object):
 
         try:
             self.server = subprocess.Popen(
-                [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
+                [
+                    sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
                     'localhost', 'localhost', "8023",
                     "--run_db",
                     '--source', os.path.join(self.tempDirectoryName, 'source'),

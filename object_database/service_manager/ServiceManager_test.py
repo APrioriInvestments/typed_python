@@ -186,11 +186,18 @@ class GraphDisplayService(ServiceBase):
         depth = Slot(50)
 
         return Tabs(
-            Overlay=Card(Plot(lambda: {'single_array': [1, 2, 3, 1, 2, 3],
-                                'xy': {'x': [1, 2, 3, 1, 2, 3], 'y': [4, 5, 6, 7, 8, 9]},
-                                }
-                    ).width(600).height(400) + Code("HI")
-                ),
+            Overlay=Card(
+                Plot(
+                    lambda:
+                        {
+                            'single_array': [1, 2, 3, 1, 2, 3],
+                            'xy': {
+                                'x': [1, 2, 3, 1, 2, 3],
+                                'y': [4, 5, 6, 7, 8, 9]
+                            },
+                        }
+                ).width(600).height(400) + Code("HI")
+            ),
             AGrid=Grid(
                 colFun=lambda: ['A', 'B', 'B'],
                 rowFun=lambda: ['1', '2', '2'],

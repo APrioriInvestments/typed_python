@@ -97,7 +97,8 @@ class SubprocessServiceManager(ServiceManager):
                     output_file = None
 
                 process = subprocess.Popen(
-                    [sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
+                    [
+                        sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
                         service.name,
                         self.host,
                         str(self.port),
@@ -105,7 +106,7 @@ class SubprocessServiceManager(ServiceManager):
                         os.path.join(self.sourceDir, instanceIdentity),
                         os.path.join(self.storageDir, instanceIdentity),
                         self.serviceToken
-                        ] + (['--log-level', 'ERROR'] if self.errorLogsOnly else []),
+                    ] + (['--log-level', 'ERROR'] if self.errorLogsOnly else []),
                     cwd=self.storageDir,
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,

@@ -46,7 +46,8 @@ def main(argv):
 
     logger = logging.getLogger(__name__)
 
-    logger.info("service_entrypoint.py connecting to %s:%s for %s",
+    logger.info(
+        "service_entrypoint.py connecting to %s:%s for %s",
         parsedArgs.host,
         parsedArgs.port,
         parsedArgs.instanceid
