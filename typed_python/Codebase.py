@@ -64,7 +64,8 @@ class Codebase:
     def coreSerializationContext():
         with _lock:
             if _coreSerializationContext[0] is None:
-                import object_database, typed_python
+                import object_database
+                import typed_python
 
                 allModules = []
 
