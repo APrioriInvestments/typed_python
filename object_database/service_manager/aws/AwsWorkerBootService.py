@@ -555,21 +555,21 @@ class AwsWorkerBootService(ServiceBase):
                 valid_instance_types[s.instance_type]['CPU'] if field == 'CPU' else
                 s.spotPrices.get('us-east-1' + field, "") if field in 'abcdef' else
                 ""
-                )
-            ) + cells.Card(
-                cells.Text("db_hostname = " + str(c.db_hostname)) +
-                cells.Text("db_port = " + str(c.db_port)) +
-                cells.Text("region = " + str(c.region)) +
-                cells.Text("vpc_id = " + str(c.vpc_id)) +
-                cells.Text("subnet = " + str(c.subnet)) +
-                cells.Text("security_group = " + str(c.security_group)) +
-                cells.Text("keypair = " + str(c.keypair)) +
-                cells.Text("worker_name = " + str(c.worker_name)) +
-                cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) +
-                cells.Text("docker_image = " + str(c.docker_image)) +
-                cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) +
-                cells.Text("max_to_boot = " + str(c.max_to_boot))
-                )
+            )
+        ) + cells.Card(
+            cells.Text("db_hostname = " + str(c.db_hostname)) +
+            cells.Text("db_port = " + str(c.db_port)) +
+            cells.Text("region = " + str(c.region)) +
+            cells.Text("vpc_id = " + str(c.vpc_id)) +
+            cells.Text("subnet = " + str(c.subnet)) +
+            cells.Text("security_group = " + str(c.security_group)) +
+            cells.Text("keypair = " + str(c.keypair)) +
+            cells.Text("worker_name = " + str(c.worker_name)) +
+            cells.Text("worker_iam_role_name = " + str(c.worker_iam_role_name)) +
+            cells.Text("docker_image = " + str(c.docker_image)) +
+            cells.Text("defaultStorageSize = " + str(c.defaultStorageSize)) +
+            cells.Text("max_to_boot = " + str(c.max_to_boot))
+        )
 
     def pushTaskLoopForward(self):
         if time.time() - self.lastSpotPriceRequest > 60.0:
