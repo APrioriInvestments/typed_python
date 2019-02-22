@@ -199,6 +199,7 @@ class TestArithmeticCompilation(unittest.TestCase):
 
     def test_integers_in_closures(self):
         y = 2
+
         def f(x: int) -> int:
             return x+y
 
