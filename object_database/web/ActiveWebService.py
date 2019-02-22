@@ -361,10 +361,10 @@ class ActiveWebService(ServiceBase):
                 ],
                 (),
                 [
-                LargePendingDownloadDisplay(),
-                Octicon('person') + Span(current_username),
-                Span('Authorized Groups: {}'.format(self.authorized_groups_text)),
-                Button(Octicon('sign-out'), '/logout')
+                    LargePendingDownloadDisplay(),
+                    Octicon('person') + Span(current_username),
+                    Span('Authorized Groups: {}'.format(self.authorized_groups_text)),
+                    Button(Octicon('sign-out'), '/logout')
                 ]) +
             Main(display)
             )
