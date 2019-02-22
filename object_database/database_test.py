@@ -60,7 +60,7 @@ expr = Alternative("Expr",
     # Add = {'l': expr, 'r': expr},
     # Sub = {'l': expr, 'r': expr},
     # Mul = {'l': expr, 'r': expr}
-    )
+)
 
 schema = Schema("test_schema")
 schema.expr = expr
@@ -253,7 +253,7 @@ class ObjectDatabaseTests:
             db1.waitForCondition(
                 lambda: not db2Connection.exists(),
                 timeout=2.0*self.PERFORMANCE_FACTOR)
-            )
+        )
 
     def test_lazy_subscriptions(self):
         db = self.createNewDb()
@@ -1495,7 +1495,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         self.redisProcess = subprocess.Popen(
             ["/usr/bin/redis-server", '--port', '1115', '--logfile', os.path.join(self.tempDirName, "log.txt"),
                 "--dbfilename", "db.rdb", "--dir", os.path.join(self.tempDirName)]
-            )
+        )
         time.sleep(.5)
         assert self.redisProcess.poll() is None
 
@@ -1723,7 +1723,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
                 self.assertEqual(
                     sorted(set([c.x for c in Counter.lookupAll(k=1)])),
                     sorted(range(5000))
-                    )
+                )
 
             # we should never have had a really long latency
             self.assertTrue(maxLatency[0] < subscriptionTime / 10.0, (maxLatency[0], subscriptionTime))

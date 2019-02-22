@@ -30,8 +30,8 @@ def externalCallTarget(name, output, *inputs):
             varargs=False,
             intrinsic=False,
             can_throw=False
-            )
         )
+    )
 
 
 free = externalCallTarget("free", Void, UInt8Ptr)

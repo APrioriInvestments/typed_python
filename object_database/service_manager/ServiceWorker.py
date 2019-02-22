@@ -140,7 +140,7 @@ class ServiceWorker:
                     "Service %s/%s exited gracefully. Setting stopped flag.",
                     self.serviceName,
                     self.instance._identity
-                    )
+                )
 
                 self.instance.state = "Stopped"
                 self.instance.end_timestamp = time.time()

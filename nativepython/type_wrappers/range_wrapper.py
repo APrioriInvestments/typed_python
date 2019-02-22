@@ -36,7 +36,7 @@ class RangeWrapper(Wrapper):
             return context.pushPod(
                 _RangeInstanceWrapper,
                 arg.nonref_expr
-                )
+            )
 
         return super().convert_call(context, expr, args, kwargs)
 
@@ -73,19 +73,19 @@ class RangeIteratorWrapper(Wrapper):
         return native_ast.Type.Struct(
             element_types=(("count", native_ast.Int64), ("len", native_ast.Int64)),
             name="range_storage"
-            )
+        )
 
     def convert_next(self, context, expr):
         context.pushEffect(
             expr.expr.ElementPtrIntegers(0, 0).store(
                 expr.expr.ElementPtrIntegers(0, 0).load().add(1)
-                )
             )
+        )
         canContinue = context.pushPod(bool,
             expr.expr.ElementPtrIntegers(0, 0).load().lt(
                 expr.expr.ElementPtrIntegers(0, 1).load()
-                )
             )
+        )
         nextExpr = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
 
         return nextExpr, canContinue

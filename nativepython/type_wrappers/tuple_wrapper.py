@@ -72,7 +72,7 @@ class TupleWrapper(Wrapper):
             expr.expr.cast(native_ast.UInt8Ptr)
                 .ElementPtrIntegers(self.byteOffsets[which])
                 .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
-            )
+        )
 
     def convert_assign(self, context, expr, other):
         assert expr.isReference

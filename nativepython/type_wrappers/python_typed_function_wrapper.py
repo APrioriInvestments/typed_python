@@ -48,9 +48,9 @@ class PythonTypedFunctionWrapper(Wrapper):
                     args,
                     kwargs,
                     overload.returnType
-                    )
+                )
 
         context.pushException(TypeError, "No overload for %s with args of type (%s)" % (
             self.typeRepresentation.__qualname__,
             ",".join([str(x.expr_type) for x in args])
-            ))
+        ))

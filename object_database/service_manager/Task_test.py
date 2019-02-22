@@ -34,7 +34,7 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database import (
     Schema, Indexed, core_schema,
     connect, service_schema, current_transaction
-    )
+)
 
 VERBOSE = True
 
@@ -63,7 +63,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
                 "TestModule1.TestService1",
                 "TestService1",
                 0
-                )
+            )
             self.testService1Codebase = self.testService1Object.codebase.instantiate()
 
         self.service1Conn = self.newDbConnection()
@@ -79,14 +79,14 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             task = Task.Task.Create(
                 service=self.testService1Object,
                 executor=Task.FunctionTask(self.testService1Codebase.getClassByName("TestModule1.createNewRecord"))
-                )
+            )
 
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
                 timeout=self.WAIT_FOR_COUNT_TIMEOUT
-                )
             )
+        )
 
         Record = self.testService1Codebase.getClassByName("TestModule1.Record")
 
@@ -103,14 +103,14 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             task = Task.Task.Create(
                 service=self.testService1Object,
                 executor=self.testService1Codebase.getClassByName("TestModule1.TaskWithSubtasks")(5)
-                )
+            )
 
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
                 timeout=self.WAIT_FOR_COUNT_TIMEOUT
-                )
             )
+        )
 
         def localVersion(x):
             if x <= 0:
@@ -132,14 +132,14 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             task = Task.Task.Create(
                 service=self.testService1Object,
                 executor=self.testService1Codebase.getClassByName("TestModule1.TaskWithSubtasks")(7)
-                )
+            )
 
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: len([t for t in Task.TaskStatus.lookupAll() if t.worker is not None]) == 4,
                 timeout=4*self.WAIT_FOR_COUNT_TIMEOUT
-                )
             )
+        )
 
         with self.service1Conn.view():
             print("Have", len(Task.TaskStatus.lookupAll()), "tasks")
@@ -150,8 +150,8 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             self.service1Conn.waitForCondition(
                 lambda: sum([t.times_failed for t in Task.TaskStatus.lookupAll()]) > 0,
                 timeout=4*self.WAIT_FOR_COUNT_TIMEOUT
-                )
             )
+        )
 
         self.dialWorkers(4)
 
@@ -159,8 +159,8 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
                 timeout=4*self.WAIT_FOR_COUNT_TIMEOUT
-                )
             )
+        )
 
         def localVersion(x):
             if x <= 0:

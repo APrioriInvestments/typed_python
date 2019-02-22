@@ -42,8 +42,8 @@ class PythonFreeObjectWrapper(Wrapper):
                     self.typeRepresentation(
                         *[a.expr_type.typeRepresentation for a in args],
                         **{k: v.expr_type.typeRepresentation for k, v in kwargs.items()}
-                        )
                     )
+                )
             except Exception as e:
                 context.pushException(type(e), str(e))
                 return
@@ -55,7 +55,7 @@ class PythonFreeObjectWrapper(Wrapper):
             return nativepython.python_object_representation.pythonObjectRepresentation(
                 context,
                 getattr(self.typeRepresentation, attribute)
-                )
+            )
         except Exception as e:
             context.pushException(type(e), str(e))
             return

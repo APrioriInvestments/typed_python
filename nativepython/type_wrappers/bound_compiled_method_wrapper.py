@@ -36,21 +36,21 @@ class BoundCompiledMethodWrapper(Wrapper):
             context,
             target.changeType(self.wrapped_type),
             toStore.changeType(self.wrapped_type)
-            )
+        )
 
     def convert_copy_initialize(self, context, target, toStore):
         return self.wrapped_type.convert_copy_initialize(
             context,
             target.changeType(self.wrapped_type),
             toStore.changeType(self.wrapped_type)
-            )
+        )
 
     def convert_destroy(self, context, instance):
         return self.wrapped_type.convert_destroy(
             context,
             target.changeType(self.wrapped_type),
             toStore.changeType(self.wrapped_type)
-            )
+        )
 
     def convert_call(self, context, left, args, kwargs):
         clsType = self.wrapped_type

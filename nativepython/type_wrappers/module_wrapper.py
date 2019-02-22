@@ -39,10 +39,10 @@ class ModuleWrapper(Wrapper):
                 "module '%s' has no attribute '%s'" % (
                     self.typeRepresentation.__name__,
                     attribute
-                    )
                 )
+            )
 
         return nativepython.python_object_representation.pythonObjectRepresentation(
             context,
             getattr(self.typeRepresentation, attribute)
-            )
+        )

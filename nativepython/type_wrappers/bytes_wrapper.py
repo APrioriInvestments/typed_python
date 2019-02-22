@@ -38,7 +38,7 @@ class BytesWrapper(RefcountedWrapper):
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
             ('data', native_ast.UInt8)
-            ), name='StringLayout').pointer()
+        ), name='StringLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -55,9 +55,9 @@ class BytesWrapper(RefcountedWrapper):
                         runtime_functions.bytes_concat.call(
                             left.nonref_expr.cast(VoidPtr),
                             right.nonref_expr.cast(VoidPtr)
-                            ).cast(self.layoutType)
-                        )
+                        ).cast(self.layoutType)
                     )
+                )
 
         return super().convert_bin_op(context, left, op, right)
 
@@ -77,9 +77,9 @@ class BytesWrapper(RefcountedWrapper):
                     cond=item.nonref_expr.lt(native_ast.const_int_expr(0)),
                     false=item.nonref_expr,
                     true=item.nonref_expr.add(len_expr.nonref_expr)
-                    ).add(native_ast.const_int_expr(8))
-                ).load().cast(native_ast.Int64)
-            )
+                ).add(native_ast.const_int_expr(8))
+            ).load().cast(native_ast.Int64)
+        )
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(
@@ -97,6 +97,6 @@ class BytesWrapper(RefcountedWrapper):
                 runtime_functions.bytes_from_ptr_and_len.call(
                     native_ast.const_bytes_cstr(s),
                     native_ast.const_int_expr(len(s))
-                    ).cast(self.layoutType)
-                )
+                ).cast(self.layoutType)
             )
+        )

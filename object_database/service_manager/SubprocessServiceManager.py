@@ -40,7 +40,7 @@ def timestampToFileString(timestamp):
         struct.tm_min,
         struct.tm_sec,
         int(timestamp*1000) % 1000
-        )
+    )
 
 
 def parseLogfileToInstanceid(fname):
@@ -110,7 +110,7 @@ class SubprocessServiceManager(ServiceManager):
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,
                     stderr=subprocess.STDOUT
-                    )
+                )
 
                 self.serviceProcesses[instanceIdentity] = process
 
@@ -122,14 +122,14 @@ class SubprocessServiceManager(ServiceManager):
                     "Started a service logging to %s with pid %s",
                     os.path.join(self.logfileDirectory, logfileName),
                     process.pid
-                    )
+                )
             else:
                 self._logger.info(
                     "Started service %s/%s with pid %s",
                     service.name,
                     instanceIdentity,
                     process.pid
-                    )
+                )
 
     def stop(self, gracefully=True):
         if gracefully:

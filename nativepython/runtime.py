@@ -81,7 +81,7 @@ class Runtime:
                 fp.fp,
                 callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
                 [i.typeRepresentation for i in input_wrappers]
-                )
+            )
 
             return targets
 

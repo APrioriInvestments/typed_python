@@ -121,37 +121,37 @@ def pythonObjectRepresentation(context, f):
             context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Void()
-                ),
+            ),
             NoneWrapper(),
             False
-            )
+        )
     if isinstance(f, bool):
         return TypedExpression(
             context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f, bits=1, signed=False)
-                ),
+            ),
             BoolWrapper(),
             False
-            )
+        )
     if isinstance(f, int):
         return TypedExpression(
             context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Int(val=f, bits=64, signed=True)
-                ),
+            ),
             Int64Wrapper(),
             False
-            )
+        )
     if isinstance(f, float):
         return TypedExpression(
             context,
             native_ast.Expression.Constant(
                 val=native_ast.Constant.Float(val=f, bits=64)
-                ),
+            ),
             Float64Wrapper(),
             False
-            )
+        )
     if isinstance(f, str):
         return StringWrapper().constant(context, f)
     if isinstance(f, bytes):
@@ -163,7 +163,7 @@ def pythonObjectRepresentation(context, f):
             native_ast.nullExpr,
             PythonFreeFunctionWrapper(f),
             False
-            )
+        )
 
     if hasattr(f, '__typed_python_category__'):
         if f.__typed_python_category__ == "Function":
@@ -172,7 +172,7 @@ def pythonObjectRepresentation(context, f):
                 native_ast.nullExpr,
                 PythonTypedFunctionWrapper(f),
                 False
-                )
+            )
 
     if isinstance(f, type):
         return TypedExpression(context, native_ast.nullExpr, PythonTypeObjectWrapper(f), False)

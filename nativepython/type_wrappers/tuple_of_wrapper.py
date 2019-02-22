@@ -44,7 +44,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             ('count', native_ast.Int32),
             ('reserved', native_ast.Int32),
             ('data', native_ast.UInt8Ptr)
-            ), name='TupleOfLayout' if self.is_tuple else 'ListOfLayout').pointer()
+        ), name='TupleOfLayout' if self.is_tuple else 'ListOfLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -59,9 +59,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 [self],
                 typeWrapper(NoneType),
                 self.generateNativeDestructorFunction
-                )
-            .call(instance)
             )
+            .call(instance)
+        )
 
     def generateNativeDestructorFunction(self, context, out, inst):
         if not self.underlyingWrapperType.is_pod:
@@ -70,10 +70,10 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 4).load())
-            )
+        )
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
-            )
+        )
 
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
@@ -87,8 +87,8 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                             [self, self],
                             self,
                             self.generateConcatenateTuple
-                            ).call(new_tuple, left, right)
-                    )
+                        ).call(new_tuple, left, right)
+                )
 
         return super().convert_bin_op(context, left, op, right)
 
@@ -99,7 +99,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 tupPtrExpr.ElementPtrIntegers(0, 4).load().cast(
                         self.underlyingWrapperType.getNativeLayoutType().pointer()
                         ).elemPtr(iExpr)
-                )
+            )
 
         left_size = left.convert_len()
         right_size = right.convert_len()
@@ -108,23 +108,23 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             out.expr.store(
                 runtime_functions.malloc.call(native_ast.const_int_expr(28))
                     .cast(self.getNativeLayoutType())
-                ) >>
+            ) >>
             out.expr.load().ElementPtrIntegers(0, 4).store(
                 runtime_functions.malloc.call(
                     left_size.nonref_expr
                         .add(right_size.nonref_expr)
                         .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
-                    ).cast(native_ast.UInt8Ptr)
-                ) >>
+                ).cast(native_ast.UInt8Ptr)
+            ) >>
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
             out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) >>
             out.expr.load().ElementPtrIntegers(0, 2).store(
                 left_size.nonref_expr.add(right_size.nonref_expr).cast(native_ast.Int32)
-                ) >>
+            ) >>
             out.expr.load().ElementPtrIntegers(0, 3).store(
                 left_size.nonref_expr.add(right_size.nonref_expr).cast(native_ast.Int32)
-                )
             )
+        )
 
         with context.loop(left_size) as i:
             out.convert_getitem_unsafe(i).convert_copy_initialize(left.convert_getitem_unsafe(i))
@@ -139,18 +139,18 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                 cond=((item >= 0) & (item < self.convert_len(context, expr))).nonref_expr,
                 true=expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
-                    ).elemPtr(item.toInt64().nonref_expr),
+                ).elemPtr(item.toInt64().nonref_expr),
                 false=generateThrowException(context, IndexError(("tuple" if self.is_tuple else "list") + " index out of range"))
-                )
             )
+        )
 
     def convert_getitem_unsafe(self, context, expr, item):
         return context.pushReference(
             self.underlyingWrapperType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                 self.underlyingWrapperType.getNativeLayoutType().pointer()
-                ).elemPtr(item.toInt64().nonref_expr)
-            )
+            ).elemPtr(item.toInt64().nonref_expr)
+        )
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(
@@ -167,4 +167,4 @@ class TupleOfWrapper(TupleOrListOfWrapper):
     def convert_default_initialize(self, context, tgt):
         context.pushEffect(
             tgt.expr.store(tgt.expr_type.getNativeLayoutType().zero())
-            )
+        )

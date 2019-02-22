@@ -101,7 +101,7 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             default=False,
             required=False,
             help="run test harness verbosely"
-            )
+        )
         self.add_argument(
             '--dump_native',
             dest='dump_native',
@@ -109,7 +109,7 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             default=False,
             required=False,
             help="show all the llvm IR we're dumping as we go"
-            )
+        )
         self.add_argument(
             '-s',
             dest='skip_build',
@@ -117,7 +117,7 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             default=False,
             required=False,
             help="dont rebuild"
-            )
+        )
         self.add_argument(
             '--list',
             dest='list',
@@ -125,21 +125,21 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
             default=False,
             required=False,
             help="don't run tests, just list them"
-            )
+        )
         self.add_argument(
             '--filter',
             nargs=1,
             help='restrict tests to a subset matching FILTER',
             action=OrderedFilterAction,
             default=None
-            )
+        )
         self.add_argument(
             '--add',
             nargs=1,
             help='add back tests matching ADD',
             action=OrderedFilterAction,
             default=None
-            )
+        )
         self.add_argument(
             '--exclude',
             nargs=1,
@@ -147,7 +147,7 @@ class PythonTestArgumentParser(argparse.ArgumentParser):
                  + "These go in a second pass after -filter",
             action=OrderedFilterAction,
             default=None
-            )
+        )
 
     def parse_args(self, toParse):
         argholder = super(PythonTestArgumentParser, self).parse_args(toParse)
@@ -198,7 +198,7 @@ def runPyTestSuite(config, testFiles, testCasesToRun, testArgs):
         suite=testCasesToRun,
         argv=testArgs,
         exit=False
-        )
+    )
 
     return not testProgram.success
 
@@ -292,7 +292,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
         parser.add_option(
             "--nocaptureall", action="store_true",
             default=False, dest="nocaptureall"
-            )
+        )
 
     def configure(self, options, conf):
         """Configure plugin. Plugin is enabled by default.
@@ -489,7 +489,7 @@ def hashSource(rootPath):
                     path.endswith(".c") or
                     path.endswith(".h") or
                     "setup.py" in path
-                    ):
+            ):
                 with open(path, "rb") as f:
                     contents.append((path, f.read()))
 
@@ -524,7 +524,7 @@ def buildModule(args):
         [sys.executable, 'setup.py', 'clean', 'build'],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT
-        )
+    )
 
     if result.returncode != 0:
         print("Build failed: ")
@@ -536,7 +536,7 @@ def buildModule(args):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         env={'PYTHONPATH': (os.environ.get('PYTHONPATH', '') + ":") + os.path.abspath("./build/install")}
-        )
+    )
 
     if result.returncode != 0:
         print("Develop install failed: ")

@@ -46,19 +46,19 @@ class PointerToWrapper(Wrapper):
             context,
             target,
             nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
-            )
+        )
 
     def convert_assign(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_copy_initialize(self, context, target, toStore):
         assert target.isReference
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
-            )
+        )
 
     def convert_destroy(self, context, instance):
         pass
@@ -92,7 +92,7 @@ class PointerToWrapper(Wrapper):
                 left.nonref_expr
                     .sub(right.nonref_expr)
                     .div(typeWrapper(self.typeRepresentation.ElementType).getBytecount())
-                )
+            )
 
         if op.matches.Lt and right.expr_type == left.expr_type:
             return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).lt(right.nonref_expr.cast(native_ast.Int64)))

@@ -705,27 +705,27 @@ class NativeClassTypesTests(unittest.TestCase):
                 self.assertEqual(
                     ClassWithComparisons(i) < ClassWithComparisons(j),
                     i < j
-                    )
+                )
                 self.assertEqual(
                     ClassWithComparisons(i) > ClassWithComparisons(j),
                     i > j
-                    )
+                )
                 self.assertEqual(
                     ClassWithComparisons(i) <= ClassWithComparisons(j),
                     i <= j
-                    )
+                )
                 self.assertEqual(
                     ClassWithComparisons(i) >= ClassWithComparisons(j),
                     i >= j
-                    )
+                )
                 self.assertEqual(
                     ClassWithComparisons(i) == ClassWithComparisons(j),
                     i == j
-                    )
+                )
                 self.assertEqual(
                     ClassWithComparisons(i) != ClassWithComparisons(j),
                     i != j
-                    )
+                )
 
     def test_class_repr_and_str_and_hash(self):
         class ClassWithReprAndStr(Class):

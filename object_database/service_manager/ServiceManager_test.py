@@ -36,7 +36,7 @@ from object_database.web.cells import *
 from object_database import (
     Schema, Indexed, core_schema,
     connect, service_schema, current_transaction
-    )
+)
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 ownName = os.path.basename(os.path.abspath(__file__))
@@ -202,14 +202,14 @@ class GraphDisplayService(ServiceBase):
                 ["A", "B", "C"],
                 1000000,
                 lambda rowIx: ["(%s) ts" % rowIx, rowIx, rowIx+1, rowIx+2]
-                ).width('calc(100vw - 70px)').height('calc(100vh - 150px)'),
+            ).width('calc(100vw - 70px)').height('calc(100vh - 150px)'),
             Timestamps=Button("Add a point!", GraphDisplayService.addAPoint) +
                 Card(Plot(GraphDisplayService.chartData)).width(600).height(400) + Code("BYE"),
             feigenbaum=Dropdown("Depth", [(val, depth.setter(val)) for val in [10, 50, 100, 250, 500, 750, 1000]]) +
                 Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
                 Dropdown("Density", list(range(100, 10000, 100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
                 Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
-            )
+        )
 
     @staticmethod
     def chartData(linePlot):
@@ -275,10 +275,10 @@ class HappyService(ServiceBase):
         return Card(
             Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) +
             Expands(Text("Closed"), Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
-            ) + Button("go to google", "http://google.com/") + SubscribedSequence(
+        ) + Button("go to google", "http://google.com/") + SubscribedSequence(
                 lambda: Happy.lookupAll(),
                 lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
-                )
+        )
 
     def doWork(self, shouldStop):
         self.db.subscribeToSchema(happy)
@@ -373,8 +373,8 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.database.waitForCondition(
                 lambda: TestServiceLastTimestamp.aliveCount() == count,
                 timeout=self.WAIT_FOR_COUNT_TIMEOUT
-                )
             )
+        )
 
     def test_starting_services(self):
         with self.database.transaction():
@@ -396,8 +396,8 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.database.waitForCondition(
                 lambda: svc.timesBootedUnsuccessfully == ServiceInstance.MAX_BAD_BOOTS,
                 10
-                )
             )
+        )
 
         with self.database.view():
             self.assertEqual(svc.effectiveTargetCount(), 0)
@@ -412,8 +412,8 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.database.waitForCondition(
                 lambda: svc.timesBootedUnsuccessfully == ServiceInstance.MAX_BAD_BOOTS,
                 10
-                )
             )
+        )
 
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
@@ -469,7 +469,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                         assert helper.g == 1
                         return 1
                 """)
-                })
+            })
 
             v2 = service_schema.Codebase.createFromFiles({
                 'test_service/__init__.py': '',
@@ -480,7 +480,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                         assert helper.g == 2
                         return 2
                 """)
-                })
+            })
 
             i1 = v1.instantiate("test_service.service")
             i2 = v2.instantiate("test_service.service")
@@ -511,7 +511,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                 "test_service.service.Service",
                 "HangingService",
                 10
-                )
+            )
 
         # this should force a redeploy.
         maxProcessesEver = 0
@@ -656,7 +656,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                         "test_service.service.Service",
                         serviceName,
                         targetCount=1
-                        )
+                    )
                 except Exception:
                     pass
 

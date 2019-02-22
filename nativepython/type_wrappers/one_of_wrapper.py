@@ -41,9 +41,9 @@ class OneOfWrapper(Wrapper):
             element_types=(
                 ('which', native_ast.UInt8),
                 ('data', native_ast.Type.Array(element_type=native_ast.UInt8, count=excessBytes))
-                ),
+            ),
             name='OneOfLayout'
-            )
+        )
 
         self._is_pod = all(typeWrapper(possibility).is_pod for possibility in t.Types)
 
@@ -92,7 +92,7 @@ class OneOfWrapper(Wrapper):
                         if converted_res is not None:
                             context.pushEffect(
                                 out_slot.convert_copy_initialize(converted_res)
-                                )
+                            )
 
                             context.markUninitializedSlotInitialized(out_slot)
 
@@ -118,7 +118,7 @@ class OneOfWrapper(Wrapper):
         if self.is_pod:
             context.pushEffect(
                 expr.expr.store(other.nonref_expr)
-                )
+            )
         else:
             temp = context.pushMove(expr)
             expr.convert_copy_initialize(other)
@@ -133,7 +133,7 @@ class OneOfWrapper(Wrapper):
         return context.pushReference(
             tw,
             expr.expr.ElementPtrIntegers(0, 1).cast(tw.getNativeLayoutType().pointer())
-            )
+        )
 
     def convert_copy_initialize(self, context, expr, other):
         assert expr.isReference
@@ -141,7 +141,7 @@ class OneOfWrapper(Wrapper):
         if self.is_pod:
             context.pushEffect(
                 expr.expr.store(other.nonref_expr)
-                )
+            )
         else:
             with context.switch(other.expr.ElementPtrIntegers(0, 0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
                 for ix, subcontext in indicesAndContexts:
@@ -149,7 +149,7 @@ class OneOfWrapper(Wrapper):
                         self.refAs(context, expr, ix).convert_copy_initialize(self.refAs(context, other, ix))
                         context.pushEffect(
                             expr.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
-                            )
+                        )
 
     def convert_destroy(self, context, expr):
         if not self.is_pod:
@@ -178,7 +178,7 @@ class OneOfWrapper(Wrapper):
                 with false:
                     context.pushEffect(
                         generateThrowException(context, Exception("Can't convert"))
-                        )
+                    )
 
             return result
         else:
@@ -200,20 +200,20 @@ class OneOfWrapper(Wrapper):
                     otherExpr.expr.ElementPtrIntegers(0, 0).load(),
                     range(len(otherExpr.expr_type.typeRepresentation.Types)),
                     False
-                    ) as indicesAndContexts:
+            ) as indicesAndContexts:
                 for i, subcontext in indicesAndContexts:
                     with subcontext:
                         self.convert_to_self_with_target(
                             context,
                             result,
                             otherExpr.expr_type.refAs(context, otherExpr, i)
-                            )
+                        )
         elif otherExpr.expr_type.typeRepresentation in self.typeRepresentation.Types:
             which = tuple(self.typeRepresentation.Types).index(otherExpr.expr_type.typeRepresentation)
 
             context.pushEffect(
                 result.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(which))
-                )
+            )
             self.refAs(context, result, which).convert_copy_initialize(otherExpr)
         else:
             return super().convert_to_self(context, otherExpr)

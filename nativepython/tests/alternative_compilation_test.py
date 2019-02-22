@@ -43,7 +43,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             A={'a': str, 'b': int},
             B={'a': str, 'c': int},
             C={'a': str, 'd': lambda: Complex}
-            )
+        )
 
         c = Complex.A(a="hi", b=20)
         c2 = Complex.C(a="hi", d=c)
@@ -118,7 +118,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             return Alternative("Tree",
                 Leaf={'value': T},
                 Node={'left': Tree(T), 'right': Tree(T)}
-                )
+            )
 
         def treeSum(x: Tree(int)):
             matches = x.matches.Leaf
@@ -133,7 +133,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                 return Tree(int).Node(
                     left=buildTree(depth-1, offset),
                     right=buildTree(depth-1, offset+1),
-                    )
+                )
             return Tree(int).Leaf(value=offset)
 
         aTree = Compiled(buildTree)(15, 0)

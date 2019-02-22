@@ -29,8 +29,8 @@ def externalCallTarget(name, output, *inputs):
             varargs=False,
             intrinsic=False,
             can_throw=True
-            )
         )
+    )
 
 
 class TestNativeAstToLlvm(unittest.TestCase):
@@ -52,10 +52,10 @@ class TestNativeAstToLlvm(unittest.TestCase):
                     teardowns=[
                         Teardown.ByTag(tag='a1', expr=Expression.Branch(cond=const_int32_expr(10), true=ct.call(), false=nullExpr)),
                         Teardown.ByTag(tag='a1', expr=nullExpr)
-                        ]
-                    )
+                    ]
                 )
             )
+        )
 
         text = converter.add_functions({'f': f})
         print(text)

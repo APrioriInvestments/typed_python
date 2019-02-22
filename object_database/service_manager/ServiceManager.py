@@ -162,7 +162,7 @@ class ServiceManager(object):
                 isMaster=self.isMaster,
                 maxGbRam=self.maxGbRam,
                 maxCores=self.maxCores
-                )
+            )
             self.serviceHostObject.hostname = self.ownHostname
 
         self._logger.info("ServiceManager starting work loop.")
@@ -251,7 +251,7 @@ class ServiceManager(object):
                     "The following services need to be stopped because their codebases are out of date: %s",
                     "\n".join(["  " + i.service.name + "." + i._identity + ". "
                             + str(i.service.codebase) + " != " + str(i.codebase) for i in needRedeploy])
-                    )
+                )
 
         if needRedeploy:
             self.stopServices(needRedeploy)
@@ -267,7 +267,7 @@ class ServiceManager(object):
         self.db.waitForCondition(
             lambda: not [x for x in needRedeploy if x.exists()],
             self.shutdownTimeout * 2.0
-            )
+        )
 
     @revisionConflictRetry
     def createInstanceRecords(self):
@@ -278,7 +278,7 @@ class ServiceManager(object):
                 actual_by_service[service] = [
                     x for x in service_schema.ServiceInstance.lookupAll(service=service)
                         if x.isActive()
-                    ]
+                ]
 
         for service, actual_records in actual_by_service.items():
             with self.db.transaction():
@@ -313,7 +313,7 @@ class ServiceManager(object):
                 host=host,
                 state="Booting",
                 start_timestamp=time.time()
-                )
+            )
 
             actual_records.append(instance)
 

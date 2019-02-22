@@ -67,7 +67,7 @@ class TestPointerToCompilation(unittest.TestCase):
             self.assertEqual(
                 testfun(x),
                 Runtime.singleton().compile(testfun, {'x': type(x)})(x)
-                )
+            )
 
         check(0)
         check(0.0)

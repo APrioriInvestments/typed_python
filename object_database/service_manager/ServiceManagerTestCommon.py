@@ -42,7 +42,7 @@ class ServiceManagerTestCommon(object):
         self.assertTrue(
             ServiceManager.waitRunning(self.database, serviceName, self.WAIT_FOR_COUNT_TIMEOUT),
             "Service " + serviceName + " never came up."
-            )
+        )
 
     def setUp(self):
         self.token = genToken()

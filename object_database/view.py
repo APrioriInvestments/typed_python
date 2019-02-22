@@ -416,7 +416,7 @@ class View(object):
                     return SerializedDatabaseValue(
                         serialize(val[0], val[1], self.serializationContext),
                         {self.serializationContext: val[1]}
-                        )
+                    )
 
                 elif val is None:
                     return SerializedDatabaseValue(val, {})
@@ -446,7 +446,7 @@ class View(object):
                 self._indexReads if self._insistIndexReadsConsistent else set(),
                 tid,
                 confirmCallback
-                )
+            )
 
             if not self._confirmCommitCallback:
                 # this is the synchronous case - we want to wait for the confirm
@@ -457,7 +457,7 @@ class View(object):
                 if time.time() - t0 > LOG_SLOW_COMMIT_THRESHOLD:
                     self._logger.info("Committing %s writes and %s set changes took %.1f seconds",
                         len(self._writes), len(self._set_adds) + len(self._set_removes), time.time() - t0
-                        )
+                    )
 
                 if res.matches.Success:
                     return

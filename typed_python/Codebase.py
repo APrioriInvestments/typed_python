@@ -40,7 +40,7 @@ class Codebase:
 
         self.serializationContext = Codebase.coreSerializationContext().union(
             SerializationContext.FromModules(modules.values())
-            )
+        )
 
     def getIsolatedSerializationContext(self):
         return SerializationContext.FromModules(self.modules.values())
@@ -70,10 +70,10 @@ class Codebase:
 
                 context1 = SerializationContext.FromModules(
                     Codebase._walkModuleDiskRepresentation(typed_python)[2].values()
-                    )
+                )
                 context2 = SerializationContext.FromModules(
                     Codebase._walkModuleDiskRepresentation(object_database)[2].values()
-                    )
+                )
 
                 _coreSerializationContext[0] = context1.union(context2)
 

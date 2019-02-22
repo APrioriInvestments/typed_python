@@ -60,7 +60,7 @@ class ConcreteTypeFunction(object):
 
         return self._concreteTypeFunction.__qualname__ + "(" + ",".join(
             [toStr(x) for x in args] + ["%s=%s" % (k, v) for k, v in kwargs]
-            ) + ")"
+        ) + ")"
 
     def applyNameChangesToType(self, type, name):
         # if hasattr(type, '__typed_python_category__'):

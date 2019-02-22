@@ -89,13 +89,13 @@ TaskStatusResult = Alternative('TaskStatusResult',
     Finished={'result': object},
     Subtasks={'subtasks': ConstDict(str, TaskExecutor)},
     SleepUntil={'wakeup_timestamp': float}
-    )
+)
 
 TaskResult = Alternative("TaskResult",
     Result={'result': object},
     Error={'error': str},
     Failure={}
-    )
+)
 
 
 @task_schema.define
@@ -121,9 +121,9 @@ class Task:
             task=Task(
                 service=service,
                 executor=executor
-                ),
+            ),
             state="Unassigned"
-            ).task
+        ).task
 
 
 @task_schema.define
@@ -194,7 +194,7 @@ class TaskService(ServiceBase):
             cells.Subscribed(lambda: cells.Text("Working Tasks: %s" % len(TaskStatus.lookupAll(state='Working')))) +
             cells.Subscribed(lambda: cells.Text("WaitingForSubtasks Tasks: %s" % len(TaskStatus.lookupAll(state='WaitForSubtasks')))) +
             cells.Subscribed(lambda: cells.Text("Unassigned Tasks: %s" % len(TaskStatus.lookupAll(state='Unassigned'))))
-            )
+        )
 
     def doTask(self, taskStatus):
         with self.db.view():
@@ -271,7 +271,7 @@ class TaskService(ServiceBase):
                                     resourceScope=task.resourceScope,
                                     executor=subtaskExecutor,
                                     parent=task
-                                    ),
+                                ),
                                 parentStatus=taskStatus,
                                 resourceScope=task.resourceScope,
                                 state="Unassigned",

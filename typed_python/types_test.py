@@ -75,14 +75,14 @@ def makeAlternative(severalDicts):
         set(
             tuple(
                 (k, typeFor(v)) for k, v in ntDict.items()
-                )
-            for ntDict in severalDicts
             )
+            for ntDict in severalDicts
         )
+    )
 
     alt = Alternative("Alt", **{
         "a_%s" % i: dict(types[i]) for i in range(len(types))
-        })
+    })
 
     res = []
     for thing in severalDicts:
@@ -181,7 +181,7 @@ class NativeTypesTests(unittest.TestCase):
             elapsed < expected,
             "Slow Performance: expected to take {expected} sec, but took {elapsed}"
             .format(expected=expected, elapsed=elapsed)
-            )
+        )
 
     def test_objects_are_singletons(self):
         self.assertTrue(Int8 is Int8)
@@ -472,7 +472,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(
             len(serialize(t, typedThings)),
             sum(2 if isinstance(t, bool) else 9 for t in someThings) + 8
-            )
+        )
 
         self.assertEqual(tuple(typedThings), someThings)
 
@@ -632,7 +632,7 @@ class NativeTypesTests(unittest.TestCase):
             ["1", "2", "3", "12", "13", "23", "24", "123123", "0", ""],
             [b"a", b"b", b"ab", b"bb", b"ba", b"aaaaaaa", b"", b"asdf"],
             [(1, 2), (1, 2, 3), (), (1, 1), (1,)]
-            ]
+        ]
 
         for ts in tgroups:
             for f in funcs:
@@ -640,7 +640,7 @@ class NativeTypesTests(unittest.TestCase):
                     for t2 in ts:
                         self.assertTrue(f(t1, t2) is f(t((t1,)), t((t2,))),
                             (f, t1, t2, f(t1, t2), f(t((t1,)), t((t2,))))
-                            )
+                        )
 
     def test_const_dict(self):
         t = ConstDict(str, str)
@@ -840,7 +840,7 @@ class NativeTypesTests(unittest.TestCase):
         alt = Alternative(
             "Alt",
             x_0={'a': bytes}
-            )
+        )
         self.assertEqual(alt.x_0(a=b''), alt.x_0(a=b''))
 
     def test_alternatives_with_str_func(self):
@@ -849,7 +849,7 @@ class NativeTypesTests(unittest.TestCase):
             x_0={'a': bytes},
             f=lambda self: 1,
             __str__=lambda self: "not_your_usual_str"
-            )
+        )
 
         self.assertEqual(alt.x_0().f(), 1)
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
@@ -870,7 +870,7 @@ class NativeTypesTests(unittest.TestCase):
             "Alt",
             A={},
             B={}
-            )
+        )
 
         self.assertEqual(a.A(), a.A())
         self.assertIsInstance(deserialize(a, serialize(a, a.A())), a.A)
@@ -885,7 +885,7 @@ class NativeTypesTests(unittest.TestCase):
             "Alt",
             A={},
             B={}
-            )
+        )
         tOfAlt = TupleOf(Alt)
 
         a = Alt.A()
@@ -899,7 +899,7 @@ class NativeTypesTests(unittest.TestCase):
             "Alt",
             child_ints={'x': int, 'y': int},
             child_strings={'x': str, 'y': str}
-            )
+        )
 
         self.assertTrue(issubclass(alt.child_ints, alt))
         self.assertTrue(issubclass(alt.child_strings, alt))
@@ -932,7 +932,7 @@ class NativeTypesTests(unittest.TestCase):
             B={'b': int},
             C={'c': str},
             D={'d': bytes},
-            )
+        )
 
         self.assertEqual(a.A(a=10), a.A(a=10))
         self.assertNotEqual(a.A(a=10), a.A(a=11))
@@ -946,7 +946,7 @@ class NativeTypesTests(unittest.TestCase):
             "Alt",
             child_ints={'x': int, 'y': int},
             __add__=lambda l, r: (l, r)
-            )
+        )
 
         a = alt.child_ints(x=0, y=2)
 
@@ -957,7 +957,7 @@ class NativeTypesTests(unittest.TestCase):
             "Alt",
             child_ints={'x': int, 'y': int},
             child_strings={'x': str, 'y': str}
-            )
+        )
 
         t0 = time.time()
 
@@ -1122,7 +1122,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(
             len(serialize(TupleOf(int), ints)),
             40
-            )
+        )
 
         while len(ints) < 1000000:
             ints = ints + ints
@@ -1330,7 +1330,7 @@ class NativeTypesTests(unittest.TestCase):
                     numpy.array([0, 1, 2, 3, 4, 5], 'int32'),
                     numpy.array([0, 1, 2, 3, 4, 5], 'int16'),
                     numpy.array([0, 1, 2, 3, 4, 5], 'bool')
-                    ]:
+            ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), [bool(x) for x in arr.tolist()])
 
@@ -1340,7 +1340,7 @@ class NativeTypesTests(unittest.TestCase):
                     numpy.array([1, 2, 3, 4, 5]),
                     numpy.array([1, 2, 3, 4, 5], 'int32'),
                     numpy.array([1, 2, 3, 4, 5], 'int16')
-                    ]:
+            ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
@@ -1349,7 +1349,7 @@ class NativeTypesTests(unittest.TestCase):
                     numpy.array([]),
                     numpy.array([1, 2, 3, 4, 5], 'float64'),
                     numpy.array([1, 2, 3, 4, 5], 'float32')
-                    ]:
+            ]:
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
@@ -1364,12 +1364,12 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(
             (1, 2, 4, 5, 6) + TupleOf(int)([1, 2]),
             (1, 2, 4, 5, 6, 1, 2)
-            )
+        )
 
         self.assertEqual(
             [1, 2, 4, 5, 6] + TupleOf(int)([1, 2]),
             (1, 2, 4, 5, 6, 1, 2)
-            )
+        )
 
         with self.assertRaises(TypeError):
             [1, 2, "hi", 5, 6] + TupleOf(int)([1, 2])
@@ -1377,7 +1377,7 @@ class NativeTypesTests(unittest.TestCase):
     def test_tuple_r_cmp(self):
         self.assertEqual(
             (1, 2, 3), TupleOf(int)([1, 2, 3])
-            )
+        )
 
     def test_other_bitness_types(self):
         # verify we can cast around non-64-bit values in a way that matches numpy

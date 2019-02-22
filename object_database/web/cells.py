@@ -303,7 +303,7 @@ class Cells:
                                 type(n),
                                 childname,
                                 type(child_cell)
-                                ))
+                            ))
 
                 except Exception:
                     self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
@@ -344,7 +344,7 @@ class Cells:
             'id': cell.identity,
             'contents': contents,
             'replacements': replaceDict
-            }
+        }
 
         if cell.postscript:
             res['postscript'] = cell.postscript
@@ -643,7 +643,7 @@ class Octicon(Cell):
     def recalculate(self):
         self.contents = (
             '<span class="octicon octicon-%s" aria-hidden="true" __style__></span>' % self.whichOcticon
-            ).replace('__style__', self._divStyle())
+        ).replace('__style__', self._divStyle())
 
 
 class Badge(Cell):
@@ -658,7 +658,7 @@ class Badge(Cell):
     def recalculate(self):
         self.contents = """<span class="badge badge-__style__">____child__</span>""".replace(
             "__style__", self.style
-            )
+        )
         self.children = {'____child__': self.inner}
 
 
@@ -675,7 +675,7 @@ class Text(Cell):
         self.contents = "<div %s>%s</div>" % (
             self._divStyle(),
             cgi.escape(str(self.text)) if self.text else "&nbsp;"
-            )
+        )
 
 
 class Padding(Cell):
@@ -735,7 +735,7 @@ class Columns(Cell):
             "\n".join(
                 """<div class="col-sm"> ____c_%s__ </div>""" % i
                 for i in range(len(elements)))
-            )
+        )
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -790,7 +790,7 @@ class HeaderBar(Cell):
             "".join(["<span class='flex-item px-3'>____left_%s__</span>" % i for i in range(len(self.leftItems))]),
             "".join(["<span class='flex-item px-3'>____center_%s__</span>" % i for i in range(len(self.centerItems))]),
             "".join(["<span class='flex-item px-3'>____right_%s__</span>" % i for i in range(len(self.rightItems))]),
-            )
+        )
 
         self.children = {'____left_%s__' % i: self.leftItems[i] for i in range(len(self.leftItems))}
         self.children.update({'____center_%s__' % i: self.centerItems[i] for i in range(len(self.centerItems))})
@@ -832,7 +832,7 @@ class _NavTab(Cell):
             """.replace("__identity__", self.target)
                .replace("__ix__", str(self.index))
                .replace("__active__", "active" if self.index == self.slot.get() else "")
-            )
+        )
 
         self.children['____child__'] = Cell.makeCell(self.child)
 
@@ -873,7 +873,7 @@ class Tabs(Cell):
                     "".join(
                         """ ____header___ix____ """.replace('__ix__', str(i))
                             for i in range(len(self.headersAndChildren))
-                        )
+                    )
                     ).replace("__identity__", self._identity)
 
     def onMessage(self, msgFrame):
@@ -932,8 +932,8 @@ class Dropdown(Cell):
                     "websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))"
                         if not isinstance(onDropdown, str) else
                     quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(onDropdown, "'")), '"')
-                    ).replace("__ix__", str(i)).replace("__identity__", self.identity)
-                )
+                ).replace("__ix__", str(i)).replace("__identity__", self.identity)
+            )
 
         self.contents = """
             <div class="btn-group">
@@ -1101,7 +1101,7 @@ class SubscribedSequence(Cell):
         self.contents = """<div %s>%s</div>""" % (
             self._divStyle(),
             "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
-            )
+        )
 
 
 class Popover(Cell):
@@ -1113,7 +1113,7 @@ class Popover(Cell):
             '____contents__': Cell.makeCell(contents),
             '____detail__': Cell.makeCell(detail),
             '____title__': Cell.makeCell(title)
-            }
+        }
 
     def recalculate(self):
         self.contents = """
@@ -1238,10 +1238,10 @@ class Grid(Cell):
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
-                        )
+                    )
                     + "</tr>"
                         for row_ix in range(len(self.rows))
-                    )
+                )
                 )
 
 
@@ -1296,7 +1296,7 @@ class SingleLineTextBox(Cell):
                .replace("__contents__", quoteForJs(self.slot.get(), '"'))
                .replace("__pat__", "" if not self.pattern else quoteForJs(self.pattern, '"'))
                .replace("__sytle__", self._divStyle())
-            )
+        )
 
     def onMessage(self, msgFrame):
         self.slot.set(msgFrame['text'])
@@ -1514,12 +1514,12 @@ class Table(Cell):
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
                             for col_ix in range(len(self.cols))
-                        )
+                    )
                     + "</tr>"
                         for row_ix in range(len(self.rows))
-                    )
                 )
-            )
+                )
+        )
 
 
 class Clickable(Cell):
@@ -1594,7 +1594,7 @@ class LoadContentsFromUrl(Cell):
             "$('#loadtarget__identity__').load('__url__')"
                 .replace("__identity__", self._identity)
                 .replace("__url__", quoteForJs(self.targetUrl, "'"))
-            )
+        )
 
 
 class SubscribeAndRetry(Exception):
@@ -1608,8 +1608,8 @@ def ensureSubscribedType(t, lazy=False):
         raise SubscribeAndRetry(
             Timer("Subscribing to type %s%s", t, " lazily" if lazy else "")(
                 lambda db: db.subscribeToType(t, lazySubscription=lazy)
-                )
             )
+        )
 
 
 def ensureSubscribedSchema(t, lazy=False):
@@ -1617,8 +1617,8 @@ def ensureSubscribedSchema(t, lazy=False):
         raise SubscribeAndRetry(
             Timer("Subscribing to schema %s%s", t, " lazily" if lazy else "")(
                 lambda db: db.subscribeToSchema(t, lazySubscription=lazy)
-                )
             )
+        )
 
 
 class Expands(Cell):
@@ -1652,7 +1652,7 @@ class Expands(Cell):
         self.children = {
             '____child__': self.open if self.isExpanded else self.closed,
             '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
-            }
+        }
 
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded
@@ -1806,7 +1806,7 @@ class Sheet(Cell):
 
         self.children = {
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
-            }
+        }
 
         self.postscript = """
             function model(opts) { return {} }
@@ -1908,14 +1908,14 @@ class Sheet(Cell):
                     .replace("__row__", str(rowToRender))
                     .replace("__identity__", self._identity)
                     .replace("__data__", json.dumps(rowData))
-                    )
+                )
 
         if rows:
             self.triggerPostscript("""
                 handsOnTables["__identity__"].render()
                 """
                 .replace("__identity__", self._identity)
-                )
+            )
 
 
 class Plot(Cell):
@@ -1945,7 +1945,7 @@ class Plot(Cell):
         self.children = {
             '____chart_updater__': _PlotUpdater(self),
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
-            }
+        }
 
         self.postscript = """
             plotDiv = document.getElementById('plot__identity__');
@@ -1985,7 +1985,7 @@ class Plot(Cell):
         self.curXYRanges.set(
             ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]', curVal[0][1])),
              (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
-            )
+        )
 
 
 class _PlotUpdater(Cell):
