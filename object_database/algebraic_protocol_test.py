@@ -24,8 +24,8 @@ import unittest
 
 Message = Alternative(
     "Message",
-    Ping = {},
-    Pong = {}
+    Ping={},
+    Pong={}
     )
 
 

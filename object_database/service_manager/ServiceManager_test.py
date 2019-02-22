@@ -70,7 +70,7 @@ class TestServiceLastTimestamp:
     version = int
 
     @staticmethod
-    def aliveServices(window = None):
+    def aliveServices(window=None):
         res = []
 
         for i in TestServiceLastTimestamp.lookupAll():
@@ -80,7 +80,7 @@ class TestServiceLastTimestamp:
         return res
 
     @staticmethod
-    def aliveCount(window = None):
+    def aliveCount(window=None):
         return len(TestServiceLastTimestamp.aliveServices(window))
 
 
@@ -173,12 +173,12 @@ class GraphDisplayService(ServiceBase):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
         with self.db.transaction():
             if not Feigenbaum.lookupAny():
-                Feigenbaum(y=2.0, density = 800)
+                Feigenbaum(y=2.0, density=800)
 
 
     @staticmethod
     def addAPoint():
-        PointsToShow(timestamp = time.time(), y = len(PointsToShow.lookupAll()) ** 2.2)
+        PointsToShow(timestamp=time.time(), y=len(PointsToShow.lookupAll()) ** 2.2)
 
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
@@ -187,14 +187,12 @@ class GraphDisplayService(ServiceBase):
         depth = Slot(50)
 
         return Tabs(
-            Overlay=
-                Card(Plot(lambda: {'single_array': [1,2,3,1,2,3],
+            Overlay=Card(Plot(lambda: {'single_array': [1,2,3,1,2,3],
                                 'xy': {'x': [1,2,3,1,2,3], 'y': [4,5,6,7,8,9]},
                                 }
                     ).width(600).height(400) + Code("HI")
                 ),
-            AGrid=
-                Grid(
+            AGrid=Grid(
                     colFun=lambda: ['A', 'B', 'B'],
                     rowFun=lambda: ['1', '2', '2'],
                     headerFun=lambda x: x,
@@ -207,11 +205,9 @@ class GraphDisplayService(ServiceBase):
                 1000000,
                 lambda rowIx: ["(%s) ts" % rowIx,rowIx,rowIx+1,rowIx+2]
                 ).width('calc(100vw - 70px)').height('calc(100vh - 150px)'),
-            Timestamps=
-                Button("Add a point!", GraphDisplayService.addAPoint) +
+            Timestamps=Button("Add a point!", GraphDisplayService.addAPoint) +
                 Card(Plot(GraphDisplayService.chartData)).width(600).height(400) + Code("BYE"),
-            feigenbaum=
-                Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
+            feigenbaum=Dropdown("Depth", [(val, depth.setter(val)) for val in [10,50,100,250,500,750,1000]]) +
                 Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
                 Dropdown("Density", list(range(100,10000,100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
                 Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
@@ -291,8 +287,8 @@ class HappyService(ServiceBase):
         self.db.subscribeToSchema(happy)
 
         with self.db.transaction():
-            h = Happy(i = 1)
-            h = Happy(i = 2)
+            h = Happy(i=1)
+            h = Happy(i=2)
 
         while not shouldStop.is_set():
             time.sleep(.5)

@@ -120,7 +120,7 @@ class ActiveWebServiceTest(unittest.TestCase):
             self.cleanupFn(error=True)
             raise
 
-    def waitUntilUp(self, timeout = 4.0):
+    def waitUntilUp(self, timeout=4.0):
         t0 = time.time()
 
         while time.time() - t0 < timeout:

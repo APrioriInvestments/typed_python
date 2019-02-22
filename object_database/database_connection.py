@@ -39,9 +39,9 @@ class Everything:
 
 TransactionResult = Alternative(
     "TransactionResult",
-    Success = {},
-    RevisionConflict = {'key': str},
-    Disconnected = {}
+    Success={},
+    RevisionConflict={'key': str},
+    Disconnected={}
     )
 
 

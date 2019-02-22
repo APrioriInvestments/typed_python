@@ -60,8 +60,8 @@ class Schema:
 
     def typeToDef(self, t):
         return TypeDefinition(
-            fields = tuple(t.__types__.keys()) + (" exists",),
-            indices= tuple(self._indices.get(t,{}).keys())
+            fields=tuple(t.__types__.keys()) + (" exists",),
+            indices=tuple(self._indices.get(t,{}).keys())
         )
 
     @property

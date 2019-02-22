@@ -111,7 +111,7 @@ class Codebase:
         return codebase
 
     @staticmethod
-    def _walkDiskRepresentation(rootPath, prefix=None, extensions=('.py',), maxTotalBytes = 100 * 1024 * 1024):
+    def _walkDiskRepresentation(rootPath, prefix=None, extensions=('.py',), maxTotalBytes=100 * 1024 * 1024):
         """ Utility method that collects the code for a given root module.
 
             Parameters:

@@ -204,7 +204,7 @@ def runPyTestSuite(config, testFiles, testCasesToRun, testArgs):
 
 
 def loadTestsFromModules(config, modules):
-    loader = nose.loader.TestLoader(config = config)
+    loader = nose.loader.TestLoader(config=config)
     allSuites = []
     for module in modules:
         cases = loader.loadTestsFromModule(module)

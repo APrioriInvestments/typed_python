@@ -23,8 +23,8 @@ def externalCallTarget(name, output, *inputs):
     return CallTarget.Named(
         target=NamedCallTarget(
             name=name,
-            arg_types = inputs,
-            output_type = output,
+            arg_types=inputs,
+            output_type=output,
             external=True,
             varargs=False,
             intrinsic=False,
@@ -43,8 +43,7 @@ class TestNativeAstToLlvm(unittest.TestCase):
             output_type=Void,
             body=FunctionBody.Internal(
                 Expression.Finally(
-                    expr = 
-                        ct.call() >>
+                    expr=ct.call() >>
                         Expression.ActivatesTeardown('a1') >> 
                         ct.call() >>
                         Expression.ActivatesTeardown('a2') >>

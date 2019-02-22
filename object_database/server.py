@@ -231,7 +231,7 @@ class Server:
                     c.close()
                     self.dropConnection(c)
 
-            self._logger.info("Connection heartbeat distribution is %s", heartbeatCount)
+            self._logger.debug("Connection heartbeat distribution is %s", heartbeatCount)
 
     def dropConnection(self, channel):
         with self._lock:
@@ -523,7 +523,7 @@ class Server:
             fieldname_and_value,
             identities,
             connectedChannel,
-            isLazy = True
+            isLazy=True
             )
 
         connectedChannel.channel.write(

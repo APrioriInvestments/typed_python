@@ -125,7 +125,7 @@ class ServiceManager(object):
         return service
 
     @staticmethod
-    def startService(serviceName, targetCount = 1):
+    def startService(serviceName, targetCount=1):
         service = service_schema.Service.lookupOne(name=serviceName)
         service.target_count = targetCount
 

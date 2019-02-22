@@ -43,14 +43,14 @@ Alias = lambda: Alias
 WithItem = lambda: WithItem
 
 Module = Alternative("Module",
-    Module = {"body": TupleOf(Statement)},
-    Expression = {'body': Expr},
-    Interactive = {'body': TupleOf(Statement)},
-    Suite = {"body": TupleOf(Statement)}
+    Module={"body": TupleOf(Statement)},
+    Expression={'body': Expr},
+    Interactive={'body': TupleOf(Statement)},
+    Suite={"body": TupleOf(Statement)}
     )
 
 Statement = Alternative("Statement",
-    FunctionDef = {
+    FunctionDef={
         "name": str,
         "args": Arguments,
         "body": TupleOf(Statement),
@@ -61,7 +61,7 @@ Statement = Alternative("Statement",
         'filename': str
   	    },
 
-    ClassDef = {
+    ClassDef={
         "name": str,
         "bases": TupleOf(Expr),
         "keywords": TupleOf(Keyword),
@@ -72,26 +72,26 @@ Statement = Alternative("Statement",
         'filename': str
         },
 
-    Return = {
+    Return={
         "value": OneOf(Expr, None) ,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Delete = {
+    Delete={
         "targets": TupleOf(Expr),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Assign = {
+    Assign={
         "targets": TupleOf(Expr),
         "value": Expr,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    AugAssign = {
+    AugAssign={
         "target": Expr,
         "op": BinaryOp,
         "value": Expr,
@@ -99,7 +99,7 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    Print = {
+    Print={
         "expr": OneOf(Expr, None),
         "values": TupleOf(Expr),
         "nl": int,
@@ -107,7 +107,7 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    For = {
+    For={
         "target": Expr,
         "iter": Expr,
         "body": TupleOf(Statement),
@@ -116,7 +116,7 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    While = {
+    While={
         "test": Expr,
         "body": TupleOf(Statement),
         "orelse": TupleOf(Statement),
@@ -124,7 +124,7 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    If = {
+    If={
         "test": Expr,
         "body": TupleOf(Statement),
         "orelse": TupleOf(Statement),
@@ -132,21 +132,21 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    With = {
+    With={
         "items": TupleOf(WithItem),
         "body": TupleOf(Statement),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Raise = {
+    Raise={
         "exc": OneOf(Expr, None),
         "cause": OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Try = {
+    Try={
         "body": TupleOf(Statement),
         "handlers": TupleOf(ExceptionHandler),
         "orelse": TupleOf(Statement),
@@ -155,20 +155,20 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    Assert = {
+    Assert={
         "test": Expr,
         "msg": OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Import = {
+    Import={
         "names": TupleOf(Alias),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    ImportFrom = {
+    ImportFrom={
         "module": OneOf(str,TupleOf(str)),
         "names": OneOf(Alias,TupleOf(Alias)),
         "level": OneOf(int, None),
@@ -176,29 +176,29 @@ Statement = Alternative("Statement",
         'col_offset': int,
         'filename': str
         },
-    Global = {
+    Global={
         "names": TupleOf(str),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Expr = {
+    Expr={
         "value": Expr,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Pass = {
+    Pass={
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Break  = {
+    Break={
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Continue = {
+    Continue={
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -206,14 +206,14 @@ Statement = Alternative("Statement",
     )
 
 Expr = Alternative("Expr",
-    BoolOp = {
+    BoolOp={
         "op": BooleanOp,
         "values": TupleOf(Expr),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    BinOp = {
+    BinOp={
         "left": Expr,
         "op": BinaryOp,
         "right": Expr,
@@ -221,21 +221,21 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    UnaryOp = {
+    UnaryOp={
         "op": UnaryOp,
         "operand": Expr,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Lambda = {
+    Lambda={
         "args": Arguments,
         "body": Expr,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    IfExp = {
+    IfExp={
         "test": Expr,
         "body": Expr,
         "orelse": Expr,
@@ -243,34 +243,34 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    Dict = {
+    Dict={
         "keys": TupleOf(Expr),
         "values": TupleOf(Expr),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Set = {
+    Set={
         "elts": TupleOf(Expr),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    ListComp = {
+    ListComp={
         "elt": Expr,
         "generators": TupleOf(Comprehension),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    SetComp = {
+    SetComp={
         "elt": Expr,
         "generators": TupleOf(Comprehension),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    DictComp = {
+    DictComp={
         "key": Expr,
         "value": Expr,
         "generators": TupleOf(Comprehension),
@@ -278,20 +278,20 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    GeneratorExp = {
+    GeneratorExp={
         "elt": Expr,
         "generators": TupleOf(Comprehension),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Yield = {
+    Yield={
         "value": OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Compare = {
+    Compare={
         "left": Expr,
         "ops": TupleOf(ComparisonOp),
         "comparators": TupleOf(Expr),
@@ -299,7 +299,7 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    Call = {
+    Call={
         "func": Expr,
         "args": TupleOf(Expr),
         "keywords": TupleOf(Keyword),
@@ -307,19 +307,19 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    Num = {
+    Num={
         "n": NumericConstant,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Str = {
+    Str={
         "s": str,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Attribute = {
+    Attribute={
         "value": Expr,
         "attr": str,
         "ctx": ExprContext,
@@ -327,7 +327,7 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    Subscript = {
+    Subscript={
         "value": Expr,
         "slice": Slice,
         "ctx": ExprContext,
@@ -335,28 +335,28 @@ Expr = Alternative("Expr",
         'col_offset': int,
         'filename': str
         },
-    Name = {
+    Name={
         "id": str,
         "ctx": ExprContext,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    List = {
+    List={
         "elts": TupleOf(Expr),
         "ctx": ExprContext,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Tuple = {
+    Tuple={
         "elts": TupleOf(Expr),
         "ctx": ExprContext,
         'line_number': int,
         'col_offset': int,
         'filename': str
         },
-    Starred = {
+    Starred={
         "value": Expr,
         "ctx": ExprContext,
         'line_number': int,
@@ -366,76 +366,76 @@ Expr = Alternative("Expr",
     )
 
 NumericConstant = Alternative("NumericConstant",
-    Int = {"value": int},
-    Long = {"value": str},
-    Boolean = {"value": bool},
-    None_ = {},
-    Float = {"value": float},
-    Unknown = {}
+    Int={"value": int},
+    Long={"value": str},
+    Boolean={"value": bool},
+    None_={},
+    Float={"value": float},
+    Unknown={}
     )
 
 ExprContext = Alternative("ExprContext",
-    Load = {},
-    Store = {},
-    Del = {},
-    AugLoad = {},
-    AugStore = {},
-    Param = {}
+    Load={},
+    Store={},
+    Del={},
+    AugLoad={},
+    AugStore={},
+    Param={}
     )
 
 Slice = Alternative("Slice",
-    Ellipsis = {},
-    Slice = {
+    Ellipsis={},
+    Slice={
          "lower": OneOf(Expr, None),
          "upper": OneOf(Expr, None),
          "step": OneOf(Expr, None)
          },
-    ExtSlice = {"dims": TupleOf(Slice)},
-    Index = {"value": Expr}
+    ExtSlice={"dims": TupleOf(Slice)},
+    Index={"value": Expr}
     )
 
 BooleanOp = Alternative("BooleanOp",
-    And = {},
-    Or = {}
+    And={},
+    Or={}
     )
 
 BinaryOp = Alternative("BinaryOp",
-    Add = {},
-    Sub = {},
-    Mult = {},
-    Div = {},
-    Mod = {},
-    Pow = {},
-    LShift = {},
-    RShift = {},
-    BitOr = {},
-    BitXor = {},
-    BitAnd = {},
-    FloorDiv = {}
+    Add={},
+    Sub={},
+    Mult={},
+    Div={},
+    Mod={},
+    Pow={},
+    LShift={},
+    RShift={},
+    BitOr={},
+    BitXor={},
+    BitAnd={},
+    FloorDiv={}
     )
 
 UnaryOp = Alternative("UnaryOp",
-    Invert = {},
-    Not = {},
-    UAdd = {},
-    USub = {}
+    Invert={},
+    Not={},
+    UAdd={},
+    USub={}
     )
 
 ComparisonOp = Alternative("ComparisonOp",
-    Eq = {},
-    NotEq = {},
-    Lt = {},
-    LtE = {},
-    Gt = {},
-    GtE = {},
-    Is = {},
-    IsNot = {},
-    In = {},
-    NotIn = {}
+    Eq={},
+    NotEq={},
+    Lt={},
+    LtE={},
+    Gt={},
+    GtE={},
+    Is={},
+    IsNot={},
+    In={},
+    NotIn={}
     )
 
 Comprehension = Alternative("Comprehension",
-    Item = {
+    Item={
         "target": Expr,
         "iter": Expr,
         "ifs": TupleOf(Expr),
@@ -444,7 +444,7 @@ Comprehension = Alternative("Comprehension",
     )
 
 ExceptionHandler = Alternative("ExceptionHandler",
-    Item = {
+    Item={
         "type": OneOf(Expr, None),
         "name": OneOf(str, None),
         "body": TupleOf(Statement),
@@ -455,7 +455,7 @@ ExceptionHandler = Alternative("ExceptionHandler",
     )
 
 Arguments = Alternative("Arguments",
-    Item = {
+    Item={
         "args": TupleOf(Arg),
         "vararg": OneOf(Arg, None),
         "kwonlyargs": TupleOf(Arg),
@@ -466,7 +466,7 @@ Arguments = Alternative("Arguments",
   )
 
 Arg = Alternative("Arg",
-    Item ={
+    Item={
         'arg': str,
         'annotation': OneOf(Expr, None),
         'line_number': int,
@@ -475,21 +475,21 @@ Arg = Alternative("Arg",
     })
 
 Keyword = Alternative("Keyword",
-    Item = {
+    Item={
         "arg": OneOf(None, str),
         "value": Expr
         }
     )
 
 Alias = Alternative("Alias",
-    Item = {
+    Item={
         "name": str,
         "asname": OneOf(str, None)
         }
     )
 
 WithItem = Alternative("WithItem",
-    Item = {
+    Item={
         "context_expr": Expr,
         "optional_vars": OneOf(Expr, None),
         }
