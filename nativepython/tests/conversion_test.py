@@ -326,7 +326,3 @@ class TestCompilationStructures(unittest.TestCase):
 
         print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0))) #I get 1.00
         self.assertTrue((t1-t0) < (t2 - t1) * 1.1)
-
-
-
-

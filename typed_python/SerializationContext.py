@@ -280,4 +280,3 @@ class SerializationContext(object):
             return True
 
         return False
-

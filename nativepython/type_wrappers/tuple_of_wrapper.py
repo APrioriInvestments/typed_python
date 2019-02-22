@@ -166,5 +166,3 @@ class TupleOfWrapper(TupleOrListOfWrapper):
         context.pushEffect(
             tgt.expr.store(tgt.expr_type.getNativeLayoutType().zero())
             )
-
-

@@ -74,4 +74,3 @@ class LdapAuthPluginTest(unittest.TestCase):
         self.assertNotEqual(error, '')
         mock_getConn.assert_called_once()
         mock_getUserAttr.assert_called_once()
-

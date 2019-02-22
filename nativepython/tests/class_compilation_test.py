@@ -214,13 +214,3 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(f().x, 123)
         self.assertEqual(f().y, 0)
-
-
-
-
-
-
-
-
-
-

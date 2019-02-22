@@ -544,4 +544,3 @@ def current_transaction():
     if not hasattr(_cur_view, "view"):
         return None
     return _cur_view.view
-

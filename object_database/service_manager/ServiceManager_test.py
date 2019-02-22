@@ -719,4 +719,3 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         # Trying to update the codebase after locking should fail
         lock_helper()
         s = deploy_helper(7, 6, s)
-

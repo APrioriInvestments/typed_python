@@ -1616,4 +1616,3 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(list(d), [10, 1, 2])
         del d[1]
         self.assertEqual(list(d), [10, 2])
-

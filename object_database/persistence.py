@@ -291,4 +291,3 @@ class RedisPersistence(object):
             if key in self.cache:
                 del self.cache[key]
             self.redis.delete(key)
-

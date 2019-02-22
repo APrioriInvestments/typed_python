@@ -201,4 +201,3 @@ def getsource(pyObject):
     IOError is raised if the source code cannot be retrieved."""
     lines, _ = getsourcelines(pyObject)
     return ''.join(lines)
-

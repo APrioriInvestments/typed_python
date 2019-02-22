@@ -180,4 +180,3 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.assertEqual(negate_int(10), -10)
         self.assertEqual(negate_float(20.5), -20.5)
-

@@ -140,4 +140,3 @@ class RingInvariantTest(unittest.TestCase):
             count, sum = checkSome(isLazy, k)
             self.assertEqual(count, i+2)
             self.assertEqual(sum, 0)
-

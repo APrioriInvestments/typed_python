@@ -1059,5 +1059,3 @@ class TypesSerializationTest(unittest.TestCase):
             x.deserialize(x.serialize(d))
 
         self.assertLess(currentMemUsageMb(), usage+1)
-
-

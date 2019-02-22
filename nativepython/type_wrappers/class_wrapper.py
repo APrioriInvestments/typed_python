@@ -227,6 +227,3 @@ class ClassWrapper(RefcountedWrapper):
             if len(args):
                 context.pushException(TypeError, "Can't construct a " + self.typeRepresentation.__qualname__ +
                         " with positional arguments because it doesn't have an __init__")
-
-
-

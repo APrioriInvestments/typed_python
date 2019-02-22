@@ -146,5 +146,3 @@ def TypeFunction(f):
     new object). """
 
     return ConcreteTypeFunction(f)
-
-

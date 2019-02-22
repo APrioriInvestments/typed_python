@@ -133,6 +133,3 @@ class TestConstDictCompilation(unittest.TestCase):
         #because most of the time is spent in the dictionary lookup, and python's
         #dict lookup is quite fast.
         self.assertGreater(speedup, 2)
-
-
-

@@ -61,5 +61,3 @@ class TestNativeAstToLlvm(unittest.TestCase):
         print(text)
         mod = llvm.parse_assembly(text)
         mod.verify()
-
-    

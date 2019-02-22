@@ -61,6 +61,3 @@ class BoundMethodWrapper(Wrapper):
             (left.changeType(clsType),) + tuple(args),
             kwargs
             )
-
-
-

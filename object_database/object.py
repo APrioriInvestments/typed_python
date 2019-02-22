@@ -151,4 +151,3 @@ class Index:
 
     def __call__(self, instance):
         return tuple(getattr(instance, x) for x in self.names)
-

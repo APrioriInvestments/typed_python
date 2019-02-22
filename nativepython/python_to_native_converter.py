@@ -392,4 +392,3 @@ class PythonToNativeConverter(object):
             self._new_native_functions.add(name)
 
         self._inflight_function_conversions.clear()
-

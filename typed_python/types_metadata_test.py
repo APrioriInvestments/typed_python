@@ -56,4 +56,3 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(Left.ElementType.ElementTypes, (Int64, String))
         self.assertEqual(Right.ElementType.ElementNames, ('x', 'val'))
         self.assertEqual(Right.ElementType.ElementTypes, (X, Int64))
-

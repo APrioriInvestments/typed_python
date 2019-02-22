@@ -214,6 +214,3 @@ class SubprocessServiceManager(ServiceManager):
                                 shutil.rmtree(path)
                             except Exception:
                                 self._logger.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
-
-
-
