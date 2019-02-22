@@ -1001,27 +1001,27 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_datetime_objects(self):
         x = SerializationContext({})
-        
+
         d = datetime.date.today()
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))
-        
+
         d = datetime.datetime.now()
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))
-        
+
         d = datetime.timedelta(days=1)
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))
-        
+
         d = datetime.datetime.now().time()
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))
-        
+
         d = pytz.timezone("America/New_York")
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))
-        
+
         d = pytz.timezone("America/New_York").localize(datetime.datetime.now())
         d2 = x.deserialize(x.serialize(d))
         self.assertEqual(d, d2, (d, type(d)))

@@ -23,5 +23,5 @@ def TypeFilter(base_type, filter_function):
 
     TypeFilter.base_type = base_type
     TypeFilter.filter_function = filter_function
-    
+
     return TypeFilter
