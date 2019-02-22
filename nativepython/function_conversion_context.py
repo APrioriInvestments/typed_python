@@ -555,7 +555,8 @@ class FunctionConversionContext(object):
 
         stararg_slot = self.named_var_expr(star_args_name)
 
-        return args_type.convert_initialize(
+        return (
+            args_type.convert_initialize(
                 self,
                 stararg_slot,
                 [TypedExpression(
@@ -564,3 +565,4 @@ class FunctionConversionContext(object):
                         )
                     for i in range(len(args_type.element_types))]
             ).with_comment("initialize *args slot") + res
+        )

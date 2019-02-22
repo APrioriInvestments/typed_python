@@ -191,9 +191,9 @@ def functionDefOrLambdaAtLineNumber(sourceAst, lineNumber):
     visitor.visit(sourceAst)
 
     subnodesAtLineNumber = (
-          visitor.funcDefSubnodesAtLineNumber
-        + visitor.lambdaSubnodesAtLineNumber
-        )
+        visitor.funcDefSubnodesAtLineNumber +
+        visitor.lambdaSubnodesAtLineNumber
+    )
 
     if len(subnodesAtLineNumber) == 0:
         raise CantGetSourceTextError(

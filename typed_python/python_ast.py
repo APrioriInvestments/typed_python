@@ -463,7 +463,7 @@ Arguments = Alternative("Arguments",
         "kwarg": OneOf(Arg, None),
         "defaults": TupleOf(Expr)
         }
-  )
+    )
 
 Arg = Alternative("Arg",
     Item={
@@ -506,13 +506,13 @@ numericConverters = {
 def createPythonAstConstant(n, **kwds):
     if type(n) not in numericConverters:
         return Expr.Num(
-          n=NumericConstant.Unknown(),
-          **kwds
-          )
+            n=NumericConstant.Unknown(),
+            **kwds
+        )
     return Expr.Num(
         n=numericConverters[type(n)](n),
         **kwds
-        )
+    )
 
 
 def createPythonAstString(s, **kwds):

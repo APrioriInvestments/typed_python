@@ -825,10 +825,10 @@ class DatabaseConnection:
                     if not self._suppressKey(k):
                         key_value[k] = val_serialized
 
-                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id,
-                            bytes.fromhex(val_serialized)
-                                    if val_serialized is not None else None
-                            )
+                        priors[k] = self._versioned_data.setVersionedValue(
+                            k, msg.transaction_id,
+                            bytes.fromhex(val_serialized) if val_serialized is not None else None
+                        )
 
                 for k, a in set_adds.items():
                     a = self._suppressIdentities(k, set(a))

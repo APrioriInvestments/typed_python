@@ -506,8 +506,8 @@ class ExpressionConversionContext(object):
         self.pushEffect(
             # as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
             runtime_functions.stash_exception_ptr.call(
-               native_ast.const_utf8_cstr(str(value))
-               )
+                native_ast.const_utf8_cstr(str(value))
+                )
             >> native_ast.Expression.Throw(
                 expr=native_ast.Expression.Constant(
                     val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())

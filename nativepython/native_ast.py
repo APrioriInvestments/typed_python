@@ -316,9 +316,9 @@ def expr_str(self):
             )
     if self.matches.TryCatch:
         return (
-              "try:\n" + indent(str(self.expr)) + "\n"
-            + "catch %s:\n" % self.varname + indent(str(self.handler)).rstrip()
-            )
+            "try:\n" + indent(str(self.expr)) + "\n" +
+            "catch %s:\n" % self.varname + indent(str(self.handler)).rstrip()
+        )
     if self.matches.FunctionPointer:
         return "&func(name=%s,(%s)->%s%s%s)" % (
             self.target.name,
