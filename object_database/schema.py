@@ -172,7 +172,7 @@ class Schema:
                     if isinstance(val, type):
                         types[name] = val
                     elif isinstance(val, Indexed) and isinstance(val.obj, type):
-                            types[name] = val.obj
+                        types[name] = val.obj
 
         t._define(**types)
 
