@@ -198,8 +198,7 @@ class GraphDisplayService(ServiceBase):
                     headerFun=lambda x: x,
                     rowLabelFun=None,
                     rendererFun=lambda row, col: row+col
-                    )
-                ,
+                    ),
             ASheet=Sheet(
                 ["A", "B", "C"],
                 1000000,
