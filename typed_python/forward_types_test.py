@@ -30,7 +30,7 @@ class NativeForwardTypesTests(unittest.TestCase):
                 unpack=lambda self: () if self.matches.Leaf else (self.head,) + self.tail.unpack()
                 )
 
-        #ensure recursive implementation actually works
+        # ensure recursive implementation actually works
         l = List.Leaf()
 
         for i in range(100):
@@ -46,11 +46,11 @@ class NativeForwardTypesTests(unittest.TestCase):
 
         this_does_not_exist = int
 
-        #fixing it doesn't help
+        # fixing it doesn't help
         with self.assertRaises(TypeError):
             X.A()
 
-        #but a new type is OK.
+        # but a new type is OK.
         X = Alternative("X", A={'x': lambda: this_does_not_exist })
 
         X.A()
@@ -71,7 +71,7 @@ class NativeForwardTypesTests(unittest.TestCase):
         self.assertTrue(a.bvals[0].avals[0] == a)
 
     def DISABLEDtest_recursives_held_infinitely_throws(self):
-        #not implemented yet but should throw
+        # not implemented yet but should throw
         class X(Class):
             impossible = Member(OneOf(None, lambda: X))
 

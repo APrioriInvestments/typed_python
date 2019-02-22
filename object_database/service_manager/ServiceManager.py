@@ -170,10 +170,10 @@ class ServiceManager(object):
         while not self.shouldStop.is_set():
             self.updateServiceHostStats()
 
-            #redeploy our own services
+            # redeploy our own services
             self.redeployServicesIfNecessary()
 
-            #if we're the master, do some allocation
+            # if we're the master, do some allocation
             if self.isMaster:
                 self.collectDeadHosts()
                 self.createInstanceRecords()
@@ -209,7 +209,7 @@ class ServiceManager(object):
 
     @revisionConflictRetry
     def collectDeadHosts(self):
-        #reset the state
+        # reset the state
         with self.db.transaction():
             for serviceHost in service_schema.ServiceHost.lookupAll():
                 instances = service_schema.ServiceInstance.lookupAll(host=serviceHost)
@@ -263,7 +263,7 @@ class ServiceManager(object):
                 if i.exists():
                     i.triggerShutdown()
 
-        #wait for them to be down before proceeding
+        # wait for them to be down before proceeding
         self.db.waitForCondition(
             lambda: not [x for x in needRedeploy if x.exists()],
             self.shutdownTimeout * 2.0

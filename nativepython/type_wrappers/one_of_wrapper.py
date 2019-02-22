@@ -75,7 +75,7 @@ class OneOfWrapper(Wrapper):
                         types.append(t)
 
             if len(types) == 0:
-                #all paths throw exceptions. we're done
+                # all paths throw exceptions. we're done
                 return None
 
             if len(types) == 1:
@@ -163,8 +163,8 @@ class OneOfWrapper(Wrapper):
             return expr
 
         if otherType.typeRepresentation in self.typeRepresentation.Types:
-            #this is wrong - we need to be unpacking each of the alternatives
-            #and attempting to convert them. Which should probably be a function...
+            # this is wrong - we need to be unpacking each of the alternatives
+            # and attempting to convert them. Which should probably be a function...
             assert expr.isReference
 
             which = tuple(self.typeRepresentation.Types).index(otherType.typeRepresentation)

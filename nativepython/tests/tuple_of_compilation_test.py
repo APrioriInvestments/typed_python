@@ -70,7 +70,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aTupleOfFloat), 1)
 
-        #I get around 150x
+        # I get around 150x
         self.assertTrue(t_py / t_fast > 50.0)
 
         print(t_py / t_fast, " speedup")

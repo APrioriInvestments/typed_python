@@ -44,7 +44,7 @@ class AlgebraicProtocol(asyncio.Protocol):
             self.transport.close()
 
     def messageReceived(self, msg):
-        #subclasses override
+        # subclasses override
         pass
 
     def onConnected(self):

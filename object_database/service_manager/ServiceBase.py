@@ -45,7 +45,7 @@ class ServiceBase:
         pass
 
     def doWork(self, shouldStop):
-        #subclasses actually do work in here.
+        # subclasses actually do work in here.
         shouldStop.wait()
 
     @staticmethod

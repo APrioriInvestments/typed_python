@@ -31,8 +31,8 @@ class PythonTypedFunctionWrapper(Wrapper):
     def convert_call(self, context, left, args, kwargs):
         for a in list(args) + list(kwargs.items()):
             if not hasattr(a.expr_type.typeRepresentation, '__typed_python_category__'):
-                #we don't know how to push around non-typed-python argument types yet. Eventually we should
-                #defer to the interpreter in these cases.
+                # we don't know how to push around non-typed-python argument types yet. Eventually we should
+                # defer to the interpreter in these cases.
                 context.pushException(TypeError, "Can't pass arguments of type %s yet" % a.typeRepresentation)
                 return
 

@@ -204,7 +204,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertGreater(speedup, 20)
         self.assertEqual(compiled_res, uncompiled_res)
 
-        print("speedup is ", speedup) #I get about 75
+        print("speedup is ", speedup)  # I get about 75
 
     def test_compile_class_init(self):
         @Compiled

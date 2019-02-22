@@ -35,7 +35,7 @@ class ServiceWorker:
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema)
 
-        #explicitly don't subscribe to everyone else's service hosts!
+        # explicitly don't subscribe to everyone else's service hosts!
         self.db.subscribeToType(service_schema.Service)
         self.db.subscribeToType(service_schema.Codebase, lazySubscription=True)
         self.db.subscribeToType(service_schema.File, lazySubscription=True)

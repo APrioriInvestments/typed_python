@@ -33,7 +33,7 @@ target = llvm.Target.from_triple(target_triple)
 target_machine = target.create_target_machine()
 target_machine_shared_object = target.create_target_machine(reloc='pic', codemodel='default')
 
-#we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
+# we need to load the appropriate libstdc++ so that we can get __cxa_begin_catch and friends
 if sys.platform == "darwin":
     ctypes.CDLL("libstdc++.dylib", mode=ctypes.RTLD_GLOBAL)
 else:
@@ -60,7 +60,7 @@ def sizeof_native_type(native_type):
         )
 
 
-#there can be only one llvm engine alive at once.
+# there can be only one llvm engine alive at once.
 _engineCache = []
 
 
@@ -105,7 +105,7 @@ class BinarySharedObject:
 
     @staticmethod
     def fromModule(module):
-        #returns the contents of a '.o' file coming out of a c++ compiler like clang
+        # returns the contents of a '.o' file coming out of a c++ compiler like clang
         o_file_contents = target_machine_shared_object.emit_object(module)
 
         # we have to run it through 'ld' to link it. if we want to support windows,
@@ -139,8 +139,8 @@ class BinarySharedObject:
         output = {}
 
         for symbol in symbolsToReturn:
-            #if you ask for 'bytes' on a ctypes function you get the function pointer
-            #encoded as a bytearray.
+            # if you ask for 'bytes' on a ctypes function you get the function pointer
+            # encoded as a bytearray.
             output[symbol] = struct.unpack("q", bytes(dll[symbol]))[0]
 
         return output

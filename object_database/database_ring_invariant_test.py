@@ -95,7 +95,7 @@ class RingInvariantTest(unittest.TestCase):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
         with db.transaction():
-            #create the empty ring
+            # create the empty ring
             r = Ring.New()
             for i in range(10):
                 r.insert(i)
@@ -106,7 +106,7 @@ class RingInvariantTest(unittest.TestCase):
         db.subscribeToSchema(schema)
 
         with db.transaction():
-            #create the empty ring
+            # create the empty ring
             r = Ring.New()
 
         def writeSome():

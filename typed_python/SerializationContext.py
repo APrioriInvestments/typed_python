@@ -38,7 +38,7 @@ _builtin_name_to_value = {
 _builtin_name_to_value[".builtin.createEmptyFunction"] = createEmptyFunction
 _builtin_name_to_value[".builtin._reconstruct"] = _reconstruct
 _builtin_name_to_value[".builtin._ndarray"] = _ndarray
-_builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0] #the 'scalar' function
+_builtin_name_to_value[".builtin.numpy.scalar"] = numpy.int64(10).__reduce__()[0]  # the 'scalar' function
 _builtin_name_to_value[".builtin.dtype"] = numpy.dtype
 _builtin_name_to_value[".builtin.numpy"] = numpy
 _builtin_name_to_value[".builtin.datetime.datetime"] = datetime.datetime
@@ -107,7 +107,7 @@ class SerializationContext(object):
                 elif isinstance(member, ModuleType):
                     nameToObject[".modules." + member.__name__] = member
 
-            #also add the module itself so we can serialize it
+            # also add the module itself so we can serialize it
             nameToObject[".modules." + modulename] = module
 
         for module in modules:
@@ -228,7 +228,7 @@ class SerializationContext(object):
 
             def walkCodeObject(code):
                 all_names.update(code.co_names)
-                #there are 'code' objects for embedded list comprehensions.
+                # there are 'code' objects for embedded list comprehensions.
                 for c in code.co_consts:
                     if type(c) is type(code):
                         walkCodeObject(c)

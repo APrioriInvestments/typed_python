@@ -241,7 +241,7 @@ class RedisPersistence(object):
 
             pipe.execute()
 
-            #update our cache _after_ executing the pipe
+            # update our cache _after_ executing the pipe
             for key, value in kvs.items():
                 if value is None:
                     if key in self.cache:

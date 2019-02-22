@@ -23,7 +23,7 @@ import threading
 from object_database.service_manager.ServiceSchema import service_schema
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
-#singleton state objects for the codebase cache
+# singleton state objects for the codebase cache
 _codebase_lock = threading.Lock()
 _codebase_cache = {}
 _codebase_instantiation_dir = None
@@ -71,7 +71,7 @@ class File:
 class Codebase:
     hash = Indexed(str)
 
-    #filename (at root of project import) to contents
+    # filename (at root of project import) to contents
     files = ConstDict(str, service_schema.File)
 
     @staticmethod
@@ -114,7 +114,7 @@ class Codebase:
 
                 disk_path = os.path.join(_codebase_instantiation_dir, self.hash)
 
-                #preload the files, since they're lazy.
+                # preload the files, since they're lazy.
                 object_database.current_transaction().db().requestLazyObjects(set(self.files.values()))
 
                 fileContents = {fpath: file.contents for fpath, file in self.files.items()}

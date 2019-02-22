@@ -27,9 +27,9 @@ from typed_python._types import (
 
 import typed_python._types as _types
 
-#in the c module, these are functions, but because they're not parametrized,
-#we want them to be actual values. Otherwise, we'll have 'Float64()'
-#where we would have written 'Float64' etc.
+# in the c module, these are functions, but because they're not parametrized,
+# we want them to be actual values. Otherwise, we'll have 'Float64()'
+# where we would have written 'Float64' etc.
 Bool = _types.Bool()
 Int8 = _types.Int8()
 Int16 = _types.Int16()

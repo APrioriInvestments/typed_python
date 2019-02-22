@@ -31,18 +31,18 @@ class Wrapper(object):
     to perform the relevant operations on objects of the wrapped type.
     """
 
-    #is this 'plain old data' with no constructor/destructor semantics?
-    #if so, we can dispense with destructors entirely.
+    # is this 'plain old data' with no constructor/destructor semantics?
+    # if so, we can dispense with destructors entirely.
     is_pod = False
 
-    #does this boil down to a void type? if so, it will always be excluded
-    #from function argument lists (both in the defeinitions and in calls)
+    # does this boil down to a void type? if so, it will always be excluded
+    # from function argument lists (both in the defeinitions and in calls)
     is_empty = False
 
-    #do we pass this as a reference to a stackslot or as registers?
-    #if true, then when this is a return value, we also have to pass a pointer
-    #to the output location as the first argument (and return void) rather
-    #than returning registers.
+    # do we pass this as a reference to a stackslot or as registers?
+    # if true, then when this is a return value, we also have to pass a pointer
+    # to the output location as the first argument (and return void) rather
+    # than returning registers.
     is_pass_by_ref = True
 
     def __repr__(self):

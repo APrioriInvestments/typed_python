@@ -102,8 +102,8 @@ def makeAlternative(severalDicts):
 
 
 def choice(x):
-    #numpy.random.choice([1,(1,2)]) blows up because it looks 'multidimensional'
-    #so we have to pick from a list of indices
+    # numpy.random.choice([1,(1,2)]) blows up because it looks 'multidimensional'
+    # so we have to pick from a list of indices
     if not isinstance(x, list):
         x = list(x)
     return x[numpy.random.choice(list(range(len(x))))]
@@ -385,13 +385,13 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(IndexError):
             l.pop(100)
 
-        self.assertEqual(_types.refcount(aTup), 7) #6 in the list because we popped at '5'
+        self.assertEqual(_types.refcount(aTup), 7)  # 6 in the list because we popped at '5'
 
         l.pop()
 
         self.assertEqual(_types.refcount(aTup), 6)
 
-        #this pops one of the empty tuples
+        # this pops one of the empty tuples
         l.pop(-10)
 
         self.assertEqual(_types.refcount(aTup), 6)
@@ -459,7 +459,7 @@ class NativeTypesTests(unittest.TestCase):
 
         typedInts = t(ints)
 
-        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 8) #4 bytes for size of list, 4 bytes for frame size
+        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 8)  # 4 bytes for size of list, 4 bytes for frame size
         self.assertEqual(tuple(typedInts), ints)
 
     def test_tuple_of_one_of_multi(self):
@@ -986,8 +986,8 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_bytes_repr(self):
         for _ in range(100000):
-            #always start with a '"' because otherwise python keeps chosing different
-            #initial characters.
+            # always start with a '"' because otherwise python keeps chosing different
+            # initial characters.
             someBytes = b'"' + numpy.random.uniform(size=2).tostring()
             self.assertEqual(repr(makeTuple(someBytes)), repr((someBytes,)))
 
@@ -1276,13 +1276,13 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(aPointer.get(), 20)
         self.assertEqual(x[10], 20)
 
-        #this is OK because ints are POD.
+        # this is OK because ints are POD.
         aPointer.initialize(30)
         self.assertEqual(x[10], 30)
 
     def test_unsafe_pointers_to_uninitialized_list_items(self):
-        #because this is testing unsafe operations, the test is
-        #really just that we don't segfault!
+        # because this is testing unsafe operations, the test is
+        # really just that we don't segfault!
         for _ in range(100):
             x = ListOf(TupleOf(int))()
             x.reserve(10)
@@ -1292,7 +1292,7 @@ class NativeTypesTests(unittest.TestCase):
 
             x.setSizeUnsafe(10)
 
-        #now check that if we fail to set the size we'll leak the tuple
+        # now check that if we fail to set the size we'll leak the tuple
         aLeakedTuple = TupleOf(int)((1, 2, 3))
         x = ListOf(TupleOf(int))()
         x.reserve(1)
@@ -1369,7 +1369,7 @@ class NativeTypesTests(unittest.TestCase):
             )
 
     def test_other_bitness_types(self):
-        #verify we can cast around non-64-bit values in a way that matches numpy
+        # verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
                 (Bool, numpy.bool),
                 (Int8, numpy.int8),
@@ -1397,10 +1397,10 @@ class NativeTypesTests(unittest.TestCase):
                         self.assertEqual(int(ourType(ourType2(candValue))), int(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
                         self.assertEqual(float(ourType(ourType2(candValue))), float(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
                 else:
-                    #we convert from float to int as c++, which is different than numpy, which clips
-                    #floats in a bizarre way. e.g.
+                    # we convert from float to int as c++, which is different than numpy, which clips
+                    # floats in a bizarre way. e.g.
                     #  numpy.int16(numpy.int64(numpy.float64(10000000000)))
-                    #is not
+                    # is not
                     #  numpy.int16(numpy.float64(10000000000))
                     pass
 
@@ -1529,7 +1529,7 @@ class NativeTypesTests(unittest.TestCase):
 
             del d[i]
 
-        #verify that adding and removing elements doesn't leak memory
+        # verify that adding and removing elements doesn't leak memory
         usage = currentMemUsageMb()
         for i in range(1000000):
             d[0] = i

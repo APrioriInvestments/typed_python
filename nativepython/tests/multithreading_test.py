@@ -74,8 +74,8 @@ class TestMultithreading(unittest.TestCase):
 
         ratio = ratios[5]
 
-        #expect the ratio to be close to 1, but have some error margin, especially on Travis
-        #where we may be running in a multitenant environment
+        # expect the ratio to be close to 1, but have some error margin, especially on Travis
+        # where we may be running in a multitenant environment
         if os.environ.get('TRAVIS_CI', None):
             self.assertTrue(ratio >= .8 and ratio < 1.75, ratio)
         else:
@@ -91,10 +91,10 @@ class TestMultithreading(unittest.TestCase):
         for instance in [
                 TupleOf(int)((1, 2, 3)),
                 ListOf(int)((1, 2, 3)),
-                #Dict(int,int)({1:2,3:4}),
+                # Dict(int,int)({1:2,3:4}),
                 ConstDict(int, int)({1: 2, 3: 4}),
                 AClass(),
-                #anObject,
+                # anObject,
                 A.X(x=10)
                 ]:
             self.refcountsTest(instance)
@@ -139,8 +139,8 @@ class TestMultithreading(unittest.TestCase):
 
         ratio = ratios[5]
 
-        #expect the ratio to be close to 1, but have some error margin, especially on Travis
-        #where we don't really get two cores
+        # expect the ratio to be close to 1, but have some error margin, especially on Travis
+        # where we don't really get two cores
         if os.environ.get('TRAVIS_CI', None):
             self.assertTrue(ratio >= .8 and ratio < 1.75, ratios)
         else:

@@ -121,5 +121,5 @@ class TestBytesCompilation(unittest.TestCase):
         self.assertEqual(interpreterRes, compiledRes)
         speedup = (t1 - t0) / (t2 - t1)
 
-        #I get about 200
+        # I get about 200
         self.assertGreater(speedup, 100)

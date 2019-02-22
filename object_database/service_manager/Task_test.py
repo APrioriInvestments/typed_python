@@ -122,7 +122,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_error_recovery(self):
         if os.getenv("TRAVIS_CI") is not None:
-            #skip the test on travis.
+            # skip the test on travis.
             return
 
         self.installServices()

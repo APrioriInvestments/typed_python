@@ -71,7 +71,7 @@ class TestListOfCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aListOfFloat), 1)
 
-        #I get around 150x
+        # I get around 150x
         self.assertTrue(t_py / t_fast > 50.0)
 
         print(t_py / t_fast, " speedup")
@@ -337,8 +337,8 @@ class TestListOfCompilation(unittest.TestCase):
 
             return slowerThanNumpyRatio
 
-        self.assertLess(timingComparison(addSafe), 10) #2.0 for me
-        self.assertLess(timingComparison(addUnsafe), 1.3) #1.07 for me
+        self.assertLess(timingComparison(addSafe), 10)  # 2.0 for me
+        self.assertLess(timingComparison(addUnsafe), 1.3)  # 1.07 for me
 
     def test_list_duplicate_operation(self):
         @Compiled

@@ -34,7 +34,7 @@ ClientToServer = Alternative(
         'schema': str,
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str, str)),
-        'isLazy': bool #load values when we first request them, instead of blocking on all the data.
+        'isLazy': bool  # load values when we first request them, instead of blocking on all the data.
         },
     Flush={'guid': str},
     Authenticate={'token': str}
@@ -50,9 +50,9 @@ ServerToClient = Alternative(
         'schema': str,
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str, str)),
-        'values': ConstDict(str, OneOf(None, str)), #value
+        'values': ConstDict(str, OneOf(None, str)),  # value
         'index_values': ConstDict(str, OneOf(None, str)),
-        'identities': OneOf(None, TupleOf(str)), #the identities in play if this is an index-level subscription
+        'identities': OneOf(None, TupleOf(str)),  # the identities in play if this is an index-level subscription
         },
     LazyTransactionPriors={ 'writes': ConstDict(str, OneOf(None, str)) },
     LazyLoadResponse={ 'identity': str, 'values': ConstDict(str, OneOf(None, str)) },
@@ -67,7 +67,7 @@ ServerToClient = Alternative(
         'schema': str,
         'typename': OneOf(None, str),
         'fieldname_and_value': OneOf(None, Tuple(str, str)),
-        'tid': int #marker transaction id
+        'tid': int  # marker transaction id
         },
     SubscriptionIncrease={
         'schema': str,

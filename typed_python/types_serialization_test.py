@@ -946,7 +946,7 @@ class TypesSerializationTest(unittest.TestCase):
 
             m = importlib.import_module('weird_serialization_test')
 
-            #verify we can serialize this
+            # verify we can serialize this
             deserialized_f = sc.deserialize(sc.serialize(m.f))
 
             self.assertEqual(deserialized_f(10), 11)
@@ -955,8 +955,8 @@ class TypesSerializationTest(unittest.TestCase):
 
         ast_util.clearAllCaches()
 
-        #at this point, the backing data for serialization is not there
-        #and also, the cache is cleared.
+        # at this point, the backing data for serialization is not there
+        # and also, the cache is cleared.
         deserialized_f_2 = sc.deserialize(sc.serialize(deserialized_f))
 
         self.assertEqual(deserialized_f_2(10), 11)
@@ -991,8 +991,8 @@ class TypesSerializationTest(unittest.TestCase):
         codebase = Codebase._FromModule(dummy_test_module)
         sc = codebase.serializationContext
 
-        #note that it matters that the 'module_level_testfun' is at the module level,
-        #because that induces a freevar in a list-comprehension code object
+        # note that it matters that the 'module_level_testfun' is at the module level,
+        # because that induces a freevar in a list-comprehension code object
         def f():
             return [module_level_testfun() for _ in range(1)][0]
 

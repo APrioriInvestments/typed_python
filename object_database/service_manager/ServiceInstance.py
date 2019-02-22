@@ -62,16 +62,16 @@ class Service:
     service_module_name = str
     service_class_name = str
 
-    #per service, how many do we use?
+    # per service, how many do we use?
     gbRamUsed = int
     coresUsed = int
     placement = OneOf("Master", "Worker", "Any")
     isSingleton = bool
 
-    #how many do we want?
+    # how many do we want?
     target_count = int
 
-    #how many would we like but we can't boot?
+    # how many would we like but we can't boot?
     unbootable_count = int
 
     timesBootedUnsuccessfully = int

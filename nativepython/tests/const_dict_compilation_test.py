@@ -133,7 +133,7 @@ class TestConstDictCompilation(unittest.TestCase):
 
         self.assertEqual(interpreterResult, compiledResult)
 
-        #I get about 3x. This is not as big a speedup as some other thigns we do
-        #because most of the time is spent in the dictionary lookup, and python's
-        #dict lookup is quite fast.
+        # I get about 3x. This is not as big a speedup as some other thigns we do
+        # because most of the time is spent in the dictionary lookup, and python's
+        # dict lookup is quite fast.
         self.assertGreater(speedup, 2)

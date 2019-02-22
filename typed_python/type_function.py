@@ -35,8 +35,8 @@ def isTypeFunctionType(type):
 def reconstructTypeFunctionType(typeFunction, args, kwargs):
     """Reconstruct a type from the values returned by 'isTypeFunctionType'"""
 
-    #note that our 'key' objects are dict-in-tuple-form, because dicts are
-    #not hashable. So to keyword-call with them, we have to convert back to a dict...
+    # note that our 'key' objects are dict-in-tuple-form, because dicts are
+    # not hashable. So to keyword-call with them, we have to convert back to a dict...
     return typeFunction(*args, **dict(kwargs))
 
 
@@ -103,8 +103,8 @@ class ConcreteTypeFunction(object):
                 raise self._memoForKey[key]
 
             if self._memoForKey[key] is forward:
-                #if this gets triggered, it means we're asking for concrete information about the type
-                #when dependent type-functions have yet to resolve.
+                # if this gets triggered, it means we're asking for concrete information about the type
+                # when dependent type-functions have yet to resolve.
                 raise TypeError("Forward declaration for %s has not resolved yet" % self.nameFor(args, kwargs))
 
             return self._memoForKey[key]

@@ -197,7 +197,7 @@ class TestCompilationStructures(unittest.TestCase):
             g_typed(input)
             typed_duration = time.time() - t0
 
-            #I get around 50x for ints and 12 for floats
+            # I get around 50x for ints and 12 for floats
             speedup = untyped_duration / typed_duration
             self.assertGreater(speedup, 20 if isinstance(input, int) else 4)
 
@@ -327,5 +327,5 @@ class TestCompilationStructures(unittest.TestCase):
         sumUsingRange(1000000)
         t2 = time.time()
 
-        print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0))) #I get 1.00
+        print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0)))  # I get 1.00
         self.assertTrue((t1-t0) < (t2 - t1) * 1.1)

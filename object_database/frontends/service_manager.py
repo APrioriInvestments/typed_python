@@ -142,7 +142,7 @@ def main(argv=None):
                     try:
                         serviceManager.cleanup()
                     except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
-                        #try to reconnect
+                        # try to reconnect
                         logger.error("Disconnected from object_database host. Attempting to reconnect.")
                         serviceManager.stop(gracefully=False)
                         serviceManager = None
