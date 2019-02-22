@@ -67,6 +67,7 @@ class K(object):
         # Shouldn't support the recursion itself
         return K, (self.value,)
 
+
 import __main__
 __main__.C = C
 C.__module__ = "__main__"
@@ -185,6 +186,7 @@ class MySet(set):
 
 class MyFrozenSet(frozenset):
     sample = frozenset({"a", "b"})
+
 
 myclasses = [MyInt, MyFloat,
              MyComplex,

@@ -37,6 +37,7 @@ from object_database.view import RevisionConflictException, DisconnectedExceptio
 class Everything:
     """Singleton to mark subscription to everything in a slice."""
 
+
 TransactionResult = Alternative(
     "TransactionResult",
     Success={},

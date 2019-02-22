@@ -55,6 +55,7 @@ def type_str(c):
 def raising(e):
     raise e
 
+
 Type = Alternative("Type",
     Void={},
     Float={'bits': int},
@@ -104,6 +105,7 @@ def const_str(c):
         return "void"
 
     assert False, type(c)
+
 
 Constant = Alternative("Constant",
     Void={},
@@ -190,6 +192,7 @@ def filterCallTargetArgs(args):
                 res.append(a.nonref_expr)
     return res
 
+
 CallTarget = Alternative("CallTarget",
     Named={'target': NamedCallTarget},
     Pointer={'expr': Expression},
@@ -203,6 +206,7 @@ def teardown_str(self):
     if self.matches.ByTag:
         return "if slot_initialized(name=%s):\n" % self.tag + indent(str(self.expr), "    ")
     assert False, type(self)
+
 
 Teardown = Alternative("Teardown",
     ByTag={'tag': str, 'expr': Expression},
@@ -349,6 +353,7 @@ def expr_is_simple(expr):
         return expr_is_simple(expr.vals[0])
     return False
 
+
 Expression = Alternative("Expression",
     Constant={'val': Constant},
     Comment={'comment': str, 'expr': Expression},
@@ -442,6 +447,7 @@ def ensureExpr(x):
         return x
     return x.nonref_expr
 
+
 nullExpr = Expression.Constant(val=Constant.Void())
 emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
 trueExpr = Expression.Constant(val=Constant.Int(bits=1, val=1, signed=False))
@@ -488,6 +494,7 @@ def const_bytes_cstr(i):
     return Expression.Constant(
         val=Constant.ByteArray(val=i)
         )
+
 
 FunctionBody = Alternative("FunctionBody",
     Internal={'body': Expression},
