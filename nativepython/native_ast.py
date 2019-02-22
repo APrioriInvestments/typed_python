@@ -392,8 +392,7 @@ Expression = Alternative("Expression",
                         )
                     for index in offsets
                 )
-            )
-        ,
+            ),
     __rshift__=expr_concatenate,
     __str__=expr_str,
     structElt=lambda self, ix: Expression.StructElementByIndex(left=self, index=ix),

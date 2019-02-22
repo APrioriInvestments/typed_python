@@ -73,7 +73,7 @@ Statement = Alternative("Statement",
         },
 
     Return={
-        "value": OneOf(Expr, None) ,
+        "value": OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str

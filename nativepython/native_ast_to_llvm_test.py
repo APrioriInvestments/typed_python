@@ -47,8 +47,7 @@ class TestNativeAstToLlvm(unittest.TestCase):
                         Expression.ActivatesTeardown('a1') >>
                         ct.call() >>
                         Expression.ActivatesTeardown('a2') >>
-                        nullExpr
-                        ,
+                        nullExpr,
                     teardowns=[
                         Teardown.ByTag(tag='a1', expr=Expression.Branch(cond=const_int32_expr(10), true=ct.call(), false=nullExpr)),
                         Teardown.ByTag(tag='a1', expr=nullExpr)
