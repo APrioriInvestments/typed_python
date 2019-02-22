@@ -42,9 +42,9 @@ class ConnectedChannel:
         self.connectionObject = connectionObject
         self.missedHeartbeats = 0
         self.definedSchemas = {}
-        self.subscribedTypes = {} #schema, type to the lazy transaction id (or -1 if not lazy)
-        self.subscribedIds = set() #identities
-        self.subscribedIndexKeys = {} #full index keys to lazy transaction id
+        self.subscribedTypes = {}  # schema, type to the lazy transaction id (or -1 if not lazy)
+        self.subscribedIds = set()  # identities
+        self.subscribedIndexKeys = {}  # full index keys to lazy transaction id
         self.identityRoot = identityRoot
         self.pendingTransactions = {}
         self._needsAuthentication = True
@@ -60,7 +60,7 @@ class ConnectedChannel:
         self.missedHeartbeats = 0
 
     def sendTransaction(self, msg):
-        #we need to cut the transaction down
+        # we need to cut the transaction down
         self.channel.write(msg)
 
     def sendInitializationMessage(self):
@@ -114,20 +114,20 @@ class Server:
         # InMemoryChannel or ServerToClientProtocol -> ConnectedChannel
         self._clientChannels = {}
 
-        #id of the next transaction
+        # id of the next transaction
         self._cur_transaction_num = 0
 
-        #for each key, the last version number we committed
+        # for each key, the last version number we committed
         self._version_numbers = {}
         self._version_numbers_timestamps = {}
 
-        #(schema,type) to set(subscribed channel)
+        # (schema,type) to set(subscribed channel)
         self._type_to_channel = {}
 
-        #index-stringname to set(subscribed channel)
+        # index-stringname to set(subscribed channel)
         self._index_to_channel = {}
 
-        #for each individually subscribed ID, a set of channels
+        # for each individually subscribed ID, a set of channels
         self._id_to_channel = {}
 
         self.longTransactionThreshold = 1.0
@@ -145,16 +145,16 @@ class Server:
 
         self._shouldStop = threading.Event()
 
-        #a queue of queue-subscription messages. we have to handle
-        #these on another thread because they can be quite large, and we don't want
-        #to prevent message processing on the main thread.
+        # a queue of queue-subscription messages. we have to handle
+        # these on another thread because they can be quite large, and we don't want
+        # to prevent message processing on the main thread.
         self._subscriptionQueue = queue.Queue()
 
-        #if we're building a subscription up, all the objects that have changed while our
-        #lock was released.
+        # if we're building a subscription up, all the objects that have changed while our
+        # lock was released.
         self._pendingSubscriptionRecheck = None
 
-        #fault injector to test this thing
+        # fault injector to test this thing
         self._subscriptionBackgroundThreadCallback = None
         self._lazyLoadCallback = None
 
@@ -322,7 +322,7 @@ class Server:
                 )
 
     def _handleSubscriptionInForeground(self, channel, msg):
-        #first see if this would be an easy subscription to handle
+        # first see if this would be an easy subscription to handle
         with Timer("Handle subscription in foreground: %s/%s/%s/isLazy=%s over %s",
                     msg.schema, msg.typename, msg.fieldname_and_value, msg.isLazy, lambda: len(identities)):
             typedef, identities = self._parseSubscriptionMsg(channel, msg)
@@ -331,7 +331,7 @@ class Server:
                 self._subscriptionQueue.put((channel, msg))
                 return
 
-            #handle this directly
+            # handle this directly
             if msg.isLazy:
                 self._completeLazySubscription(
                     msg.schema, msg.typename, msg.fieldname_and_value,
@@ -431,9 +431,9 @@ class Server:
 
                     self._pendingSubscriptionRecheck = []
 
-                #we need to send everything we know about 'identities', keeping in mind that we have to
-                #check any new identities that get written to in the background to see if they belong
-                #in the new set
+                # we need to send everything we know about 'identities', keeping in mind that we have to
+                # check any new identities that get written to in the background to see if they belong
+                # in the new set
                 identities_left_to_send = set(identities)
 
                 done = False
@@ -485,7 +485,7 @@ class Server:
 
                             break
 
-                    #don't hold the lock more than 75% of the time.
+                    # don't hold the lock more than 75% of the time.
                     time.sleep( (time.time() - locktime_start) / 3 )
 
                 if self._subscriptionBackgroundThreadCallback:
@@ -514,7 +514,7 @@ class Server:
                 )
             )
 
-        #just send the identities
+        # just send the identities
         self._markSubscriptionComplete(
             schema_name,
             typename,
@@ -534,7 +534,7 @@ class Server:
             )
 
     def _buildIndexValueMap(self, typedef, schema_name, typename, identities):
-        #build a map from reverse-index-key to {identity}
+        # build a map from reverse-index-key to {identity}
         index_vals = {}
 
         for fieldname in typedef.indices:
@@ -550,7 +550,7 @@ class Server:
 
     def _markSubscriptionComplete(self, schema, typename, fieldname_and_value, identities, connectedChannel, isLazy):
         if fieldname_and_value is not None:
-            #this is an index subscription
+            # this is an index subscription
             for ident in identities:
                 self._id_to_channel.setdefault(ident, set()).add(connectedChannel)
 
@@ -563,10 +563,10 @@ class Server:
 
                 connectedChannel.subscribedIndexKeys[index_key] = -1 if not isLazy else self._cur_transaction_num
             else:
-                #an object's identity cannot change, so we don't need to track our subscription to it
+                # an object's identity cannot change, so we don't need to track our subscription to it
                 assert not isLazy
         else:
-            #this is a type-subscription
+            # this is a type-subscription
             if (schema, typename) not in self._type_to_channel:
                 self._type_to_channel[schema, typename] = set()
 
@@ -587,7 +587,7 @@ class Server:
                 checkPending=True
                 ):
 
-        #get some objects to send
+        # get some objects to send
         kvs = {}
         index_vals = {}
 
@@ -597,7 +597,7 @@ class Server:
                 for key in transactionMessage.writes:
                     val = transactionMessage.writes[key]
 
-                    #if we write to a key we've already sent, we'll need to resend it
+                    # if we write to a key we've already sent, we'll need to resend it
                     identity = keymapping.split_data_key(key)[2]
                     if identity in identities:
                         identities_left_to_send.add(identity)
@@ -742,8 +742,8 @@ class Server:
         return {valsToGet[i]: results[i] for i in range(len(valsToGet))}
 
     def _increaseBroadcastTransactionToInclude(self, channel, indexKey, newIds, key_value, set_adds, set_removes):
-        #we need to include all the data for the objects in 'newIds' to the transaction
-        #that we're broadcasting
+        # we need to include all the data for the objects in 'newIds' to the transaction
+        # that we're broadcasting
         schema_name, typename, fieldname, fieldval = keymapping.split_index_key_full(indexKey)
 
         typedef = channel.definedSchemas.get(schema_name)[typename]
@@ -834,8 +834,8 @@ class Server:
         schemaTypePairsWriting = set()
 
         if sourceChannel:
-            #check if we created any new objects to which we are not type-subscribed
-            #and if so, ensure we are subscribed
+            # check if we created any new objects to which we are not type-subscribed
+            # and if so, ensure we are subscribed
             for add_index, added_identities in set_adds.items():
                 schema_name, typename, fieldname, fieldval = keymapping.split_index_key_full(add_index)
                 if fieldname == ' exists':
@@ -864,7 +864,7 @@ class Server:
 
                     identities_mentioned.update(subset[k])
 
-        #check all version numbers for transaction conflicts.
+        # check all version numbers for transaction conflicts.
         for subset in [keys_to_check_versions, indices_to_check_versions]:
             for key in subset:
                 last_tid = self._version_numbers.get(key, -1)
@@ -883,13 +883,13 @@ class Server:
 
         priorValues = self._kvstore.getSeveralAsDictionary(key_value)
 
-        #set the json representation in the database
+        # set the json representation in the database
         target_kvs = {k: v for k, v in key_value.items()}
         target_kvs.update(self.indexReverseLookupKvs(set_adds, set_removes))
 
         new_sets, dropped_sets = self._kvstore.setSeveral(target_kvs, set_adds, set_removes)
 
-        #update the metadata index
+        # update the metadata index
         indexSetAdds = {}
         indexSetRemoves = {}
         for s in new_sets:
@@ -910,8 +910,8 @@ class Server:
 
         channelsTriggeredForPriors = set()
 
-        #check any index-level subscriptions that are going to increase as a result of this
-        #transaction and add the backing data to the relevant transaction.
+        # check any index-level subscriptions that are going to increase as a result of this
+        # transaction and add the backing data to the relevant transaction.
         for index_key, adds in list(set_adds.items()):
             if index_key in self._index_to_channel:
                 idsToAddToTransaction = set()
@@ -919,9 +919,9 @@ class Server:
                 for channel in self._index_to_channel.get(index_key):
                     if index_key in channel.subscribedIndexKeys and \
                             channel.subscribedIndexKeys[index_key] >= 0:
-                        #this is a lazy subscription. We're not using the transaction ID yet because
-                        #we don't store it on a per-object basis here. Instead, we're always sending
-                        #everything twice to lazy subscribers.
+                        # this is a lazy subscription. We're not using the transaction ID yet because
+                        # we don't store it on a per-object basis here. Instead, we're always sending
+                        # everything twice to lazy subscribers.
                         channelsTriggeredForPriors.add(channel)
 
                     newIds = adds.difference(channel.subscribedIds)
@@ -935,11 +935,11 @@ class Server:
 
                 if idsToAddToTransaction:
                     self._increaseBroadcastTransactionToInclude(
-                        channel, #deliberately just using whatever random channel, under
-                                 #the assumption they're all the same. it would be better
-                                 #to explictly compute the union of the relevant set of defined fields,
-                                 #as its possible one channel has more fields for a type than another
-                                 #and we'd like to broadcast them all
+                        channel,  # deliberately just using whatever random channel, under
+                                 # the assumption they're all the same. it would be better
+                                 # to explictly compute the union of the relevant set of defined fields,
+                                 # as its possible one channel has more fields for a type than another
+                                 # and we'd like to broadcast them all
                         index_key, idsToAddToTransaction, key_value, set_adds, set_removes)
 
         transaction_message = None
@@ -948,9 +948,9 @@ class Server:
         for schema_type_pair in schemaTypePairsWriting:
             for channel in self._type_to_channel.get(schema_type_pair, ()):
                 if channel.subscribedTypes[schema_type_pair] >= 0:
-                    #this is a lazy subscription. We're not using the transaction ID yet because
-                    #we don't store it on a per-object basis here. Instead, we're always sending
-                    #everything twice to lazy subscribers.
+                    # this is a lazy subscription. We're not using the transaction ID yet because
+                    # we don't store it on a per-object basis here. Instead, we're always sending
+                    # everything twice to lazy subscribers.
                     channelsTriggeredForPriors.add(channel)
                 channelsTriggered.add(channel)
 

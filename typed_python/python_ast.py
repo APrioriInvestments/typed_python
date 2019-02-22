@@ -23,7 +23,7 @@ import typed_python.ast_util as ast_util
 import weakref
 from typed_python._types import Alternative, NamedTuple, TupleOf, OneOf
 
-#forward declarations.
+# forward declarations.
 Module = lambda: Module
 Statement = lambda: Statement
 Expr = lambda: Expr
@@ -750,8 +750,8 @@ def evaluateFunctionPyAst(pyAst):
     filename = pyAst.filename
 
     if isinstance(pyAst, Statement):
-        #strip out the decorator definitions. We just want the underlying function
-        #object itself.
+        # strip out the decorator definitions. We just want the underlying function
+        # object itself.
         pyAstModule = Statement.FunctionDef(
             name=pyAst.name,
             args=pyAst.args,

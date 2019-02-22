@@ -391,9 +391,9 @@ class ActiveWebService(ServiceBase):
             lastDumpTimeSpentCalculating = 0.0
 
             FRAME_SIZE = 32 * 1024
-            FRAMES_PER_ACK = 10 #this HAS to line up with the constant in page.html for our ad-hoc protocol to function.
+            FRAMES_PER_ACK = 10  # this HAS to line up with the constant in page.html for our ad-hoc protocol to function.
 
-            #large messages (more than FRAMES_PER_ACK frames) send an ack after every FRAMES_PER_ACKth message
+            # large messages (more than FRAMES_PER_ACK frames) send an ack after every FRAMES_PER_ACKth message
             largeMessageAck = gevent.queue.Queue()
 
             def readThread():
@@ -427,7 +427,7 @@ class ActiveWebService(ServiceBase):
                 """
                 msg = json.dumps(message)
 
-                #split msg int 64kb frames
+                # split msg int 64kb frames
                 frames = []
                 i = 0
                 while i < len(msg):
@@ -442,8 +442,8 @@ class ActiveWebService(ServiceBase):
                 for index, frame in enumerate(frames):
                     ws.send(frame)
 
-                    #block until we get the ack for FRAMES_PER_ACK frames ago. That way we always
-                    #have FRAMES_PER_ACK frames in the buffer.
+                    # block until we get the ack for FRAMES_PER_ACK frames ago. That way we always
+                    # have FRAMES_PER_ACK frames in the buffer.
                     framesSent = index+1
                     if framesSent % FRAMES_PER_ACK == 0 and framesSent > FRAMES_PER_ACK:
                         ack = largeMessageAck.get()

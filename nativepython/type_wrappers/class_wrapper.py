@@ -40,8 +40,8 @@ class ClassWrapper(RefcountedWrapper):
 
         element_types = [('refcount', native_ast.Int64), ('data', native_ast.UInt8)]
 
-        #this follows the general layout of 'held class' which is 1 bit per field for initialization and then
-        #each field packed directly according to byte size
+        # this follows the general layout of 'held class' which is 1 bit per field for initialization and then
+        # each field packed directly according to byte size
         byteOffset = 8 + (len(self.classType.MemberNames) // 8 + 1)
 
         self.bytesOfInitBits = byteOffset - 8;
@@ -196,11 +196,11 @@ class ClassWrapper(RefcountedWrapper):
                 runtime_functions.malloc.call(native_ast.const_int_expr(_types.bytecount(self.typeRepresentation.HeldClass) + 8))
                     .cast(self.getNativeLayoutType())
                 ) >>
-            #store a refcount
+            # store a refcount
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))
             )
 
-        #clear bits of init flags
+        # clear bits of init flags
         for byteOffset in range(self.bytesOfInitBits):
             context.pushEffect(out.nonref_expr
                 .cast(native_ast.UInt8.pointer())

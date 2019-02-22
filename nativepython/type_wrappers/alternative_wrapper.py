@@ -187,7 +187,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
         self.alternativeType = t.Alternative
         self.indexInParent = t.Index
-        self.underlyingLayout = typeWrapper(t.ElementType) #a NamedTuple
+        self.underlyingLayout = typeWrapper(t.ElementType)  # a NamedTuple
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
     def getNativeLayoutType(self):
@@ -217,11 +217,11 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         tupletype = self.typeRepresentation.ElementType
 
         if len(args) == 1 and not kwargs:
-            #check if this is the copy-constructor on ourself
+            # check if this is the copy-constructor on ourself
             if args[0].expr_type == self:
                 return args[0]
 
-            #check if it's one argument and we have one field exactly
+            # check if it's one argument and we have one field exactly
             if len(tupletype.ElementTypes) != 1:
                 context.pushException("Can't construct %s with a single positional argument" % self)
                 return
@@ -270,8 +270,8 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                 runtime_functions.malloc.call(native_ast.const_int_expr(16 + self.underlyingLayout.getBytecount()))
                     .cast(self.getNativeLayoutType())
                 ) >>
-            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >> #refcount
-            out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int_expr(self.indexInParent)) #which
+            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>  # refcount
+            out.expr.load().ElementPtrIntegers(0, 1).store(native_ast.const_int_expr(self.indexInParent))  # which
             )
 
         assert len(args) == len(tupletype.ElementTypes)

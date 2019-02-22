@@ -160,7 +160,7 @@ class NativeClassTypesTests(unittest.TestCase):
         class A(Class):
             x = Member(int)
 
-            y = int #not a member. Just a value.
+            y = int  # not a member. Just a value.
 
             def f(self):
                 return 10
@@ -186,7 +186,7 @@ class NativeClassTypesTests(unittest.TestCase):
         anI.x = 10
         self.assertEqual(e.i.x, 10)
 
-        #verify we get proper referencing to underlying python objects
+        # verify we get proper referencing to underlying python objects
         anI2 = e.iTup.x
         anI2.x = 10
         self.assertEqual(e.iTup.x.x, 10)

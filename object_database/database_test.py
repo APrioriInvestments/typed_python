@@ -57,9 +57,9 @@ class BlockingCallback:
 
 expr = Alternative("Expr",
     Constant={'value': int},
-    #Add = {'l': expr, 'r': expr},
-    #Sub = {'l': expr, 'r': expr},
-    #Mul = {'l': expr, 'r': expr}
+    # Add = {'l': expr, 'r': expr},
+    # Sub = {'l': expr, 'r': expr},
+    # Mul = {'l': expr, 'r': expr}
     )
 
 schema = Schema("test_schema")
@@ -269,8 +269,8 @@ class ObjectDatabaseTests:
         db2.subscribeToSchema(schema, lazySubscription=True)
 
         with db2.view():
-            #lookup in the index doesn't dirty the object because we have to load
-            #the index values when we first subscribe
+            # lookup in the index doesn't dirty the object because we have to load
+            # the index values when we first subscribe
             self.assertEqual(Counter.lookupAll(k=2), (c,))
 
         with db2.view():
@@ -278,7 +278,7 @@ class ObjectDatabaseTests:
 
         self.assertEqual(loadedIDs.get_nowait(), c._identity)
 
-        #at this point, the value is loaded
+        # at this point, the value is loaded
         with db2.view():
             self.assertEqual(c.x, 3)
 
@@ -651,11 +651,11 @@ class ObjectDatabaseTests:
 
         random.seed(123)
 
-        #expect nothing initially
+        # expect nothing initially
         views_by_tn[db._cur_transaction_num] = db.view()
         counter_vals_by_tn[db._cur_transaction_num] = {}
 
-        #seed the initial state
+        # seed the initial state
         with db.transaction() as t:
             for i in range(20):
                 counter = Counter(_identity="C_%s" % i)
@@ -687,7 +687,7 @@ class ObjectDatabaseTests:
                 views_by_tn[db._cur_transaction_num] = db.view()
 
             while views_by_tn and random.random() < .5 or len(views_by_tn) > 10:
-                #pick a random view and check that it's consistent
+                # pick a random view and check that it's consistent
                 all_tids = list(views_by_tn)
                 tid = all_tids[int(random.random() * len(all_tids))]
 
@@ -704,7 +704,7 @@ class ObjectDatabaseTests:
                 with db.view():
                     curCounterVals = {c: c.k for c in counters if c.exists()}
 
-                #reset the database
+                # reset the database
                 db = self.createNewDb()
                 db.subscribeToSchema(schema)
 
@@ -716,7 +716,7 @@ class ObjectDatabaseTests:
                 views_by_tn = {}
                 counter_vals_by_tn = {}
 
-        #we may have one or two for connection objects, and we have two values for every indexed thing
+        # we may have one or two for connection objects, and we have two values for every indexed thing
         self.assertLess(self.mem_store.storedStringCount(), 203)
         self.assertTrue(total_writes > 500)
 
@@ -737,14 +737,14 @@ class ObjectDatabaseTests:
             for c in counters:
                 c.delete()
 
-        #database doesn't have this
+        # database doesn't have this
         t0 = time.time()
         while time.time() - t0 < 1.0 and self.mem_store.storedStringCount() >= 2:
             time.sleep(.01)
 
         self.assertLess(self.mem_store.storedStringCount(), 4)
 
-        #but the view does!
+        # but the view does!
         with view:
             for c in counters:
                 self.assertTrue(c.exists())
@@ -1114,7 +1114,7 @@ class ObjectDatabaseTests:
             self.assertEqual(c1.x, 30)
             self.assertFalse(c0.exists())
 
-        #create a new value in the view and verify it shows up
+        # create a new value in the view and verify it shows up
         with db_all.transaction():
             c2_0 = Counter(k=0)
             c2_1 = Counter(k=1)
@@ -1127,21 +1127,21 @@ class ObjectDatabaseTests:
         with db1.view():
             self.assertFalse(c2_1.exists())
 
-        #now move c2_0 from '0' to '1'. It should show up in db2 and still in db1
+        # now move c2_0 from '0' to '1'. It should show up in db2 and still in db1
         with db_all.transaction():
             c2_0.k = 1
 
         db1.waitForCondition(lambda: c2_0.exists(), 2*self.PERFORMANCE_FACTOR)
         db2.waitForCondition(lambda: c2_0.exists(), 2*self.PERFORMANCE_FACTOR)
 
-        #now, we should see it get subscribed to in both
+        # now, we should see it get subscribed to in both
         with db_all.transaction():
             c2_0.x = 40
 
         db1.waitForCondition(lambda: c2_0.x == 40, 2*self.PERFORMANCE_FACTOR)
         db2.waitForCondition(lambda: c2_0.x == 40, 2*self.PERFORMANCE_FACTOR)
 
-        #but if we make a new database connection and subscribe, we won't see it
+        # but if we make a new database connection and subscribe, we won't see it
         db3 = self.createNewDb()
         db3.subscribeToIndex(Counter, k=0)
         db3.flush()
@@ -1202,7 +1202,7 @@ class ObjectDatabaseTests:
         db1.subscribeToSchema(schema)
 
         with db1.transaction():
-            #make sure we have values in there.
+            # make sure we have values in there.
             for _ in range(10000):
                 Counter(k=123, x=-1)
 
@@ -1220,7 +1220,7 @@ class ObjectDatabaseTests:
 
         self.assertEqual(blocker.waitForCallback(pfactor), 0)
 
-        #make a transaction
+        # make a transaction
         with db1.transaction():
             c1.x = 2
             c2 = Counter(k=123)
@@ -1237,11 +1237,11 @@ class ObjectDatabaseTests:
             assert e.wait(timeout=2.0*pfactor)
 
         with db2.transaction():
-            #verify we see the write on c1
+            # verify we see the write on c1
             self.assertTrue(c1.exists())
             self.assertTrue(c1.x == 2)
 
-            #check we see the creation of c2
+            # check we see the creation of c2
             self.assertTrue(c2.exists())
 
     def test_adding_while_subscribing_and_moving_into_index(self):
@@ -1266,13 +1266,13 @@ class ObjectDatabaseTests:
             self.assertEqual(blocker.waitForCallback(self.PERFORMANCE_FACTOR), i)
             blocker.releaseCallback()
 
-        #even while this is going, we should be able to subscribe to something small
+        # even while this is going, we should be able to subscribe to something small
         db3 = self.createNewDb()
         db3.subscribeToIndex(Counter, k=0)
         with db3.view():
             self.assertTrue(c1.exists())
 
-        #make a transaction
+        # make a transaction
         with db1.transaction():
             c1.k = 123
 
@@ -1287,7 +1287,7 @@ class ObjectDatabaseTests:
             assert e.wait(timeout=2.0*self.PERFORMANCE_FACTOR)
 
         with db2.transaction():
-            #verify we see the write on c1
+            # verify we see the write on c1
             self.assertTrue(c1.exists())
 
     def test_moving_into_index(self):
@@ -1388,7 +1388,7 @@ class ObjectDatabaseTests:
         db = self.createNewDb()
 
         while len(schemas) < 20:
-            #make a new schema
+            # make a new schema
             s = Schema("schema_" + str(len(schemas)))
 
             @s.define
@@ -1397,26 +1397,26 @@ class ObjectDatabaseTests:
 
             schemas.append(s)
 
-            #create a new database for this new schema and subscribe in both this one and
-            #the main connection
+            # create a new database for this new schema and subscribe in both this one and
+            # the main connection
             dbs.append(self.createNewDb())
             dbs[-1].subscribeToSchema(s)
             db.subscribeToSchema(s)
 
-            #create a new object in the schema
+            # create a new object in the schema
             things = []
             for i in range(len(schemas)):
                 with dbs[i].transaction():
                     things.append(schemas[i].Thing(x=10))
 
-            #make sure that the main db sees it
+            # make sure that the main db sees it
             for thing in things:
                 db.waitForCondition(lambda: thing.exists(), 10*self.PERFORMANCE_FACTOR)
 
-            #verify the main db sees something quadratic in the number of transactions plus a constant
+            # verify the main db sees something quadratic in the number of transactions plus a constant
             self.assertLess(db._messages_received, (len(schemas) + 1) * (len(schemas) + 2) + 8)
 
-            #each database sees two transactions each pass
+            # each database sees two transactions each pass
             for i in range(len(dbs)):
                 self.assertTrue(dbs[i]._messages_received < (len(schemas) - i) * 2 + 10)
 
@@ -1595,8 +1595,8 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
         at indices, that everything works correctly."""
 
         try:
-            #inject some behavior to slow down the checks so we can see if we're
-            #failing this test.
+            # inject some behavior to slow down the checks so we can see if we're
+            # failing this test.
             SetWithEdits.AGRESSIVELY_CHECK_SET_ADDS_NOT_CHANGING = True
 
             db1 = self.createNewDb()
@@ -1683,7 +1683,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
                     for i in range(5000):
                         Counter(k=ix, x=i)
 
-            #now there's a lot of stuff in the database
+            # now there's a lot of stuff in the database
 
             isDone = [False]
             maxLatency = [None]
@@ -1716,7 +1716,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
             isDone[0] = True
             latencyMeasureThread.join()
 
-            #verify the properties of the subscription. we shouldn't be disconnected!
+            # verify the properties of the subscription. we shouldn't be disconnected!
             with db2.view():
                 self.assertEqual(len(Counter.lookupAll(k=1)), 5000)
                 self.assertEqual(len(Counter.lookupAll(k=2)), 5000)
@@ -1725,7 +1725,7 @@ class ObjectDatabaseOverSocketTests(unittest.TestCase, ObjectDatabaseTests):
                     sorted(range(5000))
                     )
 
-            #we should never have had a really long latency
+            # we should never have had a really long latency
             self.assertTrue(maxLatency[0] < subscriptionTime / 10.0, (maxLatency[0], subscriptionTime))
 
         finally:

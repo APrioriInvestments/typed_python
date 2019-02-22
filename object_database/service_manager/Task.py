@@ -30,7 +30,7 @@ from typed_python import OneOf, Alternative, ConstDict, TupleOf
 
 task_schema = Schema("core.task")
 
-#how many times our worker can disconnect in a row before we get marked 'Failed'
+# how many times our worker can disconnect in a row before we get marked 'Failed'
 MAX_TIMES_FAILED = 10
 
 
@@ -261,7 +261,7 @@ class TaskService(ServiceBase):
                     taskStatus.state = "WaitForSubtasks"
                     taskStatus.worker = None
 
-                    #create the new child tasks
+                    # create the new child tasks
                     newTaskStatuses = {}
 
                     for taskName, subtaskExecutor in execResult.subtasks.items():
@@ -412,8 +412,8 @@ class TaskDispatchService(ServiceBase):
             self.db.subscribeToObject(task)
 
             with self.db.transaction():
-                #this is a root-level task. Mark it complete so it can be collected
-                #by whoever kicked it off.
+                # this is a root-level task. Mark it complete so it can be collected
+                # by whoever kicked it off.
                 task.finished = True
                 task.finished_timestamp = time.time()
                 logging.info("deleting root status %s", taskStatus)

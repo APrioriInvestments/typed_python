@@ -215,7 +215,7 @@ def loadTestsFromModules(config, modules):
 
 def extractTestCases(suites):
     testCases = flattenToTestCases(suites)
-    #make sure the tests are sorted in a sensible way.
+    # make sure the tests are sorted in a sensible way.
     sortedTestCases = sortedBy(testCases, lambda x: x.id())
 
     return [x for x in sortedTestCases if not testCaseHasAttribute(x, 'disabled')]
@@ -338,7 +338,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
                 pass
             logAsInfo("\tpassed in %s", time.time() - self.testStartTime)
         else:
-            #the test failed. Report the failure
+            # the test failed. Report the failure
             logAsInfo("\tfailed in %s seconds. See logs in %s", time.time() - self.testStartTime, self.fname)
 
     def begin(self):
@@ -387,7 +387,7 @@ class OutputCapturePlugin(nose.plugins.base.Plugin):
 
         ev = self.addCaptureToErr(ev, tb)
 
-        #print statements here show up in the logfile
+        # print statements here show up in the logfile
         print("Test ", test, ' failed: ')
         print(ev)
 

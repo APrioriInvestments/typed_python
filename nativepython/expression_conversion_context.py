@@ -440,7 +440,7 @@ class ExpressionConversionContext(object):
         if kwargs:
             raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
 
-        #force arguments to a type appropriate for argpassing
+        # force arguments to a type appropriate for argpassing
         native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
         call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
@@ -450,7 +450,7 @@ class ExpressionConversionContext(object):
             return
 
         if call_target.output_type is None:
-            #this always throws
+            # this always throws
             assert len(call_target.named_call_target.arg_types) == len(native_args)
 
             self.pushTerminal(call_target.call(*native_args))
@@ -504,7 +504,7 @@ class ExpressionConversionContext(object):
 
     def pushException(self, type, value):
         self.pushEffect(
-            #as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
+            # as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
             runtime_functions.stash_exception_ptr.call(
                native_ast.const_utf8_cstr(str(value))
                )
@@ -586,7 +586,7 @@ class ExpressionConversionContext(object):
                 elif expr_so_far[-1].matches.Constant:
                     if (expr_so_far[-1].val.val and op.matches.Or or
                                 (not expr_so_far[-1].val.val) and op.matches.And):
-                        #this is a short-circuit
+                        # this is a short-circuit
                         if len(expr_so_far) == 1:
                             return expr_so_far[0]
 
@@ -601,10 +601,10 @@ class ExpressionConversionContext(object):
 
             if not expr_so_far:
                 if op.matches.Or:
-                    #must have had all False constants
+                    # must have had all False constants
                     return TypedExpression(self, native_ast.falseExpr, typeWrapper(bool), False)
                 else:
-                    #must have had all True constants
+                    # must have had all True constants
                     return TypedExpression(self, native_ast.trueExpr, typeWrapper(bool), False)
 
             while len(expr_so_far) > 1:

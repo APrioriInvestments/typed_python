@@ -147,4 +147,4 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         self.assertEqual(sum, sumCompiled)
         speedup = (t1-t0)/(t2-t1)
-        self.assertGreater(speedup, 20) #I get about 50
+        self.assertGreater(speedup, 20)  # I get about 50

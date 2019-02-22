@@ -55,7 +55,7 @@ class TestPointerToCompilation(unittest.TestCase):
         self.assertEqual(l1[1], 20)
         self.assertEqual(l1[2], 21)
         self.assertEqual(l1[3], 21)
-        self.assertEqual(l1[4], 0x3ff0000000000000) #hex representation of 64 bit float 1.0
+        self.assertEqual(l1[4], 0x3ff0000000000000)  # hex representation of 64 bit float 1.0
 
     def test_bytecount(self):
         def testfun(x):

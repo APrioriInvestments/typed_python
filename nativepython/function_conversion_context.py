@@ -194,7 +194,7 @@ class FunctionConversionContext(object):
         self.upsizeVariableType(varname, val_to_store.expr_type)
         slot_ref = subcontext.named_var_expr(varname)
 
-        #convert the value to the target type now that we've upsized it
+        # convert the value to the target type now that we've upsized it
         val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
 
         assert val_to_store is not None, "We should always be able to upsize"
@@ -400,7 +400,7 @@ class FunctionConversionContext(object):
 
             target_var_name = ast.target.id
 
-            #create a variable to hold the iterator, and instantiate it there
+            # create a variable to hold the iterator, and instantiate it there
             iter_varname = target_var_name + ".iter." + str(ast.line_number)
 
             iterator_setup_context = ExpressionConversionContext(self)
@@ -414,7 +414,7 @@ class FunctionConversionContext(object):
 
             cond_context = ExpressionConversionContext(self)
             iter_obj = cond_context.named_var_expr(iter_varname)
-            next_ptr, is_populated = iter_obj.convert_next() #this conversion is special - it returns two values
+            next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
 
             with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
                 with if_true:
@@ -480,14 +480,14 @@ class FunctionConversionContext(object):
                 slot_type = self._varname_to_type[name]
 
                 if slot_type.is_empty:
-                    #we don't need to generate a stackslot for this value. Whenever we look it up
-                    #we'll simply make a void expression
+                    # we don't need to generate a stackslot for this value. Whenever we look it up
+                    # we'll simply make a void expression
                     pass
                 elif slot_type is not None:
                     context = ExpressionConversionContext(self)
 
                     if slot_type.is_pod:
-                        #we can just copy this into the stackslot directly. no destructor needed
+                        # we can just copy this into the stackslot directly. no destructor needed
                         context.pushEffect(
                             native_ast.Expression.Store(
                                 ptr=native_ast.Expression.StackSlot(name=name, type=slot_type.getNativeLayoutType()),
@@ -499,8 +499,8 @@ class FunctionConversionContext(object):
                             context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
                             )
                     else:
-                        #need to make a stackslot for this variable
-                        #the argument will be a pointer because it's POD
+                        # need to make a stackslot for this variable
+                        # the argument will be a pointer because it's POD
                         var_expr = context.inputArg(slot_type, name)
 
                         slot_expr = context.named_var_expr(name)
@@ -531,8 +531,8 @@ class FunctionConversionContext(object):
                         )
 
                     if name not in argnames:
-                        #this is a variable in the function that we assigned to. we need to ensure that
-                        #the initializer flag is zero
+                        # this is a variable in the function that we assigned to. we need to ensure that
+                        # the initializer flag is zero
                         context = ExpressionConversionContext(self)
                         context.pushEffect(context.isInitializedVarExpr(name).expr.store(native_ast.falseExpr))
                         to_add.append(context.finalize(None))

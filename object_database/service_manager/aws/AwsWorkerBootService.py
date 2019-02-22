@@ -169,18 +169,18 @@ instance_types_to_show = set(
 
 @schema.define
 class Configuration:
-    db_hostname = str          #hostname to connect back to
-    db_port = int              #port to connect back to
-    region = str               #region to boot into
-    vpc_id = str               #id of vpc to boot into
-    subnet = str               #id of subnet to boot into
-    security_group = str       #id of security group to boot into
-    keypair = str              #security keypair name to use
-    worker_name = str          #name of workers. This should be unique to this install.
-    worker_iam_role_name = str #AIM role to boot workers into
-    docker_image = str            #default linux AMI to use when booting linux workers
-    defaultStorageSize = int  #gb of disk to mount on booted workers (if they need ebs)
-    max_to_boot = int          #maximum number of workers we'll boot
+    db_hostname = str  # hostname to connect back to
+    db_port = int  # port to connect back to
+    region = str  # region to boot into
+    vpc_id = str  # id of vpc to boot into
+    subnet = str  # id of subnet to boot into
+    security_group = str  # id of security group to boot into
+    keypair = str  # security keypair name to use
+    worker_name = str  # name of workers. This should be unique to this install.
+    worker_iam_role_name = str  # AIM role to boot workers into
+    docker_image = str  # default linux AMI to use when booting linux workers
+    defaultStorageSize = int  # gb of disk to mount on booted workers (if they need ebs)
+    max_to_boot = int  # maximum number of workers we'll boot
 
 
 @schema.define
@@ -191,7 +191,7 @@ class State:
     desired = int
     spot_desired = int
     spot_booted = int
-    observedLimit = OneOf(None, int) #maximum observed limit count
+    observedLimit = OneOf(None, int)  # maximum observed limit count
     capacityConstrained = bool
     spotPrices = ConstDict(str, float)
 
@@ -260,7 +260,7 @@ class AwsApi:
         return False
 
     def isInstanceWeOwn(self, instance):
-        #make sure this instance is definitely one we booted.
+        # make sure this instance is definitely one we booted.
 
         if not [t for t in instance.tags if t["Key"] == "Name" and t["Value"] == self.config.worker_name]:
             return False
@@ -338,7 +338,7 @@ class AwsApi:
         if amiOverride is not None:
             ami = amiOverride
         else:
-            ami = "ami-759bc50a" #ubuntu 16.04 hvm-ssd
+            ami = "ami-759bc50a"  # ubuntu 16.04 hvm-ssd
 
         def has_ephemeral_storage(instanceType):
             for t in ['m3', 'c3', 'x1', 'r3', 'f1', 'h1', 'i3', 'd2']:
@@ -387,7 +387,7 @@ class AwsApi:
             ClientToken=clientToken,
             InstanceInitiatedShutdownBehavior='terminate' if wantsTerminateOnShutdown else "stop",
             IamInstanceProfile={'Name': self.config.worker_iam_role_name},
-            UserData=boot_script, #base64.b64encode(boot_script.encode("ASCII")),
+            UserData=boot_script,  # base64.b64encode(boot_script.encode("ASCII")),
             BlockDeviceMappings=[deviceMapping],
             InstanceMarketOptions=InstanceMarketOptions,
             TagSpecifications=[

@@ -36,7 +36,7 @@ class UndefinedBehaviorException(BaseException):
     """
 
 
-#needed by the C api
+# needed by the C api
 object = object
 
 
@@ -69,7 +69,7 @@ class Member:
     @property
     def type(self):
         if isinstance(self._type, FunctionType):
-            #resolve the function type.
+            # resolve the function type.
             self._type = self._type()
         return self._type
 

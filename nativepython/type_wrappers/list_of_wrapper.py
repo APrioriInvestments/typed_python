@@ -217,7 +217,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
             with then:
                 context.pushException(IndexError, "pop index out of range")
 
-        #we are just moving this - we assume no layouts have selfpointers throughout nativepython
+        # we are just moving this - we assume no layouts have selfpointers throughout nativepython
         result = context.push(self.underlyingWrapperType, lambda result:
             result.expr.store(inst.convert_getitem_unsafe(ix).nonref_expr)
             )
@@ -337,13 +337,13 @@ class ListOfWrapper(TupleOrListOfWrapper):
             out.expr.store(
                 runtime_functions.malloc.call(28).cast(self.getNativeLayoutType())
                 )
-            >> out.nonref_expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) #refcount
-            >> out.nonref_expr.ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1)) #hash cache
-            >> out.nonref_expr.ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0)) #count
-            >> out.nonref_expr.ElementPtrIntegers(0, 3).store(native_ast.const_int32_expr(1)) #reserved
+            >> out.nonref_expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))  # refcount
+            >> out.nonref_expr.ElementPtrIntegers(0, 1).store(native_ast.const_int32_expr(-1))  # hash cache
+            >> out.nonref_expr.ElementPtrIntegers(0, 2).store(native_ast.const_int32_expr(0))  # count
+            >> out.nonref_expr.ElementPtrIntegers(0, 3).store(native_ast.const_int32_expr(1))  # reserved
             >> out.nonref_expr.ElementPtrIntegers(0, 4).store(
                 runtime_functions.malloc.call(self.underlyingWrapperType.getBytecount())
-                ) #data
+                )  # data
             )
 
     def convert_setitem(self, context, expr, index, item):

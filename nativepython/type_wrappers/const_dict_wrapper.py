@@ -153,7 +153,7 @@ class ConstDictWrapper(RefcountedWrapper):
 
     def generateLookupFun(self, containmentOnly):
         def f(context, out, inst, key):
-            #a linear scan for now.
+            # a linear scan for now.
             lowIx = context.push(int, lambda x: x.expr.store(native_ast.const_int_expr(0)))
             highIx = context.push(int, lambda x: x.expr.store(self.convert_len_native(inst.nonref_expr)))
 

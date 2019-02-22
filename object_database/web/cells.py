@@ -255,9 +255,9 @@ class Cells:
                 assert n.cells == self
                 res.append({'id': n.identity, 'discard': True})
 
-        #the client reverses the order of postscripts because it wants
-        #to do parent nodes before child nodes. We want our postscripts
-        #here to happen in order, because they're triggered by messages.
+        # the client reverses the order of postscripts because it wants
+        # to do parent nodes before child nodes. We want our postscripts
+        # here to happen in order, because they're triggered by messages.
         for js in reversed(self._pendingPostscripts):
             res.append({'postscript': js})
 
@@ -1790,7 +1790,7 @@ class Sheet(Cell):
 
         self.columnNames = columnNames
         self.rowCount = rowCount
-        self.rowFun = rowFun #for a row, the value of all the columns in a list.
+        self.rowFun = rowFun  # for a row, the value of all the columns in a list.
         self.colWidth = colWidth
         self.error = Slot(None)
         self._overflow = "auto"
@@ -2041,7 +2041,7 @@ class _PlotUpdater(Cell):
 
     def recalculate(self):
         with self.view() as v:
-            #we only exist to run our postscript
+            # we only exist to run our postscript
             self.contents = """<div style="display:none">"""
             hadChildren = len(self.children) > 0
             self.children = {}

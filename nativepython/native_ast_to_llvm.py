@@ -24,7 +24,7 @@ llvm_void = llvmlite.ir.VoidType()
 
 exception_type_llvm = llvmlite.ir.LiteralStructType([llvm_i8ptr, llvm_i32])
 
-#just hardcoded for now. We check this in the compiler to ensure it's consistent.
+# just hardcoded for now. We check this in the compiler to ensure it's consistent.
 pointer_size = 8
 
 
@@ -46,7 +46,7 @@ def type_to_llvm_type(t):
         return llvmlite.ir.LiteralStructType(type_to_llvm_type(t[1]) for t in t.element_types)
 
     if t.matches.Pointer:
-        #llvm won't allow a void*, so we model it as a pointer to an empty struct instead
+        # llvm won't allow a void*, so we model it as a pointer to an empty struct instead
         if t.value_type.matches.Void:
             return llvmlite.ir.PointerType(llvmlite.ir.LiteralStructType(()))
 
@@ -165,11 +165,11 @@ class TeardownOnScopeExit:
         self.converter = converter
         self.builder = converter.builder
 
-        self.incoming_tags = {} #dict from block->name->(True or llvm_value)
+        self.incoming_tags = {}  # dict from block->name->(True or llvm_value)
 
-        #is the incoming block from a scope trying to return (True)
-        #or propagate an exception (False)
-        self.incoming_is_return = {} #dict from block->(True/False or llvm_value)
+        # is the incoming block from a scope trying to return (True)
+        # or propagate an exception (False)
+        self.incoming_is_return = {}  # dict from block->(True/False or llvm_value)
 
         self._block = None
 
@@ -390,8 +390,8 @@ class FunctionConverter:
 
         self.exception_slot = builder.alloca(llvm_i8ptr, name="exception_slot")
 
-        #if populated, we are expected to write our return value to 'return_slot' and jump here
-        #on return
+        # if populated, we are expected to write our return value to 'return_slot' and jump here
+        # on return
         self.teardown_handler = TeardownOnScopeExit(self, None)
 
     def finalize(self):
@@ -445,7 +445,7 @@ class FunctionConverter:
             if teardown.tag in self.tags_initialized:
                 tagVal = self.tags_initialized[teardown.tag]
 
-                #mark that the tag is no longer active
+                # mark that the tag is no longer active
                 del self.tags_initialized[teardown.tag]
                 del orig_tags[teardown.tag]
 
@@ -681,7 +681,7 @@ class FunctionConverter:
 
         if expr.matches.Return:
             if expr.arg is not None:
-                #write the value into the return slot
+                # write the value into the return slot
                 l = self.convert(expr.arg)
 
                 if l is None:
@@ -750,7 +750,7 @@ class FunctionConverter:
                 self.tags_initialized = true_tags
                 return true
 
-            #we need to merge tags
+            # we need to merge tags
             final_tags = {}
             for tag in set(list(true_tags.keys()) + list(false_tags.keys())):
                 true_val = true_tags.get(tag, False)
@@ -759,9 +759,9 @@ class FunctionConverter:
                 if true_val is True and false_val is True:
                     final_tags[tag] = True
                 else:
-                    #it's not certain
+                    # it's not certain
                     if not isinstance(true_val, bool) and not isinstance(false_val, bool) and true_val.name == false_val.name:
-                        #these are the same bit that's been passed between two different branches.
+                        # these are the same bit that's been passed between two different branches.
                         final_tags[tag] = true_val
                     else:
                         tag_llvm_value = self.builder.phi(llvm_i1, 'is_initialized.merge.' + tag)
@@ -822,7 +822,7 @@ class FunctionConverter:
                 with otherwise:
                     false = self.convert(expr.orelse)
 
-            #it's currently illegal to modify the initialized set in a while loop
+            # it's currently illegal to modify the initialized set in a while loop
             assertTagDictsSame(tags, self.tags_initialized)
 
             if false is None:
@@ -1090,8 +1090,8 @@ class FunctionConverter:
 
             self.teardown_handler = self.teardown_handler.parent_scope
 
-            #if we have a result, then we need to generate teardowns
-            #in the normal course of execution
+            # if we have a result, then we need to generate teardowns
+            # in the normal course of execution
             if finally_result is not None:
                 for teardown in expr.teardowns:
                     self.convert_teardown(teardown)

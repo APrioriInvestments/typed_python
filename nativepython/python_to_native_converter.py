@@ -73,7 +73,7 @@ class NativeFunctionConversionContext:
         native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
 
         if output_type.is_pass_by_ref:
-            #the first argument is actually the output
+            # the first argument is actually the output
             native_output_type = native_ast.Void
             native_input_types = [output_type.getNativePassingType()] + native_input_types
         else:
@@ -267,7 +267,7 @@ class PythonToNativeConverter(object):
                 untypedPtr = native_ast.var('input').ElementPtrIntegers(i).load()
 
                 if callTarget.input_types[i].is_pass_by_ref:
-                    #we've been handed a pointer, and it's already a pointer
+                    # we've been handed a pointer, and it's already a pointer
                     args.append(untypedPtr.cast(argtype.pointer()))
                 else:
                     args.append(untypedPtr.cast(argtype.pointer()).load())
@@ -369,11 +369,11 @@ class PythonToNativeConverter(object):
             finally:
                 self._inflight_function_conversions.clear()
         else:
-            #above us on the stack, we are walking a set of function conversions.
-            #if we have ever calculated this function before, we'll have a call
-            #target with an output type and we can return that. Otherwise we have to
-            #return None, which will cause callers to replace this with a throw
-            #until we have had a chance to do a full pass of conversion.
+            # above us on the stack, we are walking a set of function conversions.
+            # if we have ever calculated this function before, we'll have a call
+            # target with an output type and we can return that. Otherwise we have to
+            # return None, which will cause callers to replace this with a throw
+            # until we have had a chance to do a full pass of conversion.
             if name in self._targets:
                 return self._targets[name]
             else:

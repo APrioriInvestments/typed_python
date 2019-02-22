@@ -156,7 +156,7 @@ BinaryOp = Alternative("BinaryOp",
     )
 
 
-#loads and stores - no assignments
+# loads and stores - no assignments
 Expression = lambda: Expression
 Teardown = lambda: Teardown
 
@@ -376,10 +376,10 @@ Expression = Alternative("Expression",
                          'false': Expression
                          },
 
-    Throw={'expr': Expression }, #throw a pointer.
+    Throw={'expr': Expression },  # throw a pointer.
 
     TryCatch={'expr': Expression,
-                           'varname': str, #varname is bound to a int8*
+                           'varname': str,  # varname is bound to a int8*
                            'handler': Expression
                            },
 
@@ -390,8 +390,8 @@ Expression = Alternative("Expression",
     Return={'arg': OneOf(Expression, None)},
     Let={'var': str, 'val': Expression, 'within': Expression},
 
-    #evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
-    #clause
+    # evaluate 'expr', and then call teardowns if we passed through a named 'ActivatesTeardown'
+    # clause
     Finally={'expr': Expression, 'teardowns': TupleOf(Teardown)},
     Sequence={'vals': TupleOf(Expression)},
     ActivatesTeardown={'name': str},

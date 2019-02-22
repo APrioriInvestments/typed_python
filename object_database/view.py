@@ -449,7 +449,7 @@ class View(object):
                 )
 
             if not self._confirmCommitCallback:
-                #this is the synchronous case - we want to wait for the confirm
+                # this is the synchronous case - we want to wait for the confirm
                 t0 = time.time()
 
                 res = result_queue.get()

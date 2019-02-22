@@ -106,7 +106,7 @@ class VersionedValue(VersionedBase):
         while self.values and self.version_numbers[0] < version_number:
             if len(self.values) == 1:
                 if self.values[0].serializedByteRep is None:
-                    #this value was deleted and we can just remove this whole entry
+                    # this value was deleted and we can just remove this whole entry
                     return True
                 else:
                     self.version_numbers[0] = version_number
@@ -122,7 +122,7 @@ class VersionedValue(VersionedBase):
 
 
 class VersionedSet(VersionedBase):
-    #values in sets are always strings
+    # values in sets are always strings
     def __init__(self):
         self.version_numbers = []
         self.adds = []
@@ -152,7 +152,7 @@ class VersionedSet(VersionedBase):
             assert not self.version_numbers or self.version_numbers[-1] < version
             self.setVersionedAddsAndRemoves(version, adds, set())
         else:
-            #someone could be iterating over this set in another thread
+            # someone could be iterating over this set in another thread
             new_last_adds = set(self.adds[-1])
             new_last_adds.update(adds)
             self.adds[-1] = new_last_adds
@@ -164,14 +164,14 @@ class VersionedSet(VersionedBase):
         while self.version_numbers and self.version_numbers[0] < version_number:
             if len(self.version_numbers) == 1:
                 if not self.adds[0] and not self.removes[0]:
-                    #this value was deleted and we can just remove this whole entry
+                    # this value was deleted and we can just remove this whole entry
                     return True
                 else:
                     self.version_numbers[0] = version_number
             else:
                 if self.version_numbers[1] <= version_number:
-                    #merge slot 0 into slot 1
-                    #the new set should have no removes, and only adds
+                    # merge slot 0 into slot 1
+                    # the new set should have no removes, and only adds
                     assert not self.removes[0], (self.adds[0], self.removes[0])
 
                     new_set = set(self.adds[0])
@@ -238,15 +238,15 @@ class SetWithEdits:
 
 class ManyVersionedObjects:
     def __init__(self):
-        #for each version number we have outstanding
+        # for each version number we have outstanding
         self._version_number_refcount = {}
 
         self._min_reffed_version_number = None
 
-        #for each version number, the set of keys that are set with it
+        # for each version number, the set of keys that are set with it
         self._version_number_objects = {}
 
-        #for each key, a VersionedValue or VersionedSet
+        # for each key, a VersionedValue or VersionedSet
         self._versioned_objects = {}
 
     def keycount(self):
@@ -464,13 +464,13 @@ class DatabaseConnection:
 
         self._pendingSubscriptions = {}
 
-        #if we have object-level subscriptions to a particular type (e.g. not everything)
-        #then, this is from (schema, typename) -> {object_id -> transaction_id} so that
-        #we can tell when the subscription should become valid. Subscriptions are permanent
-        #otherwise, if we're subscribed, it's 'Everything'
+        # if we have object-level subscriptions to a particular type (e.g. not everything)
+        # then, this is from (schema, typename) -> {object_id -> transaction_id} so that
+        # we can tell when the subscription should become valid. Subscriptions are permanent
+        # otherwise, if we're subscribed, it's 'Everything'
         self._schema_and_typename_to_subscription_set = {}
 
-        #from (schema,typename,field_val) -> {'values', 'index_values', 'identities'}
+        # from (schema,typename,field_val) -> {'values', 'index_values', 'identities'}
         self._subscription_buildup = {}
 
         self._channel.setServerToClientHandler(self._onMessage)
@@ -657,7 +657,7 @@ class DatabaseConnection:
         return ()
 
     def waitForCondition(self, cond, timeout):
-        #eventally we will replace this with something that watches the calculation
+        # eventally we will replace this with something that watches the calculation
         t0 = time.time()
         while time.time() - t0 < timeout:
             with self.view():
@@ -941,8 +941,8 @@ class DatabaseConnection:
                 t0 = time.time()
                 heartbeatInterval = getHeartbeatInterval()
 
-                #this is a fault injection to allow us to verify that heartbeating during this
-                #function will keep the server connection alive.
+                # this is a fault injection to allow us to verify that heartbeating during this
+                # function will keep the server connection alive.
                 for _ in range(self._largeSubscriptionHeartbeatDelay):
                     self._channel.sendMessage(
                         ClientToServer.Heartbeat()
@@ -965,10 +965,10 @@ class DatabaseConnection:
                 for key, val in values.items():
                     self._versioned_data.setVersionedValue(key, msg.tid, None if val is None else bytes.fromhex(val))
 
-                    #this could take a long time, so we need to keep heartbeating
+                    # this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:
-                        #note that this needs to be 'sendMessage' which sends immediately,
-                        #not, 'write' which queues the message after this function finishes!
+                        # note that this needs to be 'sendMessage' which sends immediately,
+                        # not, 'write' which queues the message after this function finishes!
                         self._channel.sendMessage(
                             ClientToServer.Heartbeat()
                             )
@@ -977,16 +977,16 @@ class DatabaseConnection:
                 for key, setval in sets.items():
                     self._versioned_data.updateVersionedAdds(key, msg.tid, set(setval))
 
-                    #this could take a long time, so we need to keep heartbeating
+                    # this could take a long time, so we need to keep heartbeating
                     if time.time() - t0 > heartbeatInterval:
-                        #note that this needs to be 'sendMessage' which sends immediately,
-                        #not, 'write' which queues the message after this function finishes!
+                        # note that this needs to be 'sendMessage' which sends immediately,
+                        # not, 'write' which queues the message after this function finishes!
                         self._channel.sendMessage(
                             ClientToServer.Heartbeat()
                             )
                         t0 = time.time()
 
-                #this should be inline with the stream of messages coming from the server
+                # this should be inline with the stream of messages coming from the server
                 assert self._cur_transaction_num <= msg.tid
 
                 self._cur_transaction_num = msg.tid
@@ -996,9 +996,9 @@ class DatabaseConnection:
             assert False, "unknown message type " + msg._which
 
     def indexValuesToSetAdds(self, indexValues):
-        #indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds
-        #up the indices we need. We need to transpose to a dictionary ordered by the hash values,
-        #not the identities
+        # indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds
+        # up the indices we need. We need to transpose to a dictionary ordered by the hash values,
+        # not the identities
 
         t0 = time.time()
         heartbeatInterval = getHeartbeatInterval()
@@ -1015,10 +1015,10 @@ class DatabaseConnection:
 
                 setAdds.setdefault(index_key, set()).add(identity)
 
-                #this could take a long time, so we need to keep heartbeating
+                # this could take a long time, so we need to keep heartbeating
                 if time.time() - t0 > heartbeatInterval:
-                    #note that this needs to be 'sendMessage' which sends immediately,
-                    #not, 'write' which queues the message after this function finishes!
+                    # note that this needs to be 'sendMessage' which sends immediately,
+                    # not, 'write' which queues the message after this function finishes!
                     self._channel.sendMessage(
                         ClientToServer.Heartbeat()
                         )
