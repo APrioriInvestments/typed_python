@@ -151,4 +151,3 @@ class TestOneOfOfCompilation(unittest.TestCase):
         self.assertEqual(f(10), 10)
         self.assertEqual(f(10.5), 10.5)
         self.assertIs(f(None), None)
-

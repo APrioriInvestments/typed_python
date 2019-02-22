@@ -54,4 +54,3 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         self.assertIs(f(HoldsAnA(x)), x)
         with self.assertRaises(Exception):
             f(10)
-

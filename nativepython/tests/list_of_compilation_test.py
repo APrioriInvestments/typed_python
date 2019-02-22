@@ -347,4 +347,3 @@ class TestListOfCompilation(unittest.TestCase):
         y = dupList(x)
         x[0] = 100
         self.assertEqual(y[0], 1)
-

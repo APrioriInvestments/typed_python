@@ -307,6 +307,3 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                     )
 
         return super().convert_bin_op(context, left, op, right)
-
-
-

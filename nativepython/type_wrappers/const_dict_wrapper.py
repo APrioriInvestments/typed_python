@@ -202,6 +202,3 @@ class ConstDictWrapper(RefcountedWrapper):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
-
-
-

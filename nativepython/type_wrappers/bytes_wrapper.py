@@ -99,6 +99,3 @@ class BytesWrapper(RefcountedWrapper):
                     ).cast(self.layoutType)
                 )
             )
-
-
-

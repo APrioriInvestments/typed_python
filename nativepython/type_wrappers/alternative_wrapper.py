@@ -285,4 +285,3 @@ class AlternativeMatchingWrapper(Wrapper):
         altType = typeWrapper(self.typeRepresentation)
 
         return altType.convert_check_matches(context, instance.changeType(altType), attribute)
-

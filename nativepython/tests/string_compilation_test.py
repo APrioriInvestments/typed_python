@@ -136,4 +136,3 @@ class TestStringCompilation(unittest.TestCase):
         for s in someStrings:
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
-

@@ -95,4 +95,3 @@ class ServiceManagerTestCommon(object):
         self.server.terminate()
         self.server.wait()
         self.tempDirObj.__exit__(None, None, None)
-

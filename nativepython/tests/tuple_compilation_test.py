@@ -72,4 +72,3 @@ class TestTupleCompilation(unittest.TestCase):
 
         self.assertEqual(res.x, 20)
         self.assertEqual(_types.refcount(res), 2)
-

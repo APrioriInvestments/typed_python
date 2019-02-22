@@ -70,4 +70,3 @@ class AlgebraicProtocol(asyncio.Protocol):
                         self.transport.close()
             else:
                 return
-

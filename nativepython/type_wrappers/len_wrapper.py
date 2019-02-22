@@ -32,4 +32,3 @@ class LenWrapper(Wrapper):
             return args[0].convert_len()
 
         return super().convert_call(context, expr, args, kwargs)
-

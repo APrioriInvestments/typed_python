@@ -1207,5 +1207,3 @@ class Converter(object):
 
 
         return str(module)
-
-

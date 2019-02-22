@@ -31,4 +31,3 @@ class TypesCodebaseSerializationTest(unittest.TestCase):
             serializer.deserialize(serializer.serialize(thisIsAFunction)),
             thisIsAFunction
             )
-

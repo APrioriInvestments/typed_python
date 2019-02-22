@@ -104,5 +104,3 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
 
         return super().convert_to_self(context, expr)
-
-

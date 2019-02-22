@@ -168,4 +168,3 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
 
         with self.service1Conn.transaction():
             self.assertEqual(task.result.result, localVersion(7))
-

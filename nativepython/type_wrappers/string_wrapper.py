@@ -128,6 +128,3 @@ class StringWrapper(RefcountedWrapper):
                     ).cast(self.layoutType)
                 )
             )
-
-
-

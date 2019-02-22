@@ -141,6 +141,3 @@ class TestMultithreading(unittest.TestCase):
             self.assertTrue(ratio >= .8 and ratio < 1.75, ratios)
         else:
             self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
-
-
-
