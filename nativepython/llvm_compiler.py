@@ -99,6 +99,7 @@ class NativeFunctionPointer:
 
 class BinarySharedObject:
     """Models a shared object library (.so) loadable on linux systems."""
+
     def __init__(self, binaryForm):
         self.binaryForm = binaryForm
 

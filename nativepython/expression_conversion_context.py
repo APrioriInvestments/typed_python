@@ -45,6 +45,7 @@ class ExpressionConversionContext(object):
     evaluation, and provides convenience methods to allow expression generators to stash
     compound expressions and get back simple variable references.
     """
+
     def __init__(self, functionContext):
         self.functionContext = functionContext
         self.intermediates = []

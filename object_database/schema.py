@@ -30,6 +30,7 @@ def SubscribeLazilyByDefault(t):
 
 class Schema:
     """A collection of types that can be used to access data in a database."""
+
     def __init__(self, name):
         self._name = name
         # Map: typename:str -> cls(DatabaseObject)

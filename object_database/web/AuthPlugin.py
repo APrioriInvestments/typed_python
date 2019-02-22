@@ -34,6 +34,7 @@ class AuthPluginBase:
 
 class PermissiveAuthPlugin(AuthPluginBase):
     " An AuthPlugin that allows anyone to login (useful for testing)"
+
     def authenticate(self, username, password) -> str:
         return ''
 

@@ -63,6 +63,7 @@ def revisionConflictRetry(f):
 
 class SerializedDatabaseValue:
     """A value stored as Json with a python representation."""
+
     def __init__(self, serializedByteRep, pyRep):
         assert serializedByteRep is None or isinstance(serializedByteRep, bytes), serializedByteRep
         self.pyRep = pyRep

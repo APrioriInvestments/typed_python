@@ -59,6 +59,7 @@ def forwardToName(fwdLambda):
 
 class Member:
     """A member of a Class object."""
+
     def __init__(self, t, default_value=None):
         self._type = t
         self._default_value = default_value

@@ -72,6 +72,7 @@ class GeventPipe:
     database connection in the background is not based on gevent, so we cannot use any
     standard gevent-based event or queue objects from the db-trigger thread.
     """
+
     def __init__(self):
         self.read_fd, self.write_fd = os.pipe()
         self.fileobj = gevent.fileobject.FileObjectPosix(self.read_fd, bufsize=2)
@@ -352,6 +353,7 @@ class Cells:
 
 class Slot:
     """Holds some arbitrary state for use in a session. Not mirrored in the DB."""
+
     def __init__(self, value=None):
         self._value = value
         self._subscribedCells = set()
@@ -625,6 +627,7 @@ class CardTitle(Cell):
           ____contents__
         </div>
         """
+
     def sortsAs(self):
         return self.inner.sortsAs()
 
@@ -1301,6 +1304,7 @@ class SingleLineTextBox(Cell):
 
 class Table(Cell):
     """An active table with paging, filtering, sortable columns."""
+
     def __init__(self, colFun, rowFun, headerFun, rendererFun, maxRowsPerPage=20):
         super().__init__()
         self.colFun = colFun
@@ -1657,6 +1661,7 @@ class Expands(Cell):
 
 class CodeEditor(Cell):
     """Produce a code editor."""
+
     def __init__(self, onmessage=lambda msg: None, keybindings=None, noScroll=False, minLines=None, fontSize=None):
         """Create a code editor
 
@@ -1779,6 +1784,7 @@ class CodeEditorTrigger(Cell):
 
 class Sheet(Cell):
     """Make a nice spreadsheet viewer. The dataset needs to be static in this implementation."""
+
     def __init__(self, columnNames, rowCount, rowFun, colWidth=200):
         super().__init__()
 
@@ -1914,6 +1920,7 @@ class Sheet(Cell):
 
 class Plot(Cell):
     """Produce some reactive line plots."""
+
     def __init__(self, namedDataSubscriptions):
         """Initialize a line plot.
 
@@ -1983,6 +1990,7 @@ class Plot(Cell):
 
 class _PlotUpdater(Cell):
     """Helper utility to push data into an existing line plot."""
+
     def __init__(self, linePlot):
         super().__init__()
 
