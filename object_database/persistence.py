@@ -125,6 +125,7 @@ class InMemoryPersistence(object):
             if key in self.values:
                 del self.values[key]
 
+
 class RedisPersistence(object):
     def __init__(self, db=0, port=None):
         self.lock = threading.RLock()

@@ -15,6 +15,7 @@ import unittest
 from typed_python import Int8, Int64, Float64, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
     ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function
 
+
 class NativeFunctionTypesTests(unittest.TestCase):
     def test_create_simple_function(self):
         @Function

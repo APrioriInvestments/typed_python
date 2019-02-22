@@ -22,6 +22,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class TypedExpression(object):
     def __init__(self, context, expr, t, isReference):
         """Initialize a TypedExpression

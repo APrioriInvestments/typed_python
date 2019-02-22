@@ -102,6 +102,7 @@ def log_cells_stats(cells, logger, indentation=0):
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
+
 def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="INFO", timeout=1.0,
                           verbose=True, own_hostname='localhost', db_hostname='localhost'):
     if not verbose:

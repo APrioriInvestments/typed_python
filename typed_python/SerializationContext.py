@@ -26,6 +26,7 @@ import logging
 _reconstruct = numpy.array([1, 2, 3]).__reduce__()[0]
 _ndarray = numpy.ndarray
 
+
 def createEmptyFunction(ast):
     return evaluateFunctionPyAst(ast)
 

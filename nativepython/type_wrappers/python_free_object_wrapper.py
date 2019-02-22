@@ -17,6 +17,7 @@ from typed_python import NoneType
 import nativepython.native_ast as native_ast
 import nativepython
 
+
 class PythonFreeObjectWrapper(Wrapper):
     """Wraps an arbitrary python object we don't know how to convert.
 

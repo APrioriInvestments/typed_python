@@ -31,6 +31,7 @@ import time
 
 test_schema = Schema("core.web.test")
 
+
 @test_schema.define
 class Thing:
     k = Indexed(int)

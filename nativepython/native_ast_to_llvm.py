@@ -27,13 +27,16 @@ exception_type_llvm = llvmlite.ir.LiteralStructType([llvm_i8ptr, llvm_i32])
 #just hardcoded for now. We check this in the compiler to ensure it's consistent.
 pointer_size = 8
 
+
 def llvm_bool(i):
     return llvmlite.ir.Constant(llvm_i1, i)
+
 
 def assertTagDictsSame(left_tags, right_tags):
     for which in [left_tags, right_tags]:
         for tag in which:
             assert tag in left_tags and tag in right_tags and right_tags[tag] is left_tags[tag], "Tag %s is not the same" % tag
+
 
 def type_to_llvm_type(t):
     if t.matches.Void:
@@ -73,6 +76,8 @@ def type_to_llvm_type(t):
     assert False, "Can't handle %s yet" % t
 
 strings_ever = [0]
+
+
 def constant_to_typed_llvm_value(module, builder, c):
     if c.matches.Float and c.bits == 64:
         return TypedLLVMValue(
@@ -132,6 +137,7 @@ def constant_to_typed_llvm_value(module, builder, c):
 
     assert False, c
 
+
 class TypedLLVMValue(object):
     def __init__(self, llvm_value, native_type):
         object.__init__(self)
@@ -151,6 +157,7 @@ class TypedLLVMValue(object):
 
     def __repr__(self):
         return str(self)
+
 
 class TeardownOnScopeExit:
     def __init__(self, converter, parent_scope):
@@ -336,6 +343,7 @@ class TeardownOnScopeExit:
                 self.builder.branch(block)
 
             generator(tags, target_resume_block)
+
 
 class FunctionConverter:
     def __init__(self,
@@ -1100,6 +1108,7 @@ class FunctionConverter:
 
         assert False, "can't handle %s" % repr(expr)
 
+
 def populate_needed_externals(external_function_references, module):
     def define(fname, output, inputs, vararg=False):
         external_function_references[fname] = \
@@ -1117,6 +1126,7 @@ def populate_needed_externals(external_function_references, module):
     define("__cxa_end_catch", llvm_i8ptr, [llvm_i8ptr])
     define("__cxa_begin_catch", llvm_i8ptr, [llvm_i8ptr])
     define("__gxx_personality_v0", llvm_i32, [], vararg=True)
+
 
 class Converter(object):
     def __init__(self):

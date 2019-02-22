@@ -30,6 +30,7 @@ from typed_python import *
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class NativeFunctionConversionContext:
     def __init__(self, converter, input_types, output_type, generatingFunction):
         self.varnames = 0
@@ -117,6 +118,7 @@ class TypedCallTarget(object):
             [str(x) for x in self.input_types],
             str(self.output_type)
             )
+
 
 class PythonToNativeConverter(object):
     def __init__(self):

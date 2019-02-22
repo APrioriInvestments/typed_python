@@ -21,6 +21,7 @@ from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObje
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def __repr__(self):
         return "Wrapper(TypeObject(%s))" % self.typeRepresentation.__qualname__

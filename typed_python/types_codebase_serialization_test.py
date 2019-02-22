@@ -18,8 +18,10 @@ from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int6
     Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function, SerializationContext
 from typed_python.Codebase import Codebase
 
+
 def thisIsAFunction():
     return 10
+
 
 class TypesCodebaseSerializationTest(unittest.TestCase):
     def test_create_current_codebase(self):

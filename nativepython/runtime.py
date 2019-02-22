@@ -25,6 +25,7 @@ _singleton = [None]
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
+
 class Runtime:
     @staticmethod
     def singleton():
@@ -102,6 +103,7 @@ class Runtime:
             return result
 
         assert False, f
+
 
 def Entrypoint(f):
     """Indicate that a function is a natural entrypoint into compiled code.

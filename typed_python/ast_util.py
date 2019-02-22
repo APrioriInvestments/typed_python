@@ -21,22 +21,28 @@ import textwrap
 
 LINENO_ATTRIBUTE_NAME = 'lineno'
 
+
 class CantGetSourceTextError(Exception):
     pass
+
 
 class VisitDone(Exception):
     """Raise this exception to short-circuit the visitor once we're done
     searching."""
     pass
 
+
 def areAstsIdentical(ast1, ast2):
     return ast.dump(ast1) == ast.dump(ast2)
 
 _all_caches = []
+
+
 def clearAllCaches():
     inspect.pathExistsOnDiskCache_.clear()
     for a in _all_caches:
         a.clear()
+
 
 def CachedByArgs(f):
     """Function decorator that adds a simple memo to 'f' on its arguments"""
@@ -52,6 +58,7 @@ def CachedByArgs(f):
 
     return inner
 
+
 def getSourceText(pyObject):
     source, lineno = getSourceLines(pyObject)
     # Create a prefix of (lineno - 1) blank lines to keep track of line numbers
@@ -63,6 +70,8 @@ def getSourceText(pyObject):
     return textwrap.dedent(blankLines + "".join(source))
 
 sourceFileCache_ = {}
+
+
 def getSourceFilenameAndText(pyObject):
     try:
         sourceFile = inspect.getsourcefile(pyObject)
@@ -86,6 +95,7 @@ def getSourceFilenameAndText(pyObject):
 
     return sourceFileCache_[sourceFile], sourceFile
 
+
 def getSourceLines(pyObject):
     try:
         tr = inspect.getsourcelines(pyObject)
@@ -93,12 +103,15 @@ def getSourceLines(pyObject):
         raise CantGetSourceTextError(str(e))
     return tr
 
+
 @CachedByArgs
 def pyAstFromText(text):
     return ast.parse(text)
 
+
 def pyAstFor(pyObject):
     return pyAstFromText(getSourceText(pyObject))
+
 
 @CachedByArgs
 def getAstFromFilePath(filename):
@@ -107,6 +120,7 @@ def getAstFromFilePath(filename):
         return pyAstFromText("".join(linesOrNone))
 
     return None
+
 
 class FindEnclosingFunctionVisitor(ast.NodeVisitor):
     """"Visitor used to find the enclosing function at a given line of code.
@@ -147,6 +161,7 @@ class FindEnclosingFunctionVisitor(ast.NodeVisitor):
 def findEnclosingFunctionName(astNode, lineno):
     vis = FindEnclosingFunctionVisitor(lineno)
     return vis.find(astNode)
+
 
 class _AtLineNumberVisitor(ast.NodeVisitor):
     """Collects various types of nodes occurring at a given line number."""

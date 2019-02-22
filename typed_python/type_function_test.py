@@ -15,6 +15,7 @@
 from typed_python import TypeFunction, Class, ListOf, OneOf, Alternative, Member, SerializationContext
 import unittest
 
+
 class TypeFunctionTest(unittest.TestCase):
     def test_basic(self):
         @TypeFunction

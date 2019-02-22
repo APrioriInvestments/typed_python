@@ -365,6 +365,7 @@ def getTestServiceModule(version):
             """.format(version=version))
     }
 
+
 class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
     def schemasToSubscribeTo(self):
         return [schema]

@@ -29,10 +29,12 @@ from typed_python import *
 
 _type_to_type_wrapper_cache = {}
 
+
 def typedPythonTypeToTypeWrapper(t):
     if t not in _type_to_type_wrapper_cache:
         _type_to_type_wrapper_cache[t] = _typedPythonTypeToTypeWrapper(t)
     return _type_to_type_wrapper_cache[t]
+
 
 def _typedPythonTypeToTypeWrapper(t):
     if isinstance(t, Wrapper):
@@ -102,6 +104,7 @@ def _typedPythonTypeToTypeWrapper(t):
         return PythonObjectOfTypeWrapper(t)
 
     assert False, t
+
 
 def pythonObjectRepresentation(context, f):
     if f is len:

@@ -31,6 +31,7 @@ from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.aws.AwsWorkerBootService import AwsWorkerBootService, AwsApi
 from object_database.service_manager.aws.AwsWorkerBootService import schema as aws_worker_boot_schema
 
+
 def main(argv):
     parser = argparse.ArgumentParser("Control the AWS service")
 

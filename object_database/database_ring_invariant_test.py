@@ -31,6 +31,7 @@ from object_database.util import configureLogging
 
 schema = Schema("test_schema")
 
+
 @schema.define
 class Ring:
     left = Indexed(OneOf(None, schema.Ring))

@@ -24,6 +24,7 @@ import nativepython
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
+
 class BoundMethodWrapper(Wrapper):
     def __init__(self, t):
         super().__init__(t)

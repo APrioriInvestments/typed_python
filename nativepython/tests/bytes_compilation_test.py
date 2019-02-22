@@ -19,6 +19,7 @@ import unittest
 import time
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
@@ -31,6 +32,7 @@ someBytes = [
     b"\x00\x01",
     b"\x00\x01\x02\x00\x01",
     ]
+
 
 class TestBytesCompilation(unittest.TestCase):
     def test_bytes_passing_and_refcounting(self):

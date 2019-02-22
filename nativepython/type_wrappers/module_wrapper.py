@@ -20,6 +20,7 @@ from nativepython.type_wrappers.exceptions import generateThrowException
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class ModuleWrapper(Wrapper):
     is_pod = True
     is_empty = False

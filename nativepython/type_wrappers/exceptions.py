@@ -15,6 +15,7 @@
 import nativepython.native_ast as native_ast
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
+
 def generateThrowException(context, exception):
     return (
         #as a short-term hack, use a runtime function to stash this where the callsite can pick it up.

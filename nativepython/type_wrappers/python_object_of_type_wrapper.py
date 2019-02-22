@@ -19,6 +19,7 @@ from nativepython.typed_expression import TypedExpression
 import nativepython.native_ast as native_ast
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
+
 class PythonObjectOfTypeWrapper(Wrapper):
     is_pod = False
     is_empty = False

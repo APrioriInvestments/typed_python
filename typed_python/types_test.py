@@ -37,32 +37,38 @@ def typeFor(t):
     assert not isinstance(t, list), t
     return type(t)
 
+
 def typeForSeveral(t):
     ts = set(typeFor(a) for a in t)
     if len(ts) == 1:
         return list(ts)[0]
     return OneOf(*ts)
 
+
 def makeTupleOf(*args):
     if not args:
         return TupleOf(int)()
     return TupleOf(typeForSeveral(args))(args)
+
 
 def makeNamedTuple(**kwargs):
     if not kwargs:
         return NamedTuple()()
     return NamedTuple(**{k: typeFor(v) for k, v in kwargs.items()})(**kwargs)
 
+
 def makeTuple(*args):
     if not args:
         return Tuple()()
     return Tuple(*[typeFor(v) for v in args])(args)
+
 
 def makeDict(d):
     if not d:
         return ConstDict(int, int)()
 
     return ConstDict(typeForSeveral(d.keys()), typeForSeveral(d.values()))(d)
+
 
 def makeAlternative(severalDicts):
     types = list(
@@ -94,12 +100,14 @@ def makeAlternative(severalDicts):
 
     return res
 
+
 def choice(x):
     #numpy.random.choice([1,(1,2)]) blows up because it looks 'multidimensional'
     #so we have to pick from a list of indices
     if not isinstance(x, list):
         x = list(x)
     return x[numpy.random.choice(list(range(len(x))))]
+
 
 class RandomValueProducer:
     def __init__(self):

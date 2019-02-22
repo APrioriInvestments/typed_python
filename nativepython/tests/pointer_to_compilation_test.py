@@ -20,9 +20,11 @@ import time
 import numpy
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
 
 class TestPointerToCompilation(unittest.TestCase):
     def test_pointer_operations(self):

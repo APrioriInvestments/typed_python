@@ -15,14 +15,17 @@
 from typed_python import *
 import textwrap
 
+
 def indent(x, indentBy="    "):
     return textwrap.indent(str(x), indentBy)
+
 
 def type_attr_ix(t, attr):
     for i in range(len(t.element_types)):
         if t.element_types[i][0] == attr:
             return i
     return None
+
 
 def type_str(c):
     if c.matches.Function:
@@ -47,6 +50,7 @@ def type_str(c):
         return str(c.element_type) + "[" + str(c.count) + "]"
 
     assert False, type(c)
+
 
 def raising(e):
     raise e
@@ -77,6 +81,7 @@ def const_truth_value(c):
     if c.matches.Int:
         return c.val != 0
     return False
+
 
 def const_str(c):
     if c.matches.Float:
@@ -163,6 +168,7 @@ NamedCallTarget = NamedTuple(
                 can_throw=bool
                 )
 
+
 def filterCallTargetArgs(args):
     """Given a list of native expressions or typed expressions, filter them down,
     dropping 'empty' arguments, as per our calling convention."""
@@ -190,6 +196,7 @@ CallTarget = Alternative("CallTarget",
     call=lambda self, *args: Expression.Call(target=self, args=filterCallTargetArgs(args))
     )
 
+
 def teardown_str(self):
     if self.matches.Always:
         return str(self.expr)
@@ -202,6 +209,7 @@ Teardown = Alternative("Teardown",
     Always={'expr': Expression},
     __str__=teardown_str
     )
+
 
 def expr_concatenate(self, other):
     if self.matches.Constant:
@@ -326,6 +334,7 @@ def expr_str(self):
 
     assert False
 
+
 def expr_is_simple(expr):
     if expr.matches.StackSlot:
         return True
@@ -440,35 +449,43 @@ emptyStructExpr = Expression.Constant(val=Constant.Struct(elements=[]))
 trueExpr = Expression.Constant(val=Constant.Int(bits=1, val=1, signed=False))
 falseExpr = Expression.Constant(val=Constant.Int(bits=1, val=0, signed=False))
 
+
 def const_float_expr(f):
     return Expression.Constant(
         val=Constant.Float(bits=64, val=f)
         )
+
 
 def const_int_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=64, val=i, signed=True)
         )
 
+
 def const_int32_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=32, val=i, signed=True)
         )
+
 
 def const_uint8_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=8, val=i, signed=False)
         )
 
+
 def const_bool_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=1, val=i, signed=False)
         )
 
+
 def const_utf8_cstr(i):
     return Expression.Constant(
         val=Constant.ByteArray(val=i.encode('utf-8'))
         )
+
+
 def const_bytes_cstr(i):
     return Expression.Constant(
         val=Constant.ByteArray(val=i)
@@ -494,6 +511,7 @@ Int8Ptr = Type.Pointer(value_type=Type.Int(bits=8, signed=True))
 Float64 = Type.Float(bits=64)
 Int64 = Type.Int(bits=64, signed=True)
 Int32 = Type.Int(bits=32, signed=True)
+
 
 def var(name):
     return Expression.Variable(name=name)

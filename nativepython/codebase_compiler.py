@@ -26,6 +26,7 @@ from typed_python.internals import FunctionOverload
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
+
 class CompiledCodebase:
     def __init__(self, codebase, sharedObject, nativeTargets, typedTargets):
         self.codebase = codebase
@@ -50,6 +51,7 @@ class CompiledCodebase:
                 callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
                 [i.typeRepresentation for i in callTarget.input_types]
                 )
+
 
 class CodebaseCompiler:
     def __init__(self, codebase):

@@ -22,6 +22,7 @@ from typed_python import (
     Alternative, serialize, deserialize, Value, Class, Member, _types
 )
 
+
 class DefaultVal(Class):
     x0 = Member(int)
     x1 = Member(int, 5)
@@ -52,6 +53,7 @@ class Exterior(Class):
     def __init__(self):
         self.i = Interior()
 
+
 class ClassWithInit(Class):
     x = Member(int)
     y = Member(float)
@@ -69,6 +71,7 @@ class ClassWithInit(Class):
     def __init__(self, x):
         self.x = x
 
+
 class ClassWithComplexDispatch(Class):
     x = Member(int)
 
@@ -77,6 +80,7 @@ class ClassWithComplexDispatch(Class):
 
     def f(self, y):
         return 'y'
+
 
 class NativeClassTypesTests(unittest.TestCase):
     def test_member_default_value(self):

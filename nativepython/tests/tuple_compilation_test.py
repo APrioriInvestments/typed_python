@@ -19,9 +19,11 @@ import unittest
 import time
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
 
 class TestTupleCompilation(unittest.TestCase):
     def test_tuple_passing(self):

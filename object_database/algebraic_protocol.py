@@ -12,11 +12,14 @@ from typed_python import serialize, deserialize
 sizeType = '<L'
 longLength = struct.calcsize(sizeType)
 
+
 def longToString(l):
     return struct.pack(sizeType, l)
 
+
 def stringToLong(l):
     return struct.unpack(sizeType, l)[0]
+
 
 class AlgebraicProtocol(asyncio.Protocol):
     def __init__(self, receiveType, sendType):

@@ -252,6 +252,7 @@ def tokenFromString(text):
 
 VALID_LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL']
 
+
 def checkLogLevelValidity(level: str):
     if level not in VALID_LOG_LEVELS:
         raise Exception(

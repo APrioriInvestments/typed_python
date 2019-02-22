@@ -16,6 +16,7 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from typed_python import NoneType
 import nativepython.native_ast as native_ast
 
+
 class RangeWrapper(Wrapper):
     is_pod = True
     is_empty = False
@@ -39,6 +40,7 @@ class RangeWrapper(Wrapper):
 
         return super().convert_call(context, expr, args, kwargs)
 
+
 class RangeInstanceWrapper(Wrapper):
     is_pod = True
     is_empty = False
@@ -57,6 +59,7 @@ class RangeInstanceWrapper(Wrapper):
                     instance.expr.ElementPtrIntegers(0, 1).store(expr.nonref_expr)
                 )
         return super().convert_method_call(context, expr, methodname, args, kwargs)
+
 
 class RangeIteratorWrapper(Wrapper):
     is_pod = True

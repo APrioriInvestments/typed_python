@@ -24,6 +24,7 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 class ConstDictWrapper(RefcountedWrapper):
     is_pod = False
     is_empty = False

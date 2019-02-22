@@ -40,6 +40,7 @@ VERBOSE = True
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
+
 class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
     def dialWorkers(self, workerCount):
         with self.database.transaction():

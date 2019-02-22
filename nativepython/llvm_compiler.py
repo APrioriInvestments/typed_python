@@ -49,6 +49,7 @@ pointer_size = (
 
 assert pointer_size == native_ast_to_llvm.pointer_size
 
+
 def sizeof_native_type(native_type):
     if native_type.matches.Void:
         return 0
@@ -60,6 +61,8 @@ def sizeof_native_type(native_type):
 
 #there can be only one llvm engine alive at once.
 _engineCache = []
+
+
 def create_execution_engine():
     if _engineCache:
         return _engineCache[0]
@@ -80,6 +83,7 @@ def create_execution_engine():
 
     return engine, pass_manager
 
+
 class NativeFunctionPointer:
     def __init__(self, fname, fp, input_types, output_type):
         self.fp = fp
@@ -90,6 +94,7 @@ class NativeFunctionPointer:
     def __repr__(self):
         return "NativeFunctionPointer(name=%s,addr=%x,in=%s,out=%s)" \
             % (self.fname, self.fp, [str(x) for x in self.input_types], str(self.output_type))
+
 
 class BinarySharedObject:
     """Models a shared object library (.so) loadable on linux systems."""

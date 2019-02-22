@@ -19,6 +19,7 @@ import unittest
 import time
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
@@ -38,6 +39,7 @@ for s1 in list(someStrings):
     for s2 in list(someStrings):
         someStrings.append(s1+s2)
 someStrings = sorted(set(someStrings))
+
 
 class TestStringCompilation(unittest.TestCase):
     def test_string_passing_and_refcounting(self):

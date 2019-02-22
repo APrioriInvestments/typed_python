@@ -26,6 +26,7 @@ import nativepython
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
+
 def makeAlternativeWrapper(t):
     if t.__typed_python_category__ == "ConcreteAlternative":
         return ConcreteAlternativeWrapper(t)
@@ -34,6 +35,7 @@ def makeAlternativeWrapper(t):
         return SimpleAlternativeWrapper(t)
     else:
         return AlternativeWrapper(t)
+
 
 class SimpleAlternativeWrapper(Wrapper):
     """Wrapper around alternatives with all empty arguments."""
@@ -70,6 +72,7 @@ class SimpleAlternativeWrapper(Wrapper):
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
             )
+
 
 class AlternativeWrapper(RefcountedWrapper):
     is_empty = False
@@ -170,6 +173,7 @@ class AlternativeWrapper(RefcountedWrapper):
         if index == -1:
             return context.constant(False)
         return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0, 1).load().eq(index))
+
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
     is_empty = False
@@ -279,6 +283,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
+
 
 class AlternativeMatchingWrapper(Wrapper):
     def convert_attribute(self, context, instance, attribute):

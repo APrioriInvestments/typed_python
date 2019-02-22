@@ -54,6 +54,7 @@ pyCompOp = {
     python_ast.ComparisonOp.GtE(): native_ast.BinaryOp.GtE()
     }
 
+
 class ArithmeticTypeWrapper(Wrapper):
     is_pod = True
     is_pass_by_ref = False
@@ -185,6 +186,7 @@ class Int64Wrapper(ArithmeticTypeWrapper):
 
         return super().convert_bin_op(context, left, op, right)
 
+
 class BoolWrapper(ArithmeticTypeWrapper):
     def __init__(self):
         super().__init__(Bool)
@@ -227,6 +229,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     )
 
         return super().convert_bin_op(context, left, op, right)
+
 
 class Float64Wrapper(ArithmeticTypeWrapper):
     def __init__(self):

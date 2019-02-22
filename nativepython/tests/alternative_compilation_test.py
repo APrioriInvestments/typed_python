@@ -19,9 +19,11 @@ import unittest
 import time
 import psutil
 
+
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
 
 class TestAlternativeCompilation(unittest.TestCase):
     def test_simple_alternative_passing(self):
