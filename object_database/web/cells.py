@@ -1522,7 +1522,7 @@ class Clickable(Cell):
         val = self.f()
         if isinstance(val, str):
             self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(val, "'")), '"'))
-        
+
 class Button(Clickable):
     def __init__(self, *args, small=False, **kwargs):
         Clickable.__init__(self, *args, **kwargs)
