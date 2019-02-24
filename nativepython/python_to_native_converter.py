@@ -23,10 +23,9 @@ from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
 from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext, FunctionOutput
+from typed_python import *
 
 NoneExprType = NoneWrapper()
-
-from typed_python import *
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
