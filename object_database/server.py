@@ -574,17 +574,16 @@ class Server:
 
             connectedChannel.subscribedTypes[(schema, typename)] = -1 if not isLazy else self._cur_transaction_num
 
-    def _sendPartialSubscription(
-                self,
-                connectedChannel,
-                schema_name,
-                typename,
-                fieldname_and_value,
-                typedef,
-                identities,
-                identities_left_to_send,
-                BATCH_SIZE=100,
-                checkPending=True):
+    def _sendPartialSubscription(self,
+                                 connectedChannel,
+                                 schema_name,
+                                 typename,
+                                 fieldname_and_value,
+                                 typedef,
+                                 identities,
+                                 identities_left_to_send,
+                                 BATCH_SIZE=100,
+                                 checkPending=True):
 
         # get some objects to send
         kvs = {}

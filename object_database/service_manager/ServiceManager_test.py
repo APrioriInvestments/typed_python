@@ -283,8 +283,8 @@ class HappyService(ServiceBase):
             Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) +
             Expands(Text("Closed"), Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
         ) + Button("go to google", "http://google.com/") + SubscribedSequence(
-                lambda: Happy.lookupAll(),
-                lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
+            lambda: Happy.lookupAll(),
+            lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
         )
 
     def doWork(self, shouldStop):

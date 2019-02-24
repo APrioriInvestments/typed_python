@@ -289,8 +289,8 @@ class AwsApi:
         results = {}
 
         for x in self.ec2_client.get_paginator('describe_spot_price_history').paginate(
-                    Filters=[{'Name': 'product-description', 'Values': ['Linux/UNIX']}],
-                    StartTime=datetime.datetime.now() - datetime.timedelta(hours=1)
+            Filters=[{'Name': 'product-description', 'Values': ['Linux/UNIX']}],
+            StartTime=datetime.datetime.now() - datetime.timedelta(hours=1)
         ):
             for record in x['SpotPriceHistory']:
                 ts = record['Timestamp']
@@ -542,11 +542,15 @@ class AwsWorkerBootService(ServiceBase):
             rendererFun=lambda s, field: cells.Subscribed(lambda:
                 s.instance_type if field == 'Instance Type' else
                 s.booted if field == 'Booted' else
-                cells.Dropdown(s.desired, [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10, 101, 10))])
-                        if field == 'Desired' else
+                cells.Dropdown(
+                    s.desired,
+                    [(str(ct), bootCountSetter(s, ct)) for ct in list(range(10)) + list(range(10, 101, 10))]
+                ) if field == 'Desired' else
                 s.spot_booted if field == 'SpotBooted' else
-                cells.Dropdown(s.spot_desired, [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10, 101, 10))])
-                        if field == 'SpotDesired' else
+                cells.Dropdown(
+                    s.spot_desired,
+                    [(str(ct), bootCountSetterSpot(s, ct)) for ct in list(range(10)) + list(range(10, 101, 10))]
+                ) if field == 'SpotDesired' else
                 ("" if s.observedLimit is None else s.observedLimit) if field == 'ObservedLimit' else
                 ("Yes" if s.capacityConstrained else "") if field == 'CapacityConstrained' else
                 valid_instance_types[s.instance_type]['COST'] if field == 'COST' else

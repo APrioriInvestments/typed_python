@@ -917,18 +917,16 @@ class FunctionConverter:
                             native_ast.Bool
                         )
 
-            for py_op, floatop, intop_s, intop_u in [
-                        ('Add', 'fadd', 'add', 'add'),
-                        ('Mul', 'fmul', 'mul', 'mul'),
-                        ('Div', 'fdiv', 'sdiv', 'udiv'),
-                        ('Mod', 'frem', 'srem', 'urem'),
-                        ('Sub', 'fsub', 'sub', 'sub'),
-                        ('LShift', None, 'shl', 'shl'),
-                        ('RShift', None, 'ashr', 'lshr'),
-                        ('BitOr', None, 'or_', 'or_'),
-                        ('BitXor', None, 'xor', 'xor'),
-                        ('BitAnd', None, 'and_', 'and_')
-            ]:
+            for py_op, floatop, intop_s, intop_u in [('Add', 'fadd', 'add', 'add'),
+                                                     ('Mul', 'fmul', 'mul', 'mul'),
+                                                     ('Div', 'fdiv', 'sdiv', 'udiv'),
+                                                     ('Mod', 'frem', 'srem', 'urem'),
+                                                     ('Sub', 'fsub', 'sub', 'sub'),
+                                                     ('LShift', None, 'shl', 'shl'),
+                                                     ('RShift', None, 'ashr', 'lshr'),
+                                                     ('BitOr', None, 'or_', 'or_'),
+                                                     ('BitXor', None, 'xor', 'xor'),
+                                                     ('BitAnd', None, 'and_', 'and_')]:
                 if getattr(expr.op.matches, py_op):
                     assert l.native_type == r.native_type, \
                         "malformed types: expect l&r to be the same but got %s,%s,%s\n\nexpr=%s"\
@@ -1181,7 +1179,7 @@ class Converter(object):
             arg_assignments = {}
             for i in range(len(func.args)):
                 arg_assignments[definition.args[i][0]] = \
-                        TypedLLVMValue(func.args[i], definition.args[i][1])
+                    TypedLLVMValue(func.args[i], definition.args[i][1])
 
             block = func.append_basic_block('entry')
             builder = llvmlite.ir.IRBuilder(block)
