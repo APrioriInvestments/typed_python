@@ -65,11 +65,11 @@ class ListOfWrapper(TupleOrListOfWrapper):
                     return
 
                 native = context.converter.defineNativeFunction(
-                            'pop(' + self.typeRepresentation.__name__ + ")",
-                            ('util', self, 'pop'),
-                            [self, int],
-                            self.underlyingWrapperType,
-                            self.generatePop
+                    'pop(' + self.typeRepresentation.__name__ + ")",
+                    ('util', self, 'pop'),
+                    [self, int],
+                    self.underlyingWrapperType,
+                    self.generatePop
                 )
 
                 if self.underlyingWrapperType.is_pass_by_ref:

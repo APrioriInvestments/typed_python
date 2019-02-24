@@ -73,10 +73,10 @@ def loadTestModules(testFiles, rootDir):
 def fileNameToModuleName(fileName, rootDir):
     tr = (
         fileName
-            .replace('.py', '')
-            .replace(rootDir, '', 1)  # only replace the first occurrence
-            .replace(os.sep, '.')
-            )
+        .replace('.py', '')
+        .replace(rootDir, '', 1)  # only replace the first occurrence
+        .replace(os.sep, '.')
+    )
     if tr.startswith('.'):
         return tr[1:]
     return tr

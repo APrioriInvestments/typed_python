@@ -2072,7 +2072,8 @@ class _PlotUpdater(Cell):
 
             try:
                 jsonDataToDraw = self.calculatedDataJson()
-                self.postscript = """
+                self.postscript = (
+                    """
                     plotDiv = document.getElementById('plot__identity__');
                     data = __data__.map(mapPlotlyData)
 
@@ -2082,9 +2083,10 @@ class _PlotUpdater(Cell):
                         plotDiv.layout,
                         );
 
-                    """.replace("__identity__", self.chartId).replace("__data__",
-                        json.dumps(jsonDataToDraw)
-                        )
+                    """
+                    .replace("__identity__", self.chartId)
+                    .replace("__data__", json.dumps(jsonDataToDraw))
+                )
             except SubscribeAndRetry:
                 raise
             except Exception:

@@ -738,10 +738,8 @@ class NativeTypesTests(unittest.TestCase):
         self.assertLess(t({}), t({'a': 'b'}))
 
     def test_const_dict_lookup(self):
-        for type_to_use, vals in [
-                    (int, list(range(20))),
-                    (bytes, [b'1', b'2', b'3', b'4', b'5'])
-        ]:
+        for type_to_use, vals in [(int, list(range(20))),
+                                  (bytes, [b'1', b'2', b'3', b'4', b'5'])]:
             t = ConstDict(type_to_use, type_to_use)
 
             for _ in range(10):

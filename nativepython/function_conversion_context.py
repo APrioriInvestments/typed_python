@@ -543,8 +543,8 @@ class FunctionConversionContext(object):
 
         if destructors:
             expr = native_ast.Expression.Finally(
-                    teardowns=destructors,
-                    expr=expr
+                teardowns=destructors,
+                expr=expr
             )
 
         return expr

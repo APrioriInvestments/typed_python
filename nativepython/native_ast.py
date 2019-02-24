@@ -68,12 +68,12 @@ Type = Alternative("Type",
     __str__=type_str,
     pointer=lambda self: Type.Pointer(value_type=self),
     zero=lambda self: Expression.Constant(
-            Constant.Void() if self.matches.Void else
-            Constant.Float(val=0.0, bits=self.bits) if self.matches.Float else
-            Constant.Int(val=0, bits=self.bits, signed=self.signed) if self.matches.Int else
-            Constant.Struct(elements=[(name, t.zero()) for name, t in self.element_types]) if self.matches.Struct else
-            Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
-            raising(Exception("Can't make a zero value from %s" % self))
+        Constant.Void() if self.matches.Void else
+        Constant.Float(val=0.0, bits=self.bits) if self.matches.Float else
+        Constant.Int(val=0, bits=self.bits, signed=self.signed) if self.matches.Int else
+        Constant.Struct(elements=[(name, t.zero()) for name, t in self.element_types]) if self.matches.Struct else
+        Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
+        raising(Exception("Can't make a zero value from %s" % self))
     )
 )
 
@@ -161,13 +161,13 @@ Expression = lambda: Expression
 Teardown = lambda: Teardown
 
 NamedCallTarget = NamedTuple(
-                name=str,
-                arg_types=TupleOf(Type),
-                output_type=Type,
-                external=bool,
-                varargs=bool,
-                intrinsic=bool,
-                can_throw=bool
+    name=str,
+    arg_types=TupleOf(Type),
+    output_type=Type,
+    external=bool,
+    varargs=bool,
+    intrinsic=bool,
+    can_throw=bool
 )
 
 
@@ -233,7 +233,7 @@ def expr_str(self):
         e = str(self.expr)
         if "\n" in self.comment or "\n" in e:
             return "\n\t/*" + self.comment + "*/\n"\
-                    + indent(str(self.expr).rstrip(), "    ") + "\n"
+                + indent(str(self.expr).rstrip(), "    ") + "\n"
         else:
             return "/*" + str(self.comment) + "*/" + str(self.expr)
     if self.matches.Constant:
@@ -275,12 +275,12 @@ def expr_str(self):
         f = str(self.false)
         if "\n" in t or "\n" in f:
             return "if " + str(self.cond) + ":\n"\
-                    + indent(t).rstrip() + ("\nelse:\n" + indent(f).rstrip() if self.false != nullExpr else "")
+                + indent(t).rstrip() + ("\nelse:\n" + indent(f).rstrip() if self.false != nullExpr else "")
         else:
             return "((%s) if %s else (%s))" % (t, str(self.cond), f)
     if self.matches.MakeStruct:
         return "struct(" + \
-                ",".join("%s=%s" % (k, str(v)) for k, v in self.args) + ")"
+            ",".join("%s=%s" % (k, str(v)) for k, v in self.args) + ")"
     if self.matches.While:
         t = str(self.while_true)
         f = str(self.orelse)

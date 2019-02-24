@@ -56,9 +56,9 @@ class BoundCompiledMethodWrapper(Wrapper):
         clsType = self.wrapped_type
 
         return self.wrapped_type.convert_method_call(
-                context,
-                left.changeType(self.wrapped_type),
-                self.method_name,
-                args,
-                kwargs
+            context,
+            left.changeType(self.wrapped_type),
+            self.method_name,
+            args,
+            kwargs
         )
