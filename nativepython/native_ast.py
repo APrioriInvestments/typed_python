@@ -312,7 +312,7 @@ def expr_str(self):
     if self.matches.Finally:
         return (
             "try:\n" + indent(str(self.expr)) + "\nfinally:\n"
-                + indent("\n".join(str(x) for x in self.teardowns))
+            + indent("\n".join(str(x) for x in self.teardowns))
         )
     if self.matches.TryCatch:
         return (

@@ -440,9 +440,11 @@ class View(object):
                 writes,
                 {k: v for k, v in self._set_adds.items() if v},
                 {k: v for k, v in self._set_removes.items() if v},
-                self._reads.union(set(writes)) if self._insistReadsConsistent
-                    else set(writes) if self._insistWritesConsistent
-                    else set(),
+                (
+                    self._reads.union(set(writes)) if self._insistReadsConsistent else
+                    set(writes) if self._insistWritesConsistent else
+                    set()
+                ),
                 self._indexReads if self._insistIndexReadsConsistent else set(),
                 tid,
                 confirmCallback

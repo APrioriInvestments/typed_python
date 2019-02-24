@@ -934,10 +934,10 @@ class Server:
                 if idsToAddToTransaction:
                     self._increaseBroadcastTransactionToInclude(
                         channel,  # deliberately just using whatever random channel, under
-                                 # the assumption they're all the same. it would be better
-                                 # to explictly compute the union of the relevant set of defined fields,
-                                 # as its possible one channel has more fields for a type than another
-                                 # and we'd like to broadcast them all
+                                  # the assumption they're all the same. it would be better
+                                  # to explictly compute the union of the relevant set of
+                                  # defined fields, as its possible one channel has more fields
+                                  # for a type than another and we'd like to broadcast them all
                         index_key, idsToAddToTransaction, key_value, set_adds, set_removes)
 
         transaction_message = None

@@ -44,7 +44,7 @@ ctypes.CDLL(_types.__file__, mode=ctypes.RTLD_GLOBAL)
 
 pointer_size = (
     llvmlite.ir.PointerType(llvmlite.ir.DoubleType())
-        .get_abi_size(target_machine.target_data)
+    .get_abi_size(target_machine.target_data)
 )
 
 assert pointer_size == native_ast_to_llvm.pointer_size
@@ -56,7 +56,7 @@ def sizeof_native_type(native_type):
 
     return (
         native_ast_to_llvm.type_to_llvm_type(native_type)
-            .get_abi_size(target_machine.target_data)
+        .get_abi_size(target_machine.target_data)
     )
 
 

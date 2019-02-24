@@ -266,8 +266,8 @@ class ServiceInstance:
         """Is this service instance up and intended to be up?"""
         return (
             self.state in ("Running", "Initializing", "Booting")
-                and not self.shouldShutdown
-                and (self.connection is None or self.connection.exists())
+            and not self.shouldShutdown
+            and (self.connection is None or self.connection.exists())
         )
 
     state = Indexed(OneOf("Booting", "Initializing", "Running", "Stopped", "FailedToStart", "Crashed"))

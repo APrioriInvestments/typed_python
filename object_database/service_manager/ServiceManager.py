@@ -277,7 +277,7 @@ class ServiceManager(object):
             for service in service_schema.Service.lookupAll():
                 actual_by_service[service] = [
                     x for x in service_schema.ServiceInstance.lookupAll(service=service)
-                        if x.isActive()
+                    if x.isActive()
                 ]
 
         for service, actual_records in actual_by_service.items():

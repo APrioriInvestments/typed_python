@@ -80,22 +80,18 @@ class ConstDictWrapper(RefcountedWrapper):
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
-            expr.nonref_expr.ElementPtrIntegers(0, 4)
-                .elemPtr(
-                    item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-            )
-                .cast(self.keyType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
+                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
+            ).cast(self.keyType.getNativeLayoutType().pointer())
         )
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
-            expr.nonref_expr.ElementPtrIntegers(0, 4)
-                .elemPtr(
-                    item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
-                        .add(native_ast.const_int_expr(self.keyBytecount))
-            )
-                .cast(self.valueType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
+                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
+                .add(native_ast.const_int_expr(self.keyBytecount))
+            ).cast(self.valueType.getNativeLayoutType().pointer())
         )
 
     def convert_bin_op_reverse(self, context, left, op, right):

@@ -874,7 +874,7 @@ class Tabs(Cell):
                 "__items__",
                 "".join(
                     """ ____header___ix____ """.replace('__ix__', str(i))
-                        for i in range(len(self.headersAndChildren))
+                    for i in range(len(self.headersAndChildren))
                 )
             ).replace("__identity__", self._identity)
         )
@@ -933,7 +933,7 @@ class Dropdown(Cell):
                 """.replace(
                     "__onclick__",
                     "websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))"
-                        if not isinstance(onDropdown, str) else
+                    if not isinstance(onDropdown, str) else
                     quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(onDropdown, "'")), '"')
                 ).replace("__ix__", str(i)).replace("__identity__", self.identity)
             )
@@ -1245,10 +1245,10 @@ class Grid(Cell):
                     ("<td>____rowlabel_%s__</td>" % row_ix if self.rowLabelFun is not None else "") +
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
-                            for col_ix in range(len(self.cols))
+                        for col_ix in range(len(self.cols))
                     ) +
                     "</tr>"
-                        for row_ix in range(len(self.rows))
+                    for row_ix in range(len(self.rows))
                 )
             )
         )
@@ -1529,10 +1529,10 @@ class Table(Cell):
                     ("<td>%s</td>" % (row_ix+1)) +
                     "".join(
                         "<td>____child_%s_%s__</td>" % (row_ix, col_ix)
-                            for col_ix in range(len(self.cols))
+                        for col_ix in range(len(self.cols))
                     ) +
                     "</tr>"
-                        for row_ix in range(len(self.rows))
+                    for row_ix in range(len(self.rows))
                 )
             )
         )
@@ -1610,8 +1610,8 @@ class LoadContentsFromUrl(Cell):
 
         self.postscript = (
             "$('#loadtarget__identity__').load('__url__')"
-                .replace("__identity__", self._identity)
-                .replace("__url__", quoteForJs(self.targetUrl, "'"))
+            .replace("__identity__", self._identity)
+            .replace("__url__", quoteForJs(self.targetUrl, "'"))
         )
 
 

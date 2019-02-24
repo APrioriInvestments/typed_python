@@ -930,7 +930,7 @@ class FunctionConverter:
                 if getattr(expr.op.matches, py_op):
                     assert l.native_type == r.native_type, \
                         "malformed types: expect l&r to be the same but got %s,%s,%s\n\nexpr=%s"\
-                            % (py_op, l.native_type, r.native_type, expr)
+                        % (py_op, l.native_type, r.native_type, expr)
                     if l.native_type.matches.Float and floatop is not None:
                         return TypedLLVMValue(
                             getattr(self.builder, floatop)(l.llvm_value, r.llvm_value),
