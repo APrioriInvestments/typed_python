@@ -586,8 +586,8 @@ class ExpressionConversionContext(object):
                     if len(expr_so_far) == 1:
                         return None
                 elif expr_so_far[-1].matches.Constant:
-                    if (expr_so_far[-1].val.val and op.matches.Or or
-                                (not expr_so_far[-1].val.val) and op.matches.And):
+                    if (expr_so_far[-1].val.val and op.matches.Or
+                        or (not expr_so_far[-1].val.val) and op.matches.And):
                         # this is a short-circuit
                         if len(expr_so_far) == 1:
                             return expr_so_far[0]

@@ -1237,7 +1237,7 @@ class Grid(Cell):
             .replace(
                 "__headers__",
                 "".join("<th>____header_%s__</th>" % (col_ix)
-                            for col_ix in range(len(self.cols))))
+                        for col_ix in range(len(self.cols))))
             .replace(
                 "__rows__",
                 "\n".join(
@@ -1521,7 +1521,7 @@ class Table(Cell):
             .replace(
                 "__headers__",
                 "".join('<th style="vertical-align:top">____header_%s__</th>' % (col_ix)
-                            for col_ix in range(len(self.cols))))
+                        for col_ix in range(len(self.cols))))
             .replace(
                 "__rows__",
                 "\n".join(
@@ -2026,11 +2026,10 @@ class _PlotUpdater(Cell):
         assert isinstance(series, (dict, list))
 
         if isinstance(series, dict):
-            return [self.processSeries(callableOrData, name) for name, callableOrData in
-                        series.items()]
+            return [self.processSeries(callableOrData, name)
+                    for name, callableOrData in series.items()]
         else:
-            return [self.processSeries(callableOrData, None) for callableOrData in
-                        series]
+            return [self.processSeries(callableOrData, None) for callableOrData in series]
 
     def callFun(self, fun):
         if not callable(fun):
