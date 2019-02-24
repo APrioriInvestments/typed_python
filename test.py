@@ -172,14 +172,14 @@ def applyFilterActions(filterActions, tests):
 
     for action, pattern in filterActions:
         if action == "add":
-            filtered += [x for x in tests if
-                                    regexMatchesSubstring(pattern, x.id())]
+            filtered += [x for x in tests
+                         if regexMatchesSubstring(pattern, x.id())]
         elif action == "filter":
-            filtered = [x for x in filtered if
-                                    regexMatchesSubstring(pattern, x.id())]
+            filtered = [x for x in filtered
+                        if regexMatchesSubstring(pattern, x.id())]
         elif action == "exclude":
-            filtered = [x for x in filtered if
-                                    not regexMatchesSubstring(pattern, x.id())]
+            filtered = [x for x in filtered
+                        if not regexMatchesSubstring(pattern, x.id())]
         else:
             assert False
 

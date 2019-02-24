@@ -118,8 +118,8 @@ class TestArithmeticCompilation(unittest.TestCase):
         successes = 0
 
         for f in [add, sub, mul, div, mod, lshift, rshift,
-                    pow, bitxor, bitand, bitor, less,
-                    greater, lessEq, greaterEq, eq, neq]:
+                  pow, bitxor, bitand, bitor, less,
+                  greater, lessEq, greaterEq, eq, neq]:
             if f in [pow]:
                 lvals = range(-5, 5)
                 rvals = range(5)

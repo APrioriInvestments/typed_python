@@ -66,8 +66,8 @@ class NativeFunctionConversionContext:
             outputArg = None
 
         inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
-                        else subcontext.pushPod(native_ast.nullExpr, input_types[i])
-                        for i in range(len(input_types))]
+                     else subcontext.pushPod(native_ast.nullExpr, input_types[i])
+                     for i in range(len(input_types))]
 
         native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
 

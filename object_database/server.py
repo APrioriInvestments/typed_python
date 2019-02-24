@@ -324,7 +324,7 @@ class Server:
     def _handleSubscriptionInForeground(self, channel, msg):
         # first see if this would be an easy subscription to handle
         with Timer("Handle subscription in foreground: %s/%s/%s/isLazy=%s over %s",
-                    msg.schema, msg.typename, msg.fieldname_and_value, msg.isLazy, lambda: len(identities)):
+                   msg.schema, msg.typename, msg.fieldname_and_value, msg.isLazy, lambda: len(identities)):
             typedef, identities = self._parseSubscriptionMsg(channel, msg)
 
             if not (msg.isLazy and len(identities) < self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY or len(identities) < self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY):
@@ -539,7 +539,7 @@ class Server:
 
         for fieldname in typedef.indices:
             keys = [keymapping.data_reverse_index_key(schema_name, typename, identity, fieldname)
-                            for identity in identities]
+                    for identity in identities]
 
             vals = self._kvstore.getSeveral(keys)
 
@@ -616,7 +616,7 @@ class Server:
 
         for fieldname in typedef.fields:
             keys = [keymapping.data_key_from_names(schema_name, typename, identity, fieldname)
-                            for identity in to_send]
+                    for identity in to_send]
 
             vals = self._kvstore.getSeveral(keys)
 
