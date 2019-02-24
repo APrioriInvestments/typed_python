@@ -47,8 +47,9 @@ class Schema:
 
     def toDefinition(self):
         return SchemaDefinition({
-            tname: self.typeToDef(t) for tname, t in self._types.items()
-                if issubclass(t, DatabaseObject)
+            tname: self.typeToDef(t)
+            for tname, t in self._types.items()
+            if issubclass(t, DatabaseObject)
         })
 
     def __repr__(self):

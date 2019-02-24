@@ -112,7 +112,7 @@ class StringWrapper(RefcountedWrapper):
         return context.push(str, lambda strRef:
             strRef.expr.store(
                 runtime_functions.string_getitem_int64.call(expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr)
-                    .cast(self.layoutType)
+                .cast(self.layoutType)
             )
         )
 

@@ -270,12 +270,22 @@ class ActiveWebService(ServiceBase):
                     s.service_module_name if field == 'Module' else
                     s.service_class_name if field == 'Class' else
                     s.placement if field == 'Placement' else
-                    Subscribed(lambda: len(service_schema.ServiceInstance.lookupAll(service=s))) if field == 'Active' else
-                    Dropdown(s.target_count, [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts])
-                            if field == 'TargetCount' else
+                    Subscribed(
+                        lambda: len(service_schema.ServiceInstance.lookupAll(service=s))
+                    ) if field == 'Active' else
+                    Dropdown(
+                        s.target_count,
+                        [(str(ct), serviceCountSetter(s, ct)) for ct in serviceCounts]
+                    ) if field == 'TargetCount' else
                     str(s.coresUsed) if field == 'Cores' else
                     str(s.gbRamUsed) if field == 'RAM' else
-                    (Popover(Octicon("alert"), "Failed", Traceback(s.lastFailureReason or "<Unknown>")) if s.isThrottled() else "") if field == 'Boot Status' else
+                    (
+                        Popover(
+                            Octicon("alert"),
+                            "Failed",
+                            Traceback(s.lastFailureReason or "<Unknown>")
+                        ) if s.isThrottled() else ""
+                    ) if field == 'Boot Status' else
                     ""
                 ),
                 maxRowsPerPage=50
@@ -315,7 +325,7 @@ class ActiveWebService(ServiceBase):
             if len(path) == 2:
                 return (
                     Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
-                        .withSerializationContext(serviceObj.getSerializationContext())
+                    .withSerializationContext(serviceObj.getSerializationContext())
                 )
 
             typename = path[2]
@@ -333,14 +343,14 @@ class ActiveWebService(ServiceBase):
             if len(path) == 3:
                 return (
                     serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
-                        .withSerializationContext(serviceObj.getSerializationContext())
+                    .withSerializationContext(serviceObj.getSerializationContext())
                 )
 
             instance = typeObj.fromIdentity(path[3])
 
             return (
                 serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
-                    .withSerializationContext(serviceObj.getSerializationContext())
+                .withSerializationContext(serviceObj.getSerializationContext())
             )
 
         return Traceback("Invalid url path: %s" % path)

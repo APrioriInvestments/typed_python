@@ -556,7 +556,7 @@ class DatabaseConnection:
             self.addSchema(type(t).__schema__)
         self.subscribeMultiple([
             (type(t).__schema__.name, type(t).__qualname__, ("_identity", t._identity), False)
-                for t in objects
+            for t in objects
         ])
 
     def _lazinessForType(self, typeObj, desiredLaziness):
@@ -805,8 +805,8 @@ class DatabaseConnection:
             with self._lock:
                 try:
                     self._transaction_callbacks.pop(msg.transaction_guid)(
-                        TransactionResult.Success() if msg.success
-                            else TransactionResult.RevisionConflict(key=msg.badKey)
+                        TransactionResult.Success() if msg.success else
+                        TransactionResult.RevisionConflict(key=msg.badKey)
                     )
                 except Exception:
                     self._logger.error(

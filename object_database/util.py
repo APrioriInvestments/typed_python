@@ -33,8 +33,9 @@ def formatTable(rows):
     colWidth = [max([len(c) for c in col]) for col in cols]
 
     formattedRows = [
-        "  ".join(row[col] + " " * (colWidth[col] - len(row[col])) for col in range(len(cols)))
-            for row in rows
+        "  ".join(row[col] + " " * (colWidth[col] - len(row[col]))
+        for col in range(len(cols)))
+        for row in rows
     ]
     formattedRows = formattedRows[:1] + [
         "  ".join("-" * colWidth[col] for col in range(len(cols)))

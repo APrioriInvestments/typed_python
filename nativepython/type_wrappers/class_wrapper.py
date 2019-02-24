@@ -82,9 +82,13 @@ class ClassWrapper(RefcountedWrapper):
 
     def memberPtr(self, instance, ix):
         return (
-            instance.nonref_expr.cast(native_ast.UInt8.pointer()).ElementPtrIntegers(self.indexToByteOffset[ix])
-                .cast(
-                    typeWrapper(self.typeRepresentation.MemberTypes[ix]).getNativeLayoutType().pointer()
+            instance
+            .nonref_expr.cast(native_ast.UInt8.pointer())
+            .ElementPtrIntegers(self.indexToByteOffset[ix])
+            .cast(
+                typeWrapper(self.typeRepresentation.MemberTypes[ix])
+                .getNativeLayoutType()
+                .pointer()
             )
         )
 
@@ -94,11 +98,11 @@ class ClassWrapper(RefcountedWrapper):
 
         return (
             instance.nonref_expr
-                .cast(native_ast.UInt8.pointer())
-                .ElementPtrIntegers(8 + byte)
-                .load()
-                .rshift(native_ast.const_uint8_expr(bit))
-                .bitand(native_ast.const_uint8_expr(1))
+            .cast(native_ast.UInt8.pointer())
+            .ElementPtrIntegers(8 + byte)
+            .load()
+            .rshift(native_ast.const_uint8_expr(bit))
+            .bitand(native_ast.const_uint8_expr(1))
         )
 
     def setIsInitializedExpr(self, instance, ix):
@@ -160,7 +164,7 @@ class ClassWrapper(RefcountedWrapper):
         if attr_type.is_pod:
             return context.pushEffect(
                 self.memberPtr(instance, ix).store(value.nonref_expr)
-                    >> self.setIsInitializedExpr(instance, ix)
+                >> self.setIsInitializedExpr(instance, ix)
             )
         else:
             member = context.pushReference(attr_type, self.memberPtr(instance, ix))

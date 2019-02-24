@@ -112,8 +112,8 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             out.expr.load().ElementPtrIntegers(0, 4).store(
                 runtime_functions.malloc.call(
                     left_size.nonref_expr
-                        .add(right_size.nonref_expr)
-                        .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
+                    .add(right_size.nonref_expr)
+                    .mul(native_ast.const_int_expr(self.underlyingWrapperType.getBytecount()))
                 ).cast(native_ast.UInt8Ptr)
             ) >>
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>

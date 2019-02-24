@@ -111,7 +111,7 @@ class FunctionConversionContext(object):
             if len(input_types) < len(self._ast_arg.args):
                 raise ConversionException(
                     "Expected at least %s arguments but got %s" %
-                        (len(self._ast_arg.args), len(input_types))
+                    (len(self._ast_arg.args), len(input_types))
                 )
 
         self._native_args = []
@@ -489,9 +489,14 @@ class FunctionConversionContext(object):
                         # we can just copy this into the stackslot directly. no destructor needed
                         context.pushEffect(
                             native_ast.Expression.Store(
-                                ptr=native_ast.Expression.StackSlot(name=name, type=slot_type.getNativeLayoutType()),
-                                val=native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
+                                ptr=native_ast.Expression.StackSlot(
+                                    name=name,
+                                    type=slot_type.getNativeLayoutType()
+                                ),
+                                val=(
+                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
                                     native_ast.Expression.Variable(name=name).load()
+                                )
                             )
                         )
                         context.pushEffect(

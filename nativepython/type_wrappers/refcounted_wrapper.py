@@ -56,9 +56,11 @@ class RefcountedWrapper(Wrapper):
             native_ast.Expression.Branch(
                 cond=other,
                 false=expr.store(other),
-                true=expr.store(other) >>
+                true=(
+                    expr.store(other) >>
                     expr.load().ElementPtrIntegers(0, 0).atomic_add(1) >>
                     native_ast.nullExpr
+                )
             )
         )
 

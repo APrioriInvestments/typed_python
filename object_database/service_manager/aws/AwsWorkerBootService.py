@@ -160,9 +160,9 @@ valid_instance_types = {
 
 
 instance_types_to_show = set([
-    x for x in valid_instance_types if
-    ('xlarge' in x and '.xlarge' not in x) and
-     x.split(".")[0] in ['m4', 'm5', 'c4', 'c5', 'r4', 'r5', 'i3', 'g2', 'x1']
+    x for x in valid_instance_types
+    if ('xlarge' in x and '.xlarge' not in x)
+    and x.split(".")[0] in ['m4', 'm5', 'c4', 'c5', 'r4', 'r5', 'i3', 'g2', 'x1']
 ])
 
 
