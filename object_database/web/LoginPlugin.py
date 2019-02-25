@@ -135,7 +135,8 @@ def authorized_groups_text(authorized_groups, default_text='All') -> str:
     """ Helper function that returns a string for display purposes. """
     res = default_text
     if authorized_groups:
-        return ', '.join(authorized_groups)
+        res = ', '.join(authorized_groups)
+    return res
 
 
 class LoginIpPlugin(LoginPluginInterface):

@@ -1131,8 +1131,6 @@ class NativeTypesTests(unittest.TestCase):
             print(time.time() - t0, " for ", len(ints))
 
     def test_serialization_roundtrip(self):
-        badlen = None
-
         for _ in range(100):
             producer = RandomValueProducer()
             producer.addEvenly(30, 3)

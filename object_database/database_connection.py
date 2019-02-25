@@ -343,14 +343,9 @@ class ManyVersionedObjects:
         else:
             lowestId = curTransactionId
 
-        t0 = time.time()
-
         if self._version_number_objects:
             while min(self._version_number_objects) < lowestId:
                 toCollapse = min(self._version_number_objects)
-
-                t1 = time.time()
-                count = len(self._version_number_objects[toCollapse])
 
                 for key in self._version_number_objects[toCollapse]:
                     if key not in self._versioned_objects:
@@ -734,7 +729,7 @@ class DatabaseConnection:
         return not self._suppressKey(object._identity)
 
     def _suppressKey(self, k):
-        keyname = schema, typename, ident, fieldname = keymapping.split_data_key(k)
+        schema, typename, ident, fieldname = keymapping.split_data_key(k)
 
         subscriptionSet = self._schema_and_typename_to_subscription_set.get((schema, typename))
 

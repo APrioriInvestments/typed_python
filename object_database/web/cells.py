@@ -453,10 +453,10 @@ class Cell:
         t0 = time.time()
         while True:
             try:
-                with self.transaction() as t:
+                with self.transaction():
                     self.onMessage(*args)
                     return
-            except RevisionConflictException as e:
+            except RevisionConflictException:
                 tries += 1
                 if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
                     self._logger.error("OnMessage timed out. This should really fail.")
@@ -859,8 +859,6 @@ class Tabs(Cell):
         self.whichSlot.set(index)
 
     def recalculate(self):
-        items = []
-
         self.children['____display__'] = Subscribed(lambda: self.headersAndChildren[self.whichSlot.get()][1])
 
         for i in range(len(self.headersAndChildren)):
@@ -2072,7 +2070,6 @@ class _PlotUpdater(Cell):
         with self.view() as v:
             # we only exist to run our postscript
             self.contents = """<div style="display:none">"""
-            hadChildren = len(self.children) > 0
             self.children = {}
             self.postscript = ""
             self.linePlot.error.set(None)

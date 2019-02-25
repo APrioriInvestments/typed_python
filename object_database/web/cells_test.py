@@ -259,13 +259,13 @@ class CellsTests(unittest.TestCase):
                     thing.delete()
                     thing = Thing(k=0, x=counter)
 
-                msg = cells.renderMessages()
+                cells.renderMessages()
 
         def initFn(db, cells):
             with db.transaction():
-                thing = Thing(k=0, x=0)
+                Thing(k=0, x=0)
 
-            msg = cells.renderMessages()
+            cells.renderMessages()
 
             workFn(db, cells, iterations=500)
 
@@ -303,11 +303,11 @@ class CellsTests(unittest.TestCase):
                     for anything in all_things:
                         anything.x = anything.x + 1
 
-                msg = cells.renderMessages()
+                cells.renderMessages()
 
         def initFn(db, cells):
             with db.transaction():
-                thing = Thing(x=1, k=0)
+                Thing(x=1, k=0)
 
             cells.renderMessages()
 

@@ -427,8 +427,6 @@ class Server:
                         )
                         return True
 
-                    t1 = time.time()
-
                     self._pendingSubscriptionRecheck = []
 
                 # we need to send everything we know about 'identities', keeping in mind that we have to
@@ -436,7 +434,6 @@ class Server:
                 # in the new set
                 identities_left_to_send = set(identities)
 
-                done = False
                 messageCount = 0
                 while True:
                     locktime_start = time.time()
@@ -593,7 +590,7 @@ class Server:
         if checkPending:
             for transactionMessage in self._pendingSubscriptionRecheck:
                 for key in transactionMessage.writes:
-                    val = transactionMessage.writes[key]
+                    transactionMessage.writes[key]
 
                     # if we write to a key we've already sent, we'll need to resend it
                     identity = keymapping.split_data_key(key)[2]
@@ -957,7 +954,7 @@ class Server:
                 channelsTriggered.update(self._id_to_channel[i])
 
         for channel in channelsTriggeredForPriors:
-            lazy_message = ServerToClient.LazyTransactionPriors(writes=priorValues)
+            lazy_message = ServerToClient.LazyTransactionPriors(writes=priorValues)  # noqa
 
         transaction_message = ServerToClient.Transaction(
             writes={k: v for k, v in key_value.items()},

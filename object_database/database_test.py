@@ -130,13 +130,13 @@ class ObjectDatabaseTests:
 
         with db.view():
             with self.assertRaises(Exception):
-                z = ThingWithDicts.lookupAll()
+                ThingWithDicts.lookupAll()
             Counter.lookupAll()
 
         db.subscribeToSchema(schema)
 
         with db.view():
-            z = ThingWithDicts.lookupAll()
+            ThingWithDicts.lookupAll()
 
     def test_subscribe_to_objects(self):
         db1 = self.createNewDb()
@@ -247,8 +247,6 @@ class ObjectDatabaseTests:
 
         db2Connection = db2.connectionObject
         db2.disconnect()
-
-        t0 = time.time()
 
         self.assertTrue(
             db1.waitForCondition(
@@ -451,7 +449,7 @@ class ObjectDatabaseTests:
 
         with TransactionListener(db, handler):
             with db.transaction():
-                root = Root()
+                Root()
 
             didOne.wait()
 
@@ -484,7 +482,7 @@ class ObjectDatabaseTests:
 
         t0 = time.time()
         while time.time() < t0 + 1.0:
-            with db.transaction() as t:
+            with db.transaction():
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
 
         with db.view():
@@ -501,10 +499,8 @@ class ObjectDatabaseTests:
             root = Root()
             root.obj = Object(k=expr.Constant(value=0))
 
-        t0 = time.time()
-
         for i in range(1000):
-            with db.transaction().onConfirmed(confirmed.put) as t:
+            with db.transaction().onConfirmed(confirmed.put):
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
 
         self.assertTrue(confirmed.qsize() < 1000)
@@ -565,7 +561,7 @@ class ObjectDatabaseTests:
         count = 0
         steps = 0
         while time.time() < t0 + 1.0:
-            with db.transaction() as t:
+            with db.transaction():
                 for i in range(100):
                     count += objects[i].obj.k.value
                     steps += 1
@@ -633,7 +629,7 @@ class ObjectDatabaseTests:
         try:
             with t2:
                 root.obj.k = expr.Constant(value=root.obj.k.value + 1)
-        except RevisionConflictException as e:
+        except RevisionConflictException:
             pass
 
         for i in range(100):
@@ -657,7 +653,7 @@ class ObjectDatabaseTests:
         counter_vals_by_tn[db._cur_transaction_num] = {}
 
         # seed the initial state
-        with db.transaction() as t:
+        with db.transaction():
             for i in range(20):
                 counter = Counter(_identity="C_%s" % i)
                 counter.k = int(random.random() * 100)
@@ -791,28 +787,28 @@ class ObjectDatabaseTests:
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
-        with db.view() as v:
+        with db.view():
             self.assertEqual(Counter.lookupAll(k=20), ())
             self.assertEqual(Counter.lookupAll(k=30), ())
 
         with db.transaction():
             o1 = Counter(k=20)
 
-        with db.view() as v:
+        with db.view():
             self.assertEqual(Counter.lookupAll(k=20), (o1,))
             self.assertEqual(Counter.lookupAll(k=30), ())
 
         with db.transaction():
             o1.k = 30
 
-        with db.view() as v:
+        with db.view():
             self.assertEqual(Counter.lookupAll(k=20), ())
             self.assertEqual(Counter.lookupAll(k=30), (o1,))
 
         with db.transaction():
             o1.delete()
 
-        with db.view() as v:
+        with db.view():
             self.assertEqual(Counter.lookupAll(k=20), ())
             self.assertEqual(Counter.lookupAll(k=30), ())
 
@@ -820,9 +816,9 @@ class ObjectDatabaseTests:
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
-        with db.transaction() as v:
+        with db.transaction():
             k1 = Counter(k=20)
-            k2 = Counter(k=20)
+            Counter(k=20)
 
             self.assertEqual(len(Counter.lookupAll(k=20)), 2)
 
@@ -834,7 +830,7 @@ class ObjectDatabaseTests:
 
             self.assertEqual(len(Counter.lookupAll(k=20)), 2)
 
-        with db.transaction() as v:
+        with db.transaction():
             self.assertEqual(len(Counter.lookupAll(k=20)), 2)
 
             k1.k = 30
@@ -856,7 +852,7 @@ class ObjectDatabaseTests:
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
-        with db.transaction() as v:
+        with db.transaction():
             o = Counter.lookupOne(k=1)
             self.assertEqual(o.x, 10)
             o.k = 2
@@ -865,7 +861,7 @@ class ObjectDatabaseTests:
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
-        with db.transaction() as v:
+        with db.transaction():
             o = Counter.lookupOne(k=2)
             o.k = 3
             self.assertEqual(o.x, 11)
@@ -873,7 +869,7 @@ class ObjectDatabaseTests:
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
-        with db.transaction() as v:
+        with db.transaction():
             self.assertFalse(Counter.lookupAny(k=2))
 
             o = Counter.lookupOne(k=3)
@@ -922,7 +918,7 @@ class ObjectDatabaseTests:
         with db.transaction():
             o1 = Object(k=expr.Constant(value=123))
 
-        with db.view() as v:
+        with db.view():
             self.assertEqual(Object.lookupAll(k=expr.Constant(value=123)), (o1,))
 
     def test_frozen_schema(self):
@@ -971,7 +967,7 @@ class ObjectDatabaseTests:
         with db.transaction():
             o1 = Object(k=10)
 
-        with db.view() as v:
+        with db.view():
             self.assertEqual(Object.lookupAll(k=10), (o1,))
             self.assertEqual(Object.lookupAll(k=20), ())
 
@@ -992,7 +988,7 @@ class ObjectDatabaseTests:
 
         db.subscribeToSchema(schema)
 
-        with db.transaction() as v:
+        with db.transaction():
             self.assertEqual(Object.lookupAll(k=10), ())
             o1 = Object(k=10)
 
@@ -1022,7 +1018,7 @@ class ObjectDatabaseTests:
         with db.transaction():
             o1 = Object(k=10)
             o2 = Object(k=20)
-            o3 = Object(k=30)
+            Object(k=30)
 
         t1 = db.transaction().consistency(full=True)
         t2 = db.transaction().consistency(full=True)
@@ -1433,7 +1429,7 @@ class ObjectDatabaseTests:
         for i in range(10000):
             t0 = time.time()
             with db1.transaction():
-                x = schema.Root()
+                schema.Root()
             times.append(time.time() - t0)
 
         m1 = numpy.mean(times[:1000])

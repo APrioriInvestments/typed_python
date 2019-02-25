@@ -67,8 +67,6 @@ class Codebase:
                 import object_database
                 import typed_python
 
-                allModules = []
-
                 context1 = SerializationContext.FromModules(
                     Codebase._walkModuleDiskRepresentation(typed_python)[2].values()
                 )

@@ -1209,7 +1209,7 @@ class Converter(object):
                     if not builder.block.is_terminated:
                         builder.unreachable()
 
-            except Exception as e:
+            except Exception:
                 print("function failing = " + name)
                 raise
 

@@ -125,7 +125,6 @@ class FunctionConversionContext(object):
         if self._star_args_name is not None:
             star_args_count = len(input_types) - len(self._ast_arg.args)
 
-            starargs_elts = []
             for i in range(len(self._ast_arg.args), len(input_types)):
                 self._native_args.append(
                     ('.star_args.%s' % (i - len(self._ast_arg.args)),

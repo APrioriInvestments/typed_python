@@ -117,7 +117,7 @@ def _main(argv):
                 svcClass = s.instantiateServiceType()
 
             svcClass.configureFromCommandline(db, s, parsedArgs.args)
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             return 1
 

@@ -258,8 +258,6 @@ class PythonToNativeConverter(object):
         if identifier in self._names_for_identifier:
             return self._names_for_identifier[identifier]
 
-        underlyingDefinition = self._definitions[callTarget.name]
-
         args = []
         for i in range(len(callTarget.input_types)):
             if not callTarget.input_types[i].is_empty:

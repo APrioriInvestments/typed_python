@@ -58,11 +58,11 @@ class TestMultithreading(unittest.TestCase):
             return res
 
         ratios = []
-        for _ in range(10):
+        for _1 in range(10):
             t0 = time.time()
-            res1 = thread_apply(f, [(100000000,)])
+            thread_apply(f, [(100000000,)])
             t1 = time.time()
-            res2 = thread_apply(f, [(100000000,), (100000001,)])
+            thread_apply(f, [(100000000,), (100000001,)])
             t2 = time.time()
 
             first = t1 - t0
@@ -84,7 +84,7 @@ class TestMultithreading(unittest.TestCase):
     def test_refcounts_of_objects_across_boundary(self):
         class Object:
             pass
-        anObject = Object()
+        _ = Object()
 
         A = Alternative("A", X={'x': int}, Y={'y': int})
 
@@ -104,9 +104,9 @@ class TestMultithreading(unittest.TestCase):
 
         @Compiled
         def rapidlyIncAndDecref(x: typeOfInstance):
-            y = x
-            for _ in range(1000000):
-                y = x
+            _ = x
+            for _1 in range(1000000):
+                _ = x
             return x
 
         thread_apply(rapidlyIncAndDecref, [(instance,)] * 10)

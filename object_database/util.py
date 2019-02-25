@@ -210,7 +210,7 @@ def generateSslContext():
         cert_path = os.path.join(tempDir, 'selfsigned.cert')
         key_path = os.path.join(tempDir, 'selfsigned.key')
         try:
-            proc = subprocess.run(
+            subprocess.run(
                 [
                     'openssl', 'req', '-x509', '-newkey', 'rsa:2048',
                     '-keyout', key_path, '-nodes',

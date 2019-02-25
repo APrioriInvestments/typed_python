@@ -83,7 +83,7 @@ class NativeForwardTypesTests(unittest.TestCase):
         Y = OneOf(None, lambda: X)
         X = TupleOf(Y)
 
-        xStr = str(X)
+        str(X)
 
         anX = X( (None,) )
 
@@ -96,7 +96,7 @@ class NativeForwardTypesTests(unittest.TestCase):
     def test_deep_forwards_work(self):
         X = TupleOf(TupleOf(TupleOf(TupleOf(OneOf(None, lambda: X)))))
 
-        xStr = str(X)
+        str(X)
 
         anX = X( ((((None,),),),) )
 

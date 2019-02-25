@@ -107,7 +107,7 @@ class RingInvariantTest(unittest.TestCase):
 
         with db.transaction():
             # create the empty ring
-            r = Ring.New()
+            Ring.New()
 
         def writeSome():
             with db.transaction():
