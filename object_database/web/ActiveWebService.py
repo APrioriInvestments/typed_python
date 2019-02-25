@@ -258,7 +258,8 @@ class ActiveWebService(ServiceBase):
                 rowFun=lambda:
                     sorted(service_schema.Service.lookupAll(), key=lambda s: s.name),
                 headerFun=lambda x: x,
-                rendererFun=lambda s, field: Subscribed(lambda:
+                rendererFun=lambda s, field: Subscribed(
+                    lambda:
                     Clickable(s.name, "/services/" + s.name) if field == 'Service' else
                     (   Clickable(Sequence([Octicon('stop').color('red'), Span('Unlocked')]),
                                   lambda: s.lock()) if s.isUnlocked else
@@ -294,7 +295,8 @@ class ActiveWebService(ServiceBase):
                 colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
                 rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s: s.hostname),
                 headerFun=lambda x: x,
-                rendererFun=lambda s, field: Subscribed(lambda:
+                rendererFun=lambda s, field: Subscribed(
+                    lambda:
                     s.connection._identity if field == "Connection" else
                     str(s.isMaster) if field == "IsMaster" else
                     s.hostname if field == "Hostname" else
@@ -361,8 +363,8 @@ class ActiveWebService(ServiceBase):
         return (
             HeaderBar(
                 [
-                    Subscribed(lambda:
-                        Dropdown(
+                    Subscribed(
+                        lambda: Dropdown(
                             "Service",
                             [("All", "/services")] +
                             [(s.name, "/services/" + s.name)
@@ -494,7 +496,8 @@ class ActiveWebService(ServiceBase):
 
                 lastDumpFrames += 1
                 if time.time() - lastDumpTimestamp > 5.0:
-                    self._logger.info("In the last %.2f seconds, spent %.2f seconds calculating %s messages over %s frames",
+                    self._logger.info(
+                        "In the last %.2f seconds, spent %.2f seconds calculating %s messages over %s frames",
                         time.time() - lastDumpTimestamp,
                         lastDumpTimeSpentCalculating,
                         lastDumpMessages,

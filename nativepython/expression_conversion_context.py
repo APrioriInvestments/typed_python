@@ -30,7 +30,8 @@ NoneExprType = NoneWrapper()
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
-ExpressionIntermediate = Alternative("ExpressionIntermediate",
+ExpressionIntermediate = Alternative(
+    "ExpressionIntermediate",
     Effect={"expr": native_ast.Expression},
     Terminal={"expr": native_ast.Expression},
     Simple={"name": str, "expr": native_ast.Expression},
@@ -587,7 +588,7 @@ class ExpressionConversionContext(object):
                         return None
                 elif expr_so_far[-1].matches.Constant:
                     if (expr_so_far[-1].val.val and op.matches.Or
-                        or (not expr_so_far[-1].val.val) and op.matches.And):
+                            or (not expr_so_far[-1].val.val) and op.matches.And):
                         # this is a short-circuit
                         if len(expr_so_far) == 1:
                             return expr_so_far[0]

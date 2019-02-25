@@ -168,11 +168,11 @@ class Wrapper(object):
         if expr.expr_type == self:
             return expr
         return context.pushTerminal(
-            generateThrowException(context,
+            generateThrowException(
+                context,
                 TypeError("Can't convert from type %s to type %s" % (
-                    expr.expr_type.typeRepresentation.__name__,
-                    self.typeRepresentation.__name__)
-                )
+                          expr.expr_type.typeRepresentation.__name__,
+                          self.typeRepresentation.__name__))
             )
         )
 
@@ -181,8 +181,11 @@ class Wrapper(object):
 
     def convert_bin_op_reverse(self, context, r, op, l):
         return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't apply op %s to expressions of type %s and %s" %
-                (op, str(l.expr_type), str(r.expr_type))))
+            generateThrowException(
+                context,
+                TypeError("Can't apply op %s to expressions of type %s and %s" %
+                          (op, str(l.expr_type), str(r.expr_type)))
+            )
         )
 
     def convert_type_call(self, context, typeInst, args, kwargs):
@@ -198,9 +201,14 @@ class Wrapper(object):
         )
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
-        return context.pushException(TypeError, "Can't call %s.%s with args of type (%s)" % (
-            self,
-            methodname,
-            ",".join([str(a.expr_type) for a in args] +
-                ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()])
-        ))
+        return context.pushException(
+            TypeError,
+            "Can't call %s.%s with args of type (%s)" % (
+                self,
+                methodname,
+                ",".join(
+                    [str(a.expr_type) for a in args] +
+                    ["%s=%s" % (k, str(v.expr_type)) for k, v in kwargs.items()]
+                )
+            )
+        )

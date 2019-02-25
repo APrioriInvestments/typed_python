@@ -638,7 +638,8 @@ class NativeTypesTests(unittest.TestCase):
             for f in funcs:
                 for t1 in ts:
                     for t2 in ts:
-                        self.assertTrue(f(t1, t2) is f(t((t1,)), t((t2,))),
+                        self.assertTrue(
+                            f(t1, t2) is f(t((t1,)), t((t2,))),
                             (f, t1, t2, f(t1, t2), f(t((t1,)), t((t2,))))
                         )
 
@@ -925,7 +926,8 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(empty.B(), empty.B())
         self.assertNotEqual(empty.A(), empty.B())
 
-        a = Alternative("X",
+        a = Alternative(
+            "X",
             A={'a': int},
             B={'b': int},
             C={'c': str},

@@ -99,7 +99,8 @@ class LoginPluginInterface:
         if self.REQUIRED_KEYS:
             for key in self.REQUIRED_KEYS:
                 if key not in config:
-                    raise Exception("{cls} missing configuration parameter '{key}'"
+                    raise Exception(
+                        "{cls} missing configuration parameter '{key}'"
                         .format(cls=self.__class__.__name__, key=key)
                     )
                 setattr(self, '_' + key, config[key])
@@ -179,9 +180,7 @@ class LoginIpPlugin(LoginPluginInterface):
                 "" (empty string) if no error occurred and an error message otherwise
         """
         login_ip = request_ip_address()
-        self._logger.info("User '{username}' trying to authenticate from IP {login_ip}".
-            format(username=username, login_ip=login_ip)
-        )
+        self._logger.info(f"User '{username}' trying to authenticate from IP {login_ip}")
         # error = self.authenticate(username, password, login_ip=login_ip)
         if not self.bypassAuth:
             error = self._auth_plugin.authenticate(username, password)

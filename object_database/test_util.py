@@ -130,8 +130,8 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
     except subprocess.TimeoutExpired:
         pass
     else:
-        raise Exception("Failed to start service_manager (retcode:{})"
-            .format(server.returncode)
+        raise Exception(
+            f"Failed to start service_manager (retcode:{server.returncode})"
         )
     return server
 

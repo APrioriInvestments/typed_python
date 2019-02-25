@@ -207,7 +207,8 @@ class ClassWrapper(RefcountedWrapper):
 
         # clear bits of init flags
         for byteOffset in range(self.bytesOfInitBits):
-            context.pushEffect(out.nonref_expr
+            context.pushEffect(
+                out.nonref_expr
                 .cast(native_ast.UInt8.pointer())
                 .ElementPtrIntegers(8 + byteOffset).store(native_ast.const_uint8_expr(0))
             )
@@ -230,5 +231,8 @@ class ClassWrapper(RefcountedWrapper):
             initFuncType.convert_call(context, context.pushVoid(initFuncType), (out,) + args, {})
         else:
             if len(args):
-                context.pushException(TypeError, "Can't construct a " + self.typeRepresentation.__qualname__ +
-                        " with positional arguments because it doesn't have an __init__")
+                context.pushException(
+                    TypeError,
+                    "Can't construct a " + self.typeRepresentation.__qualname__ +
+                    " with positional arguments because it doesn't have an __init__"
+                )

@@ -20,7 +20,8 @@ class TypeFunctionTest(unittest.TestCase):
     def test_basic(self):
         @TypeFunction
         def List(T):
-            return Alternative("List",
+            return Alternative(
+                "List",
                 Node={"head": T, "tail": List(T)},
                 Empty={}
             )
@@ -77,7 +78,8 @@ class TypeFunctionTest(unittest.TestCase):
     def test_can_serialize_type_functions(self):
         @TypeFunction
         def List(T):
-            return Alternative("List",
+            return Alternative(
+                "List",
                 Node={"head": T, "tail": List(T)},
                 Empty={}
             )

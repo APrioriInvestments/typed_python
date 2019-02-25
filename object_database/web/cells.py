@@ -725,16 +725,21 @@ class Columns(Cell):
 
         self.elements = elements
         self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
-        self.contents = """
+        self.contents = (
+            """
             <div class="container-fluid" __style__>
             <div class="row flex-nowrap">
                 __contents__
             </div>
             </div>
-        """.replace("__style__", self._divStyle()).replace("__contents__",
-            "\n".join(
-                """<div class="col-sm"> ____c_%s__ </div>""" % i
-                for i in range(len(elements)))
+            """
+            .replace("__style__", self._divStyle())
+            .replace(
+                "__contents__",
+                "\n".join(
+                    """<div class="col-sm"> ____c_%s__ </div>""" % i
+                    for i in range(len(elements)))
+            )
         )
 
     def __add__(self, other):
@@ -1582,7 +1587,8 @@ class Button(Clickable):
 
     def recalculate(self):
         self.children = {'____contents__': self.content}
-        self.contents = ("""
+        self.contents = (
+            """
             <button
                 class='btn btn-primary __size__'
                 onclick="__onclick__"
@@ -1922,7 +1928,8 @@ class Sheet(Cell):
 
                 rowData = self.rowFun(rowToRender)
 
-                self.triggerPostscript("""
+                self.triggerPostscript(
+                    """
                     var hot = handsOnTables["__identity__"]
 
                     hot.getSettings().data.cache[__row__] = __data__
@@ -1933,9 +1940,8 @@ class Sheet(Cell):
                 )
 
         if rows:
-            self.triggerPostscript("""
-                handsOnTables["__identity__"].render()
-                """
+            self.triggerPostscript(
+                """handsOnTables["__identity__"].render()"""
                 .replace("__identity__", self._identity)
             )
 

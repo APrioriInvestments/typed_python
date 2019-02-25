@@ -50,8 +50,9 @@ class BytesWrapper(RefcountedWrapper):
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
             if op.matches.Add:
-                return context.push(bytes, lambda bytesRef:
-                    bytesRef.expr.store(
+                return context.push(
+                    bytes,
+                    lambda bytesRef: bytesRef.expr.store(
                         runtime_functions.bytes_concat.call(
                             left.nonref_expr.cast(VoidPtr),
                             right.nonref_expr.cast(VoidPtr)
@@ -92,8 +93,9 @@ class BytesWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        return context.push(bytes, lambda bytesRef:
-            bytesRef.expr.store(
+        return context.push(
+            bytes,
+            lambda bytesRef: bytesRef.expr.store(
                 runtime_functions.bytes_from_ptr_and_len.call(
                     native_ast.const_bytes_cstr(s),
                     native_ast.const_int_expr(len(s))

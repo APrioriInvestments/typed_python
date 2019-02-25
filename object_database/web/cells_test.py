@@ -131,8 +131,8 @@ class CellsTests(unittest.TestCase):
 
     def test_cells_subscriptions(self):
         self.cells.root.setChild(
-            Subscribed(lambda:
-                Sequence([
+            Subscribed(
+                lambda: Sequence([
                     Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
                     for thing in Thing.lookupAll()
                 ])
@@ -243,8 +243,8 @@ class CellsTests(unittest.TestCase):
             cleanupFn()
 
     def test_cells_memory_leak1(self):
-        cell = Subscribed(lambda:
-            Sequence([
+        cell = Subscribed(
+            lambda: Sequence([
                 Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
                 for thing in Thing.lookupAll(k=0)
             ])

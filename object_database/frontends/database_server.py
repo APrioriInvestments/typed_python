@@ -29,8 +29,10 @@ def main(argv):
 
     parser.add_argument("host")
     parser.add_argument("port", type=int)
-    parser.add_argument("--service-token", type=str, required=True,
-        help="the auth token to be used with this service")
+    parser.add_argument(
+        "--service-token", type=str, required=True,
+        help="the auth token to be used with this service"
+    )
     parser.add_argument("--ssl-path", default=None, required=False, help="path to (self-signed) SSL certificate")
     parser.add_argument("--redis_port", type=int, default=None)
     parser.add_argument("--inmem", default=False, action='store_true')

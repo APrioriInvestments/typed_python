@@ -42,14 +42,16 @@ Keyword = lambda: Keyword
 Alias = lambda: Alias
 WithItem = lambda: WithItem
 
-Module = Alternative("Module",
+Module = Alternative(
+    "Module",
     Module={"body": TupleOf(Statement)},
     Expression={'body': Expr},
     Interactive={'body': TupleOf(Statement)},
     Suite={"body": TupleOf(Statement)}
 )
 
-Statement = Alternative("Statement",
+Statement = Alternative(
+    "Statement",
     FunctionDef={
         "name": str,
         "args": Arguments,
@@ -205,7 +207,8 @@ Statement = Alternative("Statement",
     }
 )
 
-Expr = Alternative("Expr",
+Expr = Alternative(
+    "Expr",
     BoolOp={
         "op": BooleanOp,
         "values": TupleOf(Expr),
@@ -365,7 +368,8 @@ Expr = Alternative("Expr",
     }
 )
 
-NumericConstant = Alternative("NumericConstant",
+NumericConstant = Alternative(
+    "NumericConstant",
     Int={"value": int},
     Long={"value": str},
     Boolean={"value": bool},
@@ -374,7 +378,8 @@ NumericConstant = Alternative("NumericConstant",
     Unknown={}
 )
 
-ExprContext = Alternative("ExprContext",
+ExprContext = Alternative(
+    "ExprContext",
     Load={},
     Store={},
     Del={},
@@ -383,7 +388,8 @@ ExprContext = Alternative("ExprContext",
     Param={}
 )
 
-Slice = Alternative("Slice",
+Slice = Alternative(
+    "Slice",
     Ellipsis={},
     Slice={
         "lower": OneOf(Expr, None),
@@ -394,12 +400,14 @@ Slice = Alternative("Slice",
     Index={"value": Expr}
 )
 
-BooleanOp = Alternative("BooleanOp",
+BooleanOp = Alternative(
+    "BooleanOp",
     And={},
     Or={}
 )
 
-BinaryOp = Alternative("BinaryOp",
+BinaryOp = Alternative(
+    "BinaryOp",
     Add={},
     Sub={},
     Mult={},
@@ -414,14 +422,16 @@ BinaryOp = Alternative("BinaryOp",
     FloorDiv={}
 )
 
-UnaryOp = Alternative("UnaryOp",
+UnaryOp = Alternative(
+    "UnaryOp",
     Invert={},
     Not={},
     UAdd={},
     USub={}
 )
 
-ComparisonOp = Alternative("ComparisonOp",
+ComparisonOp = Alternative(
+    "ComparisonOp",
     Eq={},
     NotEq={},
     Lt={},
@@ -434,7 +444,8 @@ ComparisonOp = Alternative("ComparisonOp",
     NotIn={}
 )
 
-Comprehension = Alternative("Comprehension",
+Comprehension = Alternative(
+    "Comprehension",
     Item={
         "target": Expr,
         "iter": Expr,
@@ -443,7 +454,8 @@ Comprehension = Alternative("Comprehension",
     }
 )
 
-ExceptionHandler = Alternative("ExceptionHandler",
+ExceptionHandler = Alternative(
+    "ExceptionHandler",
     Item={
         "type": OneOf(Expr, None),
         "name": OneOf(str, None),
@@ -454,7 +466,8 @@ ExceptionHandler = Alternative("ExceptionHandler",
     }
 )
 
-Arguments = Alternative("Arguments",
+Arguments = Alternative(
+    "Arguments",
     Item={
         "args": TupleOf(Arg),
         "vararg": OneOf(Arg, None),
@@ -465,30 +478,35 @@ Arguments = Alternative("Arguments",
     }
 )
 
-Arg = Alternative("Arg",
+Arg = Alternative(
+    "Arg",
     Item={
         'arg': str,
         'annotation': OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str
-    })
+    }
+)
 
-Keyword = Alternative("Keyword",
+Keyword = Alternative(
+    "Keyword",
     Item={
         "arg": OneOf(None, str),
         "value": Expr
     }
 )
 
-Alias = Alternative("Alias",
+Alias = Alternative(
+    "Alias",
     Item={
         "name": str,
         "asname": OneOf(str, None)
     }
 )
 
-WithItem = Alternative("WithItem",
+WithItem = Alternative(
+    "WithItem",
     Item={
         "context_expr": Expr,
         "optional_vars": OneOf(Expr, None),

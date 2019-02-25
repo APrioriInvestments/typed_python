@@ -42,8 +42,10 @@ def main(argv=None):
     parser.add_argument("port", type=int)
     parser.add_argument("--source", help="path for the source trees used by services", required=True)
     parser.add_argument("--storage", help="path for local storage used by services", required=True)
-    parser.add_argument("--service-token", type=str, required=True,
-        help="the auth token to be used with this service")
+    parser.add_argument(
+        "--service-token", type=str, required=True,
+        help="the auth token to be used with this service"
+    )
     parser.add_argument("--run_db", default=False, action='store_true')
 
     parser.add_argument("--ssl-path", default=None, required=False, help="path to (self-signed) SSL certificate")
@@ -73,9 +75,10 @@ def main(argv=None):
         parser.print_help()
         return 2
 
-    logger.info("ServiceManager on %s connecting to %s:%s",
-        parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port)
-
+    logger.info(
+        "ServiceManager on %s connecting to %s:%s",
+        parsedArgs.own_hostname, parsedArgs.db_hostname, parsedArgs.port
+    )
     shouldStop = threading.Event()
 
     def shutdownCleanly(signalNumber, frame):

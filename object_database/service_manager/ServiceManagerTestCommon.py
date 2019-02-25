@@ -77,10 +77,9 @@ class ServiceManagerTestCommon(object):
         except subprocess.TimeoutExpired:
             pass
         else:
-            raise Exception("Failed to start service_manager (retcode:{})"
-                .format(self.server.returncode)
+            raise Exception(
+                f"Failed to start service_manager (retcode:{self.server.returncode})"
             )
-
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, *self.schemasToSubscribeTo())
