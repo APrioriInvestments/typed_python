@@ -492,10 +492,10 @@ class AwsWorkerBootService(ServiceBase):
             c.max_to_boot = max_to_boot
 
     def setBootCount(self, instance_type, count):
-        state = State.lookupAny(instance_type=instType)
+        state = State.lookupAny(instance_type=instance_type)
 
         if not state:
-            state = State(instance_type=instType)
+            state = State(instance_type=instance_type)
 
         state.desired = count
 

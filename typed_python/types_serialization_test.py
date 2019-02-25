@@ -832,11 +832,11 @@ class TypesSerializationTest(unittest.TestCase):
     # Didn't even bother
     @unittest.skip
     def test_serialize_dynamic_class(self):
+        import copyreg
         a = create_dynamic_class("my_dynamic_class", (object,))
         copyreg.pickle(pickling_metaclass, pickling_metaclass.__reduce__)
 
-        s = self.dumps(a, proto)
-        b = self.loads(s)
+        b = ping_pong(a)
         self.assertEqual(a, b)
         self.assertIs(type(a), type(b))
 
@@ -851,13 +851,11 @@ class TypesSerializationTest(unittest.TestCase):
         self.assert_is_copy(t, u)
         if hasattr(os, "stat"):
             t = os.stat(os.curdir)
-            s = self.dumps(t, proto)
-            u = self.loads(s)
+            u = ping_pong(t)
             self.assert_is_copy(t, u)
         if hasattr(os, "statvfs"):
             t = os.statvfs(os.curdir)
-            s = self.dumps(t, proto)
-            u = self.loads(s)
+            u = ping_pong(t)
             self.assert_is_copy(t, u)
 
     # FAILS
