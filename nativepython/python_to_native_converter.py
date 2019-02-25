@@ -71,13 +71,6 @@ class NativeFunctionConversionContext:
 
         native_input_types = [t.getNativePassingType() for t in input_types if not t.is_empty]
 
-        if output_type.is_pass_by_ref:
-            # the first argument is actually the output
-            native_output_type = native_ast.Void
-            native_input_types = [output_type.getNativePassingType()] + native_input_types
-        else:
-            native_output_type = output_type.getNativeLayoutType()
-
         generatingFunction(subcontext, outputArg, *inputArgs)
 
         native_args = [
@@ -85,11 +78,15 @@ class NativeFunctionConversionContext:
             for i in range(len(input_types)) if not input_types[i].is_empty
         ]
         if output_type.is_pass_by_ref:
+            # the first argument is actually the output
+            native_output_type = native_ast.Void
             native_args = [('.return', output_type.getNativePassingType())] + native_args
+        else:
+            native_output_type = output_type.getNativeLayoutType()
 
         return native_ast.Function(
             args=native_args,
-            output_type=native_ast.Void if output_type.is_pass_by_ref else output_type.getNativeLayoutType(),
+            output_type=native_output_type,
             body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
         )
 
@@ -165,7 +162,7 @@ class PythonToNativeConverter(object):
                 filename=ast.body.filename
             )]
 
-        return FunctionConversionContext(self, identity, pyast.args, pyast.body, input_types, output_type, freevars)
+        return FunctionConversionContext(self, identity, pyast.args, body, input_types, output_type, freevars)
 
     def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
         """Define a native function if we haven't defined it before already.
