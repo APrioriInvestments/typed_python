@@ -89,8 +89,9 @@ class StringWrapper(RefcountedWrapper):
                     )
 
             if op.matches.Add:
-                return context.push(str, lambda strRef:
-                    strRef.expr.store(
+                return context.push(
+                    str,
+                    lambda strRef: strRef.expr.store(
                         runtime_functions.string_concat.call(
                             left.nonref_expr.cast(VoidPtr),
                             right.nonref_expr.cast(VoidPtr)
@@ -109,10 +110,12 @@ class StringWrapper(RefcountedWrapper):
             with true:
                 context.pushException(IndexError, "string index out of range")
 
-        return context.push(str, lambda strRef:
-            strRef.expr.store(
-                runtime_functions.string_getitem_int64.call(expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr)
-                .cast(self.layoutType)
+        return context.push(
+            str,
+            lambda strRef: strRef.expr.store(
+                runtime_functions.string_getitem_int64.call(
+                    expr.nonref_expr.cast(native_ast.VoidPtr), item.nonref_expr
+                ).cast(self.layoutType)
             )
         )
 
@@ -127,8 +130,9 @@ class StringWrapper(RefcountedWrapper):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
     def constant(self, context, s):
-        return context.push(str, lambda strRef:
-            strRef.expr.store(
+        return context.push(
+            str,
+            lambda strRef: strRef.expr.store(
                 runtime_functions.string_from_utf8_and_len.call(
                     native_ast.const_utf8_cstr(s),
                     native_ast.const_int_expr(len(s))

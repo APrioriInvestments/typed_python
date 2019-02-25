@@ -55,7 +55,8 @@ class BlockingCallback:
         self.is_released.put(True)
 
 
-expr = Alternative("Expr",
+expr = Alternative(
+    "Expr",
     Constant={'value': int},
     # Add = {'l': expr, 'r': expr},
     # Sub = {'l': expr, 'r': expr},

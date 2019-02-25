@@ -192,9 +192,9 @@ class Compiler:
             input_types = [x[1] for x in functions[fname].args]
             output_type = functions[fname].output_type
 
-            native_function_pointers[fname] = NativeFunctionPointer(fname, func_ptr,
-                                                  input_types, output_type)
-
+            native_function_pointers[fname] = NativeFunctionPointer(
+                fname, func_ptr, input_types, output_type
+            )
             self.functions_by_name[fname] = native_function_pointers[fname]
 
         return native_function_pointers
@@ -231,9 +231,9 @@ class Compiler:
             input_types = [x[1] for x in functions[fname].args]
             output_type = functions[fname].output_type
 
-            native_function_pointers[fname] = NativeFunctionPointer(fname, func_ptr,
-                                                  input_types, output_type)
-
+            native_function_pointers[fname] = NativeFunctionPointer(
+                fname, func_ptr, input_types, output_type
+            )
             self.functions_by_name[fname] = native_function_pointers[fname]
 
         return native_function_pointers

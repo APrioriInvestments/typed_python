@@ -973,7 +973,8 @@ class Server:
             channel.sendTransaction(transaction_message)
 
         if self.verbose or time.time() - t0 > self.longTransactionThreshold:
-            self._logger.info("Transaction [%.2f/%.2f/%.2f] with %s writes, %s set ops: %s",
+            self._logger.info(
+                "Transaction [%.2f/%.2f/%.2f] with %s writes, %s set ops: %s",
                 t1 - t0, t2 - t1, time.time() - t2,
                 len(key_value), len(set_adds) + len(set_removes), sorted(key_value)[:3]
             )

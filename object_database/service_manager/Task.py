@@ -85,13 +85,15 @@ class FunctionTask(TaskExecutor):
         return RunningFunctionTask(self.f)
 
 
-TaskStatusResult = Alternative('TaskStatusResult',
+TaskStatusResult = Alternative(
+    'TaskStatusResult',
     Finished={'result': object},
     Subtasks={'subtasks': ConstDict(str, TaskExecutor)},
     SleepUntil={'wakeup_timestamp': float}
 )
 
-TaskResult = Alternative("TaskResult",
+TaskResult = Alternative(
+    "TaskResult",
     Result={'result': object},
     Error={'error': str},
     Failure={}

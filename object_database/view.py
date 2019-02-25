@@ -457,7 +457,8 @@ class View(object):
                 res = result_queue.get()
 
                 if time.time() - t0 > LOG_SLOW_COMMIT_THRESHOLD:
-                    self._logger.info("Committing %s writes and %s set changes took %.1f seconds",
+                    self._logger.info(
+                        "Committing %s writes and %s set changes took %.1f seconds",
                         len(self._writes), len(self._set_adds) + len(self._set_removes), time.time() - t0
                     )
 

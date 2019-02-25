@@ -83,7 +83,8 @@ class RangeIteratorWrapper(Wrapper):
                 expr.expr.ElementPtrIntegers(0, 0).load().add(1)
             )
         )
-        canContinue = context.pushPod(bool,
+        canContinue = context.pushPod(
+            bool,
             expr.expr.ElementPtrIntegers(0, 0).load().lt(
                 expr.expr.ElementPtrIntegers(0, 1).load()
             )

@@ -73,8 +73,9 @@ class ListOfWrapper(TupleOrListOfWrapper):
                 )
 
                 if self.underlyingWrapperType.is_pass_by_ref:
-                    return context.push(self.underlyingWrapperType, lambda out:
-                        native.call(out, instance, count)
+                    return context.push(
+                        self.underlyingWrapperType,
+                        lambda out: native.call(out, instance, count)
                     )
                 else:
                     return context.pushPod(

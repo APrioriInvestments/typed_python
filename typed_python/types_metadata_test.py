@@ -39,7 +39,8 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(ConstDict(str, int).ValueType, Int64)
 
     def test_alternatives(self):
-        X = Alternative("X",
+        X = Alternative(
+            "X",
             Left={'x': int, 'y': str},
             Right={'x': lambda: X, 'val': int}
         )

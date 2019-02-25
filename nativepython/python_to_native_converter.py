@@ -80,8 +80,10 @@ class NativeFunctionConversionContext:
 
         generatingFunction(subcontext, outputArg, *inputArgs)
 
-        native_args = [('a_%s' % i, input_types[i].getNativePassingType())
-            for i in range(len(input_types)) if not input_types[i].is_empty]
+        native_args = [
+            ('a_%s' % i, input_types[i].getNativePassingType())
+            for i in range(len(input_types)) if not input_types[i].is_empty
+        ]
         if output_type.is_pass_by_ref:
             native_args = [('.return', output_type.getNativePassingType())] + native_args
 

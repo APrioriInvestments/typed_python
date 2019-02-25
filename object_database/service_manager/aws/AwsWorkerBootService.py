@@ -535,11 +535,18 @@ class AwsWorkerBootService(ServiceBase):
             return f
 
         return cells.Grid(
-            colFun=lambda: ['Instance Type', 'COST', 'RAM', 'CPU', 'Booted', 'Desired', 'SpotBooted', 'SpotDesired', 'ObservedLimit', 'CapacityConstrained', 'Spot-us-east-1', 'a', 'b', 'c', 'd', 'e', 'f'],
-            rowFun=lambda: sorted([x for x in State.lookupAll() if x.instance_type in instance_types_to_show], key=lambda s: s.instance_type),
+            colFun=lambda: [
+                'Instance Type', 'COST', 'RAM', 'CPU', 'Booted', 'Desired',
+                'SpotBooted', 'SpotDesired', 'ObservedLimit', 'CapacityConstrained',
+                'Spot-us-east-1', 'a', 'b', 'c', 'd', 'e', 'f'],
+            rowFun=lambda: sorted(
+                [x for x in State.lookupAll() if x.instance_type in instance_types_to_show],
+                key=lambda s: s.instance_type
+            ),
             headerFun=lambda x: x,
             rowLabelFun=None,
-            rendererFun=lambda s, field: cells.Subscribed(lambda:
+            rendererFun=lambda s, field: cells.Subscribed(
+                lambda:
                 s.instance_type if field == 'Instance Type' else
                 s.booted if field == 'Booted' else
                 cells.Dropdown(

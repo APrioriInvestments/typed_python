@@ -907,12 +907,17 @@ class DatabaseConnection:
 
         elif msg.matches.SubscriptionComplete:
             with self._lock:
-                event = self._pendingSubscriptions.get((msg.schema, msg.typename,
-                    tuple(msg.fieldname_and_value) if msg.fieldname_and_value is not None else None))
+                event = self._pendingSubscriptions.get((
+                    msg.schema,
+                    msg.typename,
+                    tuple(msg.fieldname_and_value) if msg.fieldname_and_value is not None else None
+                ))
 
                 if not event:
-                    self._logger.error("Received unrequested subscription to schema %s / %s / %s. have %s",
-                        msg.schema, msg.typename, msg.fieldname_and_value, self._pendingSubscriptions)
+                    self._logger.error(
+                        "Received unrequested subscription to schema %s / %s / %s. have %s",
+                        msg.schema, msg.typename, msg.fieldname_and_value, self._pendingSubscriptions
+                    )
                     return
 
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
@@ -1105,8 +1110,11 @@ class DatabaseConnection:
             out_writes[k] = v.serializedByteRep.hex() if v.serializedByteRep is not None else None
             if len(out_writes) > 10000:
                 self._channel.write(
-                    ClientToServer.TransactionData(writes=out_writes, set_adds={}, set_removes={},
-                        key_versions=(), index_versions=(), transaction_guid=transaction_guid)
+                    ClientToServer.TransactionData(
+                        writes=out_writes, set_adds={}, set_removes={},
+                        key_versions=(), index_versions=(),
+                        transaction_guid=transaction_guid
+                    )
                 )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_writes = {}
@@ -1119,8 +1127,11 @@ class DatabaseConnection:
 
             if len(out_set_adds) > 10000 or ct > 100000:
                 self._channel.write(
-                    ClientToServer.TransactionData(writes={}, set_adds=out_set_adds, set_removes={},
-                        key_versions=(), index_versions=(), transaction_guid=transaction_guid)
+                    ClientToServer.TransactionData(
+                        writes={}, set_adds=out_set_adds, set_removes={},
+                        key_versions=(), index_versions=(),
+                        transaction_guid=transaction_guid
+                    )
                 )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_set_adds = {}
@@ -1134,8 +1145,11 @@ class DatabaseConnection:
 
             if len(out_set_removes) > 10000 or ct > 100000:
                 self._channel.write(
-                    ClientToServer.TransactionData(writes={}, set_adds={}, set_removes=out_set_removes,
-                        key_versions=(), index_versions=(), transaction_guid=transaction_guid)
+                    ClientToServer.TransactionData(
+                        writes={}, set_adds={}, set_removes=out_set_removes,
+                        key_versions=(), index_versions=(),
+                        transaction_guid=transaction_guid
+                    )
                 )
                 self._channel.write(ClientToServer.Heartbeat())
                 out_set_removes = {}
@@ -1144,8 +1158,11 @@ class DatabaseConnection:
         keys_to_check_versions = list(keys_to_check_versions)
         while len(keys_to_check_versions) > 10000:
             self._channel.write(
-                ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
-                    key_versions=keys_to_check_versions[:10000], index_versions=(), transaction_guid=transaction_guid)
+                ClientToServer.TransactionData(
+                    writes={}, set_adds={}, set_removes={},
+                    key_versions=keys_to_check_versions[:10000],
+                    index_versions=(), transaction_guid=transaction_guid
+                )
             )
             self._channel.write(ClientToServer.Heartbeat())
             keys_to_check_versions = keys_to_check_versions[10000:]
@@ -1153,8 +1170,10 @@ class DatabaseConnection:
         indices_to_check_versions = list(indices_to_check_versions)
         while len(indices_to_check_versions) > 10000:
             self._channel.write(
-                ClientToServer.TransactionData(writes={}, set_adds={}, set_removes={},
-                    key_versions=(), index_versions=indices_to_check_versions[:10000], transaction_guid=transaction_guid)
+                ClientToServer.TransactionData(
+                    writes={}, set_adds={}, set_removes={},
+                    key_versions=(), index_versions=indices_to_check_versions[:10000],
+                    transaction_guid=transaction_guid)
             )
             indices_to_check_versions = indices_to_check_versions[10000:]
 

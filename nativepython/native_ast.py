@@ -56,7 +56,8 @@ def raising(e):
     raise e
 
 
-Type = Alternative("Type",
+Type = Alternative(
+    "Type",
     Void={},
     Float={'bits': int},
     Int={'bits': int, 'signed': bool},
@@ -107,7 +108,8 @@ def const_str(c):
     assert False, type(c)
 
 
-Constant = Alternative("Constant",
+Constant = Alternative(
+    "Constant",
     Void={},
     Float={'val': float, 'bits': int},
     Int={'val': int, 'bits': int, 'signed': bool},
@@ -131,7 +133,8 @@ UnaryOp = Alternative(
         "~" if o.matches.BitwiseNot else "unknown unary op"
 )
 
-BinaryOp = Alternative("BinaryOp",
+BinaryOp = Alternative(
+    "BinaryOp",
     Add={}, Sub={}, Mul={}, Div={}, Eq={},
     NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
     Mod={}, LShift={}, RShift={},
@@ -193,7 +196,8 @@ def filterCallTargetArgs(args):
     return res
 
 
-CallTarget = Alternative("CallTarget",
+CallTarget = Alternative(
+    "CallTarget",
     Named={'target': NamedCallTarget},
     Pointer={'expr': Expression},
     call=lambda self, *args: Expression.Call(target=self, args=filterCallTargetArgs(args))
@@ -208,7 +212,8 @@ def teardown_str(self):
     assert False, type(self)
 
 
-Teardown = Alternative("Teardown",
+Teardown = Alternative(
+    "Teardown",
     ByTag={'tag': str, 'expr': Expression},
     Always={'expr': Expression},
     __str__=teardown_str
@@ -294,11 +299,14 @@ def expr_str(self):
     if self.matches.Let:
         if self.val.matches.Sequence and len(self.val.vals) > 1:
             return str(
-                Expression.Sequence(vals=self.val.vals[:-1] +
-                    (Expression.Let(
-                        var=self.var,
-                        val=self.val.vals[-1],
-                        within=self.within),)
+                Expression.Sequence(
+                    vals=(
+                        self.val.vals[:-1] +
+                        (Expression.Let(
+                            var=self.var,
+                            val=self.val.vals[-1],
+                            within=self.within), )
+                    )
                 )
             )
         valstr = str(self.val)
@@ -496,7 +504,8 @@ def const_bytes_cstr(i):
     )
 
 
-FunctionBody = Alternative("FunctionBody",
+FunctionBody = Alternative(
+    "FunctionBody",
     Internal={'body': Expression},
     External={'name': str}
 )
