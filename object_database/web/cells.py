@@ -449,6 +449,8 @@ class Cell:
 
     def onMessageWithTransaction(self, *args):
         """Call our inner 'onMessage' function with a transaction and a revision conflict retry loop."""
+        tries = 0
+        t0 = time.time()
         while True:
             try:
                 with self.transaction() as t:

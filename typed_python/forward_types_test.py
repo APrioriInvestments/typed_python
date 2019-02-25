@@ -40,7 +40,7 @@ class NativeForwardTypesTests(unittest.TestCase):
         self.assertEqual(list(l.unpack()), list(reversed(range(100))))
 
     def test_instantiating_invalid_forward(self):
-        X = Alternative("X", A={'x': lambda: this_does_not_Exist })
+        X = Alternative("X", A={'x': lambda: this_does_not_Exist })  # noqa
 
         with self.assertRaises(TypeError):
             X.A()
