@@ -447,8 +447,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertTrue(numpy.all(ping_pong({'a': x, 'b': x})['a'] == x))
 
     def test_serialize_and_threads(self):
-        x = numpy.ones(10000)
-
         class A:
             def __init__(self, x):
                 self.x = x
@@ -490,10 +488,10 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_bad_serialization_context(self):
         with self.assertRaises(AssertionError):
-            ts = SerializationContext({'': int})
+            SerializationContext({'': int})
 
         with self.assertRaises(AssertionError):
-            ts = SerializationContext({b'': int})
+            SerializationContext({b'': int})
 
     def test_serialization_context_queries(self):
         sc = SerializationContext({
@@ -702,37 +700,37 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_base_type_subclass(self):
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyInt())
+            sc.serialize(MyInt())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyFloat())
+            sc.serialize(MyFloat())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyComplex())
+            sc.serialize(MyComplex())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyStr())
+            sc.serialize(MyStr())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyUnicode())
+            sc.serialize(MyUnicode())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyBytes())
+            sc.serialize(MyBytes())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyTuple())
+            sc.serialize(MyTuple())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyList())
+            sc.serialize(MyList())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyDict())
+            sc.serialize(MyDict())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MySet())
+            sc.serialize(MySet())
 
         with self.assertRaises(TypeError):
-            ser = sc.serialize(MyFrozenSet())
+            sc.serialize(MyFrozenSet())
 
     # THIS FAILS
     @unittest.skip

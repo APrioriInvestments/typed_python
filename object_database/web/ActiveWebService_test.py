@@ -125,7 +125,7 @@ class ActiveWebServiceTest(unittest.TestCase):
 
         while time.time() - t0 < timeout:
             try:
-                res = requests.get(self.base_url + "/status")
+                requests.get(self.base_url + "/status")
                 return
             except Exception:
                 time.sleep(.5)

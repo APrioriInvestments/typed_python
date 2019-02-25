@@ -192,8 +192,6 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(e.iTup.x.x, 10)
 
     def test_class_stringification(self):
-        i = Interior()
-
         self.assertEqual(Interior.__qualname__, "Interior")
         self.assertEqual(str(Interior()), "Interior(x=0, y=0)")
 

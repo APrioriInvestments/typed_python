@@ -55,7 +55,7 @@ class TestConstDictCompilation(unittest.TestCase):
         for dtype in dictTypes:
             @Compiled
             def copyInOut(x: dtype):
-                y = x
+                _ = x
                 return x
 
             aDict = makeSomeValues(dtype)
@@ -81,7 +81,7 @@ class TestConstDictCompilation(unittest.TestCase):
             def callOrExpr(f):
                 try:
                     return ("Value", f())
-                except Exception as e:
+                except Exception:
                     return ("Exception", )
 
             d = makeSomeValues(dtype, 10)

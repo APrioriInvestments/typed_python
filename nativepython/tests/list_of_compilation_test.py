@@ -129,7 +129,7 @@ class TestListOfCompilation(unittest.TestCase):
 
             self.assertEqual(_types.refcount(intTup), 2)
 
-            res = None
+            res = None  # noqa
 
             self.assertEqual(_types.refcount(intTup), 1)
 

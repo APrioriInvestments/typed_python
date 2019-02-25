@@ -53,7 +53,7 @@ class TestPythonAst(unittest.TestCase):
         def f(x):
             try:
                 A()
-            except Exception as e:
+            except Exception:
                 pass
             else:
                 print("hihi")
@@ -112,7 +112,7 @@ class TestPythonAst(unittest.TestCase):
 
     def test_reverse_parse_eval_withblock(self):
         def f(x, filename):
-            with open(filename, 'r') as f:
+            with open(filename, 'r'):
                 pass
             return x+x
 

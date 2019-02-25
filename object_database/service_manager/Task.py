@@ -422,7 +422,7 @@ class TaskDispatchService(ServiceBase):
                 taskStatus.delete()
 
         elif state == "DoneCalculating":
-            with self.db.transaction() as tr:
+            with self.db.transaction():
                 parentStatus.subtasks_completed = parentStatus.subtasks_completed + 1
 
                 if len(parentStatus.subtasks) == parentStatus.subtasks_completed:

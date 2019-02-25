@@ -438,7 +438,6 @@ class AwsWorkerBootService(ServiceBase):
 
     @staticmethod
     def shutOneDown(instance_type):
-        api = AwsApi()
         i = [x for x in AwsApi.allRunningInstances().values() if x['InstanceType'] == instance_type]
         if not i:
             raise Exception("No instances of type %s are booted." % instance_type)

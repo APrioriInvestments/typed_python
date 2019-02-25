@@ -721,7 +721,7 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
 
             try:
                 return converter(**args)
-            except Exception as e:
+            except Exception:
                 import traceback
                 raise UserWarning(
                     "Failed to construct %s from %s with arguments\n%s\n\n%s"
@@ -753,7 +753,7 @@ def convertFunctionToAlgebraicPyAst(f, keepLineInformation=True):
         _, fname = ast_util.getSourceFilenameAndText(f)
 
         pyast = ast_util.functionDefOrLambdaAtLineNumber(pyast, lineno)
-    except Exception as e:
+    except Exception:
         raise Exception("Failed to get source for function %s" % (f.__qualname__))
 
     try:

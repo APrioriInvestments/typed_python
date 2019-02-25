@@ -35,8 +35,8 @@ class TypeFunctionTest(unittest.TestCase):
         l_i = List(int).Empty()
         l_f = List(float).Empty()
 
-        l_i_2 = List(int).Node(head=10, tail=l_i)
-        l_f_2 = List(float).Node(head=10.5, tail=l_f)
+        List(int).Node(head=10, tail=l_i)
+        List(float).Node(head=10.5, tail=l_f)
 
         with self.assertRaises(TypeError):
             List(int).Node(head=10, tail=l_f)

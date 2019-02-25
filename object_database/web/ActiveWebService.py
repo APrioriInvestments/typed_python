@@ -213,7 +213,6 @@ class ActiveWebService(ServiceBase):
         server.serve_forever()
 
     def configureApp(self):
-        instanceName = self.serviceObject.name
         self.app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or genToken()
 
         self.app.add_url_rule('/', endpoint='index', view_func=lambda: redirect("/services"))
