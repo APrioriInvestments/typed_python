@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, ListOf, OneOf, Alternative, Member, SerializationContext
+from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext
 import unittest
 
 

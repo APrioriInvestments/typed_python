@@ -14,8 +14,7 @@
 import unittest
 import typed_python
 
-from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    Bool, Bytes, ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function, SerializationContext
+
 from typed_python.Codebase import Codebase
 
 
