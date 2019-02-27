@@ -18,7 +18,6 @@ from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceSchema import service_schema
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
-import os.path
 import psutil
 import logging
 import traceback

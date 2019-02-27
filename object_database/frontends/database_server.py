@@ -17,7 +17,6 @@
 import argparse
 import sys
 import time
-import typed_python
 
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.tcp_server import TcpServer

@@ -12,20 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, TupleOf, OneOf, ConstDict
+from typed_python import OneOf
 
-from object_database.schema import Indexed, Index, Schema
-from object_database.core_schema import core_schema
-from object_database.view import RevisionConflictException, DisconnectedException, ObjectDoesntExistException
-from object_database.database_connection import TransactionListener, DatabaseConnection
-from object_database.tcp_server import TcpServer, connect
+from object_database.schema import Indexed, Schema
 from object_database.inmem_server import InMemServer
-from object_database.persistence import InMemoryPersistence, RedisPersistence
+from object_database.persistence import InMemoryPersistence
 from object_database.util import genToken
 
 import unittest
 import numpy
-import threading
 
 from object_database.util import configureLogging
 

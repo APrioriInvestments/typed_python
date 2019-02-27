@@ -16,9 +16,7 @@ from object_database.view import _cur_view, coerce_value
 
 from typed_python.hash import sha_hash
 
-from typed_python import Alternative, OneOf, TupleOf, ConstDict, Tuple, NamedTuple
-
-from types import FunctionType
+from typed_python import NamedTuple
 
 
 _base = NamedTuple(_identity=str)

@@ -15,16 +15,11 @@
 #   limitations under the License.
 
 import os
-import threading
 import argparse
 import sys
 import time
-import signal
-import logging
-import traceback
-import logging.config
 
-from object_database import connect, InMemServer
+from object_database import connect
 from object_database.util import configureLogging, formatTable, secondsToHumanReadable
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceSchema import service_schema

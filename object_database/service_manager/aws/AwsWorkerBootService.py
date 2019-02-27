@@ -12,19 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import base64
 import boto3
 import datetime
-import json
 import logging
 import os
-import sys
 import time
 import traceback
 import uuid
 
 from typed_python import OneOf, ConstDict
-from object_database import ServiceBase, service_schema, Schema, Indexed
+from object_database import ServiceBase, Schema, Indexed
 from object_database.web import cells
 from object_database.util import closest_N_in
 

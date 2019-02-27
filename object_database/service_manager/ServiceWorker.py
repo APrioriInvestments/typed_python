@@ -12,17 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
-from typed_python.Codebase import Codebase as TypedPythonCodebase
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase, ServiceRuntimeConfig
 
-import object_database
-
 import logging
 import os
-import tempfile
 import threading
 import time
 import traceback

@@ -16,26 +16,21 @@ import logging
 import numpy
 import os
 import psutil
-import subprocess
 import sys
 import tempfile
 import textwrap
-import threading
 import time
 import unittest
 
-import object_database
 from object_database.service_manager.ServiceManagerTestCommon import ServiceManagerTestCommon
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
-from object_database.util import genToken
-from object_database.test_util import autoconfigure_and_start_service_manager
 from object_database.web.cells import *
 
 from object_database import (
     Schema, Indexed, core_schema,
-    connect, service_schema, current_transaction
+    service_schema, current_transaction
 )
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
@@ -155,7 +150,7 @@ class TextEditorService(ServiceBase):
         ed = CodeEditor(None, {'Enter': onEnter}, noScroll=True, minLines=50)
 
         def makePlotData():
-            import numpy
+            import numpy  # noqa
             res = eval(contents.get())
             res = {'data': res}
             return res

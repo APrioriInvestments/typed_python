@@ -27,7 +27,6 @@ from object_database.test_util import (
 import logging
 import unittest
 import threading
-import time
 
 test_schema = Schema("core.web.test")
 
