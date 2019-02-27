@@ -87,9 +87,13 @@ class ServiceManager(object):
 
         if coresUsed is not None:
             service.coresUsed = coresUsed
+        else:
+            service.coresUsed = serviceClass.coresUsed
 
         if gbRamUsed is not None:
             service.gbRamUsed = gbRamUsed
+        else:
+            service.gbRamUsed = serviceClass.gbRamUsed
 
         return service
 
