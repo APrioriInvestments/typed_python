@@ -13,15 +13,9 @@
 #   limitations under the License.
 
 import nativepython.python_to_native_converter as python_to_native_converter
-import nativepython.native_ast as native_ast
 import nativepython.llvm_compiler as llvm_compiler
-import nativepython
-import ctypes
-import tempfile
 import os
-from typed_python import _types
-from typed_python import Function, NoneType
-from typed_python import Codebase
+from typed_python import NoneType
 from typed_python.internals import FunctionOverload
 
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)

@@ -12,13 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Alternative, OneOf, Bool, Float64, Int64
+from typed_python import Bool, Float64, Int64
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import nativepython.native_ast as native_ast
 import nativepython
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.type_wrappers.none_wrapper import NoneWrapper
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 

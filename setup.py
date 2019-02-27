@@ -18,7 +18,7 @@ import pkg_resources
 
 def is_numpy_installed():
     try:
-        import numpy
+        import numpy  # noqa
         numpy_installed = True
     except ImportError:
         numpy_installed = False

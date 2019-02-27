@@ -13,13 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.typed_expression import TypedExpression
-from nativepython.type_wrappers.exceptions import generateThrowException
-import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, Int64, _types
-
-import nativepython.native_ast as native_ast
 import nativepython
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
