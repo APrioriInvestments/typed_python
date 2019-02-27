@@ -611,31 +611,31 @@ class ExpressionConversionContext(object):
                     return TypedExpression(self, native_ast.trueExpr, typeWrapper(bool), False)
 
             while len(expr_so_far) > 1:
-                l, r = expr_so_far[-2], expr_so_far[-1]
+                lhs, rhs = expr_so_far[-2], expr_so_far[-1]
                 expr_so_far.pop()
                 expr_so_far.pop()
 
                 if op.matches.And:
-                    new_expr = native_ast.Expression.Branch(cond=l, true=r, false=native_ast.falseExpr)
+                    new_expr = native_ast.Expression.Branch(cond=lhs, true=rhs, false=native_ast.falseExpr)
                 else:
-                    new_expr = native_ast.Expression.Branch(cond=l, true=native_ast.trueExpr, false=r)
+                    new_expr = native_ast.Expression.Branch(cond=lhs, true=native_ast.trueExpr, false=rhs)
 
                 expr_so_far.append(new_expr)
 
             return TypedExpression(self, expr_so_far[0], typeWrapper(bool), False)
 
         if ast.matches.BinOp:
-            l = self.convert_expression_ast(ast.left)
+            lhs = self.convert_expression_ast(ast.left)
 
-            if l is None:
+            if lhs is None:
                 return None
 
-            r = self.convert_expression_ast(ast.right)
+            rhs = self.convert_expression_ast(ast.right)
 
-            if r is None:
+            if rhs is None:
                 return None
 
-            return l.convert_bin_op(ast.op, r)
+            return lhs.convert_bin_op(ast.op, rhs)
 
         if ast.matches.UnaryOp:
             operand = self.convert_expression_ast(ast.operand)
@@ -655,9 +655,9 @@ class ExpressionConversionContext(object):
             return val.convert_getitem(index)
 
         if ast.matches.Call:
-            l = self.convert_expression_ast(ast.func)
+            lhs = self.convert_expression_ast(ast.func)
 
-            if l is None:
+            if lhs is None:
                 return None
 
             for a in ast.args:
@@ -678,15 +678,15 @@ class ExpressionConversionContext(object):
                 if kwargs[argname] is None:
                     return None
 
-            return l.convert_call(args, kwargs)
+            return lhs.convert_call(args, kwargs)
 
         if ast.matches.Compare:
             assert len(ast.comparators) == 1, "multi-comparison not implemented yet"
             assert len(ast.ops) == 1
 
-            l = self.convert_expression_ast(ast.left)
+            lhs = self.convert_expression_ast(ast.left)
 
-            if l is None:
+            if lhs is None:
                 return None
 
             r = self.convert_expression_ast(ast.comparators[0])
@@ -694,7 +694,7 @@ class ExpressionConversionContext(object):
             if r is None:
                 return None
 
-            return l.convert_bin_op(ast.ops[0], r)
+            return lhs.convert_bin_op(ast.ops[0], r)
 
         if ast.matches.Tuple:
             raise NotImplementedError("not implemented yet")

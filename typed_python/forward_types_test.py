@@ -32,12 +32,12 @@ class NativeForwardTypesTests(unittest.TestCase):
         )
 
         # ensure recursive implementation actually works
-        l = List.Leaf()
+        lst = List.Leaf()
 
         for i in range(100):
-            l = List.Node(head=i, tail=l)
+            lst = List.Node(head=i, tail=lst)
 
-        self.assertEqual(list(l.unpack()), list(reversed(range(100))))
+        self.assertEqual(list(lst.unpack()), list(reversed(range(100))))
 
     def test_instantiating_invalid_forward(self):
         X = Alternative("X", A={'x': lambda: this_does_not_Exist })  # noqa

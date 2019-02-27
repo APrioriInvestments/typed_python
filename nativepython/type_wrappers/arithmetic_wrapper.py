@@ -146,8 +146,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Branch(
                         cond=(right >= 0).nonref_expr,
                         true=native_ast.Expression.Binop(
-                            l=left.nonref_expr,
-                            r=right.nonref_expr,
+                            left=left.nonref_expr,
+                            right=right.nonref_expr,
                             op=pyOpToNative[op]
                         ),
                         false=generateThrowException(context, ValueError("negative shift count"))
@@ -166,8 +166,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     self,
                     native_ast.Expression.Binop(
-                        l=left.nonref_expr,
-                        r=right.nonref_expr,
+                        left=left.nonref_expr,
+                        right=right.nonref_expr,
                         op=pyOpToNative[op]
                     )
                 )
@@ -175,8 +175,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     bool,
                     native_ast.Expression.Binop(
-                        l=left.nonref_expr,
-                        r=right.nonref_expr,
+                        left=left.nonref_expr,
+                        right=right.nonref_expr,
                         op=pyCompOp[op]
                     )
                 )
@@ -222,8 +222,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     self,
                     native_ast.Expression.Binop(
-                        l=left.nonref_expr,
-                        r=right.nonref_expr,
+                        left=left.nonref_expr,
+                        right=right.nonref_expr,
                         op=pyOpToNative[op]
                     )
                 )
@@ -274,8 +274,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                     native_ast.Expression.Branch(
                         cond=right.nonref_expr,
                         true=native_ast.Expression.Binop(
-                            l=left.nonref_expr,
-                            r=right.nonref_expr,
+                            left=left.nonref_expr,
+                            right=right.nonref_expr,
                             op=pyOpToNative[op]
                         ),
                         false=generateThrowException(context, ZeroDivisionError())
@@ -293,8 +293,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     self,
                     native_ast.Expression.Binop(
-                        l=left.nonref_expr,
-                        r=right.nonref_expr,
+                        left=left.nonref_expr,
+                        right=right.nonref_expr,
                         op=pyOpToNative[op]
                     )
                 )
@@ -303,8 +303,8 @@ class Float64Wrapper(ArithmeticTypeWrapper):
                 return context.pushPod(
                     bool,
                     native_ast.Expression.Binop(
-                        l=left.nonref_expr,
-                        r=right.nonref_expr,
+                        left=left.nonref_expr,
+                        right=right.nonref_expr,
                         op=pyCompOp[op]
                     )
                 )

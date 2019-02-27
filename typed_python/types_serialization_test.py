@@ -314,10 +314,10 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_memoizes_tuples(self):
         ts = SerializationContext()
 
-        l = (1, 2, 3)
+        lst = (1, 2, 3)
         for i in range(100):
-            l = (l, l)
-            self.assertTrue(len(ts.serialize(l)) < (i+1) * 100)
+            lst = (lst, lst)
+            self.assertTrue(len(ts.serialize(lst)) < (i+1) * 100)
 
     def test_serialize_objects(self):
         class AnObject:
@@ -659,13 +659,13 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(x.attr, x)
 
     def test_serialize_recursive_multi(self):
-        l = []
-        d = {1: l}
+        lst = []
+        d = {1: lst}
         i = C()
         i.attr = d
-        l.append(i)
+        lst.append(i)
 
-        x = ping_pong(l, sc)
+        x = ping_pong(lst, sc)
         self.assertIsInstance(x, list)
         self.assertEqual(len(x), 1)
         self.assertEqual(dir(x[0]), dir(i))
@@ -999,17 +999,17 @@ class TypesSerializationTest(unittest.TestCase):
     def test_serialize_large_lists(self):
         x = SerializationContext({})
 
-        l = ListOf(ListOf(int))()
+        lst = ListOf(ListOf(int))()
 
-        l.resize(100)
-        for sublist in l:
+        lst.resize(100)
+        for sublist in lst:
             sublist.resize(1000000)
 
         t0 = time.time()
-        l2 = x.deserialize(x.serialize(l))
+        l2 = x.deserialize(x.serialize(lst))
         print(time.time() - t0, " to roundtrip")
 
-        self.assertEqual(l, l2)
+        self.assertEqual(lst, l2)
 
     def test_serialize_large_numpy_arrays(self):
         x = SerializationContext({})
