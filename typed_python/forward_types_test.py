@@ -13,8 +13,7 @@
 #   limitations under the License.
 import unittest
 from typed_python.internals import forwardToName
-from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types
+from typed_python import TupleOf, OneOf, Alternative, Class, Member
 
 
 class NativeForwardTypesTests(unittest.TestCase):

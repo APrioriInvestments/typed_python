@@ -14,17 +14,10 @@
 
 from types import FunctionType
 
-import threading
-import numpy
 import typed_python._types as _types
 import typed_python.inspect_override as inspect
 
-from typed_python.hash import sha_hash
-from typed_python._types import (
-    TupleOf, Tuple, NamedTuple, OneOf, ConstDict,
-    Alternative, Value, serialize, deserialize, Int8,
-    Int16, Int32, UInt8, UInt32, UInt64, NoneType, TypeFor
-)
+from typed_python._types import NamedTuple
 
 
 class UndefinedBehaviorException(BaseException):

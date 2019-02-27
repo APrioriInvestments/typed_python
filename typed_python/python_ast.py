@@ -21,7 +21,7 @@ Python ast directly.
 import ast
 import typed_python.ast_util as ast_util
 import weakref
-from typed_python._types import Alternative, NamedTuple, TupleOf, OneOf
+from typed_python._types import Alternative, TupleOf, OneOf
 
 # forward declarations.
 Module = lambda: Module

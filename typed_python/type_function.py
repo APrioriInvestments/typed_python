@@ -12,11 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python.hash import sha_hash
-import logging
-import traceback
 from types import FunctionType
-import typed_python._types as _types
 
 _type_to_typefunction = {}
 

@@ -17,7 +17,6 @@ import inspect
 import linecache
 import os
 import re
-import sys
 
 from inspect import *
 
