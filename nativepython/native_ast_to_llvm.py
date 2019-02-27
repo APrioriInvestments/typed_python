@@ -520,10 +520,10 @@ class FunctionConverter:
 
     def convert(self, expr):
         if expr.matches.Let:
-            l = self.convert(expr.val)
+            lhs = self.convert(expr.val)
 
             prior = self.arg_assignments.get(expr.var, None)
-            self.arg_assignments[expr.var] = l
+            self.arg_assignments[expr.var] = lhs
 
             res = self.convert(expr.within)
 
@@ -633,63 +633,63 @@ class FunctionConverter:
             return constant_to_typed_llvm_value(self.module, self.builder, expr.val)
 
         if expr.matches.Cast:
-            l = self.convert(expr.left)
+            lhs = self.convert(expr.left)
 
-            if l is None:
+            if lhs is None:
                 return
 
             target_type = type_to_llvm_type(expr.to_type)
 
-            if l.native_type == expr.to_type:
-                return l
+            if lhs.native_type == expr.to_type:
+                return lhs
 
-            if l.native_type.matches.Pointer and expr.to_type.matches.Pointer:
-                return TypedLLVMValue(self.builder.bitcast(l.llvm_value, target_type), expr.to_type)
+            if lhs.native_type.matches.Pointer and expr.to_type.matches.Pointer:
+                return TypedLLVMValue(self.builder.bitcast(lhs.llvm_value, target_type), expr.to_type)
 
-            if l.native_type.matches.Pointer and expr.to_type.matches.Int:
-                return TypedLLVMValue(self.builder.ptrtoint(l.llvm_value, target_type), expr.to_type)
+            if lhs.native_type.matches.Pointer and expr.to_type.matches.Int:
+                return TypedLLVMValue(self.builder.ptrtoint(lhs.llvm_value, target_type), expr.to_type)
 
-            if l.native_type.matches.Int and expr.to_type.matches.Pointer:
-                return TypedLLVMValue(self.builder.inttoptr(l.llvm_value, target_type), expr.to_type)
+            if lhs.native_type.matches.Int and expr.to_type.matches.Pointer:
+                return TypedLLVMValue(self.builder.inttoptr(lhs.llvm_value, target_type), expr.to_type)
 
-            if l.native_type.matches.Float and expr.to_type.matches.Int:
+            if lhs.native_type.matches.Float and expr.to_type.matches.Int:
                 if expr.to_type.signed:
-                    return TypedLLVMValue(self.builder.fptosi(l.llvm_value, target_type), expr.to_type)
+                    return TypedLLVMValue(self.builder.fptosi(lhs.llvm_value, target_type), expr.to_type)
                 else:
-                    return TypedLLVMValue(self.builder.fptoui(l.llvm_value, target_type), expr.to_type)
+                    return TypedLLVMValue(self.builder.fptoui(lhs.llvm_value, target_type), expr.to_type)
 
-            elif l.native_type.matches.Float and expr.to_type.matches.Float:
-                if l.native_type.bits > expr.to_type.bits:
-                    return TypedLLVMValue(self.builder.fptrunc(l.llvm_value, target_type), expr.to_type)
+            elif lhs.native_type.matches.Float and expr.to_type.matches.Float:
+                if lhs.native_type.bits > expr.to_type.bits:
+                    return TypedLLVMValue(self.builder.fptrunc(lhs.llvm_value, target_type), expr.to_type)
                 else:
-                    return TypedLLVMValue(self.builder.fpext(l.llvm_value, target_type), expr.to_type)
+                    return TypedLLVMValue(self.builder.fpext(lhs.llvm_value, target_type), expr.to_type)
 
-            elif l.native_type.matches.Int and expr.to_type.matches.Int:
-                if l.native_type.bits < expr.to_type.bits:
+            elif lhs.native_type.matches.Int and expr.to_type.matches.Int:
+                if lhs.native_type.bits < expr.to_type.bits:
                     if expr.to_type.signed:
-                        return TypedLLVMValue(self.builder.sext(l.llvm_value, target_type), expr.to_type)
+                        return TypedLLVMValue(self.builder.sext(lhs.llvm_value, target_type), expr.to_type)
                     else:
-                        return TypedLLVMValue(self.builder.zext(l.llvm_value, target_type), expr.to_type)
+                        return TypedLLVMValue(self.builder.zext(lhs.llvm_value, target_type), expr.to_type)
                 else:
-                    return TypedLLVMValue(self.builder.trunc(l.llvm_value, target_type), expr.to_type)
+                    return TypedLLVMValue(self.builder.trunc(lhs.llvm_value, target_type), expr.to_type)
 
-            elif l.native_type.matches.Int and expr.to_type.matches.Float:
-                if l.native_type.signed:
-                    return TypedLLVMValue(self.builder.sitofp(l.llvm_value, target_type), expr.to_type)
+            elif lhs.native_type.matches.Int and expr.to_type.matches.Float:
+                if lhs.native_type.signed:
+                    return TypedLLVMValue(self.builder.sitofp(lhs.llvm_value, target_type), expr.to_type)
                 else:
-                    return TypedLLVMValue(self.builder.uitofp(l.llvm_value, target_type), expr.to_type)
+                    return TypedLLVMValue(self.builder.uitofp(lhs.llvm_value, target_type), expr.to_type)
 
         if expr.matches.Return:
             if expr.arg is not None:
                 # write the value into the return slot
-                l = self.convert(expr.arg)
+                arg = self.convert(expr.arg)
 
-                if l is None:
+                if arg is None:
                     return
 
                 if not self.output_type.matches.Void:
                     assert self.return_slot is not None
-                    self.builder.store(l.llvm_value, self.return_slot)
+                    self.builder.store(arg.llvm_value, self.return_slot)
 
             block = self.teardown_handler.accept_incoming(
                 self.builder.block,
@@ -896,24 +896,24 @@ class FunctionConverter:
             assert False, "can't apply unary operand %s to %s" % (expr.op, str(operand.native_type))
 
         if expr.matches.Binop:
-            l = self.convert(expr.l)
-            if l is None:
+            lhs = self.convert(expr.left)
+            if lhs is None:
                 return
-            r = self.convert(expr.r)
-            if r is None:
+            rhs = self.convert(expr.right)
+            if rhs is None:
                 return
 
             for which, rep in [('Gt', '>'), ('Lt', '<'), ('GtE', '>='),
                                ('LtE', '<='), ('Eq', "=="), ("NotEq", "!=")]:
                 if getattr(expr.op.matches, which):
-                    if l.native_type.matches.Float:
+                    if lhs.native_type.matches.Float:
                         return TypedLLVMValue(
-                            self.builder.fcmp_ordered(rep, l.llvm_value, r.llvm_value),
+                            self.builder.fcmp_ordered(rep, lhs.llvm_value, rhs.llvm_value),
                             native_ast.Bool
                         )
-                    elif l.native_type.matches.Int:
+                    elif lhs.native_type.matches.Int:
                         return TypedLLVMValue(
-                            self.builder.icmp_signed(rep, l.llvm_value, r.llvm_value),
+                            self.builder.icmp_signed(rep, lhs.llvm_value, rhs.llvm_value),
                             native_ast.Bool
                         )
 
@@ -928,21 +928,21 @@ class FunctionConverter:
                                                      ('BitXor', None, 'xor', 'xor'),
                                                      ('BitAnd', None, 'and_', 'and_')]:
                 if getattr(expr.op.matches, py_op):
-                    assert l.native_type == r.native_type, \
-                        "malformed types: expect l&r to be the same but got %s,%s,%s\n\nexpr=%s"\
-                        % (py_op, l.native_type, r.native_type, expr)
-                    if l.native_type.matches.Float and floatop is not None:
+                    assert lhs.native_type == rhs.native_type, \
+                        "malformed types: expect lhs&rhs to be the same but got %s,%s,%s\n\nexpr=%s"\
+                        % (py_op, lhs.native_type, rhs.native_type, expr)
+                    if lhs.native_type.matches.Float and floatop is not None:
                         return TypedLLVMValue(
-                            getattr(self.builder, floatop)(l.llvm_value, r.llvm_value),
-                            l.native_type
+                            getattr(self.builder, floatop)(lhs.llvm_value, rhs.llvm_value),
+                            lhs.native_type
                         )
-                    elif l.native_type.matches.Int:
-                        llvm_op = intop_s if l.native_type.signed else intop_u
+                    elif lhs.native_type.matches.Int:
+                        llvm_op = intop_s if lhs.native_type.signed else intop_u
 
                         if llvm_op is not None:
                             return TypedLLVMValue(
-                                getattr(self.builder, llvm_op)(l.llvm_value, r.llvm_value),
-                                l.native_type
+                                getattr(self.builder, llvm_op)(lhs.llvm_value, rhs.llvm_value),
+                                lhs.native_type
                             )
 
         if expr.matches.Call:

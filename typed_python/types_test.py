@@ -270,20 +270,20 @@ class NativeTypesTests(unittest.TestCase):
 
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
-        O = OneOf(None, X)
+        Ox = OneOf(None, X)
 
-        self.assertEqual(O(X.V(a=10)), X.V(a=10))
+        self.assertEqual(Ox(X.V(a=10)), X.V(a=10))
 
     def test_one_of_py_subclass(self):
         class X(NamedTuple(x=int)):
             def f(self):
                 return self.x
 
-        O = OneOf(None, X)
+        Ox = OneOf(None, X)
 
         self.assertEqual(NamedTuple(x=int)(x=10).x, 10)
         self.assertEqual(X(x=10).f(), 10)
-        self.assertEqual(O(X(x=10)).f(), 10)
+        self.assertEqual(Ox(X(x=10)).f(), 10)
 
     def test_tuple_of_tuple_of(self):
         tupleOfInt = TupleOf(int)
@@ -331,73 +331,73 @@ class NativeTypesTests(unittest.TestCase):
         L = ListOf(int)
         self.assertEqual(L.__qualname__, "ListOf(Int64)")
 
-        l = L([1, 2, 3, 4])
+        l1 = L([1, 2, 3, 4])
 
-        self.assertEqual(l[0], 1)
-        self.assertEqual(l[-1], 4)
+        self.assertEqual(l1[0], 1)
+        self.assertEqual(l1[-1], 4)
 
-        l[0] = 10
-        self.assertEqual(l[0], 10)
+        l1[0] = 10
+        self.assertEqual(l1[0], 10)
 
-        l[-1] = 11
-        self.assertEqual(l[3], 11)
+        l1[-1] = 11
+        self.assertEqual(l1[3], 11)
 
         with self.assertRaisesRegex(IndexError, "index out of range"):
-            l[100] = 20
+            l1[100] = 20
 
         l2 = L((10, 2, 3, 11))
 
-        self.assertEqual(l, l2)
-        self.assertNotEqual(l, (10, 2, 3, 11))
-        self.assertEqual(l, [10, 2, 3, 11])
+        self.assertEqual(l1, l2)
+        self.assertNotEqual(l1, (10, 2, 3, 11))
+        self.assertEqual(l1, [10, 2, 3, 11])
 
-        self.assertEqual(str(l), str([10, 2, 3, 11]))
+        self.assertEqual(str(l1), str([10, 2, 3, 11]))
 
-        l3 = l + l2
+        l3 = l1 + l2
         self.assertEqual(l3, [10, 2, 3, 11, 10, 2, 3, 11])
 
         l3.append(23)
         self.assertEqual(l3, [10, 2, 3, 11, 10, 2, 3, 11, 23])
 
     def test_list_resize(self):
-        l = ListOf(TupleOf(int))()
+        l1 = ListOf(TupleOf(int))()
 
-        l.resize(10)
-        self.assertEqual(l.reserved(), 10)
-        self.assertEqual(len(l), 10)
+        l1.resize(10)
+        self.assertEqual(l1.reserved(), 10)
+        self.assertEqual(len(l1), 10)
 
         emptyTup = TupleOf(int)()
         aTup = TupleOf(int)((1, 2, 3))
 
-        self.assertEqual(list(l), [emptyTup] * 10)
-        l.resize(20, aTup)
-        self.assertEqual(list(l), [emptyTup] * 10 + [aTup] * 10)
+        self.assertEqual(list(l1), [emptyTup] * 10)
+        l1.resize(20, aTup)
+        self.assertEqual(list(l1), [emptyTup] * 10 + [aTup] * 10)
 
         self.assertEqual(_types.refcount(aTup), 11)
 
-        self.assertEqual(l.pop(15), aTup)
-        self.assertEqual(l.pop(5), emptyTup)
+        self.assertEqual(l1.pop(15), aTup)
+        self.assertEqual(l1.pop(5), emptyTup)
 
         self.assertEqual(_types.refcount(aTup), 10)
 
-        l.resize(15)
+        l1.resize(15)
 
         with self.assertRaises(IndexError):
-            l.pop(100)
+            l1.pop(100)
 
         self.assertEqual(_types.refcount(aTup), 7)  # 6 in the list because we popped at '5'
 
-        l.pop()
+        l1.pop()
 
         self.assertEqual(_types.refcount(aTup), 6)
 
         # this pops one of the empty tuples
-        l.pop(-10)
+        l1.pop(-10)
 
         self.assertEqual(_types.refcount(aTup), 6)
 
-        l.clear()
-        self.assertEqual(len(l), 0)
+        l1.clear()
+        self.assertEqual(len(l1), 0)
 
     def test_one_of(self):
         o = OneOf(None, str)
@@ -945,7 +945,7 @@ class NativeTypesTests(unittest.TestCase):
         alt = Alternative(
             "Alt",
             child_ints={'x': int, 'y': int},
-            __add__=lambda l, r: (l, r)
+            __add__=lambda lhs, rhs: (lhs, rhs)
         )
 
         a = alt.child_ints(x=0, y=2)
