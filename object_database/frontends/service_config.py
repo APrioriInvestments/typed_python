@@ -15,20 +15,14 @@
 #   limitations under the License.
 
 import os
-import threading
 import argparse
 import sys
-import time
-import signal
-import logging
 import traceback
-import logging.config
 import tempfile
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database import connect, service_schema, core_schema, ServiceBase, Codebase
-from object_database.util import configureLogging, formatTable, secondsToHumanReadable
+from object_database import connect, service_schema, core_schema, ServiceBase
+from object_database.util import configureLogging, formatTable
 import object_database
-from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 
 def findGitParent(p_root):

@@ -3,7 +3,6 @@ from object_database.database_connection import DatabaseConnection
 from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
 from object_database.persistence import InMemoryPersistence
 
-import json
 import time
 import queue
 import logging

@@ -1,4 +1,4 @@
-from typed_python import sha_hash, serialize
+from typed_python import sha_hash
 
 
 def data_key(obj_type, identity, field_name):

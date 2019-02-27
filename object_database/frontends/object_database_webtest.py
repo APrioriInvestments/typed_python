@@ -15,9 +15,7 @@
 #   limitations under the License.
 
 
-import argparse
 import os
-import subprocess
 import sys
 import tempfile
 import time
@@ -36,15 +34,11 @@ from object_database.web.ActiveWebService import (
 from object_database import (
     connect,
     core_schema,
-    current_transaction,
-    Index,
-    Indexed,
-    Schema,
     service_schema,
-    TcpServer
+
 )
 from object_database.test_util import start_service_manager
-from object_database.util import tokenFromString, genToken
+from object_database.util import genToken
 from object_database.web.LoginPlugin import LoginIpPlugin
 
 

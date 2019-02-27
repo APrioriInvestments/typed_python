@@ -12,9 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.from collections import defaultdict
 
-
 import unittest
-from unittest.mock import patch, Mock
+from unittest.mock import Mock
 
 from object_database.web.AuthPlugin import PermissiveAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin

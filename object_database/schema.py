@@ -12,8 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import inspect
-
 from object_database.object import DatabaseObject, Index, Indexed
 from types import FunctionType
 from typed_python import ConstDict, NamedTuple, Tuple, TupleOf

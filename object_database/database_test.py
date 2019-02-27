@@ -19,7 +19,7 @@ from object_database.schema import Indexed, Index, Schema
 from object_database.core_schema import core_schema
 from object_database.view import RevisionConflictException, DisconnectedException, ObjectDoesntExistException
 from object_database.database_connection import TransactionListener, DatabaseConnection, SetWithEdits
-from object_database.tcp_server import TcpServer, connect
+from object_database.tcp_server import TcpServer
 from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.util import configureLogging, genToken

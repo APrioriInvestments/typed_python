@@ -18,7 +18,6 @@ from typed_python import Alternative
 import asyncio
 import queue
 import ssl
-import threading
 import unittest
 
 

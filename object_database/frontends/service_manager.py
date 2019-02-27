@@ -27,7 +27,7 @@ import time
 import traceback
 
 from object_database.util import configureLogging, sslContextFromCertPathOrNone, checkLogLevelValidity
-from object_database import connect, TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
+from object_database import TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
 

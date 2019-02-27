@@ -5,8 +5,6 @@ from object_database.algebraic_protocol import AlgebraicProtocol
 from object_database.persistence import InMemoryPersistence
 
 import asyncio
-import json
-import queue
 import logging
 import ssl
 import time

@@ -13,20 +13,16 @@
 #   limitations under the License.
 
 import logging
-import os
 import traceback
 import threading
 import time
 
-import object_database
-
 from object_database.web import cells as cells
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase
-from object_database.service_manager.Codebase import Codebase
-from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
-from object_database.view import revisionConflictRetry, RevisionConflictException, DisconnectedException, current_transaction
-from typed_python import OneOf, Alternative, ConstDict, TupleOf
+from object_database import Schema, Indexed, Index, core_schema
+from object_database.view import revisionConflictRetry, DisconnectedException
+from typed_python import OneOf, Alternative, ConstDict
 
 task_schema = Schema("core.task")
 

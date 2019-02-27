@@ -12,19 +12,14 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.schema import Schema
-from object_database.messages import ClientToServer, ServerToClient, SchemaDefinition, getHeartbeatInterval
+from object_database.messages import ClientToServer, getHeartbeatInterval
 from object_database.core_schema import core_schema
 from object_database.view import View, Transaction, _cur_view, SerializedDatabaseValue
 from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
-from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 from typed_python import Alternative
-
-import typed_python
-import object_database
 
 import queue
 import threading
@@ -32,7 +27,7 @@ import logging
 import traceback
 import time
 
-from object_database.view import RevisionConflictException, DisconnectedException
+from object_database.view import DisconnectedException
 
 
 class Everything:

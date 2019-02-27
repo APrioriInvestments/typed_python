@@ -12,29 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import logging
-import numpy
 import os
-import psutil
-import subprocess
-import sys
-import tempfile
-import textwrap
-import threading
-import time
 import unittest
 
-import object_database
 import object_database.service_manager.Task as Task
 from object_database.service_manager.ServiceManagerTestCommon import ServiceManagerTestCommon
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.service_manager.ServiceBase import ServiceBase
-import object_database.service_manager.ServiceInstance as ServiceInstance
 
-from object_database import (
-    Schema, Indexed, core_schema,
-    connect, service_schema, current_transaction
-)
+from object_database import service_schema
+
 
 VERBOSE = True
 
