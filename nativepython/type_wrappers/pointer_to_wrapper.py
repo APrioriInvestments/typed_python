@@ -13,14 +13,10 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.typed_expression import TypedExpression
-from nativepython.type_wrappers.exceptions import generateThrowException
-from nativepython.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
 from nativepython.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
-import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, Int64, PointerTo
+from typed_python import Int64, PointerTo
 
 import nativepython.native_ast as native_ast
 import nativepython

@@ -16,8 +16,6 @@ from typed_python import *
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
-import time
-import psutil
 
 
 def Compiled(f):

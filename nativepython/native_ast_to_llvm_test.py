@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import *
 from nativepython.native_ast import Expression, Void, Int32, nullExpr, Function, FunctionBody, Teardown, const_int32_expr, CallTarget, NamedCallTarget
 from nativepython.llvm_compiler import llvm
 import nativepython.native_ast_to_llvm as native_ast_to_llvm

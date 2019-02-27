@@ -18,11 +18,9 @@ import typed_python.ast_util as ast_util
 import nativepython
 import nativepython.native_ast as native_ast
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
-from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
-from nativepython.typed_expression import TypedExpression
-from nativepython.conversion_exception import ConversionException
+from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from nativepython.expression_conversion_context import ExpressionConversionContext
-from nativepython.function_conversion_context import FunctionConversionContext, FunctionOutput
+from nativepython.function_conversion_context import FunctionConversionContext
 from typed_python import *
 
 NoneExprType = NoneWrapper()

@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import NoneType, Int64
+from typed_python import Int64
 from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast

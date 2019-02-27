@@ -15,7 +15,6 @@
 from typed_python import *
 from nativepython.runtime import Runtime
 import unittest
-import time
 
 
 def Compiled(f):
