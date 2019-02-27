@@ -17,7 +17,6 @@ import llvmlite.ir
 import nativepython.native_ast_to_llvm as native_ast_to_llvm
 import sys
 import ctypes
-import time
 import struct
 import tempfile
 import os

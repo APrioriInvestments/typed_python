@@ -12,8 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython.native_ast as native_ast
-import nativepython
 from typed_python import _types
 
 from nativepython.type_wrappers.exceptions import generateThrowException

@@ -12,15 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import typed_python.python_ast as python_ast
-import typed_python.ast_util as ast_util
-
 import nativepython
 import nativepython.native_ast as native_ast
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
-from nativepython.python_object_representation import pythonObjectRepresentation, typedPythonTypeToTypeWrapper
+from nativepython.python_object_representation import pythonObjectRepresentation
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
 from typed_python import *

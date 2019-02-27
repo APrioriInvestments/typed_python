@@ -16,8 +16,6 @@ import typed_python.python_ast as python_ast
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.conversion_exception import ConversionException
-from nativepython.typed_expression import TypedExpression
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
 import nativepython

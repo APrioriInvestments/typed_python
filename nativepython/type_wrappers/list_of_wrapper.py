@@ -12,14 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.typed_expression import TypedExpression
-from nativepython.type_wrappers.exceptions import generateThrowException
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOrListOfWrapper
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, Int64, PointerTo
+from typed_python import PointerTo
 
 import nativepython.native_ast as native_ast
 import nativepython
