@@ -22,7 +22,6 @@ import time
 import traceback
 
 from object_database.service_manager.ServiceManager import ServiceManager
-from object_database.service_manager.ServiceWorker import ServiceWorker
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database import connect
 

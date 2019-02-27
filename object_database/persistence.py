@@ -13,11 +13,9 @@
 #   limitations under the License.
 
 import redis
-import json
 import time
 import threading
 import logging
-import os
 
 
 class InMemoryPersistence(object):

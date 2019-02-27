@@ -11,12 +11,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import threading
 import logging
 import time
-import base64
 import json
-import sys
 import time
 import argparse
 import traceback
@@ -26,11 +23,10 @@ import gevent.socket
 import gevent.queue
 
 from object_database.util import genToken, checkLogLevelValidity
-from object_database import ServiceBase, service_schema, Schema, Indexed, Index, DatabaseObject
+from object_database import ServiceBase, service_schema, Indexed
 from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin
 from object_database.web.ActiveWebServiceSchema import active_webservice_schema
-from object_database.web.flask_util import request_ip_address
 from object_database.web.cells import *
 from typed_python import OneOf, TupleOf, ConstDict
 from typed_python.Codebase import Codebase as TypedPythonCodebase
@@ -40,19 +36,16 @@ from gevent.greenlet import Greenlet
 from geventwebsocket.handler import WebSocketHandler
 
 from flask import (
-    flash,
     Flask,
     jsonify,
     make_response,
     redirect,
-    render_template,
     request,
     send_from_directory,
-    url_for,
 )
 from flask_sockets import Sockets
 from flask_cors import CORS
-from flask_login import LoginManager, current_user, login_user, logout_user, login_required
+from flask_login import LoginManager, current_user, login_required
 
 
 @active_webservice_schema.define

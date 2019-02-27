@@ -14,19 +14,13 @@
 
 import importlib
 import logging
-import os
-import six
-import sys
-import tempfile
-import threading
 import time
 import urllib.parse
 
 import object_database
 
 from object_database.service_manager.ServiceSchema import service_schema
-from object_database.service_manager.Codebase import Codebase
-from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
+from object_database import Schema, Indexed, core_schema
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 from typed_python import OneOf
 

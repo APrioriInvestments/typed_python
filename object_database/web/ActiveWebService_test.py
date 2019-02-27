@@ -27,7 +27,7 @@ from object_database.web.ActiveWebService import ActiveWebService
 
 from object_database import core_schema, connect, service_schema
 from object_database.util import configureLogging, genToken
-from object_database.test_util import autoconfigure_and_start_service_manager, currentMemUsageMb
+from object_database.test_util import autoconfigure_and_start_service_manager
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 ownDir = os.path.dirname(os.path.abspath(__file__))

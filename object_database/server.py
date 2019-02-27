@@ -12,24 +12,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.messages import ClientToServer, ServerToClient, getHeartbeatInterval
+from object_database.messages import ClientToServer, ServerToClient
 from object_database.identity import IdentityProducer
-from object_database.schema import Schema
 from object_database.messages import SchemaDefinition
 from object_database.core_schema import core_schema
 import object_database.keymapping as keymapping
-from object_database.algebraic_protocol import AlgebraicProtocol
 from object_database.util import Timer
-from typed_python.hash import sha_hash
 from typed_python import *
 
-import redis
 import queue
 import time
 import logging
 import threading
 import traceback
-import json
 
 DEFAULT_GC_INTERVAL = 900.0
 

@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# flake8: noqa
 from object_database.tcp_server import connect, TcpServer
 from object_database.persistence import RedisPersistence, InMemoryPersistence
 from object_database.schema import Schema, Indexed, Index, SubscribeLazilyByDefault

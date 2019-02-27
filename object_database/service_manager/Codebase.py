@@ -16,7 +16,7 @@ import logging
 import os
 import object_database
 
-from object_database import Schema, Indexed, Index, core_schema, SubscribeLazilyByDefault
+from object_database import Indexed, SubscribeLazilyByDefault
 from typed_python import *
 import threading
 
