@@ -18,8 +18,7 @@ import gc
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    Int8, NoneType, ListOf, TupleOf, OneOf, Tuple, NamedTuple, ConstDict,
-    Alternative, serialize, deserialize, Value, Class, Member, _types
+    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types
 )
 
 

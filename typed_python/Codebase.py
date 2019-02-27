@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 import importlib
-import types
 import tempfile
 import os
 import sys

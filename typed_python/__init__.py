@@ -14,12 +14,12 @@
 
 __version__ = "0.2"
 
-from typed_python.internals import Class, Member, Function, UndefinedBehaviorException, makeNamedTuple
-from typed_python.type_function import TypeFunction
-from typed_python.hash import sha_hash
-from typed_python.SerializationContext import SerializationContext
-from typed_python.type_filter import TypeFilter
-from typed_python._types import (
+from typed_python.internals import Class, Member, Function, UndefinedBehaviorException, makeNamedTuple  # noqa
+from typed_python.type_function import TypeFunction  # noqa
+from typed_python.hash import sha_hash  # noqa
+from typed_python.SerializationContext import SerializationContext  # noqa
+from typed_python.type_filter import TypeFilter  # noqa
+from typed_python._types import (  # noqa
     TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
     Alternative, Value, serialize, deserialize,
     PointerTo, Dict

@@ -12,8 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python import Int8, NoneType, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function
+from typed_python import TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
+    ConstDict, Alternative, _types
 
 
 class TypesMetadataTest(unittest.TestCase):

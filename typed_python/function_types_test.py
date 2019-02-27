@@ -12,8 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python import Int8, Int64, Float64, NoneType, TupleOf, OneOf, Tuple, NamedTuple, \
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member, _types, Function
+from typed_python import Int64, NoneType, TupleOf, ConstDict, Function
 
 
 class NativeFunctionTypesTests(unittest.TestCase):

@@ -16,7 +16,6 @@ import typed_python.inspect_override as inspect
 
 import ast
 import os
-import sys
 import textwrap
 
 LINENO_ATTRIBUTE_NAME = 'lineno'

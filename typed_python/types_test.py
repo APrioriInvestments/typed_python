@@ -18,19 +18,17 @@ from typed_python import (
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64,
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
-    ConstDict, Alternative, serialize, deserialize, Value, Class, Member,
-    TypeFilter, UndefinedBehaviorException, Function
+    ConstDict, Alternative, serialize, deserialize, Class, Member,
+    TypeFilter, Function
 )
 
 from typed_python.test_util import currentMemUsageMb
 import typed_python._types as _types
 import psutil
 import unittest
-import traceback
 import time
 import numpy
 import os
-import sys
 
 
 def typeFor(t):

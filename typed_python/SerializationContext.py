@@ -12,10 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python._types import serialize, deserialize, resolveForwards
+from typed_python._types import serialize, deserialize
 from typed_python.python_ast import convertFunctionToAlgebraicPyAst, evaluateFunctionPyAst, Expr, Statement
 from typed_python.hash import sha_hash
-from typed_python.type_function import TypeFunction, ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
+from typed_python.type_function import ConcreteTypeFunction, isTypeFunctionType, reconstructTypeFunctionType
 from types import FunctionType, ModuleType
 import numpy
 import datetime
