@@ -41,7 +41,7 @@ test: testcert.cert testcert.key install
 .PHONY: lint
 lint: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
-	flake8 --statistics
+	flake8 --count
 
 .PHONY: lib
 lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
@@ -67,10 +67,6 @@ docker-test:
 docker-web:
 	#run a dummy webframework
 	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
-
-.PHONY: lint
-lint:
-	flake8 --count
 
 .PHONY: clean
 clean:
