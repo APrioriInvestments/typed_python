@@ -70,7 +70,7 @@ docker-web:
 
 .PHONY: lint
 lint:
-	find . -not -path "./.venv*" -name "*.py" | xargs flake8
+	flake8 --count
 
 .PHONY: clean
 clean:

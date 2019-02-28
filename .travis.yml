@@ -14,8 +14,11 @@ env:
 install:
   - pip install pipenv
   - pipenv install --dev --deploy
-
-script:
   - make testcert.cert
-  - ./test.py -s
-  - pipenv check
+
+jobs:
+  include:
+    - stage: "test"
+      script: make lint
+    - script: pipenv check
+    - script: ./test.py -s
