@@ -108,7 +108,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
-                timeout=self.WAIT_FOR_COUNT_TIMEOUT
+                timeout=self.WAIT_FOR_COUNT_TIMEOUT * 2
             )
         )
 
