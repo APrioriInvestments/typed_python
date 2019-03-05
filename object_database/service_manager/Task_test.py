@@ -30,12 +30,12 @@ ownDir = os.path.dirname(os.path.abspath(__file__))
 class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
     def dialWorkers(self, workerCount):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(Task.TaskService, "TaskService", target_count=workerCount)
+            ServiceManager.createOrUpdateService(Task.TaskService, "TaskService", target_count=workerCount, gbRamUsed=0, coresUsed=0)
 
     def installServices(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(Task.TaskService, "TaskService", target_count=1)
-            ServiceManager.createOrUpdateService(Task.TaskDispatchService, "TaskDispatchService", target_count=1)
+            ServiceManager.createOrUpdateService(Task.TaskService, "TaskService", target_count=1, gbRamUsed=0, coresUsed=0)
+            ServiceManager.createOrUpdateService(Task.TaskDispatchService, "TaskDispatchService", target_count=1, gbRamUsed=0, coresUsed=0)
 
         self.waitRunning("TaskService")
         self.waitRunning("TaskDispatchService")

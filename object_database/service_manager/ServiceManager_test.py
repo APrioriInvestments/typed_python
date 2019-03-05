@@ -80,6 +80,9 @@ class TestServiceLastTimestamp:
 
 
 class TestService(ServiceBase):
+    gbRamUsed = 0
+    coresUsed = 0
+
     def initialize(self):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
 
@@ -102,6 +105,9 @@ class TestService(ServiceBase):
 
 
 class HangingService(ServiceBase):
+    gbRamUsed = 0
+    coresUsed = 0
+
     def initialize(self):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
 
