@@ -377,7 +377,8 @@ class ActiveWebService(ServiceBase):
     @login_required
     def mainSocket(self, ws, path):
         path = str(path).split("/")
-        queryArgs = dict(request.args)
+        queryArgs = dict(request.args.items())
+
         self._logger.info("path = %s", path)
         reader = None
 
