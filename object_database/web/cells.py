@@ -1811,7 +1811,26 @@ class CodeEditorTrigger(Cell):
 class Sheet(Cell):
     """Make a nice spreadsheet viewer. The dataset needs to be static in this implementation."""
 
-    def __init__(self, columnNames, rowCount, rowFun, colWidth=200):
+    def __init__(self, columnNames, rowCount, rowFun,
+                 colWidth=200,
+                 onCellDblClick = None
+                  ):
+        """
+        columnNames:
+            names to go in column Header
+        rowCount:
+            number of rows in table
+        rowFun:
+            function taking integer row as argument that returns list of values
+            to populate that row of the table
+        colWidth:
+            width of columns
+        onCellDblClick:
+            function to run after user double clicks a cell. It takes as keyword
+            arguments row, col, and sheet where row and col represent the row and
+            column clicked and sheet is the Sheet object. Clicks on row(col)
+            headers will return row(col) values of -1
+        """
         super().__init__()
 
         self.columnNames = columnNames
@@ -1821,6 +1840,74 @@ class Sheet(Cell):
         self.error = Slot(None)
         self._overflow = "auto"
         self.rowsSent = set()
+
+        self._hookfns = {}
+        if onCellDblClick is not None:
+            def _makeOnCellDblClick(func):
+                def _onMessage(sheet, msgFrame):
+                    return onCellDblClick(sheet = sheet,
+                                          row = msgFrame["row"],
+                                          col = msgFrame["col"])
+                return _onMessage
+
+
+            self._hookfns["onCellDblClick"] = _makeOnCellDblClick(onCellDblClick)
+
+
+    def _addHandsontableOnCellDblClick(self):
+            return """
+            Handsontable.hooks.add(
+                "beforeOnCellMouseDown",
+                function(event,data) {
+                    handsOnObj = handsOnTables["__identity__"];
+                    if(handsOnObj.lastCellClicked.row == data.row &
+                       handsOnObj.lastCellClicked.col == data.col){
+                       handsOnObj.dblClicked = true;
+                       setTimeout(function(){
+                            handsOnObj = handsOnTables["__identity__"];
+                            if(handsOnObj.dblClicked){
+                                websocket.send(JSON.stringify(
+                                    {'event':'onCellDblClick',
+                                     'target_cell': '__identity__',
+                                     'row': data.row,
+                                     'col': data.col
+                                     }
+                                ));
+                            }
+                            handsOnObj.lastCellClicked = {row: -100, col: -100};
+                            handsOnObj.dblClicked = false;
+                        },200);
+                    } else {
+                    handsOnObj.lastCellClicked = {row: data.row, col: data.col};
+                    setTimeout(function(){
+                        handsOnObj = handsOnTables["__identity__"];
+                        handsOnObj.lastCellClicked = {row: -100, col: -100};
+                        handsOnObj.dblClicked = false;
+                        },600);
+                    }
+                },
+                currentTable
+            );
+            Handsontable.hooks.add(
+                "beforeOnCellContextMenu",
+                function(event,data) {
+                    handsOnObj = handsOnTables["__identity__"];
+                    handsOnObj.dblClicked = false;
+                    handsOnObj.lastCellClicked = {row: -100, col: -100};
+                },
+                currentTable
+            );
+            Handsontable.hooks.add(
+                "beforeContextMenuShow",
+                function(event,data) {
+                    handsOnObj = handsOnTables["__identity__"];
+                    handsOnObj.dblClicked = false;
+                    handsOnObj.lastCellClicked = {row: -100, col: -100};
+                },
+                currentTable
+            );
+
+            """ .replace("__identity__", self._identity)
 
     def recalculate(self):
         self.contents = """
@@ -1834,7 +1921,7 @@ class Sheet(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = (
+        self.postscript = ((
             """
             function model(opts) { return {} }
 
@@ -1904,46 +1991,55 @@ class Sheet(Cell):
                 readOnly: true,
                 ManualRowMove: false
                 });
-
-            handsOnTables["__identity__"] = currentTable
-
-            """
+            handsOnTables["__identity__"] = {
+                    table: currentTable,
+                    lastCellClicked: {row: -100, col:-100},
+                    dblClicked: true
+            }
+            """ +\
+            self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else ""
+            )
             .replace("__identity__", self._identity)
             .replace("__rows__", str(self.rowCount))
             .replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames))
             .replace("__col_width__", json.dumps(self.colWidth))
         )
 
+
     def onMessage(self, msgFrame):
-        row = msgFrame['data']
 
-        if row in self.rowsSent:
-            return
+        if msgFrame["event"] == 'sheet_needs_data':
+            row = msgFrame['data']
 
-        rows = []
-        for rowToRender in range(max(0, row-100), min(row+100, self.rowCount)):
-            if rowToRender not in self.rowsSent:
-                self.rowsSent.add(rowToRender)
-                rows.append(rowToRender)
+            if row in self.rowsSent:
+                return
 
-                rowData = self.rowFun(rowToRender)
+            rows = []
+            for rowToRender in range(max(0, row-100), min(row+100, self.rowCount)):
+                if rowToRender not in self.rowsSent:
+                    self.rowsSent.add(rowToRender)
+                    rows.append(rowToRender)
 
+                    rowData = self.rowFun(rowToRender)
+
+                    self.triggerPostscript(
+                        """
+                        var hot = handsOnTables["__identity__"].table
+
+                        hot.getSettings().data.cache[__row__] = __data__
+                        """
+                        .replace("__row__", str(rowToRender))
+                        .replace("__identity__", self._identity)
+                        .replace("__data__", json.dumps(rowData))
+                    )
+
+            if rows:
                 self.triggerPostscript(
-                    """
-                    var hot = handsOnTables["__identity__"]
-
-                    hot.getSettings().data.cache[__row__] = __data__
-                    """
-                    .replace("__row__", str(rowToRender))
+                    """handsOnTables["__identity__"].table.render()"""
                     .replace("__identity__", self._identity)
-                    .replace("__data__", json.dumps(rowData))
                 )
-
-        if rows:
-            self.triggerPostscript(
-                """handsOnTables["__identity__"].render()"""
-                .replace("__identity__", self._identity)
-            )
+        else:
+            return self._hookfns[msgFrame["event"]](self, msgFrame)
 
 
 class Plot(Cell):
