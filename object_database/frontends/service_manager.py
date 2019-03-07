@@ -132,7 +132,7 @@ def main(argv=None):
                             shutdownTimeout=parsedArgs.shutdownTimeout
                         )
                         logger.info("Connected the service-manager")
-                    except (ConnectionRefusedError, DisconnectedException):
+                    except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
                         serviceManager = None
 
                     if serviceManager is None:
