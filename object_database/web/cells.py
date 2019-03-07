@@ -98,6 +98,8 @@ class Cells:
     def __init__(self, db):
         self.db = db
 
+        self._gEventHasTransactions = GeventPipe()
+
         self.db.registerOnTransactionHandler(self._onTransaction)
 
         # map: Cell.identity ->  Cell
@@ -116,8 +118,6 @@ class Cells:
         self._nodesToDiscard = set()
 
         self._transactionQueue = queue.Queue()
-
-        self._gEventHasTransactions = GeventPipe()
 
         # map: db.key -> set(Cell)
         self._subscribedCells = {}
