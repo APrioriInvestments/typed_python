@@ -8,6 +8,7 @@
     crossorigin="anonymous">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ext-language_tools.js"></script>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/handsontable/6.2.2/handsontable.full.css"></link>
 
@@ -24,6 +25,8 @@
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 
 <script>
+    var langTools = ace.require("ace/ext/language_tools");
+
     var FRAMES_PER_ACK = 10;
 
     var websocket;

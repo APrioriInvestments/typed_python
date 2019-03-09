@@ -1686,7 +1686,13 @@ class Expands(Cell):
 class CodeEditor(Cell):
     """Produce a code editor."""
 
-    def __init__(self, onmessage=lambda msg: None, keybindings=None, noScroll=False, minLines=None, fontSize=None):
+    def __init__(self, onmessage=lambda msg: None,
+            keybindings=None,
+            noScroll=False,
+            minLines=None,
+            fontSize=None,
+            autocomplete=True
+            ):
         """Create a code editor
 
         onmessage - receives messages from the user as they type
@@ -1702,6 +1708,7 @@ class CodeEditor(Cell):
         self.noScroll = noScroll
         self.fontSize = fontSize
         self.minLines = minLines
+        self.autocomplete = autocomplete
 
     def setContents(self, contents):
         self._slot.set((self._slot.getWithoutRegisteringDependency()[0]+1, contents))
@@ -1735,6 +1742,12 @@ class CodeEditor(Cell):
             editor.setAutoScrollEditorIntoView(true);
             editor.session.setUseSoftTabs(true);
         """
+
+        if self.autocomplete:
+            self.postscript += """
+            editor.setOptions({enableBasicAutocompletion: true});
+            editor.setOptions({enableLiveAutocompletion: true});
+            """
 
         if self.fontSize is not None:
             self.postscript += """
