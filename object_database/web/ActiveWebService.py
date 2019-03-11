@@ -220,6 +220,7 @@ class ActiveWebService(ServiceBase):
 
     @login_required
     def sendPage(self, path=None):
+        self._logger.info("Sending 'page.html'")
         return self.sendContent("page.html")
 
     def mainDisplay(self):
@@ -379,8 +380,9 @@ class ActiveWebService(ServiceBase):
         path = str(path).split("/")
         queryArgs = dict(request.args.items())
 
-        self._logger.info("path = %s", path)
+        self._logger.info("entering websocket with path %s", path)
         reader = None
+        isFirstMessage = True
 
         try:
             self._logger.info("Starting main websocket handler with %s", ws)
@@ -479,6 +481,10 @@ class ActiveWebService(ServiceBase):
                     return
 
                 lastDumpTimeSpentCalculating += time.time() - t0
+
+                if isFirstMessage:
+                    self._logger.info("Completed first rendering loop")
+                    isFirstMessage = False
 
                 for message in messages:
                     gevent.socket.wait_write(ws.stream.handler.socket.fileno())

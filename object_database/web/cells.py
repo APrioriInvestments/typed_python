@@ -1691,15 +1691,22 @@ class CodeEditor(Cell):
             noScroll=False,
             minLines=None,
             fontSize=None,
-            autocomplete=True
+            autocomplete=True,
+            onTextChange=None
             ):
         """Create a code editor
 
         onmessage - receives messages from the user as they type
         keybindings - map from keycode to a lambda function that will receive
-            the current buffer and the current selection range
+            the current buffer and the current selection range when the user
+            types ctrl-X and 'X' is a valid keycode. Common values here are also
+            'Enter' and 'space'
 
-        You may call 'setContents' to override the current contents.
+        You may call 'setContents' to override the current contents of the editor.
+        This version is not robust to mutiple users editing at the same time.
+
+        onTextChange - called when the text buffer changes with the new buffer with
+            the current text and a selection.
         """
         super().__init__()
         self._slot = Slot((0, ""))
@@ -1709,15 +1716,22 @@ class CodeEditor(Cell):
         self.fontSize = fontSize
         self.minLines = minLines
         self.autocomplete = autocomplete
+        self.onTextChange = onTextChange
 
     def setContents(self, contents):
-        self._slot.set((self._slot.getWithoutRegisteringDependency()[0]+1, contents))
+        if contents != self._slot.getWithoutRegisteringDependency()[1]:
+            self._slot.set((self._slot.getWithoutRegisteringDependency()[0]+1, contents))
 
     def onMessage(self, msgFrame):
         if msgFrame['event'] == 'keybinding':
             self.keybindings[msgFrame['key']](msgFrame['buffer'], msgFrame['selection'])
+        elif msgFrame['event'] == 'editing':
+            if self.onTextChange:
+                self.onTextChange(msgFrame['buffer'], msgFrame['selection'])
         else:
-            self._onmessage(msgFrame['data'])
+            if self._onmessage:
+                self._onmessage(msgFrame['data'])
+
 
     def recalculate(self):
         self.children = {'____child__': Subscribed(lambda: CodeEditorTrigger(self))}
@@ -1735,6 +1749,7 @@ class CodeEditor(Cell):
         self.postscript = """
             var editor = ace.edit("editor__identity__");
             aceEditors["editor__identity__"] = editor
+            editor.last_edit_millis = Date.now()
 
             console.log("setting up editor")
             editor.setTheme("ace/theme/textmate");
@@ -1764,15 +1779,33 @@ class CodeEditor(Cell):
                 editor.setOption("maxLines", Infinity);
             """
 
-        if self._onmessage is not None:
-            self.postscript += """
-                editor.session.on('change', function(delta) {
-                    websocket.send(
-                        JSON.stringify(
-                            {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta}
-                            )
+        self.postscript += """
+            editor.session.on('change', function(delta) {
+                websocket.send(
+                    JSON.stringify(
+                        {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta, 'iteration': editor.current_cells_content_iteration }
                         )
-                });
+                    )
+                //record that we just edited
+                editor.last_edit_millis = Date.now()
+
+                //schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms that will update the server,
+                //but only if the user has stopped typing.
+                SERVER_UPDATE_DELAY_MS = 200
+
+                window.setTimeout(function() {
+                    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
+                        websocket.send(
+                            JSON.stringify(
+                                {'event': 'editing', 'target_cell': '__identity__',
+                                'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
+                                'iteration': editor.current_cells_content_iteration }
+                                )
+                            )
+                        editor.last_edit_millis = Date.now()
+                    }
+                }, SERVER_UPDATE_DELAY_MS + 2) //2ms for a little grace period.
+            });
             """
 
         for kb in self.keybindings:
@@ -1784,9 +1817,11 @@ class CodeEditor(Cell):
                     websocket.send(
                         JSON.stringify(
                             {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
-                            'buffer': editor.getValue(), 'selection': editor.selection.getRange()}
+                            'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
+                            'iteration': editor.current_cells_content_iteration }
                             )
                         )
+                    editor.last_edit_millis = Date.now()
                 },
                 readOnly: true // false if this command should not apply in readOnly mode
             });
@@ -1805,7 +1840,9 @@ class CodeEditorTrigger(Cell):
         self.postscript = (
             """
             var editor = aceEditors["editor__identity__"]
-            console.log("setting contents")
+
+            editor.current_cells_content_iteration = __iteration__;
+            editor.last_edit_millis = Date.now()
 
             curRange = editor.selection.getRange()
             var Range=require('ace/range').Range
@@ -1815,8 +1852,16 @@ class CodeEditorTrigger(Cell):
             editor.setValue("__text__")
             editor.selection.setRange(range)
 
-            """.replace("__identity__", self.editor.identity).replace(
-                "__text__", quoteForJs(self.editor._slot.get()[1], '"')
+            websocket.send(
+                JSON.stringify(
+                    {'event': 'server_initiated_editor_change', 'target_cell': '__identity__',
+                        'buffer': editor.getValue(), 'selection': editor.selection.getRange()}
+                    )
+                )
+
+            """.replace("__identity__", self.editor.identity)
+               .replace("__text__", quoteForJs(self.editor._slot.get()[1], '"'))
+               .replace("__iteration__", str(self.editor._slot.get()[0])
             )
         )
 
