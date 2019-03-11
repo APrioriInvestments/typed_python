@@ -1903,7 +1903,7 @@ class CodeEditor(Cell):
             editor.session.on('change', function(delta) {
                 websocket.send(
                     JSON.stringify(
-                        {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta, 'iteration': editor.current_cells_content_iteration }
+                        {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta}
                         )
                     )
                 //record that we just edited
@@ -1918,8 +1918,8 @@ class CodeEditor(Cell):
                         websocket.send(
                             JSON.stringify(
                                 {'event': 'editing', 'target_cell': '__identity__',
-                                'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
-                                'iteration': editor.current_cells_content_iteration }
+                                'buffer': editor.getValue(), 'selection': editor.selection.getRange()
+                                }
                                 )
                             )
                         editor.last_edit_millis = Date.now()
@@ -1937,8 +1937,7 @@ class CodeEditor(Cell):
                     websocket.send(
                         JSON.stringify(
                             {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
-                            'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
-                            'iteration': editor.current_cells_content_iteration }
+                            'buffer': editor.getValue(), 'selection': editor.selection.getRange()}
                             )
                         )
                     editor.last_edit_millis = Date.now()
@@ -1961,16 +1960,19 @@ class CodeEditorTrigger(Cell):
             """
             var editor = aceEditors["editor__identity__"]
 
-            editor.current_cells_content_iteration = __iteration__;
             editor.last_edit_millis = Date.now()
 
             curRange = editor.selection.getRange()
             var Range=require('ace/range').Range
             var range = new Range(curRange.start.row,curRange.start.column,curRange.end.row,curRange.end.column)
-            console.log(range)
+            console.log("Resetting editor text")
 
-            editor.setValue("__text__")
-            editor.selection.setRange(range)
+            newText = "__text__";
+
+            if (editor.getValue() != newText) {
+                editor.setValue("__text__")
+                editor.selection.setRange(range)
+            }
 
             websocket.send(
                 JSON.stringify(
@@ -1981,9 +1983,7 @@ class CodeEditorTrigger(Cell):
 
             """.replace("__identity__", self.editor.identity)
                .replace("__text__", quoteForJs(self.editor._slot.get()[1], '"'))
-               .replace("__iteration__", str(self.editor._slot.get()[0])
             )
-        )
 
 
 class Sheet(Cell):
@@ -2174,8 +2174,8 @@ class Sheet(Cell):
                     lastCellClicked: {row: -100, col:-100},
                     dblClicked: true
             }
-            """ +\
-            self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else ""
+            """ +
+            (self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else "")
             )
             .replace("__identity__", self._identity)
             .replace("__rows__", str(self.rowCount))
