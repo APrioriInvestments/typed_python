@@ -17,7 +17,7 @@ import os
 import object_database
 
 from object_database import Indexed, SubscribeLazilyByDefault
-from typed_python import *
+from typed_python import ConstDict, sha_hash
 import threading
 
 from object_database.service_manager.ServiceSchema import service_schema

@@ -26,7 +26,11 @@ from object_database.service_manager.ServiceManagerTestCommon import ServiceMana
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
-from object_database.web.cells import *
+from object_database.web.cells import (
+    Button, SubscribedSequence, Subscribed,
+    Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands
+)
 
 from object_database import (
     Schema, Indexed, core_schema,
