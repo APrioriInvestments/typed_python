@@ -1911,7 +1911,7 @@ class CodeEditor(Cell):
 
                 //schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms that will update the server,
                 //but only if the user has stopped typing.
-                SERVER_UPDATE_DELAY_MS = 200
+                SERVER_UPDATE_DELAY_MS = 1000
 
                 window.setTimeout(function() {
                     if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
@@ -1923,6 +1923,7 @@ class CodeEditor(Cell):
                                 )
                             )
                         editor.last_edit_millis = Date.now()
+                        editor.last_edit_sent_text = editor.getValue()
                     }
                 }, SERVER_UPDATE_DELAY_MS + 2) //2ms for a little grace period.
             });
@@ -1963,13 +1964,14 @@ class CodeEditorTrigger(Cell):
             editor.last_edit_millis = Date.now()
 
             curRange = editor.selection.getRange()
-            var Range=require('ace/range').Range
+            var Range = require('ace/range').Range
             var range = new Range(curRange.start.row,curRange.start.column,curRange.end.row,curRange.end.column)
-            console.log("Resetting editor text")
 
             newText = "__text__";
 
-            if (editor.getValue() != newText) {
+            if (editor.getValue() != editor.last_edit_sent_text) {
+                console.log("Resetting editor text")
+
                 editor.setValue("__text__")
                 editor.selection.setRange(range)
             }
