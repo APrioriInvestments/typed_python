@@ -20,7 +20,7 @@ from nativepython.expression_conversion_context import ExpressionConversionConte
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
-from typed_python import Struct, OneOf
+from typed_python import OneOf
 
 NoneExprType = NoneWrapper()
 
@@ -129,7 +129,7 @@ class FunctionConversionContext(object):
                         input_types[i].getNativePassingType())
                 )
 
-            starargs_type = Struct(
+            starargs_type = native_ast.Struct(
                 [('f_%s' % i, input_types[i+len(self._ast_arg.args)])
                     for i in range(star_args_count)]
             )

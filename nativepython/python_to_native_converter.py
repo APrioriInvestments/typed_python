@@ -21,7 +21,6 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext
-from typed_python import ast
 
 NoneExprType = NoneWrapper()
 
@@ -154,10 +153,10 @@ class PythonToNativeConverter(object):
             body = pyast.body
         else:
             body = [python_ast.Statement.Return(
-                value=ast.body,
-                line_number=ast.body.line_number,
-                col_offset=ast.body.col_offset,
-                filename=ast.body.filename
+                value=pyast.body,
+                line_number=pyast.body.line_number,
+                col_offset=pyast.body.col_offset,
+                filename=pyast.body.filename
             )]
 
         return FunctionConversionContext(self, identity, pyast.args, body, input_types, output_type, freevars)
