@@ -68,10 +68,6 @@ docker-web:
 	#run a dummy webframework
 	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
 
-.PHONY: lint
-lint:
-	find . -not -path "./.venv*" -name "*.py" | xargs flake8
-
 .PHONY: clean
 clean:
 	rm -rf build/
