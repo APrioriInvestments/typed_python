@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import *
+from typed_python import TypeFunction, Function, Alternative
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest

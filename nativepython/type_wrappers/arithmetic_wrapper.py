@@ -20,7 +20,7 @@ from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
 import nativepython
 
-from typed_python import *
+from typed_python import Int64, Float64, Bool
 
 pyOpToNative = {
     python_ast.BinaryOp.Add(): native_ast.BinaryOp.Add(),

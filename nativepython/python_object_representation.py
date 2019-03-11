@@ -25,7 +25,7 @@ from nativepython.type_wrappers.bytes_wrapper import BytesWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount, resolveForwards
-from typed_python import *
+from typed_python import Int64, Float64, Bool, String, Bytes, NoneType
 
 _type_to_type_wrapper_cache = {}
 

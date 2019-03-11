@@ -20,7 +20,7 @@ from nativepython.expression_conversion_context import ExpressionConversionConte
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
-from typed_python import *
+from typed_python import Struct, OneOf
 
 NoneExprType = NoneWrapper()
 
