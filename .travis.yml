@@ -15,7 +15,10 @@ env:
 #   - pip install pipenv
 #   - pipenv install --dev --deploy
 
-cache: pip
+cache:
+  directories:
+    - $HOME/.cache/pip
+
 
 jobs:
   include:
