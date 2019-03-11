@@ -11,14 +11,21 @@ env:
   global:
     - TRAVIS_CI=true
 
-install:
-  - pip install pipenv
-  - pipenv install --dev --deploy
+# install:
+#   - pip install pipenv
+#   - pipenv install --dev --deploy
 
 
 jobs:
   include:
+    - stage: "install"
+      script: pip install pipenv; pipenv install --dev --deploy
     - stage: "test"
       script: flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403
     - script: pipenv check
     - script: ./test.py -s
+
+
+stages:
+  - install
+  - test
