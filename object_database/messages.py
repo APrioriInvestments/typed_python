@@ -1,4 +1,4 @@
-from typed_python import *
+from typed_python import OneOf, Alternative, ConstDict, TupleOf, Tuple
 from object_database.schema import SchemaDefinition
 
 

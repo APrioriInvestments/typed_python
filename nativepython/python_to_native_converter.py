@@ -21,7 +21,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext
-from typed_python import *
+from typed_python import ast
 
 NoneExprType = NoneWrapper()
 

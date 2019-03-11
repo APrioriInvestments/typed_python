@@ -28,7 +28,13 @@ from object_database import ServiceBase, service_schema, Indexed
 from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin
 from object_database.web.ActiveWebServiceSchema import active_webservice_schema
-from object_database.web.cells import *
+
+from object_database.web.cells import (
+    Subscribed, Sequence, Traceback, Span, Button, Octicon, Main, Cells,
+    Card, Text, Padding, Tabs, Table, Clickable, Dropdown, Popover,
+    LargePendingDownloadDisplay, MAX_FPS, HeaderBar
+)
+
 from typed_python import OneOf, TupleOf, ConstDict
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 

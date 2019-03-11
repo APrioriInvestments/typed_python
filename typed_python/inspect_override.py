@@ -18,7 +18,7 @@ import linecache
 import os
 import re
 
-from inspect import *
+from inspect import *  # noqa
 
 
 class InspectError(Exception):

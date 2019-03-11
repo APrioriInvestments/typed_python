@@ -18,7 +18,7 @@ from object_database.messages import SchemaDefinition
 from object_database.core_schema import core_schema
 import object_database.keymapping as keymapping
 from object_database.util import Timer
-from typed_python import *
+from typed_python import serialize, deserialize
 
 import queue
 import time

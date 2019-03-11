@@ -14,7 +14,7 @@
 
 from typed_python import serialize, deserialize
 
-from object_database.keymapping import *
+from object_database.keymapping import data_key, index_key
 import logging
 import threading
 import queue
