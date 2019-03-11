@@ -24,7 +24,7 @@ jobs:
   include:
     - stage: "install"
       # script: pip install pipenv; pipenv install --dev --deploy
-      script: pip install pipenv; pipenv lock --dev --requirements > requirements.txt; pip install -r requirements.txt; flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403
+      script: pip install pipenv; pipenv lock --dev --requirements > requirements.txt; pip install -r requirements.txt; flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403; which flake8
     - stage: "test"
       script: flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403
     - script: pipenv check
