@@ -119,6 +119,10 @@ class Cells:
 
         self._transactionQueue = queue.Queue()
 
+        # set(Slot) containing slots that have been dirtied but whose
+        # values have not been updated yet.
+        self._dirtySlots = set()
+
         # map: db.key -> set(Cell)
         self._subscribedCells = {}
 
@@ -127,11 +131,60 @@ class Cells:
         # used by _newID to generate unique identifiers
         self._id = 0
 
+        # a list of pending task objects
+        self._tasks = queue.Queue()
+
         self._logger = logging.getLogger(__name__)
 
         self._root = RootCell()
 
+        self._shouldStopProcessingTasks = threading.Event()
+
         self._addCell(self._root, parent=None)
+
+
+    def createTask(self, owningCell, taskFun):
+        """Create a long-running task (such as a task that acquires data) that can push content into slots.
+
+        Tasks are run in the order received by a set of worker threads. They can interact
+        with object_db, and write into slots.
+
+        Tasks are callables that are invoked as
+
+            task(owningCell, shouldStop)
+
+        where 'owningCell' is the cell that created the task, 'shouldStop' is a threading.Event that
+        we set if we know the task should stop (because we've navigated away from the cell
+        that produced it.)
+
+        Tasks should use 'owningCell' to create transactions and views because it will have the
+        correct serialization context.
+        """
+        self._tasks.put((owningCell, taskFun))
+
+    def markStopProcessingTasks(self):
+        """Our calling context is leaving, so we should stop processing."""
+        self._shouldStopProcessingTasks.set()
+
+    def processTasks(self):
+        while not self._shouldStopProcessingTasks.is_set():
+            self.processOneTask()
+
+    def processOneTask(self):
+        try:
+            creatingCell, task = self._tasks.get(timeout=.25)
+            if creatingCell.isActive():
+                try:
+                    self._logger.info("Starting task %s with %s remaining", task, self._tasks.qsize())
+                    t0 = time.time()
+                    task(creatingCell, self._shouldStopProcessingTasks)
+                    self._logger.info("Task %s took %s", task, time.time() - t0)
+                except Exception:
+                    self._logger.error("Unexpected Exception in cells.processTasks:\n%s", traceback.format_exc())
+            return True
+        except queue.Empty:
+            return False
+
 
     @property
     def root(self):
@@ -159,6 +212,11 @@ class Cells:
 
     def wait(self):
         self._gEventHasTransactions.wait()
+
+    def markSlotDirtyForNextRecompute(self, slot):
+        self._dirtySlots.add(slot)
+        self._gEventHasTransactions.trigger()
+
 
     def _onTransaction(self, *trans):
         self._transactionQueue.put(trans)
@@ -235,6 +293,7 @@ class Cells:
         self._nodesToBroadcast.add(node)
 
     def renderMessages(self):
+        self._processDirtySlots()
         self._recalculateCells()
 
         res = []
@@ -267,6 +326,13 @@ class Cells:
         self._nodesToDiscard = set()
 
         return res
+
+    def _processDirtySlots(self):
+        slots = list(self._dirtySlots)
+        self._dirtySlots.clear()
+
+        for slot in slots:
+            slot.absorbPendingWrite()
 
     def _recalculateCells(self):
         # handle all the transactions so far
@@ -352,11 +418,29 @@ class Cells:
 
 
 class Slot:
-    """Holds some arbitrary state for use in a session. Not mirrored in the DB."""
+    """Represents a piece of session-specific interface state. Any cells
+    that call 'get' will be recalculated if the value changes. UX is allowed
+    to change the state (say, because of a button call), thereby causing any
+    cells that depend on the Slot to recalculate.
 
+    For the most part, slots are specific to a particular part of a UX tree,
+    so they don't have memory. Eventually, it would be good to give them a
+    specific name based on where they are in the UX, so that we don't lose
+    UX state when we navigate away. We could also keep this in ODB so that
+    the state is preserved when we bounce the page.
+    """
     def __init__(self, value=None):
         self._value = value
+        self._pendingValue = value
         self._subscribedCells = set()
+        self._lock = threading.Lock()
+
+        # mark the cells object present when we were created so we can trigger
+        # it when we get updated.
+        if hasattr(_cur_cell, 'cell') and _cur_cell.cell is not None:
+            self._cells = _cur_cell.cell.cells
+        else:
+            self._cells = None
 
     def setter(self, val):
         return lambda: self.set(val)
@@ -365,17 +449,42 @@ class Slot:
         return self._value
 
     def get(self):
-        if _cur_cell.cell:
-            self._subscribedCells.add(_cur_cell.cell)
-        return self._value
+        """Get the value of the Slot, and register a dependency on the calling cell."""
+        with self._lock:
+            # we can only create a dependency if we're being read
+            # as part of a cell's state recalculation.
+            if _cur_cell.cell:
+                self._subscribedCells.add(_cur_cell.cell)
+
+            return self._value
 
     def set(self, val):
-        if val != self._value:
-            self._value = val
-            for c in self._subscribedCells:
-                c.markDirty()
-            self._subscribedCells = set()
+        """Schedule a write to a slot. This does _NOT_ happen synchronously, because
+        we need to buffer writes to Slots that can happen on background threads.
+        """
+        with self._lock:
+            if val == self._pendingValue:
+                return
 
+            self._pendingValue = val
+
+        # delay triggering this slot as dirty
+        if self._cells:
+            self._cells.markSlotDirtyForNextRecompute(self)
+
+    def absorbPendingWrite(self):
+        """Update our value and dirty any listening cells.
+
+        If our pending value hasn't actually changed, do nothing.
+        """
+        if self._value == self._pendingValue:
+            return
+
+        self._value = self._pendingValue
+
+        for c in self._subscribedCells:
+            c.markDirty()
+        self._subscribedCells = set()
 
 class Cell:
     def __init__(self):
@@ -453,6 +562,8 @@ class Cell:
         t0 = time.time()
         while True:
             try:
+                _cur_cell.cell = self
+
                 with self.transaction():
                     self.onMessage(*args)
                     return
@@ -464,6 +575,8 @@ class Cell:
             except Exception:
                 self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
                 return
+            finally:
+                _cur_cell.cell = None
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -554,6 +667,10 @@ class Cell:
         self._color = color
         return self
 
+    def isActive(self):
+        """Is this cell installed in the tree and active?"""
+        return self.cells and not self.garbageCollected
+
     def prepareForReuse(self):
         if not self.garbageCollected:
             return False
@@ -577,7 +694,7 @@ class Cell:
         return self._identity
 
     def markDirty(self):
-        if not self.garbageCollected:
+        if not self.garbageCollected and self.cells is not None:
             self.cells.markDirty(self)
 
     def recalculate(self):
@@ -1635,6 +1752,9 @@ def ensureSubscribedType(t, lazy=False):
             )
         )
 
+def createTask(task):
+    """Create a long-running task from within an executing cell. See Cells.createTask."""
+    return _cur_cell.cell.cells.createTask(_cur_cell.cell, task)
 
 def ensureSubscribedSchema(t, lazy=False):
     if not current_transaction().db().isSubscribedToSchema(t):

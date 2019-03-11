@@ -19,6 +19,7 @@ import argparse
 import traceback
 import os
 import json
+import threading
 import gevent.socket
 import gevent.queue
 
@@ -391,6 +392,10 @@ class ActiveWebService(ServiceBase):
             cells.root.setRootSerializationContext(self.db.serializationContext)
             cells.root.setChild(self.addMainBar(Subscribed(lambda: self.pathToDisplay(path, queryArgs))))
 
+            cellsTaskThread = threading.Thread(target=cells.processTasks)
+            cellsTaskThread.daemon = True
+            cellsTaskThread.start()
+
             timestamps = []
 
             lastDumpTimestamp = time.time()
@@ -522,6 +527,8 @@ class ActiveWebService(ServiceBase):
         except Exception:
             self._logger.error("Websocket handler error: %s", traceback.format_exc())
         finally:
+            cells.markStopProcessingTasks()
+
             if reader:
                 reader.join()
 
