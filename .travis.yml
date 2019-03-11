@@ -15,8 +15,10 @@ install:
   - pip install pipenv
   - pipenv install --dev --deploy
 
-script:
-  - make testcert.cert
-  - flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403
-  - ./test.py -s
-  - pipenv check
+
+jobs:
+  include:
+    - stage: "test"
+      script: flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403
+    - script: pipenv check
+    - script: ./test.py -s
