@@ -41,6 +41,8 @@ public:
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
 
+    PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }

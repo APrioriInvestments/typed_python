@@ -240,6 +240,18 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.X, A2.Y))
         self.assertFalse(ibc(A1.Y, A2.X))
 
+    def test_callable_alternatives(self):
+        def myCall(self, *args, **kwargs):
+            return 42
+
+        alt = Alternative("alts", One = {}, Two = {}, __call__ = myCall)
+
+        one = alt.One()
+        self.assertEqual(one(), 42)
+
+        two = alt.Two()
+        self.assertEqual(two(), 42)
+
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(NoneType), 0)
         self.assertEqual(_types.bytecount(Int8), 1)
