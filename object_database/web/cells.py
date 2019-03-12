@@ -316,9 +316,10 @@ class Cells:
 
         # the client reverses the order of postscripts because it wants
         # to do parent nodes before child nodes. We want our postscripts
-        # here to happen in order, because they're triggered by messages.
-        for js in reversed(self._pendingPostscripts):
-            res.append({'postscript': js})
+        # here to happen in order, because they're triggered by messages,
+        # so we have to reverse the order in which we append them, and
+        # put them on the front.
+        res = [{'postscript': js} for js in reversed(self._pendingPostscripts)] + res
 
         self._pendingPostscripts.clear()
 
@@ -508,6 +509,7 @@ class Cell:
         self._logger = logging.getLogger(__name__)
 
     def triggerPostscript(self, javascript):
+        """Queue a postscript (piece of javascript to execute) to be run at the end of message processing."""
         self.cells._pendingPostscripts.append(javascript)
 
     def tagged(self, tag):
@@ -1806,7 +1808,7 @@ class Expands(Cell):
 class CodeEditor(Cell):
     """Produce a code editor."""
 
-    def __init__(self, onmessage=lambda msg: None,
+    def __init__(self,
             keybindings=None,
             noScroll=False,
             minLines=None,
@@ -1816,7 +1818,6 @@ class CodeEditor(Cell):
             ):
         """Create a code editor
 
-        onmessage - receives messages from the user as they type
         keybindings - map from keycode to a lambda function that will receive
             the current buffer and the current selection range when the user
             types ctrl-X and 'X' is a valid keycode. Common values here are also
@@ -1825,12 +1826,11 @@ class CodeEditor(Cell):
         You may call 'setContents' to override the current contents of the editor.
         This version is not robust to mutiple users editing at the same time.
 
-        onTextChange - called when the text buffer changes with the new buffer with
-            the current text and a selection.
+        onTextChange - called when the text buffer changes with the new buffer
+            and a json selection.
         """
         super().__init__()
-        self._slot = Slot((0, ""))
-        self._onmessage = onmessage
+        self._slot = Slot((0, "")) #contains code, and the 'current' iteration
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
         self.fontSize = fontSize
@@ -1838,31 +1838,27 @@ class CodeEditor(Cell):
         self.autocomplete = autocomplete
         self.onTextChange = onTextChange
 
+    def getContents(self):
+        return self._slot.get()[1]
+
     def setContents(self, contents):
-        if contents != self._slot.getWithoutRegisteringDependency()[1]:
-            self._slot.set((self._slot.getWithoutRegisteringDependency()[0]+1, contents))
+        newSlotState = (self._slot.getWithoutRegisteringDependency()[0]+1000000, contents)
+        self._slot.set(newSlotState)
+        self.sendCurrentStateToBrowser(newSlotState)
 
     def onMessage(self, msgFrame):
         if msgFrame['event'] == 'keybinding':
             self.keybindings[msgFrame['key']](msgFrame['buffer'], msgFrame['selection'])
         elif msgFrame['event'] == 'editing':
             if self.onTextChange:
+                self._slot.set((self._slot.getWithoutRegisteringDependency()[0] + 1, msgFrame['buffer']))
                 self.onTextChange(msgFrame['buffer'], msgFrame['selection'])
-        else:
-            if self._onmessage:
-                self._onmessage(msgFrame['data'])
-
 
     def recalculate(self):
-        self.children = {'____child__': Subscribed(lambda: CodeEditorTrigger(self))}
+        self.children = {}
         self.contents = """
             <div __style__>
             <div id="editor__identity__" style="width:100%;height:100%;margin:auto;border:1px solid lightgray"></div>
-
-                <div style="display:none">
-                    ____child__
-                </div>
-
             </div>
         """.replace("__identity__", self.identity).replace("__style__", self._divStyle()) + ";"
 
@@ -1876,7 +1872,8 @@ class CodeEditor(Cell):
             editor.session.setMode("ace/mode/python");
             editor.setAutoScrollEditorIntoView(true);
             editor.session.setUseSoftTabs(true);
-        """
+            editor.setValue("__text__");
+        """.replace("__text__", quoteForJs(self._slot.getWithoutRegisteringDependency()[1], '"'))
 
         if self.autocomplete:
             self.postscript += """
@@ -1911,19 +1908,23 @@ class CodeEditor(Cell):
 
                 //schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms that will update the server,
                 //but only if the user has stopped typing.
-                SERVER_UPDATE_DELAY_MS = 1000
+                SERVER_UPDATE_DELAY_MS = 200
 
                 window.setTimeout(function() {
                     if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
+                        //save our current state to the remote buffer
+                        editor.current_iteration += 1;
+                        editor.last_edit_millis = Date.now()
+                        editor.last_edit_sent_text = editor.getValue()
+
                         websocket.send(
                             JSON.stringify(
                                 {'event': 'editing', 'target_cell': '__identity__',
-                                'buffer': editor.getValue(), 'selection': editor.selection.getRange()
+                                'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
+                                'iteration': editor.current_iteration
                                 }
                                 )
                             )
-                        editor.last_edit_millis = Date.now()
-                        editor.last_edit_sent_text = editor.getValue()
                     }
                 }, SERVER_UPDATE_DELAY_MS + 2) //2ms for a little grace period.
             });
@@ -1935,13 +1936,17 @@ class CodeEditor(Cell):
                 name: 'cmd___key__',
                 bindKey: {win: 'Ctrl-__key__',  mac: 'Command-__key__'},
                 exec: function(editor) {
+                    editor.current_iteration += 1;
+                    editor.last_edit_millis = Date.now()
+                    editor.last_edit_sent_text = editor.getValue()
+
                     websocket.send(
                         JSON.stringify(
                             {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
-                            'buffer': editor.getValue(), 'selection': editor.selection.getRange()}
+                            'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
+                            'iteration': editor.current_iteration}
                             )
                         )
-                    editor.last_edit_millis = Date.now()
                 },
                 readOnly: true // false if this command should not apply in readOnly mode
             });
@@ -1949,43 +1954,33 @@ class CodeEditor(Cell):
 
         self.postscript = self.postscript.replace("__identity__", self.identity)
 
+    def sendCurrentStateToBrowser(self, newSlotState):
+        if self.identity is not None:
+            # if self.identity is None, then we have not been installed in the tree yet
+            # so sending ourselves a message makes no sense.
+            self.triggerPostscript(
+                """
+                var editor = aceEditors["editor__identity__"]
 
-class CodeEditorTrigger(Cell):
-    def __init__(self, editor):
-        super().__init__()
-        self.editor = editor
+                editor.last_edit_millis = Date.now()
+                editor.current_iteration = __iteration__;
 
-    def recalculate(self):
-        self.contents = """<div></div>"""
-        self.postscript = (
-            """
-            var editor = aceEditors["editor__identity__"]
+                curRange = editor.selection.getRange()
+                var Range = require('ace/range').Range
+                var range = new Range(curRange.start.row,curRange.start.column,curRange.end.row,curRange.end.column)
 
-            editor.last_edit_millis = Date.now()
+                newText = "__text__";
 
-            curRange = editor.selection.getRange()
-            var Range = require('ace/range').Range
-            var range = new Range(curRange.start.row,curRange.start.column,curRange.end.row,curRange.end.column)
+                console.log("Resetting editor text to " + newText.length + " because it changed on the server" +
+                    " Cur iteration is __iteration__.")
 
-            newText = "__text__";
-
-            if (editor.getValue() != editor.last_edit_sent_text) {
-                console.log("Resetting editor text")
-
-                editor.setValue("__text__")
+                editor.setValue(newText, 1)
                 editor.selection.setRange(range)
-            }
 
-            websocket.send(
-                JSON.stringify(
-                    {'event': 'server_initiated_editor_change', 'target_cell': '__identity__',
-                        'buffer': editor.getValue(), 'selection': editor.selection.getRange()}
-                    )
+                """.replace("__identity__", self.identity)
+                   .replace("__text__", quoteForJs(newSlotState[1], '"'))
+                   .replace("__iteration__", str(newSlotState[0]))
                 )
-
-            """.replace("__identity__", self.editor.identity)
-               .replace("__text__", quoteForJs(self.editor._slot.get()[1], '"'))
-            )
 
 
 class Sheet(Cell):
@@ -2236,6 +2231,8 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = Slot(None)
         self.error = Slot(None)
+
+        print("NEW PLOT")
 
     def recalculate(self):
         self.contents = """

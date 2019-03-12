@@ -151,23 +151,20 @@ class TextEditorService(ServiceBase):
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         ensureSubscribedType(TextEditor)
-        contents = Slot("")
 
         def onEnter(buffer, selection):
-            contents.set(buffer)
             TextEditor.lookupAny().code = buffer
 
-        ed = CodeEditor(None, {'Enter': onEnter}, noScroll=True, minLines=50)
+        def onTextChange(buffer, selection):
+            TextEditor.lookupAny().code = buffer
+
+        ed = CodeEditor(keybindings={'Enter': onEnter}, noScroll=True, minLines=50, onTextChange=onTextChange)
 
         def makePlotData():
-            import numpy  # noqa
-            res = eval(contents.get())
-            res = {'data': res}
-            return res
+            return {'data': eval(ed.getContents())}
 
         def onCodeChange():
-            if contents.getWithoutRegisteringDependency() != TextEditor.lookupAny().code:
-                contents.set(TextEditor.lookupAny().code)
+            if ed.getContents() != TextEditor.lookupAny().code:
                 ed.setContents(TextEditor.lookupAny().code)
 
         return Columns(ed, Card(Plot(makePlotData).height("100%").width("100%"))) + Subscribed(onCodeChange)

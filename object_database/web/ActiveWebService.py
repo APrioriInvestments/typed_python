@@ -519,6 +519,7 @@ class ActiveWebService(ServiceBase):
                     lastDumpTimeSpentCalculating = 0
                     lastDumpTimestamp = time.time()
 
+                # tell the browser to execute the postscripts that its built up.
                 writeJsonMessage("postscripts")
 
                 cells.wait()
