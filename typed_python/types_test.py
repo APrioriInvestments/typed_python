@@ -252,6 +252,15 @@ class NativeTypesTests(unittest.TestCase):
         two = alt.Two()
         self.assertEqual(two(), 42)
 
+        alt = Alternative("alts", One = {}, Two = {}, myCall = myCall)
+        with self.assertRaises(TypeError):
+            one = alt.One()
+            one()
+
+        with self.assertRaises(TypeError):
+            two = alt.Two()
+            two()
+
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(NoneType), 0)
         self.assertEqual(_types.bytecount(Int8), 1)
