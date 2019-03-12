@@ -14,7 +14,7 @@
 
 from object_database.web.cells import (
     Cells, Sequence, Container, Subscribed, Span, SubscribedSequence,
-    Card, Text, Slot, ensureSubscribedType
+    Card, Text, Slot, ensureSubscribedType, registerDisplay
 )
 from object_database import InMemServer, Schema, Indexed, connect
 from object_database.util import genToken, configureLogging
@@ -313,3 +313,40 @@ class CellsTests(unittest.TestCase):
             workFn(db, cells, iterations=500)
 
         self.helper_memory_leak(cell, initFn, workFn, 1)
+
+
+    def test_cells_context(self):
+        class X:
+            def __init__(self, x):
+                self.x = x
+
+        @registerDisplay(X, size="small")
+        def small_x(X):
+            return Text(X.x).tagged("small display " + str(X.x))
+
+        @registerDisplay(X, size="large")
+        def large_x(X):
+            return Text(X.x).tagged("large display " + str(X.x))
+
+        @registerDisplay(X, size=lambda size: size is not None)
+        def sized_x(X):
+            return Text(X.x).tagged("sized display " + str(X.x))
+
+        @registerDisplay(X)
+        def any_x(X):
+            return Text(X.x).tagged("display " + str(X.x))
+
+        self.cells.root.setChild(
+            Card(X(0)).withContext(size="small") +
+            Card(X(1)).withContext(size="large") +
+            Card(X(2)).withContext(size="something else") +
+            Card(X(3))
+            )
+
+        self.cells.renderMessages()
+
+        self.assertTrue(self.cells.root.findChildrenByTag("small display 0"))
+        self.assertTrue(self.cells.root.findChildrenByTag("large display 1"))
+        self.assertTrue(self.cells.root.findChildrenByTag("sized display 2"))
+        self.assertTrue(self.cells.root.findChildrenByTag("display 3"))
+

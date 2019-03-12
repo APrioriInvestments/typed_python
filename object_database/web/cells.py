@@ -22,6 +22,32 @@ MAX_FPS = 10
 
 _cur_cell = threading.local()
 
+def registerDisplay(type, **context):
+    """Register a display function for any instances of a given type. For instance
+
+    @registerDisplay(MyType, size="small")
+    def display(value):
+        return cells.Text("For small values")
+
+    @registerDisplay(MyType)
+    def display(value):
+        return cells.Text("For any other kinds of values")
+
+    Arguments:
+        type - the type object to display. Instances of _exactly_ this type
+            will match this if we don't have a display for the object already.
+        context - a dict from str->value. we'll only use this display if this context
+            is exactly matched in the parent cell. We'll check contexts in the
+            order in which they were registered.
+    """
+    def registrar(displayFunc):
+        ContextualDisplay._typeToDisplay.setdefault(type, []).append(
+            (ContextualDisplay.ContextMatcher(context), displayFunc)
+            )
+
+        return displayFunc
+
+    return registrar
 
 def quoteForJs(string, quoteType):
     if quoteType == "'":
@@ -141,7 +167,6 @@ class Cells:
         self._shouldStopProcessingTasks = threading.Event()
 
         self._addCell(self._root, parent=None)
-
 
     def createTask(self, owningCell, taskFun):
         """Create a long-running task (such as a task that acquires data) that can push content into slots.
@@ -505,6 +530,7 @@ class Cell:
         self._color = None
         self._height = None
         self.serializationContext = None
+        self.context = {}
 
         self._logger = logging.getLogger(__name__)
 
@@ -710,10 +736,25 @@ class Cell:
             return Span("")
         if isinstance(x, Cell):
             return x
-        assert False, "don't know what to do with %s" % x
+
+        return ContextualDisplay(x)
 
     def __add__(self, other):
         return Sequence([self, Cell.makeCell(other)])
+
+    def withContext(self, **kwargs):
+        """Modify our context, and then return self."""
+        self.context.update(kwargs)
+        return self
+
+    def getContext(self, contextKey):
+        if contextKey in self.context:
+            return self.context[contextKey]
+
+        if self.parent:
+            return self.parent.getContext(contextKey)
+
+        return None
 
 
 class Card(Cell):
@@ -1137,6 +1178,47 @@ class Code(Cell):
     def sortsAs(self):
         return self.codeContents
 
+
+
+class ContextualDisplay(Cell):
+    """Display an arbitrary python object by checking registered display handlers"""
+
+    # map from type -> [(ContextMatcher, displayFun)]
+    _typeToDisplay = {}
+
+    class ContextMatcher:
+        """Checks if a cell matches a context dict."""
+
+        def __init__(self, contextDict):
+            """Initialize a context matcher."""
+            self.contextDict = contextDict
+
+        def matchesCell(self, cell):
+            for key, value in self.contextDict.items():
+                ctx = cell.getContext(key)
+                if callable(value):
+                    if not value(ctx):
+                        return False
+                else:
+                    if ctx != value:
+                        return False
+            return True
+
+    def __init__(self, obj):
+        super().__init__()
+        self.obj = obj
+        self.contents = """<div>____child__</div>"""
+
+    def getChild(self):
+        if type(self.obj) in ContextualDisplay._typeToDisplay:
+            for context, dispFun in ContextualDisplay._typeToDisplay[type(self.obj)]:
+                if context.matchesCell(self):
+                    return dispFun(self.obj)
+
+        return Traceback(f"Invalid object of type {type(self.obj)}")
+
+    def recalculate(self):
+        self.children = {"____child__": self.getChild()}
 
 class Subscribed(Cell):
     def __init__(self, f):
