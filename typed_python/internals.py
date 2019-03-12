@@ -89,6 +89,7 @@ def makeFunction(name, f, firstArgType=None):
     spec = inspect.getfullargspec(f)
 
     def getAnn(argname):
+        """ Return the annotated type for the given argument or None. """
         if argname not in spec.annotations:
             return None
         else:
@@ -98,15 +99,21 @@ def makeFunction(name, f, firstArgType=None):
             else:
                 return ann
 
-    arg_types = []
-    for i, argname in enumerate(spec.args):
+    def getDefault(idx: int):
+        """ Return the default value for a positional argument given its index. """
         if spec.defaults is not None:
-            if i >= len(spec.args) - len(spec.defaults):
-                default = (spec.defaults[i-(len(spec.args) - len(spec.defaults))],)
+            if idx >= len(spec.args) - len(spec.defaults):
+                default = (spec.defaults[idx -(len(spec.args) - len(spec.defaults))],)
             else:
                 default = None
         else:
             default = None
+
+        return default
+
+    arg_types = []
+    for i, argname in enumerate(spec.args):
+        default = getDefault(i)
 
         ann = getAnn(argname)
         if ann is None and i == 0 and firstArgType is not None:
