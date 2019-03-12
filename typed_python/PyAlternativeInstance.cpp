@@ -328,7 +328,7 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
             "'%s' object is not callable because '__call__' was not defined",
             type()->name().c_str()
             );
-        return nullptr;
+        throw PythonExceptionSet();
     } else {
         Function* f = it->second;
 
