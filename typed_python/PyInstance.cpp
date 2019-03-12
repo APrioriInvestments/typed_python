@@ -867,7 +867,7 @@ PyObject* PyInstance::tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
 
 PyObject* PyInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     PyErr_Format(PyExc_TypeError, "'%s' object is not callable", type()->name().c_str());
-    return 0;
+    return nullptr;
 }
 
 PyObject* PyInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
@@ -878,7 +878,7 @@ PyObject* PyInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attr
 PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
     if (!PyUnicode_Check(attrName)) {
         PyErr_SetString(PyExc_AttributeError, "attribute is not a string");
-        return NULL;
+        return nullptr;
     }
 
     char *attr_name = PyUnicode_AsUTF8(attrName);
