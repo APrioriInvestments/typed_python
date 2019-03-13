@@ -2097,12 +2097,12 @@ class CodeEditor(Cell):
     """Produce a code editor."""
 
     def __init__(self,
-            keybindings=None,
-            noScroll=False,
-            minLines=None,
-            fontSize=None,
-            autocomplete=True,
-            onTextChange=None):
+                 keybindings=None,
+                 noScroll=False,
+                 minLines=None,
+                 fontSize=None,
+                 autocomplete=True,
+                 onTextChange=None):
         """Create a code editor
 
         keybindings - map from keycode to a lambda function that will receive
