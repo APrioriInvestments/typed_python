@@ -18,7 +18,11 @@ import linecache
 import os
 import re
 
-from inspect import *  # noqa
+from inspect import (  # import what we use to avoid F405 warnings
+    isclass, ismethod, isfunction, ismodule, isframe, iscode, istraceback,
+    getmembers, getmodule, getblock
+)
+from inspect import *  # noqa  import everything else also
 
 
 class InspectError(Exception):
