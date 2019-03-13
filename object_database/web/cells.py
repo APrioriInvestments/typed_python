@@ -2117,7 +2117,7 @@ class CodeEditor(Cell):
             and a json selection.
         """
         super().__init__()
-        self._slot = Slot((0, "")) #contains (current_iteration_number: int, text: str)
+        self._slot = Slot((0, ""))  # contains (current_iteration_number: int, text: str)
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
         self.fontSize = fontSize
