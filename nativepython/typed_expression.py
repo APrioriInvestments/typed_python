@@ -180,9 +180,6 @@ class TypedExpression(object):
     def __or__(self, other):
         return TypedExpression.sugar_operator(self, other, "BitOr")
 
-    def __and__(self, other):
-        return TypedExpression.sugar_operator(self, other, "BitAnd")
-
     def __lt__(self, other):
         return TypedExpression.sugar_operator(self, other, "Lt")
 

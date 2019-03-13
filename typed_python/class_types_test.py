@@ -62,12 +62,12 @@ class ClassWithInit(Class):
     def __init__(self):
         pass
 
-    def __init__(self, x=1, cwi=None):
+    def __init__(self, x=1, cwi=None):  # noqa: F811
         self.x = x
         if cwi is not None:
             self.cwi = cwi
 
-    def __init__(self, x):
+    def __init__(self, x):  # noqa: F811
         self.x = x
 
 
@@ -77,7 +77,7 @@ class ClassWithComplexDispatch(Class):
     def f(self, x):
         return 'x'
 
-    def f(self, y):
+    def f(self, y):  # noqa: F811
         return 'y'
 
 
@@ -153,7 +153,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
     def test_class(self):
         with self.assertRaises(TypeError):
-            class A(Class):
+            class A0(Class):
                 x = Member((1, 2, 3))
 
         class A(Class):
@@ -231,16 +231,16 @@ class NativeClassTypesTests(unittest.TestCase):
             def f(self):
                 return 0
 
-            def f(self, i):
+            def f(self, i):  # noqa: F811
                 return 1
 
-            def f(self, i, i2):
+            def f(self, i, i2):  # noqa: F811
                 return 2
 
-            def f(self, i, i2, *args):
+            def f(self, i, i2, *args):  # noqa: F811
                 return 2 + len(args)
 
-            def f(self, i, i2, *args):
+            def f(self, i, i2, *args):  # noqa: F811
                 return 2 + len(args)
 
         c = C()
@@ -294,16 +294,16 @@ class NativeClassTypesTests(unittest.TestCase):
             def f(self, a: float):
                 return float
 
-            def f(self, a):
+            def f(self, a):  # noqa: F811
                 return "any"
 
-            def f(self, *args: int):
+            def f(self, *args: int):  # noqa: F811
                 return "int list"
 
-            def f(self, *args: str):
+            def f(self, *args: str):  # noqa: F811
                 return "string list"
 
-            def f(self, **kwargs: TupleOf(int)):
+            def f(self, **kwargs: TupleOf(int)):  # noqa: F811
                 return "named tuple of ints"
 
         self.assertEqual(C().f(1), float)
@@ -339,19 +339,19 @@ class NativeClassTypesTests(unittest.TestCase):
             def f(a: float):
                 return float
 
-            @staticmethod
+            @staticmethod  # noqa: F811
             def f(a):
                 return "any"
 
-            @staticmethod
+            @staticmethod  # noqa: F811
             def f(*args: int):
                 return "int list"
 
-            @staticmethod
+            @staticmethod  # noqa: F811
             def f(*args: str):
                 return "string list"
 
-            @staticmethod
+            @staticmethod  # noqa: F811
             def f(**kwargs: TupleOf(int)):
                 return "named tuple of ints"
 
@@ -387,13 +387,13 @@ class NativeClassTypesTests(unittest.TestCase):
             def f(self, x: NTSubclass):
                 return "NTSubclass"
 
-            def f(self, x: NormalPySubclass):
+            def f(self, x: NormalPySubclass):  # noqa: F811
                 return "NormalPySubclass"
 
-            def f(self, x: NormalPyClass):
+            def f(self, x: NormalPyClass):  # noqa: F811
                 return "NormalPyClass"
 
-            def f(self, x):
+            def f(self, x):  # noqa: F811
                 return "object"
 
         x = X()
@@ -440,7 +440,7 @@ class NativeClassTypesTests(unittest.TestCase):
             def __getitem__(self, x: int):
                 return "Int"
 
-            def __getitem__(self, x: str):
+            def __getitem__(self, x: str):  # noqa: F811
                 return "Str"
 
         self.assertEqual(WithGetitem()[0], "Int")
@@ -665,7 +665,7 @@ class NativeClassTypesTests(unittest.TestCase):
             def f(self, x: TupleOf(int)):
                 return "Tuple"
 
-            def f(self, x: ListOf(int)):
+            def f(self, x: ListOf(int)):  # noqa: F811
                 return "List"
 
         c = WithTwoFunctions()
