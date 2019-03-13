@@ -39,13 +39,21 @@ test: testcert.cert testcert.key install
 	./test.py -s
 
 .PHONY: lint
-lint: $(VIRTUAL_ENV)
-	. $(VIRTUAL_ENV)/bin/activate; \
+lint:
 	flake8 --show-source \
 		--select=E999,E722,E303,E302,E262,E261,E251,E225,E128,E124,E123,E117,W291,W292,W293,W391,F403,F405
 
+.PHONY: vlint
+vlint: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	make lint
+
 .PHONY: lint-all
-lint-all: $(VIRTUAL_ENV)
+lint-all:
+	flake8
+
+.PHONY: vlint-all
+vlint-all: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
 	flake8
 
