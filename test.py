@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-#   Copyright 2017 Braxton Mckee
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -535,7 +535,7 @@ def buildModule(args):
         [sys.executable, 'setup.py', 'develop', '--install-dir', './build/install'],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        env={'PYTHONPATH': (os.environ.get('PYTHONPATH', '') + ":") + os.path.abspath("./build/install")}
+        env=dict(os.environ, PYTHONPATH=(os.environ.get('PYTHONPATH', '') + ":") + os.path.abspath("./build/install"))
     )
 
     if result.returncode != 0:

@@ -49,12 +49,15 @@ def registerDisplay(type, **context):
 
     return registrar
 
+def context(contextKey):
+    """During cell evaluation, lookup context from our parent cell by name."""
+    return _cur_cell.cell.getContext(contextKey)
+
 def quoteForJs(string, quoteType):
     if quoteType == "'":
         return string.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
     else:
         return string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
 
 def multiReplace(msg, replacements):
     for k, v in replacements.items():
@@ -396,12 +399,15 @@ class Cells:
                                 childname,
                                 type(child_cell)
                             ))
+                        if child_cell.cells:
+                            child_cell.prepareForReuse()
 
                 except Exception:
                     self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
                     self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(traceback.format_exc())}
                     n.contents = "____contents__"
+                    return
                 finally:
                     _cur_cell.cell = None
 
@@ -512,6 +518,57 @@ class Slot:
             c.markDirty()
         self._subscribedCells = set()
 
+class SessionState(object):
+    """Represents a piece of session-specific interface state. You may access state
+    using attributes, which will register a dependency
+    """
+    def __init__(self):
+        self._slots = {}
+
+    def _reset(self, cells):
+        self._slots = {k:Slot(v.getWithoutRegisteringDependency()) for k,v in self._slots.items()}
+        for s in self._slots.values():
+            s._cells = cells
+            if isinstance(s._value, Cell):
+                try:
+                    s._value.prepareForReuse()
+                except Exception:
+                    logging.warn("Reusing a Cell slot could create a problem: %s", s._value)
+
+    def _slotFor(self, name):
+        if name not in self._slots:
+            self._slots[name] = Slot()
+        return self._slots[name]
+
+    def __getattr__(self, attr):
+        if attr[:1] == "_":
+            raise AttributeError(attr)
+
+        return self._slotFor(attr).get()
+
+    def __setattr__(self, attr, val):
+        if attr[:1] == "_":
+            self.__dict__[attr] = val
+            return
+
+        return self._slotFor(attr).set(val)
+
+    def ensure(self, attr, value):
+        if attr not in self._slots:
+            self._slots[attr] = Slot(value)
+
+    def set(self, attr, value):
+        self.__setattr__(attr, value)
+
+    def toggle(self, attr):
+        self.set(attr, not self.__getattr__(attr))
+
+    def get(self, attr):
+        return self.__getattr__(attr)
+
+def sessionState():
+    return context(SessionState)
+
 class Cell:
     def __init__(self):
         self.cells = None  # will get set when its added to a 'Cells' object
@@ -525,6 +582,7 @@ class Cell:
         self.garbageCollected = False
         self.subscriptions = set()
         self._nowrap = False
+        self._background_color = None
         self._width = None
         self._overflow = None
         self._color = None
@@ -533,6 +591,16 @@ class Cell:
         self.context = {}
 
         self._logger = logging.getLogger(__name__)
+
+    def evaluateWithDependencies(self, fun):
+        """Evaluate function within a view and add dependencies for whatever
+        we read."""
+        with self.view() as v:
+            result = fun()
+
+            self._resetSubscriptionsToViewReads(v)
+
+            return result
 
     def triggerPostscript(self, javascript):
         """Queue a postscript (piece of javascript to execute) to be run at the end of message processing."""
@@ -667,6 +735,9 @@ class Cell:
         if self._color is not None:
             res.append("color:%s" % self._color)
 
+        if self._background_color is not None:
+            res.append("background-color:%s" % self._background_color)
+
         if self._overflow is not None:
             res.append("overflow:%s" % self._overflow)
 
@@ -693,6 +764,10 @@ class Cell:
 
     def color(self, color):
         self._color = color
+        return self
+
+    def background_color(self, color):
+        self._background_color = color
         return self
 
     def isActive(self):
@@ -747,6 +822,9 @@ class Cell:
         self.context.update(kwargs)
         return self
 
+    def setContext(self, key, val):
+        self.context[key] = val
+
     def getContext(self, contextKey):
         if contextKey in self.context:
             return self.context[contextKey]
@@ -762,18 +840,20 @@ class Card(Cell):
         super().__init__()
 
         self.children = {"____contents__": Cell.makeCell(inner)}
+        self.padding = padding
 
+    def recalculate(self):
         other = ""
-        if padding:
-            other += " p-" + str(padding)
+        if self.padding:
+            other += " p-" + str(self.padding)
 
         self.contents = """
-        <div class='card'>
-          <div class="card-body __other__">
-            ____contents__
-          </div>
-        </div>
-        """.replace('__other__', other)
+            <div class="card" __style__>
+              <div class="card-body __other__">
+                ____contents__
+              </div>
+            </div>
+            """.replace('__other__', other).replace('__style__', self._divStyle())
 
     def sortsAs(self):
         return self.inner.sortsAs()
@@ -793,6 +873,45 @@ class CardTitle(Cell):
     def sortsAs(self):
         return self.inner.sortsAs()
 
+class Modal(Cell):
+    def __init__(self, title, message, **buttonActions):
+        """Initialize a modal dialog.
+
+        title - string for the title
+        message - string for the message body
+        buttonActions - a dict from string to a button action function.
+        """
+        super().__init__()
+        self.title = title
+        self.message = message
+        self.buttons = {f"____button_{k}__": Button(k, v) for k,v in buttonActions.items()}
+
+    def recalculate(self):
+        self.contents = (
+            f"""
+            <div class="modal fade show" tabindex="-1" role="dialog" style="display: block; padding-right: 15px;">
+              <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">____title__</h5>
+                  </div>
+                  <div class="modal-body">
+                    ____message__
+                  </div>
+                  <div class="modal-footer">
+                    __buttons__
+                  </div>
+                </div>
+              </div>
+            </div>
+            """
+            .replace("__buttons__",
+                " ".join(self.buttons)
+                )
+            )
+        self.children = dict(self.buttons)
+        self.children["____title__"] = Cell.makeCell(self.title)
+        self.children["____message__"] = Cell.makeCell(self.message)
 
 class Octicon(Cell):
     def __init__(self, which):
@@ -822,6 +941,48 @@ class Badge(Cell):
             "__style__", self.style
         )
         self.children = {'____child__': self.inner}
+
+class CollapsiblePanel(Cell):
+    def __init__(self, panel, content, isExpanded):
+        super().__init__()
+        self.panel = panel
+        self.content = content
+        self.isExpanded = isExpanded
+
+    def sortsAs(self):
+        return self.content.sortsAs()
+
+    def recalculate(self):
+        expanded = self.evaluateWithDependencies(self.isExpanded)
+
+        self.contents = """
+            <div class="container-fluid" __style__>
+                <div class="row flex-nowrap no-gutters">
+                    <div class="col-md-auto">
+                        ____panel__
+                    </div>
+                    <div class="col-sm">
+                        ____content__
+                    </div>
+                </div>
+            </div>
+            """ if expanded else """
+            <div __style__>
+                ____content__
+            </div>
+            """
+
+        self.contents = (
+            self.contents.replace("__identity__", self.identity)
+                         .replace("__style__", self._divStyle())
+            )
+
+        self.children = {
+            '____content__': self.content
+            }
+
+        if expanded:
+            self.children['____panel__'] = self.panel
 
 
 class Text(Cell):
@@ -865,7 +1026,6 @@ class Sequence(Cell):
 
         self.elements = elements
         self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
-        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" % i for i in range(len(elements))) + "</div>"
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -873,6 +1033,9 @@ class Sequence(Cell):
             return Sequence(self.elements + other.elements)
         else:
             return Sequence(self.elements + [other])
+
+    def recalculate(self):
+        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" % i for i in range(len(self.elements))) + "</div>"
 
     def sortsAs(self):
         if self.elements:
@@ -943,7 +1106,7 @@ class HeaderBar(Cell):
                     </div>
                 </div>
                 <div class="flex-item" style="flex-grow:1">
-                    <div class="flex-container" style="display:flex;justify-content:flex-center;align-items:baseline">
+                    <div class="flex-container" style="display:flex;justify-content:center;align-items:baseline">
                         %s
                     </div>
                 </div>
@@ -1178,8 +1341,6 @@ class Code(Cell):
     def sortsAs(self):
         return self.codeContents
 
-
-
 class ContextualDisplay(Cell):
     """Display an arbitrary python object by checking registered display handlers"""
 
@@ -1257,14 +1418,14 @@ class Subscribed(Cell):
 
 
 class SubscribedSequence(Cell):
-    def __init__(self, itemsFun, rendererFun):
+    def __init__(self, itemsFun, rendererFun, asColumns=False):
         super().__init__()
 
         self.itemsFun = itemsFun
         self.rendererFun = rendererFun
-
         self.existingItems = {}
         self.spine = []
+        self.asColumns = asColumns
 
     def prepareForReuse(self):
         self._clearSubscriptions()
@@ -1275,6 +1436,9 @@ class SubscribedSequence(Cell):
     def sortsAs(self):
         if '____child_0__' in self.children:
             return self.children['____child_0__'].sortsAs()
+
+    def makeCell(self, item):
+        return Subscribed(lambda: Cell.makeCell(self.rendererFun(item)))
 
     def recalculate(self):
         with self.view() as v:
@@ -1294,7 +1458,7 @@ class SubscribedSequence(Cell):
                     new_children["____child_%s__" % ix] = self.existingItems[rowKey]
                 else:
                     try:
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Cell.makeCell(self.rendererFun(rowKey[0]))
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = self.makeCell(rowKey[0])
                     except SubscribeAndRetry:
                         raise
                     except Exception:
@@ -1307,11 +1471,28 @@ class SubscribedSequence(Cell):
             if i not in spineAsSet:
                 del self.existingItems[i]
 
-        self.contents = """<div %s>%s</div>""" % (
-            self._divStyle(),
-            "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
-        )
-
+        if self.asColumns:
+            self.contents = (
+                """
+                <div class="container-fluid" __style__>
+                <div class="row flex-nowrap">
+                    __contents__
+                </div>
+                </div>
+                """
+                .replace("__style__", self._divStyle())
+                .replace(
+                    "__contents__",
+                    "\n".join(
+                        f"""<div class="col-sm"> ____child_{i}__ </div>"""
+                        for i in range(len(self.spine)))
+                )
+            )
+        else:
+            self.contents = """<div %s>%s</div>""" % (
+                self._divStyle(),
+                "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
+            )
 
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
@@ -1780,27 +1961,43 @@ class Clickable(Cell):
         if isinstance(val, str):
             self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(val, "'")), '"'))
 
-
 class Button(Clickable):
-    def __init__(self, *args, small=False, **kwargs):
+    def __init__(self, *args, small=False, active=True, style="primary", **kwargs):
         Clickable.__init__(self, *args, **kwargs)
         self.small = small
+        self.active = active
+        self.style = style
 
     def recalculate(self):
         self.children = {'____contents__': self.content}
         self.contents = (
-            """
+            f"""
             <button
-                class='btn btn-primary __size__'
+                class='btn btn{'-outline' if not self.active else ''}-{self.style} __size__'
                 onclick="__onclick__"
                 >
             ____contents__
             </button>"""
             .replace("__size__", "" if not self.small else "btn-xs")
+            .replace("__size__", "" if not self.small else "btn-xs")
             .replace('__identity__', self.identity)
             .replace("__onclick__", self.calculatedOnClick())
         )
 
+class ButtonGroup(Cell):
+    def __init__(self, buttons):
+        super().__init__()
+        self.buttons = buttons
+
+    def recalculate(self):
+        self.children = {f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
+        self.contents = (
+            """
+            <div class="btn-group" role="group">
+                __buttons__
+            </div>"""
+            .replace("__buttons__", " ".join(f"____{i}__" for i in range(len(self.buttons))))
+        )
 
 class LoadContentsFromUrl(Cell):
     def __init__(self, targetUrl):
@@ -1850,13 +2047,13 @@ def ensureSubscribedSchema(t, lazy=False):
 
 
 class Expands(Cell):
-    def __init__(self, closed, open, closedIcon=Octicon("diff-added)"), openedIcon=Octicon("diff-removed"), initialState=False):
+    def __init__(self, closed, open, closedIcon=None, openedIcon=None, initialState=False):
         super().__init__()
         self.isExpanded = initialState
         self.closed = closed
         self.open = open
-        self.openedIcon = openedIcon
-        self.closedIcon = closedIcon
+        self.openedIcon = openedIcon or Octicon("diff-removed")
+        self.closedIcon = closedIcon or Octicon("diff-added")
 
     def sortsAs(self):
         if self.isExpanded:
@@ -1882,8 +2079,13 @@ class Expands(Cell):
             '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
+        for c in self.children.values():
+            if c.cells is not None:
+                c.prepareForReuse()
+
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded
+
         self.markDirty()
 
 

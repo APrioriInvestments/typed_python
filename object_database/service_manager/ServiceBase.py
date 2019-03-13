@@ -51,3 +51,7 @@ class ServiceBase:
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         return Card("No details provided for service '%s'" % serviceObject.name)
+
+    @staticmethod
+    def serviceHeaderToggles(serviceObject, instance=None):
+        return []

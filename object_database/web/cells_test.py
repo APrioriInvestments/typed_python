@@ -349,4 +349,3 @@ class CellsTests(unittest.TestCase):
         self.assertTrue(self.cells.root.findChildrenByTag("large display 1"))
         self.assertTrue(self.cells.root.findChildrenByTag("sized display 2"))
         self.assertTrue(self.cells.root.findChildrenByTag("display 3"))
-
