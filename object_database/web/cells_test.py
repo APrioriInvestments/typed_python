@@ -341,7 +341,7 @@ class CellsTests(unittest.TestCase):
             Card(X(1)).withContext(size="large") +
             Card(X(2)).withContext(size="something else") +
             Card(X(3))
-            )
+        )
 
         self.cells.renderMessages()
 

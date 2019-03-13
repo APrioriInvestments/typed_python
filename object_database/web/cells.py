@@ -43,7 +43,7 @@ def registerDisplay(type, **context):
     def registrar(displayFunc):
         ContextualDisplay._typeToDisplay.setdefault(type, []).append(
             (ContextualDisplay.ContextMatcher(context), displayFunc)
-            )
+        )
 
         return displayFunc
 
@@ -2266,10 +2266,11 @@ class CodeEditor(Cell):
                 editor.setValue(newText, 1)
                 editor.selection.setRange(range)
 
-                """.replace("__identity__", self.identity)
-                   .replace("__text__", quoteForJs(newSlotState[1], '"'))
-                   .replace("__iteration__", str(newSlotState[0]))
-                )
+                """
+                .replace("__identity__", self.identity)
+                .replace("__text__", quoteForJs(newSlotState[1], '"'))
+                .replace("__iteration__", str(newSlotState[0]))
+            )
         else:
             self.initialText = newSlotState[1]
 
@@ -2387,83 +2388,84 @@ class Sheet(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = ((
-            """
-            function model(opts) { return {} }
+        self.postscript = (
+            (
+                """
+                function model(opts) { return {} }
 
-            function property(index) {
-              return function (row) {
-                return row[index]
-              }
-            }
-
-            function SyntheticIntegerArray(size) {
-                this.length = size
-                this.cache = {}
-                this.push = function() { }
-                this.splice = function() {}
-
-                this.slice = function(low, high) {
-                    if (high === undefined) {
-                        high = this.length
-                    }
-
-                    res = Array(high-low)
-                    initLow = low
-                    while (low < high) {
-                        out = this.cache[low]
-                        if (out === undefined) {
-                            websocket.send(JSON.stringify(
-                                {'event':'sheet_needs_data',
-                                 'target_cell': '__identity__',
-                                 'data': low
-                                 }
-                                ))
-                            out = emptyRow
-                        }
-                        res[low-initLow] = out
-                        low = low + 1
-                    }
-
-                    return res
+                function property(index) {
+                  return function (row) {
+                    return row[index]
+                  }
                 }
-            }
 
-            var data = new SyntheticIntegerArray(__rows__)
-            var container = document.getElementById('sheet__identity__');
+                function SyntheticIntegerArray(size) {
+                    this.length = size
+                    this.cache = {}
+                    this.push = function() { }
+                    this.splice = function() {}
 
-            var colnames = [__column_names__]
-            var columns = []
-            var emptyRow = []
+                    this.slice = function(low, high) {
+                        if (high === undefined) {
+                            high = this.length
+                        }
 
-            for (var i = 0; i < colnames.length; i++) {
-                columns.push({data: property(i)})
-                emptyRow.push("")
-            }
+                        res = Array(high-low)
+                        initLow = low
+                        while (low < high) {
+                            out = this.cache[low]
+                            if (out === undefined) {
+                                websocket.send(JSON.stringify(
+                                    {'event':'sheet_needs_data',
+                                     'target_cell': '__identity__',
+                                     'data': low
+                                     }
+                                    ))
+                                out = emptyRow
+                            }
+                            res[low-initLow] = out
+                            low = low + 1
+                        }
 
-            var currentTable = new Handsontable(container, {
-                data: data,
-                dataSchema: model,
-                colHeaders: colnames,
-                columns: columns,
-                rowHeaders: true,
-                rowHeaderWidth: 100,
-                viewportRowRenderingOffset: 100,
-                autoColumnSize: false,
-                autoRowHeight: false,
-                manualColumnResize: true,
-                colWidths: __col_width__,
-                rowHeights: 23,
-                readOnly: true,
-                ManualRowMove: false
-                });
-            handsOnTables["__identity__"] = {
-                    table: currentTable,
-                    lastCellClicked: {row: -100, col:-100},
-                    dblClicked: true
-            }
-            """ +
-            (self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else "")
+                        return res
+                    }
+                }
+
+                var data = new SyntheticIntegerArray(__rows__)
+                var container = document.getElementById('sheet__identity__');
+
+                var colnames = [__column_names__]
+                var columns = []
+                var emptyRow = []
+
+                for (var i = 0; i < colnames.length; i++) {
+                    columns.push({data: property(i)})
+                    emptyRow.push("")
+                }
+
+                var currentTable = new Handsontable(container, {
+                    data: data,
+                    dataSchema: model,
+                    colHeaders: colnames,
+                    columns: columns,
+                    rowHeaders: true,
+                    rowHeaderWidth: 100,
+                    viewportRowRenderingOffset: 100,
+                    autoColumnSize: false,
+                    autoRowHeight: false,
+                    manualColumnResize: true,
+                    colWidths: __col_width__,
+                    rowHeights: 23,
+                    readOnly: true,
+                    ManualRowMove: false
+                    });
+                handsOnTables["__identity__"] = {
+                        table: currentTable,
+                        lastCellClicked: {row: -100, col:-100},
+                        dblClicked: true
+                }
+                """ +
+                (self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else "")
             )
             .replace("__identity__", self._identity)
             .replace("__rows__", str(self.rowCount))
