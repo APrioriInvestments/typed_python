@@ -2279,7 +2279,7 @@ class Sheet(Cell):
 
     def __init__(self, columnNames, rowCount, rowFun,
                  colWidth=200,
-                 onCellDblClick = None
+                 onCellDblClick=None
                   ):
         """
         columnNames:
@@ -2311,9 +2311,9 @@ class Sheet(Cell):
         if onCellDblClick is not None:
             def _makeOnCellDblClick(func):
                 def _onMessage(sheet, msgFrame):
-                    return onCellDblClick(sheet = sheet,
-                                          row = msgFrame["row"],
-                                          col = msgFrame["col"])
+                    return onCellDblClick(sheet=sheet,
+                                          row=msgFrame["row"],
+                                          col=msgFrame["col"])
                 return _onMessage
 
 

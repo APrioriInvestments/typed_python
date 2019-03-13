@@ -244,7 +244,7 @@ class NativeTypesTests(unittest.TestCase):
         def myCall(self, *args, **kwargs):
             return 42
 
-        alt = Alternative("alts", One = {}, Two = {}, __call__ = myCall)
+        alt = Alternative("alts", One={}, Two={}, __call__=myCall)
 
         one = alt.One()
         self.assertEqual(one(), 42)
@@ -252,7 +252,7 @@ class NativeTypesTests(unittest.TestCase):
         two = alt.Two()
         self.assertEqual(two(), 42)
 
-        alt = Alternative("alts", One = {}, Two = {}, myCall = myCall)
+        alt = Alternative("alts", One={}, Two={}, myCall=myCall)
         with self.assertRaises(TypeError):
             one = alt.One()
             one()

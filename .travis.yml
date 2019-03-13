@@ -17,6 +17,6 @@ install:
 
 script:
   - make testcert.cert
-  - flake8 --show-source --select=E999,E722,W291,W292,W293,W391,F403
+  - make lint
   - ./test.py -s
   - pipenv check
