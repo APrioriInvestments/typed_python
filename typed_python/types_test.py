@@ -1524,7 +1524,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(S(x=1, y=2), S(x=1, y=3))
         self.assertFalse(S(x=1, y=2) == S(x=1, y=3))
 
-    def test_const_dict_comparison(self):
+    def test_const_dict_comparison_more(self):
         N = NamedTuple(x=OneOf(None, int), y=OneOf(None, int))
         D = ConstDict(str, N)
 
