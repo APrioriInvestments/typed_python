@@ -103,7 +103,7 @@ def makeFunction(name, f, firstArgType=None):
         """ Return the default value for a positional argument given its index. """
         if spec.defaults is not None:
             if idx >= len(spec.args) - len(spec.defaults):
-                default = (spec.defaults[idx -(len(spec.args) - len(spec.defaults))],)
+                default = (spec.defaults[idx - (len(spec.args) - len(spec.defaults))],)
             else:
                 default = None
         else:
