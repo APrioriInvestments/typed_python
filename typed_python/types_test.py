@@ -171,7 +171,7 @@ class RandomValueProducer:
 
 class NativeTypesTests(unittest.TestCase):
 
-    def check_expected_performance(self, elapsed, expected=1.0):
+    def check_expected_performance(self, elapsed, expected=1.5):
         if os.environ.get('TRAVIS_CI', None) is not None:
             expected = 2 * expected
 
