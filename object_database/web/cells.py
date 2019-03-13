@@ -2102,8 +2102,7 @@ class CodeEditor(Cell):
             minLines=None,
             fontSize=None,
             autocomplete=True,
-            onTextChange=None
-            ):
+            onTextChange=None):
         """Create a code editor
 
         keybindings - map from keycode to a lambda function that will receive
@@ -2280,8 +2279,7 @@ class Sheet(Cell):
 
     def __init__(self, columnNames, rowCount, rowFun,
                  colWidth=200,
-                 onCellDblClick=None
-                  ):
+                 onCellDblClick=None):
         """
         columnNames:
             names to go in column Header
