@@ -782,6 +782,8 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE(a2), *context);
 
     try {
+        PyInstance::guaranteeForwardsResolvedOrThrow(serializeType);
+
         Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
             PyEnsureGilReleased releaseTheGil;
             serializeType->deserialize(p, buf);

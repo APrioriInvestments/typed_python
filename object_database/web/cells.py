@@ -1912,13 +1912,14 @@ class CodeEditor(Cell):
             and a json selection.
         """
         super().__init__()
-        self._slot = Slot((0, "")) #contains code, and the 'current' iteration
+        self._slot = Slot((0, "")) #contains (current_iteration_number: int, text: str)
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
         self.fontSize = fontSize
         self.minLines = minLines
         self.autocomplete = autocomplete
         self.onTextChange = onTextChange
+        self.initialText = ""
 
     def getContents(self):
         return self._slot.get()[1]
@@ -1949,13 +1950,13 @@ class CodeEditor(Cell):
             aceEditors["editor__identity__"] = editor
             editor.last_edit_millis = Date.now()
 
-            console.log("setting up editor")
+            console.log("setting up editor with " )
             editor.setTheme("ace/theme/textmate");
             editor.session.setMode("ace/mode/python");
             editor.setAutoScrollEditorIntoView(true);
             editor.session.setUseSoftTabs(true);
             editor.setValue("__text__");
-        """.replace("__text__", quoteForJs(self._slot.getWithoutRegisteringDependency()[1], '"'))
+        """.replace("__text__", quoteForJs(self.initialText, '"'))
 
         if self.autocomplete:
             self.postscript += """
@@ -2037,7 +2038,7 @@ class CodeEditor(Cell):
         self.postscript = self.postscript.replace("__identity__", self.identity)
 
     def sendCurrentStateToBrowser(self, newSlotState):
-        if self.identity is not None:
+        if self.cells is not None:
             # if self.identity is None, then we have not been installed in the tree yet
             # so sending ourselves a message makes no sense.
             self.triggerPostscript(
@@ -2063,6 +2064,8 @@ class CodeEditor(Cell):
                    .replace("__text__", quoteForJs(newSlotState[1], '"'))
                    .replace("__iteration__", str(newSlotState[0]))
                 )
+        else:
+            self.initialText = newSlotState[1]
 
 
 class Sheet(Cell):
@@ -2313,8 +2316,6 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = Slot(None)
         self.error = Slot(None)
-
-        print("NEW PLOT")
 
     def recalculate(self):
         self.contents = """
