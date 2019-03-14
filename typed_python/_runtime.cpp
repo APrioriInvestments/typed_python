@@ -22,6 +22,10 @@ extern "C" {
         return String::concatenate(lhs, rhs);
     }
 
+    String::layout* nativepython_runtime_string_lower(String::layout* l) {
+        return String::lower(l);
+    }
+
     String::layout* nativepython_runtime_string_getitem_int64(String::layout* lhs, int64_t index) {
         return String::getitem(lhs, index);
     }

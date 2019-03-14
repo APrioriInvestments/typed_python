@@ -131,6 +131,12 @@ string_from_utf8_and_len = externalCallTarget(
     UInt8Ptr, Int64
 )
 
+string_lower = externalCallTarget(
+    "nativepython_runtime_string_lower",
+    Void.pointer(),
+    Void.pointer()
+)
+
 bytes_concat = externalCallTarget(
     "nativepython_runtime_bytes_concat",
     Void.pointer(),

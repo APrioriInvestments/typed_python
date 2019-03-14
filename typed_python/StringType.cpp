@@ -82,6 +82,37 @@ String::layout* String::concatenate(layout* lhs, layout* rhs) {
     return new_layout;
 }
 
+String::layout* String::lower(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
+    new_layout->pointcount = l->pointcount;
+
+    if (l->bytes_per_codepoint == 1) {
+        for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->pointcount; src < end; ) {
+            *dest++ = (uint8_t)tolower(*src++);
+        }
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        for (uint16_t *src = (uint16_t *)l->data, *dest = (uint16_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
+            *dest++ = (uint16_t)towlower(*src++);
+        }
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        for (uint32_t *src = (uint32_t *)l->data, *dest = (uint32_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
+            *dest++ = (uint32_t)towlower(*src++);
+        }
+    }
+
+    return new_layout;
+}
+
 String::layout* String::getitem(layout* lhs, int64_t offset) {
     if (!lhs) {
         return lhs;
@@ -136,7 +167,7 @@ int64_t String::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t
         if (utf8Str[0] >> 4 == 0b1110) {
             length -= 1;
             utf8Str += 3;
-            bytes_per_codepoint = std::max<int64_t>(4, bytes_per_codepoint);
+            bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
         }
 
         if (utf8Str[0] >> 3 == 0b11110) {

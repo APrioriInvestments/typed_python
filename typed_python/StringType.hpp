@@ -34,6 +34,9 @@ public:
     //return an increffed concatenated layout of lhs and rhs
     static layout* concatenate(layout* lhs, layout* rhs);
 
+    //return an increffed lowercase conversion layout of l
+    static layout* lower(layout *l);
+
     //return an increffed string containing the one codepoint at 'offset'. this function
     //will correctly map negative indices, but performs no other boundschecking.
     static layout* getitem(layout* lhs, int64_t offset);

@@ -135,3 +135,14 @@ class TestStringCompilation(unittest.TestCase):
         for s in someStrings:
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
+
+
+    def test_string_lower(self):
+
+        @Compiled
+        def c_lower(s: str):
+            return s.lower()
+
+        someupper_strings = ["Abc","aBc","abC", "ABC","\u00CA\u00D1\u011A\u1E66\u1EEA","XyZ\U0001D471"]
+        for s in someupper_strings:
+            self.assertEqual(s.lower(), c_lower(s))
