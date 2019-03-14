@@ -22,6 +22,7 @@ MAX_FPS = 10
 
 _cur_cell = threading.local()
 
+
 def registerDisplay(type, **context):
     """Register a display function for any instances of a given type. For instance
 
@@ -49,15 +50,18 @@ def registerDisplay(type, **context):
 
     return registrar
 
+
 def context(contextKey):
     """During cell evaluation, lookup context from our parent cell by name."""
     return _cur_cell.cell.getContext(contextKey)
+
 
 def quoteForJs(string, quoteType):
     if quoteType == "'":
         return string.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
     else:
         return string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
 
 def multiReplace(msg, replacements):
     for k, v in replacements.items():
@@ -213,7 +217,6 @@ class Cells:
         except queue.Empty:
             return False
 
-
     @property
     def root(self):
         return self._root
@@ -244,7 +247,6 @@ class Cells:
     def markSlotDirtyForNextRecompute(self, slot):
         self._dirtySlots.add(slot)
         self._gEventHasTransactions.trigger()
-
 
     def _onTransaction(self, *trans):
         self._transactionQueue.put(trans)
@@ -520,6 +522,7 @@ class Slot:
             c.markDirty()
         self._subscribedCells = set()
 
+
 class SessionState(object):
     """Represents a piece of session-specific interface state. You may access state
     using attributes, which will register a dependency
@@ -568,8 +571,10 @@ class SessionState(object):
     def get(self, attr):
         return self.__getattr__(attr)
 
+
 def sessionState():
     return context(SessionState)
+
 
 class Cell:
     def __init__(self):
@@ -877,6 +882,7 @@ class CardTitle(Cell):
     def sortsAs(self):
         return self.inner.sortsAs()
 
+
 class Modal(Cell):
     def __init__(self, title, message, **buttonActions):
         """Initialize a modal dialog.
@@ -909,13 +915,12 @@ class Modal(Cell):
               </div>
             </div>
             """
-            .replace("__buttons__",
-                " ".join(self.buttons)
-                )
-            )
+            .replace("__buttons__", " ".join(self.buttons))
+        )
         self.children = dict(self.buttons)
         self.children["____title__"] = Cell.makeCell(self.title)
         self.children["____message__"] = Cell.makeCell(self.message)
+
 
 class Octicon(Cell):
     def __init__(self, which):
@@ -945,6 +950,7 @@ class Badge(Cell):
             "__style__", self.style
         )
         self.children = {'____child__': self.inner}
+
 
 class CollapsiblePanel(Cell):
     def __init__(self, panel, content, isExpanded):
@@ -979,11 +985,11 @@ class CollapsiblePanel(Cell):
         self.contents = (
             self.contents.replace("__identity__", self.identity)
                          .replace("__style__", self._divStyle())
-            )
+        )
 
         self.children = {
             '____content__': self.content
-            }
+        }
 
         if expanded:
             self.children['____panel__'] = self.panel
@@ -1345,6 +1351,7 @@ class Code(Cell):
     def sortsAs(self):
         return self.codeContents
 
+
 class ContextualDisplay(Cell):
     """Display an arbitrary python object by checking registered display handlers"""
 
@@ -1384,6 +1391,7 @@ class ContextualDisplay(Cell):
 
     def recalculate(self):
         self.children = {"____child__": self.getChild()}
+
 
 class Subscribed(Cell):
     def __init__(self, f):
@@ -1497,6 +1505,7 @@ class SubscribedSequence(Cell):
                 self._divStyle(),
                 "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
             )
+
 
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
@@ -1965,6 +1974,7 @@ class Clickable(Cell):
         if isinstance(val, str):
             self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(val, "'")), '"'))
 
+
 class Button(Clickable):
     def __init__(self, *args, small=False, active=True, style="primary", **kwargs):
         Clickable.__init__(self, *args, **kwargs)
@@ -1988,6 +1998,7 @@ class Button(Clickable):
             .replace("__onclick__", self.calculatedOnClick())
         )
 
+
 class ButtonGroup(Cell):
     def __init__(self, buttons):
         super().__init__()
@@ -2002,6 +2013,7 @@ class ButtonGroup(Cell):
             </div>"""
             .replace("__buttons__", " ".join(f"____{i}__" for i in range(len(self.buttons))))
         )
+
 
 class LoadContentsFromUrl(Cell):
     def __init__(self, targetUrl):
@@ -2037,9 +2049,11 @@ def ensureSubscribedType(t, lazy=False):
             )
         )
 
+
 def createTask(task):
     """Create a long-running task from within an executing cell. See Cells.createTask."""
     return _cur_cell.cell.cells.createTask(_cur_cell.cell, task)
+
 
 def ensureSubscribedSchema(t, lazy=False):
     if not current_transaction().db().isSubscribedToSchema(t):
@@ -2315,9 +2329,7 @@ class Sheet(Cell):
                                           col=msgFrame["col"])
                 return _onMessage
 
-
             self._hookfns["onCellDblClick"] = _makeOnCellDblClick(onCellDblClick)
-
 
     def _addHandsontableOnCellDblClick(self):
         return """
@@ -2470,7 +2482,6 @@ class Sheet(Cell):
             .replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames))
             .replace("__col_width__", json.dumps(self.colWidth))
         )
-
 
     def onMessage(self, msgFrame):
 

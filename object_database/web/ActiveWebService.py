@@ -339,7 +339,7 @@ class ActiveWebService(ServiceBase):
                     Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
                     .withSerializationContext(serviceObj.getSerializationContext()),
                     serviceToggles
-                    )
+                )
 
             typename = path[2]
 
@@ -356,17 +356,17 @@ class ActiveWebService(ServiceBase):
             if len(path) == 3:
                 return (
                     serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
-                        .withSerializationContext(serviceObj.getSerializationContext()),
+                    .withSerializationContext(serviceObj.getSerializationContext()),
                     serviceToggles
-                    )
+                )
 
             instance = typeObj.fromIdentity(path[3])
 
             return (
                 serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
-                    .withSerializationContext(serviceObj.getSerializationContext()),
+                .withSerializationContext(serviceObj.getSerializationContext()),
                 serviceToggles
-                )
+            )
 
         return Traceback("Invalid url path: %s" % path), []
 
@@ -574,10 +574,11 @@ class ActiveWebService(ServiceBase):
         finally:
             self.sessionStates[sessionId].append(sessionState)
 
-            self._logger.info("Returning session state to pool for %s. Have %s",
+            self._logger.info(
+                "Returning session state to pool for %s. Have %s",
                 sessionId,
                 len(self.sessionStates[sessionId])
-                )
+            )
 
             cells.markStopProcessingTasks()
 
