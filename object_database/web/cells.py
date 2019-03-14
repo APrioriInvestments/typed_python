@@ -384,6 +384,7 @@ class Cells:
 
                 try:
                     _cur_cell.cell = n
+                    _cur_cell.isProcessingMessage = False
                     while True:
                         try:
                             n.prepare()
@@ -410,6 +411,7 @@ class Cells:
                     return
                 finally:
                     _cur_cell.cell = None
+                    _cur_cell.isProcessingMessage = False
 
                 newChildren = set(n.children.values())
 
@@ -485,7 +487,7 @@ class Slot:
         with self._lock:
             # we can only create a dependency if we're being read
             # as part of a cell's state recalculation.
-            if _cur_cell.cell:
+            if _cur_cell.cell and not getattr(_cur_cell, 'isProcessingMessage', False):
                 self._subscribedCells.add(_cur_cell.cell)
 
             return self._value
@@ -659,6 +661,7 @@ class Cell:
         while True:
             try:
                 _cur_cell.cell = self
+                _cur_cell.isProcessingMessage = True
 
                 with self.transaction():
                     self.onMessage(*args)
@@ -673,6 +676,7 @@ class Cell:
                 return
             finally:
                 _cur_cell.cell = None
+                _cur_cell.isProcessingMessage = False
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -2507,7 +2511,7 @@ class Sheet(Cell):
 class Plot(Cell):
     """Produce some reactive line plots."""
 
-    def __init__(self, namedDataSubscriptions):
+    def __init__(self, namedDataSubscriptions, xySlot=None):
         """Initialize a line plot.
 
         namedDataSubscriptions: a map from plot name to a lambda function
@@ -2516,7 +2520,7 @@ class Plot(Cell):
         super().__init__()
 
         self.namedDataSubscriptions = namedDataSubscriptions
-        self.curXYRanges = Slot(None)
+        self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
 
     def recalculate(self):
@@ -2534,6 +2538,7 @@ class Plot(Cell):
         }
 
         self.postscript = """
+            console.log("Creating a new plotly chart.")
             plotDiv = document.getElementById('plot__identity__');
             Plotly.plot(
                 plotDiv,
@@ -2545,6 +2550,9 @@ class Plot(Cell):
                 );
             plotDiv.on('plotly_relayout',
                 function(eventdata){
+                    if (plotDiv.is_server_defined_move === true) {
+                        return
+                    }
                     //if we're sending a string, then its a date object, and we want to send
                     // a timestamp
                     if (typeof(eventdata['xaxis.range[0]']) === 'string') {
@@ -2572,6 +2580,39 @@ class Plot(Cell):
             ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]', curVal[0][1])),
              (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
         )
+
+    def setXRange(self, low, high):
+        self.curXYRanges.set(((low,high), self.curXYRanges.get()[1]))
+
+        self.triggerPostscript(f"""
+            plotDiv = document.getElementById('plot__identity__');
+            newLayout = plotDiv.layout
+
+            if (typeof(newLayout.xaxis.range[0]) === 'string') {{
+                formatDate = function(d) {{
+                    return (d.getYear() + 1900) + "-" + ("00" + (d.getMonth() + 1)).substr(-2) + "-" + ("00" + d.getDate()).substr(-2) + " " + ("00" + d.getHours()).substr(-2) + ":" + ("00" + d.getMinutes()).substr(-2) + ":" + ("00" + d.getSeconds()).substr(-2) + "." + ("000000" + d.getMilliseconds()).substr(-3)
+                    }};
+
+                newLayout.xaxis.range[0] = formatDate(new Date({low*1000}));
+                newLayout.xaxis.range[1] = formatDate(new Date({high*1000}));
+                newLayout.xaxis.autorange = false;
+
+                console.log("set layout for __identity__ to " + formatDate(new Date({low*1000})) + " from " + {low*1000})
+
+            }} else {{
+                newLayout.xaxis.range[0] = {low};
+                newLayout.xaxis.range[1] = {high};
+                newLayout.xaxis.autorange = false;
+            }}
+
+
+            plotDiv.is_server_defined_move = true;
+            Plotly.react(plotDiv, plotDiv.data, newLayout);
+            plotDiv.is_server_defined_move = false;
+
+            console.log("Range is now " + plotDiv.layout.xaxis.range[0])
+
+            """.replace("__identity__", self._identity))
 
 
 class _PlotUpdater(Cell):

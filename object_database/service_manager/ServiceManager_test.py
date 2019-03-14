@@ -187,6 +187,19 @@ class GraphDisplayService(ServiceBase):
         ensureSubscribedType(Feigenbaum)
         depth = Slot(50)
 
+        def twinned():
+            data = {'PointsToShow': {'timestamp': [1500000000 + x for x in range(1000)], 'y': [numpy.sin(x) for x in range(1000)]}}
+            slot = Slot(None)
+            p1 = Plot(lambda: data, xySlot=slot)
+            p2 = Plot(lambda: data, xySlot=slot)
+
+            def synchronize():
+                if slot.get() is not None:
+                    p1.setXRange(*slot.get()[0])
+                    p2.setXRange(*slot.get()[0])
+
+            return p1 + p2 + Subscribed(synchronize)
+
         return Tabs(
             Overlay=Card(
                 Plot(
@@ -214,8 +227,9 @@ class GraphDisplayService(ServiceBase):
             ).width('calc(100vw - 70px)').height('calc(100vh - 150px)'),
             Timestamps=(
                 Button("Add a point!", GraphDisplayService.addAPoint) +
-                Card(Plot(GraphDisplayService.chartData)).width(600).height(400) + Code("BYE")
+                Card(Plot(GraphDisplayService.chartData)).width(600).height(400)
             ),
+            Twinned=Subscribed(twinned),
             feigenbaum=(
                 Dropdown("Depth", [(val, depth.setter(val)) for val in [10, 50, 100, 250, 500, 750, 1000]]) +
                 Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
