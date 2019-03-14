@@ -93,7 +93,7 @@ class OrderedFilterAction(argparse.Action):
 
 class PythonTestArgumentParser(argparse.ArgumentParser):
     def __init__(self):
-        super(PythonTestArgumentParser, self).__init__(add_help=False)
+        super(PythonTestArgumentParser, self).__init__(add_help=True)
         self.add_argument(
             '-v',
             dest='testHarnessVerbose',
