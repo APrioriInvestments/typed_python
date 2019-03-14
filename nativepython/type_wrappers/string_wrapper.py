@@ -14,6 +14,7 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
+from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
 from typed_python import String
 
@@ -137,3 +138,27 @@ class StringWrapper(RefcountedWrapper):
                 ).cast(self.layoutType)
             )
         )
+
+    def convert_attribute(self, context, instance, attr):
+        if attr in ("lower",):
+            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+
+        return super().convert_attribute(context, instance, attr)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if kwargs:
+            return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+        if methodname == "lower":
+            if len(args) != 0:
+                    return
+            return context.push(
+                str,
+                lambda strRef: strRef.expr.store(
+                    runtime_functions.string_lower.call(
+                        instance.nonref_expr.cast(VoidPtr)
+                    ).cast(self.layoutType)
+                )
+            )
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
