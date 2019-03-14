@@ -314,7 +314,6 @@ class CellsTests(unittest.TestCase):
 
         self.helper_memory_leak(cell, initFn, workFn, 1)
 
-
     def test_cells_context(self):
         class X:
             def __init__(self, x):

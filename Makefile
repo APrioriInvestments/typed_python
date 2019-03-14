@@ -42,7 +42,7 @@ test: testcert.cert testcert.key install
 lint: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
 	flake8 --show-source \
-		--select=E999,E722,E262,E261,E251,E225,E128,E124,E123,E117,W291,W292,W293,W391,F403,F405
+		--select=E999,E722,E303,E302,E262,E261,E251,E225,E128,E124,E123,E117,W291,W292,W293,W391,F403,F405
 
 .PHONY: lint-all
 lint-all: $(VIRTUAL_ENV)
