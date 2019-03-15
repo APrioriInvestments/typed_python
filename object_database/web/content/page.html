@@ -42,7 +42,22 @@
         d.x = unpackHexFloats(d.x)
       }
 
-      d.y = unpackHexFloats(d.y)
+      if (d.y !== undefined) {
+        d.y = unpackHexFloats(d.y)
+      }
+      if (d.open !== undefined) {
+        d.open = unpackHexFloats(d.open)
+      }
+      if (d.close !== undefined) {
+        d.close = unpackHexFloats(d.close)
+      }
+      if (d.high !== undefined) {
+        d.high = unpackHexFloats(d.high)
+      }
+      if (d.low !== undefined) {
+        d.low = unpackHexFloats(d.low)
+      }
+
 
       return d
     }

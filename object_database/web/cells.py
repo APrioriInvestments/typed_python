@@ -209,10 +209,13 @@ class Cells:
                 try:
                     self._logger.info("Starting task %s with %s remaining", task, self._tasks.qsize())
                     t0 = time.time()
+                    _cur_cell.isProcessingTask = True
                     task(creatingCell, self._shouldStopProcessingTasks)
                     self._logger.info("Task %s took %s", task, time.time() - t0)
                 except Exception:
                     self._logger.error("Unexpected Exception in cells.processTasks:\n%s", traceback.format_exc())
+                finally:
+                    _cur_cell.isProcessingTask = False
             return True
         except queue.Empty:
             return False
@@ -387,6 +390,7 @@ class Cells:
                 try:
                     _cur_cell.cell = n
                     _cur_cell.isProcessingMessage = False
+                    _cur_cell.isProcessingTask = False
                     while True:
                         try:
                             n.prepare()
@@ -410,10 +414,10 @@ class Cells:
                     self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(traceback.format_exc())}
                     n.contents = "____contents__"
-                    return
                 finally:
                     _cur_cell.cell = None
                     _cur_cell.isProcessingMessage = False
+                    _cur_cell.isProcessingTask = False
 
                 newChildren = set(n.children.values())
 
@@ -489,24 +493,44 @@ class Slot:
         with self._lock:
             # we can only create a dependency if we're being read
             # as part of a cell's state recalculation.
-            if _cur_cell.cell and not getattr(_cur_cell, 'isProcessingMessage', False):
+            if (_cur_cell.cell and not getattr(_cur_cell, 'isProcessingMessage', False) and
+                    not getattr(_cur_cell, 'isProcessingTask', False)):
                 self._subscribedCells.add(_cur_cell.cell)
 
-            return self._value
+            if getattr(_cur_cell, "isProcessingTask", False):
+                return self._pendingValue
+            else:
+                return self._value
 
     def set(self, val):
-        """Schedule a write to a slot. This does _NOT_ happen synchronously, because
-        we need to buffer writes to Slots that can happen on background threads.
+        """Write to a slot.
+
+        If the outside context is a Task, this gets placed on a 'pendingValue' and
+        the primary value gets updated between Task cycles. Otherwise, the write
+        is synchronous.
         """
         with self._lock:
-            if val == self._pendingValue:
-                return
+            if getattr(_cur_cell, "isProcessingTask", False):
+                if val == self._pendingValue:
+                    return
 
-            self._pendingValue = val
+                self._pendingValue = val
+
+                if self._cells:
+                    self._cells.markSlotDirtyForNextRecompute(self)
+            else:
+                if val == self._value:
+                    return
+
+                self._value = val
+                self._pendingValue = val
+
+                for c in self._subscribedCells:
+                    c.markDirty()
+                self._subscribedCells = set()
+
 
         # delay triggering this slot as dirty
-        if self._cells:
-            self._cells.markSlotDirtyForNextRecompute(self)
 
     def absorbPendingWrite(self):
         """Update our value and dirty any listening cells.
@@ -585,15 +609,16 @@ class Cell:
         self.contents = ""  # some contents containing a local node def
         self._identity = None
         self._tag = None
-        self.postscript = None
-        self.garbageCollected = False
-        self.subscriptions = set()
-        self._nowrap = False
+        self._nowrap = None
         self._background_color = None
+        self._height = None
         self._width = None
         self._overflow = None
         self._color = None
-        self._height = None
+        self.postscript = None
+        self.garbageCollected = False
+        self.subscriptions = set()
+        self._style = {}
         self.serializationContext = None
         self.context = {}
 
@@ -667,6 +692,7 @@ class Cell:
             try:
                 _cur_cell.cell = self
                 _cur_cell.isProcessingMessage = True
+                _cur_cell.isProcessingTask = False
 
                 with self.transaction():
                     self.onMessage(*args)
@@ -682,6 +708,7 @@ class Cell:
             finally:
                 _cur_cell.cell = None
                 _cur_cell.isProcessingMessage = False
+                _cur_cell.isProcessingTask = False
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -845,27 +872,41 @@ class Cell:
 
 
 class Card(Cell):
-    def __init__(self, inner, padding=None):
+    def __init__(self, body, header=None, padding=None):
         super().__init__()
 
-        self.children = {"____contents__": Cell.makeCell(inner)}
         self.padding = padding
+        self.body = body
+        self.header = header
 
     def recalculate(self):
+        self.children = {"____contents__": Cell.makeCell(self.body)}
+
+        if self.header is not None:
+            self.children['____header__'] = Cell.makeCell(self.header)
+
         other = ""
         if self.padding:
             other += " p-" + str(self.padding)
 
-        self.contents = """
+        self.contents = ("""
             <div class="card" __style__>
+              __header__
               <div class="card-body __other__">
                 ____contents__
               </div>
             </div>
-            """.replace('__other__', other).replace('__style__', self._divStyle())
+            """.replace('__other__', other)
+               .replace('__style__', self._divStyle())
+               .replace("__header__",  """
+                    <div class="card-header">
+                        ____header__
+                    </div>
+                """ if self.header is not None else ""
+            ))
 
     def sortsAs(self):
-        return self.inner.sortsAs()
+        return self.contents.sortsAs()
 
 
 class CardTitle(Cell):
@@ -1387,6 +1428,9 @@ class ContextualDisplay(Cell):
                 if context.matchesCell(self):
                     return dispFun(self.obj)
 
+        if hasattr(self.obj, "cellDisplay"):
+            return self.obj.cellDisplay()
+
         return Traceback(f"Invalid object of type {type(self.obj)}")
 
     def recalculate(self):
@@ -1704,7 +1748,7 @@ class SingleLineTextBox(Cell):
                .replace("__identity__", self.identity)
                .replace("__contents__", quoteForJs(self.slot.get(), '"'))
                .replace("__pat__", "" if not self.pattern else quoteForJs(self.pattern, '"'))
-               .replace("__sytle__", self._divStyle())
+               .replace("__style__", self._divStyle())
         )
 
     def onMessage(self, msgFrame):
@@ -2554,7 +2598,9 @@ class Plot(Cell):
             Plotly.plot(
                 plotDiv,
                 [],
-                { margin: {t : 30, l: 30, r: 30, b:30 }
+                {
+                    margin: {t : 30, l: 30, r: 30, b:30 },
+                    xaxis: {rangeslider: {visible: false}}
                 },
                 { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
                     modeBarButtons: [ ['pan2d'], ['zoom2d'], ['zoomIn2d'], ['zoomOut2d'] ] }
@@ -2592,8 +2638,13 @@ class Plot(Cell):
              (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
         )
 
+        self.cells._logger.info("User navigated plot to %s", self.curXYRanges.get())
+
     def setXRange(self, low, high):
-        self.curXYRanges.set(((low,high), self.curXYRanges.get()[1]))
+        curXY = self.curXYRanges.getWithoutRegisteringDependency()
+        self.curXYRanges.set(
+            ((low,high), curXY[1] if curXY else (None, None))
+            )
 
         self.triggerPostscript(f"""
             plotDiv = document.getElementById('plot__identity__');
@@ -2601,15 +2652,15 @@ class Plot(Cell):
 
             if (typeof(newLayout.xaxis.range[0]) === 'string') {{
                 formatDate = function(d) {{
-                    return (d.getYear() + 1900) + "-" + ("00" + (d.getMonth() + 1)).substr(-2) + "-" + ("00" + d.getDate()).substr(-2) + " " + ("00" + d.getHours()).substr(-2) + ":" + ("00" + d.getMinutes()).substr(-2) + ":" + ("00" + d.getSeconds()).substr(-2) + "." + ("000000" + d.getMilliseconds()).substr(-3)
+                    return (d.getYear() + 1900) + "-" + ("00" + (d.getMonth() + 1)).substr(-2) + "-" +
+                            ("00" + d.getDate()).substr(-2) + " " + ("00" + d.getHours()).substr(-2) + ":" +
+                            ("00" + d.getMinutes()).substr(-2) + ":" + ("00" + d.getSeconds()).substr(-2) + "." +
+                            ("000000" + d.getMilliseconds()).substr(-3)
                     }};
 
                 newLayout.xaxis.range[0] = formatDate(new Date({low*1000}));
                 newLayout.xaxis.range[1] = formatDate(new Date({high*1000}));
                 newLayout.xaxis.autorange = false;
-
-                console.log("set layout for __identity__ to " + formatDate(new Date({low*1000})) + " from " + {low*1000})
-
             }} else {{
                 newLayout.xaxis.range[0] = {low};
                 newLayout.xaxis.range[1] = {high};
@@ -2621,7 +2672,8 @@ class Plot(Cell):
             Plotly.react(plotDiv, plotDiv.data, newLayout);
             plotDiv.is_server_defined_move = false;
 
-            console.log("Range is now " + plotDiv.layout.xaxis.range[0])
+            console.log("cells.Plot: range for 'plot__identity__' is now " +
+                plotDiv.layout.xaxis.range[0] + " to " + plotDiv.layout.xaxis.range[1])
 
             """.replace("__identity__", self._identity))
 
