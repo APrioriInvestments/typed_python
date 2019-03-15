@@ -146,3 +146,45 @@ class TestStringCompilation(unittest.TestCase):
         someupper_strings = ["Abc","aBc","abC", "ABC","\u00CA\u00D1\u011A\u1E66\u1EEA","XyZ\U0001D471"]
         for s in someupper_strings:
             self.assertEqual(s.lower(), c_lower(s))
+
+
+    def test_string_find(self):
+
+        @Compiled
+        def c_find(s: str, sub: str, start: int, end: int):
+            return s.find(sub, start, end)
+
+        @Compiled
+        def c_find_3(s: str, sub: str, start: int):
+            return s.find(sub, start)
+
+        @Compiled
+        def c_find_2(s: str, sub: str):
+            return s.find(sub)
+
+        def test_find(teststring):
+            substrings = ["", "x", "xyz", teststring[0:-2] + teststring[-1] ]
+            for start in range(0,len(teststring)):
+                for end in range(start+1,len(teststring)+1):
+                    substrings.append(teststring[start:end])
+            for sub in substrings:
+                for start in range(-len(teststring)-1, len(teststring)+1):
+                    for end in range(-len(teststring)-1, len(teststring)+1):
+                        i = teststring.find(sub, start, end)
+                        c_i = c_find(teststring, sub, start, end)
+                        self.assertEqual(i, c_i)
+            for sub in substrings:
+                for start in range(-len(teststring)-1, len(teststring)+1):
+                    i = teststring.find(sub, start)
+                    c_i = c_find_3(teststring, sub, start)
+                    self.assertEqual(i, c_i)
+            for sub in substrings:
+                i = teststring.find(sub)
+                c_i = c_find_2(teststring, sub)
+                self.assertEqual(i, c_i)
+
+        test_find("abcdef")
+        test_find("\u00CA\u00D1\u011A\u1E66\u1EEA")
+        test_find("\u00DD\U00012EEE\U0001D471\u00AA\U00011234")
+
+
