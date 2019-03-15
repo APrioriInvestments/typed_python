@@ -37,6 +37,11 @@ public:
     //return an increffed lowercase conversion layout of l
     static layout* lower(layout *l);
 
+    //return the lowest index in the string where substring sub is found within l[start, end]
+    static int64_t find(layout* l, layout* sub, int64_t start, int64_t end);
+    static int64_t find_2(layout* l, layout* sub);
+    static int64_t find_3(layout* l, layout* sub, int64_t start);
+
     //return an increffed string containing the one codepoint at 'offset'. this function
     //will correctly map negative indices, but performs no other boundschecking.
     static layout* getitem(layout* lhs, int64_t offset);
