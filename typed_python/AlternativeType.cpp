@@ -176,25 +176,7 @@ Alternative* Alternative::Make(std::string name,
                                const std::vector<std::pair<std::string, NamedTuple*> >& types,
                                const std::map<std::string, Function*>& methods //methods preclude us from being in the memo
                               ) {
-    if (methods.size()) {
-        return new Alternative(name, types, methods);
-    }
-
-    static std::mutex guard;
-
-    std::lock_guard<std::mutex> lock(guard);
-
-    typedef std::pair<std::string, std::vector<std::pair<std::string, NamedTuple*> > > keytype;
-
-    static std::map<keytype, Alternative*> m;
-
-    auto it = m.find(keytype(name, types));
-
-    if (it == m.end()) {
-        it = m.insert(std::make_pair(keytype(name, types), new Alternative(name, types, methods))).first;
-    }
-
-    return it->second;
+    return new Alternative(name, types, methods);
 }
 
 Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) {
