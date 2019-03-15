@@ -13,6 +13,9 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from typed_python import Int64
+from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper
+
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
@@ -140,7 +143,7 @@ class StringWrapper(RefcountedWrapper):
         )
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("lower",):
+        if attr in ("lower", "find"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -159,5 +162,40 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
+            )
+        elif methodname == "find":
+            if len(args) == 1:
+                return context.push(
+                    Int64,
+                    lambda iRef: iRef.expr.store(
+                        runtime_functions.string_find_2.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+            elif len(args) == 2:
+                return context.push(
+                    Int64,
+                    lambda iRef: iRef.expr.store(
+                        runtime_functions.string_find_3.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr),
+                            args[1].nonref_expr
+                        )
+                    )
+                )
+            elif len(args) == 3:
+                return context.push(
+                    Int64,
+                    lambda iRef: iRef.expr.store(
+                        runtime_functions.string_find.call(
+                        instance.nonref_expr.cast(VoidPtr),
+                        args[0].nonref_expr.cast(VoidPtr),
+                        args[1].nonref_expr,
+                        args[2].nonref_expr
+                    )
+                )
+            )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)

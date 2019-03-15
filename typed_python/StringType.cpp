@@ -1,4 +1,6 @@
 #include "AllTypes.hpp"
+#include  <iostream>
+using namespace std;
 
 String::layout* String::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint) {
     if (!lhs) {
@@ -113,6 +115,59 @@ String::layout* String::lower(layout *l) {
     return new_layout;
 }
 
+int64_t String::find_2(layout *l, layout *sub) {
+    return find(l, sub, 0, l->pointcount);
+}
+
+int64_t String::find_3(layout *l, layout *sub, int64_t start) {
+    return find(l, sub, start, l->pointcount);
+}
+
+int64_t String::find(layout *l, layout *sub, int64_t start, int64_t end) {
+
+    auto getpoint = [] (layout *a, int64_t i) -> int32_t {
+        if (a->bytes_per_codepoint == 1)
+            return ((uint8_t *)a->data)[i];
+        else if (a->bytes_per_codepoint == 2)
+            return ((uint16_t *)a->data)[i];
+        else if (a->bytes_per_codepoint == 4)
+            return ((uint32_t *)a->data)[i];
+    };
+
+    if (!l || !l->pointcount)
+        return -1;
+    if (start < 0) {
+        start += l->pointcount;
+        if (start < 0) start = 0;
+    }
+    if (end < 0) {
+        end += l->pointcount;
+        if (end < 0) end = 0;
+    }
+    if (end < start)
+        return -1;
+    if (!sub || !sub->pointcount)
+        return start >= 0 ? start : 0;
+
+    end -= (sub->pointcount - 1);
+    if (start < 0 || end < 0 || start >= end || start > l->pointcount - sub->pointcount)
+        return -1;
+
+    for (int64_t i = start; i < end; i++) {
+        bool match = true;
+        for (int64_t j = 0; j < sub->pointcount; j++) {
+            if (getpoint(l, i+j) != getpoint(sub, j)) {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+            return i;
+    }
+
+    return -1;
+}
+
 String::layout* String::getitem(layout* lhs, int64_t offset) {
     if (!lhs) {
         return lhs;
@@ -137,13 +192,13 @@ String::layout* String::getitem(layout* lhs, int64_t offset) {
 
     //we could figure out if we can represent this with a smaller encoding.
     if (new_layout->bytes_per_codepoint == 1) {
-        ((int8_t*)new_layout->data)[0] = ((int8_t*)lhs->data)[offset];
+        ((uint8_t*)new_layout->data)[0] = ((uint8_t*)lhs->data)[offset];
     }
     if (new_layout->bytes_per_codepoint == 2) {
-        ((int16_t*)new_layout->data)[0] = ((int16_t*)lhs->data)[offset];
+        ((uint16_t*)new_layout->data)[0] = ((uint16_t*)lhs->data)[offset];
     }
     if (new_layout->bytes_per_codepoint == 4) {
-        ((int32_t*)new_layout->data)[0] = ((int32_t*)lhs->data)[offset];
+        ((uint32_t*)new_layout->data)[0] = ((uint32_t*)lhs->data)[offset];
     }
 
     return new_layout;
