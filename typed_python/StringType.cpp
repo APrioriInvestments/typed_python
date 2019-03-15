@@ -116,11 +116,11 @@ String::layout* String::lower(layout *l) {
 }
 
 int64_t String::find_2(layout *l, layout *sub) {
-    return find(l, sub, 0, l->pointcount);
+    return find(l, sub, 0, l ? l->pointcount : 0);
 }
 
 int64_t String::find_3(layout *l, layout *sub, int64_t start) {
-    return find(l, sub, start, l->pointcount);
+    return find(l, sub, start, l ? l->pointcount : 0);
 }
 
 int64_t String::find(layout *l, layout *sub, int64_t start, int64_t end) {
@@ -134,8 +134,11 @@ int64_t String::find(layout *l, layout *sub, int64_t start, int64_t end) {
             return ((uint32_t *)a->data)[i];
     };
 
-    if (!l || !l->pointcount)
+    if (!l || !l->pointcount) {
+        if (!sub || !sub->pointcount)
+            return start > 0 ? -1 : 0;
         return -1;
+    }
     if (start < 0) {
         start += l->pointcount;
         if (start < 0) start = 0;
@@ -144,13 +147,15 @@ int64_t String::find(layout *l, layout *sub, int64_t start, int64_t end) {
         end += l->pointcount;
         if (end < 0) end = 0;
     }
-    if (end < start)
+    if (end < start || start > l->pointcount)
         return -1;
     if (!sub || !sub->pointcount)
         return start >= 0 ? start : 0;
 
+    if (end > l->pointcount)
+        end = l->pointcount;
     end -= (sub->pointcount - 1);
-    if (start < 0 || end < 0 || start >= end || start > l->pointcount - sub->pointcount)
+    if (start < 0 || end < 0 || start >= end || sub->pointcount > l->pointcount || start > l->pointcount - sub->pointcount)
         return -1;
 
     for (int64_t i = start; i < end; i++) {

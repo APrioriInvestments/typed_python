@@ -162,7 +162,6 @@ class StringWrapper(RefcountedWrapper):
                         ).cast(self.layoutType)
                     )
                 )
-            )
         elif methodname == "find":
             if len(args) == 1:
                 return context.push(
@@ -194,8 +193,8 @@ class StringWrapper(RefcountedWrapper):
                         args[0].nonref_expr.cast(VoidPtr),
                         args[1].nonref_expr,
                         args[2].nonref_expr
+                        )
                     )
                 )
-            )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
