@@ -150,15 +150,14 @@ class StringWrapper(RefcountedWrapper):
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
         if methodname == "lower":
-            if len(args) != 0:
-                    return
-            return context.push(
-                str,
-                lambda strRef: strRef.expr.store(
-                    runtime_functions.string_lower.call(
-                        instance.nonref_expr.cast(VoidPtr)
-                    ).cast(self.layoutType)
+            if len(args) == 0:
+                return context.push(
+                    str,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.string_lower.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        ).cast(self.layoutType)
+                    )
                 )
-            )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
