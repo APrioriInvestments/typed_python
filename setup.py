@@ -48,6 +48,8 @@ ext_modules = [Extension(
     ]
 )]
 
+INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
+
 setuptools.setup(
     name='nativepython',
     version='0.0.1',
@@ -62,27 +64,7 @@ setuptools.setup(
         'numpy',
         'flask'
     ],
-    install_requires=[
-        'boto3',
-        'bs4',
-        'flask',
-        'flask_cors',
-        'flask-login',
-        'flask-sockets',
-        'flask-wtf',
-        'gevent',
-        'ldap3',
-        'llvmlite',
-        'lz4',
-        'nose',
-        'numpy',
-        'psutil',
-        'pytz',
-        'pyyaml',
-        'redis',
-        'requests',
-        'websockets',
-    ],
+    install_requires=INSTALL_REQUIRES,
     classifiers=[
         "Programming Language :: Python :: 3"
     ],
