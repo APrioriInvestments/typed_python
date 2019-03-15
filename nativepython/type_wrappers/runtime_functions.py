@@ -137,6 +137,24 @@ string_lower = externalCallTarget(
     Void.pointer()
 )
 
+string_find = externalCallTarget(
+    "nativepython_runtime_string_find",
+    Int64,
+    Void.pointer(), Void.pointer(), Int64, Int64
+)
+
+string_find_2 = externalCallTarget(
+    "nativepython_runtime_string_find_2",
+    Int64,
+    Void.pointer(), Void.pointer()
+)
+
+string_find_3 = externalCallTarget(
+    "nativepython_runtime_string_find_3",
+    Int64,
+    Void.pointer(), Void.pointer(), Int64
+)
+
 bytes_concat = externalCallTarget(
     "nativepython_runtime_bytes_concat",
     Void.pointer(),

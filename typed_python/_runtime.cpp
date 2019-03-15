@@ -26,6 +26,18 @@ extern "C" {
         return String::lower(l);
     }
 
+    int64_t nativepython_runtime_string_find(String::layout* l, String::layout* sub, int64_t start, int64_t end) {
+        return String::find(l, sub, start, end);
+    }
+
+    int64_t nativepython_runtime_string_find_2(String::layout* l, String::layout* sub) {
+        return String::find_2(l, sub);
+    }
+
+    int64_t nativepython_runtime_string_find_3(String::layout* l, String::layout* sub, int64_t start) {
+        return String::find_3(l, sub, start);
+    }
+
     String::layout* nativepython_runtime_string_getitem_int64(String::layout* lhs, int64_t index) {
         return String::getitem(lhs, index);
     }
