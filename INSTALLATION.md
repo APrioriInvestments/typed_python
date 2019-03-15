@@ -1,6 +1,22 @@
-# Installation #
+## Development ##
+There are several methods for building and setting up a development environment.
+  
+### Manual Method ###
+1. Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it
+2. Install requirements via pip. For the moment there are two options:
+   * Install with plain pip using the `requirements`
+   * Install using Pipenv (which reads from the Pipfile)
+3. Build nativepython libraries using `python setup.py build`
+4. Append the root of this repository to your `PYTHONPATH`
+  
+### Pipenv Method ###
+1. (Optional) Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it. If you choose to use Pipenv alone, it will create an appropriate virtualenv for you.
+2. Run `pipenv install`
+3. Append the root directory of this repository to your `PYTHONPATH`
 
-## OSX ##
+## Installation ##
+
+### OSX ###
 
 #### Prerequisites ####
 * Python 3.6 (recommended installed with homebrew)
@@ -12,10 +28,10 @@
 
 
 
-## Linux ##
+### Linux ###
 (These instructions are only for Ubuntu for the moment)
 
-### Prerequisites ###
+#### Prerequisites ####
 Before building the modules in this repository, you will need to make sure that you have the following:
 * Python 3.6 with header files (`python3.6-dev python3.6-dbg`)
   Note that for development you will also install the debug interpreter.
@@ -29,3 +45,4 @@ Before building the modules in this repository, you will need to make sure that 
   ```
 * Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv))
 * Redis Server (`redis-server`)
+
