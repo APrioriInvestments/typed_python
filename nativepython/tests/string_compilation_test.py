@@ -27,9 +27,9 @@ someStrings = [
     "a",
     "as\x00df",
     "\u00F1",
-    "\u0F01",
-    "\u0F01",
-    "\u1002"
+    "\u007F\u0080\u0081\u07FF",
+    "\u0800\u0801\uFFFF",
+    "\U00010000\U00010001\U0010FFFF"
 ]
 
 for s1 in list(someStrings):
@@ -137,12 +137,37 @@ class TestStringCompilation(unittest.TestCase):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
 
-    def test_string_lower(self):
+    def test_string__lower(self):
 
         @Compiled
         def c_lower(s: str):
             return s.lower()
 
-        someupper_strings = ["Abc","aBc","abC", "ABC","\u00CA\u00D1\u011A\u1E66\u1EEA","XyZ\U0001D471"]
+        @Compiled
+        def c_lower2(s: str, t: str):
+            return s.lower(t)
+
+        def callOrExceptType(f, *args):
+            try:
+                return ("Normal", f(*args))
+            except Exception as e:
+                return ("Exception", str(type(e)))
+
+        someupper_strings = [
+            "abc"
+            "Abc",
+            "aBc",
+            "abC",
+            "ABC",
+            "aBcDeFgHiJkLm" *10000,
+            "\u00CA\u00D1\u011A\u1E66\u1EEA",
+            "\u00CA\u00D1\u011A\u1E66\u1EEA" *10000,
+            "XyZ\U0001D471",
+            "XyZ\U0001D471" *10000,
+            "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF"
+        ]
         for s in someupper_strings:
-            self.assertEqual(s.lower(), c_lower(s))
+            self.assertEqual(c_lower(s), s.lower())
+
+        for s in someupper_strings:
+            self.assertEqual(callOrExceptType(c_lower2, s, s), callOrExceptType(s.lower, s))
