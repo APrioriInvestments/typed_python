@@ -318,3 +318,29 @@ int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObj
     return -1;
 }
 
+
+PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
+    auto it = type()->getAlternative()->getMethods().find("__call__");
+
+    if (it == type()->getAlternative()->getMethods().end()) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "'%s' object is not callable because '__call__' was not defined",
+            type()->name().c_str()
+            );
+        throw PythonExceptionSet();
+    } else {
+        Function* f = it->second;
+
+        for (const auto& overload: f->getOverloads()) {
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(
+                overload, (PyObject*)this, args, kwargs
+                );
+
+            if (res.first) {
+                return res.second;
+            }
+        }
+    }
+}
+

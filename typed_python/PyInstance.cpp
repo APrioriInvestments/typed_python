@@ -779,7 +779,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
-            .tp_iternext = PyInstance::tp_iternext,// iternextfunc
+            .tp_iternext = PyInstance::tp_iternext,     // iternextfunc
             .tp_methods = typeMethods(inType),          // struct PyMethodDef*
             .tp_members = 0,                            // struct PyMemberDef*
             .tp_getset = 0,                             // struct PyGetSetDef*
@@ -790,7 +790,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_dictoffset = 0,                         // Py_ssize_t
             .tp_init = 0,                               // initproc
             .tp_alloc = 0,                              // allocfunc
-            .tp_new = PyInstance::tp_new,  // newfunc
+            .tp_new = PyInstance::tp_new,                // newfunc
             .tp_free = 0,                               // freefunc /* Low-level free-memory routine */
             .tp_is_gc = 0,                              // inquiry  /* For PyObject_IS_GC */
             .tp_bases = 0,                              // PyObject*
@@ -798,7 +798,7 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_cache = 0,                              // PyObject*
             .tp_subclasses = 0,                         // PyObject*
             .tp_weaklist = 0,                           // PyObject*
-            .tp_del = 0,                               // destructor
+            .tp_del = 0,                                // destructor
             .tp_version_tag = 0,                        // unsigned int
             .tp_finalize = 0,                           // destructor
             }, inType
@@ -867,7 +867,7 @@ PyObject* PyInstance::tp_call(PyObject* o, PyObject* args, PyObject* kwargs) {
 
 PyObject* PyInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     PyErr_Format(PyExc_TypeError, "'%s' object is not callable", type()->name().c_str());
-    return 0;
+    return nullptr;
 }
 
 PyObject* PyInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
@@ -878,7 +878,7 @@ PyObject* PyInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attr
 PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
     if (!PyUnicode_Check(attrName)) {
         PyErr_SetString(PyExc_AttributeError, "attribute is not a string");
-        return NULL;
+        return nullptr;
     }
 
     char *attr_name = PyUnicode_AsUTF8(attrName);

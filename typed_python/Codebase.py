@@ -20,6 +20,7 @@ import threading
 import logging
 
 from typed_python.SerializationContext import SerializationContext
+from typed_python import sha_hash
 
 _lock = threading.RLock()
 _root_level_module_codebase_cache = {}
@@ -40,6 +41,9 @@ class Codebase:
         self.serializationContext = Codebase.coreSerializationContext().union(
             SerializationContext.FromModules(modules.values())
         )
+
+    def hash(self):
+        return sha_hash(self.filesToContents).hexdigest
 
     def getIsolatedSerializationContext(self):
         return SerializationContext.FromModules(self.modules.values())
@@ -83,14 +87,14 @@ class Codebase:
         return Codebase._FromModule(module, **kwargs)
 
     @staticmethod
-    def _FromModule(module, **kwargs):
+    def _FromModule(module, ignoreCache=False, **kwargs):
         if '.' in module.__name__:
             prefix = module.__name__.rsplit(".", 1)[0]
         else:
             prefix = None
 
         with _lock:
-            if module in _root_level_module_codebase_cache:
+            if module in _root_level_module_codebase_cache and not ignoreCache:
                 return _root_level_module_codebase_cache[module]
 
             assert module.__file__.endswith("__init__.py") or module.__file__.endswith("__init__.pyc")

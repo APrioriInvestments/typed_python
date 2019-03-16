@@ -140,6 +140,7 @@ class TestStringCompilation(unittest.TestCase):
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
+
     def test_string_lower(self):
 
         @Compiled
@@ -156,11 +157,12 @@ class TestStringCompilation(unittest.TestCase):
             "aBc",
             "abC",
             "ABC",
-            "aBcDeFgHiJkLm" *10000,
+
+            "aBcDeFgHiJkLm" * 10000,
             "\u00CA\u00D1\u011A\u1E66\u1EEA",
-            "\u00CA\u00D1\u011A\u1E66\u1EEA" *10000,
+            "\u00CA\u00D1\u011A\u1E66\u1EEA" * 10000,
             "XyZ\U0001D471",
-            "XyZ\U0001D471" *10000,
+            "XyZ\U0001D471" * 10000,
             "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF"
         ]
         for s in someupper_strings:
@@ -168,7 +170,6 @@ class TestStringCompilation(unittest.TestCase):
 
         for s in someupper_strings:
             self.assertEqual(callOrExceptType(c_lower2, s, s), callOrExceptType(s.lower, s))
-
 
     def test_string__find(self):
 

@@ -233,8 +233,11 @@ public:
     }
 
     void assertForwardsResolved() const {
-        if (m_references_unresolved_forwards || m_failed_resolution) {
-            throw std::logic_error("Type has unresolved forwards.");
+        if (m_references_unresolved_forwards) {
+            throw std::logic_error("Type " + m_name + " has unresolved forwards.");
+        }
+        if (m_failed_resolution) {
+            throw std::logic_error("Type " + m_name + " failed to resolve.");
         }
     }
 

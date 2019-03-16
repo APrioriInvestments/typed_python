@@ -931,7 +931,7 @@ class TypesSerializationTest(unittest.TestCase):
                 unpickled = ping_pong(obj, sc)
                 self.assertIs(obj, unpickled)
 
-    def test_serialize_lambdas(self):
+    def test_serialize_lambdas_more(self):
         sc = SerializationContext({})
 
         with tempfile.TemporaryDirectory() as tf:
@@ -1057,7 +1057,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertEqual(d, d2)
 
-    def test_serialize_recursive_dict(self):
+    def test_serialize_recursive_dict_more(self):
         D = Dict(str, OneOf(str, lambda: D))
         x = SerializationContext({"D": D})
 

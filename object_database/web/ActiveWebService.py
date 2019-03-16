@@ -14,11 +14,9 @@
 import logging
 import time
 import json
-import time
 import argparse
 import traceback
 import os
-import json
 import threading
 import gevent.socket
 import gevent.queue
@@ -32,7 +30,7 @@ from object_database.web.ActiveWebServiceSchema import active_webservice_schema
 from object_database.web.cells import (
     Subscribed, Sequence, Traceback, Span, Button, Octicon, Main, Cells,
     Card, Text, Padding, Tabs, Table, Clickable, Dropdown, Popover,
-    LargePendingDownloadDisplay, MAX_FPS, HeaderBar
+    LargePendingDownloadDisplay, MAX_FPS, HeaderBar, SessionState
 )
 
 from typed_python import OneOf, TupleOf, ConstDict
@@ -162,6 +160,9 @@ class ActiveWebService(ServiceBase):
             )
 
     def initialize(self):
+        # dict from session id (cookie really) to a a list of [cells.SessionState]
+        self.sessionStates = {}
+
         self.db.subscribeToType(Configuration)
         self.db.subscribeToType(LoginPlugin)
         self.db.subscribeToSchema(service_schema)
@@ -312,22 +313,30 @@ class ActiveWebService(ServiceBase):
         )
         return Sequence([buttons, tabs])
 
-    def pathToDisplay(self, path, queryArgs):
+    def displayForPathAndQueryArgs(self, path, queryArgs):
+        display, toggles = self.displayAndHeadersForPathAndQueryArgs(path, queryArgs)
+        return self.addMainBar(display, toggles)
+
+    def displayAndHeadersForPathAndQueryArgs(self, path, queryArgs):
         if len(path) and path[0] == 'services':
             if len(path) == 1:
-                return self.mainDisplay()
+                return self.mainDisplay(), []
 
             serviceObj = service_schema.Service.lookupAny(name=path[1])
 
             if serviceObj is None:
-                return Traceback("Unknown service %s" % path[1])
+                return Traceback("Unknown service %s" % path[1]), []
 
             serviceType = serviceObj.instantiateServiceType()
+
+            serviceToggles = [x.withSerializationContext(serviceObj.getSerializationContext()) for x in
+                                        serviceType.serviceHeaderToggles(serviceObj)]
 
             if len(path) == 2:
                 return (
                     Subscribed(lambda: serviceType.serviceDisplay(serviceObj, queryArgs=queryArgs))
-                    .withSerializationContext(serviceObj.getSerializationContext())
+                    .withSerializationContext(serviceObj.getSerializationContext()),
+                    serviceToggles
                 )
 
             typename = path[2]
@@ -340,24 +349,26 @@ class ActiveWebService(ServiceBase):
                     break
 
             if typeObj is None:
-                return Traceback("Can't find fully-qualified type %s" % typename)
+                return Traceback("Can't find fully-qualified type %s" % typename), []
 
             if len(path) == 3:
                 return (
                     serviceType.serviceDisplay(serviceObj, objType=typename, queryArgs=queryArgs)
-                    .withSerializationContext(serviceObj.getSerializationContext())
+                    .withSerializationContext(serviceObj.getSerializationContext()),
+                    serviceToggles
                 )
 
             instance = typeObj.fromIdentity(path[3])
 
             return (
                 serviceType.serviceDisplay(serviceObj, instance=instance, queryArgs=queryArgs)
-                .withSerializationContext(serviceObj.getSerializationContext())
+                .withSerializationContext(serviceObj.getSerializationContext()),
+                serviceToggles
             )
 
-        return Traceback("Invalid url path: %s" % path)
+        return Traceback("Invalid url path: %s" % path), []
 
-    def addMainBar(self, display):
+    def addMainBar(self, display, toggles):
         current_username = current_user.username
 
         return (
@@ -372,7 +383,7 @@ class ActiveWebService(ServiceBase):
                         ),
                     )
                 ],
-                (),
+                toggles,
                 [
                     LargePendingDownloadDisplay(),
                     Octicon('person') + Span(current_username),
@@ -387,6 +398,25 @@ class ActiveWebService(ServiceBase):
         path = str(path).split("/")
         queryArgs = dict(request.args.items())
 
+        sessionId = request.cookies.get("session")
+
+        #wait for the other socket to close if we were bounced
+        sleep(.25)
+
+        if sessionId is None:
+            sessionState = SessionState()
+        else:
+            # we keep sessions in a list. This is not great, but if you
+            # bounce your browser, you'll get the session state you just dropped.
+            # if you have several windows open, close a few, and then reopen
+            # you'll get a random one
+            sessionStateList = self.sessionStates.setdefault(sessionId, [])
+            if not sessionStateList:
+                self._logger.info("Creating a new SessionState for %s", sessionId)
+                sessionState = SessionState()
+            else:
+                sessionState = sessionStateList.pop()
+
         self._logger.info("entering websocket with path %s", path)
         reader = None
         isFirstMessage = True
@@ -395,8 +425,14 @@ class ActiveWebService(ServiceBase):
             self._logger.info("Starting main websocket handler with %s", ws)
 
             cells = Cells(self.db)
+
+            # reset the session state. There's only one per cells (which is why
+            # we keep a list of sessions.)
+            sessionState._reset(cells)
+
             cells.root.setRootSerializationContext(self.db.serializationContext)
-            cells.root.setChild(self.addMainBar(Subscribed(lambda: self.pathToDisplay(path, queryArgs))))
+            cells.root.setChild(Subscribed(lambda: self.displayForPathAndQueryArgs(path, queryArgs)))
+            cells.root.setContext(SessionState, sessionState)
 
             cellsTaskThread = threading.Thread(target=cells.processTasks)
             cellsTaskThread.daemon = True
@@ -534,6 +570,14 @@ class ActiveWebService(ServiceBase):
         except Exception:
             self._logger.error("Websocket handler error: %s", traceback.format_exc())
         finally:
+            self.sessionStates[sessionId].append(sessionState)
+
+            self._logger.info(
+                "Returning session state to pool for %s. Have %s",
+                sessionId,
+                len(self.sessionStates[sessionId])
+            )
+
             cells.markStopProcessingTasks()
 
             if reader:

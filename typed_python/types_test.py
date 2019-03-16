@@ -240,6 +240,27 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.X, A2.Y))
         self.assertFalse(ibc(A1.Y, A2.X))
 
+    def test_callable_alternatives(self):
+        def myCall(self, *args, **kwargs):
+            return 42
+
+        alt = Alternative("alts", One={}, Two={}, __call__=myCall)
+
+        one = alt.One()
+        self.assertEqual(one(), 42)
+
+        two = alt.Two()
+        self.assertEqual(two(), 42)
+
+        alt = Alternative("alts", One={}, Two={}, myCall=myCall)
+        with self.assertRaises(TypeError):
+            one = alt.One()
+            one()
+
+        with self.assertRaises(TypeError):
+            two = alt.Two()
+            two()
+
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(NoneType), 0)
         self.assertEqual(_types.bytecount(Int8), 1)
@@ -1503,7 +1524,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertNotEqual(S(x=1, y=2), S(x=1, y=3))
         self.assertFalse(S(x=1, y=2) == S(x=1, y=3))
 
-    def test_const_dict_comparison(self):
+    def test_const_dict_comparison_more(self):
         N = NamedTuple(x=OneOf(None, int), y=OneOf(None, int))
         D = ConstDict(str, N)
 

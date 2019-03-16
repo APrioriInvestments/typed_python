@@ -23,6 +23,39 @@ MAX_FPS = 10
 _cur_cell = threading.local()
 
 
+def registerDisplay(type, **context):
+    """Register a display function for any instances of a given type. For instance
+
+    @registerDisplay(MyType, size="small")
+    def display(value):
+        return cells.Text("For small values")
+
+    @registerDisplay(MyType)
+    def display(value):
+        return cells.Text("For any other kinds of values")
+
+    Arguments:
+        type - the type object to display. Instances of _exactly_ this type
+            will match this if we don't have a display for the object already.
+        context - a dict from str->value. we'll only use this display if this context
+            is exactly matched in the parent cell. We'll check contexts in the
+            order in which they were registered.
+    """
+    def registrar(displayFunc):
+        ContextualDisplay._typeToDisplay.setdefault(type, []).append(
+            (ContextualDisplay.ContextMatcher(context), displayFunc)
+        )
+
+        return displayFunc
+
+    return registrar
+
+
+def context(contextKey):
+    """During cell evaluation, lookup context from our parent cell by name."""
+    return _cur_cell.cell.getContext(contextKey)
+
+
 def quoteForJs(string, quoteType):
     if quoteType == "'":
         return string.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
@@ -142,7 +175,6 @@ class Cells:
 
         self._addCell(self._root, parent=None)
 
-
     def createTask(self, owningCell, taskFun):
         """Create a long-running task (such as a task that acquires data) that can push content into slots.
 
@@ -185,7 +217,6 @@ class Cells:
         except queue.Empty:
             return False
 
-
     @property
     def root(self):
         return self._root
@@ -216,7 +247,6 @@ class Cells:
     def markSlotDirtyForNextRecompute(self, slot):
         self._dirtySlots.add(slot)
         self._gEventHasTransactions.trigger()
-
 
     def _onTransaction(self, *trans):
         self._transactionQueue.put(trans)
@@ -356,6 +386,7 @@ class Cells:
 
                 try:
                     _cur_cell.cell = n
+                    _cur_cell.isProcessingMessage = False
                     while True:
                         try:
                             n.prepare()
@@ -371,14 +402,18 @@ class Cells:
                                 childname,
                                 type(child_cell)
                             ))
+                        if child_cell.cells:
+                            child_cell.prepareForReuse()
 
                 except Exception:
                     self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
                     self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(traceback.format_exc())}
                     n.contents = "____contents__"
+                    return
                 finally:
                     _cur_cell.cell = None
+                    _cur_cell.isProcessingMessage = False
 
                 newChildren = set(n.children.values())
 
@@ -454,7 +489,7 @@ class Slot:
         with self._lock:
             # we can only create a dependency if we're being read
             # as part of a cell's state recalculation.
-            if _cur_cell.cell:
+            if _cur_cell.cell and not getattr(_cur_cell, 'isProcessingMessage', False):
                 self._subscribedCells.add(_cur_cell.cell)
 
             return self._value
@@ -487,6 +522,60 @@ class Slot:
             c.markDirty()
         self._subscribedCells = set()
 
+
+class SessionState(object):
+    """Represents a piece of session-specific interface state. You may access state
+    using attributes, which will register a dependency
+    """
+    def __init__(self):
+        self._slots = {}
+
+    def _reset(self, cells):
+        self._slots = {k:Slot(v.getWithoutRegisteringDependency()) for k,v in self._slots.items()}
+        for s in self._slots.values():
+            s._cells = cells
+            if isinstance(s._value, Cell):
+                try:
+                    s._value.prepareForReuse()
+                except Exception:
+                    logging.warn("Reusing a Cell slot could create a problem: %s", s._value)
+
+    def _slotFor(self, name):
+        if name not in self._slots:
+            self._slots[name] = Slot()
+        return self._slots[name]
+
+    def __getattr__(self, attr):
+        if attr[:1] == "_":
+            raise AttributeError(attr)
+
+        return self._slotFor(attr).get()
+
+    def __setattr__(self, attr, val):
+        if attr[:1] == "_":
+            self.__dict__[attr] = val
+            return
+
+        return self._slotFor(attr).set(val)
+
+    def ensure(self, attr, value):
+        if attr not in self._slots:
+            self._slots[attr] = Slot(value)
+
+    def set(self, attr, value):
+        self.__setattr__(attr, value)
+
+    def toggle(self, attr):
+        self.set(attr, not self.__getattr__(attr))
+
+    def get(self, attr):
+        return self.__getattr__(attr)
+
+
+def sessionState():
+    return context(SessionState)
+
+
 class Cell:
     def __init__(self):
         self.cells = None  # will get set when its added to a 'Cells' object
@@ -500,13 +589,25 @@ class Cell:
         self.garbageCollected = False
         self.subscriptions = set()
         self._nowrap = False
+        self._background_color = None
         self._width = None
         self._overflow = None
         self._color = None
         self._height = None
         self.serializationContext = None
+        self.context = {}
 
         self._logger = logging.getLogger(__name__)
+
+    def evaluateWithDependencies(self, fun):
+        """Evaluate function within a view and add dependencies for whatever
+        we read."""
+        with self.view() as v:
+            result = fun()
+
+            self._resetSubscriptionsToViewReads(v)
+
+            return result
 
     def triggerPostscript(self, javascript):
         """Queue a postscript (piece of javascript to execute) to be run at the end of message processing."""
@@ -565,6 +666,7 @@ class Cell:
         while True:
             try:
                 _cur_cell.cell = self
+                _cur_cell.isProcessingMessage = True
 
                 with self.transaction():
                     self.onMessage(*args)
@@ -579,6 +681,7 @@ class Cell:
                 return
             finally:
                 _cur_cell.cell = None
+                _cur_cell.isProcessingMessage = False
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -641,6 +744,9 @@ class Cell:
         if self._color is not None:
             res.append("color:%s" % self._color)
 
+        if self._background_color is not None:
+            res.append("background-color:%s" % self._background_color)
+
         if self._overflow is not None:
             res.append("overflow:%s" % self._overflow)
 
@@ -667,6 +773,10 @@ class Cell:
 
     def color(self, color):
         self._color = color
+        return self
+
+    def background_color(self, color):
+        self._background_color = color
         return self
 
     def isActive(self):
@@ -710,10 +820,28 @@ class Cell:
             return Span("")
         if isinstance(x, Cell):
             return x
-        assert False, "don't know what to do with %s" % x
+
+        return ContextualDisplay(x)
 
     def __add__(self, other):
         return Sequence([self, Cell.makeCell(other)])
+
+    def withContext(self, **kwargs):
+        """Modify our context, and then return self."""
+        self.context.update(kwargs)
+        return self
+
+    def setContext(self, key, val):
+        self.context[key] = val
+
+    def getContext(self, contextKey):
+        if contextKey in self.context:
+            return self.context[contextKey]
+
+        if self.parent:
+            return self.parent.getContext(contextKey)
+
+        return None
 
 
 class Card(Cell):
@@ -721,18 +849,20 @@ class Card(Cell):
         super().__init__()
 
         self.children = {"____contents__": Cell.makeCell(inner)}
+        self.padding = padding
 
+    def recalculate(self):
         other = ""
-        if padding:
-            other += " p-" + str(padding)
+        if self.padding:
+            other += " p-" + str(self.padding)
 
         self.contents = """
-        <div class='card'>
-          <div class="card-body __other__">
-            ____contents__
-          </div>
-        </div>
-        """.replace('__other__', other)
+            <div class="card" __style__>
+              <div class="card-body __other__">
+                ____contents__
+              </div>
+            </div>
+            """.replace('__other__', other).replace('__style__', self._divStyle())
 
     def sortsAs(self):
         return self.inner.sortsAs()
@@ -751,6 +881,45 @@ class CardTitle(Cell):
 
     def sortsAs(self):
         return self.inner.sortsAs()
+
+
+class Modal(Cell):
+    def __init__(self, title, message, **buttonActions):
+        """Initialize a modal dialog.
+
+        title - string for the title
+        message - string for the message body
+        buttonActions - a dict from string to a button action function.
+        """
+        super().__init__()
+        self.title = title
+        self.message = message
+        self.buttons = {f"____button_{k}__": Button(k, v) for k,v in buttonActions.items()}
+
+    def recalculate(self):
+        self.contents = (
+            f"""
+            <div class="modal fade show" tabindex="-1" role="dialog" style="display: block; padding-right: 15px;">
+              <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                  <div class="modal-header">
+                    <h5 class="modal-title">____title__</h5>
+                  </div>
+                  <div class="modal-body">
+                    ____message__
+                  </div>
+                  <div class="modal-footer">
+                    __buttons__
+                  </div>
+                </div>
+              </div>
+            </div>
+            """
+            .replace("__buttons__", " ".join(self.buttons))
+        )
+        self.children = dict(self.buttons)
+        self.children["____title__"] = Cell.makeCell(self.title)
+        self.children["____message__"] = Cell.makeCell(self.message)
 
 
 class Octicon(Cell):
@@ -781,6 +950,49 @@ class Badge(Cell):
             "__style__", self.style
         )
         self.children = {'____child__': self.inner}
+
+
+class CollapsiblePanel(Cell):
+    def __init__(self, panel, content, isExpanded):
+        super().__init__()
+        self.panel = panel
+        self.content = content
+        self.isExpanded = isExpanded
+
+    def sortsAs(self):
+        return self.content.sortsAs()
+
+    def recalculate(self):
+        expanded = self.evaluateWithDependencies(self.isExpanded)
+
+        self.contents = """
+            <div class="container-fluid" __style__>
+                <div class="row flex-nowrap no-gutters">
+                    <div class="col-md-auto">
+                        ____panel__
+                    </div>
+                    <div class="col-sm">
+                        ____content__
+                    </div>
+                </div>
+            </div>
+            """ if expanded else """
+            <div __style__>
+                ____content__
+            </div>
+            """
+
+        self.contents = (
+            self.contents.replace("__identity__", self.identity)
+                         .replace("__style__", self._divStyle())
+        )
+
+        self.children = {
+            '____content__': self.content
+        }
+
+        if expanded:
+            self.children['____panel__'] = self.panel
 
 
 class Text(Cell):
@@ -824,7 +1036,6 @@ class Sequence(Cell):
 
         self.elements = elements
         self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
-        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" % i for i in range(len(elements))) + "</div>"
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -832,6 +1043,9 @@ class Sequence(Cell):
             return Sequence(self.elements + other.elements)
         else:
             return Sequence(self.elements + [other])
+
+    def recalculate(self):
+        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" % i for i in range(len(self.elements))) + "</div>"
 
     def sortsAs(self):
         if self.elements:
@@ -902,7 +1116,7 @@ class HeaderBar(Cell):
                     </div>
                 </div>
                 <div class="flex-item" style="flex-grow:1">
-                    <div class="flex-container" style="display:flex;justify-content:flex-center;align-items:baseline">
+                    <div class="flex-container" style="display:flex;justify-content:center;align-items:baseline">
                         %s
                     </div>
                 </div>
@@ -1138,6 +1352,47 @@ class Code(Cell):
         return self.codeContents
 
 
+class ContextualDisplay(Cell):
+    """Display an arbitrary python object by checking registered display handlers"""
+
+    # map from type -> [(ContextMatcher, displayFun)]
+    _typeToDisplay = {}
+
+    class ContextMatcher:
+        """Checks if a cell matches a context dict."""
+
+        def __init__(self, contextDict):
+            """Initialize a context matcher."""
+            self.contextDict = contextDict
+
+        def matchesCell(self, cell):
+            for key, value in self.contextDict.items():
+                ctx = cell.getContext(key)
+                if callable(value):
+                    if not value(ctx):
+                        return False
+                else:
+                    if ctx != value:
+                        return False
+            return True
+
+    def __init__(self, obj):
+        super().__init__()
+        self.obj = obj
+        self.contents = """<div>____child__</div>"""
+
+    def getChild(self):
+        if type(self.obj) in ContextualDisplay._typeToDisplay:
+            for context, dispFun in ContextualDisplay._typeToDisplay[type(self.obj)]:
+                if context.matchesCell(self):
+                    return dispFun(self.obj)
+
+        return Traceback(f"Invalid object of type {type(self.obj)}")
+
+    def recalculate(self):
+        self.children = {"____child__": self.getChild()}
+
+
 class Subscribed(Cell):
     def __init__(self, f):
         super().__init__()
@@ -1175,14 +1430,14 @@ class Subscribed(Cell):
 
 
 class SubscribedSequence(Cell):
-    def __init__(self, itemsFun, rendererFun):
+    def __init__(self, itemsFun, rendererFun, asColumns=False):
         super().__init__()
 
         self.itemsFun = itemsFun
         self.rendererFun = rendererFun
-
         self.existingItems = {}
         self.spine = []
+        self.asColumns = asColumns
 
     def prepareForReuse(self):
         self._clearSubscriptions()
@@ -1193,6 +1448,9 @@ class SubscribedSequence(Cell):
     def sortsAs(self):
         if '____child_0__' in self.children:
             return self.children['____child_0__'].sortsAs()
+
+    def makeCell(self, item):
+        return Subscribed(lambda: Cell.makeCell(self.rendererFun(item)))
 
     def recalculate(self):
         with self.view() as v:
@@ -1212,7 +1470,7 @@ class SubscribedSequence(Cell):
                     new_children["____child_%s__" % ix] = self.existingItems[rowKey]
                 else:
                     try:
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Cell.makeCell(self.rendererFun(rowKey[0]))
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = self.makeCell(rowKey[0])
                     except SubscribeAndRetry:
                         raise
                     except Exception:
@@ -1225,10 +1483,28 @@ class SubscribedSequence(Cell):
             if i not in spineAsSet:
                 del self.existingItems[i]
 
-        self.contents = """<div %s>%s</div>""" % (
-            self._divStyle(),
-            "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
-        )
+        if self.asColumns:
+            self.contents = (
+                """
+                <div class="container-fluid" __style__>
+                <div class="row flex-nowrap">
+                    __contents__
+                </div>
+                </div>
+                """
+                .replace("__style__", self._divStyle())
+                .replace(
+                    "__contents__",
+                    "\n".join(
+                        f"""<div class="col-sm"> ____child_{i}__ </div>"""
+                        for i in range(len(self.spine)))
+                )
+            )
+        else:
+            self.contents = """<div %s>%s</div>""" % (
+                self._divStyle(),
+                "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
+            )
 
 
 class Popover(Cell):
@@ -1700,23 +1976,42 @@ class Clickable(Cell):
 
 
 class Button(Clickable):
-    def __init__(self, *args, small=False, **kwargs):
+    def __init__(self, *args, small=False, active=True, style="primary", **kwargs):
         Clickable.__init__(self, *args, **kwargs)
         self.small = small
+        self.active = active
+        self.style = style
 
     def recalculate(self):
         self.children = {'____contents__': self.content}
         self.contents = (
-            """
+            f"""
             <button
-                class='btn btn-primary __size__'
+                class='btn btn{'-outline' if not self.active else ''}-{self.style} __size__'
                 onclick="__onclick__"
                 >
             ____contents__
             </button>"""
             .replace("__size__", "" if not self.small else "btn-xs")
+            .replace("__size__", "" if not self.small else "btn-xs")
             .replace('__identity__', self.identity)
             .replace("__onclick__", self.calculatedOnClick())
+        )
+
+
+class ButtonGroup(Cell):
+    def __init__(self, buttons):
+        super().__init__()
+        self.buttons = buttons
+
+    def recalculate(self):
+        self.children = {f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
+        self.contents = (
+            """
+            <div class="btn-group" role="group">
+                __buttons__
+            </div>"""
+            .replace("__buttons__", " ".join(f"____{i}__" for i in range(len(self.buttons))))
         )
 
 
@@ -1754,9 +2049,11 @@ def ensureSubscribedType(t, lazy=False):
             )
         )
 
+
 def createTask(task):
     """Create a long-running task from within an executing cell. See Cells.createTask."""
     return _cur_cell.cell.cells.createTask(_cur_cell.cell, task)
+
 
 def ensureSubscribedSchema(t, lazy=False):
     if not current_transaction().db().isSubscribedToSchema(t):
@@ -1768,13 +2065,13 @@ def ensureSubscribedSchema(t, lazy=False):
 
 
 class Expands(Cell):
-    def __init__(self, closed, open, closedIcon=Octicon("diff-added)"), openedIcon=Octicon("diff-removed"), initialState=False):
+    def __init__(self, closed, open, closedIcon=None, openedIcon=None, initialState=False):
         super().__init__()
         self.isExpanded = initialState
         self.closed = closed
         self.open = open
-        self.openedIcon = openedIcon
-        self.closedIcon = closedIcon
+        self.openedIcon = openedIcon or Octicon("diff-removed")
+        self.closedIcon = closedIcon or Octicon("diff-added")
 
     def sortsAs(self):
         if self.isExpanded:
@@ -1800,8 +2097,13 @@ class Expands(Cell):
             '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
+        for c in self.children.values():
+            if c.cells is not None:
+                c.prepareForReuse()
+
     def onMessage(self, msgFrame):
         self.isExpanded = not self.isExpanded
+
         self.markDirty()
 
 
@@ -1809,13 +2111,12 @@ class CodeEditor(Cell):
     """Produce a code editor."""
 
     def __init__(self,
-            keybindings=None,
-            noScroll=False,
-            minLines=None,
-            fontSize=None,
-            autocomplete=True,
-            onTextChange=None
-            ):
+                 keybindings=None,
+                 noScroll=False,
+                 minLines=None,
+                 fontSize=None,
+                 autocomplete=True,
+                 onTextChange=None):
         """Create a code editor
 
         keybindings - map from keycode to a lambda function that will receive
@@ -1830,13 +2131,14 @@ class CodeEditor(Cell):
             and a json selection.
         """
         super().__init__()
-        self._slot = Slot((0, "")) #contains code, and the 'current' iteration
+        self._slot = Slot((0, ""))  # contains (current_iteration_number: int, text: str)
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
         self.fontSize = fontSize
         self.minLines = minLines
         self.autocomplete = autocomplete
         self.onTextChange = onTextChange
+        self.initialText = ""
 
     def getContents(self):
         return self._slot.get()[1]
@@ -1867,13 +2169,13 @@ class CodeEditor(Cell):
             aceEditors["editor__identity__"] = editor
             editor.last_edit_millis = Date.now()
 
-            console.log("setting up editor")
+            console.log("setting up editor with " )
             editor.setTheme("ace/theme/textmate");
             editor.session.setMode("ace/mode/python");
             editor.setAutoScrollEditorIntoView(true);
             editor.session.setUseSoftTabs(true);
             editor.setValue("__text__");
-        """.replace("__text__", quoteForJs(self._slot.getWithoutRegisteringDependency()[1], '"'))
+        """.replace("__text__", quoteForJs(self.initialText, '"'))
 
         if self.autocomplete:
             self.postscript += """
@@ -1955,7 +2257,7 @@ class CodeEditor(Cell):
         self.postscript = self.postscript.replace("__identity__", self.identity)
 
     def sendCurrentStateToBrowser(self, newSlotState):
-        if self.identity is not None:
+        if self.cells is not None:
             # if self.identity is None, then we have not been installed in the tree yet
             # so sending ourselves a message makes no sense.
             self.triggerPostscript(
@@ -1977,10 +2279,13 @@ class CodeEditor(Cell):
                 editor.setValue(newText, 1)
                 editor.selection.setRange(range)
 
-                """.replace("__identity__", self.identity)
-                   .replace("__text__", quoteForJs(newSlotState[1], '"'))
-                   .replace("__iteration__", str(newSlotState[0]))
-                )
+                """
+                .replace("__identity__", self.identity)
+                .replace("__text__", quoteForJs(newSlotState[1], '"'))
+                .replace("__iteration__", str(newSlotState[0]))
+            )
+        else:
+            self.initialText = newSlotState[1]
 
 
 class Sheet(Cell):
@@ -1988,8 +2293,7 @@ class Sheet(Cell):
 
     def __init__(self, columnNames, rowCount, rowFun,
                  colWidth=200,
-                 onCellDblClick = None
-                  ):
+                 onCellDblClick=None):
         """
         columnNames:
             names to go in column Header
@@ -2020,69 +2324,67 @@ class Sheet(Cell):
         if onCellDblClick is not None:
             def _makeOnCellDblClick(func):
                 def _onMessage(sheet, msgFrame):
-                    return onCellDblClick(sheet = sheet,
-                                          row = msgFrame["row"],
-                                          col = msgFrame["col"])
+                    return onCellDblClick(sheet=sheet,
+                                          row=msgFrame["row"],
+                                          col=msgFrame["col"])
                 return _onMessage
-
 
             self._hookfns["onCellDblClick"] = _makeOnCellDblClick(onCellDblClick)
 
-
     def _addHandsontableOnCellDblClick(self):
-            return """
-            Handsontable.hooks.add(
-                "beforeOnCellMouseDown",
-                function(event,data) {
-                    handsOnObj = handsOnTables["__identity__"];
-                    if(handsOnObj.lastCellClicked.row == data.row &
-                       handsOnObj.lastCellClicked.col == data.col){
-                       handsOnObj.dblClicked = true;
-                       setTimeout(function(){
-                            handsOnObj = handsOnTables["__identity__"];
-                            if(handsOnObj.dblClicked){
-                                websocket.send(JSON.stringify(
-                                    {'event':'onCellDblClick',
-                                     'target_cell': '__identity__',
-                                     'row': data.row,
-                                     'col': data.col
-                                     }
-                                ));
-                            }
-                            handsOnObj.lastCellClicked = {row: -100, col: -100};
-                            handsOnObj.dblClicked = false;
-                        },200);
-                    } else {
-                    handsOnObj.lastCellClicked = {row: data.row, col: data.col};
-                    setTimeout(function(){
+        return """
+        Handsontable.hooks.add(
+            "beforeOnCellMouseDown",
+            function(event,data) {
+                handsOnObj = handsOnTables["__identity__"];
+                if(handsOnObj.lastCellClicked.row == data.row &
+                   handsOnObj.lastCellClicked.col == data.col){
+                   handsOnObj.dblClicked = true;
+                   setTimeout(function(){
                         handsOnObj = handsOnTables["__identity__"];
+                        if(handsOnObj.dblClicked){
+                            websocket.send(JSON.stringify(
+                                {'event':'onCellDblClick',
+                                 'target_cell': '__identity__',
+                                 'row': data.row,
+                                 'col': data.col
+                                 }
+                            ));
+                        }
                         handsOnObj.lastCellClicked = {row: -100, col: -100};
                         handsOnObj.dblClicked = false;
-                        },600);
-                    }
-                },
-                currentTable
-            );
-            Handsontable.hooks.add(
-                "beforeOnCellContextMenu",
-                function(event,data) {
+                    },200);
+                } else {
+                handsOnObj.lastCellClicked = {row: data.row, col: data.col};
+                setTimeout(function(){
                     handsOnObj = handsOnTables["__identity__"];
-                    handsOnObj.dblClicked = false;
                     handsOnObj.lastCellClicked = {row: -100, col: -100};
-                },
-                currentTable
-            );
-            Handsontable.hooks.add(
-                "beforeContextMenuShow",
-                function(event,data) {
-                    handsOnObj = handsOnTables["__identity__"];
                     handsOnObj.dblClicked = false;
-                    handsOnObj.lastCellClicked = {row: -100, col: -100};
-                },
-                currentTable
-            );
+                    },600);
+                }
+            },
+            currentTable
+        );
+        Handsontable.hooks.add(
+            "beforeOnCellContextMenu",
+            function(event,data) {
+                handsOnObj = handsOnTables["__identity__"];
+                handsOnObj.dblClicked = false;
+                handsOnObj.lastCellClicked = {row: -100, col: -100};
+            },
+            currentTable
+        );
+        Handsontable.hooks.add(
+            "beforeContextMenuShow",
+            function(event,data) {
+                handsOnObj = handsOnTables["__identity__"];
+                handsOnObj.dblClicked = false;
+                handsOnObj.lastCellClicked = {row: -100, col: -100};
+            },
+            currentTable
+        );
 
-            """ .replace("__identity__", self._identity)
+        """ .replace("__identity__", self._identity)
 
     def recalculate(self):
         self.contents = """
@@ -2096,90 +2398,90 @@ class Sheet(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = ((
-            """
-            function model(opts) { return {} }
+        self.postscript = (
+            (
+                """
+                function model(opts) { return {} }
 
-            function property(index) {
-              return function (row) {
-                return row[index]
-              }
-            }
-
-            function SyntheticIntegerArray(size) {
-                this.length = size
-                this.cache = {}
-                this.push = function() { }
-                this.splice = function() {}
-
-                this.slice = function(low, high) {
-                    if (high === undefined) {
-                        high = this.length
-                    }
-
-                    res = Array(high-low)
-                    initLow = low
-                    while (low < high) {
-                        out = this.cache[low]
-                        if (out === undefined) {
-                            websocket.send(JSON.stringify(
-                                {'event':'sheet_needs_data',
-                                 'target_cell': '__identity__',
-                                 'data': low
-                                 }
-                                ))
-                            out = emptyRow
-                        }
-                        res[low-initLow] = out
-                        low = low + 1
-                    }
-
-                    return res
+                function property(index) {
+                  return function (row) {
+                    return row[index]
+                  }
                 }
-            }
 
-            var data = new SyntheticIntegerArray(__rows__)
-            var container = document.getElementById('sheet__identity__');
+                function SyntheticIntegerArray(size) {
+                    this.length = size
+                    this.cache = {}
+                    this.push = function() { }
+                    this.splice = function() {}
 
-            var colnames = [__column_names__]
-            var columns = []
-            var emptyRow = []
+                    this.slice = function(low, high) {
+                        if (high === undefined) {
+                            high = this.length
+                        }
 
-            for (var i = 0; i < colnames.length; i++) {
-                columns.push({data: property(i)})
-                emptyRow.push("")
-            }
+                        res = Array(high-low)
+                        initLow = low
+                        while (low < high) {
+                            out = this.cache[low]
+                            if (out === undefined) {
+                                websocket.send(JSON.stringify(
+                                    {'event':'sheet_needs_data',
+                                     'target_cell': '__identity__',
+                                     'data': low
+                                     }
+                                    ))
+                                out = emptyRow
+                            }
+                            res[low-initLow] = out
+                            low = low + 1
+                        }
 
-            var currentTable = new Handsontable(container, {
-                data: data,
-                dataSchema: model,
-                colHeaders: colnames,
-                columns: columns,
-                rowHeaders: true,
-                rowHeaderWidth: 100,
-                viewportRowRenderingOffset: 100,
-                autoColumnSize: false,
-                autoRowHeight: false,
-                manualColumnResize: true,
-                colWidths: __col_width__,
-                rowHeights: 23,
-                readOnly: true,
-                ManualRowMove: false
-                });
-            handsOnTables["__identity__"] = {
-                    table: currentTable,
-                    lastCellClicked: {row: -100, col:-100},
-                    dblClicked: true
-            }
-            """ +
-            (self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else "")
+                        return res
+                    }
+                }
+
+                var data = new SyntheticIntegerArray(__rows__)
+                var container = document.getElementById('sheet__identity__');
+
+                var colnames = [__column_names__]
+                var columns = []
+                var emptyRow = []
+
+                for (var i = 0; i < colnames.length; i++) {
+                    columns.push({data: property(i)})
+                    emptyRow.push("")
+                }
+
+                var currentTable = new Handsontable(container, {
+                    data: data,
+                    dataSchema: model,
+                    colHeaders: colnames,
+                    columns: columns,
+                    rowHeaders: true,
+                    rowHeaderWidth: 100,
+                    viewportRowRenderingOffset: 100,
+                    autoColumnSize: false,
+                    autoRowHeight: false,
+                    manualColumnResize: true,
+                    colWidths: __col_width__,
+                    rowHeights: 23,
+                    readOnly: true,
+                    ManualRowMove: false
+                    });
+                handsOnTables["__identity__"] = {
+                        table: currentTable,
+                        lastCellClicked: {row: -100, col:-100},
+                        dblClicked: true
+                }
+                """ +
+                (self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else "")
             )
             .replace("__identity__", self._identity)
             .replace("__rows__", str(self.rowCount))
             .replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames))
             .replace("__col_width__", json.dumps(self.colWidth))
         )
-
 
     def onMessage(self, msgFrame):
 
@@ -2220,7 +2522,7 @@ class Sheet(Cell):
 class Plot(Cell):
     """Produce some reactive line plots."""
 
-    def __init__(self, namedDataSubscriptions):
+    def __init__(self, namedDataSubscriptions, xySlot=None):
         """Initialize a line plot.
 
         namedDataSubscriptions: a map from plot name to a lambda function
@@ -2229,10 +2531,8 @@ class Plot(Cell):
         super().__init__()
 
         self.namedDataSubscriptions = namedDataSubscriptions
-        self.curXYRanges = Slot(None)
+        self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
-
-        print("NEW PLOT")
 
     def recalculate(self):
         self.contents = """
@@ -2249,6 +2549,7 @@ class Plot(Cell):
         }
 
         self.postscript = """
+            console.log("Creating a new plotly chart.")
             plotDiv = document.getElementById('plot__identity__');
             Plotly.plot(
                 plotDiv,
@@ -2260,6 +2561,9 @@ class Plot(Cell):
                 );
             plotDiv.on('plotly_relayout',
                 function(eventdata){
+                    if (plotDiv.is_server_defined_move === true) {
+                        return
+                    }
                     //if we're sending a string, then its a date object, and we want to send
                     // a timestamp
                     if (typeof(eventdata['xaxis.range[0]']) === 'string') {
@@ -2287,6 +2591,39 @@ class Plot(Cell):
             ((d.get('xaxis.range[0]', curVal[0][0]), d.get('xaxis.range[1]', curVal[0][1])),
              (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
         )
+
+    def setXRange(self, low, high):
+        self.curXYRanges.set(((low,high), self.curXYRanges.get()[1]))
+
+        self.triggerPostscript(f"""
+            plotDiv = document.getElementById('plot__identity__');
+            newLayout = plotDiv.layout
+
+            if (typeof(newLayout.xaxis.range[0]) === 'string') {{
+                formatDate = function(d) {{
+                    return (d.getYear() + 1900) + "-" + ("00" + (d.getMonth() + 1)).substr(-2) + "-" + ("00" + d.getDate()).substr(-2) + " " + ("00" + d.getHours()).substr(-2) + ":" + ("00" + d.getMinutes()).substr(-2) + ":" + ("00" + d.getSeconds()).substr(-2) + "." + ("000000" + d.getMilliseconds()).substr(-3)
+                    }};
+
+                newLayout.xaxis.range[0] = formatDate(new Date({low*1000}));
+                newLayout.xaxis.range[1] = formatDate(new Date({high*1000}));
+                newLayout.xaxis.autorange = false;
+
+                console.log("set layout for __identity__ to " + formatDate(new Date({low*1000})) + " from " + {low*1000})
+
+            }} else {{
+                newLayout.xaxis.range[0] = {low};
+                newLayout.xaxis.range[1] = {high};
+                newLayout.xaxis.autorange = false;
+            }}
+
+
+            plotDiv.is_server_defined_move = true;
+            Plotly.react(plotDiv, plotDiv.data, newLayout);
+            plotDiv.is_server_defined_move = false;
+
+            console.log("Range is now " + plotDiv.layout.xaxis.range[0])
+
+            """.replace("__identity__", self._identity))
 
 
 class _PlotUpdater(Cell):

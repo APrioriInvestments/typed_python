@@ -64,11 +64,11 @@ class AClassWithInit(Class):
         self.x = 100
         self.y = 100.0
 
-    def __init__(self, x):
+    def __init__(self, x):  # noqa: F811
         self.x = x
         self.y = 100.0
 
-    def __init__(self, x, y):
+    def __init__(self, x, y):  # noqa: F811
         self.x = x
         self.y = y
 

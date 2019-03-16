@@ -155,8 +155,6 @@ string_find_3 = externalCallTarget(
     Void.pointer(), Void.pointer(), Int64
 )
 
-
-
 bytes_concat = externalCallTarget(
     "nativepython_runtime_bytes_concat",
     Void.pointer(),

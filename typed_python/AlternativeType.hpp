@@ -41,12 +41,12 @@ public:
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         for (auto& subtype_pair: m_subtypes) {
-            Type* t = subtype_pair.second;
+            Type* t = (Type*)subtype_pair.second;
             visitor(t);
             assert(t == subtype_pair.second);
         }
         for (auto& method_pair: m_methods) {
-            Type* t = method_pair.second;
+            Type* t = (Type*)method_pair.second;
             visitor(t);
             assert(t == method_pair.second);
         }

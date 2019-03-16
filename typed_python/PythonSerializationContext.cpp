@@ -744,6 +744,9 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     } else
     if (code == T_NATIVE) {
         Type* t = deserializeNativeType(b);
+
+        PyInstance::guaranteeForwardsResolvedOrThrow(t);
+
         return PyInstance::initialize(t, [&](instance_ptr selfData) {
             PyEnsureGilReleased releaseTheGil;
 
