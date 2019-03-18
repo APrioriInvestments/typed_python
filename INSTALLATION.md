@@ -10,9 +10,15 @@ There are several methods for building and setting up a development environment.
 4. Append the root of this repository to your `PYTHONPATH`
   
 ### Pipenv Method ###
+This method is simple, and can take care of virtual environment creation and installation for you.
 1. (Optional) Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it. If you choose to use Pipenv alone, it will create an appropriate virtualenv for you.
-2. Run `pipenv install`
-3. Append the root directory of this repository to your `PYTHONPATH`
+2. Run `pipenv install --dev --deploy`
+  
+### Makefile Method ###
+The included Makefile in this repository contains recipes for building, installing, and testing. For the moment, it is explicitly linked to a specific Python interpreter, so if you are using, say, an interpreter called `python3.6` (as opposed to `python3`), you will need to change the `PYTHON` variable at the top of the Makefile.
+  
+You can also customize the name and location of any built virtual environments with the `VIRTUAL_ENV` variable.
+
 
 ## Installation ##
 
@@ -35,7 +41,7 @@ There are several methods for building and setting up a development environment.
 Before building the modules in this repository, you will need to make sure that you have the following:
 * Python 3.6 with header files (`python3.6-dev python3.6-dbg`)
   Note that for development you will also install the debug interpreter.
-  On Ubuntu this is not so straight forward. You will first need to add the following PPA:
+  If you are using **Ubuntu 16** or earlier,  you will first need to add the following PPA:
   ```
   sudo add-apt-repository ppa:jonathonf/python-3.6
   ```
