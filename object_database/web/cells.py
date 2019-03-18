@@ -529,7 +529,6 @@ class Slot:
                     c.markDirty()
                 self._subscribedCells = set()
 
-
         # delay triggering this slot as dirty
 
     def absorbPendingWrite(self):
@@ -902,8 +901,8 @@ class Card(Cell):
                     <div class="card-header">
                         ____header__
                     </div>
-                """ if self.header is not None else ""
-            ))
+                """ if self.header is not None else "")
+        )
 
     def sortsAs(self):
         return self.contents.sortsAs()
@@ -2644,7 +2643,7 @@ class Plot(Cell):
         curXY = self.curXYRanges.getWithoutRegisteringDependency()
         self.curXYRanges.set(
             ((low,high), curXY[1] if curXY else (None, None))
-            )
+        )
 
         self.triggerPostscript(f"""
             plotDiv = document.getElementById('plot__identity__');
