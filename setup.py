@@ -61,8 +61,7 @@ setuptools.setup(
     cmdclass={'build_ext': NumpyBuildExtension},
     ext_modules=ext_modules,
     setup_requires=[
-        'numpy',
-        'flask'
+        'numpy'
     ],
     install_requires=INSTALL_REQUIRES,
     classifiers=[
