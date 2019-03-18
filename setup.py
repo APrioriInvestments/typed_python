@@ -17,18 +17,22 @@ import pkg_resources
 from distutils.command.build_ext import build_ext
 from distutils.extension import Extension
 
+
 class NumpyBuildExtension(build_ext):
     """
     Used for when numpy headers are needed during build.
     Ensures that numpy will be installed before attempting
     to include any of its libraries
     """
+
     def run(self):
-        self.include_dirs.append(pkg_resources.resource_filename('numpy', 'core/include'))
+        self.include_dirs.append(
+            pkg_resources.resource_filename('numpy', 'core/include'))
         build_ext.run(self)
 
+
 ext_modules = [Extension(
-   'typed_python._types',
+    'typed_python._types',
     sources=[
         'typed_python/all.cpp',
     ],
