@@ -345,7 +345,7 @@ class TaskDispatchService(ServiceBase):
         def assignLoop():
             while not shouldStop.is_set():
                 try:
-                    if self.assignWork():
+                    if not self.assignWork():
                         shouldStop.wait(timeout=.01)
                 except DisconnectedException:
                     return
@@ -355,7 +355,7 @@ class TaskDispatchService(ServiceBase):
         def collectLoop():
             while not shouldStop.is_set():
                 try:
-                    if self.collectResults():
+                    if not self.collectResults():
                         shouldStop.wait(timeout=.01)
                 except DisconnectedException:
                     return
