@@ -10,3 +10,5 @@ nativepython.egg-info
 /testcert.key
 /testcert.cert
 /.venv
+/.eggs
+
