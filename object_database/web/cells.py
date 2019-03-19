@@ -554,7 +554,11 @@ class SessionState(object):
         self._slots = {}
 
     def _reset(self, cells):
-        self._slots = {k:Slot(v.getWithoutRegisteringDependency()) for k,v in self._slots.items()}
+        self._slots = {
+            k: Slot(v.getWithoutRegisteringDependency())
+            for k, v in self._slots.items()
+        }
+
         for s in self._slots.values():
             s._cells = cells
             if isinstance(s._value, Cell):
@@ -897,7 +901,7 @@ class Card(Cell):
             </div>
             """.replace('__other__', other)
                .replace('__style__', self._divStyle())
-               .replace("__header__",  """
+               .replace("__header__", """
                     <div class="card-header">
                         ____header__
                     </div>
@@ -934,7 +938,7 @@ class Modal(Cell):
         super().__init__()
         self.title = title
         self.message = message
-        self.buttons = {f"____button_{k}__": Button(k, v) for k,v in buttonActions.items()}
+        self.buttons = {f"____button_{k}__": Button(k, v) for k, v in buttonActions.items()}
 
     def recalculate(self):
         self.contents = (
@@ -2642,7 +2646,7 @@ class Plot(Cell):
     def setXRange(self, low, high):
         curXY = self.curXYRanges.getWithoutRegisteringDependency()
         self.curXYRanges.set(
-            ((low,high), curXY[1] if curXY else (None, None))
+            ((low, high), curXY[1] if curXY else (None, None))
         )
 
         self.triggerPostscript(f"""
