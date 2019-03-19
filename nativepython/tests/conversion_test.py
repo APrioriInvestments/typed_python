@@ -295,7 +295,7 @@ class TestCompilationStructures(unittest.TestCase):
     def test_nonexistent_variable(self):
         @Compiled
         def f():
-            return this_variable_name_is_undefined
+            return this_variable_name_is_undefined  # noqa: F821
 
         with self.assertRaisesRegex(Exception, "name 'this_variable_name_is_undefined' is not defined"):
             f()

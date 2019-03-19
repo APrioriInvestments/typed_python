@@ -22,7 +22,7 @@ ownName = os.path.abspath(__file__)
 
 class TestPythonAst(unittest.TestCase):
     def test_basic_parsing(self):
-        pyast = python_ast.convertFunctionToAlgebraicPyAst(lambda: X)
+        pyast = python_ast.convertFunctionToAlgebraicPyAst(lambda: X)  # noqa: F821
 
         self.assertTrue(pyast.matches.Lambda)
         self.assertTrue(pyast.body.matches.Name)
@@ -39,9 +39,9 @@ class TestPythonAst(unittest.TestCase):
         self.assertEqual(pyast, pyast3)
 
     def test_reverse_parse(self):
-        self.reverseParseCheck(lambda: X)
-        self.reverseParseCheck(lambda x: X)
-        self.reverseParseCheck(lambda x: X+1)
+        self.reverseParseCheck(lambda: X)  # noqa: F821
+        self.reverseParseCheck(lambda x: X)  # noqa: F821
+        self.reverseParseCheck(lambda x: X+1)  # noqa: F821
         self.reverseParseCheck(lambda x: 1.2)
         self.reverseParseCheck(lambda x: "hi")
         self.reverseParseCheck(lambda x: (x, True))
@@ -51,7 +51,7 @@ class TestPythonAst(unittest.TestCase):
 
         def f(x):
             try:
-                A()
+                A()  # noqa: F821
             except Exception:
                 pass
             else:
@@ -67,9 +67,9 @@ class TestPythonAst(unittest.TestCase):
                 def y(self, z: int):
                     pass
 
-                @otherDecordator
+                @otherDecordator  # noqa: F821
                 def z(self, z: int, *args: list, **kwargs: dict) -> float:
-                    while a < b < c:
+                    while a < b < c:  # noqa: F821
                         pass
                     return 12
 
@@ -85,9 +85,9 @@ class TestPythonAst(unittest.TestCase):
 
     def test_reverse_parse_comprehensions(self):
         def f():
-            [x for x in y]
-            [x for x in y for z in q]
-            {k: v for k in v}
+            [x for x in y]  # noqa: F821
+            [x for x in y for z in q]  # noqa: F821
+            {k: v for k in v}  # noqa: F821
 
         self.reverseParseCheck(f)
 

@@ -277,7 +277,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         self.refToInner(context, out).convert_initialize_from_args(*args)
 
     def convert_attribute(self, context, instance, attribute, nocheck=False):
-        return self.refToInner(context, out).convert_attribute(attribute)
+        return self.refToInner(context, instance).convert_attribute(attribute)
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
