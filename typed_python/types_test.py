@@ -430,7 +430,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(o("hi") == "hi")
         self.assertTrue(o(b"hi2") == b"hi2")
         self.assertTrue(o(1.5) == 1.5)
-        self.assertTrue(o(1) is 1)
+        self.assertTrue(o(1) == 1)
         self.assertIs(o(True), True)
 
         with self.assertRaises(TypeError):
