@@ -329,8 +329,10 @@ class ActiveWebService(ServiceBase):
 
             serviceType = serviceObj.instantiateServiceType()
 
-            serviceToggles = [x.withSerializationContext(serviceObj.getSerializationContext()) for x in
-                                        serviceType.serviceHeaderToggles(serviceObj)]
+            serviceToggles = [
+                x.withSerializationContext(serviceObj.getSerializationContext())
+                for x in serviceType.serviceHeaderToggles(serviceObj)
+            ]
 
             if len(path) == 2:
                 return (
@@ -400,7 +402,7 @@ class ActiveWebService(ServiceBase):
 
         sessionId = request.cookies.get("session")
 
-        #wait for the other socket to close if we were bounced
+        # wait for the other socket to close if we were bounced
         sleep(.25)
 
         if sessionId is None:
