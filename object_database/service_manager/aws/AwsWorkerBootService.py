@@ -605,7 +605,7 @@ class AwsWorkerBootService(ServiceBase):
             for state in State.lookupAll():
                 if state.instance_type not in instancesByType:
                     state.booted = 0
-                elif state.instance_type not in spotRequestsByType:
+                elif state.instance_type not in spotInstancesByType:
                     state.spot_booted = 0
 
             for type in valid_instance_types:

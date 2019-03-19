@@ -87,7 +87,7 @@ class Wrapper(object):
 
         raise NotImplementedError(self)
 
-    def convert_next(self):
+    def convert_next(self, context, expr):
         """Return a pair of typed_expressions (next_value, continue_iteration) for the result of __next__.
 
         If continue_iteration is False, then next_value will be ignored. It should be a reference.

@@ -42,8 +42,7 @@ class BoundCompiledMethodWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         return self.wrapped_type.convert_destroy(
             context,
-            target.changeType(self.wrapped_type),
-            toStore.changeType(self.wrapped_type)
+            instance.changeType(self.wrapped_type)
         )
 
     def convert_call(self, context, left, args, kwargs):
