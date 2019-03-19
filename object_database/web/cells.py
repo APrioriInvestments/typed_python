@@ -1707,7 +1707,7 @@ class SortWrapper:
 
     def __lt__(self, other):
         try:
-            if type(self.x) is type(other.x):
+            if type(self.x) is type(other.x):  # noqa: E721
                 return self.x < other.x
             else:
                 return str(type(self.x)) < str(type(other.x))
@@ -1719,7 +1719,7 @@ class SortWrapper:
 
     def __eq__(self, other):
         try:
-            if type(self.x) is type(other.x):
+            if type(self.x) is type(other.x):  # noqa: E721
                 return self.x == other.x
             else:
                 return str(type(self.x)) == str(type(other.x))

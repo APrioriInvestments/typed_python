@@ -910,7 +910,7 @@ class NativeTypesTests(unittest.TestCase):
         aTup = tOfAlt((a,))
 
         self.assertEqual(a, aTup[0])
-        self.assertTrue(type(a) is type(aTup[0]))
+        self.assertTrue(type(a) is type(aTup[0]))  # noqa: F721
 
     def test_alternatives(self):
         alt = Alternative(
