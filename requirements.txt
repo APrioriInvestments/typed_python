@@ -1,7 +1,7 @@
 numpy
 flask
 boto3
-bs4
+beautifulsoup4
 flask
 flask_cors
 flask-login
