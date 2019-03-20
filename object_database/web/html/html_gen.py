@@ -1,6 +1,9 @@
+import inspect
+
 from abc import ABC, abstractmethod
-from io import StringIO
 from collections import defaultdict
+from functools import partial
+from io import StringIO
 
 
 class HTMLElementChildrenError(Exception):
@@ -119,17 +122,32 @@ class HTMLElement(AbstractHTMLWriter):
             else:
                 io_stream.write(child.__str__())
 
-    @classmethod
-    def div(cls, *args, **kwargs):
-        return cls('div', *args, **kwargs)
 
-    @classmethod
-    def p(cls, *args, **kwargs):
-        return cls('p', *args, **kwargs)
+# HELPERS
+# For the sake of brevity we set HTMLElement bound class methods, i.e. html
+# "tags" dynamically. TODO: HTML_TAG_CONFIG should be moved to another file?
 
-    @classmethod
-    def img(cls, *args, **kwargs):
-        return cls('img', is_self_closing=True, *args, **kwargs)
+def _func(cls, *args, **kwargs):
+    """Helper function for setting classmethods."""
+    return cls(*args, **kwargs)
+
+HTML_TAG_CONFIG = [
+    {"tag_name": "div"},
+    {"tag_name": "p"},
+    {"tag_name": "img", "is_self_closing": True},
+]
+
+for tag in HTML_TAG_CONFIG:
+    setattr(HTMLElement, tag["tag_name"],
+            classmethod(partial(_func, **tag)))
+
+# helper static method for inspecting all available tags
+def _get_method_names(cls):
+    return [item[0] for item in
+            inspect.getmembers(cls, predicate=inspect.ismethod)]
+
+setattr(HTMLElement, "list_methods",
+        staticmethod(_get_method_names(HTMLElement)))
 
 
 class HTMLTextContent(AbstractHTMLWriter):
