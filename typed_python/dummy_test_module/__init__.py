@@ -1,5 +1,5 @@
 """A dummy module for testing purposes."""
-import pytz  # noqa
+import pytz
 
 
 def testfunction():

@@ -686,7 +686,11 @@ class AwsWorkerBootService(ServiceBase):
                     )
 
                     try:
-                        instanceId = self.api.bootWorker(state.instance_type, self.runtimeConfig.serviceToken, spotPrice=valid_instance_types[state.instance_type]['COST'])
+                        instanceId = self.api.bootWorker(
+                            state.instance_type,
+                            self.runtimeConfig.serviceToken,
+                            spotPrice=valid_instance_types[state.instance_type]['COST']
+                        )
                         if not self.api.tagSpotRequest(instanceId):
                             self._logger.error("Failed to tag spot-request associated with instance %s", instanceId)
                         state.spot_booted += 1

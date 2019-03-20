@@ -68,7 +68,7 @@ class K(object):
         return K, (self.value,)
 
 
-import __main__  # noqa
+import __main__  # noqa: E402
 __main__.C = C
 C.__module__ = "__main__"
 __main__.D = D

@@ -1422,8 +1422,16 @@ class NativeTypesTests(unittest.TestCase):
 
                 if zeroOrTwoFloatTypes:
                     for candValue in [-1, 0, 1, 10, 100, 1000, 100000, 10000000, 10000000000]:
-                        self.assertEqual(int(ourType(ourType2(candValue))), int(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
-                        self.assertEqual(float(ourType(ourType2(candValue))), float(numpyType(numpyType2(candValue))), (ourType, ourType2, candValue))
+                        self.assertEqual(
+                            int(ourType(ourType2(candValue))),
+                            int(numpyType(numpyType2(candValue))),
+                            (ourType, ourType2, candValue)
+                        )
+                        self.assertEqual(
+                            float(ourType(ourType2(candValue))),
+                            float(numpyType(numpyType2(candValue))),
+                            (ourType, ourType2, candValue)
+                        )
                 else:
                     # we convert from float to int as c++, which is different than numpy, which clips
                     # floats in a bizarre way. e.g.

@@ -128,7 +128,7 @@ class TestTupleOfCompilation(unittest.TestCase):
 
             self.assertEqual(_types.refcount(intTup), 2)
 
-            res = None  # noqa
+            res = None  # noqa: F841
 
             self.assertEqual(_types.refcount(intTup), 1)
 
