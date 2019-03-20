@@ -146,7 +146,7 @@ def _get_method_names(cls):
     return [item[0] for item in
             inspect.getmembers(cls, predicate=inspect.ismethod)]
 
-setattr(HTMLElement, "list_methods",
+setattr(HTMLElement, "all_methods",
         staticmethod(_get_method_names(HTMLElement)))
 
 
