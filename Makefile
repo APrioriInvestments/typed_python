@@ -36,7 +36,7 @@ install: $(VIRTUAL_ENV)
 .PHONY: test
 test: testcert.cert testcert.key install
 	. $(VIRTUAL_ENV)/bin/activate; \
-	./test.py -s
+		./test.py -s
 
 .PHONY: lint
 lint:
@@ -46,7 +46,7 @@ lint:
 .PHONY: vlint
 vlint: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
-	make lint
+		make lint
 
 .PHONY: lint-all
 lint-all:
@@ -55,7 +55,7 @@ lint-all:
 .PHONY: vlint-all
 vlint-all: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
-	flake8
+		flake8
 
 .PHONY: lib
 lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
