@@ -21,6 +21,7 @@ def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
 
+
 someStrings = [
     "",
     "a",
