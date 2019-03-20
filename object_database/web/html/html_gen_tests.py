@@ -1,9 +1,14 @@
+#!/usr/bin/env python3
+
 from html_gen import *
 from io import StringIO
 
 import unittest
 
 class HTMLGeneratorTests(unittest.TestCase):
+    def setUp(self):
+        pass
+
     def test_add_child(self):
         test_child = HTMLElement()
         test_parent = HTMLElement()
@@ -31,4 +36,11 @@ class HTMLGeneratorTests(unittest.TestCase):
         element.attributes['class'] = 'column-4 medium'
         element.print_on(stream, newlines=False)
         output = stream.getvalue()
-        self.assertEquals('<div class="column-4 medium"></div>', output)
+        self.assertEqual('<div class="column-4 medium"></div>', output)
+
+    def tearDown(self):
+        pass
+
+
+if __name__ == '__main__':
+    unittest.main()
