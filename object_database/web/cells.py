@@ -1568,7 +1568,13 @@ class Popover(Cell):
     def recalculate(self):
         self.contents = """
             <div __style__>
-            <a href="#popmain___identity__" data-toggle="popover" data-trigger="focus" data-bind="#pop___identity__" container="body" class="btn btn-xs" role="button">____contents__</a>
+            <a href="#popmain___identity__"
+               data-toggle="popover"
+               data-trigger="focus"
+               data-bind="#pop___identity__"
+               container="body"
+               class="btn btn-xs"
+               role="button">____contents__</a>
             <div style="display:none;">
               <div id="pop___identity__">
                 <div class='data-placement'>bottom</div>
@@ -1633,11 +1639,15 @@ class Grid(Cell):
                 new_children["____header_%s__" % (col_ix)] = self.existingItems[(None, col)]
             else:
                 try:
-                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = Cell.makeCell(self.headerFun(col[0]))
+                    self.existingItems[(None, col)] = \
+                        new_children["____header_%s__" % col_ix] = \
+                        Cell.makeCell(self.headerFun(col[0]))
                 except SubscribeAndRetry:
                     raise
                 except Exception:
-                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
+                    self.existingItems[(None, col)] = \
+                        new_children["____header_%s__" % col_ix] = \
+                        Traceback(traceback.format_exc())
 
         if self.rowLabelFun is not None:
             for row_ix, row in enumerate(self.rows):
@@ -1646,25 +1656,34 @@ class Grid(Cell):
                     new_children["____rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
                 else:
                     try:
-                        self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Cell.makeCell(self.rowLabelFun(row[0]))
+                        self.existingItems[(row, None)] = \
+                            new_children["____rowlabel_%s__" % row_ix] = \
+                            Cell.makeCell(self.rowLabelFun(row[0]))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[(row, None)] = new_children["____rowlabel_%s__" % row_ix] = Traceback(traceback.format_exc())
+                        self.existingItems[(row, None)] = \
+                            new_children["____rowlabel_%s__" % row_ix] = \
+                            Traceback(traceback.format_exc())
 
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
                 seen.add((row, col))
                 if (row, col) in self.existingItems:
-                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row, col)]
+                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
+                        self.existingItems[(row, col)]
                 else:
                     try:
-                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row[0], col[0]))
+                        self.existingItems[(row, col)] = \
+                            new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
+                            Cell.makeCell(self.rendererFun(row[0], col[0]))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
+                        self.existingItems[(row, col)] = \
+                            new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
+                            Traceback(traceback.format_exc())
 
         self.children = new_children
 
@@ -1910,25 +1929,34 @@ class Table(Cell):
                 new_children["____header_%s__" % (col_ix)] = self.existingItems[(None, col)]
             else:
                 try:
-                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = self.makeHeaderCell(col_ix)
+                    self.existingItems[(None, col)] = \
+                        new_children["____header_%s__" % col_ix] = \
+                        self.makeHeaderCell(col_ix)
                 except SubscribeAndRetry:
                     raise
                 except Exception:
-                    self.existingItems[(None, col)] = new_children["____header_%s__" % col_ix] = Traceback(traceback.format_exc())
+                    self.existingItems[(None, col)] = \
+                        new_children["____header_%s__" % col_ix] = \
+                        Traceback(traceback.format_exc())
 
         seen = set()
         for row_ix, row in enumerate(self.rows):
             for col_ix, col in enumerate(self.cols):
                 seen.add((row, col))
                 if (row, col) in self.existingItems:
-                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = self.existingItems[(row, col)]
+                    new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
+                        self.existingItems[(row, col)]
                 else:
                     try:
-                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Cell.makeCell(self.rendererFun(row, col))
+                        self.existingItems[(row, col)] = \
+                            new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
+                            Cell.makeCell(self.rendererFun(row, col))
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[(row, col)] = new_children["____child_%s_%s__" % (row_ix, col_ix)] = Traceback(traceback.format_exc())
+                        self.existingItems[(row, col)] = \
+                            new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
+                            Traceback(traceback.format_exc())
 
         self.children = new_children
 
@@ -1942,16 +1970,30 @@ class Table(Cell):
         if totalPages <= 1:
             self.children['____page__'] = Cell.makeCell(totalPages).nowrap()
         else:
-            self.children['____page__'] = SingleLineTextBox(self.curPage, pattern="[0-9]+").width(10 * len(str(totalPages)) + 6).height(20).nowrap()
+            self.children['____page__'] = (
+                SingleLineTextBox(self.curPage, pattern="[0-9]+")
+                .width(10 * len(str(totalPages)) + 6)
+                .height(20)
+                .nowrap()
+            )
         if self.curPage.get() == "1":
             self.children['____left__'] = Octicon("triangle-left").nowrap().color("lightgray")
         else:
-            self.children['____left__'] = Clickable(Octicon("triangle-left"), lambda: self.curPage.set(str(int(self.curPage.get())-1))).nowrap()
-
+            self.children['____left__'] = (
+                Clickable(
+                    Octicon("triangle-left"),
+                    lambda: self.curPage.set(str(int(self.curPage.get())-1))
+                ).nowrap()
+            )
         if self.curPage.get() == str(totalPages):
             self.children['____right__'] = Octicon("triangle-right").nowrap().color("lightgray")
         else:
-            self.children['____right__'] = Clickable(Octicon("triangle-right"), lambda: self.curPage.set(str(int(self.curPage.get())+1))).nowrap()
+            self.children['____right__'] = (
+                Clickable(
+                    Octicon("triangle-right"),
+                    lambda: self.curPage.set(str(int(self.curPage.get())+1))
+                ).nowrap()
+            )
 
         self.contents = (
             """

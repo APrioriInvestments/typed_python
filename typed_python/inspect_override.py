@@ -22,7 +22,7 @@ from inspect import (  # import what we use to avoid F405 warnings
     isclass, ismethod, isfunction, ismodule, isframe, iscode, istraceback,
     getmembers, getmodule, getblock
 )
-from inspect import *  # noqa  import everything else also
+from inspect import *  # noqa: F401,F403
 
 
 class InspectError(Exception):

@@ -410,7 +410,11 @@ class Server:
                         return
 
                     if msg.isLazy:
-                        assert msg.fieldname_and_value is None or msg.fieldname_and_value[0] != '_identity', 'makes no sense to lazily subscribe to specific values!'
+                        if (msg.fieldname_and_value is not None
+                                and msg.fieldname_and_value[0] != '_identity'):
+                            raise Exception(
+                                "It makes no sense to lazily subscribe to specific values!"
+                            )
 
                         messageCount = 1
 
@@ -949,7 +953,7 @@ class Server:
                 channelsTriggered.update(self._id_to_channel[i])
 
         for channel in channelsTriggeredForPriors:
-            lazy_message = ServerToClient.LazyTransactionPriors(writes=priorValues)  # noqa
+            lazy_message = ServerToClient.LazyTransactionPriors(writes=priorValues)  # noqa: F841
 
         transaction_message = ServerToClient.Transaction(
             writes={k: v for k, v in key_value.items()},

@@ -298,7 +298,9 @@ class FunctionConversionContext(object):
             subcontext = ExpressionConversionContext(self)
 
             if ast.value is None:
-                e = subcontext.convert_expression_ast(python_ast.Expr.Num(n=python_ast.NumericConstant.None_()))
+                e = subcontext.convert_expression_ast(
+                    python_ast.Expr.Num(n=python_ast.NumericConstant.None_())
+                )
             else:
                 e = subcontext.convert_expression_ast(ast.value)
 
@@ -319,7 +321,12 @@ class FunctionConversionContext(object):
                 return subcontext.finalize(None), False
 
             if e.expr_type.is_pass_by_ref:
-                returnTarget = TypedExpression(subcontext, native_ast.Expression.Variable(name=".return"), self._varname_to_type[FunctionOutput], True)
+                returnTarget = TypedExpression(
+                    subcontext,
+                    native_ast.Expression.Variable(name=".return"),
+                    self._varname_to_type[FunctionOutput],
+                    True
+                )
 
                 returnTarget.convert_copy_initialize(e)
 
