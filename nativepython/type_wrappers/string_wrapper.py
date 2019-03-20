@@ -14,7 +14,6 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python import Int64
-from nativepython.type_wrappers.arithmetic_wrapper import Int64Wrapper
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
