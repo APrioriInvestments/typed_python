@@ -188,10 +188,10 @@ class StringWrapper(RefcountedWrapper):
                     Int64,
                     lambda iRef: iRef.expr.store(
                         runtime_functions.string_find.call(
-                        instance.nonref_expr.cast(VoidPtr),
-                        args[0].nonref_expr.cast(VoidPtr),
-                        args[1].nonref_expr,
-                        args[2].nonref_expr
+                            instance.nonref_expr.cast(VoidPtr),
+                            args[0].nonref_expr.cast(VoidPtr),
+                            args[1].nonref_expr,
+                            args[2].nonref_expr
                         )
                     )
                 )
