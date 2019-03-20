@@ -18,7 +18,9 @@ class HTMLGeneratorTests(unittest.TestCase):
     def test_add_child_self_closing(self):
         test_child = HTMLElement()
         test_parent = HTMLElement(is_self_closing=True)
-        self.assertRaises(HTMLElementChildrenError, test_parent.add_child, test_child)
+
+        self.assertRaises(HTMLElementChildrenError, test_parent.add_child,
+                          test_child)
 
     def test_add_children(self):
         kids = [HTMLElement() for i in range(0, 10)]
@@ -33,6 +35,14 @@ class HTMLGeneratorTests(unittest.TestCase):
     def test_print_on(self):
         stream = StringIO()
         element = HTMLElement('div')
+        element.attributes['class'] = 'column-4 medium'
+        element.print_on(stream, newlines=False)
+        output = stream.getvalue()
+        self.assertEqual('<div class="column-4 medium"></div>', output)
+
+    def test_print_on_set_boundmethod(self):
+        stream = StringIO()
+        element = HTMLElement.div()
         element.attributes['class'] = 'column-4 medium'
         element.print_on(stream, newlines=False)
         output = stream.getvalue()
