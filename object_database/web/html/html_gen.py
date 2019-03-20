@@ -21,11 +21,12 @@ class AbstractHTMLWriter(ABC):
 
 
 class HTMLElement(AbstractHTMLWriter):
-    def __init__(self, tag_name=None, attributes={}, children=[], is_self_closing=False):
+    def __init__(self, tag_name=None, attributes=None, children=None,
+                 is_self_closing=False):
         self.tag_name = tag_name
         self.is_self_closing = is_self_closing
-        self.attributes = attributes
-        self.children = children
+        self.attributes = attributes if attributes is not None else {}
+        self.children = children 
         self.parent = None
 
     def add_child(self, child_element):
@@ -34,12 +35,16 @@ class HTMLElement(AbstractHTMLWriter):
                 '{} elements do not have children'.format(self.tag_name))
         elif child_element.parent:
             child_element.parent.remove_child(child_element)
-        self.children.append(child_element)
+        if self.children is None:
+            self.children = [child_element]
+        else:
+            self.children.append(child_element)
         child_element.parent = self
 
     def remove_child(self, child_element):
-        if child_element not in self.children:
-            return
+        if self.children is None or child_element not in self.children:
+            raise HTMLElementChildrenError(
+                '{} elements does not have children'.format(self.tag_name))
         self.children = [kid for kid in self.children if kid != child_element]
 
     def add_children(self, list_of_children):
@@ -105,7 +110,7 @@ class HTMLElement(AbstractHTMLWriter):
                     ' {}="{}"'.format(key, val))
 
     def _print_children_on(self, io_stream, indent=0, indent_increment=4):
-        if len(self.children) == 0:
+        if self.children is None or len(self.children) == 0:
             return
         indent += indent_increment
         for child in self.children:
