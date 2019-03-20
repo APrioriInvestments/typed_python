@@ -187,8 +187,8 @@ class TestStringCompilation(unittest.TestCase):
 
         def test_find(t):
             substrings = ["", "x", "xyz", "a"*100, t[0:-2] + t[-1] if len(t) > 2 else ""]
-            for start in range(0,min(len(t),8)):
-                for end in range(start+1,min(len(t),8)+1):
+            for start in range(0, min(len(t), 8)):
+                for end in range(start+1, min(len(t), 8)+1):
                     substrings.append(t[start:end])
 
             indexrange = [
