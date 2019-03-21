@@ -3,7 +3,12 @@
 import re
 import unittest
 
-from html_gen import HTMLElement, HTML_TAG_CONFIG, HTMLElementChildrenError
+from html_gen import (
+    HTMLElement,
+    HTMLTextContent,
+    HTML_TAG_CONFIG,
+    HTMLElementChildrenError
+)
 from io import StringIO
 
 
@@ -52,6 +57,28 @@ class HTMLGeneratorTests(unittest.TestCase):
         output = stream.getvalue()
         test_out = ('<div class="column-4 medium"><p class="column-4 medium">' +
                     '</p></div>')
+        # we don't care about white spaces or new linesso much
+        output = re.sub('\s{2,}', '', output)
+        output = re.sub(r'\n', '', output)
+        self.assertEqual(test_out, output)
+
+    def test_print_on_with_content(self):
+        stream = StringIO()
+        element = HTMLTextContent('this is content')
+        element.print_on(stream)
+        output = stream.getvalue()
+        test_out = "this is content\n" 
+        self.assertEqual(test_out, output)
+
+    def test_print_on_with_content_nested(self):
+        stream = StringIO()
+        content = HTMLTextContent('this is content')
+        parent = HTMLElement('div', children=[content])
+        parent.attributes['class'] = 'column-4 medium'
+        parent.print_on(stream, newlines=False)
+        output = stream.getvalue()
+        test_out = ('<div class="column-4 medium">this is content' +
+                    '</div>')
         # we don't care about white spaces or new linesso much
         output = re.sub('\s{2,}', '', output)
         output = re.sub(r'\n', '', output)
