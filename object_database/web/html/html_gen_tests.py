@@ -92,6 +92,14 @@ class HTMLGeneratorTests(unittest.TestCase):
         output = stream.getvalue()
         self.assertEqual('<div class="column-4 medium"></div>', output)
 
+    def test_with_children(self):
+        element = HTMLElement('div')
+        child_one = HTMLElement('img')
+        child_two = HTMLElement('article')
+        element.with_children(child_one, child_two)
+        self.assertTrue(child_one in element.children)
+        self.assertTrue(child_two in element.children)
+
     def test_list_methods(self):
         method_names = HTMLElement.all_methods
         for name in self.current_tag_names:
@@ -100,6 +108,37 @@ class HTMLGeneratorTests(unittest.TestCase):
     def tearDown(self):
         pass
 
+class HTMLChainingMethodTests(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_chaining_add_child(self):
+        element = HTMLElement('div')
+        result = element.add_child(HTMLElement())
+        self.assertEqual(element, result)
+
+    def test_chaining_remove_child(self):
+        element = HTMLElement()
+        child = HTMLElement()
+        element.add_child(child)
+        result = element.remove_child(child)
+        self.assertEqual(element, result)
+
+    def test_chaining_add_children(self):
+        element = HTMLElement('div')
+        children = [HTMLElement(), HTMLElement()]
+        result = element.add_children(children)
+        self.assertEqual(element, result)
+
+    def test_chaining_with_children(self):
+        element = HTMLElement('div')
+        child_one = HTMLElement()
+        child_two = HTMLElement()
+        result = element.with_children(child_one, child_two)
+        self.assertEqual(result, element)
+
+    def tearDown(self):
+        pass
 
 class HTMLCustomConstructorTests(unittest.TestCase):
     def setUp(self):
