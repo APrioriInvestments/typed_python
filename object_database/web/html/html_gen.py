@@ -58,16 +58,19 @@ class HTMLElement(AbstractHTMLWriter):
         else:
             self.children.append(child_element)
         child_element.parent = self
+        return self
 
     def remove_child(self, child_element):
         if self.children is None or child_element not in self.children:
             raise HTMLElementChildrenError(
                 '{} elements does not have children'.format(self.tag_name))
         self.children = [kid for kid in self.children if kid != child_element]
+        return self
 
     def add_children(self, list_of_children):
         for child in list_of_children:
             self.add_child(child)
+        return self
 
     def add_class(self, cls_string):
         if 'class' in self.attributes:
@@ -75,15 +78,21 @@ class HTMLElement(AbstractHTMLWriter):
             current_set = set(current)
             current_set.add(cls_string)
             self.attributes['class'] = " ".join(list(current_set))
+        return self
 
     def remove_class(self, cls_string):
         if 'class' in self.attributes:
             current = self.attributes['class'].split()
             current_set = set(current)
             if cls_string not in current_set:
-                return
+                return self
             current_set.remove(cls_string)
             self.attributes['class'] = " ".join(list(current_set))
+        return self
+
+    def with_children(self, *args):
+        self.add_children(args)
+        return self
 
     def __str__(self):
         stream = StringIO()
