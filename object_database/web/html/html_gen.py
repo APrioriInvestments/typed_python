@@ -182,7 +182,7 @@ HTML_TAG_CONFIG = [
     {"tag_name": "data"},
     {"tag_name": "datalist"},
     {"tag_name": "dd"},
-    #{"tag_name": "del"}, # Invalid: conflicts with py somehow
+    {"tag_name": "_del"}, # decided not to overload the "del" destructor
     {"tag_name": "details"},
     {"tag_name": "dfn"},
     {"tag_name": "dialog"},
