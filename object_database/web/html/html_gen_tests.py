@@ -225,6 +225,11 @@ class HTMLCustomConstructorTests(unittest.TestCase):
         self.assertEqual(element.tag_name, 'dd')
         self.assertFalse(element.is_self_closing)
 
+    def test_del_constructor(self):
+        element = HTMLElement._del()
+        self.assertEqual(element.tag_name, '_del')
+        self.assertFalse(element.is_self_closing)
+
     def test_details_constructor(self):
         element = HTMLElement.details()
         self.assertEqual(element.tag_name, 'details')
