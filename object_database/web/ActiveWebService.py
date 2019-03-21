@@ -435,9 +435,11 @@ class ActiveWebService(ServiceBase):
             # we keep a list of sessions.)
             sessionState._reset(cells)
 
-            cells.root.setRootSerializationContext(self.db.serializationContext)
-            cells.root.setChild(Subscribed(lambda: self.displayForPathAndQueryArgs(path, queryArgs)))
-            cells.root.setContext(SessionState, sessionState)
+            cells = cells.withRoot(
+                Subscribed(lambda: self.displayForPathAndQueryArgs(path, queryArgs)),
+                serialization_context=self.db.serializationContext,
+                session_state=sessionState
+            )
 
             cellsTaskThread = threading.Thread(target=cells.processTasks)
             cellsTaskThread.daemon = True

@@ -226,9 +226,22 @@ class Cells:
         except queue.Empty:
             return False
 
-    @property
-    def root(self):
-        return self._root
+    def withRoot(self, root_cell, serialization_context=None, session_state=None):
+        self._root.setChild(
+            root_cell
+        )
+        self._root.setContext(
+            SessionState,
+            session_state
+            or self._root.context.get(SessionState)
+            or SessionState()._reset(self)
+        )
+        self._root.withSerializationContext(
+            serialization_context
+            or self._root.serializationContext
+            or self.db.serializationContext
+        )
+        return self
 
     def __contains__(self, cell_or_id):
         if isinstance(cell_or_id, Cell):
@@ -471,6 +484,19 @@ class Cells:
             res['postscript'] = cell.postscript
         return res
 
+    def childrenWithExceptions(self):
+        return self._root.findChildrenMatching(lambda cell: isinstance(cell, Traceback))
+
+    def findChildrenByTag(self, tag, stopSearchingAtTag=True, isRoot=True):
+        return self._root.findChildrenByTag(
+            tag,
+            stopSearchingAtTag=stopSearchingAtTag,
+            isRoot=isRoot
+        )
+
+    def findChildrenMatching(self, filtr):
+        return self._root.findChildrenMatching(filtr)
+
 
 class Slot:
     """Represents a piece of session-specific interface state. Any cells
@@ -583,7 +609,8 @@ class SessionState(object):
                     s._value.prepareForReuse()
                 except Exception:
                     logging.warn(
-                        "Reusing a Cell slot could create a problem: %s", s._value)
+                        f"Reusing a Cell slot could create a problem: {s._value}")
+        return self
 
     def _slotFor(self, name):
         if name not in self._slots:
@@ -603,7 +630,7 @@ class SessionState(object):
 
         return self._slotFor(attr).set(val)
 
-    def ensure(self, attr, value):
+    def setdefault(self, attr, value):
         if attr not in self._slots:
             self._slots[attr] = Slot(value)
 
@@ -689,11 +716,11 @@ class Cell:
         for child in self.children.values():
             child.visitAllChildren(visitor)
 
-    def findChildrenMatching(self, filter):
+    def findChildrenMatching(self, filtr):
         res = []
 
         def visitor(cell):
-            if filter(cell):
+            if filtr(cell):
                 res.append(cell)
 
         self.visitAllChildren(visitor)
@@ -1398,9 +1425,6 @@ class Scrollable(Container):
 
 
 class RootCell(Container):
-    def setRootSerializationContext(self, context):
-        self.serializationContext = context
-
     @property
     def identity(self):
         return "page_root"
