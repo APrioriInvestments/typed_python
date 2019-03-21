@@ -1,7 +1,12 @@
+"""HTML String Generation
+
+This module contains classes for creating bare-bones
+HTML string generation. The included classes cover all
+text-node and HTML5 tag cases
+"""
 import inspect
 
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from functools import partial
 from io import StringIO
 
@@ -24,7 +29,53 @@ class AbstractHTMLWriter(ABC):
 
 
 class HTMLElement(AbstractHTMLWriter):
-    """HTML element generation class."""
+    """HTML element generation class.
+
+    This class can generate correctly-formatted HTML
+    corresponding to any valid HTML5 element.
+    It contains a collection of children who it also
+    knows how to format.
+
+    Notes
+    _____
+    HTMLElement and children use the `print_on` method to
+    write the string representations of their HTML to
+    a stream (StringIO stream in this implementation).
+    A Given HTMLElement's children are written to this
+    stream recursively before any close tags (see docstring
+    for `print_on`)
+
+    We also use some meta properties to add convenience
+    constructors to this class that allow for easier to
+    read composition by end users. See the Examples.
+
+    Example
+    -------
+    Any valid HTML5 tag can be created using a convenience
+    constructor that is simply its name. These handle
+    knowing and configuring whether or not an element is
+    self closing::
+        element = HTMLElement.div().with_children(
+            HTMLElement.img())
+        print(element)
+        # <div>
+        #     <img/>
+        # </div>
+
+    You can also construct elements manually by specifying
+    the tagname as the first argument::
+        element = HTMLElement('div').with_children(
+            HTMLElement('img', is_self_closing=True))
+
+    All methods besides private and basic printing
+    methods return `self` and are therefore chainable::
+        element = HTMLElement.div() \
+                             .add_class('container') \
+                             .with_children(
+                                 HTMLElement.img(),
+                                 HTMLElement.br())
+    """
+
     def __init__(self, tag_name=None, attributes=None, children=None,
                  is_self_closing=False):
         """
@@ -48,6 +99,31 @@ class HTMLElement(AbstractHTMLWriter):
         self.parent = None
 
     def add_child(self, child_element):
+        """Adds a child element
+
+        To prevent circular references, this method will
+        remove the passed `child_element` from its parent
+        (if present) and will set the new parent to the
+        current instance.
+
+        Parameters
+        ----------
+        child_element: AbstractHTMLWriter
+            Any subclass of AbstractHTMLWriter that implements
+            a `print_on` method.
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current element instance
+            that can be used for chaining
+
+        Raises
+        ------
+        HTMLElementChildrenError
+            If the current instance is self closing
+            (and therefore doesn't take children)
+        """
         if self.is_self_closing:
             raise HTMLElementChildrenError(
                 '{} elements do not have children'.format(self.tag_name))
@@ -61,6 +137,26 @@ class HTMLElement(AbstractHTMLWriter):
         return self
 
     def remove_child(self, child_element):
+        """Removes a child element
+
+        Parameters
+        ----------
+        child_element: AbstractHTMLWriter
+            Any subclass of AbstractHTMLWriter that implements
+            a `print_on` method.
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current element instance
+            that can be used for chaining.
+
+        Raises
+        ------
+        HTMLElementChildrenError
+            If the current instance is self closing
+            (and therefore doesn't have children)
+        """
         if self.children is None or child_element not in self.children:
             raise HTMLElementChildrenError(
                 '{} elements does not have children'.format(self.tag_name))
@@ -68,11 +164,71 @@ class HTMLElement(AbstractHTMLWriter):
         return self
 
     def add_children(self, list_of_children):
+        """Adds all children from a provided list of child elements
+
+        Parameters
+        ----------
+        list_of_children: list
+            A list of any AbstractHTMLWriter subclass instances.
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current element instance
+            that can be used for chaining.
+        """
         for child in list_of_children:
             self.add_child(child)
         return self
 
+    def with_children(self, *args):
+        """Adds children to current element using positional args
+
+        This is a convenience function that can be used
+        for a different type of composition than `add_children`.
+        Instead of taking a list, it takes an unspecified number
+        of arguments, each of which is an element of some sort.
+
+        Parameters
+        ----------
+        *args
+            A variable length argument list where each argument
+            is an instance of any AbstractHTMLWriter subclass.
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current element instance
+            that can be used for chaining.
+        """
+        self.add_children(args)
+        return self
+
     def add_class(self, cls_string):
+        """Adds an HTML element class value to current class attributes
+
+        Example
+        -------
+        Adding a class will modify the `attributes['class'] string
+        value::
+            initial_attrs = {'class': 'primary column-4'}
+            element = HTMLElement('div', attributes=initial_attrs)
+            element.add_class('medium')
+            print(element.attributes['class'])
+            # 'primary column-4 medium'
+
+        Parameters
+        ----------
+        cls_string: str
+            A string of an html class attribute to add to
+            current classes for the element
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current element instance
+            that can be used for chaining.
+        """
         if 'class' in self.attributes:
             current = self.attributes['class'].split()
             current_set = set(current)
@@ -81,6 +237,30 @@ class HTMLElement(AbstractHTMLWriter):
         return self
 
     def remove_class(self, cls_string):
+        """Removes an HTML element class value from the current attributes
+
+        Example
+        -------
+        Removing a class will modify the `attributes['class'] string
+        value::
+            initial_attrs = {'class': 'primary column-4 medium'}
+            element = HTMLElement('div', attributes=initial_attrs)
+            element.remove_class('medium')
+            print(element.attributes['class'])
+            # 'primary column-4'
+
+        Parameters
+        ----------
+        cls_string: str
+            A string of an html class attribute to remove
+            from the current element's class attribute.
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current element instance
+            that can be used for chaining.
+        """
         if 'class' in self.attributes:
             current = self.attributes['class'].split()
             current_set = set(current)
@@ -90,33 +270,55 @@ class HTMLElement(AbstractHTMLWriter):
             self.attributes['class'] = " ".join(list(current_set))
         return self
 
-    def with_children(self, *args):
-        self.add_children(args)
-        return self
-
-    def __str__(self):
-        stream = StringIO()
-        self.print_on(stream)
-        return stream.getvalue()
-
-    def __repr__(self):
-        return "<{} [{}]>".format(self.__class__.__name__, self.tag_name)
-
     def pretty_print(self, indent_increment=2):
+        """Prints the HTML structure of the element with custom indentation
+
+        Parameters
+        ----------
+        indent_increment: int
+            The number of spaces to indent each new
+            level of the hierarchy as nested elements
+            are printed to the string.
+
+        Returns
+        -------
+        str
+            A printed string of the HTML structure using
+            the specified indentation
+        """
         stream = StringIO()
         self.print_on(stream, indent_increment=indent_increment)
         return stream.getvalue()
 
     def print_on(self, io_stream, indent=0, indent_increment=4, newlines=True):
-        """Print payload to stream.
+        """Prints the entire HTML representation to a stream.
+
+        Notes
+        -----
+        This is a required method of all AbstractHTMLWriter subclasses.
+        In this implementation, an element prints its opening tag and
+        if it takes and has children, recursively calls each child's
+        corresponding `print_on` using the same stream. In the end
+        it prints its closing tag.
+
+        This implementation makes use of default arguments for
+        newlines and indentation which can be customized
+        (see `pretty_print` for an example)
 
         Parameters:
         ----------
-        io_stream: Stream
+        io_stream: StringIO
+            A stream that we can write strings to.
+            Can be any stream object that implements
+            a `write` method.
         indent: int
+            The current indentation level. Each recursively
+            rendered child will increment this amount by
+            the passed `indent_increment`.
         indent_increment: int
-        newlines: True
-            print with newlines
+            The indentation level to use (number of spaces)
+        newlines: bool
+            Whether or not to print using newlines
         """
         self._print_open_tag_on(io_stream, indent, newlines)
         if not self.is_self_closing:
@@ -124,6 +326,7 @@ class HTMLElement(AbstractHTMLWriter):
             self._print_close_tag_on(io_stream, indent, newlines)
 
     def _print_open_tag_on(self, io_stream, indent, newlines):
+        """Prints the correct opening HTML tag for the element to stream."""
         inline_indent = ' ' * indent
         io_stream.write('{}<{}'.format(inline_indent, self.tag_name))
         self._print_attributes_on(io_stream)
@@ -135,18 +338,23 @@ class HTMLElement(AbstractHTMLWriter):
             io_stream.write('\n')
 
     def _print_close_tag_on(self, io_stream, indent, newlines):
+        """Prints the correct closing for the element to the stream"""
         inline_indent = ' ' * indent
         io_stream.write('{}</{}>'.format(inline_indent, self.tag_name))
         if newlines:
             io_stream.write('\n')
 
     def _print_attributes_on(self, io_stream):
+        """Prints the attributes of the element to the stream"""
         for key, val in self.attributes.items():
             if len(val) > 0:
                 io_stream.write(
                     ' {}="{}"'.format(key, val))
 
     def _print_children_on(self, io_stream, indent=0, indent_increment=4):
+        """Recursively prints the HTML representation of
+        a child element to the stream.
+        """
         if self.children is None or len(self.children) == 0:
             return
         indent += indent_increment
@@ -155,6 +363,14 @@ class HTMLElement(AbstractHTMLWriter):
                 child.print_on(io_stream, indent, indent_increment)
             else:
                 io_stream.write(child.__str__())
+
+    def __str__(self):
+        stream = StringIO()
+        self.print_on(stream)
+        return stream.getvalue()
+
+    def __repr__(self):
+        return "<{} [{}]>".format(self.__class__.__name__, self.tag_name)
 
 
 # HELPERS
@@ -191,7 +407,7 @@ HTML_TAG_CONFIG = [
     {"tag_name": "data"},
     {"tag_name": "datalist"},
     {"tag_name": "dd"},
-    {"tag_name": "_del"}, # decided not to overload the "del" destructor
+    {"tag_name": "_del"},  # decided not to overload the "del" destructor
     {"tag_name": "details"},
     {"tag_name": "dfn"},
     {"tag_name": "dialog"},
@@ -290,10 +506,9 @@ for tag in HTML_TAG_CONFIG:
     setattr(HTMLElement, tag["tag_name"],
             classmethod(partial(_func, **tag)))
 
-# helper static method for inspecting all available tags
-
 
 def _get_method_names(cls):
+    """Helper static method for inspecting all avail. tags"""
     return [item[0] for item in
             inspect.getmembers(cls, predicate=inspect.ismethod)]
 
@@ -303,26 +518,43 @@ setattr(HTMLElement, "all_methods",
 
 
 class HTMLTextContent(AbstractHTMLWriter):
-    """Display raw content in a div."""
+    """Raw text content adjacent to elements.
+
+    This class is equivalent to a DOM text node
+    that displays as a direct child of a given
+    element.
+
+    Example
+    -------
+    Here is how we could add text to a paragraph::
+        paragraph = HTMLElement('p').with_children(
+            HTMLTextContent('Here is the para text!'))
+    """
+
     def __init__(self, content):
         """
         Parameters:
         ----------
         content: str
+            Content that will be displayed
         """
         super().__init__()
         self.content = content
 
     def print_on(self, io_stream, indent=0, indent_increment=4, newlines=True):
-        """Print payload to stream.
+        """Print the text content to a given stream
 
         Parameters:
         ----------
-        io_stream: Stream
+        io_stream: StringIO
+            Any stream object that we can write strings
+            to.
         indent: int
+            The current indentation level
         indent_increment: int
-        newlines: True
-            print with newlines
+            The amount to increase indendation by
+        newlines: bool
+            Whether or not to print with newlines
         """
         for line in self.content.splitlines():
             inline_indent = " " * indent
