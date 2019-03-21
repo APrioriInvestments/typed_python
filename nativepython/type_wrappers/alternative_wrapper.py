@@ -119,7 +119,9 @@ class AlternativeWrapper(RefcountedWrapper):
         )
 
     def generateNativeDestructorFunction(self, context, out, instance):
-        with context.switch(instance.nonref_expr.ElementPtrIntegers(0, 1).load(), range(len(self.alternatives)), False) as indicesAndContexts:
+        with context.switch(instance.nonref_expr.ElementPtrIntegers(0, 1).load(),
+                            range(len(self.alternatives)),
+                            False) as indicesAndContexts:
             for ix, subcontext in indicesAndContexts:
                 with subcontext:
                     self.refAs(context, instance, ix).convert_destroy()

@@ -186,7 +186,8 @@ class ClassWrapper(RefcountedWrapper):
             self,
             lambda new_class:
                 context.converter.defineNativeFunction(
-                    'construct(' + self.typeRepresentation.__name__ + ")(" + ",".join([a.expr_type.typeRepresentation.__name__ for a in args]) + ")",
+                    'construct(' + self.typeRepresentation.__name__ + ")("
+                    + ",".join([a.expr_type.typeRepresentation.__name__ for a in args]) + ")",
                     ('util', self, 'construct', tuple([a.expr_type for a in args])),
                     [a.expr_type for a in args],
                     self,
@@ -197,8 +198,11 @@ class ClassWrapper(RefcountedWrapper):
     def generateConstructor(self, context, out, *args):
         context.pushEffect(
             out.expr.store(
-                runtime_functions.malloc.call(native_ast.const_int_expr(_types.bytecount(self.typeRepresentation.HeldClass) + 8))
-                    .cast(self.getNativeLayoutType())
+                runtime_functions.malloc.call(
+                    native_ast.const_int_expr(
+                        _types.bytecount(self.typeRepresentation.HeldClass) + 8
+                    )
+                ).cast(self.getNativeLayoutType())
             ) >>
             # store a refcount
             out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))

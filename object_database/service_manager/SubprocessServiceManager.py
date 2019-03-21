@@ -88,7 +88,10 @@ class SubprocessServiceManager(ServiceManager):
                 return
 
             with self.lock:
-                logfileName = service.name + "-" + timestampToFileString(time.time()) + "-" + instanceIdentity + ".log.txt"
+                logfileName = (
+                    service.name + "-" + timestampToFileString(time.time())
+                    + "-" + instanceIdentity + ".log.txt"
+                )
 
                 if self.logfileDirectory is not None:
                     output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
@@ -97,7 +100,8 @@ class SubprocessServiceManager(ServiceManager):
 
                 process = subprocess.Popen(
                     [
-                        sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
+                        sys.executable,
+                        os.path.join(ownDir, '..', 'frontends', 'service_entrypoint.py'),
                         service.name,
                         self.host,
                         str(self.port),
@@ -191,7 +195,10 @@ class SubprocessServiceManager(ServiceManager):
                     if instanceId and instanceId not in self.serviceProcesses:
                         if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
                             os.makedirs(os.path.join(self.logfileDirectory, "old"))
-                        shutil.move(os.path.join(self.logfileDirectory, file), os.path.join(self.logfileDirectory, "old", file))
+                        shutil.move(
+                            os.path.join(self.logfileDirectory, file),
+                            os.path.join(self.logfileDirectory, "old", file)
+                        )
 
         if self.storageDir:
             with self.lock:
@@ -203,7 +210,11 @@ class SubprocessServiceManager(ServiceManager):
                                 self._logger.info("Removing storage at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except Exception:
-                                self._logger.error("Failed to remove storage at path %s for dead service:\n%s", path, traceback.format_exc())
+                                self._logger.error(
+                                    "Failed to remove storage at path %s for dead service:\n%s",
+                                    path,
+                                    traceback.format_exc()
+                                )
 
         if self.sourceDir:
             with self.lock:
@@ -215,4 +226,8 @@ class SubprocessServiceManager(ServiceManager):
                                 self._logger.info("Removing source caches at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except Exception:
-                                self._logger.error("Failed to remove source cache at path %s for dead service:\n%s", path, traceback.format_exc())
+                                self._logger.error(
+                                    "Failed to remove source cache at path %s for dead service:\n%s",
+                                    path,
+                                    traceback.format_exc()
+                                )

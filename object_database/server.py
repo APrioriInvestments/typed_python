@@ -319,10 +319,13 @@ class Server:
     def _handleSubscriptionInForeground(self, channel, msg):
         # first see if this would be an easy subscription to handle
         with Timer("Handle subscription in foreground: %s/%s/%s/isLazy=%s over %s",
-                   msg.schema, msg.typename, msg.fieldname_and_value, msg.isLazy, lambda: len(identities)):
+                   msg.schema, msg.typename, msg.fieldname_and_value,
+                   msg.isLazy, lambda: len(identities)
+                   ):
             typedef, identities = self._parseSubscriptionMsg(channel, msg)
 
-            if not (msg.isLazy and len(identities) < self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY or len(identities) < self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY):
+            if not (msg.isLazy and len(identities) < self.MAX_LAZY_TO_SEND_SYNCHRONOUSLY
+                    or len(identities) < self.MAX_NORMAL_TO_SEND_SYNCHRONOUSLY):
                 self._subscriptionQueue.put((channel, msg))
                 return
 
@@ -376,7 +379,10 @@ class Server:
         assert msg.typename is not None
         typename = msg.typename
 
-        assert typename in definition, "Can't subscribe to a type we didn't define in the schema: %s not in %s" % (typename, list(definition))
+        assert typename in definition, (
+            "Can't subscribe to a type we didn't define in the schema: %s not in %s"
+            % (typename, list(definition))
+        )
 
         typedef = definition[typename]
 
@@ -388,7 +394,13 @@ class Server:
         if field == '_identity':
             identities = set([val])
         else:
-            identities = set(self._kvstore.getSetMembers(keymapping.index_key_from_names_encoded(schema_name, typename, field, val)))
+            identities = set(
+                self._kvstore.getSetMembers(
+                    keymapping.index_key_from_names_encoded(
+                        schema_name, typename, field, val
+                    )
+                )
+            )
 
         return typedef, identities
 

@@ -231,10 +231,25 @@ class GraphDisplayService(ServiceBase):
             ),
             Twinned=Subscribed(twinned),
             feigenbaum=(
-                Dropdown("Depth", [(val, depth.setter(val)) for val in [10, 50, 100, 250, 500, 750, 1000]]) +
-                Dropdown("Polynomial", [1.0, 1.5, 2.0], lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))) +
-                Dropdown("Density", list(range(100, 10000, 100)), lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))) +
-                Card(Plot(lambda graph: GraphDisplayService.feigenbaum(graph, depth.get()))).width(600).height(400)
+                Dropdown(
+                    "Depth",
+                    [(val, depth.setter(val)) for val in [10, 50, 100, 250, 500, 750, 1000]]
+                ) +
+                Dropdown(
+                    "Polynomial",
+                    [1.0, 1.5, 2.0],
+                    lambda polyVal: setattr(Feigenbaum.lookupAny(), 'y', float(polyVal))
+                ) +
+                Dropdown(
+                    "Density",
+                    list(range(100, 10000, 100)),
+                    lambda polyVal: setattr(Feigenbaum.lookupAny(), 'density', float(polyVal))
+                ) +
+                Card(
+                    Plot(
+                        lambda graph: GraphDisplayService.feigenbaum(graph, depth.get())
+                    )
+                ).width(600).height(400)
             )
         )
 

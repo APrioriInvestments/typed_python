@@ -2038,7 +2038,10 @@ class Clickable(Cell):
         if isinstance(self.f, str):
             return quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(self.f, "'")), '"')
         else:
-            return "websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))".replace("__identity__", self.identity)
+            return (
+                "websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
+                .replace("__identity__", self.identity)
+            )
 
     def recalculate(self):
         self.children = {'____contents__': self.content}
