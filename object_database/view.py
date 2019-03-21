@@ -15,6 +15,7 @@
 from typed_python import serialize, deserialize
 
 from object_database.keymapping import data_key, index_key
+import object_database
 import logging
 import threading
 import queue
@@ -28,6 +29,10 @@ class DisconnectedException(Exception):
 
 
 class RevisionConflictException(Exception):
+    pass
+
+
+class FieldNotDefaultInitializable(Exception):
     pass
 
 
@@ -78,8 +83,9 @@ def coerce_value(value, toType):
 
 
 def default_initialize(t):
+    if issubclass(t, object_database.object.DatabaseObject):
+        raise FieldNotDefaultInitializable(f"Can't default initialize a {t}")
     return t()
-
 
 _cur_view = threading.local()
 
@@ -103,6 +109,7 @@ class View(object):
         self._insistWritesConsistent = True
         self._insistIndexReadsConsistent = False
         self._confirmCommitCallback = None
+        self._objects_being_constructed = set()
         self._logger = logging.getLogger(__name__)
 
     def db(self):
@@ -115,14 +122,14 @@ class View(object):
     def transaction_id(self):
         return self._transaction_num
 
-    def _new(self, cls, kwds):
+    def _new(self, cls, args, kwds):
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
 
         if not self._db._isTypeSubscribed(cls):
             raise Exception("No subscriptions exist for type %s" % cls)
 
-        if "_identity" in kwds:
+        if "_identity" in kwds and not args and len(kwds) == 1:
             identity = kwds["_identity"]
             kwds = dict(kwds)
             del kwds["_identity"]
@@ -131,12 +138,45 @@ class View(object):
 
         o = cls.fromIdentity(identity)
 
-        writes = {}
+        try:
+            self._writes[data_key(cls, identity, " exists")] = (bool, True)
 
+            if not hasattr(cls, '__types__') or cls.__types__ is None:
+                raise Exception("Please initialize the type object for %s" % str(cls.__qualname__))
+
+            if hasattr(cls, '__odb_initializer__'):
+                self._add_to_index(index_key(cls, " exists", True), identity)
+
+                cls.__odb_initializer__(o, *args, **kwds)
+
+                for tname, t in cls.__types__.items():
+                    k = data_key(cls, identity, tname)
+                    if k not in self._writes:
+                        setattr(o, tname, default_initialize(t))
+            else:
+                if args:
+                    raise Exception(f"Default constructor for {cls.__qualname__} doesn't accept positional arguments.")
+
+                self._defaultConstructInstance(cls, o, kwds)
+
+        except Exception:
+            # make sure we leave no trace of this object.
+            for tname in cls.__types__:
+                k = data_key(cls, identity, tname)
+                if k in self._writes:
+                    del self._writes[k]
+
+            del self._writes[data_key(cls, identity, " exists")]
+
+            # propagate the exception
+            raise
+
+        return o
+
+    def _defaultConstructInstance(self, cls, o, kwds):
         kwds = dict(kwds)
 
-        if not hasattr(cls, '__types__') or cls.__types__ is None:
-            raise Exception("Please initialize the type object for %s" % str(cls.__qualname__))
+        identity = o._identity
 
         for tname, t in cls.__types__.items():
             if tname not in kwds:
@@ -146,28 +186,27 @@ class View(object):
             if kwd not in cls.__types__:
                 raise TypeError("Unknown field %s on %s" % (kwd, cls))
 
+            targetType = cls.__types__[kwd]
+
             try:
-                coerced_val = coerce_value(val, cls.__types__[kwd])
+                coerced_val = coerce_value(val, targetType)
             except Exception:
-                raise TypeError("Can't coerce %s to type %s" % (val, cls.__types__[kwd]))
+                raise TypeError(f"Can't coerce {val} to type {targetType} when initializing {kwd} of {cls.__qualname__}")
 
-            writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
-
-        writes[data_key(cls, identity, " exists")] = (bool, True)
-
-        self._writes.update(writes)
+            self._writes[data_key(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
 
         if cls in cls.__schema__._indices:
             for index_name, index_fun in cls.__schema__._indices[cls].items():
-                val = index_fun(o)
+                try:
+                    val = index_fun(o)
+                    if val is not None:
+                        indexType = cls.__schema__._indexTypes[cls][index_name]
+                        ik = index_key(cls, index_name, coerce_value(val, indexType))
 
-                if val is not None:
-                    indexType = cls.__schema__._indexTypes[cls][index_name]
-                    ik = index_key(cls, index_name, indexType(val))
+                        self._add_to_index(ik, identity)
 
-                    self._add_to_index(ik, identity)
-
-        return o
+                except FieldNotDefaultInitializable:
+                    pass
 
     def _get(self, obj, identity, field_name, field_type):
         key = data_key(type(obj), identity, field_name)
@@ -240,7 +279,10 @@ class View(object):
         if not obj.exists():
             raise ObjectDoesntExistException(obj)
 
-        existing_index_vals = self._compute_index_vals(obj)
+        if hasattr(type(obj), '__odb_destructor__'):
+            type(obj).__odb_destructor__(obj)
+
+        existing_index_vals = self._compute_index_vals(obj, obj.__schema__._indices.get(type(obj), {}).keys())
 
         for name in field_names:
             key = data_key(type(obj), identity, name)
@@ -262,36 +304,41 @@ class View(object):
 
         key = data_key(type(obj), identity, field_name)
 
-        if field_name not in obj.__schema__._indexed_fields[type(obj)]:
+        indicesChanged = obj.__schema__._indexed_fields[type(obj)].get(field_name, [])
+
+        if not indicesChanged:
             self._writes[key] = (field_type, val)
         else:
-            existing_index_vals = self._compute_index_vals(obj)
+            existing_index_vals = self._compute_index_vals(obj, indicesChanged)
 
             self._writes[key] = (field_type, val)
 
-            new_index_vals = self._compute_index_vals(obj)
+            new_index_vals = self._compute_index_vals(obj, indicesChanged)
 
             self._update_indices(obj, identity, existing_index_vals, new_index_vals)
 
-    def _compute_index_vals(self, obj):
+    def _compute_index_vals(self, obj, indicesChanged):
         existing_index_vals = {}
 
-        if type(obj) in obj.__schema__._indices:
-            for index_name, index_fun in obj.__schema__._indices[type(obj)].items():
-                indexType = obj.__schema__._indexTypes[type(obj)][index_name]
+        for index_name in indicesChanged:
+            index_fun = obj.__schema__._indices[type(obj)][index_name]
+            indexType = obj.__schema__._indexTypes[type(obj)][index_name]
 
+            try:
                 unconvertedVal = index_fun(obj)
 
                 if unconvertedVal is not None and indexType is None:
                     assert False, (obj, index_name, unconvertedVal)
 
-                existing_index_vals[index_name] = indexType(unconvertedVal) if unconvertedVal is not None else None
+                existing_index_vals[index_name] = coerce_value(unconvertedVal, indexType) if unconvertedVal is not None else None
+            except FieldNotDefaultInitializable:
+                pass
 
         return existing_index_vals
 
     def _update_indices(self, obj, identity, existing_index_vals, new_index_vals):
         if type(obj) in obj.__schema__._indices:
-            for index_name, index_fun in obj.__schema__._indices[type(obj)].items():
+            for index_name in obj.__schema__._indices[type(obj)]:
                 new_index_val = new_index_vals.get(index_name, None)
                 cur_index_val = existing_index_vals.get(index_name, None)
 
@@ -344,7 +391,7 @@ class View(object):
         indexType = db_type.__schema__._indexTypes[db_type][tname]
 
         if indexType is not None:
-            value = indexType(value)
+            value = coerce_value(value, indexType)
 
         keyname = index_key(db_type, tname, value)
 
@@ -372,7 +419,7 @@ class View(object):
         indexType = db_type.__schema__._indexTypes[db_type][tname]
 
         if indexType is not None:
-            value = indexType(value)
+            value = coerce_value(value, indexType)
 
         keyname = index_key(db_type, tname, value)
 

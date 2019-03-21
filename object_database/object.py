@@ -47,16 +47,10 @@ class DatabaseObject(_base):
         return _base.__new__(cls, _identity=identity)
 
     def __new__(cls, *args, **kwds):
-        if args and len(args) == 1 and isinstance(args[0], cls):
-            return args[0]
-
         if not hasattr(_cur_view, "view"):
             raise Exception("Please create new objects from within a transaction.")
 
-        if args:
-            raise Exception("%s cannot be created with positional arguments." % cls)
-
-        return _cur_view.view._new(cls, kwds)
+        return _cur_view.view._new(cls, args, kwds)
 
     def __repr__(self):
         return type(self).__qualname__ + "(" + self._identity[:8] + ")"
@@ -102,7 +96,7 @@ class DatabaseObject(_base):
 
     def __setattr__(self, name, val):
         if name not in self.__types__:
-            raise AttributeError("Database object of type %s has no attribute %s" % (type(self).__qualname__, name))
+            raise AttributeError(f"Database object of type {type(self).__qualname__} has no attribute '{name}', only {self.__types__.keys()}")
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")

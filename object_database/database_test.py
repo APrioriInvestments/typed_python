@@ -85,6 +85,33 @@ class Object:
 
 
 @schema.define
+class DeletedThingWithInit:
+    pass
+
+
+@schema.define
+class ThingWithInit:
+    x = int
+    y = float
+    z = str
+
+    def __init__(self, x=0,y=123):
+        self.x = x
+        self.y = y
+
+    def __del__(self):
+        DeletedThingWithInit()
+
+
+@schema.define
+class ThingWithInitHoldingOdbRef:
+    x = Indexed(Root)
+
+    def __init__(self):
+        self.x = Root()
+
+
+@schema.define
 class ThingWithDicts:
     x = ConstDict(str, bytes)
 
@@ -99,6 +126,20 @@ class Counter:
 
     def __str__(self):
         return "Counter(k=%s)" % self.k
+
+
+@schema.define
+class ObjectWithManyIndices:
+    x0 = Indexed(int)
+    x1 = Indexed(int)
+    x2 = Indexed(int)
+    x3 = Indexed(int)
+    x4 = Indexed(int)
+    x5 = Indexed(int)
+    x6 = Indexed(int)
+    x7 = Indexed(int)
+    x8 = Indexed(int)
+    x9 = Indexed(int)
 
 
 @schema.define
@@ -123,6 +164,60 @@ class ObjectDatabaseTests:
         with db.transaction():
             z2 = ThingWithDicts()
             z2.x = z.x
+
+    def test_construct_with_init(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            x = ThingWithInit()
+            y = ThingWithInit(1,y=1000)
+
+        with db.view():
+            self.assertEqual(x.x, 0)
+            self.assertEqual(y.x, 1)
+
+            self.assertEqual(x.y, 123)
+            self.assertEqual(y.y, 1000)
+
+            self.assertEqual(x.z, "")
+            self.assertEqual(y.z, "")
+
+    def test_indices_independent(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            x = ObjectWithManyIndices()
+
+        with db.transaction() as t:
+            x.x0 = x.x0 + 1
+
+            # exists, and x.x0, but not x1 through x9
+            self.assertEqual(len(t._reads), 2)
+
+    def test_construct_with_indexed_init(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            r = ThingWithInitHoldingOdbRef()
+
+        with db.view():
+            self.assertTrue(ThingWithInitHoldingOdbRef.lookupOne(x=r.x) == r)
+            self.assertEqual(ThingWithInitHoldingOdbRef.lookupAll(), (r,))
+
+    def test_destructors(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            x = ThingWithInit()
+            x.delete()
+
+        with db.view():
+            self.assertEqual(len(ThingWithInit.lookupAll()), 0)
+            self.assertEqual(len(DeletedThingWithInit.lookupAll()), 1)
 
     def test_subscribe_excluding(self):
         db = self.createNewDb()

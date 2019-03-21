@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.object import DatabaseObject, Index, Indexed
+from object_database.object import _base, DatabaseObject, Index, Indexed
 from types import FunctionType
 from typed_python import ConstDict, NamedTuple, Tuple, TupleOf
 
@@ -36,7 +36,7 @@ class Schema:
         self._supportingTypes = {}
         # class -> indexname -> fun(object->value)
         self._indices = {}
-        # class -> set(fieldname)
+        # class -> fieldname -> set(indices)
         self._indexed_fields = {}
         self._indexTypes = {}
         self._frozen = False
@@ -111,7 +111,7 @@ class Schema:
             self._types[typename] = cls
             self._indices[cls] = {" exists": lambda e: True}
             self._indexTypes[cls] = {" exists": bool}
-            self._indexed_fields[cls] = set([' exists'])
+            self._indexed_fields.setdefault(cls, {}).setdefault(" exists", set()).add(' exists')
 
         return self._types[typename]
 
@@ -121,14 +121,14 @@ class Schema:
         if type not in self._indices:
             self._indices[type] = {}
             self._indexTypes[type] = {}
-            self._indexed_fields[type] = set()
+            self._indexed_fields[type] = {}
 
         fun = lambda o: getattr(o, prop)
         index_type = type.__types__[prop]
 
         self._indices[type][prop] = fun
         self._indexTypes[type][prop] = index_type
-        self._indexed_fields[type].add(prop)
+        self._indexed_fields[type].setdefault(prop, set()).add(prop)
 
     def _addTupleIndex(self, type, name, props, indexType):
         assert issubclass(type, DatabaseObject)
@@ -142,7 +142,9 @@ class Schema:
 
         self._indices[type][name] = fun
         self._indexTypes[type][name] = indexType
-        self._indexed_fields[type].update(props)
+
+        for prop in props:
+            self._indexed_fields[type].setdefault(prop, set()).add(name)
 
     def define(self, cls):
         assert not cls.__name__.startswith("_"), "Illegal to use _ for first character in database classnames."
@@ -176,14 +178,19 @@ class Schema:
         t._define(**types)
 
         for base in reversed(properBaseClasses):
-            for name, val in base.__dict__.items():
-                if isinstance(val, Index):
-                    self._addTupleIndex(t, name, val.names, Tuple(*tuple(types[k] for k in val.names)))
-                if not name.startswith('__') and isinstance(val, Indexed):
-                    self._addIndex(t, name)
-                elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
-                    if isinstance(val, (FunctionType, staticmethod, property)):
-                        setattr(t, name, val)
+            if base not in (DatabaseObject, _base, object):
+                for name, val in base.__dict__.items():
+                    if isinstance(val, Index):
+                        self._addTupleIndex(t, name, val.names, Tuple(*tuple(types[k] for k in val.names)))
+                    if not name.startswith('__') and isinstance(val, Indexed):
+                        self._addIndex(t, name)
+                    elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
+                        if isinstance(val, (FunctionType, staticmethod, property)):
+                            setattr(t, name, val)
+                    elif name == "__init__":
+                        setattr(t, "__odb_initializer__", val)
+                    elif name == "__del__":
+                        setattr(t, "__odb_destructor__", val)
 
         if hasattr(cls, '__object_database_lazy_subscription__'):
             t.__object_database_lazy_subscription__ = cls.__object_database_lazy_subscription__
