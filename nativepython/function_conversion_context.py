@@ -61,8 +61,9 @@ class FunctionConversionContext(object):
         if self._star_args_name is not None:
             body_native_expr = self.construct_starargs_around(body_native_expr, self._star_args_name)
 
-        body_native_expr = self.construct_stackslots_around(body_native_expr, self._argnames, self._star_args_name)
-
+        body_native_expr = self.construct_stackslots_around(
+            body_native_expr, self._argnames, self._star_args_name
+        )
         return_type = self._varname_to_type.get(FunctionOutput, None)
 
         if return_type is None:
@@ -78,7 +79,10 @@ class FunctionConversionContext(object):
         if return_type.is_pass_by_ref:
             return (
                 native_ast.Function(
-                    args=(('.return', return_type.getNativeLayoutType().pointer()),) + tuple(self._native_args),
+                    args=(
+                        (('.return', return_type.getNativeLayoutType().pointer()),)
+                        + tuple(self._native_args)
+                    ),
                     body=native_ast.FunctionBody.Internal(body=body_native_expr),
                     output_type=native_ast.Void
                 ),
@@ -204,7 +208,9 @@ class FunctionConversionContext(object):
                     slot_ref.convert_assign(val_to_store)
                 with false_block:
                     slot_ref.convert_copy_initialize(val_to_store)
-                    subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+                    subcontext.pushEffect(
+                        subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr)
+                    )
 
     def convert_statement_ast(self, ast):
         if ast.matches.Assign or ast.matches.AugAssign:
@@ -367,7 +373,9 @@ class FunctionConversionContext(object):
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
             return (
-                native_ast.Expression.Branch(cond=cond_context.finalize(cond.nonref_expr), true=true, false=false),
+                native_ast.Expression.Branch(
+                    cond=cond_context.finalize(cond.nonref_expr), true=true, false=false
+                ),
                 true_returns or false_returns
             )
 
@@ -390,7 +398,9 @@ class FunctionConversionContext(object):
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
 
             return (
-                native_ast.Expression.While(cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false),
+                native_ast.Expression.While(
+                    cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false
+                ),
                 true_returns or false_returns
             )
 
@@ -429,7 +439,9 @@ class FunctionConversionContext(object):
 
             return (
                 iterator_setup_context.finalize(None) >>
-                native_ast.Expression.While(cond=cond_context.finalize(is_populated), while_true=true, orelse=false),
+                native_ast.Expression.While(
+                    cond=cond_context.finalize(is_populated), while_true=true, orelse=false
+                ),
                 true_returns or false_returns
             )
 
@@ -464,7 +476,13 @@ class FunctionConversionContext(object):
                 else:
                     self.upsizeVariableType(FunctionOutput, NoneWrapper())
 
-            exprAndReturns.append(self.convert_statement_ast(python_ast.Statement.Return(value=None, filename="", line_number=0, col_offset=0)))
+            exprAndReturns.append(
+                self.convert_statement_ast(
+                    python_ast.Statement.Return(
+                        value=None, filename="", line_number=0, col_offset=0
+                    )
+                )
+            )
 
         seq_expr = native_ast.Expression.Sequence(
             vals=[expr for expr, _ in exprAndReturns]

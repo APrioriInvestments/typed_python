@@ -57,7 +57,9 @@ class OneOfWrapper(Wrapper):
         exprs = []
         typesSeen = set()
 
-        with context.switch(left.expr.ElementPtrIntegers(0, 0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
+        with context.switch(left.expr.ElementPtrIntegers(0, 0).load(),
+                            range(len(self.typeRepresentation.Types)),
+                            False) as indicesAndContexts:
             for i, subcontext in indicesAndContexts:
                 with subcontext:
                     if isReversed:
@@ -141,7 +143,9 @@ class OneOfWrapper(Wrapper):
                 expr.expr.store(other.nonref_expr)
             )
         else:
-            with context.switch(other.expr.ElementPtrIntegers(0, 0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
+            with context.switch(other.expr.ElementPtrIntegers(0, 0).load(),
+                                range(len(self.typeRepresentation.Types)),
+                                False) as indicesAndContexts:
                 for ix, subcontext in indicesAndContexts:
                     with subcontext:
                         self.refAs(context, expr, ix).convert_copy_initialize(self.refAs(context, other, ix))
@@ -151,7 +155,9 @@ class OneOfWrapper(Wrapper):
 
     def convert_destroy(self, context, expr):
         if not self.is_pod:
-            with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(), range(len(self.typeRepresentation.Types)), False) as indicesAndContexts:
+            with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
+                                range(len(self.typeRepresentation.Types)),
+                                False) as indicesAndContexts:
                 for ix, subcontext in indicesAndContexts:
                     with subcontext:
                         self.refAs(context, expr, ix).convert_destroy()

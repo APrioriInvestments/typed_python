@@ -724,11 +724,17 @@ def convertPyAstToAlgebraic(tree, fname, keepLineInformation=True):
             except Exception:
                 import traceback
                 raise UserWarning(
-                    "Failed to construct %s from %s with arguments\n%s\n\n%s"
-                    % (converter, type(tree),
-                       "\n".join(["\t%s:%s (from %s)" % (k, repr(v)[:50], getattr(tree, k) if hasattr(tree, k) else None) for k, v in args.items()]),
-                       traceback.format_exc()
-                       )
+                    "Failed to construct %s from %s with arguments\n%s\n\n%s" % (
+                        converter,
+                        type(tree),
+                        "\n".join([
+                            "\t%s:%s (from %s)" % (
+                                k, repr(v)[:50], getattr(tree, k) if hasattr(tree, k) else None
+                            )
+                            for k, v in args.items()
+                        ]),
+                        traceback.format_exc()
+                    )
                 )
 
     if isinstance(tree, list):

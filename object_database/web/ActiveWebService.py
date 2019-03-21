@@ -293,7 +293,10 @@ class ActiveWebService(ServiceBase):
                 maxRowsPerPage=50
             ),
             Hosts=Table(
-                colFun=lambda: ['Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION', 'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'],
+                colFun=lambda: [
+                    'Connection', 'IsMaster', 'Hostname', 'RAM ALLOCATION',
+                    'CORE ALLOCATION', 'SERVICE COUNT', 'CPU USE', 'RAM USE'
+                ],
                 rowFun=lambda: sorted(service_schema.ServiceHost.lookupAll(), key=lambda s: s.hostname),
                 headerFun=lambda x: x,
                 rendererFun=lambda s, field: Subscribed(
