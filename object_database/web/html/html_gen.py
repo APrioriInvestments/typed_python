@@ -29,7 +29,7 @@ class HTMLElement(AbstractHTMLWriter):
         self.tag_name = tag_name
         self.is_self_closing = is_self_closing
         self.attributes = attributes if attributes is not None else {}
-        self.children = children 
+        self.children = children
         self.parent = None
 
     def add_child(self, child_element):
@@ -131,20 +131,138 @@ def _func(cls, *args, **kwargs):
     """Helper function for setting classmethods."""
     return cls(*args, **kwargs)
 
+
 HTML_TAG_CONFIG = [
+    {"tag_name": "a"},
+    {"tag_name": "abbr"},
+    {"tag_name": "address"},
+    {"is_self_closing": True, "tag_name": "area"},
+    {"tag_name": "article"},
+    {"tag_name": "aside"},
+    {"tag_name": "audio"},
+    {"tag_name": "b"},
+    {"is_self_closing": True, "tag_name": "base"},
+    {"tag_name": "bdi"},
+    {"tag_name": "bdo"},
+    {"tag_name": "blockquote"},
+    {"tag_name": "body"},
+    {"is_self_closing": True, "tag_name": "br"},
+    {"tag_name": "button"},
+    {"tag_name": "canvas"},
+    {"tag_name": "caption"},
+    {"tag_name": "cite"},
+    {"tag_name": "code"},
+    {"is_self_closing": True, "tag_name": "col"},
+    {"tag_name": "colgroup"},
+    {"tag_name": "data"},
+    {"tag_name": "datalist"},
+    {"tag_name": "dd"},
+    {"tag_name": "del"},
+    {"tag_name": "details"},
+    {"tag_name": "dfn"},
+    {"tag_name": "dialog"},
     {"tag_name": "div"},
+    {"tag_name": "dl"},
+    {"tag_name": "dt"},
+    {"tag_name": "em"},
+    {"is_self_closing": True, "tag_name": "embed"},
+    {"tag_name": "fieldset"},
+    {"tag_name": "figcaption"},
+    {"tag_name": "figure"},
+    {"tag_name": "footer"},
+    {"tag_name": "form"},
+    {"tag_name": "h1"},
+    {"tag_name": "h2"},
+    {"tag_name": "h3"},
+    {"tag_name": "h4"},
+    {"tag_name": "h5"},
+    {"tag_name": "h6"},
+    {"tag_name": "head"},
+    {"tag_name": "header"},
+    {"tag_name": "hgroup"},
+    {"is_self_closing": True, "tag_name": "hr"},
+    {"tag_name": "html"},
+    {"tag_name": "i"},
+    {"tag_name": "iframe"},
+    {"is_self_closing": True, "tag_name": "img"},
+    {"is_self_closing": True, "tag_name": "input"},
+    {"tag_name": "ins"},
+    {"tag_name": "kbd"},
+    {"tag_name": "keygen"},
+    {"tag_name": "label"},
+    {"tag_name": "legend"},
+    {"tag_name": "li"},
+    {"is_self_closing": True, "tag_name": "link"},
+    {"tag_name": "main"},
+    {"tag_name": "map"},
+    {"tag_name": "mark"},
+    {"tag_name": "math"},
+    {"tag_name": "menu"},
+    {"tag_name": "menuitem"},
+    {"is_self_closing": True, "tag_name": "meta"},
+    {"tag_name": "meter"},
+    {"tag_name": "nav"},
+    {"tag_name": "noscript"},
+    {"tag_name": "object"},
+    {"tag_name": "ol"},
+    {"tag_name": "optgroup"},
+    {"tag_name": "option"},
+    {"tag_name": "output"},
     {"tag_name": "p"},
-    {"tag_name": "img", "is_self_closing": True},
-]
+    {"is_self_closing": True, "tag_name": "param"},
+    {"tag_name": "picture"},
+    {"tag_name": "pre"},
+    {"tag_name": "progress"},
+    {"tag_name": "q"},
+    {"tag_name": "rb"},
+    {"tag_name": "rp"},
+    {"tag_name": "rt"},
+    {"tag_name": "rtc"},
+    {"tag_name": "ruby"},
+    {"tag_name": "s"},
+    {"tag_name": "samp"},
+    {"tag_name": "script"},
+    {"tag_name": "section"},
+    {"tag_name": "select"},
+    {"tag_name": "slot"},
+    {"tag_name": "small"},
+    {"is_self_closing": True, "tag_name": "source"},
+    {"tag_name": "span"},
+    {"tag_name": "strong"},
+    {"tag_name": "style"},
+    {"tag_name": "sub"},
+    {"tag_name": "summary"},
+    {"tag_name": "sup"},
+    {"tag_name": "svg"},
+    {"tag_name": "table"},
+    {"tag_name": "tbody"},
+    {"tag_name": "td"},
+    {"tag_name": "template"},
+    {"tag_name": "textarea"},
+    {"tag_name": "tfoot"},
+    {"tag_name": "th"},
+    {"tag_name": "thead"},
+    {"tag_name": "time"},
+    {"tag_name": "title"},
+    {"tag_name": "tr"},
+    {"is_self_closing": True, "tag_name": "track"},
+    {"tag_name": "u"},
+    {"tag_name": "ul"},
+    {"tag_name": "var"},
+    {"tag_name": "video"},
+    {"is_self_closing": True, "tag_name": "wbr"}]
 
 for tag in HTML_TAG_CONFIG:
     setattr(HTMLElement, tag["tag_name"],
             classmethod(partial(_func, **tag)))
 
 # helper static method for inspecting all available tags
+
+
 def _get_method_names(cls):
     return [item[0] for item in
             inspect.getmembers(cls, predicate=inspect.ismethod)]
+
 
 setattr(HTMLElement, "all_methods",
         staticmethod(_get_method_names(HTMLElement)))
