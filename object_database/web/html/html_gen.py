@@ -24,8 +24,23 @@ class AbstractHTMLWriter(ABC):
 
 
 class HTMLElement(AbstractHTMLWriter):
+    """HTML element generation class."""
     def __init__(self, tag_name=None, attributes=None, children=None,
                  is_self_closing=False):
+        """
+        Parameters:
+        ----------
+        tag_name: str
+            example: div, p, a etc
+        attributes : dict
+            html tag attributes
+        children : list
+            list of HTMLElement or HTMLTextContent
+        is_self_closing : bool
+            a self-closing tag does not carry a content payload;
+            example: <img src="path to img"/>
+
+        """
         self.tag_name = tag_name
         self.is_self_closing = is_self_closing
         self.attributes = attributes if attributes is not None else {}
@@ -84,6 +99,16 @@ class HTMLElement(AbstractHTMLWriter):
         return stream.getvalue()
 
     def print_on(self, io_stream, indent=0, indent_increment=4, newlines=True):
+        """Print payload to stream.
+
+        Parameters:
+        ----------
+        io_stream: Stream
+        indent: int
+        indent_increment: int
+        newlines: True
+            print with newlines
+        """
         self._print_open_tag_on(io_stream, indent, newlines)
         if not self.is_self_closing:
             self._print_children_on(io_stream, indent, indent_increment)
@@ -269,11 +294,30 @@ setattr(HTMLElement, "all_methods",
 
 
 class HTMLTextContent(AbstractHTMLWriter):
+    """Display raw content in a div."""
     def __init__(self, content):
+        """
+        Parameters:
+        ----------
+        content: str
+        """
         super().__init__()
         self.content = content
 
     def print_on(self, io_stream, indent=0, indent_increment=4, newlines=True):
-        for line in self.content.split("\n"):
+        """Print payload to stream.
+
+        Parameters:
+        ----------
+        io_stream: Stream
+        indent: int
+        indent_increment: int
+        newlines: True
+            print with newlines
+        """
+        for line in self.content.splitlines():
             inline_indent = " " * indent
-            io_stream.write('{}{}\n'.format(inline_indent, line))
+            if newlines:
+                io_stream.write('{}{}\n'.format(inline_indent, line))
+            else:
+                io_stream.write('{}{} '.format(inline_indent, line))
