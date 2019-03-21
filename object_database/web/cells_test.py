@@ -64,13 +64,13 @@ class CellsTests(unittest.TestCase):
             Container("HI2")
         ]
         pairCell = Sequence(pair)
-        self.cells.root.setChild(pairCell)
+        self.cells.withRoot(pairCell)
 
         msgs = self.cells.renderMessages()
 
-        expectedCells = [self.cells.root, pairCell, pair[0], pair[1]]
+        expectedCells = [self.cells._root, pairCell, pair[0], pair[1]]
 
-        self.assertTrue(self.cells.root in self.cells)
+        self.assertTrue(self.cells._root in self.cells)
         self.assertTrue(pairCell in self.cells)
         self.assertTrue(pair[0] in self.cells)
         self.assertTrue(pair[1] in self.cells)
@@ -90,7 +90,7 @@ class CellsTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            set(messages[self.cells.root.identity]['replacements'].values()),
+            set(messages[self.cells._root.identity]['replacements'].values()),
             set([pairCell.identity])
         )
 
@@ -100,7 +100,7 @@ class CellsTests(unittest.TestCase):
             Container("HI2")
         ]
 
-        self.cells.root.setChild(
+        self.cells.withRoot(
             Sequence(pair)
         )
 
@@ -116,7 +116,7 @@ class CellsTests(unittest.TestCase):
         c2 = Card(Text("HI2"))
         slot = Slot(0)
 
-        self.cells.root.setChild(
+        self.cells.withRoot(
             Subscribed(lambda: c1 if slot.get() else c2)
         )
 
@@ -126,10 +126,10 @@ class CellsTests(unittest.TestCase):
         slot.set(0)
         self.cells.renderMessages()
 
-        self.assertFalse(self.cells.root.childrenWithExceptions())
+        self.assertFalse(self.cells.childrenWithExceptions())
 
     def test_cells_subscriptions(self):
-        self.cells.root.setChild(
+        self.cells.withRoot(
             Subscribed(
                 lambda: Sequence([
                     Span("Thing(k=%s).x = %s" % (thing.k, thing.x))
@@ -173,7 +173,7 @@ class CellsTests(unittest.TestCase):
 
             return res
 
-        self.cells.root.setChild(Subscribed(checkThing2s))
+        self.cells.withRoot(Subscribed(checkThing2s))
 
         self.cells.renderMessages()
 
@@ -185,7 +185,7 @@ class CellsTests(unittest.TestCase):
         # cell count, and that we send deletion messages
 
         # subscribes to the set of cells with k=0 and displays something
-        self.cells.root.setChild(
+        self.cells.withRoot(
             SubscribedSequence(
                 lambda: Thing.lookupAll(k=0),
                 lambda thing: Subscribed(
@@ -221,7 +221,7 @@ class CellsTests(unittest.TestCase):
             db.subscribeToSchema(test_schema)
             cells = Cells(db)
 
-            cells.root.setChild(cell)
+            cells.withRoot(cell)
 
             initFn(db, cells)
 
@@ -335,7 +335,7 @@ class CellsTests(unittest.TestCase):
         def any_x(X):
             return Text(X.x).tagged("display " + str(X.x))
 
-        self.cells.root.setChild(
+        self.cells.withRoot(
             Card(X(0)).withContext(size="small") +
             Card(X(1)).withContext(size="large") +
             Card(X(2)).withContext(size="something else") +
@@ -344,7 +344,7 @@ class CellsTests(unittest.TestCase):
 
         self.cells.renderMessages()
 
-        self.assertTrue(self.cells.root.findChildrenByTag("small display 0"))
-        self.assertTrue(self.cells.root.findChildrenByTag("large display 1"))
-        self.assertTrue(self.cells.root.findChildrenByTag("sized display 2"))
-        self.assertTrue(self.cells.root.findChildrenByTag("display 3"))
+        self.assertTrue(self.cells.findChildrenByTag("small display 0"))
+        self.assertTrue(self.cells.findChildrenByTag("large display 1"))
+        self.assertTrue(self.cells.findChildrenByTag("sized display 2"))
+        self.assertTrue(self.cells.findChildrenByTag("display 3"))
