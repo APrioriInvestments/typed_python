@@ -3,7 +3,7 @@
 import re
 import unittest
 
-from html_gen import (
+from object_database.web.html.html_gen import (
     HTMLElement,
     HTMLTextContent,
     HTML_TAG_CONFIG,
@@ -39,6 +39,27 @@ class HTMLGeneratorTests(unittest.TestCase):
                 all_present = False
         self.assertTrue(all_present)
 
+    def test_add_class_on_empty(self):
+        element = HTMLElement()
+        element.add_class("column-4")
+        class_list = element.attributes["class"].split()
+        self.assertTrue("column-4" in class_list)
+
+    def test_add_class(self):
+        element = HTMLElement(attributes={'class': 'one two'})
+        element.add_class("three")
+        self.assertEqual(element.attributes['class'], "one two three")
+
+    def test_remove_class(self):
+        element = HTMLElement(attributes={"class": "one two three"})
+        element.remove_class("two")
+        self.assertEqual(element.attributes['class'], "one three")
+
+    def test_remove_class_on_empty(self):
+        element = HTMLElement()
+        element.remove_class("test")
+        self.assertTrue("class" not in element.attributes)
+
     def test_print_on_basic(self):
         stream = StringIO()
         element = HTMLElement('div')
@@ -67,7 +88,7 @@ class HTMLGeneratorTests(unittest.TestCase):
         element = HTMLTextContent('this is content')
         element.print_on(stream)
         output = stream.getvalue()
-        test_out = "this is content\n" 
+        test_out = "this is content\n"
         self.assertEqual(test_out, output)
 
     def test_print_on_with_content_nested(self):
@@ -108,6 +129,7 @@ class HTMLGeneratorTests(unittest.TestCase):
     def tearDown(self):
         pass
 
+
 class HTMLChainingMethodTests(unittest.TestCase):
     def setUp(self):
         pass
@@ -139,6 +161,7 @@ class HTMLChainingMethodTests(unittest.TestCase):
 
     def tearDown(self):
         pass
+
 
 class HTMLCustomConstructorTests(unittest.TestCase):
     def setUp(self):
