@@ -540,6 +540,7 @@ class HTMLTextContent(AbstractHTMLWriter):
         """
         super().__init__()
         self.content = content
+        self.parent = None
 
     def print_on(self, io_stream, indent=0, indent_increment=4, newlines=True):
         """Print the text content to a given stream
