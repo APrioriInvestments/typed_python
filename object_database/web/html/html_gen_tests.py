@@ -79,7 +79,7 @@ class HTMLGeneratorTests(unittest.TestCase):
         test_out = ('<div class="column-4 medium"><p class="column-4 medium">' +
                     '</p></div>')
         # we don't care about white spaces or new linesso much
-        output = re.sub('\s{2,}', '', output)
+        output = re.sub(r'\s{2,}', '', output)
         output = re.sub(r'\n', '', output)
         self.assertEqual(test_out, output)
 
@@ -101,7 +101,7 @@ class HTMLGeneratorTests(unittest.TestCase):
         test_out = ('<div class="column-4 medium">this is content' +
                     '</div>')
         # we don't care about white spaces or new linesso much
-        output = re.sub('\s{2,}', '', output)
+        output = re.sub(r'\s{2,}', '', output)
         output = re.sub(r'\n', '', output)
         self.assertEqual(test_out, output)
 
