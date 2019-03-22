@@ -230,10 +230,12 @@ class HTMLElement(AbstractHTMLWriter):
             that can be used for chaining.
         """
         if 'class' in self.attributes:
-            current = self.attributes['class'].split()
-            current_set = set(current)
-            current_set.add(cls_string)
-            self.attributes['class'] = " ".join(list(current_set))
+            class_list = self.attributes['class'].split()
+            if cls_string not in class_list:
+                class_list.append(cls_string)
+                self.attributes['class'] = " ".join(class_list)
+        else:
+            self.attributes["class"] = cls_string
         return self
 
     def remove_class(self, cls_string):
@@ -262,12 +264,37 @@ class HTMLElement(AbstractHTMLWriter):
             that can be used for chaining.
         """
         if 'class' in self.attributes:
-            current = self.attributes['class'].split()
-            current_set = set(current)
-            if cls_string not in current_set:
-                return self
-            current_set.remove(cls_string)
-            self.attributes['class'] = " ".join(list(current_set))
+            class_list = self.attributes["class"].split()
+            if cls_string in class_list:
+                class_list.remove(cls_string)
+            self.attributes['class'] = " ".join(class_list)
+        return self
+
+    def add_classes(self, list_of_str):
+        """Adds HTML element class values from a list
+
+        Example
+        -------
+        Add three classes from a list::
+            classes_to_add = ["one", "two", "three"]
+            element = HTMLElement()
+            element.add_classes(classes_to_add)
+            print(element.attributes["class"])
+            # 'one two three'
+
+        Parameters
+        ----------
+        list_of_str: list
+            A list of strings that are HTML class values
+
+        Returns
+        -------
+        HTMLElement
+            A reference to the current instance that can be
+            used for chaining calls.
+        """
+        for class_str in list_of_str:
+            self.add_class(class_str)
         return self
 
     def pretty_print(self, indent_increment=2):
