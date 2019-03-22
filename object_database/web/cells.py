@@ -908,7 +908,7 @@ class Card(Cell):
         card.attributes["style"] = self._divStyle()
 
         self.cells._logger.info(str(card))
-        
+
         self.contents = str(card)
 
     def sortsAs(self):
@@ -920,11 +920,9 @@ class CardTitle(Cell):
         super().__init__()
 
         self.children = {"____contents__": Cell.makeCell(inner)}
-        self.contents = """
-        <div class='card-title'>
-          ____contents__
-        </div>
-        """
+        self.contents = HTMLElement.div().add_child(
+            HTMLTextContent("____contents__")
+        ).add_class("card-title")
 
     def sortsAs(self):
         return self.inner.sortsAs()
@@ -1011,28 +1009,27 @@ class CollapsiblePanel(Cell):
 
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
-
-        self.contents = """
-            <div class="container-fluid" __style__>
-                <div class="row flex-nowrap no-gutters">
-                    <div class="col-md-auto">
-                        ____panel__
-                    </div>
-                    <div class="col-sm">
-                        ____content__
-                    </div>
-                </div>
-            </div>
-            """ if expanded else """
-            <div __style__>
-                ____content__
-            </div>
-            """
-
-        self.contents = (
-            self.contents.replace("__identity__", self.identity)
-                         .replace("__style__", self._divStyle())
-        )
+        if expanded:
+            container = HTMLElement.div().add_class("container-fluid")
+            container.attributes["style"] = self._divStyle()
+            row = HTMLElement.div().add_classes(
+                 ["row", "flex-nowrap", "no-gutters"]
+            ).with_children(
+                HTMLElement.div().add_class("col-md-auto").add_child(
+                    HTMLTextContent("____panel__")
+                ),
+                HTMLElement.div().add_class("col-sm").add_child(
+                    HTMLTextContent("____content__")
+                )
+            )
+            container.add_child(row)
+            self.contents = str(container)
+        else:
+            unexpanded_container = HTMLElement.div().add_child(
+                HTMLTextContent("____content__")
+            )
+            unexpanded_container.attributes['style'] = self._divStyle()
+            self.contents = str(unexpanded_container)
 
         self.children = {
             '____content__': self.content
