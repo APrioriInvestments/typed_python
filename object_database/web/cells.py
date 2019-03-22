@@ -82,7 +82,8 @@ def multiReplace(msg, replacements):
         else:
             outChunks.append("____" + chunk)
 
-    assert not replacements, "Didn't use up replacement %s in %s" % (replacements.keys(), msg)
+    assert not replacements, "Didn't use up replacement %s in %s" % (
+        replacements.keys(), msg)
 
     return "".join(outChunks)
 
@@ -109,7 +110,8 @@ class GeventPipe:
 
     def __init__(self):
         self.read_fd, self.write_fd = os.pipe()
-        self.fileobj = gevent.fileobject.FileObjectPosix(self.read_fd, bufsize=2)
+        self.fileobj = gevent.fileobject.FileObjectPosix(
+            self.read_fd, bufsize=2)
         self.netChange = 0
 
     def wait(self):
@@ -208,13 +210,16 @@ class Cells:
             creatingCell, task = self._tasks.get(timeout=.25)
             if creatingCell.isActive():
                 try:
-                    self._logger.info("Starting task %s with %s remaining", task, self._tasks.qsize())
+                    self._logger.info(
+                        "Starting task %s with %s remaining", task, self._tasks.qsize())
                     t0 = time.time()
                     _cur_cell.isProcessingTask = True
                     task(creatingCell, self._shouldStopProcessingTasks)
-                    self._logger.info("Task %s took %s", task, time.time() - t0)
+                    self._logger.info("Task %s took %s",
+                                      task, time.time() - t0)
                 except Exception:
-                    self._logger.error("Unexpected Exception in cells.processTasks:\n%s", traceback.format_exc())
+                    self._logger.error(
+                        "Unexpected Exception in cells.processTasks:\n%s", traceback.format_exc())
                 finally:
                     _cur_cell.isProcessingTask = False
             return True
@@ -312,12 +317,14 @@ class Cells:
                 del self._subscribedCells[subscription]
 
     def markDirty(self, cell):
-        assert not cell.garbageCollected, (cell, cell.text if isinstance(cell, Text) else "")
+        assert not cell.garbageCollected, (cell, cell.text if isinstance(
+            cell, Text) else "")
 
         self._dirtyNodes.add(cell)
 
     def markToDiscard(self, cell):
-        assert not cell.garbageCollected, (cell, cell.text if isinstance(cell, Text) else "")
+        assert not cell.garbageCollected, (cell, cell.text if isinstance(
+            cell, Text) else "")
 
         self._nodesToDiscard.add(cell)
 
@@ -353,7 +360,8 @@ class Cells:
         # here to happen in order, because they're triggered by messages,
         # so we have to reverse the order in which we append them, and
         # put them on the front.
-        res = [{'postscript': js} for js in reversed(self._pendingPostscripts)] + res
+        res = [{'postscript': js}
+               for js in reversed(self._pendingPostscripts)] + res
 
         self._pendingPostscripts.clear()
 
@@ -411,9 +419,12 @@ class Cells:
                             child_cell.prepareForReuse()
 
                 except Exception:
-                    self._logger.error("Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
-                    self._logger.error("Subscribed cell threw an exception:\n%s", traceback.format_exc())
-                    n.children = {'____contents__': Traceback(traceback.format_exc())}
+                    self._logger.error(
+                        "Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
+                    self._logger.error(
+                        "Subscribed cell threw an exception:\n%s", traceback.format_exc())
+                    n.children = {'____contents__': Traceback(
+                        traceback.format_exc())}
                     n.contents = "____contents__"
                 finally:
                     _cur_cell.cell = None
@@ -432,20 +443,23 @@ class Cells:
 
     def updateMessageFor(self, cell):
         contents = cell.contents
-        assert isinstance(contents, str), "Cell %s produced %s for its contents which is not a string" % (cell, contents)
+        assert isinstance(
+            contents, str), "Cell %s produced %s for its contents which is not a string" % (cell, contents)
 
         formatArgs = {}
 
         replaceDict = {}
 
         for childName, childNode in cell.children.items():
-            formatArgs[childName] = "<div id='%s'></div>" % (cell.identity + "_" + childName)
+            formatArgs[childName] = "<div id='%s'></div>" % (
+                cell.identity + "_" + childName)
             replaceDict[cell.identity + "_" + childName] = childNode.identity
 
         try:
             contents = multiReplace(contents, formatArgs)
         except Exception:
-            raise Exception("Failed to format these contents with args %s:\n\n%s", formatArgs, contents)
+            raise Exception(
+                "Failed to format these contents with args %s:\n\n%s", formatArgs, contents)
 
         res = {
             'id': cell.identity,
@@ -470,6 +484,7 @@ class Slot:
     UX state when we navigate away. We could also keep this in ODB so that
     the state is preserved when we bounce the page.
     """
+
     def __init__(self, value=None):
         self._value = value
         self._pendingValue = value
@@ -551,6 +566,7 @@ class SessionState(object):
     """Represents a piece of session-specific interface state. You may access state
     using attributes, which will register a dependency
     """
+
     def __init__(self):
         self._slots = {}
 
@@ -566,7 +582,8 @@ class SessionState(object):
                 try:
                     s._value.prepareForReuse()
                 except Exception:
-                    logging.warn("Reusing a Cell slot could create a problem: %s", s._value)
+                    logging.warn(
+                        "Reusing a Cell slot could create a problem: %s", s._value)
 
     def _slotFor(self, name):
         if name not in self._slots:
@@ -662,7 +679,8 @@ class Cell:
             return cells
 
         for child in self.children:
-            cells.extend(self.children[child].findChildrenByTag(tag, stopSearchingAtTag, False))
+            cells.extend(self.children[child].findChildrenByTag(
+                tag, stopSearchingAtTag, False))
 
         return cells
 
@@ -704,10 +722,12 @@ class Cell:
             except RevisionConflictException:
                 tries += 1
                 if tries > MAX_TRIES or time.time() - t0 > MAX_TIMEOUT:
-                    self._logger.error("OnMessage timed out. This should really fail.")
+                    self._logger.error(
+                        "OnMessage timed out. This should really fail.")
                     return
             except Exception:
-                self._logger.error("Exception in dropdown logic:\n%s", traceback.format_exc())
+                self._logger.error(
+                    "Exception in dropdown logic:\n%s", traceback.format_exc())
                 return
             finally:
                 _cur_cell.cell = None
@@ -939,7 +959,8 @@ class Modal(Cell):
         super().__init__()
         self.title = title
         self.message = message
-        self.buttons = {f"____button_{k}__": Button(k, v) for k, v in buttonActions.items()}
+        self.buttons = {f"____button_{k}__": Button(
+            k, v) for k, v in buttonActions.items()}
 
     def recalculate(self):
         self.contents = (
@@ -1013,7 +1034,7 @@ class CollapsiblePanel(Cell):
             container = HTMLElement.div().add_class("container-fluid")
             container.attributes["style"] = self._divStyle()
             row = HTMLElement.div().add_classes(
-                 ["row", "flex-nowrap", "no-gutters"]
+                ["row", "flex-nowrap", "no-gutters"]
             ).with_children(
                 HTMLElement.div().add_class("col-md-auto").add_child(
                     HTMLTextContent("____panel__")
@@ -1079,7 +1100,8 @@ class Sequence(Cell):
         elements = [Cell.makeCell(x) for x in elements]
 
         self.elements = elements
-        self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
+        self.children = {"____c_%s__" %
+                         i: elements[i] for i in range(len(elements))}
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1089,7 +1111,8 @@ class Sequence(Cell):
             return Sequence(self.elements + [other])
 
     def recalculate(self):
-        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" % i for i in range(len(self.elements))) + "</div>"
+        self.contents = "<div %s>" % self._divStyle() + "\n".join("____c_%s__" %
+                                                                  i for i in range(len(self.elements))) + "</div>"
 
     def sortsAs(self):
         if self.elements:
@@ -1103,7 +1126,8 @@ class Columns(Cell):
         elements = [Cell.makeCell(x) for x in elements]
 
         self.elements = elements
-        self.children = {"____c_%s__" % i: elements[i] for i in range(len(elements)) }
+        self.children = {"____c_%s__" %
+                         i: elements[i] for i in range(len(elements))}
         self.contents = (
             """
             <div class="container-fluid" __style__>
@@ -1171,14 +1195,20 @@ class HeaderBar(Cell):
                 </div>
             </div>
         """ % (
-            "".join(["<span class='flex-item px-3'>____left_%s__</span>" % i for i in range(len(self.leftItems))]),
-            "".join(["<span class='flex-item px-3'>____center_%s__</span>" % i for i in range(len(self.centerItems))]),
-            "".join(["<span class='flex-item px-3'>____right_%s__</span>" % i for i in range(len(self.rightItems))]),
+            "".join(["<span class='flex-item px-3'>____left_%s__</span>" %
+                     i for i in range(len(self.leftItems))]),
+            "".join(["<span class='flex-item px-3'>____center_%s__</span>" %
+                     i for i in range(len(self.centerItems))]),
+            "".join(["<span class='flex-item px-3'>____right_%s__</span>" %
+                     i for i in range(len(self.rightItems))]),
         )
 
-        self.children = {'____left_%s__' % i: self.leftItems[i] for i in range(len(self.leftItems))}
-        self.children.update({'____center_%s__' % i: self.centerItems[i] for i in range(len(self.centerItems))})
-        self.children.update({'____right_%s__' % i: self.rightItems[i] for i in range(len(self.rightItems))})
+        self.children = {'____left_%s__' %
+                         i: self.leftItems[i] for i in range(len(self.leftItems))}
+        self.children.update(
+            {'____center_%s__' % i: self.centerItems[i] for i in range(len(self.centerItems))})
+        self.children.update(
+            {'____right_%s__' % i: self.rightItems[i] for i in range(len(self.rightItems))})
 
 
 class Main(Cell):
@@ -1236,10 +1266,12 @@ class Tabs(Cell):
         self.whichSlot.set(index)
 
     def recalculate(self):
-        self.children['____display__'] = Subscribed(lambda: self.headersAndChildren[self.whichSlot.get()][1])
+        self.children['____display__'] = Subscribed(
+            lambda: self.headersAndChildren[self.whichSlot.get()][1])
 
         for i in range(len(self.headersAndChildren)):
-            self.children['____header_{ix}__'.format(ix=i)] = _NavTab(self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
+            self.children['____header_{ix}__'.format(ix=i)] = _NavTab(
+                self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
 
         self.contents = (
             """
@@ -1287,7 +1319,8 @@ class Dropdown(Cell):
                     singleLambda(cell)
                 return callback
 
-            self.headersAndLambdas = [(header, makeCallback(header)) for header in headersAndLambdas]
+            self.headersAndLambdas = [(header, makeCallback(header))
+                                      for header in headersAndLambdas]
         else:
             self.headersAndLambdas = headersAndLambdas
 
@@ -1316,7 +1349,8 @@ class Dropdown(Cell):
                     "__onclick__",
                     "websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))"
                     if not isinstance(onDropdown, str) else
-                    quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(onDropdown, "'")), '"')
+                    quoteForJs("window.location.href = '__url__'".replace(
+                        "__url__", quoteForJs(onDropdown, "'")), '"')
                 ).replace("__ix__", str(i)).replace("__identity__", self.identity)
             )
 
@@ -1348,7 +1382,8 @@ class Container(Cell):
             self.children = {"____child__": Cell.makeCell(child)}
 
     def setChild(self, child):
-        self.setContents("<div>____child__</div>", {"____child__": Cell.makeCell(child)})
+        self.setContents("<div>____child__</div>",
+                         {"____child__": Cell.makeCell(child)})
 
     def setContents(self, newContents, newChildren):
         self.contents = newContents
@@ -1470,8 +1505,10 @@ class Subscribed(Cell):
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self.children = {'____contents__': Traceback(traceback.format_exc())}
-                self._logger.error("Subscribed inner function threw exception:\n%s", traceback.format_exc())
+                self.children = {'____contents__': Traceback(
+                    traceback.format_exc())}
+                self._logger.error(
+                    "Subscribed inner function threw exception:\n%s", traceback.format_exc())
 
             self._resetSubscriptionsToViewReads(v)
 
@@ -1506,7 +1543,8 @@ class SubscribedSequence(Cell):
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self._logger.error("Spine calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error(
+                    "Spine calc threw an exception:\n%s", traceback.format_exc())
                 self.spine = []
 
             self._resetSubscriptionsToViewReads(v)
@@ -1514,14 +1552,17 @@ class SubscribedSequence(Cell):
             new_children = {}
             for ix, rowKey in enumerate(self.spine):
                 if rowKey in self.existingItems:
-                    new_children["____child_%s__" % ix] = self.existingItems[rowKey]
+                    new_children["____child_%s__" %
+                                 ix] = self.existingItems[rowKey]
                 else:
                     try:
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = self.makeCell(rowKey[0])
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = self.makeCell(
+                            rowKey[0])
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Traceback(traceback.format_exc())
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Traceback(
+                            traceback.format_exc())
 
         self.children = new_children
 
@@ -1550,7 +1591,8 @@ class SubscribedSequence(Cell):
         else:
             self.contents = """<div %s>%s</div>""" % (
                 self._divStyle(),
-                "\n".join(['____child_%s__' % i for i in range(len(self.spine))])
+                "\n".join(['____child_%s__' %
+                           i for i in range(len(self.spine))])
             )
 
 
@@ -1618,14 +1660,16 @@ class Grid(Cell):
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error(
+                    "Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
             try:
                 self.cols = augmentToBeUnique(self.colFun())
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self._logger.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error(
+                    "Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
             self._resetSubscriptionsToViewReads(v)
@@ -1636,7 +1680,8 @@ class Grid(Cell):
         for col_ix, col in enumerate(self.cols):
             seen.add((None, col))
             if (None, col) in self.existingItems:
-                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None, col)]
+                new_children["____header_%s__" %
+                             (col_ix)] = self.existingItems[(None, col)]
             else:
                 try:
                     self.existingItems[(None, col)] = \
@@ -1653,7 +1698,8 @@ class Grid(Cell):
             for row_ix, row in enumerate(self.rows):
                 seen.add((None, row))
                 if (row, None) in self.existingItems:
-                    new_children["____rowlabel_%s__" % (row_ix)] = self.existingItems[(row, None)]
+                    new_children["____rowlabel_%s__" %
+                                 (row_ix)] = self.existingItems[(row, None)]
                 else:
                     try:
                         self.existingItems[(row, None)] = \
@@ -1863,7 +1909,8 @@ class Table(Cell):
             page = max(0, int(self.curPage.get())-1)
             page = min(page, (len(rows) - 1) // self.maxRowsPerPage)
         except Exception:
-            self._logger.error("Failed to parse current page: %s", traceback.format_exc())
+            self._logger.error(
+                "Failed to parse current page: %s", traceback.format_exc())
 
         return rows[page * self.maxRowsPerPage:(page+1) * self.maxRowsPerPage]
 
@@ -1878,11 +1925,13 @@ class Table(Cell):
                 return ""
             return Octicon("arrow-up" if not self.sortColumnAscending.get() else "arrow-down")
 
-        cell = Cell.makeCell(self.headerFun(col)).nowrap() + Padding() + Subscribed(icon).nowrap()
+        cell = Cell.makeCell(self.headerFun(col)).nowrap() + \
+            Padding() + Subscribed(icon).nowrap()
 
         def onClick():
             if self.sortColumn.get() == col_ix:
-                self.sortColumnAscending.set(not self.sortColumnAscending.get())
+                self.sortColumnAscending.set(
+                    not self.sortColumnAscending.get())
             else:
                 self.sortColumn.set(col_ix)
                 self.sortColumnAscending.set(False)
@@ -1890,10 +1939,12 @@ class Table(Cell):
         res = Clickable(cell, onClick, makeBold=True)
 
         if self.columnFilters[col].get() is None:
-            res = res.nowrap() + Clickable(Octicon("search"), lambda: self.columnFilters[col].set("")).nowrap()
+            res = res.nowrap() + Clickable(Octicon("search"),
+                                           lambda: self.columnFilters[col].set("")).nowrap()
         else:
             res = res + SingleLineTextBox(self.columnFilters[col]).nowrap() + \
-                Button(Octicon("x"), lambda: self.columnFilters[col].set(None), small=True)
+                Button(Octicon("x"), lambda: self.columnFilters[col].set(
+                    None), small=True)
 
         return Card(res, padding=1)
 
@@ -1904,7 +1955,8 @@ class Table(Cell):
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self._logger.error("Col fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error(
+                    "Col fun calc threw an exception:\n%s", traceback.format_exc())
                 self.cols = []
 
             try:
@@ -1915,7 +1967,8 @@ class Table(Cell):
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self._logger.error("Row fun calc threw an exception:\n%s", traceback.format_exc())
+                self._logger.error(
+                    "Row fun calc threw an exception:\n%s", traceback.format_exc())
                 self.rows = []
 
             self._resetSubscriptionsToViewReads(v)
@@ -1926,7 +1979,8 @@ class Table(Cell):
         for col_ix, col in enumerate(self.cols):
             seen.add((None, col))
             if (None, col) in self.existingItems:
-                new_children["____header_%s__" % (col_ix)] = self.existingItems[(None, col)]
+                new_children["____header_%s__" %
+                             (col_ix)] = self.existingItems[(None, col)]
             else:
                 try:
                     self.existingItems[(None, col)] = \
@@ -1966,7 +2020,8 @@ class Table(Cell):
 
         totalPages = ((len(self.filteredRows) - 1) // self.maxRowsPerPage + 1)
 
-        rowDisplay = "____left__ ____right__ Page ____page__ of " + str(totalPages)
+        rowDisplay = "____left__ ____right__ Page ____page__ of " + \
+            str(totalPages)
         if totalPages <= 1:
             self.children['____page__'] = Cell.makeCell(totalPages).nowrap()
         else:
@@ -1977,7 +2032,8 @@ class Table(Cell):
                 .nowrap()
             )
         if self.curPage.get() == "1":
-            self.children['____left__'] = Octicon("triangle-left").nowrap().color("lightgray")
+            self.children['____left__'] = Octicon(
+                "triangle-left").nowrap().color("lightgray")
         else:
             self.children['____left__'] = (
                 Clickable(
@@ -1986,7 +2042,8 @@ class Table(Cell):
                 ).nowrap()
             )
         if self.curPage.get() == str(totalPages):
-            self.children['____right__'] = Octicon("triangle-right").nowrap().color("lightgray")
+            self.children['____right__'] = Octicon(
+                "triangle-right").nowrap().color("lightgray")
         else:
             self.children['____right__'] = (
                 Clickable(
@@ -2054,7 +2111,8 @@ class Clickable(Cell):
             .replace('__onclick__', self.calculatedOnClick())
             .replace(
                 '__style__',
-                self._divStyle("cursor:pointer;*cursor: hand" + (";font-weight:bold" if self.bold else ""))
+                self._divStyle("cursor:pointer;*cursor: hand" +
+                               (";font-weight:bold" if self.bold else ""))
             )
         )
 
@@ -2064,7 +2122,8 @@ class Clickable(Cell):
     def onMessage(self, msgFrame):
         val = self.f()
         if isinstance(val, str):
-            self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(val, "'")), '"'))
+            self.triggerPostscript(quoteForJs("window.location.href = '__url__'".replace(
+                "__url__", quoteForJs(val, "'")), '"'))
 
 
 class Button(Clickable):
@@ -2097,7 +2156,8 @@ class ButtonGroup(Cell):
         self.buttons = buttons
 
     def recalculate(self):
-        self.children = {f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
+        self.children = {
+            f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
         self.contents = (
             """
             <div class="btn-group" role="group">
@@ -2223,7 +2283,8 @@ class CodeEditor(Cell):
             and a json selection.
         """
         super().__init__()
-        self._slot = Slot((0, ""))  # contains (current_iteration_number: int, text: str)
+        # contains (current_iteration_number: int, text: str)
+        self._slot = Slot((0, ""))
         self.keybindings = keybindings or {}
         self.noScroll = noScroll
         self.fontSize = fontSize
@@ -2236,16 +2297,19 @@ class CodeEditor(Cell):
         return self._slot.get()[1]
 
     def setContents(self, contents):
-        newSlotState = (self._slot.getWithoutRegisteringDependency()[0]+1000000, contents)
+        newSlotState = (self._slot.getWithoutRegisteringDependency()[
+                        0]+1000000, contents)
         self._slot.set(newSlotState)
         self.sendCurrentStateToBrowser(newSlotState)
 
     def onMessage(self, msgFrame):
         if msgFrame['event'] == 'keybinding':
-            self.keybindings[msgFrame['key']](msgFrame['buffer'], msgFrame['selection'])
+            self.keybindings[msgFrame['key']](
+                msgFrame['buffer'], msgFrame['selection'])
         elif msgFrame['event'] == 'editing':
             if self.onTextChange:
-                self._slot.set((self._slot.getWithoutRegisteringDependency()[0] + 1, msgFrame['buffer']))
+                self._slot.set((self._slot.getWithoutRegisteringDependency()[
+                               0] + 1, msgFrame['buffer']))
                 self.onTextChange(msgFrame['buffer'], msgFrame['selection'])
 
     def recalculate(self):
@@ -2346,7 +2410,8 @@ class CodeEditor(Cell):
             });
             """.replace("__key__", kb)
 
-        self.postscript = self.postscript.replace("__identity__", self.identity)
+        self.postscript = self.postscript.replace(
+            "__identity__", self.identity)
 
     def sendCurrentStateToBrowser(self, newSlotState):
         if self.cells is not None:
@@ -2406,7 +2471,8 @@ class Sheet(Cell):
 
         self.columnNames = columnNames
         self.rowCount = rowCount
-        self.rowFun = rowFun  # for a row, the value of all the columns in a list.
+        # for a row, the value of all the columns in a list.
+        self.rowFun = rowFun
         self.colWidth = colWidth
         self.error = Slot(None)
         self._overflow = "auto"
@@ -2421,7 +2487,8 @@ class Sheet(Cell):
                                           col=msgFrame["col"])
                 return _onMessage
 
-            self._hookfns["onCellDblClick"] = _makeOnCellDblClick(onCellDblClick)
+            self._hookfns["onCellDblClick"] = _makeOnCellDblClick(
+                onCellDblClick)
 
     def _addHandsontableOnCellDblClick(self):
         return """
@@ -2567,7 +2634,8 @@ class Sheet(Cell):
                         dblClicked: true
                 }
                 """ +
-                (self._addHandsontableOnCellDblClick() if "onCellDblClick" in self._hookfns else "")
+                (self._addHandsontableOnCellDblClick()
+                 if "onCellDblClick" in self._hookfns else "")
             )
             .replace("__identity__", self._identity)
             .replace("__rows__", str(self.rowCount))
@@ -2686,7 +2754,8 @@ class Plot(Cell):
              (d.get('yaxis.range[0]', curVal[1][0]), d.get('yaxis.range[1]', curVal[1][1])))
         )
 
-        self.cells._logger.info("User navigated plot to %s", self.curXYRanges.get())
+        self.cells._logger.info(
+            "User navigated plot to %s", self.curXYRanges.get())
 
     def setXRange(self, low, high):
         curXY = self.curXYRanges.getWithoutRegisteringDependency()
@@ -2762,7 +2831,8 @@ class _PlotUpdater(Cell):
         data = self.callFun(callableOrData)
 
         if isinstance(data, list):
-            res = {'x': [float(x) for x in range(len(data))], 'y': [float(d) for d in data]}
+            res = {'x': [float(x) for x in range(len(data))],
+                   'y': [float(d) for d in data]}
         else:
             assert isinstance(data, dict)
             res = dict(data)
