@@ -893,7 +893,7 @@ class Card(Cell):
         body = HTMLElement.div().add_class(
             "card-body").add_class(
                 other).add_child(
-                    HTMLTextContent("____contents__"))
+                    HTMLTextContent(" ____contents__"))
         card = HTMLElement.div().add_class("card")
 
         if self.header is not None:
@@ -907,6 +907,8 @@ class Card(Cell):
         card.add_child(body)
         card.attributes["style"] = self._divStyle()
 
+        self.cells._logger.info(str(card))
+        
         self.contents = str(card)
 
     def sortsAs(self):
