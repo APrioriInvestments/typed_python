@@ -15,6 +15,7 @@ from inspect import signature
 from object_database.view import RevisionConflictException
 from object_database.view import current_transaction
 from object_database.util import Timer
+from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
 
 MAX_TIMEOUT = 1.0
 MAX_TRIES = 10
@@ -885,28 +886,28 @@ class Card(Cell):
     def recalculate(self):
         self.children = {"____contents__": Cell.makeCell(self.body)}
 
-        if self.header is not None:
-            self.children['____header__'] = Cell.makeCell(self.header)
-
         other = ""
         if self.padding:
             other += " p-" + str(self.padding)
 
-        self.contents = ("""
-            <div class="card" __style__>
-              __header__
-              <div class="card-body __other__">
-                ____contents__
-              </div>
-            </div>
-            """.replace('__other__', other)
-               .replace('__style__', self._divStyle())
-               .replace("__header__", """
-                    <div class="card-header">
-                        ____header__
-                    </div>
-                """ if self.header is not None else "")
-        )
+        body = HTMLElement.div().add_class(
+            "card-body").add_class(
+                other).add_child(
+                    HTMLTextContent("____contents__"))
+        card = HTMLElement.div().add_class("card")
+
+        if self.header is not None:
+            header = HTMLElement.div().add_class(
+                "card-header").add_child(
+                    HTMLTextContent("____header__")
+            )
+            self.children['____header__'] = Cell.makeCell(self.header)
+            card.add_child(header)
+
+        card.add_child(body)
+        card.attributes["style"] = self._divStyle()
+
+        self.contents = str(card)
 
     def sortsAs(self):
         return self.contents.sortsAs()
