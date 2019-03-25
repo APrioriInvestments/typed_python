@@ -984,10 +984,12 @@ class Modal(Cell):
         buttonActions - a dict from string to a button action function.
         """
         super().__init__()
-        self.title = title
-        self.message = message
-        self.buttons = {f"____button_{k}__": Button(
-            k, v) for k, v in buttonActions.items()}
+        self.title = Cell.makeCell(title).tagged("title")
+        self.message = Cell.makeCell(message).tagged("message")
+        self.buttons = {
+            f"____button_{k}__": Button(k, v).tagged(k)
+            for k, v in buttonActions.items()
+        }
 
     def recalculate(self):
         self.contents = (
@@ -1011,8 +1013,8 @@ class Modal(Cell):
             .replace("__buttons__", " ".join(self.buttons))
         )
         self.children = dict(self.buttons)
-        self.children["____title__"] = Cell.makeCell(self.title)
-        self.children["____message__"] = Cell.makeCell(self.message)
+        self.children["____title__"] = self.title
+        self.children["____message__"] = self.message
 
 
 class Octicon(Cell):
