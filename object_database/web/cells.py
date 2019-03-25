@@ -487,11 +487,10 @@ class Cells:
     def childrenWithExceptions(self):
         return self._root.findChildrenMatching(lambda cell: isinstance(cell, Traceback))
 
-    def findChildrenByTag(self, tag, stopSearchingAtTag=True, isRoot=True):
+    def findChildrenByTag(self, tag, stopSearchingAtFoundTag=True):
         return self._root.findChildrenByTag(
             tag,
-            stopSearchingAtTag=stopSearchingAtTag,
-            isRoot=isRoot
+            stopSearchingAtFoundTag=stopSearchingAtFoundTag
         )
 
     def findChildrenMatching(self, filtr):
@@ -691,23 +690,23 @@ class Cell:
         self._tag = tag
         return self
 
-    def findChildrenByTag(self, tag, stopSearchingAtTag=True, isRoot=True):
+    def findChildrenByTag(self, tag, stopSearchingAtFoundTag=False):
         """Search the cell and its children for all cells with the given tag.
 
-        If `stopSearchingAtTag`, then if we encounter a non-None tag that doesn't
-        match, stop searching immediately.
+        If `stopSearchingAtFoundTag`, we don't search recursively the children of a
+        cell that matched our search.
         """
         cells = []
 
         if self._tag == tag:
             cells.append(self)
-
-        if self._tag is not None and stopSearchingAtTag and not isRoot:
-            return cells
+            if stopSearchingAtFoundTag:
+                return cells
 
         for child in self.children:
-            cells.extend(self.children[child].findChildrenByTag(
-                tag, stopSearchingAtTag, False))
+            cells.extend(
+                self.children[child].findChildrenByTag(tag, stopSearchingAtFoundTag)
+            )
 
         return cells
 
