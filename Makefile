@@ -23,6 +23,7 @@ O_FILES = $(BUILD_PATH)/_types.o \
           $(BUILD_PATH)/Type.o \
           $(BUILD_PATH)/PythonSerializationContext.o
 
+UNICODEPROPS = $(SRC_PATH)/UnicodeProps.hpp
 
 ##########################################################################
 #  MAIN RULES
@@ -31,6 +32,7 @@ O_FILES = $(BUILD_PATH)/_types.o \
 install: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip install pipenv==2018.11.26; \
+		$(PYTHON) $(SRC_PATH)/unicodeprops.py > $(UNICODEPROPS); \
 		pipenv install --dev --deploy
 
 .PHONY: test
@@ -80,6 +82,7 @@ clean:
 	rm -f typed_python/_types.cpython-*.so
 	rm -f testcert.cert testcert.key
 	rm -rf .venv
+	rm -f $(UNICODEPROPS)
 
 
 ##########################################################################
@@ -91,13 +94,17 @@ $(VIRTUAL_ENV): $(PYTHON)
 $(BUILD_PATH)/%.o: $(SRC_PATH)/%.cc
 	$(CC) $(CPP_FLAGS) -c $< -o $@
 
+$(BUILD_PATH)/all.o: $(UNICODEPROPS)
 $(BUILD_PATH)/%.o: $(SRC_PATH)/%.cpp
 	$(CXX) $(CPP_FLAGS) -c $< -o $@
+
+$(UNICODEPROPS): $(SRC_PATH)/unicodeprops.py
+	$(PYTHON) $(SRC_PATH)/unicodeprops.py > $(UNICODEPROPS)
 
 typed_python/_types.cpython-36m-x86_64-linux-gnu.so: $(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
 	cp $(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so  typed_python
 
-$(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(LIB_PATH) $(BUILD_PATH) $(O_FILES)
+$(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(LIB_PATH) $(BUILD_PATH) $(UNICODEPROPS) $(O_FILES)
 	$(CXX) -pthread -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2 \
 		$(O_FILES) \
 		-o $(LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
@@ -112,6 +119,7 @@ testcert.cert testcert.key:
 	openssl req -x509 -newkey rsa:2048 -keyout testcert.key -nodes \
 		-out testcert.cert -sha256 -days 1000 \
 		-subj '/C=US/ST=New York/L=New York/CN=localhost'
+
 
 
 

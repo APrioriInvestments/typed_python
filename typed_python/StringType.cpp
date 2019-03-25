@@ -1,5 +1,6 @@
 #include "AllTypes.hpp"
 #include  <iostream>
+#include "UnicodeProps.hpp"
 using namespace std;
 
 String::layout* String::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint) {
@@ -115,6 +116,37 @@ String::layout* String::lower(layout *l) {
     return new_layout;
 }
 
+String::layout* String::upper(layout *l) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t new_byteCount = sizeof(layout) + l->pointcount * l->bytes_per_codepoint;
+    layout* new_layout = (layout*)malloc(new_byteCount);
+    new_layout->refcount = 1;
+    new_layout->hash_cache = -1;
+    new_layout->bytes_per_codepoint = l->bytes_per_codepoint;
+    new_layout->pointcount = l->pointcount;
+
+    if (l->bytes_per_codepoint == 1) {
+        for (uint8_t *src = l->data, *dest = new_layout->data, *end = src + l->pointcount; src < end; ) {
+            *dest++ = (uint8_t)toupper(*src++);
+        }
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        for (uint16_t *src = (uint16_t *)l->data, *dest = (uint16_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
+            *dest++ = (uint16_t)towupper(*src++);
+        }
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        for (uint32_t *src = (uint32_t *)l->data, *dest = (uint32_t *)new_layout->data, *end = src + l->pointcount; src < end; ) {
+            *dest++ = (uint32_t)towupper(*src++);
+        }
+    }
+
+    return new_layout;
+}
+
 int64_t String::find_2(layout *l, layout *sub) {
     return find(l, sub, 0, l ? l->pointcount : 0);
 }
@@ -123,17 +155,17 @@ int64_t String::find_3(layout *l, layout *sub, int64_t start) {
     return find(l, sub, start, l ? l->pointcount : 0);
 }
 
+uint32_t getpoint(String::layout *l, uint64_t i) {
+    if (l->bytes_per_codepoint == 1)
+        return ((uint8_t *)l->data)[i];
+    else if (l->bytes_per_codepoint == 2)
+        return ((uint16_t *)l->data)[i];
+    else if (l->bytes_per_codepoint == 4)
+        return ((uint32_t *)l->data)[i];
+    return 0;
+}
+
 int64_t String::find(layout *l, layout *sub, int64_t start, int64_t end) {
-
-    auto getpoint = [] (layout *a, int64_t i) -> int32_t {
-        if (a->bytes_per_codepoint == 1)
-            return ((uint8_t *)a->data)[i];
-        else if (a->bytes_per_codepoint == 2)
-            return ((uint16_t *)a->data)[i];
-        else if (a->bytes_per_codepoint == 4)
-            return ((uint32_t *)a->data)[i];
-    };
-
     if (!l || !l->pointcount) {
         if (!sub || !sub->pointcount)
             return start > 0 ? -1 : 0;
@@ -171,6 +203,137 @@ int64_t String::find(layout *l, layout *sub, int64_t start, int64_t end) {
     }
 
     return -1;
+}
+
+bool String::isalpha(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    for (int64_t i = 0; i < l->pointcount; i++)
+        if (!(uprops[getpoint(l, i)] & Uprops_ALPHA))
+            return false;
+    return true;
+}
+
+bool String::isalnum(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    for (int64_t i = 0; i < l->pointcount; i++) {
+        auto flags = uprops[getpoint(l, i)];
+        if (!(flags & Uprops_ALPHA)
+            && !(flags & Uprops_NUMERIC)
+            && !(flags & Uprops_DECIMAL)
+            && !(flags & Uprops_DIGIT)) // for completeness; looks to me like DECIMAL and DIGIT are subsets of NUMERIC
+            return false;
+    }
+    return true;
+}
+
+bool String::isdecimal(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    for (int64_t i = 0; i < l->pointcount; i++)
+        if (!(uprops[getpoint(l, i)] & Uprops_DECIMAL))
+            return false;
+    return true;
+}
+
+bool String::isdigit(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    for (int64_t i = 0; i < l->pointcount; i++) {
+        auto flags = uprops[getpoint(l, i)];
+        if (!(flags & Uprops_DECIMAL)
+            && !(flags & Uprops_DIGIT)) // For completeness; looks to me like DECIMAL is a subset of DIGIT
+            return false;
+    }
+    return true;
+}
+
+bool String::islower(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    bool found_one = false;
+    for (int64_t i = 0; i < l->pointcount; i++) {
+        auto flags = uprops[getpoint(l, i)];
+        if (flags & Uprops_UPPER)
+            return false;
+        if (flags & Uprops_TITLE)
+            return false;
+        if (flags & Uprops_LOWER)
+            found_one = true;
+    }
+    return found_one;
+}
+
+bool String::isnumeric(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    for (int64_t i = 0; i < l->pointcount; i++) {
+        auto flags = uprops[getpoint(l, i)];
+        if (!(flags & Uprops_DECIMAL)
+            && !(flags & Uprops_DIGIT)
+            && !(flags & Uprops_NUMERIC))
+            return false;
+    }
+    return true;
+}
+
+bool String::isprintable(layout *l) {
+    if (!l || !l->pointcount)
+        return true;
+    for (int64_t i = 0; i < l->pointcount; i++)
+        if (!(uprops[getpoint(l, i)] & Uprops_PRINTABLE))
+            return false;
+    return true;
+}
+
+bool String::isspace(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    for (int64_t i = 0; i < l->pointcount; i++)
+        if (!(uprops[getpoint(l, i)] & Uprops_SPACE))
+            return false;
+    return true;
+}
+
+bool String::istitle(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    bool last_cased = false;
+    bool found_one = false;
+    for (int64_t i = 0; i < l->pointcount; i++) {
+        auto flags = uprops[getpoint(l, i)];
+        bool upper = flags & Uprops_UPPER;
+        bool lower = flags & Uprops_LOWER;
+        bool title = flags & Uprops_TITLE;
+        if (upper && last_cased)
+            return false;
+        if (lower && !last_cased)
+            return false;
+        if (title && last_cased)
+            return false;
+        last_cased = upper || lower || title;
+        if (last_cased)
+            found_one = true;
+    }
+
+    return found_one;
+}
+
+bool String::isupper(layout *l) {
+    if (!l || !l->pointcount)
+        return false;
+    bool found_one = false;
+    for (int64_t i = 0; i < l->pointcount; i++) {
+        auto flags = uprops[getpoint(l, i)];
+        if (flags & Uprops_LOWER)
+            return false;
+        if (flags & Uprops_TITLE)
+            return false;
+        if (flags & Uprops_UPPER)
+            found_one = true;
+    }
+    return found_one;
 }
 
 String::layout* String::getitem(layout* lhs, int64_t offset) {

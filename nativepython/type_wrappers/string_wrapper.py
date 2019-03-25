@@ -14,6 +14,7 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python import Int64
+from typed_python import Bool
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
@@ -146,7 +147,8 @@ class StringWrapper(RefcountedWrapper):
         )
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("lower", "find"):
+        if attr in ("lower", "upper", "find", "isalpha", "isalnum", "isdecimal", "isdigit",
+                    "islower", "isnumeric", "isprintable", "isspace", "istitle", "isupper"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -163,6 +165,116 @@ class StringWrapper(RefcountedWrapper):
                         runtime_functions.string_lower.call(
                             instance.nonref_expr.cast(VoidPtr)
                         ).cast(self.layoutType)
+                    )
+                )
+        elif methodname == "upper":
+            if len(args) == 0:
+                return context.push(
+                    str,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.string_upper.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        ).cast(self.layoutType)
+                    )
+                )
+        elif methodname == "isalpha":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isalpha.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isalnum":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isalnum.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isdecimal":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isdecimal.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isdigit":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isdigit.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "islower":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_islower.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isnumeric":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isnumeric.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isprintable":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isprintable.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isspace":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isspace.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "istitle":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_istitle.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                )
+        elif methodname == "isupper":
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        runtime_functions.string_isupper.call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
                     )
                 )
         elif methodname == "find":
