@@ -934,7 +934,6 @@ class Card(Cell):
         if self.padding:
             other += " p-" + str(self.padding)
 
-<<<<<<< HEAD
         body = HTMLElement.div().add_class(
             "card-body").add_class(
                 other).add_child(
@@ -953,23 +952,6 @@ class Card(Cell):
         card.attributes["style"] = self._divStyle()
 
         self.contents = str(card)
-=======
-        self.contents = ("""
-            <div class="card" __style__>
-              __header__
-              <div class="card-body __other__">
-                ____contents__
-              </div>
-            </div>
-            """.replace('__other__', other)
-               .replace('__style__', self._divStyle())
-               .replace("__header__",  """
-                    <div class="card-header">
-                        ____header__
-                    </div>
-                """ if self.header is not None else "")
-        )
->>>>>>> e95797c... Implement constructors and destructors for object_database objects.
 
     def sortsAs(self):
         return self.contents.sortsAs()

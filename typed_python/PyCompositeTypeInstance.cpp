@@ -1,15 +1,46 @@
 #include "PyCompositeTypeInstance.hpp"
 
 CompositeType* PyCompositeTypeInstance::type() {
-    return (CompositeType*)extractTypeFrom(((PyObject*)this)->ob_type);
+    Type* t = extractTypeFrom(((PyObject*)this)->ob_type);
+
+    if (t->getBaseType()) {
+        t = t->getBaseType();
+    }
+
+    if (t->getTypeCategory() != Type::TypeCategory::catNamedTuple &&
+            t->getTypeCategory() != Type::TypeCategory::catTuple) {
+        throw std::runtime_error("Invalid type object found in PyCompositeTypeInstance");
+    }
+
+    return (CompositeType*)t;
 }
 
 Tuple* PyTupleInstance::type() {
-    return (Tuple*)extractTypeFrom(((PyObject*)this)->ob_type);
+    Type* t = extractTypeFrom(((PyObject*)this)->ob_type);
+
+    if (t->getBaseType()) {
+        t = t->getBaseType();
+    }
+
+    if (t->getTypeCategory() != Type::TypeCategory::catTuple) {
+        throw std::runtime_error("Invalid type object found in PyTupleInstance");
+    }
+
+    return (Tuple*)t;
 }
 
 NamedTuple* PyNamedTupleInstance::type() {
-    return (NamedTuple*)extractTypeFrom(((PyObject*)this)->ob_type);
+    Type* t = extractTypeFrom(((PyObject*)this)->ob_type);
+
+    if (t->getBaseType()) {
+        t = t->getBaseType();
+    }
+
+    if (t->getTypeCategory() != Type::TypeCategory::catNamedTuple) {
+        throw std::runtime_error("Invalid type object found in PyTupleInstance");
+    }
+
+    return (NamedTuple*)t;
 }
 
 PyObject* PyCompositeTypeInstance::sq_item_concrete(Py_ssize_t ix) {
@@ -27,7 +58,6 @@ PyObject* PyCompositeTypeInstance::sq_item_concrete(Py_ssize_t ix) {
 Py_ssize_t PyCompositeTypeInstance::mp_and_sq_length_concrete() {
     return type()->getTypes().size();
 }
-
 
 void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyDict_Check(pyRepresentation)) {

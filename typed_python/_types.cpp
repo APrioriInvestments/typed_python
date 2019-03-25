@@ -718,7 +718,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    Type* actualType = PyInstance::extractTypeFrom(a2->ob_type, true);
+    Type* actualType = PyInstance::extractTypeFrom(a2->ob_type);
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
     if (a3 && a3 != Py_None) {

@@ -20,16 +20,21 @@ PythonSubclass* PythonSubclass::Make(Type* base, PyTypeObject* pyType) {
 
     std::lock_guard<std::mutex> lock(guard);
 
-    typedef std::pair<Type*, PyTypeObject*> keytype;
+    static std::map<PyTypeObject*, PythonSubclass*> m;
 
-    static std::map<keytype, PythonSubclass*> m;
-
-    auto it = m.find(keytype(base, pyType));
+    auto it = m.find(pyType);
 
     if (it == m.end()) {
         it = m.insert(
-            std::make_pair(keytype(base,pyType), new PythonSubclass(base, pyType))
+            std::make_pair(pyType, new PythonSubclass(base, pyType))
             ).first;
+    }
+
+    if (it->second->getBaseType() != base) {
+        throw std::runtime_error(
+            "Expected to find the same base type. Got "
+                + it->second->getBaseType()->name() + " != " + base->name()
+            );
     }
 
     return it->second;

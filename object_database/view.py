@@ -87,6 +87,7 @@ def default_initialize(t):
         raise FieldNotDefaultInitializable(f"Can't default initialize a {t}")
     return t()
 
+
 _cur_view = threading.local()
 
 

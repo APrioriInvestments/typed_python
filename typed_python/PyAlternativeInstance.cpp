@@ -141,7 +141,7 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
             PyObject* arg = PyTuple_GetItem(args, 0);
             Type* argType = extractTypeFrom(arg->ob_type);
 
-            if (argType && argType->isBinaryCompatibleWith(alt)) {
+            if (argType && alt == argType) {
                 //it's already the right kind of instance, so we can copy-through the underlying element
                 alt->elementType()->copy_constructor(p, alt->eltPtr(((PyInstance*)arg)->dataPtr()));
                 return;
@@ -166,6 +166,18 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
             throw std::logic_error("Can only initialize " + alt->name() + " from python with kwargs or a single in-place argument");
         }
     });
+}
+
+void PyAlternativeInstance::copyConstructFromPythonInstanceConcrete(Alternative* altType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
+    if (argType && argType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative &&
+            ((ConcreteAlternative*)argType)->getAlternative() == altType) {
+        altType->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
+        return;
+    }
+
+    PyInstance::copyConstructFromPythonInstanceConcrete(altType, tgt, pyRepresentation, isExplicit);
 }
 
 

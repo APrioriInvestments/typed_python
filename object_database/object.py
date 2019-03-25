@@ -96,7 +96,10 @@ class DatabaseObject(_base):
 
     def __setattr__(self, name, val):
         if name not in self.__types__:
-            raise AttributeError(f"Database object of type {type(self).__qualname__} has no attribute '{name}', only {self.__types__.keys()}")
+            raise AttributeError(
+                f"Database object of type {type(self).__qualname__} "
+                f"has no attribute '{name}', only {self.__types__.keys()}"
+            )
 
         if not hasattr(_cur_view, "view"):
             raise Exception("Please access properties from within a view or transaction.")

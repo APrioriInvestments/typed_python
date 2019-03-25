@@ -114,7 +114,7 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    if (argType && argType->isBinaryCompatibleWith(argType)) {
+    if (argType && argType == t) {
         return true;
     }
 
@@ -134,7 +134,7 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    if (argType && argType->isBinaryCompatibleWith(eltType)) {
+    if (argType && (eltType == argType || eltType == argType->getBaseType())) {
         //it's already the right kind of instance
         eltType->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
         return;
@@ -717,14 +717,24 @@ bool PyInstance::isSubclassOfNativeType(PyTypeObject* typeObj) {
     return false;
 }
 
-// static
-Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj, bool exact /*=false*/) {
-    if (exact && isSubclassOfNativeType(typeObj)) {
-        return PythonSubclass::Make(extractTypeFrom(typeObj), typeObj);
+Type* PyInstance::rootNativeType(PyTypeObject* typeObj) {
+    PyTypeObject* baseType = typeObj;
+
+    while (!isNativeType(baseType) && baseType) {
+        baseType = baseType->tp_base;
     }
 
-    while (!exact && typeObj->tp_base && !isNativeType(typeObj)) {
-        typeObj = typeObj->tp_base;
+    if (!baseType) {
+        return nullptr;
+    }
+
+    return ((NativeTypeWrapper*)baseType)->mType;
+}
+
+// static
+Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj) {
+    if (isSubclassOfNativeType(typeObj)) {
+        return PythonSubclass::Make(rootNativeType(typeObj), typeObj);
     }
 
     if (isNativeType(typeObj)) {
@@ -1299,7 +1309,7 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         }
 
         if (PyInstance::isSubclassOfNativeType(pyType)) {
-            Type* nativeT = PyInstance::extractTypeFrom(pyType);
+            Type* nativeT = PyInstance::rootNativeType(pyType);
 
             if (!nativeT) {
                 PyErr_SetString(PyExc_TypeError,

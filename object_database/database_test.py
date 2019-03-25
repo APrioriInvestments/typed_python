@@ -95,7 +95,7 @@ class ThingWithInit:
     y = float
     z = str
 
-    def __init__(self, x=0,y=123):
+    def __init__(self, x=0, y=123):
         self.x = x
         self.y = y
 
@@ -171,7 +171,7 @@ class ObjectDatabaseTests:
 
         with db.transaction():
             x = ThingWithInit()
-            y = ThingWithInit(1,y=1000)
+            y = ThingWithInit(1, y=1000)
 
         with db.view():
             self.assertEqual(x.x, 0)

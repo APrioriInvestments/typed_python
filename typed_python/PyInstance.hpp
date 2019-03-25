@@ -50,8 +50,12 @@ public:
     Instance mContainingInstance;
 
     template<class T>
-    static auto specialize(PyObject* obj, const T& f) {
-        switch (extractTypeFrom(obj->ob_type)->getTypeCategory()) {
+    static auto specialize(PyObject* obj, const T& f, Type* typeOverride = nullptr) {
+        if (!typeOverride) {
+            typeOverride = extractTypeFrom(obj->ob_type);
+        }
+
+        switch (typeOverride->getTypeCategory()) {
             case Type::TypeCategory::catBool:
                 return f(*(PyRegisterTypeInstance<bool>*)obj);
             case Type::TypeCategory::catUInt8:
@@ -203,9 +207,9 @@ public:
     }
 
     template<class T>
-    static Py_ssize_t specializeForTypeReturningSizeT(PyObject* obj, const T& f) {
+    static Py_ssize_t specializeForTypeReturningSizeT(PyObject* obj, const T& f, Type* typeOverride=nullptr) {
         try {
-            return specialize(obj, f);
+            return specialize(obj, f, typeOverride);
         } catch(PythonExceptionSet& e) {
             return -1;
         } catch(std::exception& e) {
@@ -215,9 +219,9 @@ public:
     }
 
     template<class T>
-    static PyObject* specializeForType(PyObject* obj, const T& f) {
+    static PyObject* specializeForType(PyObject* obj, const T& f, Type* typeOverride=nullptr) {
         try {
-            return specialize(obj, f);
+            return specialize(obj, f, typeOverride);
         } catch(PythonExceptionSet& e) {
             return NULL;
         } catch(std::exception& e) {
@@ -442,9 +446,11 @@ public:
 
     static bool isSubclassOfNativeType(PyTypeObject* typeObj);
 
+    static Type* rootNativeType(PyTypeObject* typeObj);
+
     static bool isNativeType(PyTypeObject* typeObj);
 
-    static Type* extractTypeFrom(PyTypeObject* typeObj, bool exact=false);
+    static Type* extractTypeFrom(PyTypeObject* typeObj);
 
     static int tp_setattro(PyObject *o, PyObject* attrName, PyObject* attrVal);
 

@@ -6,7 +6,7 @@
 void PythonSerializationContext::serializePythonObject(PyObject* o, SerializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    Type* t = PyInstance::extractTypeFrom(o->ob_type, true);
+    Type* t = PyInstance::extractTypeFrom(o->ob_type);
 
     if (t) {
         b.write_uint8(T_NATIVE);
@@ -72,7 +72,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
             serializePyDict(o, b);
         } else
         if (PyType_Check(o)) {
-            Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o, true);
+            Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);
 
             if (nativeType) {
                 b.write_uint8(T_NATIVETYPE);
@@ -555,7 +555,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             throw std::runtime_error(msg);
         }
 
-        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res, true);
+        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res);
         decref(res);
 
         if (!resultType) {
@@ -568,7 +568,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         //the -1 code indicates we don't want to memoize this. That should have happened at an outer layer.
         PyObject* res = deserializePyRepresentation(b, -1);
 
-        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res, true);
+        Type* resultType = PyInstance::extractTypeFrom((PyTypeObject*)res);
 
         decref(res);
 

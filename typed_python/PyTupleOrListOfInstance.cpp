@@ -693,7 +693,7 @@ void PyListOfInstance::constructFromPythonArgumentsConcrete(ListOf* t, uint8_t* 
         PyObject* arg = PyTuple_GetItem(args, 0);
         Type* argType = extractTypeFrom(arg->ob_type);
 
-        if (argType && argType->isBinaryCompatibleWith(t)) {
+        if (argType == t) {
             //following python semantics, this needs to produce a new object
             //that's a copy of the original list. We can't just incref it and return
             //the original object because it has state.

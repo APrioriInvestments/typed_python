@@ -208,9 +208,6 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(ibc(OneOf(int, float), OneOf(float, int)))
         self.assertTrue(ibc(OneOf(int, X), OneOf(int, Y)))
 
-        self.assertIsInstance(OneOf(None, X)(Y()), X)
-        self.assertIsInstance(NamedTuple(x=OneOf(None, X))(x=Y()).x, X)
-
     def test_binary_compatibility_incompatible_alternatives(self):
         ibc = _types.isBinaryCompatible
 
@@ -303,6 +300,20 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(NamedTuple(x=int)(x=10).x, 10)
         self.assertEqual(X(x=10).f(), 10)
         self.assertEqual(Ox(X(x=10)).f(), 10)
+
+    def test_one_of_distinguishes_py_subclasses(self):
+        class X(NamedTuple(x=int)):
+            def f(self):
+                return self.x
+
+        class X2(NamedTuple(x=int)):
+            def f(self):
+                return self.x + 2
+
+        XorX2 = OneOf(X, X2)
+
+        self.assertTrue(isinstance(XorX2(X()), X))
+        self.assertTrue(isinstance(XorX2(X2()), X2))
 
     def test_tuple_of_tuple_of(self):
         tupleOfInt = TupleOf(int)
@@ -1222,13 +1233,10 @@ class NativeTypesTests(unittest.TestCase):
         class T2Comp(NamedTuple(d=ConstDict(str, T1))):
             pass
 
-        aT1C = T1Comp(d={'a': T1(a=10)})
+        self.assertTrue(_types.isBinaryCompatible(T1Comp, T2Comp))
+        self.assertTrue(_types.isBinaryCompatible(T1, T2))
 
-        self.assertEqual(T2Comp(aT1C).d['a'].a, 10)
-
-        self.assertEqual(aT1C, deserialize(T1Comp, serialize(T2Comp, aT1C)))
-
-    def test_conversion_of_binary_compatible_nested(self):
+    def test_binary_compatible_nested(self):
         def make():
             class Interior(NamedTuple(a=int)):
                 pass
@@ -1241,7 +1249,7 @@ class NativeTypesTests(unittest.TestCase):
         E1 = make()
         E2 = make()
 
-        OneOf(None, E2)(E1())
+        self.assertTrue(_types.isBinaryCompatible(E1, E2))
 
     def test_python_objects_in_tuples(self):
         class NormalPyClass(object):

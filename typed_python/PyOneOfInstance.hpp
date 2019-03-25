@@ -24,7 +24,6 @@ public:
 
         throw std::logic_error("Can't initialize a " + oneOf->name() + " from an instance of " +
             std::string(pyRepresentation->ob_type->tp_name));
-        return;
     }
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
