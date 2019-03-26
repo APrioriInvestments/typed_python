@@ -13,6 +13,7 @@
 #include "SerializationBuffer.hpp"
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
+#include "UnicodeProps.hpp"
 
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
@@ -1111,6 +1112,9 @@ void updateTypeRepForType(Type* type, PyTypeObject* pyType) {
 PyMODINIT_FUNC
 PyInit__types(void)
 {
+    // initialize unicode property table, for String class
+    initialize_uprops();
+
     //initialize numpy. This is only OK because all the .cpp files get
     //glommed together in a single file. If we were to change that behavior,
     //then additional steps must be taken as per the API documentation.
