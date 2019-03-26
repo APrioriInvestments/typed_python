@@ -23,6 +23,7 @@ O_FILES = $(BUILD_PATH)/_types.o \
           $(BUILD_PATH)/Type.o \
           $(BUILD_PATH)/PythonSerializationContext.o
 
+UNICODEPROPS = $(SRC_PATH)/UnicodeProps.hpp
 
 ##########################################################################
 #  MAIN RULES
@@ -72,6 +73,10 @@ docker-web:
 	#run a dummy webframework
 	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
 
+.PHONY: unicodeprops
+unicodeprops: $(SRC_PATH)/unicodeprops.py
+	$(PYTHON) $(SRC_PATH)/unicodeprops.py > $(UNICODEPROPS)
+
 .PHONY: clean
 clean:
 	rm -rf build/
@@ -112,6 +117,7 @@ testcert.cert testcert.key:
 	openssl req -x509 -newkey rsa:2048 -keyout testcert.key -nodes \
 		-out testcert.cert -sha256 -days 1000 \
 		-subj '/C=US/ST=New York/L=New York/CN=localhost'
+
 
 
 
