@@ -14,6 +14,7 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from typed_python import Int64
+from typed_python import Bool
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
@@ -145,8 +146,29 @@ class StringWrapper(RefcountedWrapper):
             )
         )
 
+    def _d(s):
+        return (s, eval("runtime_functions.string_" + s))
+
+    _bool_methods = dict([
+        _d("isalpha"),
+        _d("isalnum"),
+        _d("isdecimal"),
+        _d("isdigit"),
+        _d("islower"),
+        _d("isnumeric"),
+        _d("isprintable"),
+        _d("isspace"),
+        _d("istitle"),
+        _d("isupper")
+    ])
+
+    _str_methods = dict([
+        _d("lower"),
+        _d("upper")
+    ])
+
     def convert_attribute(self, context, instance, attr):
-        if attr in ("lower", "find"):
+        if attr in ("find",) or attr in self._str_methods or attr in self._bool_methods:
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -155,14 +177,24 @@ class StringWrapper(RefcountedWrapper):
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-        if methodname == "lower":
+        if methodname in self._str_methods:
             if len(args) == 0:
                 return context.push(
                     str,
                     lambda strRef: strRef.expr.store(
-                        runtime_functions.string_lower.call(
+                        self._str_methods[methodname].call(
                             instance.nonref_expr.cast(VoidPtr)
                         ).cast(self.layoutType)
+                    )
+                )
+        elif methodname in self._bool_methods:
+            if len(args) == 0:
+                return context.push(
+                    Bool,
+                    lambda bRef: bRef.expr.store(
+                        self._bool_methods[methodname].call(
+                            instance.nonref_expr.cast(VoidPtr)
+                        )
                     )
                 )
         elif methodname == "find":

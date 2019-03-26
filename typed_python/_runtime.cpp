@@ -26,6 +26,10 @@ extern "C" {
         return String::lower(l);
     }
 
+    String::layout* nativepython_runtime_string_upper(String::layout* l) {
+        return String::upper(l);
+    }
+
     int64_t nativepython_runtime_string_find(String::layout* l, String::layout* sub, int64_t start, int64_t end) {
         return String::find(l, sub, start, end);
     }
@@ -36,6 +40,46 @@ extern "C" {
 
     int64_t nativepython_runtime_string_find_3(String::layout* l, String::layout* sub, int64_t start) {
         return String::find_3(l, sub, start);
+    }
+
+    bool nativepython_runtime_string_isalpha(String::layout* l) {
+        return String::isalpha(l);
+    }
+
+    bool nativepython_runtime_string_isalnum(String::layout* l) {
+        return String::isalnum(l);
+    }
+
+    bool nativepython_runtime_string_isdecimal(String::layout* l) {
+        return String::isdecimal(l);
+    }
+
+    bool nativepython_runtime_string_isdigit(String::layout* l) {
+        return String::isdigit(l);
+    }
+
+    bool nativepython_runtime_string_islower(String::layout* l) {
+        return String::islower(l);
+    }
+
+    bool nativepython_runtime_string_isnumeric(String::layout* l) {
+        return String::isnumeric(l);
+    }
+
+    bool nativepython_runtime_string_isprintable(String::layout* l) {
+        return String::isprintable(l);
+    }
+
+    bool nativepython_runtime_string_isspace(String::layout* l) {
+        return String::isspace(l);
+    }
+
+    bool nativepython_runtime_string_istitle(String::layout* l) {
+        return String::istitle(l);
+    }
+
+    bool nativepython_runtime_string_isupper(String::layout* l) {
+        return String::isupper(l);
     }
 
     String::layout* nativepython_runtime_string_getitem_int64(String::layout* lhs, int64_t index) {

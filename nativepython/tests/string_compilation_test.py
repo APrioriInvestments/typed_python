@@ -143,7 +143,7 @@ class TestStringCompilation(unittest.TestCase):
             for i in range(-20, 20):
                 self.assertEqual(callOrExcept(getitem, s, i), callOrExcept(lambda s, i: s[i], s, i), (s, i))
 
-    def test_string_lower(self):
+    def test_string_lower_upper(self):
 
         @Compiled
         def c_lower(s: str):
@@ -153,26 +153,36 @@ class TestStringCompilation(unittest.TestCase):
         def c_lower2(s: str, t: str):
             return s.lower(t)
 
-        someupper_strings = [
+        @Compiled
+        def c_upper(s: str):
+            return s.upper()
+
+        @Compiled
+        def c_upper2(s: str, t: str):
+            return s.upper(t)
+
+        some_lu_strings = [
             "abc"
             "Abc",
             "aBc",
             "abC",
             "ABC",
-            "aBcDeFgHiJkLm" * 10000,
-            "\u00CA\u00D1\u011A\u1E66\u1EEA",
-            "\u00CA\u00D1\u011A\u1E66\u1EEA" * 10000,
+            "aBcDefGHiJkLm" * 10000,
+            "\u00CA\u00F1\u011A\u1E66\u3444\u1E67\u1EEA\1F04",
+            "\u00CA\u00F1\u011A\u1E66\u3444\u1E67\u1EEA\1F04" * 10000,
             "XyZ\U0001D471",
             "XyZ\U0001D471" * 10000,
             "\u007F\u0080\u0081\u07FF\u0800\u0801\uFFFF\U00010000\U00010001\U0010FFFF"
         ]
-        for s in someupper_strings:
+        for s in some_lu_strings:
             self.assertEqual(c_lower(s), s.lower())
+            self.assertEqual(c_upper(s), s.upper())
 
-        for s in someupper_strings:
+        for s in some_lu_strings:
             self.assertEqual(callOrExceptType(c_lower2, s, s), callOrExceptType(s.lower, s))
+            self.assertEqual(callOrExceptType(c_upper2, s, s), callOrExceptType(s.upper, s))
 
-    def test_string__find(self):
+    def test_string_find(self):
 
         @Compiled
         def c_find(s: str, sub: str, start: int, end: int):
@@ -240,6 +250,85 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(callOrExceptType(c_find_5, s, s, 0, 1, 2), callOrExceptType(s.find, s, 0, 1, 2))
             self.assertEqual(callOrExceptType(c_find_1, s), callOrExceptType(s.find))
 
+    def test_string_is_something(self):
+
+        @Compiled
+        def c_isalpha(s: str):
+            return s.isalpha()
+
+        @Compiled
+        def c_isalnum(s: str):
+            return s.isalnum()
+
+        @Compiled
+        def c_isdecimal(s: str):
+            return s.isdecimal()
+
+        @Compiled
+        def c_isdigit(s: str):
+            return s.isdigit()
+
+        @Compiled
+        def c_islower(s: str):
+            return s.islower()
+
+        @Compiled
+        def c_isnumeric(s: str):
+            return s.isnumeric()
+
+        @Compiled
+        def c_isprintable(s: str):
+            return s.isprintable()
+
+        @Compiled
+        def c_isspace(s: str):
+            return s.isspace()
+
+        @Compiled
+        def c_istitle(s: str):
+            return s.istitle()
+
+        @Compiled
+        def c_isupper(s: str):
+            return s.isupper()
+
+        def perform_comparison(s: str):
+            self.assertEqual(c_isalpha(s), s.isalpha(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isalnum(s), s.isalnum(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isdecimal(s), s.isdecimal(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isdigit(s), s.isdigit(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_islower(s), s.islower(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isnumeric(s), s.isnumeric(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isprintable(s), s.isprintable(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isspace(s), s.isspace(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_istitle(s), s.istitle(), [hex(ord(c)) for c in s])
+            self.assertEqual(c_isupper(s), s.isupper(), [hex(ord(c)) for c in s])
+
+        perform_comparison("")
+        for i in range(0, 0x1000):
+            perform_comparison(chr(i))
+        for i in range(0x1000, 0x110000, 47):
+            perform_comparison(chr(i))
+        for i in range(0, 0x1000):
+            perform_comparison(chr(i) + "a")
+            perform_comparison(chr(i) + "1")
+            perform_comparison(chr(i) + "A")
+            perform_comparison(chr(i) + "/")
+            perform_comparison(chr(i) + " ")
+            perform_comparison(chr(i) + "\u01C5")
+            perform_comparison(chr(i) + "\x00")
+            perform_comparison(chr(i) + "\U00010401")
+            perform_comparison(chr(i) + "\U00010428")
+
+        titlestrings = [
+            "Title Case", "TitleCa)se", "2Title/Case", "2title/case",
+            "\u01C5a", "\u01C5A", "\u01C5\u1F88",
+            "\u01C5 \u1F88", "\u01C5 \u1F88a", "\u01C5 \u1F88A",
+            "\U00010401 \u1F88", "\U00010401 \u1F88a", "\U00010401 \u1F88A",
+            "\U00010428 \u1F88", "\U00010428 \u1F88a", "\U00010428 \u1F88A"
+        ]
+        for s in titlestrings:
+            self.assertEqual(c_istitle(s), s.istitle(), s)
         """
         def rep_find(s, subs):
             result = 0
