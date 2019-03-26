@@ -14,6 +14,7 @@
 
 import nativepython.native_ast as native_ast
 
+Bool = native_ast.Bool
 UInt8Ptr = native_ast.UInt8Ptr
 Int64 = native_ast.Int64
 Float64 = native_ast.Float64
@@ -137,6 +138,12 @@ string_lower = externalCallTarget(
     Void.pointer()
 )
 
+string_upper = externalCallTarget(
+    "nativepython_runtime_string_upper",
+    Void.pointer(),
+    Void.pointer()
+)
+
 string_find = externalCallTarget(
     "nativepython_runtime_string_find",
     Int64,
@@ -153,6 +160,66 @@ string_find_3 = externalCallTarget(
     "nativepython_runtime_string_find_3",
     Int64,
     Void.pointer(), Void.pointer(), Int64
+)
+
+string_isalpha = externalCallTarget(
+    "nativepython_runtime_string_isalpha",
+    Bool,
+    Void.pointer()
+)
+
+string_isalnum = externalCallTarget(
+    "nativepython_runtime_string_isalnum",
+    Bool,
+    Void.pointer()
+)
+
+string_isdecimal = externalCallTarget(
+    "nativepython_runtime_string_isdecimal",
+    Bool,
+    Void.pointer()
+)
+
+string_isdigit = externalCallTarget(
+    "nativepython_runtime_string_isdigit",
+    Bool,
+    Void.pointer()
+)
+
+string_islower = externalCallTarget(
+    "nativepython_runtime_string_islower",
+    Bool,
+    Void.pointer()
+)
+
+string_isnumeric = externalCallTarget(
+    "nativepython_runtime_string_isnumeric",
+    Bool,
+    Void.pointer()
+)
+
+string_isprintable = externalCallTarget(
+    "nativepython_runtime_string_isprintable",
+    Bool,
+    Void.pointer()
+)
+
+string_isspace = externalCallTarget(
+    "nativepython_runtime_string_isspace",
+    Bool,
+    Void.pointer()
+)
+
+string_istitle = externalCallTarget(
+    "nativepython_runtime_string_istitle",
+    Bool,
+    Void.pointer()
+)
+
+string_isupper = externalCallTarget(
+    "nativepython_runtime_string_isupper",
+    Bool,
+    Void.pointer()
 )
 
 bytes_concat = externalCallTarget(
