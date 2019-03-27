@@ -58,4 +58,6 @@ from object_database.web.cells.cells import (
     _PlotUpdater,
 )
 
+from object_database.web.cells.CellsTestHelperMixin import CellsTestHelperMixin
+
 MAX_FPS = 10
