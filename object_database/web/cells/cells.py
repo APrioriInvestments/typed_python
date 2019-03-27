@@ -19,7 +19,6 @@ from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
 
 MAX_TIMEOUT = 1.0
 MAX_TRIES = 10
-MAX_FPS = 10
 
 _cur_cell = threading.local()
 
