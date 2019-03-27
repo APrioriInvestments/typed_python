@@ -953,8 +953,6 @@ class Card(Cell):
         card.add_child(body)
         card.attributes["style"] = self._divStyle()
 
-        self.cells._logger.info(str(card))
-
         self.contents = str(card)
 
     def sortsAs(self):
