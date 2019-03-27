@@ -74,8 +74,8 @@ docker-web:
 	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
 
 .PHONY: unicodeprops
-unicodeprops: $(SRC_PATH)/unicodeprops.py
-	$(PYTHON) $(SRC_PATH)/unicodeprops.py > $(UNICODEPROPS)
+unicodeprops: ./unicodeprops.py
+	$(PYTHON) ./unicodeprops.py > $(UNICODEPROPS)
 
 .PHONY: clean
 clean:
