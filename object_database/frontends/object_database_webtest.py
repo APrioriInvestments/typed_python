@@ -14,7 +14,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-
 import os
 import sys
 import tempfile
@@ -51,9 +50,11 @@ def main(argv=None):
 
     token = genToken()
     port = 8020
+    loglevel_name = 'INFO'
+
     with tempfile.TemporaryDirectory() as tmpDirName:
         try:
-            server = start_service_manager(tmpDirName, port, token)
+            server = start_service_manager(tmpDirName, port, token, loglevel_name=loglevel_name)
 
             database = connect("localhost", port, token, retry=True)
             database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
@@ -65,7 +66,7 @@ def main(argv=None):
                 database, service,
                 ['--port', '8000',
                  '--host', '0.0.0.0',
-                 '--log-level', 'INFO']
+                 '--log-level', loglevel_name]
             )
 
             ActiveWebService.setLoginPlugin(
@@ -80,17 +81,21 @@ def main(argv=None):
                 ServiceManager.startService("ActiveWebService", 1)
 
             with database.transaction():
-                service = ServiceManager.createOrUpdateService(UninitializableService, "UninitializableService", target_count=1)
-
+                service = ServiceManager.createOrUpdateService(
+                    UninitializableService, "UninitializableService", target_count=1
+                )
             with database.transaction():
-                service = ServiceManager.createOrUpdateService(HappyService, "HappyService", target_count=1)
-
+                service = ServiceManager.createOrUpdateService(
+                    HappyService, "HappyService", target_count=1
+                )
             with database.transaction():
-                service = ServiceManager.createOrUpdateService(GraphDisplayService, "GraphDisplayService", target_count=1)
-
+                service = ServiceManager.createOrUpdateService(
+                    GraphDisplayService, "GraphDisplayService", target_count=1
+                )
             with database.transaction():
-                service = ServiceManager.createOrUpdateService(TextEditorService, "TextEditorService", target_count=1)
-
+                service = ServiceManager.createOrUpdateService(
+                    TextEditorService, "TextEditorService", target_count=1
+                )
             while True:
                 time.sleep(.1)
         finally:

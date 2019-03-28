@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import logging
 import os
 import subprocess
 import sys
@@ -47,10 +48,16 @@ class ServiceManagerTestCommon(object):
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.name
-        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(self.tempDirectoryName, forceReset=True)
+        object_database.service_manager.Codebase.setCodebaseInstantiationDirectory(
+            self.tempDirectoryName, forceReset=True
+        )
 
         os.makedirs(os.path.join(self.tempDirectoryName, 'source'))
         os.makedirs(os.path.join(self.tempDirectoryName, 'storage'))
+
+        logLevelName = logging.getLevelName(
+            logging.getLogger(__name__).getEffectiveLevel()
+        )
 
         if not VERBOSE:
             kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
@@ -67,7 +74,8 @@ class ServiceManagerTestCommon(object):
                     '--storage', os.path.join(self.tempDirectoryName, 'storage'),
                     '--service-token', self.token,
                     '--shutdownTimeout', '1.0',
-                    '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert')
+                    '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert'),
+                    '--log-level', logLevelName
                 ],
                 **kwargs
             )

@@ -26,7 +26,7 @@ import threading
 import time
 import traceback
 
-from object_database.util import configureLogging, sslContextFromCertPathOrNone, checkLogLevelValidity
+from object_database.util import configureLogging, sslContextFromCertPathOrNone, validateLogLevel
 from object_database import TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
@@ -61,7 +61,7 @@ def main(argv=None):
     parsedArgs = parser.parse_args(argv[1:])
 
     level_name = parsedArgs.log_level.upper()
-    checkLogLevelValidity(level_name)
+    level_name = validateLogLevel(level_name, fallback='INFO')
 
     # getLevelName returns a name when given an int and an int when given a name,
     # and there doesn't seem to be an other way to get the int from the string.
@@ -101,14 +101,17 @@ def main(argv=None):
             databaseServer = TcpServer(
                 parsedArgs.own_hostname,
                 object_database_port,
-                RedisPersistence(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None else InMemoryPersistence(),
+                RedisPersistence(port=parsedArgs.redis_port) if parsedArgs.redis_port is not None
+                else InMemoryPersistence(),
                 ssl_context=ssl_ctx,
                 auth_token=parsedArgs.service_token
             )
 
             databaseServer.start()
 
-            logger.info("Started a database server on %s:%s", parsedArgs.own_hostname, object_database_port)
+            logger.info(
+                "Started a database server on %s:%s",
+                parsedArgs.own_hostname, object_database_port)
 
         serviceManager = None
 
@@ -129,7 +132,8 @@ def main(argv=None):
                             maxGbRam=parsedArgs.max_gb_ram or int(psutil.virtual_memory().total / 1024.0 / 1024.0 / 1024.0 + .1),
                             maxCores=parsedArgs.max_cores or multiprocessing.cpu_count(),
                             logfileDirectory=parsedArgs.logdir,
-                            shutdownTimeout=parsedArgs.shutdownTimeout
+                            shutdownTimeout=parsedArgs.shutdownTimeout,
+                            logLevelName=level_name
                         )
                         logger.info("Connected the service-manager")
                     except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):

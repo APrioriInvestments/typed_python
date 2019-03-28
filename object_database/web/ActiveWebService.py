@@ -21,7 +21,7 @@ import threading
 import gevent.socket
 import gevent.queue
 
-from object_database.util import genToken, checkLogLevelValidity
+from object_database.util import genToken, validateLogLevel
 from object_database import ServiceBase, service_schema, Indexed
 from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin
@@ -138,7 +138,7 @@ class ActiveWebService(ServiceBase):
                 c = Configuration(service=serviceObject)
 
             level_name = parsedArgs.log_level.upper()
-            checkLogLevelValidity(level_name)
+            level_name = validateLogLevel(level_name, fallback='INFO')
 
             c.port = parsedArgs.port
             c.hostname = parsedArgs.hostname
