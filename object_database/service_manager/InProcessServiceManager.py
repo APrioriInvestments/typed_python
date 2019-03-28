@@ -17,12 +17,16 @@ import tempfile
 
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceWorker import ServiceWorker
-
+from object_database.service_manager.Codebase import setCodebaseInstantiationDirectory
 
 class InProcessServiceManager(ServiceManager):
-    def __init__(self, dbConnectionFactory):
+    def __init__(self, dbConnectionFactory, auth_token):
         self.storageRoot = tempfile.TemporaryDirectory()
         self.sourceRoot = tempfile.TemporaryDirectory()
+        self.auth_token = auth_token
+
+
+        setCodebaseInstantiationDirectory(self.sourceRoot.name)
 
         ServiceManager.__init__(
             self, dbConnectionFactory, self.sourceRoot.name, isMaster=True, ownHostname="localhost"
@@ -31,14 +35,14 @@ class InProcessServiceManager(ServiceManager):
         self.serviceWorkers = {}
 
     def startServiceWorker(self, service, instanceIdentity):
-
         if instanceIdentity in self.serviceWorkers:
             return
 
         worker = ServiceWorker(
             self.dbConnectionFactory,
             instanceIdentity,
-            os.path.join(self.storageRoot.name, instanceIdentity)
+            os.path.join(self.storageRoot.name, str(instanceIdentity)),
+            self.auth_token
         )
 
         self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)
