@@ -141,8 +141,9 @@ def autoconfigure_and_start_service_manager(port=None, auth_token=None, loglevel
     auth_token = auth_token or genToken()
 
     if loglevel_name is None:
-        loglevel = logging.getLogger(__name__).getEffectiveLevel()
-        loglevel_name = logging.getLevelName(loglevel)
+        loglevel_name = logging.getLevelName(
+            logging.getLogger(__name__).getEffectiveLevel()
+        )
 
     tempDirObj = tempfile.TemporaryDirectory()
     tempDirectoryName = tempDirObj.name

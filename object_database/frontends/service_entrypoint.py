@@ -20,7 +20,7 @@ import sys
 import traceback
 
 from object_database import connect
-from object_database.util import checkLogLevelValidity, configureLogging
+from object_database.util import validateLogLevel, configureLogging
 from object_database.service_manager.Codebase import setCodebaseInstantiationDirectory
 from object_database.service_manager.ServiceWorker import ServiceWorker
 
@@ -40,7 +40,7 @@ def main(argv):
     parsedArgs = parser.parse_args(argv[1:])
 
     level = parsedArgs.log_level.upper()
-    checkLogLevelValidity(level)
+    level = validateLogLevel(level, fallback='INFO')
 
     configureLogging(preamble=parsedArgs.instanceid[:8], level=level)
 

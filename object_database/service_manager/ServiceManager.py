@@ -29,7 +29,8 @@ import sys
 class ServiceManager(object):
     DEFAULT_SHUTDOWN_TIMEOUT = 10.0
 
-    def __init__(self, dbConnectionFactory, sourceDir, isMaster, ownHostname, maxGbRam=4, maxCores=4, shutdownTimeout=None):
+    def __init__(self, dbConnectionFactory, sourceDir, isMaster, ownHostname,
+                 maxGbRam=4, maxCores=4, shutdownTimeout=None):
         object.__init__(self)
         self.shutdownTimeout = shutdownTimeout or ServiceManager.DEFAULT_SHUTDOWN_TIMEOUT
         self.ownHostname = ownHostname

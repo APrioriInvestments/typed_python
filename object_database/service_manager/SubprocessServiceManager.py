@@ -23,6 +23,7 @@ import traceback
 
 from object_database.service_manager.ServiceManager import ServiceManager
 from object_database.service_manager.ServiceSchema import service_schema
+from object_database.util import validateLogLevel
 from object_database import connect
 
 
@@ -52,13 +53,13 @@ class SubprocessServiceManager(ServiceManager):
     def __init__(self, ownHostname, host, port,
                  sourceDir, storageDir, serviceToken,
                  isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None,
-                 shutdownTimeout=None, errorLogsOnly=False):
+                 shutdownTimeout=None, logLevelName="INFO"):
         self.host = host
         self.port = port
         self.storageDir = storageDir
         self.serviceToken = serviceToken
         self.logfileDirectory = logfileDirectory
-        self.errorLogsOnly = errorLogsOnly
+        self.logLevelName = validateLogLevel(logLevelName, fallback='INFO')
 
         self.lock = threading.Lock()
 
@@ -108,8 +109,9 @@ class SubprocessServiceManager(ServiceManager):
                         instanceIdentity,
                         os.path.join(self.sourceDir, instanceIdentity),
                         os.path.join(self.storageDir, instanceIdentity),
-                        self.serviceToken
-                    ] + (['--log-level', 'ERROR'] if self.errorLogsOnly else []),
+                        self.serviceToken,
+                        '--log-level', self.logLevelName
+                    ],
                     cwd=self.storageDir,
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,
