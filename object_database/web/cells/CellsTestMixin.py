@@ -1,38 +1,18 @@
-import time
 from object_database.web.cells import Cells
+from object_database.web.cells.util import waitForCellsCondition
 
 
-class CellsTestHelperMixin:
-    # FIXME: this method should probably part of a cells_util file
-    # instead of this mixin because it doesn't require any unittest
-    # methods
-    def waitForCellsCondition(self, cells, condition, timeout=10.0):
-        assert cells.db.serializationContext is not None
-
-        t0 = time.time()
-        while time.time() - t0 < timeout:
-            condRes = condition()
-
-            if not condRes:
-                time.sleep(.1)
-                while cells.processOneTask():
-                    pass
-                cells.renderMessages()
-            else:
-                return condRes
-
-        exceptions = cells.childrenWithExceptions()
-        if exceptions:
-            raise Exception("\n\n".join([e.childByIndex(0).contents for e in exceptions]))
-
-        return None
+class CellsTestMixin:
+    @staticmethod
+    def waitForCells(cells: Cells, condition, timeout=10.0):
+        return waitForCellsCondition(cells, condition, timeout)
 
     def assertNoCellExceptions(self, cells: Cells):
         exceptions = cells.childrenWithExceptions()
         self.assertTrue(not exceptions, "\n\n".join([e.childByIndex(0).contents for e in exceptions]))
 
     def assertCellTagExists(self, cells: Cells, tag: str, expected_count=1):
-        res = self.waitForCellsCondition(
+        res = self.waitForCells(
             cells,
             lambda: cells.findChildrenByTag(tag)
         )
@@ -40,7 +20,7 @@ class CellsTestHelperMixin:
         self.assertEqual(len(res), expected_count)
 
     def assertCellTypeExists(self, cells: Cells, typ, expected_count=1):
-        res = self.waitForCellsCondition(
+        res = self.waitForCells(
             cells,
             lambda: cells.findChildrenMatching(lambda cell: isinstance(cell, typ))
         )
