@@ -164,7 +164,11 @@ class SerializationContext(object):
             res = _builtin_name_to_value.get(name)
 
         if res is None:
-            logging.warn("Failed to find a value for object named %s", name)
+            logging.warn(
+                "Failed to find a value for object named %s. unique prefixes are %s",
+                name,
+                set([x.split(".")[0] for x in self.nameToObject])
+            )
 
         return res
 

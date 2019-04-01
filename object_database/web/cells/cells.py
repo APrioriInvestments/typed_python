@@ -787,8 +787,8 @@ class Cell:
         return self.cells.db.transaction().setSerializationContext(self.serializationContext)
 
     def prepare(self):
-        if self.serializationContext is None and self.parent is not None:
-            if self.parent.serializationContext is None:
+        if self.serializationContext is TypedPythonCodebase.coreSerializationContext() and self.parent is not None:
+            if self.parent.serializationContext is TypedPythonCodebase.coreSerializationContext():
                 self.parent.prepare()
             self.serializationContext = self.parent.serializationContext
 
