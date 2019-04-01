@@ -34,7 +34,7 @@ def main(argv):
     parser.add_argument("instanceid", type=int)
     parser.add_argument("sourceDir")
     parser.add_argument("storageRoot")
-    parser.add_argument("serviceToken")
+    parser.add_argument("authToken")
     parser.add_argument("--log-level", required=False, default="INFO")
     parser.add_argument("--ip", required=False)
 
@@ -58,7 +58,7 @@ def main(argv):
 
     try:
         def dbConnectionFactory():
-            return connect(parsedArgs.host, parsedArgs.port, parsedArgs.serviceToken)
+            return connect(parsedArgs.host, parsedArgs.port, parsedArgs.authToken)
 
         mainDbConnection = dbConnectionFactory()
 
@@ -74,7 +74,7 @@ def main(argv):
             dbConnectionFactory,
             int(parsedArgs.instanceid),
             parsedArgs.storageRoot,
-            parsedArgs.serviceToken,
+            parsedArgs.authToken,
             ourIP
         )
 

@@ -51,13 +51,13 @@ def parseLogfileToInstanceid(fname):
 
 class SubprocessServiceManager(ServiceManager):
     def __init__(self, ownHostname, host, port,
-                 sourceDir, storageDir, serviceToken,
+                 sourceDir, storageDir, authToken,
                  isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None,
                  shutdownTimeout=None, logLevelName="INFO"):
         self.host = host
         self.port = port
         self.storageDir = storageDir
-        self.serviceToken = serviceToken
+        self.authToken = authToken
         self.logfileDirectory = logfileDirectory
         self.logLevelName = validateLogLevel(logLevelName, fallback='INFO')
 
@@ -74,7 +74,7 @@ class SubprocessServiceManager(ServiceManager):
             os.makedirs(sourceDir)
 
         def dbConnectionFactory():
-            return connect(host, port, self.serviceToken)
+            return connect(host, port, self.authToken)
 
         ServiceManager.__init__(
             self, dbConnectionFactory, sourceDir, isMaster, ownHostname,
@@ -109,7 +109,7 @@ class SubprocessServiceManager(ServiceManager):
                         str(instanceIdentity),
                         os.path.join(self.sourceDir, str(instanceIdentity)),
                         os.path.join(self.storageDir, str(instanceIdentity)),
-                        self.serviceToken,
+                        self.authToken,
                         '--log-level', self.logLevelName
                     ],
                     cwd=self.storageDir,

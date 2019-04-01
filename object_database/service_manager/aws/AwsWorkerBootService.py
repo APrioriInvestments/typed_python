@@ -659,7 +659,7 @@ class AwsWorkerBootService(ServiceBase):
                     )
 
                     try:
-                        self.api.bootWorker(state.instance_type, self.runtimeConfig.serviceToken)
+                        self.api.bootWorker(state.instance_type, self.runtimeConfig.authToken)
 
                         state.booted += 1
                         state.capacityConstrained = False
@@ -688,7 +688,7 @@ class AwsWorkerBootService(ServiceBase):
                     try:
                         instanceId = self.api.bootWorker(
                             state.instance_type,
-                            self.runtimeConfig.serviceToken,
+                            self.runtimeConfig.authToken,
                             spotPrice=valid_instance_types[state.instance_type]['COST']
                         )
                         if not self.api.tagSpotRequest(instanceId):
