@@ -39,10 +39,12 @@ class InProcessServiceManager(ServiceManager):
             return
 
         worker = ServiceWorker(
+            self.dbConnectionFactory(),
             self.dbConnectionFactory,
             instanceIdentity,
             os.path.join(self.storageRoot.name, str(instanceIdentity)),
-            self.auth_token
+            self.auth_token,
+            '127.0.0.1'
         )
 
         self.serviceWorkers[instanceIdentity] = self.serviceWorkers.get(service, ()) + (worker,)

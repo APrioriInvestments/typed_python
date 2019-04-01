@@ -36,6 +36,7 @@ def main(argv):
     parser.add_argument("storageRoot")
     parser.add_argument("serviceToken")
     parser.add_argument("--log-level", required=False, default="INFO")
+    parser.add_argument("--ip", required=False)
 
     parsedArgs = parser.parse_args(argv[1:])
 
@@ -53,17 +54,28 @@ def main(argv):
         parsedArgs.instanceid
     )
 
-    def dbConnectionFactory():
-        return connect(parsedArgs.host, parsedArgs.port, parsedArgs.serviceToken)
-
     setCodebaseInstantiationDirectory(parsedArgs.sourceDir)
 
     try:
+        def dbConnectionFactory():
+            return connect(parsedArgs.host, parsedArgs.port, parsedArgs.serviceToken)
+
+        mainDbConnection = dbConnectionFactory()
+
+        if parsedArgs.ip is not None:
+            logger.info("Our ip explicitly specified as %s", parsedArgs.ip)
+            ourIP = parsedArgs.ip
+        else:
+            ourIP = mainDbConnection.getConnectionMetadata()['sockname'][0]
+            logger.info("Our ip inferred from our connection back to the server as %s", ourIP)
+
         manager = ServiceWorker(
+            mainDbConnection,
             dbConnectionFactory,
             int(parsedArgs.instanceid),
             parsedArgs.storageRoot,
-            parsedArgs.serviceToken
+            parsedArgs.serviceToken,
+            ourIP
         )
 
         manager.runAndWaitForShutdown()

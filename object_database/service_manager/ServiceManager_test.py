@@ -67,6 +67,7 @@ class TestServiceLastTimestamp:
     triggerHardKill = bool
     triggerSoftKill = bool
     version = int
+    ownIp = str
 
     @staticmethod
     def aliveServices(window=None):
@@ -93,6 +94,7 @@ class TestService(ServiceBase):
         with self.db.transaction():
             self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
+            self.conn.ownIp = self.runtimeConfig.ownIpAddress
 
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
@@ -423,6 +425,19 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
 
         self.waitForCount(1)
+
+    def test_own_ip_populated(self):
+        with self.database.transaction():
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+
+        self.waitForCount(1)
+
+        with self.database.view():
+            state = TestServiceLastTimestamp.lookupAny()
+
+            # we should always know our ip as 127.0.0.1 because we infer it from
+            # the server we connect to, and we connected to localhost.
+            self.assertEqual(state.ownIp, "127.0.0.1")
 
     def test_service_storage(self):
         with self.database.transaction():

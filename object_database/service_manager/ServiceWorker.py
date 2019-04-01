@@ -24,10 +24,10 @@ import traceback
 
 
 class ServiceWorker:
-    def __init__(self, dbConnectionFactory, instance_id, storageRoot, serviceToken):
+    def __init__(self, db, dbConnectionFactory, instance_id, storageRoot, serviceToken, ownIpAddress):
         self._logger = logging.getLogger(__name__)
         self.dbConnectionFactory = dbConnectionFactory
-        self.db = dbConnectionFactory()
+        self.db = db
         self.db.subscribeToSchema(core_schema)
 
         # explicitly don't subscribe to everyone else's service hosts!
@@ -35,7 +35,7 @@ class ServiceWorker:
         self.db.subscribeToType(service_schema.Codebase, lazySubscription=True)
         self.db.subscribeToType(service_schema.File, lazySubscription=True)
 
-        self.runtimeConfig = ServiceRuntimeConfig(storageRoot, serviceToken)
+        self.runtimeConfig = ServiceRuntimeConfig(storageRoot, serviceToken, ownIpAddress)
 
         if not os.path.exists(storageRoot):
             os.makedirs(storageRoot)

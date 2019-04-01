@@ -174,7 +174,12 @@ def connect(host, port, auth_token, timeout=10.0, retry=False, eventLoop=_eventL
     if proto is None:
         raise ConnectionRefusedError()
 
-    conn = DatabaseConnection(proto)
+    conn = DatabaseConnection(proto, {
+        propertyName:
+            proto.transport.get_extra_info(propertyName)
+            for propertyName in ['socket', 'peername', 'sockname']
+    })
+
     conn.authenticate(auth_token)
 
     conn.initialized.wait(timeout=max(timeout - (time.time() - t0), 0.0))

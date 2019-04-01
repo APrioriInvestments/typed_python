@@ -266,9 +266,10 @@ class ManyVersionedObjects:
 
 
 class DatabaseConnection:
-    def __init__(self, channel):
+    def __init__(self, channel, connectionMetadata=None):
         self._channel = channel
         self._transaction_callbacks = {}
+        self._connectionMetadata = connectionMetadata or {}
 
         self._lock = threading.Lock()
 
@@ -324,6 +325,20 @@ class DatabaseConnection:
         self.serializationContext = TypedPythonCodebase.coreSerializationContext().withoutCompression()
 
         self._logger = logging.getLogger(__name__)
+
+    def getConnectionMetadata(self):
+        """Return any data provided to us by the underlying transport.
+
+        Returns:
+            A dictionary of extra metadata.
+
+            If we are a TCP-based connection, this will have the members:
+                'peername': the remote address to which the socket is connected,
+                            result of socket.socket.getpeername() (None on error)
+                'socket':   socket.socket instance
+                'sockname': the socket's own address, result of socket.socket.getsockname()
+        """
+        return self._connectionMetadata
 
     def registerOnTransactionHandler(self, handler):
         self._onTransactionHandlers.append(handler)

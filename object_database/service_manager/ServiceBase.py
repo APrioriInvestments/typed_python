@@ -17,9 +17,10 @@ import object_database
 
 
 class ServiceRuntimeConfig:
-    def __init__(self, serviceTemporaryStorageRoot, serviceToken):
+    def __init__(self, serviceTemporaryStorageRoot, serviceToken, ownIpAddress):
         self.serviceTemporaryStorageRoot = serviceTemporaryStorageRoot
         self.serviceToken = serviceToken
+        self.ownIpAddress = ownIpAddress
 
 
 class ServiceBase:
