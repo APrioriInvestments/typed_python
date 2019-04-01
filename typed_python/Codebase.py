@@ -147,7 +147,10 @@ class Codebase:
                 else:
                     if os.path.splitext(name)[1] in extensions:
                         with open(fullpath, "r") as f:
-                            contents = f.read()
+                            try:
+                                contents = f.read()
+                            except UnicodeDecodeError:
+                                raise Exception(f"Failed to parse code in {fullpath} because of a unicode error.")
 
                         total_bytes[0] += len(contents)
 
