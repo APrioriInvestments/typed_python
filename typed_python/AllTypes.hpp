@@ -42,3 +42,4 @@
 #include "ClassType.hpp"
 #include "BoundMethodType.hpp"
 
+#include "DirectTypes.hpp"
