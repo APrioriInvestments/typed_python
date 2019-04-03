@@ -39,6 +39,7 @@ SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
 UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
 TP_O_FILES = $(TP_BUILD_PATH)/all.o
 ODB_O_FILES = $(ODB_BUILD_PATH)/all.o
+GENERATEDTYPES = $(SRC_PATH)/GeneratedTypes.hpp
 
 ##########################################################################
 #  MAIN RULES
@@ -94,6 +95,10 @@ docker-web:
 .PHONY: unicodeprops
 unicodeprops: ./unicodeprops.py
 	$(PYTHON) ./unicodeprops.py > $(UNICODEPROPS)
+
+.PHONY: generatetypes
+generatetypes: ./generate.py
+	$(PYTHON) ./generate.py $(GENERATEDTYPES)
 
 .PHONY: clean
 clean:
