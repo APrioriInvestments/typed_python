@@ -68,18 +68,6 @@ class ExpressionConversionContext(object):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False)
         assert False
 
-    def ensureTypedExpression(self, expr):
-        if expr is None:
-            return TypedExpression(self, native_ast.nullExpr, typeWrapper(type(None)), False)
-        else:
-            return expr
-
-    def as_bool(self, expr):
-        expr = self.ensureTypedExpression(expr)
-        expr = expr.toBool()
-        expr = self.ensureTypedExpression(expr)
-        return expr
-
     def pushVoid(self, t=None):
         if t is None:
             t = typeWrapper(type(None))
@@ -572,28 +560,24 @@ class ExpressionConversionContext(object):
 
         if ast.matches.BoolOp:
             def convertBoolOp(depth=0):
-                if depth == len(ast.values) - 1:
-                    with self.subcontext() as sc:
-                        value = self.as_bool(
-                            self.convert_expression_ast(ast.values[depth])
-                        )
-                        sc.expr = value.expr
-                    return sc.result
-                # else
                 with self.subcontext() as sc:
-                    tail_expr = convertBoolOp(depth + 1)
-                    value = self.as_bool(
-                        self.convert_expression_ast(ast.values[depth])
-                    )
+                    value = self.convert_expression_ast(ast.values[depth])
+                    value = TypedExpression.asBool(value)
+                    if value is not None:
+                        if depth == len(ast.values) - 1:
+                            sc.expr = value.expr
+                        else:
+                            tail_expr = convertBoolOp(depth + 1)
 
-                    if ast.op.matches.And:
-                        sc.expr = native_ast.Expression.Branch(
-                            cond=value.expr, true=tail_expr, false=native_ast.falseExpr)
-                    elif ast.op.matches.Or:
-                        sc.expr = native_ast.Expression.Branch(
-                            cond=value.expr, true=native_ast.trueExpr, false=tail_expr)
-                    else:
-                        raise Exception(f"Unknown kind of Boolean operator: {ast.op.Name}")
+                            if ast.op.matches.And:
+                                sc.expr = native_ast.Expression.Branch(
+                                    cond=value.expr, true=tail_expr, false=native_ast.falseExpr)
+                            elif ast.op.matches.Or:
+                                sc.expr = native_ast.Expression.Branch(
+                                    cond=value.expr, true=native_ast.trueExpr, false=tail_expr)
+                            else:
+                                raise Exception(f"Unknown kind of Boolean operator: {ast.op.Name}")
+
                 return sc.result
 
             return TypedExpression(self, convertBoolOp(), typeWrapper(bool), False)
