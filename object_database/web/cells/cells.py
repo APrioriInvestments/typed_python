@@ -1333,7 +1333,7 @@ class _NavTab(Cell):
 
     def recalculate(self):
         inlineScript = """
-        websocket.send(JSON.stringify({'event': 'click', 'ix': __ix__, 'target_cell': '__identity__'}))
+        cellSocket.sendString(JSON.stringify({'event': 'click', 'ix': __ix__, 'target_cell': '__identity__'}))
         """.replace('__identity__', self.target).replace('__ix__', str(self.index))
         navLinkClasses = ['nav-link']
         if self.index == self.slot.get():
@@ -1444,7 +1444,7 @@ class Dropdown(Cell):
             self.children["____child_%s__" % i] = Cell.makeCell(header)
             if not isinstance(onDropdown, str):
                 inlineScript = """
-                websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
+                cellSocket.sendString(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
                 """.replace('__ix__', str(i)).replace('__identity__', self.identity)
             else:
                 inlineScript = quoteForJs("window.location.href = '%s'"
@@ -1983,7 +1983,7 @@ class SingleLineTextBox(Cell):
 
     def recalculate(self):
         inlineScript = """
-        websocket.send(
+        cellSocket.sendString(
             JSON.stringify({
                 'event':'click',
                 'target_cell': '__identity__',
@@ -2306,7 +2306,7 @@ class Clickable(Cell):
             return quoteForJs("window.location.href = '__url__'".replace("__url__", quoteForJs(self.f, "'")), '"')
         else:
             return (
-                "websocket.send(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
+                "cellSocket.sendString(JSON.stringify({'event':'click', 'target_cell': '__identity__'}))"
                 .replace("__identity__", self.identity)
             )
 
@@ -2439,7 +2439,7 @@ class Expands(Cell):
         return self.closed.sortsAs()
 
     def recalculate(self):
-        inlineScript = "websocket.send(JSON.stringify({'event':'click', 'target_cell': '%s'}))" % self.identity
+        inlineScript = "cellSocket.sendString(JSON.stringify({'event':'click', 'target_cell': '%s'}))" % self.identity
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
@@ -2573,7 +2573,7 @@ class CodeEditor(Cell):
 
         self.postscript += """
             editor.session.on('change', function(delta) {
-                websocket.send(
+                cellSocket.sendString(
                     JSON.stringify(
                         {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta}
                         )
@@ -2592,7 +2592,7 @@ class CodeEditor(Cell):
                         editor.last_edit_millis = Date.now()
                         editor.last_edit_sent_text = editor.getValue()
 
-                        websocket.send(
+                        cellSocket.sendString(
                             JSON.stringify(
                                 {'event': 'editing', 'target_cell': '__identity__',
                                 'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
@@ -2615,7 +2615,7 @@ class CodeEditor(Cell):
                     editor.last_edit_millis = Date.now()
                     editor.last_edit_sent_text = editor.getValue()
 
-                    websocket.send(
+                    cellSocket.sendString(
                         JSON.stringify(
                             {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
                             'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
@@ -2719,7 +2719,7 @@ class Sheet(Cell):
                    setTimeout(function(){
                         handsOnObj = handsOnTables["__identity__"];
                         if(handsOnObj.dblClicked){
-                            websocket.send(JSON.stringify(
+                            cellSocket.sendString(JSON.stringify(
                                 {'event':'onCellDblClick',
                                  'target_cell': '__identity__',
                                  'row': data.row,
@@ -2804,7 +2804,7 @@ class Sheet(Cell):
                         while (low < high) {
                             out = this.cache[low]
                             if (out === undefined) {
-                                websocket.send(JSON.stringify(
+                                cellSocket.sendString(JSON.stringify(
                                     {'event':'sheet_needs_data',
                                      'target_cell': '__identity__',
                                      'data': low
@@ -2958,7 +2958,7 @@ class Plot(Cell):
                         eventdata["xaxis.range[1]"] = Date.parse(eventdata["xaxis.range[1]"]) / 1000.0
                     }
 
-                    websocket.send(JSON.stringify(
+                    cellSocket.sendString(JSON.stringify(
                         {'event':'plot_layout',
                          'target_cell': '__identity__',
                          'data': eventdata
