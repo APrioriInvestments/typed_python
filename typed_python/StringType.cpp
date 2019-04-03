@@ -19,7 +19,7 @@
 #include "UnicodeProps.hpp"
 using namespace std;
 
-String::layout* String::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint) {
+StringType::layout* StringType::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint) {
     if (!lhs) {
         return lhs;
     }
@@ -56,7 +56,7 @@ String::layout* String::upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepo
     return new_layout;
 }
 
-String::layout* String::concatenate(layout* lhs, layout* rhs) {
+StringType::layout* StringType::concatenate(layout* lhs, layout* rhs) {
     if (!rhs && !lhs) {
         return lhs;
     }
@@ -73,7 +73,7 @@ String::layout* String::concatenate(layout* lhs, layout* rhs) {
         layout* newLayout = upgradeCodePoints(lhs, rhs->bytes_per_codepoint);
 
         layout* result = concatenate(newLayout, rhs);
-        String::destroyStatic((instance_ptr)&newLayout);
+        StringType::destroyStatic((instance_ptr)&newLayout);
         return result;
     }
 
@@ -81,7 +81,7 @@ String::layout* String::concatenate(layout* lhs, layout* rhs) {
         layout* newLayout = upgradeCodePoints(rhs, lhs->bytes_per_codepoint);
 
         layout* result = concatenate(lhs, newLayout);
-        String::destroyStatic((instance_ptr)&newLayout);
+        StringType::destroyStatic((instance_ptr)&newLayout);
         return result;
     }
 
@@ -101,7 +101,7 @@ String::layout* String::concatenate(layout* lhs, layout* rhs) {
     return new_layout;
 }
 
-String::layout* String::lower(layout *l) {
+StringType::layout* StringType::lower(layout *l) {
     if (!l) {
         return l;
     }
@@ -132,7 +132,7 @@ String::layout* String::lower(layout *l) {
     return new_layout;
 }
 
-String::layout* String::upper(layout *l) {
+StringType::layout* StringType::upper(layout *l) {
     if (!l) {
         return l;
     }
@@ -163,15 +163,15 @@ String::layout* String::upper(layout *l) {
     return new_layout;
 }
 
-int64_t String::find_2(layout *l, layout *sub) {
+int64_t StringType::find_2(layout *l, layout *sub) {
     return find(l, sub, 0, l ? l->pointcount : 0);
 }
 
-int64_t String::find_3(layout *l, layout *sub, int64_t start) {
+int64_t StringType::find_3(layout *l, layout *sub, int64_t start) {
     return find(l, sub, start, l ? l->pointcount : 0);
 }
 
-uint32_t getpoint(String::layout *l, uint64_t i) {
+uint32_t getpoint(StringType::layout *l, uint64_t i) {
     if (l->bytes_per_codepoint == 1)
         return ((uint8_t *)l->data)[i];
     else if (l->bytes_per_codepoint == 2)
@@ -181,7 +181,7 @@ uint32_t getpoint(String::layout *l, uint64_t i) {
     return 0;
 }
 
-int64_t String::find(layout *l, layout *sub, int64_t start, int64_t stop) {
+int64_t StringType::find(layout *l, layout *sub, int64_t start, int64_t stop) {
     if (!l || !l->pointcount) {
         if (!sub || !sub->pointcount)
             return start > 0 ? -1 : 0;
@@ -221,14 +221,14 @@ int64_t String::find(layout *l, layout *sub, int64_t start, int64_t stop) {
     return -1;
 }
 
-void String::split_2(ListOfType::layout* outList, layout* l) {
+void StringType::split_2(ListOfType::layout* outList, layout* l) {
     split_3max(outList, l, -1);
 }
 
-void String::split_3max(ListOfType::layout* outList, layout* l, int64_t max) {
+void StringType::split_3max(ListOfType::layout* outList, layout* l, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
-    static auto listofstring = ListOfType::Make(String::Make());
+    static auto listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
     if (!l || !l->pointcount)
@@ -239,7 +239,7 @@ void String::split_3max(ListOfType::layout* outList, layout* l, int64_t max) {
         int64_t cur = 0;
         while (cur < l->pointcount && uprops[getpoint(l, cur)] & Uprops_SPACE)
             cur++;
-        String::layout* remainder = String::getsubstr(l, cur, l->pointcount);
+        layout* remainder = getsubstr(l, cur, l->pointcount);
         listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
     }
     else {
@@ -257,7 +257,7 @@ void String::split_3max(ListOfType::layout* outList, layout* l, int64_t max) {
             if (match < 0)
                 break;
             if (cur != match) {
-                String::layout* piece = String::getsubstr(l, cur, match);
+                layout* piece = getsubstr(l, cur, match);
                 listofstring->append((instance_ptr)&outList, (instance_ptr)&piece);
                 count++;
             }
@@ -268,20 +268,20 @@ void String::split_3max(ListOfType::layout* outList, layout* l, int64_t max) {
         while (cur < l->pointcount && uprops[getpoint(l, cur)] & Uprops_SPACE)
             cur++;
         if (cur < l->pointcount) {
-            String::layout* remainder = String::getsubstr(l, cur, l->pointcount);
+            layout* remainder = getsubstr(l, cur, l->pointcount);
             listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
         }
     }
 }
 
-void String::split_3(ListOfType::layout* outList, layout* l, layout* sep) {
+void StringType::split_3(ListOfType::layout* outList, layout* l, layout* sep) {
     split(outList, l, sep, -1);
 }
 
-void String::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
+void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
-    static auto listofstring = ListOfType::Make(String::Make());
+    static auto listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
     if (!sep || !sep->pointcount)
@@ -292,10 +292,10 @@ void String::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t 
         int64_t cur = 0;
         int64_t count = 0;
         while (cur < l->pointcount) {
-            int64_t match = String::find_3(l, sep, cur);
+            int64_t match = find_3(l, sep, cur);
             if (match < 0)
                 break;
-            String::layout* piece = String::getsubstr(l, cur, match);
+            layout* piece = getsubstr(l, cur, match);
 
             listofstring->append((instance_ptr)&outList, (instance_ptr)&piece);
             cur = match + sep->pointcount;
@@ -303,12 +303,12 @@ void String::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t 
             if (max >= 0 && count >= max)
                 break;
         }
-        String::layout* remainder = String::getsubstr(l, cur, l->pointcount);
+        layout* remainder = getsubstr(l, cur, l->pointcount);
         listofstring->append((instance_ptr)&outList, (instance_ptr)&remainder);
     }
 }
 
-bool String::isalpha(layout *l) {
+bool StringType::isalpha(layout *l) {
     if (!l || !l->pointcount)
         return false;
     for (int64_t i = 0; i < l->pointcount; i++)
@@ -317,7 +317,7 @@ bool String::isalpha(layout *l) {
     return true;
 }
 
-bool String::isalnum(layout *l) {
+bool StringType::isalnum(layout *l) {
     if (!l || !l->pointcount)
         return false;
     for (int64_t i = 0; i < l->pointcount; i++) {
@@ -331,7 +331,7 @@ bool String::isalnum(layout *l) {
     return true;
 }
 
-bool String::isdecimal(layout *l) {
+bool StringType::isdecimal(layout *l) {
     if (!l || !l->pointcount)
         return false;
     for (int64_t i = 0; i < l->pointcount; i++)
@@ -340,7 +340,7 @@ bool String::isdecimal(layout *l) {
     return true;
 }
 
-bool String::isdigit(layout *l) {
+bool StringType::isdigit(layout *l) {
     if (!l || !l->pointcount)
         return false;
     for (int64_t i = 0; i < l->pointcount; i++) {
@@ -352,7 +352,7 @@ bool String::isdigit(layout *l) {
     return true;
 }
 
-bool String::islower(layout *l) {
+bool StringType::islower(layout *l) {
     if (!l || !l->pointcount)
         return false;
     bool found_one = false;
@@ -368,7 +368,7 @@ bool String::islower(layout *l) {
     return found_one;
 }
 
-bool String::isnumeric(layout *l) {
+bool StringType::isnumeric(layout *l) {
     if (!l || !l->pointcount)
         return false;
     for (int64_t i = 0; i < l->pointcount; i++) {
@@ -381,7 +381,7 @@ bool String::isnumeric(layout *l) {
     return true;
 }
 
-bool String::isprintable(layout *l) {
+bool StringType::isprintable(layout *l) {
     if (!l || !l->pointcount)
         return true;
     for (int64_t i = 0; i < l->pointcount; i++)
@@ -390,7 +390,7 @@ bool String::isprintable(layout *l) {
     return true;
 }
 
-bool String::isspace(layout *l) {
+bool StringType::isspace(layout *l) {
     if (!l || !l->pointcount)
         return false;
     for (int64_t i = 0; i < l->pointcount; i++)
@@ -399,7 +399,7 @@ bool String::isspace(layout *l) {
     return true;
 }
 
-bool String::istitle(layout *l) {
+bool StringType::istitle(layout *l) {
     if (!l || !l->pointcount)
         return false;
     bool last_cased = false;
@@ -423,7 +423,7 @@ bool String::istitle(layout *l) {
     return found_one;
 }
 
-bool String::isupper(layout *l) {
+bool StringType::isupper(layout *l) {
     if (!l || !l->pointcount)
         return false;
     bool found_one = false;
@@ -439,7 +439,7 @@ bool String::isupper(layout *l) {
     return found_one;
 }
 
-String::layout* String::getitem(layout* lhs, int64_t offset) {
+StringType::layout* StringType::getitem(layout* lhs, int64_t offset) {
     if (!lhs) {
         return lhs;
     }
@@ -475,7 +475,7 @@ String::layout* String::getitem(layout* lhs, int64_t offset) {
     return new_layout;
 }
 
-String::layout* String::getsubstr(layout* l, int64_t start, int64_t stop) {
+StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop) {
     if (!l) {
         return l;
     }
@@ -515,7 +515,7 @@ String::layout* String::getsubstr(layout* l, int64_t start, int64_t stop) {
 }
 
 
-int64_t String::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length) {
+int64_t StringType::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length) {
     int64_t bytes_per_codepoint = 1;
     while (length > 0) {
         if (utf8Str[0] >> 7 == 0) {
@@ -584,7 +584,7 @@ void decodeUtf8ToTyped(T* target, uint8_t* utf8Str, int64_t bytes_per_codepoint,
     }
 }
 
-void String::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length) {
+void StringType::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length) {
     if (bytes_per_codepoint == 1) {
         decodeUtf8ToTyped(target, utf8Str, bytes_per_codepoint, length);
     }
@@ -596,7 +596,7 @@ void String::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_c
     }
 }
 
-String::layout* String::createFromUtf8(const char* utfEncodedString, int64_t length) {
+StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int64_t length) {
     int64_t bytes_per_codepoint = bytesPerCodepointRequiredForUtf8((uint8_t*)utfEncodedString, length);
 
     int64_t new_byteCount = sizeof(layout) + length * bytes_per_codepoint;
@@ -616,7 +616,7 @@ String::layout* String::createFromUtf8(const char* utfEncodedString, int64_t len
     return new_layout;
 }
 
-int32_t String::hash32(instance_ptr left) {
+int32_t StringType::hash32(instance_ptr left) {
     if (!(*(layout**)left)) {
         return 0x12345;
     }
@@ -648,11 +648,11 @@ char typedArrayCompare(T1* l, T2* r, size_t count) {
     return 0;
 }
 
-bool String::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool StringType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpStatic(*(layout**)left, *(layout**)right));
 }
 
-char String::cmpStatic(layout* left, layout* right) {
+char StringType::cmpStatic(layout* left, layout* right) {
     if ( !left && !right ) {
         return 0;
     }
@@ -706,7 +706,7 @@ char String::cmpStatic(layout* left, layout* right) {
     return 0;
 }
 
-void String::constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const {
+void StringType::constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const {
     if (count == 0) {
         *(layout**)self = nullptr;
         return;
@@ -724,7 +724,7 @@ void String::constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t
     }
 }
 
-void String::repr(instance_ptr self, ReprAccumulator& stream) {
+void StringType::repr(instance_ptr self, ReprAccumulator& stream) {
     //as if it were bytes, which is totally wrong...
     stream << "\"";
     long bytes = count(self);
@@ -747,7 +747,7 @@ void String::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "\"";
 }
 
-instance_ptr String::eltPtr(instance_ptr self, int64_t i) const {
+instance_ptr StringType::eltPtr(instance_ptr self, int64_t i) const {
     const static char* emptyPtr = "";
 
     if (*(layout**)self == nullptr) {
@@ -757,7 +757,7 @@ instance_ptr String::eltPtr(instance_ptr self, int64_t i) const {
     return (*(layout**)self)->eltPtr(i);
 }
 
-int64_t String::bytes_per_codepoint(instance_ptr self) const {
+int64_t StringType::bytes_per_codepoint(instance_ptr self) const {
     if (*(layout**)self == nullptr) {
         return 1;
     }
@@ -765,7 +765,7 @@ int64_t String::bytes_per_codepoint(instance_ptr self) const {
     return (*(layout**)self)->bytes_per_codepoint;
 }
 
-int64_t String::count(instance_ptr self) const {
+int64_t StringType::count(instance_ptr self) const {
     if (*(layout**)self == nullptr) {
         return 0;
     }
@@ -773,11 +773,11 @@ int64_t String::count(instance_ptr self) const {
     return (*(layout**)self)->pointcount;
 }
 
-void String::destroy(instance_ptr self) {
+void StringType::destroy(instance_ptr self) {
     destroyStatic(self);
 }
 
-void String::destroyStatic(instance_ptr self) {
+void StringType::destroyStatic(instance_ptr self) {
     if (!*(layout**)self) {
         return;
     }
@@ -787,14 +787,14 @@ void String::destroyStatic(instance_ptr self) {
     }
 }
 
-void String::copy_constructor(instance_ptr self, instance_ptr other) {
+void StringType::copy_constructor(instance_ptr self, instance_ptr other) {
     (*(layout**)self) = (*(layout**)other);
     if (*(layout**)self) {
         (*(layout**)self)->refcount++;
     }
 }
 
-void String::assign(instance_ptr self, instance_ptr other) {
+void StringType::assign(instance_ptr self, instance_ptr other) {
     layout* old = (*(layout**)self);
 
     (*(layout**)self) = (*(layout**)other);

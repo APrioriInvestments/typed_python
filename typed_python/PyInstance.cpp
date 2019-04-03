@@ -1241,9 +1241,9 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
                                            (char*)PyUnicode_4BYTE_DATA(inst);
 
         return Instance::createAndInitialize(
-            String::Make(),
+            StringType::Make(),
             [&](instance_ptr i) {
-                String::Make()->constructor(i, bytesPerCodepoint, count, data);
+                StringType::Make()->constructor(i, bytesPerCodepoint, count, data);
             }
         );
 
@@ -1328,7 +1328,7 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
             return Bytes::Make();
         }
         if (pyType == &PyUnicode_Type) {
-            return String::Make();
+            return StringType::Make();
         }
 
         if (PyInstance::isSubclassOfNativeType(pyType)) {
