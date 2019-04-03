@@ -24,259 +24,89 @@
 <link rel="stylesheet" href="/content/object_database.css"/>
 
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="/content/CellSocket.js"></script>
+<script src="/content/CellHandler.js"></script>
 
 <script>
-    var langTools = ace.require("ace/ext/language_tools");
+ var langTools = ace.require("ace/ext/language_tools");
+ var aceEditors = {};
+ var handsOnTables = {}; // Not sure what this is or where it's used
+ 
+ const cellSocket = new CellSocket();
+ const cellHandler = new CellHandler();
+ cellSocket.onPostscripts(cellHandler.handlePostscript);
+ cellSocket.onMessage(cellHandler.handleMessage);
+ cellSocket.onClose(cellHandler.showConnectionClosed);
+ cellSocket.onError(err => {
+     console.error("SOCKET ERROR: ", err);
+ });
+ document.addEventListener('DOMContentLoaded', () => {
+     cellSocket.connect();
+ });
 
-    var FRAMES_PER_ACK = 10;
+ function mapPlotlyData(d) {
+     if (d.timestamp !== undefined) {
+         d.timestamp = unpackHexFloats(d.timestamp)
+         d.x = Array.from(d.timestamp).map(ts => new Date(ts * 1000))
+     } else {
+         d.x = unpackHexFloats(d.x)
+     }
 
-    var websocket;
+     if (d.y !== undefined) {
+         d.y = unpackHexFloats(d.y)
+     }
+     if (d.open !== undefined) {
+         d.open = unpackHexFloats(d.open)
+     }
+     if (d.close !== undefined) {
+         d.close = unpackHexFloats(d.close)
+     }
+     if (d.high !== undefined) {
+         d.high = unpackHexFloats(d.high)
+     }
+     if (d.low !== undefined) {
+         d.low = unpackHexFloats(d.low)
+     }
+     return d
+ }
 
-    var aceEditors = {}
-    var handsOnTables = {}
+ function hexcharToInt(x) {
+     if (x>=97) return x - 97 + 10
+     return x - 48
+ }
 
-    function mapPlotlyData(d) {
-      if (d.timestamp !== undefined) {
-        d.timestamp = unpackHexFloats(d.timestamp)
-        d.x = Array.from(d.timestamp).map(ts => new Date(ts * 1000))
-      } else {
-        d.x = unpackHexFloats(d.x)
-      }
+ function unpackHexFloats(x) {
+     if (typeof x != "string") {
+         return x
+     }
 
-      if (d.y !== undefined) {
-        d.y = unpackHexFloats(d.y)
-      }
-      if (d.open !== undefined) {
-        d.open = unpackHexFloats(d.open)
-      }
-      if (d.close !== undefined) {
-        d.close = unpackHexFloats(d.close)
-      }
-      if (d.high !== undefined) {
-        d.high = unpackHexFloats(d.high)
-      }
-      if (d.low !== undefined) {
-        d.low = unpackHexFloats(d.low)
-      }
+     var buf = new ArrayBuffer(x.length/2);
+     var bufView = new Uint8Array(buf);
 
+     for (var i=0, strLen=x.length/2; i < strLen; i+=1) {
+         bufView[i] = hexcharToInt(x.charCodeAt(i*2)) * 16 + hexcharToInt(x.charCodeAt(i*2+1));
+     }
 
-      return d
-    }
-    function hexcharToInt(x) {
-        if (x>=97) return x - 97 + 10
-        return x - 48
-    }
-    function unpackHexFloats(x) {
-      if (typeof x != "string") {
-        return x
-      }
-
-      var buf = new ArrayBuffer(x.length/2);
-      var bufView = new Uint8Array(buf);
-
-      for (var i=0, strLen=x.length/2; i < strLen; i+=1) {
-        bufView[i] = hexcharToInt(x.charCodeAt(i*2)) * 16 + hexcharToInt(x.charCodeAt(i*2+1));
-      }
-
-      return new Float64Array(buf)
-    }
-
-
-    var loc = window.location, new_uri;
-    if (loc.protocol === "https:") {
-        new_uri = "wss:";
-    } else {
-        new_uri = "ws:";
-    }
-    new_uri += "//" + loc.host;
-    new_uri += "/socket" + loc.pathname + loc.search;
-
-    if (window.WebSocket) {
-        websocket = new WebSocket(new_uri);
-    }
-    else if (window.MozWebSocket) {
-        websocket = MozWebSocket(new_uri);
-    }
-    else {
-        console.log('WebSocket Not Supported');
-    }
-
-    var buf = '';
-
-    function sendString_(str) {
-        websocket.send(str);
-    };
-
-    cells = {}
-    postscripts = []
-
-    var currentBuffer = {'remaining': null, 'buffer': null, 'hasDisplay': false}
-
-    function setLargeDownloadDisplay(msg) {
-      if (msg.length == 0 && !currentBuffer.hasDisplay) {
-        return
-      }
-
-      currentBuffer.hasDisplay = msg.length != 0
-
-      domElement = document.getElementById("object_database_large_pending_download_text")
-      if (domElement != undefined) {
-        domElement.innerHTML = msg
-      }
-    }
-    function htmlToDomElt(contents) {
-        elt = document.createElement("div")
-        elt.innerHTML = contents
-        return elt.children[0]
-    }
-
-    function updatePopovers() {
-      $('[data-toggle="popover"]').popover({
-          html: true,
-          container: 'body',
-          title: function () {
-            return getChildProp(this, 'title');
-          },
-          content: function () {
-            return getChildProp(this, 'content');
-          },
-          placement: function () {
-            return getChildProp(this, 'placement');
-          }
-      });
-      $('.popover-dismiss').popover({
-        trigger: 'focus'
-      });
-    }
-
-    websocket.onclose = function(event) {
-      document.getElementById("page_root").innerHTML =  `
-      <main role="main" class="container">
-            <div class='alert alert-primary center-block mt-5'>
-              Disconnected!
-            </div>
-      </main>`
-    }
-
-    websocket.onerror = function(event) {
-      console.log("SOCKET ERRORED: ", event)
-    }
-
-    websocket.onmessage = function(event) {
-        if (currentBuffer.remaining === null) {
-          currentBuffer.remaining = JSON.parse(event.data)
-          currentBuffer.buffer = []
-          if (currentBuffer.hasDisplay && currentBuffer.remaining == 1) {
-            setLargeDownloadDisplay("")
-          }
-          return
-        }
-
-        currentBuffer.remaining -= 1
-        currentBuffer.buffer.push(event.data)
-
-        if (currentBuffer.buffer.length % FRAMES_PER_ACK == 0) {
-          //ACK every tenth message. We have to do active pushback
-          //because the websocket disconnects on Chrome if you jam too
-          //much in at once
-          sendString_(JSON.stringify({"ACK": currentBuffer.buffer.length}))
-          setLargeDownloadDisplay(
-            "(Downloaded " +
-              Math.round(100 * currentBuffer.buffer.length / (currentBuffer.remaining + currentBuffer.buffer.length)) + " % of " +
-              Math.round((currentBuffer.remaining + currentBuffer.buffer.length) / (1024 / 32)) + "MB"
-              + ")"
-            )
-        }
-
-        if (currentBuffer.remaining > 0) {
-          return;
-        }
-
-        setLargeDownloadDisplay("")
-
-        update = JSON.parse(currentBuffer.buffer.join(''))
-
-        currentBuffer.remaining = null
-        currentBuffer.buffer = null
-
-        if (update === "postscripts") {
-          updatePopovers()
-
-          //run the postscripts in the reverse order they were sent to us
-          //we build the child tree from the bottom up, but execute postscripts
-          //from the top down.
-          while (postscripts.length) {
-            try {
-              postscript = postscripts.pop()
-              eval(postscript)
-            } catch(e) {
-              console.log("ERROR RUNNING POSTSCRIPT", e)
-              console.log(postscript)
-            }
-          }
-        } else {
-          if (cells["page_root"] === undefined) {
-            cells["page_root"] = document.getElementById("page_root")
-            cells['holding_pen'] = document.getElementById("holding_pen")
-          }
-
-          eltID = update.id //document ID to replace or update
-
-          if (update.discard !== undefined) {
-            cells[update.id].remove()
-          } else if (update.id !== undefined) {
-            replacements = update.replacements //a dictionary of ids within the object to replace. targets are real ids of other objects.
-
-            elt = htmlToDomElt(update.contents)
-
-            //install the element into the dom
-            if (cells[update.id] === undefined) {
-              //this is a totally new node. for the moment, add it to the holding pen
-              cells['holding_pen'].appendChild(elt)
-              cells[update.id] = elt
-              elt.id = update.id
-            } else {
-              //replace the existing copy of the node with this copy
-              if (cells[update.id].parentNode === null) {
-                cells['holding_pen'].appendChild(cells[update.id])
-              }
-
-              cells[update.id].parentNode.replaceChild(elt, cells[update.id])
-              cells[update.id] = elt
-              elt.id = update.id
-            }
-
-            //now wire in its children
-            replacementKeys = Object.keys(replacements)
-
-            for (i = 0; i < replacementKeys.length; i++) {
-              target = document.getElementById(replacementKeys[i])
-
-              if (cells[replacements[replacementKeys[i]]] === undefined) {
-                //this is actually a new node. we'll define it later in the event stream.
-                cells[replacements[replacementKeys[i]]] = document.createElement("div")
-                source = cells[replacements[replacementKeys[i]]]
-                source.id = replacements[replacementKeys[i]]
-                cells['holding_pen'].appendChild(source)
-              } else {
-                //not a new node.
-                source = cells[replacements[replacementKeys[i]]]
-              }
-
-              if (target != null) {
-                target.parentNode.replaceChild(source, target)
-              } else {
-                console.log("In message ", update, " couldn't find ", replacementKeys[i])
-              }
-            }
-          }
-
-          if (update.postscript !== undefined) {
-            postscripts.push(update.postscript)
-          }
-        }
-    };
-
+     return new Float64Array(buf)
+ }
+ function updatePopovers() {
+     $('[data-toggle="popover"]').popover({
+         html: true,
+         container: 'body',
+         title: function () {
+             return getChildProp(this, 'title');
+         },
+         content: function () {
+             return getChildProp(this, 'content');
+         },
+         placement: function () {
+             return getChildProp(this, 'placement');
+         }
+     });
+     $('.popover-dismiss').popover({
+         trigger: 'focus'
+     });
+ }
 </script>
 </head>
 <body>
