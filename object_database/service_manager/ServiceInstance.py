@@ -253,8 +253,19 @@ class ServiceInstance:
         self.failureReason = reason
         self.state = "FailedToStart"
 
-    def isNotRunning(self):
-        return self.state in ("Stopped", "FailedToStart", "Crashed") or (self.connection and not self.connection.exists())
+    def isRunning(self):
+        return (
+            self.state == "Running"
+            and not self.shouldShutdown
+            and self.connection is not None
+            and self.connection.exists()
+        )
+
+    def isNotActive(self):
+        return (
+            self.state in ("Stopped", "FailedToStart", "Crashed")
+            or (self.connection and not self.connection.exists())
+        )
 
     def isActive(self):
         """Is this service instance up and intended to be up?"""
@@ -264,7 +275,8 @@ class ServiceInstance:
             and (self.connection is None or self.connection.exists())
         )
 
-    state = Indexed(OneOf("Booting", "Initializing", "Running", "Stopped", "FailedToStart", "Crashed"))
+    state = Indexed(OneOf("Booting", "Initializing", "Running",
+                          "Stopped", "FailedToStart", "Crashed"))
 
     boot_timestamp = OneOf(None, float)
     start_timestamp = OneOf(None, float)

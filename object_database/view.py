@@ -260,7 +260,7 @@ class View(object):
 
     def _exists(self, obj, identity):
         if not self._db._isTypeSubscribed(type(obj)):
-            raise Exception("No subscriptions exist for type %s" % obj)
+            raise Exception("No subscriptions exist for type %s" % type(obj))
 
         key = data_key(type(obj), identity, " exists")
 
