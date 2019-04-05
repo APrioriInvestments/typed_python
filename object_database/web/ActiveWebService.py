@@ -548,7 +548,7 @@ class ActiveWebService(ServiceBase):
                     lastDumpMessages += 1
 
                 lastDumpFrames += 1
-                if time.time() - lastDumpTimestamp > 5.0:
+                if time.time() - lastDumpTimestamp > 60.0:
                     self._logger.info(
                         "In the last %.2f seconds, spent %.2f seconds calculating %s messages over %s frames",
                         time.time() - lastDumpTimestamp,
