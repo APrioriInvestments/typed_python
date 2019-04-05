@@ -31,5 +31,11 @@ from object_database.object import DatabaseObject
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.Codebase import Codebase
 from object_database.service_manager.ServiceBase import ServiceBase
-from object_database.view import revisionConflictRetry, RevisionConflictException, DisconnectedException, current_transaction
+from object_database.view import (
+    revisionConflictRetry,
+    RevisionConflictException,
+    DisconnectedException,
+    current_transaction,
+    MaskView
+)
 from object_database.inmem_server import InMemServer

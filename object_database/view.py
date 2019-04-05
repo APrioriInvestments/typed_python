@@ -43,6 +43,19 @@ class ObjectDoesntExistException(Exception):
         self.obj = obj
 
 
+class MaskView:
+    def __enter__(self):
+        if hasattr(_cur_view, 'view'):
+            self.view = _cur_view.view
+            del _cur_view.view
+        else:
+            self.view = None
+
+    def __exit__(self, *args):
+        if self.view is not None:
+            self._cur_view.view = self.view
+
+
 def revisionConflictRetry(f):
     MAX_TRIES = 100
 
