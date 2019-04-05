@@ -656,7 +656,11 @@ class DatabaseConnection:
                     if cond():
                         return True
                 except Exception:
-                    self._logger.error("Condition callback threw an exception:\n%s", traceback.format_exc())
+                    self._logger.error(
+                        "Condition callback threw an exception:\n%s\n%s",
+                        traceback.format_exc(),
+                        ''.join(traceback.format_stack())
+                    )
 
                 time.sleep(min(timeout / 20, .25))
         return False

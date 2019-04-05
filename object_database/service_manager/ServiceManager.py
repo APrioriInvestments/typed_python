@@ -139,12 +139,32 @@ class ServiceManager(object):
             service = service_schema.Service.lookupAny(name=serviceName)
             if not service:
                 return False
-            for i in service_schema.ServiceInstance.lookupAll(service=service):
-                if i.state == "Running":
-                    return True
+
+            instances = service_schema.ServiceInstance.lookupAll(service=service)
+            if any(inst.isRunning() for inst in instances):
+                return True
             return False
 
         return db.waitForCondition(isRunning, timeout)
+
+    @staticmethod
+    def stopService(serviceName):
+        service = service_schema.Service.lookupOne(name=serviceName)
+        service.target_count = 0
+
+    @staticmethod
+    def waitStopped(db, serviceName, timeout=5.0):
+        def isStopped():
+            service = service_schema.Service.lookupAny(name=serviceName)
+            if not service:
+                return True
+
+            instances = service_schema.ServiceInstance.lookupAll(service=service)
+            if any(inst.isActive() for inst in instances):
+                return False
+            return True
+
+        return db.waitForCondition(isStopped, timeout)
 
     def stopAllServices(self, timeout):
         with self.db.transaction():
@@ -152,9 +172,9 @@ class ServiceManager(object):
                 s.target_count = 0
 
         def allStopped():
-            for s in service_schema.ServiceInstance.lookupAll():
-                if not s.isNotRunning():
-                    return False
+            instances = service_schema.ServiceInstance.lookupAll()
+            if any(not inst.isNotActive() for inst in instances):
+                return False
             return True
 
         self.db.waitForCondition(allStopped, timeout)
