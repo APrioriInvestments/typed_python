@@ -44,9 +44,13 @@ def timestampToFileString(timestamp):
 
 
 def parseLogfileToInstanceid(fname):
+    """Parse a file name and return the integer instance id for the service."""
     if not fname.endswith(".log.txt") or "-" not in fname:
         return
-    return fname.split("-")[-1][:-8]
+    try:
+        return int(fname.split("-")[-1][:-8])
+    except ValueError:
+        return
 
 
 class SubprocessServiceManager(ServiceManager):
@@ -174,6 +178,8 @@ class SubprocessServiceManager(ServiceManager):
         self.cleanupOldLogfiles()
 
     def extractLogData(self, targetInstanceId, maxBytes):
+        assert isinstance(targetInstanceId, int)
+
         if self.logfileDirectory:
             with self.lock:
                 for file in os.listdir(self.logfileDirectory):
@@ -194,7 +200,8 @@ class SubprocessServiceManager(ServiceManager):
             with self.lock:
                 for file in os.listdir(self.logfileDirectory):
                     instanceId = parseLogfileToInstanceid(file)
-                    if instanceId and instanceId not in self.serviceProcesses:
+
+                    if instanceId and self.isLiveService(instanceId):
                         if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
                             os.makedirs(os.path.join(self.logfileDirectory, "old"))
                         shutil.move(
@@ -205,10 +212,10 @@ class SubprocessServiceManager(ServiceManager):
         if self.storageDir:
             with self.lock:
                 if os.path.exists(self.storageDir):
-                    for file in os.listdir(self.storageDir):
-                        if file not in self.serviceProcesses:
+                    for stringifiedInstanceId in os.listdir(self.storageDir):
+                        if not self.isLiveService(stringifiedInstanceId):
                             try:
-                                path = os.path.join(self.storageDir, file)
+                                path = os.path.join(self.storageDir, stringifiedInstanceId)
                                 self._logger.info("Removing storage at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except Exception:
@@ -221,10 +228,10 @@ class SubprocessServiceManager(ServiceManager):
         if self.sourceDir:
             with self.lock:
                 if os.path.exists(self.sourceDir):
-                    for file in os.listdir(self.sourceDir):
-                        if file not in self.serviceProcesses:
+                    for stringifiedInstanceId in os.listdir(self.sourceDir):
+                        if not self.isLiveService(stringifiedInstanceId):
                             try:
-                                path = os.path.join(self.sourceDir, file)
+                                path = os.path.join(self.sourceDir, stringifiedInstanceId)
                                 self._logger.info("Removing source caches at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except Exception:
@@ -233,3 +240,12 @@ class SubprocessServiceManager(ServiceManager):
                                     path,
                                     traceback.format_exc()
                                 )
+
+    def isLiveService(self, instanceId):
+        if isinstance(instanceId, str):
+            try:
+                instanceId = int(instanceId)
+            except ValueError:
+                return False
+
+        return instanceId in self.serviceProcesses
