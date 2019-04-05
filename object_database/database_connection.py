@@ -326,6 +326,8 @@ class DatabaseConnection:
 
         self._logger = logging.getLogger(__name__)
 
+        self._auth_token = None
+
     def getConnectionMetadata(self):
         """Return any data provided to us by the underlying transport.
 
@@ -366,6 +368,9 @@ class DatabaseConnection:
             return not self._versioned_data._version_number_refcount
 
     def authenticate(self, token):
+        assert self._auth_token is None, "We already authenticated."
+        self._auth_token = token
+
         self._channel.write(
             ClientToServer.Authenticate(token=token)
         )
