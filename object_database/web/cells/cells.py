@@ -1444,7 +1444,8 @@ class Dropdown(Cell):
             self.children["____child_%s__" % i] = Cell.makeCell(header)
             if not isinstance(onDropdown, str):
                 inlineScript = """
-                websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))""".replace('__ix__', str(i))
+                websocket.send(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
+                """.replace('__ix__', str(i)).replace('__identity__', self.identity)
             else:
                 inlineScript = quoteForJs("window.location.href = '%s'"
                                           % (quoteForJs(onDropdown, "'")), '"')
@@ -1982,8 +1983,14 @@ class SingleLineTextBox(Cell):
 
     def recalculate(self):
         inlineScript = """
-        websocket.send(JSON.stringify({'event':'click', \
-        'target_cell': '__identity__', 'text': this.value})"""
+        websocket.send(
+            JSON.stringify({
+                'event':'click',
+                'target_cell': '__identity__',
+                'text': this.value
+            })
+        )
+        """
         inlineScript = inlineScript.replace('__identity__', self.identity)
         inputValue = quoteForJs(self.slot.get(), '"')
         element = (

@@ -108,6 +108,9 @@ class CellsHTMLTests(unittest.TestCase):
             error_str += str(self.validator.errors)
             raise AssertionError(error_str)
 
+        if '__identity__' in html:
+            raise AssertionError("Html shouldn't contain __identity__ - should already be replaced.")
+
     def assertHTMLNotEmpty(self, html):
         if html == "":
             raise AssertionError("Cell does not produce any HTML!")
