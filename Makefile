@@ -18,8 +18,26 @@ TP_LIB_PATH ?= build/lib.linux-x86_64-3.6/typed_python
 ODB_BUILD_PATH ?= build/temp.linux-x86_64-3.6/object_database
 ODB_LIB_PATH ?= build/lib.linux-x86_64-3.6/object_database
 
-CPP_FLAGS = -pthread -DNDEBUG -g -fwrapv -O2 -Wall -g -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2 -fPIC -I/usr/include/python3.6m -I$(VIRTUAL_ENV)/include/python3.6m -std=c++14 -Wno-sign-compare -Wno-narrowing -Wno-unused-variable -Wno-int-in-bool-context
-CPP_FLAGS += -I/usr/local/lib/python3.6/dist-packages/numpy/core/include
+CPP_FLAGS = -std=c++14 -O2 -Wall -pthread -DNDEBUG -g -fwrapv               \
+            -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIC              \
+            -Wformat -Werror=format-security -Wdate-time                    \
+            -Wno-sign-compare -Wno-narrowing                                \
+            -Wno-unused-variable -Wno-int-in-bool-context                   \
+            -I$(VIRTUAL_ENV)/include/python3.6m                             \
+            -I$(VIRTUAL_ENV)/lib/python3.6/site-packages/numpy/core/include \
+            -I/usr/include/python3.6m                                       \
+            -I/usr/local/lib/python3.6/dist-packages/numpy/core/include
+
+LINKER_FLAGS = -Wl,-O1 \
+               -Wl,-Bsymbolic-functions \
+               -Wl,-Bsymbolic-functions \
+               -Wl,-Bsymbolic-functions \
+               -Wl,-z,relro \
+               -Wl,-z,relro
+
+SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
+                  -Wformat -Werror=format-security -Wdate-time \
+                  -D_FORTIFY_SOURCE=2
 
 UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
 TP_O_FILES = $(TP_BUILD_PATH)/all.o
@@ -49,7 +67,7 @@ vlint: $(VIRTUAL_ENV)
 		make lint
 
 .PHONY: lib
-lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so object_database/_types.cpython-36m-x86_64-linux-gnu.so
+lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so  object_database/_types.cpython-36m-x86_64-linux-gnu.so
 
 .PHONY: docker-build
 docker-build:
@@ -66,12 +84,15 @@ docker-push:
 .PHONY: docker-test
 docker-test:
 	#run unit tests in the debugger
-	docker run -it --rm --privileged --entrypoint bash nativepython/cloud:"$(COMMIT)" -c "gdb -ex run --args python ./test.py -v -s"
+	docker run -it --rm --privileged --entrypoint bash \
+		nativepython/cloud:"$(COMMIT)" \
+		-c "gdb -ex run --args python ./test.py -v -s"
 
 .PHONY: docker-web
 docker-web:
 	#run a dummy webframework
-	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest nativepython/cloud:"$(COMMIT)"
+	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest \
+		nativepython/cloud:"$(COMMIT)"
 
 .PHONY: unicodeprops
 unicodeprops: ./unicodeprops.py
@@ -107,12 +128,12 @@ object_database/_types.cpython-36m-x86_64-linux-gnu.so: $(ODB_LIB_PATH)/_types.c
 	cp $(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so  object_database
 
 $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH) $(TP_BUILD_PATH) $(TP_O_FILES)
-	$(CXX) -pthread -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2 \
+	$(CXX) $(SHAREDLIB_FLAGS) $(LINKER_FLAGS) \
 		$(TP_O_FILES) \
 		-o $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
 
 $(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(ODB_LIB_PATH) $(ODB_BUILD_PATH) $(ODB_O_FILES)
-	$(CXX) -pthread -shared -Wl,-O1 -Wl,-Bsymbolic-functions -Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-Bsymbolic-functions -Wl,-z,relro -g -fstack-protector-strong -Wformat -Werror=format-security -Wdate-time -D_FORTIFY_SOURCE=2 \
+	$(CXX) $(SHAREDLIB_FLAGS) $(LINKER_FLAGS) \
 		$(ODB_O_FILES) \
 		-o $(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
 
