@@ -5,6 +5,28 @@ Function* PyFunctionInstance::type() {
 }
 
 // static
+std::pair<bool, PyObject*>
+PyFunctionInstance::tryToCallAnyOverload(const Function* f, PyObject* self,
+                                         PyObject* args, PyObject* kwargs) {
+    for (const auto& overload: f->getOverloads()) {
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallOverload(overload, self, args, kwargs);
+        if (res.first) {
+            return res;
+        }
+    }
+    std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(args, kwargs);
+
+    PyErr_Format(
+        PyExc_TypeError, "Cannot find a valid overload of '%s' with arguments of type %s",
+        f->name().c_str(),
+        argTupleTypeDesc.c_str()
+        );
+
+    return std::pair<bool, PyObject*>(false, nullptr);
+}
+
+// static
 std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
     PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+(self?1:0)));
     Function::Matcher matcher(f);
@@ -135,15 +157,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCall(const Function* f, PyOb
             PyTuple_Pack(1, arg0) :
             PyTuple_Pack(0)
         );
-
-    for (const auto& overload: f->getOverloads()) {
-        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-        if (res.first) {
-            return res;
-        }
-    }
-
-    return std::pair<bool, PyObject*>(false, NULL);
+    return PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
 }
 
 // static

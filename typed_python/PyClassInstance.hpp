@@ -26,6 +26,8 @@ public:
 
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
+    PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
+
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);

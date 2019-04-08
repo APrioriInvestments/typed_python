@@ -238,16 +238,21 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(ibc(A1.Y, A2.X))
 
     def test_callable_alternatives(self):
-        def myCall(self, *args, **kwargs):
-            return 42
+        def myCall(self):
+            if self.matches.One:
+                return 1
+            elif self.matches.Two:
+                return 2
+            else:
+                raise TypeError("Unexpected alternative kind")
 
         alt = Alternative("alts", One={}, Two={}, __call__=myCall)
 
         one = alt.One()
-        self.assertEqual(one(), 42)
+        self.assertEqual(one(), 1)
 
         two = alt.Two()
-        self.assertEqual(two(), 42)
+        self.assertEqual(two(), 2)
 
         alt = Alternative("alts", One={}, Two={}, myCall=myCall)
         with self.assertRaises(TypeError):
@@ -257,6 +262,36 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             two = alt.Two()
             two()
+
+    def test_callable_class(self):
+        class CallableClass(Class):
+            x = Member(int)
+
+            def __call__(self, x):
+                return self.x + x
+
+            def __call__(self):  # noqa: F811
+                return -1
+
+        class RegularClass(Class):
+            x = Member(int)
+
+            def call(self, x):
+                return self.x + x
+
+        obj = CallableClass(x=42)
+        self.assertEqual(obj(0), 42)
+        self.assertEqual(obj(1), 43)
+        self.assertEqual(obj(), -1 )
+
+        exceptionMsg = "Cannot find a valid overload of '__call__' with arguments of type"
+        with self.assertRaisesRegex(TypeError, exceptionMsg):
+            obj(1, 2, 3)
+
+        obj = RegularClass(x=42)
+        self.assertEqual(obj.call(5), 47)
+        with self.assertRaises(TypeError):
+            obj()
 
     def test_object_bytecounts(self):
         self.assertEqual(_types.bytecount(NoneType), 0)
@@ -891,8 +926,12 @@ class NativeTypesTests(unittest.TestCase):
             def __repr__(self):
                 return "repr override"
 
+            def __call__(self):
+                return "call implemented"
+
         self.assertEqual(repr(X()), "repr override")
         self.assertEqual(str(X()), "str override")
+        self.assertEqual(X()(), "call implemented")
 
     def test_empty_alternatives(self):
         a = Alternative(
