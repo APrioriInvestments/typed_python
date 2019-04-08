@@ -40,7 +40,7 @@ extra_compile_args = [
     '-std=c++14',
     '-Wno-sign-compare',
     '-Wno-narrowing',
-    '-Wno-unused-'
+    '-Wno-unused-variable'
 ]
 
 ext_modules = [

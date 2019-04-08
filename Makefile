@@ -30,9 +30,6 @@ CPP_FLAGS = -std=c++14 -O2 -Wall -pthread -DNDEBUG -g -fwrapv               \
 
 LINKER_FLAGS = -Wl,-O1 \
                -Wl,-Bsymbolic-functions \
-               -Wl,-Bsymbolic-functions \
-               -Wl,-Bsymbolic-functions \
-               -Wl,-z,relro \
                -Wl,-z,relro
 
 SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
