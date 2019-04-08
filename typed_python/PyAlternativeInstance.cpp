@@ -19,11 +19,10 @@ PyObject* PyAlternativeInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObje
             PyTuple_Pack(3, (PyObject*)this, (PyObject*)rhs, (PyObject*)thirdArg)
             );
 
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-            if (res.first) {
-                return res.second;
-            }
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res.second;
         }
     }
 
@@ -38,12 +37,10 @@ PyObject* PyConcreteAlternativeInstance::pyTernaryOperatorConcrete(PyObject* rhs
         PyObjectStealer argTuple(
             PyTuple_Pack(3, (PyObject*)this, (PyObject*)rhs, (PyObject*)thirdArg)
             );
-
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-            if (res.first) {
-                return res.second;
-            }
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res.second;
         }
     }
 
@@ -60,11 +57,10 @@ PyObject* PyAlternativeInstance::pyOperatorConcrete(PyObject* rhs, const char* o
             PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
             );
 
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-            if (res.first) {
-                return res.second;
-            }
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res.second;
         }
     }
 
@@ -80,11 +76,10 @@ PyObject* PyConcreteAlternativeInstance::pyOperatorConcrete(PyObject* rhs, const
             PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
             );
 
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-            if (res.first) {
-                return res.second;
-            }
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res.second;
         }
     }
 
@@ -101,11 +96,10 @@ PyObject* PyAlternativeInstance::pyUnaryOperatorConcrete(const char* op, const c
             PyTuple_Pack(2, (PyObject*)this)
             );
 
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-            if (res.first) {
-                return res.second;
-            }
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res.second;
         }
     }
 
@@ -121,11 +115,10 @@ PyObject* PyConcreteAlternativeInstance::pyUnaryOperatorConcrete(const char* op,
             PyTuple_Pack(2, (PyObject*)this)
             );
 
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, argTuple, nullptr);
-            if (res.first) {
-                return res.second;
-            }
+        std::pair<bool, PyObject*> res =
+            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
+        if (res.first) {
+            return res.second;
         }
     }
 
@@ -203,7 +196,10 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
 
     auto it = toCheck->getMethods().find(attrName);
     if (it != toCheck->getMethods().end()) {
-        return PyMethod_New((PyObject*)it->second->getOverloads()[0].getFunctionObj(), (PyObject*)this);
+        return PyMethod_New(
+            (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
+            (PyObject*)this
+            );
     }
 
     //see if its a member of our held type
@@ -243,7 +239,10 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
 
     auto it = toCheck->getMethods().find(attrName);
     if (it != toCheck->getMethods().end()) {
-        return PyMethod_New((PyObject*)it->second->getOverloads()[0].getFunctionObj(), (PyObject*)this);
+        return PyMethod_New(
+            (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
+            (PyObject*)this
+            );
     }
 
     //see if its a member of our held type
@@ -341,28 +340,14 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
             type()->name().c_str()
             );
         throw PythonExceptionSet();
-    } else {
-        Function* f = it->second;
-
-        for (const auto& overload: f->getOverloads()) {
-            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(
-                overload, (PyObject*)this, args, kwargs
-                );
-
-            if (res.first) {
-                return res.second;
-            }
-        }
     }
-
-    std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(args, kwargs);
-
-    PyErr_Format(
-        PyExc_TypeError, "'%s' cannot find a valid overload with arguments of type %s",
-        type()->name().c_str(),
-        argTupleTypeDesc.c_str()
-        );
-
-    return NULL;
+    // else
+    Function* f = it->second;
+    auto res = PyFunctionInstance::tryToCallAnyOverload(f, (PyObject*)this, args, kwargs);
+    if (res.first) {
+        return res.second;
+    }
+    // else
+    throw PythonExceptionSet();
 }
 

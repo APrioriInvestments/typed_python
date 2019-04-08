@@ -168,25 +168,21 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
         PyTuple_SetItem(targetArgTuple, 2, incref(arg1)); //steals a reference
     }
 
+    // FIXME: why am I not getting a warning about unused var 'threw'
     bool threw = false;
     bool ran = false;
 
-    for (const auto& overload: method->getOverloads()) {
-        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, targetArgTuple, nullptr);
-        if (res.first) {
-            //res.first is true if we matched and tried to call this function
-            if (res.second) {
-                //don't need the result.
-                return std::make_pair(true, res.second);
-            } else {
-                //it threw an exception
-                return std::make_pair(true, (PyObject*)nullptr);
-            }
-        }
+    auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, targetArgTuple, nullptr);
+    if (res.first) {
+        return res;
     }
-
-    PyErr_Format(PyExc_TypeError, "'%s.%s' cannot find a valid overload with these arguments", type()->name().c_str(), name);
-    return std::make_pair(true, (PyObject*)nullptr);
+    PyErr_Format(
+        PyExc_TypeError,
+        "'%s.%s' cannot find a valid overload with these arguments",
+        type()->name().c_str(),
+        name
+    );
+    return res;
 }
 
 PyObject* PyClassInstance::mp_subscript_concrete(PyObject* item) {
@@ -257,32 +253,14 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
         PyTuple_SetItem(targetArgTuple, k+1, incref(PyTuple_GetItem(args, k))); //have to incref because of stealing
     }
 
-    bool threw = false;
-    bool ran = false;
-
-    for (const auto& overload: initMethod->getOverloads()) {
-        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, targetArgTuple, kwargs);
-        if (res.first) {
-            //res.first is true if we matched and tried to call this function
-            if (res.second) {
-                //don't need the result.
-                decref(res.second);
-                ran = true;
-            } else {
-                //it threw an exception
-                ran = true;
-                threw = true;
-            }
-
-            break;
-        }
-    }
-
-    if (!ran) {
+    auto res = PyFunctionInstance::tryToCallAnyOverload(initMethod, nullptr, targetArgTuple, kwargs);
+    if (!res.first) {
         throw std::runtime_error("Cannot find a valid overload of __init__ with these arguments.");
     }
 
-    if (threw) {
+    if (res.second) {
+        decref(res.second);
+    } else {
         throw PythonExceptionSet();
     }
 }
@@ -414,4 +392,25 @@ int PyClassInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) 
 }
 
 
+PyObject* PyClassInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
+    auto it = type()->getMemberFunctions().find("__call__");
 
+    if (it == type()->getMemberFunctions().end()) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "'%s' object is not callable because '__call__' was not defined",
+            type()->name().c_str()
+            );
+        throw PythonExceptionSet();
+    }
+    // else
+    Function* method = it->second;
+
+    auto res = PyFunctionInstance::tryToCallAnyOverload(method, (PyObject*)this, args, kwargs);
+
+    if (res.first) {
+        return res.second;
+    }
+    // else
+    throw PythonExceptionSet();
+}

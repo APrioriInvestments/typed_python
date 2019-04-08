@@ -40,7 +40,11 @@ class NativeFunctionTypesTests(unittest.TestCase):
 
     def test_create_function_with_kwargs_and_star_args_and_defaults(self):
         @Function
-        def f(x: int, y=30, z: None = None, *args: TupleOf(float), **kwargs: ConstDict(str, float)) -> int:
+        def f(x: int,
+              y=30,
+              z: None = None,
+              *args: TupleOf(float),
+              **kwargs: ConstDict(str, float)) -> int:
             return x + 1
 
         self.assertEqual(len(f.overloads), 1)

@@ -14,6 +14,8 @@ public:
 
     static std::pair<bool, PyObject*> tryToCall(const Function* f, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
+    static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, PyObject* self, PyObject* args, PyObject* kwargs);
+
     static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs);
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
