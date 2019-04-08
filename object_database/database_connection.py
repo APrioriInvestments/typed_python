@@ -819,7 +819,7 @@ class DatabaseConnection:
                 markedLazy = self._subscription_buildup[lookupTuple]['markedLazy']
                 del self._subscription_buildup[lookupTuple]
 
-                sets = self.indexValuesToSetAdds(index_values)
+                sets = self._indexValuesToSetAdds(index_values)
 
                 if msg.fieldname_and_value is None:
                     if msg.typename is None:
@@ -892,7 +892,7 @@ class DatabaseConnection:
         else:
             assert False, "unknown message type " + msg._which
 
-    def indexValuesToSetAdds(self, indexValues):
+    def _indexValuesToSetAdds(self, indexValues):
         # indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds
         # up the indices we need. We need to transpose to a dictionary ordered by the hash values,
         # not the identities

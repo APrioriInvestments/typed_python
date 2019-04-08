@@ -65,9 +65,6 @@ def revisionConflictRetry(f):
             try:
                 return f(*args, **kwargs)
             except RevisionConflictException as e:
-                if hasattr(e, 'fieldId'):
-                    fieldId = e.fieldId
-
                 logging.getLogger(__name__).info(
                     "Handled a revision conflict on key %s in %s. Retrying." % (e, f.__name__)
                 )
@@ -107,6 +104,8 @@ def default_initialize(t):
     return t()
 
 
+# thread local variable containing the current view or transaction as property 'view',
+# if there is one.
 _cur_view = threading.local()
 
 
@@ -581,12 +580,36 @@ class View(object):
         return self
 
     def __exit__(self, type, val, tb):
+        if hasattr(_cur_view, "watchers"):
+            for watcher in _cur_view.watchers:
+                watcher.callback(self, type is None)
+
         del _cur_view.view
+
         try:
             if type is None and self._writes:
                 self.commit()
         finally:
             self._db._releaseView(self)
+
+
+class ViewWatcher:
+    """Get a chance to look at any view or transaction being __exit__ed.
+
+    All views or clients below us in the call stack will see this object and
+    call 'callback' with the view and a boolean indicating whether they are
+    exiting with an exception.
+    """
+    def __init__(self, callback):
+        self.callback = callback
+
+    def __enter__(self):
+        if not hasattr(_cur_view, 'watchers'):
+            _cur_view.watchers = set()
+        _cur_view.watchers.add(self)
+
+    def __exit__(self, *args):
+        _cur_view.watchers.discard(self)
 
 
 class Transaction(View):

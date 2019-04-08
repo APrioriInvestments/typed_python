@@ -24,6 +24,7 @@ from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.util import configureLogging, genToken
 from object_database.test_util import currentMemUsageMb
+from object_database.reactor import Reactor
 
 import object_database.messages as messages
 import queue
@@ -1302,6 +1303,49 @@ class ObjectDatabaseTests:
 
         with db1.transaction():
             self.assertEqual(len(Counter.lookupAll(k=0)), 21000)
+
+    def test_reactor(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        executed = [0]
+
+        def incrementor():
+            with db.transaction():
+                for c in Counter.lookupAll():
+                    if c.x != 0:
+                        executed[0] += 1
+                        c.k += c.x
+                        c.x = 0
+
+        r1 = Reactor(db, incrementor)
+        r1.start()
+
+        try:
+            time.sleep(.10)
+            self.assertEqual(executed[0], 0)
+
+            with db.transaction():
+                c = Counter(k=0, x=100)
+
+            db.waitForCondition(lambda: c.k == 100, 2.0)
+
+            with db.view():
+                self.assertEqual(c.k, 100)
+                self.assertEqual(c.x, 0)
+                self.assertEqual(executed[0], 1)
+
+            with db.transaction():
+                c.x += 2
+
+            db.waitForCondition(lambda: c.k == 102, 2.0)
+
+            with db.view():
+                self.assertEqual(c.k, 102)
+                self.assertEqual(c.x, 0)
+                self.assertEqual(executed[0], 2)
+        finally:
+            r1.stop()
 
     def test_adding_while_subscribing(self, shouldSubscribeToIndex=False):
         pfactor = self.PERFORMANCE_FACTOR
