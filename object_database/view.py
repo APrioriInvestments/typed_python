@@ -53,7 +53,7 @@ class MaskView:
 
     def __exit__(self, *args):
         if self.view is not None:
-            self._cur_view.view = self.view
+            _cur_view.view = self.view
 
 
 def revisionConflictRetry(f):
