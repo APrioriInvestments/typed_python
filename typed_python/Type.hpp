@@ -51,7 +51,7 @@ class Float32;
 class Float64;
 class StringType;
 class Bytes;
-class OneOf;
+class OneOfType;
 class Value;
 class TupleOfType;
 class PointerTo;
@@ -210,7 +210,7 @@ public:
             case catValue:
                 return f(*(Value*)this);
             case catOneOf:
-                return f(*(OneOf*)this);
+                return f(*(OneOfType*)this);
             case catTupleOf:
                 return f(*(TupleOfType*)this);
             case catPointerTo:

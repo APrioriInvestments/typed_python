@@ -18,9 +18,9 @@
 
 #include "Type.hpp"
 
-class OneOf : public Type {
+class OneOfType : public Type {
 public:
-    OneOf(const std::vector<Type*>& types) :
+    OneOfType(const std::vector<Type*>& types) :
                     Type(TypeCategory::catOneOf),
                     m_types(types)
     {
@@ -89,7 +89,7 @@ public:
         return m_types;
     }
 
-    static OneOf* Make(const std::vector<Type*>& types);
+    static OneOfType* Make(const std::vector<Type*>& types);
 
 private:
     std::vector<Type*> m_types;
