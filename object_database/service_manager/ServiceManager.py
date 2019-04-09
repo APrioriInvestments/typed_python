@@ -30,7 +30,7 @@ class ServiceManager(object):
     DEFAULT_SHUTDOWN_TIMEOUT = 10.0
 
     def __init__(self, dbConnectionFactory, sourceDir, isMaster, ownHostname,
-                 maxGbRam=4, maxCores=4, shutdownTimeout=None):
+                 maxGbRam=4, maxCores=4, shutdownTimeout=None, sleepInterval=0.5):
         object.__init__(self)
         self.shutdownTimeout = shutdownTimeout or ServiceManager.DEFAULT_SHUTDOWN_TIMEOUT
         self.ownHostname = ownHostname
@@ -47,7 +47,7 @@ class ServiceManager(object):
         self.thread = threading.Thread(target=self.doWork)
         self.thread.daemon = True
 
-        self.SLEEP_INTERVAL = 0.5
+        self.sleepInterval = sleepInterval
 
         self._logger = logging.getLogger(__name__)
 
@@ -221,7 +221,7 @@ class ServiceManager(object):
                     for i in bad_instances:
                         i.markFailedToStart(bad_instances[i])
 
-            time.sleep(self.SLEEP_INTERVAL)
+            time.sleep(self.sleepInterval)
 
         self._logger.info("ServiceManager exiting work loop.")
 
