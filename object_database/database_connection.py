@@ -610,6 +610,9 @@ class DatabaseConnection:
         fieldId = k.fieldId
         identity = k.objId
 
+        if fieldId not in self._field_id_to_field_def:
+            return True
+
         fieldDef = self._field_id_to_field_def[fieldId]
 
         subscriptionSet = self._schema_and_typename_to_subscription_set.get((fieldDef.schema, fieldDef.typename))
@@ -622,6 +625,9 @@ class DatabaseConnection:
         return True
 
     def _suppressIdentities(self, index_key, identities):
+        if index_key.fieldId not in self._field_id_to_field_def:
+            return set()
+
         fieldDef = self._field_id_to_field_def[index_key.fieldId]
 
         subscriptionSet = self._schema_and_typename_to_subscription_set.get((fieldDef.schema, fieldDef.typename))
