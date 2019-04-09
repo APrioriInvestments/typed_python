@@ -11,7 +11,7 @@ public:
     PythonObjectOfType(PyTypeObject* typePtr) :
             Type(TypeCategory::catPythonObjectOfType)
     {
-        mPyTypePtr = typePtr;
+        mPyTypePtr = (PyTypeObject*)incref((PyObject*)typePtr);
         m_name = typePtr->tp_name;
         m_is_simple = false;
 

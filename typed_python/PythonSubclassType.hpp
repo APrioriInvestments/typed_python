@@ -8,7 +8,7 @@ public:
             Type(TypeCategory::catPythonSubclass)
     {
         m_base = base;
-        mTypeRep = typePtr;
+        mTypeRep = (PyTypeObject*)incref((PyObject*)typePtr);
         m_name = typePtr->tp_name;
         m_is_simple = false;
 
