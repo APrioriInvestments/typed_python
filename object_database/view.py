@@ -65,6 +65,9 @@ def revisionConflictRetry(f):
             try:
                 return f(*args, **kwargs)
             except RevisionConflictException as e:
+                if hasattr(e, 'fieldId'):
+                    fieldId = e.fieldId
+
                 logging.getLogger(__name__).info(
                     "Handled a revision conflict on key %s in %s. Retrying." % (e, f.__name__)
                 )
@@ -552,7 +555,12 @@ class View(object):
                 if res.matches.Disconnected:
                     raise DisconnectedException()
                 if res.matches.RevisionConflict:
-                    raise RevisionConflictException(res.key)
+                    if hasattr(res.key, 'fieldId'):
+                        fieldId = res.key.fieldId
+                        fieldDef = self._db._field_id_to_field_def.get(fieldId)
+                    else:
+                        fieldDef = None
+                    raise RevisionConflictException(res.key, fieldDef)
 
                 assert False, "unknown transaction result: " + str(res)
 
