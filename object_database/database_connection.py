@@ -16,6 +16,7 @@ from object_database.schema import ObjectFieldId, IndexId, FieldDefinition, Obje
 from object_database.messages import ClientToServer, getHeartbeatInterval
 from object_database.core_schema import core_schema
 from object_database.view import View, Transaction, _cur_view, SerializedDatabaseValue
+from object_database.reactor import Reactor
 from object_database.identity import IdentityProducer
 import object_database.keymapping as keymapping
 from object_database._types import VersionedIdSet
@@ -296,7 +297,7 @@ class DatabaseConnection:
         self.connectionObject = None
 
         # transaction handlers. These must be nonblocking since we call them under lock
-        self._onTransactionHandlers = []
+        self._onTransactionHandlers = set()
 
         self._flushEvents = {}
 
@@ -343,7 +344,12 @@ class DatabaseConnection:
         return self._connectionMetadata
 
     def registerOnTransactionHandler(self, handler):
-        self._onTransactionHandlers.append(handler)
+        with self._lock:
+            self._onTransactionHandlers.add(handler)
+
+    def dropTransactionHandler(self, handler):
+        with self._lock:
+            self._onTransactionHandlers.discard(handler)
 
     def setSerializationContext(self, context):
         assert isinstance(context, SerializationContext), context
@@ -528,21 +534,16 @@ class DatabaseConnection:
 
     def waitForCondition(self, cond, timeout):
         # eventally we will replace this with something that watches the calculation
-        t0 = time.time()
-        while time.time() - t0 < timeout:
-            with self.view():
-                try:
-                    if cond():
-                        return True
-                except Exception:
-                    self._logger.error(
-                        "Condition callback threw an exception:\n%s\n%s",
-                        traceback.format_exc(),
-                        ''.join(traceback.format_stack())
-                    )
+        try:
+            def checkCondition():
+                with self.view():
+                    return cond()
 
-                time.sleep(min(timeout / 20, .25))
-        return False
+            reactor = Reactor(self, checkCondition)
+
+            return reactor.blockUntilTrue(timeout)
+        finally:
+            reactor.teardown()
 
     def _data_key_to_object(self, key):
         schema_name, typename, identity, fieldname = keymapping.split_data_key(key)

@@ -718,8 +718,11 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                     pass
 
             if existing_service:
-                self.database.waitForCondition(
-                    lambda: not existing_service.connection.exists(), timeout=5.0)
+                self.assertTrue(
+                    self.database.waitForCondition(
+                        lambda: not existing_service.connection.exists(), timeout=5.0
+                    )
+                )
 
             self.waitForCount(1)
 
@@ -754,14 +757,14 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         s = deploy_helper(1, 1)
 
         # Trying to update the codebase without unlocking should fail
-        s = deploy_helper(2, 1, s)
+        s = deploy_helper(2, 1)
 
         # Trying to update the codebase after preparing for deployment should succeed
         prepare_helper()
         s = deploy_helper(3, 3, s)
 
         # Trying to update the codebase a second time after preparing for deployment should fail
-        s = deploy_helper(4, 3, s)
+        s = deploy_helper(4, 3)
 
         # Trying to update the codebase after unlocking should succeed
         unlock_helper()
@@ -770,4 +773,4 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         # Trying to update the codebase after locking should fail
         lock_helper()
-        s = deploy_helper(7, 6, s)
+        s = deploy_helper(7, 6)

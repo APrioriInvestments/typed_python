@@ -58,7 +58,7 @@ class SubprocessServiceManager(ServiceManager):
                  sourceDir, storageDir, authToken,
                  isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None,
                  shutdownTimeout=None, logLevelName="INFO",
-                 sleepInterval=0.5
+                 metricUpdateInterval=2.0
                  ):
         self.host = host
         self.port = port
@@ -85,7 +85,7 @@ class SubprocessServiceManager(ServiceManager):
         ServiceManager.__init__(
             self, dbConnectionFactory, sourceDir, isMaster, ownHostname,
             maxGbRam=maxGbRam, maxCores=maxCores, shutdownTimeout=shutdownTimeout,
-            sleepInterval=sleepInterval
+            metricUpdateInterval=metricUpdateInterval
         )
         self.serviceProcesses = {}
         self._logger = logging.getLogger(__name__)

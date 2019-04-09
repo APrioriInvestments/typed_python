@@ -16,12 +16,12 @@
 from object_database.view import revisionConflictRetry
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceSchema import service_schema
+from object_database.reactor import Reactor
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 import psutil
 import logging
 import traceback
-import threading
 import time
 import sys
 
@@ -30,7 +30,7 @@ class ServiceManager(object):
     DEFAULT_SHUTDOWN_TIMEOUT = 10.0
 
     def __init__(self, dbConnectionFactory, sourceDir, isMaster, ownHostname,
-                 maxGbRam=4, maxCores=4, shutdownTimeout=None, sleepInterval=0.5):
+                 maxGbRam=4, maxCores=4, shutdownTimeout=None, metricUpdateInterval=2.0):
         object.__init__(self)
         self.shutdownTimeout = shutdownTimeout or ServiceManager.DEFAULT_SHUTDOWN_TIMEOUT
         self.ownHostname = ownHostname
@@ -42,21 +42,26 @@ class ServiceManager(object):
         self.dbConnectionFactory = dbConnectionFactory
         self.db = dbConnectionFactory()
         self.db.subscribeToSchema(core_schema, service_schema)
-
-        self.shouldStop = threading.Event()
-        self.thread = threading.Thread(target=self.doWork)
-        self.thread.daemon = True
-
-        self.sleepInterval = sleepInterval
+        self.metricUpdateInterval = metricUpdateInterval
+        self._lastMetricUpdateTimestamp = 0.0
+        self.reactor = Reactor(self.db, self.doWork, metricUpdateInterval)
 
         self._logger = logging.getLogger(__name__)
 
     def start(self):
-        self.thread.start()
+        with self.db.transaction():
+            self.serviceHostObject = service_schema.ServiceHost(
+                connection=self.db.connectionObject,
+                isMaster=self.isMaster,
+                maxGbRam=self.maxGbRam,
+                maxCores=self.maxCores
+            )
+            self.serviceHostObject.hostname = self.ownHostname
+
+        self.reactor.start()
 
     def stop(self):
-        self.shouldStop.set()
-        self.thread.join()
+        self.reactor.stop()
 
     @staticmethod
     def createOrUpdateService(serviceClass, serviceName, target_count=None, placement=None, isSingleton=None,
@@ -180,56 +185,42 @@ class ServiceManager(object):
         self.db.waitForCondition(allStopped, timeout)
 
     def doWork(self):
-        with self.db.transaction():
-            self.serviceHostObject = service_schema.ServiceHost(
-                connection=self.db.connectionObject,
-                isMaster=self.isMaster,
-                maxGbRam=self.maxGbRam,
-                maxCores=self.maxCores
-            )
-            self.serviceHostObject.hostname = self.ownHostname
+        self.updateServiceHostStats()
 
-        self._logger.info("ServiceManager starting work loop.")
+        # redeploy our own services
+        self.redeployServicesIfNecessary()
 
-        while not self.shouldStop.is_set():
-            self.updateServiceHostStats()
+        # if we're the master, do some allocation
+        if self.isMaster:
+            self.collectDeadHosts()
+            self.createInstanceRecords()
 
-            # redeploy our own services
-            self.redeployServicesIfNecessary()
+        instances = self.instanceRecordsToBoot()
 
-            # if we're the master, do some allocation
-            if self.isMaster:
-                self.collectDeadHosts()
-                self.createInstanceRecords()
+        bad_instances = {}
 
-            instances = self.instanceRecordsToBoot()
+        for i in instances:
+            try:
+                with self.db.view():
+                    service = i.service
+                self.startServiceWorker(service, i._identity)
 
-            bad_instances = {}
+            except Exception:
+                self._logger.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
+                bad_instances[i] = traceback.format_exc()
 
-            for i in instances:
-                try:
-                    with self.db.view():
-                        service = i.service
-                    self.startServiceWorker(service, i._identity)
-
-                except Exception:
-                    self._logger.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
-                    bad_instances[i] = traceback.format_exc()
-
-            if bad_instances:
-                with self.db.transaction():
-                    for i in bad_instances:
-                        i.markFailedToStart(bad_instances[i])
-
-            time.sleep(self.sleepInterval)
-
-        self._logger.info("ServiceManager exiting work loop.")
+        if bad_instances:
+            with self.db.transaction():
+                for i in bad_instances:
+                    i.markFailedToStart(bad_instances[i])
 
     def updateServiceHostStats(self):
-        with self.db.transaction():
-            self.serviceHostObject.cpuUse = psutil.cpu_percent() / 100.0
-            self.serviceHostObject.actualMemoryUseGB = psutil.virtual_memory().used / 1024**3
-            self.serviceHostObject.statsLastUpdateTime = time.time()
+        if time.time() - self._lastMetricUpdateTimestamp > self.metricUpdateInterval:
+            self._lastMetricUpdateTimestamp = time.time()
+            with self.db.transaction():
+                self.serviceHostObject.cpuUse = psutil.cpu_percent() / 100.0
+                self.serviceHostObject.actualMemoryUseGB = psutil.virtual_memory().used / 1024**3
+                self.serviceHostObject.statsLastUpdateTime = time.time()
 
     @revisionConflictRetry
     def collectDeadHosts(self):

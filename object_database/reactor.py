@@ -16,8 +16,14 @@ import traceback
 import threading
 import queue
 import logging
+import time
 
 from object_database.view import RevisionConflictException, ViewWatcher
+
+
+class Timeout:
+    """Singleton used to indicate that the reactor timed out."""
+    pass
 
 
 class Reactor:
@@ -40,6 +46,15 @@ class Reactor:
     You may also specify a periodic wakup time, which causes the reactor
     to run at least that frequently.
 
+    Reactors can run inside a thread, using 'start/stop' semantics, or
+    synchronously, where the client calls 'next', which returns the
+    next function call result, or Timeout if the reactor doesn't want
+    to retrigger within the timeout. This can be useful for watching for
+    a condition.
+
+    Finally, you may call 'blockUntilTrue' if you want to wait until
+    the function returns a non-false value.
+
     Example:
 
         def consumeOne():
@@ -55,6 +70,16 @@ class Reactor:
         ...
 
         r.stop()
+        r.teardown()
+
+        # alternatively
+
+        r1 = Reactor(db, consumeOne)
+        r1.next(timeout=1.0)
+        r1.next(timeout=1.0)
+
+        ...
+
     """
     class STOP:
         """singleton class to indicate that we should exit the loop."""
@@ -64,11 +89,17 @@ class Reactor:
         self.db = db
         self.reactorFunction = reactorFunction
         self.maxSleepTime = maxSleepTime
-        self.db.registerOnTransactionHandler(self._onTransaction)
+
         self._transactionQueue = queue.Queue()
         self._thread = threading.Thread(target=self.updateLoop)
         self._thread.daemon = True
         self._isStarted = False
+        self._lastReadKeys = None
+
+        # grab a transaction handler. We need to ensure this is the same object
+        # when we deregister it.
+        self.transactionHandler = self._onTransaction
+        self.db.registerOnTransactionHandler(self.transactionHandler)
 
     def start(self):
         self._isStarted = True
@@ -81,34 +112,105 @@ class Reactor:
         self._transactionQueue.put(Reactor.STOP)
         self._thread.join()
 
+    def teardown(self):
+        """Remove this reactor. Clients should _always_ call this when they are done."""
+        self.db.dropTransactionHandler(self.transactionHandler)
+
+    def blockUntilTrue(self, timeout=None):
+        """Block until the reactor function returns 'True'.
+
+        Returns True if we succeed, False if we exceed the threshold.
+        """
+        if timeout is None:
+            while not self.next():
+                pass
+
+            return True
+        else:
+            curTime = time.time()
+            timeThreshold = curTime + timeout
+
+            while curTime < timeThreshold:
+                result = self.next(timeout=timeThreshold - curTime)
+
+                if result is Timeout:
+                    return False
+
+                if result:
+                    return True
+
+                curTime = time.time()
+
+            return False
+
+    def next(self, timeout=None):
+        if self._isStarted:
+            raise Exception("Can't call 'next' if the reactor is being used in threaded mode.")
+
+        if self._lastReadKeys is not None:
+            if not self._blockUntilRecalculate(self._lastReadKeys, timeout=timeout):
+                return Timeout
+
+        self._drainTransactionQueue()
+        result, self._lastReadKeys = self._calculate(catchRevisionConflicts=False)
+
+        return result
+
     def updateLoop(self):
         try:
             """Update as quickly as possible."""
             while self._isStarted:
                 self._drainTransactionQueue()
-                readKeys = self._calculate()
+                _, readKeys = self._calculate(catchRevisionConflicts=True)
                 if readKeys is not None:
-                    self.blockUntilRecalculate(readKeys)
+                    self._blockUntilRecalculate(readKeys, self.maxSleepTime)
+
         except Exception:
             logging.error("Unexpected exception in Reactor loop:\n%s", traceback.format_exc())
 
-    def blockUntilRecalculate(self, readKeys):
-        while True:
-            result = self._transactionQueue.get()
+    def _blockUntilRecalculate(self, readKeys, timeout):
+        """Wait until we're triggered, or hit a timeout.
+
+        Returns:
+            True if we were triggered by a key update, False otherwise.
+        """
+        if not readKeys and timeout is None:
+            raise Exception("Reactor would block forever.")
+
+        curTime = time.time()
+        finalTime = curTime + (timeout if timeout is not None else 10**8)
+
+        while curTime < finalTime:
+            try:
+                result = self._transactionQueue.get(timeout=finalTime - curTime)
+            except queue.Empty:
+                return False
+
             if result is Reactor.STOP:
-                return
+                return False
             for key in result:
                 if key in readKeys:
-                    return
+                    return True
+
+            curTime = time.time()
+
+        return False
 
     def _drainTransactionQueue(self):
         self._transactionQueue = queue.Queue()
 
-    def _calculate(self):
+    def _calculate(self, catchRevisionConflicts):
         """Calculate the reactor function.
 
-        Returns 'None' if the function should be recalculated, otherwise
-        the set of keys to check for updates and a transactionId
+        Returns:
+            (functionResult, keySetOrNone)
+
+            keySetOrNone will be 'None' if the function should be
+            recalculated, otherwise the set of keys to check for updates and a
+            transactionId.
+
+            functionResult will be the actual result of the function,
+            or None if it threw a RevisionConflictException
         """
         try:
             seenKeys = set()
@@ -126,18 +228,21 @@ class Reactor:
                 seenKeys.update(view._indexReads)
 
             with ViewWatcher(onViewClose):
-                self.reactorFunction()
+                functionResult = self.reactorFunction()
 
             if hadWrites[0]:
-                return None
+                return functionResult, None
             else:
-                return seenKeys
+                return functionResult, seenKeys
 
         except RevisionConflictException as e:
+            if not catchRevisionConflicts:
+                raise
+
             logging.getLogger(__name__).info(
                 "Handled a revision conflict on key %s in %s. Retrying." % (e, self.reactorFunction.__name__)
             )
-            return None
+            return None, None
 
     def _onTransaction(self, key_value, priors, set_adds, set_removes, transactionId):
         self._transactionQueue.put(list(key_value) + list(set_adds) + list(set_removes))

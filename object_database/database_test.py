@@ -25,7 +25,7 @@ from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.util import configureLogging, genToken
 from object_database.test_util import currentMemUsageMb
 from object_database.reactor import Reactor
-
+import object_database
 import object_database.messages as messages
 import queue
 import unittest
@@ -1304,7 +1304,7 @@ class ObjectDatabaseTests:
         with db1.transaction():
             self.assertEqual(len(Counter.lookupAll(k=0)), 21000)
 
-    def test_reactor(self):
+    def test_reactor_threaded(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
@@ -1346,6 +1346,100 @@ class ObjectDatabaseTests:
                 self.assertEqual(executed[0], 2)
         finally:
             r1.stop()
+            r1.teardown()
+
+    def test_reactor_synchronous(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        def incrementor():
+            executed = 0
+            with db.transaction():
+                for c in Counter.lookupAll():
+                    if c.x != 0:
+                        executed += 1
+                        c.k += c.x
+                        c.x = 0
+
+            return executed
+
+        r1 = Reactor(db, incrementor)
+
+        self.assertEqual(r1.next(timeout=.01), 0)
+        self.assertIs(r1.next(timeout=.01), object_database.reactor.Timeout)
+
+        with db.transaction():
+            c = Counter(k=0, x=100)
+
+        self.assertEqual(r1.next(timeout=.01), 1)
+        self.assertEqual(r1.next(timeout=.01), 0)
+        self.assertIs(r1.next(timeout=.01), object_database.reactor.Timeout)
+
+        with db.view():
+            self.assertEqual(c.k, 100)
+            self.assertEqual(c.x, 0)
+
+        with db.transaction():
+            c.x += 2
+
+        self.assertEqual(r1.next(timeout=.01), 1)
+        self.assertEqual(r1.next(timeout=.01), 0)
+        self.assertIs(r1.next(timeout=.01), object_database.reactor.Timeout)
+
+        with db.view():
+            self.assertEqual(c.k, 102)
+            self.assertEqual(c.x, 0)
+
+        r1.teardown()
+
+    def test_reactor_block_until_true(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        checkCount = [0]
+        incrementCount = [0]
+
+        def incrementor():
+            incrementCount[0] += 1
+            # move '1' from any nonzero 'x' to 'k'
+            with db.transaction():
+                for c in Counter.lookupAll():
+                    if c.x > 0:
+                        c.k += 1
+                        c.x -= 1
+
+            time.sleep(0.001)
+
+        def checker():
+            # Check if any counters exist with x > 0
+            checkCount[0] += 1
+            with db.view():
+                for c in Counter.lookupAll():
+                    if c.x > 0:
+                        return False
+            return True
+
+        incrementor = Reactor(db, incrementor)
+        checker = Reactor(db, checker)
+        incrementor.start()
+
+        with db.transaction():
+            c = Counter(k=0, x=10)
+
+        self.assertFalse(checker.blockUntilTrue(timeout=.00001))
+        self.assertTrue(checker.blockUntilTrue(timeout=1.0))
+
+        self.assertTrue(incrementCount[0] >= 10)
+        self.assertTrue(checkCount[0] >= 5)
+
+        with db.transaction():
+            c.x += 5
+
+        self.assertFalse(checker.blockUntilTrue(timeout=.00001))
+        self.assertTrue(checker.blockUntilTrue(timeout=1.0))
+
+        self.assertTrue(incrementCount[0] >= 15)
+        self.assertTrue(checkCount[0] >= 8)
 
     def test_adding_while_subscribing(self, shouldSubscribeToIndex=False):
         pfactor = self.PERFORMANCE_FACTOR
