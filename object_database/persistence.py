@@ -212,7 +212,8 @@ class RedisPersistence(object):
                     time.sleep(1.0)
 
             if vals:
-                self.cache[key] = set([k for k in vals])
+                # set members are integers
+                self.cache[key] = set([int(k) for k in vals])
                 return self.cache[key]
             else:
                 return set()
@@ -233,6 +234,7 @@ class RedisPersistence(object):
                     self.getSetMembers(key)
 
                 for to_add_val in to_add:
+                    # to_add_val is an int
                     pipe.sadd(serialize(KeyType, key), to_add_val)
 
             for key, to_remove in (setRemoves or {}).items():

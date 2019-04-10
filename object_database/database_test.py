@@ -1778,6 +1778,29 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         self.redisProcess = None
         self.tempDir.__exit__(None, None, None)
 
+    def test_reboot_against_redis(self):
+        db1 = self.createNewDb()
+        db1.subscribeToSchema(schema)
+
+        with db1.transaction():
+            c = Counter(k=123)
+
+        self.server.stop()
+        self.mem_store = RedisPersistence(port=1115)
+        self.server = InMemServer(self.mem_store, self.auth_token)
+        self.server.start()
+
+        db1.disconnect()
+
+        db1 = self.createNewDb()
+        db1.subscribeToSchema(schema)
+        with db1.view():
+            self.assertTrue(c.exists())
+            self.assertEqual(c.k, 123)
+            self.assertEqual(list(Counter.lookupAll()), [c])
+            self.assertEqual(list(Counter.lookupAll(k=123)), [c])
+            self.assertEqual(list(Counter.lookupAll(k=124)), [])
+
     def test_throughput(self):
         pass
 
