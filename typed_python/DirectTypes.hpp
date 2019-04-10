@@ -174,9 +174,10 @@ public:
         return t;
     }
 
-    //static TupleOf<element_type> fromPython(PyObject* p) {
-        //pyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
-    //}
+    static TupleOf<element_type> fromPython(PyObject* p) {
+        TupleOfType::layout* l = nullptr;
+        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+    }
 
     element_type& operator[](int64_t offset) {
        return *(element_type*)((uint8_t*)mLayout->data + TypeDetails<element_type>::bytecount * offset);
@@ -242,6 +243,7 @@ public:
 
     static const uint64_t bytecount = sizeof(void*);
 };
+
 
 template<class t1, class t2>
 class OneOf {
