@@ -94,6 +94,7 @@ public:
     static ListOf<element_type> fromPython(PyObject* p) {
         ListOfType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        return (ListOf<element_type>)l;
     }
 
     element_type& operator[](int64_t offset) {
@@ -138,6 +139,13 @@ public:
                );
     }
 
+    ListOf(ListOfType::layout* l) {
+        getType()->copy_constructor(
+               (instance_ptr)&mLayout,
+               (instance_ptr)&l
+               );
+    }
+
     ListOf& operator=(const ListOf& other)
     {
         getType()->assign(
@@ -177,6 +185,7 @@ public:
     static TupleOf<element_type> fromPython(PyObject* p) {
         TupleOfType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        return (TupleOf<element_type>)l;
     }
 
     element_type& operator[](int64_t offset) {
@@ -217,6 +226,13 @@ public:
                );
     }
 
+    TupleOf(TupleOfType::layout* l) {
+        getType()->copy_constructor(
+               (instance_ptr)&mLayout,
+               (instance_ptr)&l
+               );
+    }
+
     TupleOf& operator=(const TupleOf& other)
     {
         getType()->assign(
@@ -244,28 +260,32 @@ public:
     static const uint64_t bytecount = sizeof(void*);
 };
 
+template<class... Ts>
+class OneOf;
 
-template<class t1, class t2>
-class OneOf {
+template<class T1, class... Ts>
+class OneOf<T1, Ts...> {
 public:
+    static const size_t m_datasize = std::max(TypeDetails<T1>::bytecount, OneOf<Ts...>::m_datasize);
     class layout {
         uint8_t which;
-        uint8_t data[std::max(TypeDetails<t1>::bytecount, TypeDetails<t2>::bytecount)];
+        uint8_t data[OneOf<T1, Ts...>::m_datasize];
     };
 private:
     layout mLayout;
 public:
     static OneOfType* getType() {
-        static OneOfType* t = OneOfType::Make((std::vector<Type*>){TypeDetails<t1>::getType(), TypeDetails<t2>::getType()});
+        static OneOfType* t = OneOfType::Make({TypeDetails<T1>::getType(), TypeDetails<Ts>::getType()...});
 
         return t;
     }
 
-//    static OneOf<t1, t2> fromPython(PyObject* p) {
-//        OneOfType::layout* l = nullptr;
-//        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-//    }
-//
+    static OneOf<T1, Ts...> fromPython(PyObject* p) {
+        OneOf<T1, Ts...>::layout* l = nullptr;
+        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        return (OneOf<T1, Ts...>)l;
+    }
+
     std::pair<Type*, instance_ptr> unwrap() {
         return getType()->unwrap((instance_ptr)&mLayout);
     }
@@ -300,6 +320,13 @@ public:
                );
     }
 
+    OneOf(OneOf<T1, Ts...>::layout* l) {
+        getType()->copy_constructor(
+               (instance_ptr)&mLayout,
+               (instance_ptr)&l
+               );
+    }
+
     OneOf& operator=(const OneOf& other)
     {
         getType()->assign(
@@ -310,19 +337,26 @@ public:
     }
 };
 
-template<class t1, class t2>
-class TypeDetails<OneOf<t1, t2>> {
+template <>
+class OneOf<> {
+public:
+    static const size_t m_datasize = 0;
+};
+
+template<class... Ts>
+class TypeDetails<OneOf<Ts...>> {
 public:
     static Type* getType() {
-        static Type* t = OneOf<t1, t2>::getType();
+        static Type* t = OneOf<Ts...>::getType();
         if (t->bytecount() != bytecount) {
             throw std::runtime_error("somehow we have the wrong bytecount!");
         }
         return t;
     }
 
-    static const uint64_t bytecount = sizeof(int8_t) + std::max(TypeDetails<t1>::bytecount, TypeDetails<t2>::bytecount);
+    static const uint64_t bytecount = 1 + OneOf<Ts...>::m_datasize;
 };
+
 
 /*
 

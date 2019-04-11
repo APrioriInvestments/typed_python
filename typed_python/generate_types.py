@@ -1,5 +1,6 @@
+import sys
 from typed_python._types import NamedTuple
-# from typed_python._types import ListOf, TupleOf
+from typed_python._types import ListOf, TupleOf, OneOf
 
 
 def gen_named_tuple_type(name, **kwargs):
@@ -142,12 +143,18 @@ def typed_python_codegen(**kwargs):
     return ret
 
 
-def generate_some_types(destination):
-    with open(destination, "w") as f:
-        f.writelines(gen_named_tuple_type("NamedTupleBoolAndInt", X="int64_t", Y="float"))
-        f.writelines(gen_named_tuple_type("NamedTupleBoolIntStr", X="int64_t", Y="float", Z="String"))
-        f.writelines(gen_named_tuple_type("NamedTupleListAndTupleOfStr", items="ListOf<String>", elements="TupleOf<String>"))
-        f.writelines(gen_named_tuple_type("NamedTupleTwoParts", first="NamedTupleBoolAndInt", second="NamedTupleListAndTupleOfStr"))
-        typed_python_codegen(
-            Blah=NamedTuple(X=int, Y=float)
-        )
+def main(argv):
+    if len(argv) < 2:
+        return 1
+    with open(argv[1], "w") as f:
+        f.writelines(typed_python_codegen(
+            NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
+            NamedTupleIntFloat=NamedTuple(a=OneOf(int, float, bool), b=float),
+            NamedTupleBoolListOfInt=NamedTuple(X=bool, Y=ListOf(int)),
+            NamedTupleAttrAndValues=NamedTuple(attributes=TupleOf(str), values=TupleOf(int))
+        ))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

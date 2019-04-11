@@ -69,11 +69,11 @@ public:
 };
 
 // "NamedTupleIntFloat"
-//    a=OneOf<int64_t, double>
+//    a=OneOf<int64_t, double, bool>
 //    b=double
 class NamedTupleIntFloat {
 public:
-    typedef OneOf<int64_t, double> a_type;
+    typedef OneOf<int64_t, double, bool> a_type;
     typedef double b_type;
     a_type& a() const { return *(a_type*)(data); }
     b_type& b() const { return *(b_type*)(data + size1); }
