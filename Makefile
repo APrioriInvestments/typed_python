@@ -96,9 +96,9 @@ unicodeprops: ./unicodeprops.py
 	$(PYTHON) ./unicodeprops.py > $(UNICODEPROPS)
 
 .PHONY: generatetesttypes
-generatetesttypes: ./generate_test_types.py
+generatetesttypes: $(TP_SRC_PATH)/generate_types.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	./generate_test_types.py $(GENERATEDTYPES)
+	python3 $(TP_SRC_PATH)/generate_types.py --testTypes $(TP_SRC_PATH)/TestGeneratedTypes.hpp
 
 .PHONY: clean
 clean:

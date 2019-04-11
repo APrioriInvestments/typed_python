@@ -24,8 +24,8 @@ public:
     }
 
     ~NamedTupleTwoStrings() {
-        X().~X_type();
         Y().~Y_type();
+        X().~X_type();
     }
 
     NamedTupleTwoStrings() {
@@ -38,8 +38,8 @@ public:
             initY = true;
         } catch(...) {
             try {
-                if (initX) X().~X_type();
                 if (initY) Y().~Y_type();
+                if (initX) X().~X_type();
             } catch(...) {
             }
             throw;
@@ -68,48 +68,59 @@ public:
         sizeof(NamedTupleTwoStrings::Y_type);
 };
 
-// "NamedTupleIntFloat"
+// "NamedTupleIntFloatDesc"
 //    a=OneOf<int64_t, double, bool>
 //    b=double
-class NamedTupleIntFloat {
+//    desc=String
+class NamedTupleIntFloatDesc {
 public:
     typedef OneOf<int64_t, double, bool> a_type;
     typedef double b_type;
+    typedef String desc_type;
     a_type& a() const { return *(a_type*)(data); }
     b_type& b() const { return *(b_type*)(data + size1); }
+    desc_type& desc() const { return *(desc_type*)(data + size1 + size2); }
 private:
     static const int size1 = sizeof(a_type);
     static const int size2 = sizeof(b_type);
-    uint8_t data[size1 + size2];
+    static const int size3 = sizeof(desc_type);
+    uint8_t data[size1 + size2 + size3];
 public:
-    NamedTupleIntFloat& operator = (const NamedTupleIntFloat& other) {
+    NamedTupleIntFloatDesc& operator = (const NamedTupleIntFloatDesc& other) {
         a() = other.a();
         b() = other.b();
+        desc() = other.desc();
         return *this;
     }
 
-    NamedTupleIntFloat(const NamedTupleIntFloat& other) {
+    NamedTupleIntFloatDesc(const NamedTupleIntFloatDesc& other) {
         new (&a()) a_type(other.a());
         new (&b()) b_type(other.b());
+        new (&desc()) desc_type(other.desc());
     }
 
-    ~NamedTupleIntFloat() {
-        a().~a_type();
+    ~NamedTupleIntFloatDesc() {
+        desc().~desc_type();
         b().~b_type();
+        a().~a_type();
     }
 
-    NamedTupleIntFloat() {
+    NamedTupleIntFloatDesc() {
         bool inita = false;
         bool initb = false;
+        bool initdesc = false;
         try {
             new (&a()) a_type();
             inita = true;
             new (&b()) b_type();
             initb = true;
+            new (&desc()) desc_type();
+            initdesc = true;
         } catch(...) {
             try {
-                if (inita) a().~a_type();
+                if (initdesc) desc().~desc_type();
                 if (initb) b().~b_type();
+                if (inita) a().~a_type();
             } catch(...) {
             }
             throw;
@@ -118,15 +129,17 @@ public:
 };
 
 template <>
-class TypeDetails<NamedTupleIntFloat> {
+class TypeDetails<NamedTupleIntFloatDesc> {
 public:
     static Type* getType() {
         static Type* t = NamedTuple::Make({
-                TypeDetails<NamedTupleIntFloat::a_type>::getType(),
-                TypeDetails<NamedTupleIntFloat::b_type>::getType()
+                TypeDetails<NamedTupleIntFloatDesc::a_type>::getType(),
+                TypeDetails<NamedTupleIntFloatDesc::b_type>::getType(),
+                TypeDetails<NamedTupleIntFloatDesc::desc_type>::getType()
             },{
                 "a",
-                "b"
+                "b",
+                "desc"
             });
         if (t->bytecount() != bytecount) {
             throw std::runtime_error("somehow we have the wrong bytecount!");
@@ -134,8 +147,9 @@ public:
         return t;
     }
     static const uint64_t bytecount = 
-        sizeof(NamedTupleIntFloat::a_type) +
-        sizeof(NamedTupleIntFloat::b_type);
+        sizeof(NamedTupleIntFloatDesc::a_type) +
+        sizeof(NamedTupleIntFloatDesc::b_type) +
+        sizeof(NamedTupleIntFloatDesc::desc_type);
 };
 
 // "NamedTupleBoolListOfInt"
@@ -164,8 +178,8 @@ public:
     }
 
     ~NamedTupleBoolListOfInt() {
-        X().~X_type();
         Y().~Y_type();
+        X().~X_type();
     }
 
     NamedTupleBoolListOfInt() {
@@ -178,8 +192,8 @@ public:
             initY = true;
         } catch(...) {
             try {
-                if (initX) X().~X_type();
                 if (initY) Y().~Y_type();
+                if (initX) X().~X_type();
             } catch(...) {
             }
             throw;
@@ -234,8 +248,8 @@ public:
     }
 
     ~NamedTupleAttrAndValues() {
-        attributes().~attributes_type();
         values().~values_type();
+        attributes().~attributes_type();
     }
 
     NamedTupleAttrAndValues() {
@@ -248,8 +262,8 @@ public:
             initvalues = true;
         } catch(...) {
             try {
-                if (initattributes) attributes().~attributes_type();
                 if (initvalues) values().~values_type();
+                if (initattributes) attributes().~attributes_type();
             } catch(...) {
             }
             throw;

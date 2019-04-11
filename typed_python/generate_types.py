@@ -1,4 +1,5 @@
 import sys
+import argparse
 from typed_python._types import NamedTuple
 from typed_python._types import ListOf, TupleOf, OneOf
 
@@ -6,6 +7,7 @@ from typed_python._types import ListOf, TupleOf, OneOf
 def gen_named_tuple_type(name, **kwargs):
     items = kwargs.items()
     keys = kwargs.keys()
+    revkeys = list(keys)[::-1]
     ret = []
     ret.append(f'// "{name}"')
     for key, value in items:
@@ -45,7 +47,7 @@ def gen_named_tuple_type(name, **kwargs):
     ret.append("")
 
     ret.append(f"    ~{name}() {{")
-    for key in keys:
+    for key in revkeys:
         ret.append(f"        {key}().~{key}_type();")
     ret.append("    }")
     ret.append("")
@@ -59,7 +61,7 @@ def gen_named_tuple_type(name, **kwargs):
         ret.append(f"            init{key} = true;")
     ret.append("        } catch(...) {")
     ret.append("            try {")
-    for key in keys:
+    for key in revkeys:
         ret.append(f"                if (init{key}) {key}().~{key}_type();")
     ret.append("            } catch(...) {")
     ret.append("            }")
@@ -143,17 +145,24 @@ def typed_python_codegen(**kwargs):
     return ret
 
 
-def main(argv):
-    if len(argv) < 2:
-        return 1
-    with open(argv[1], "w") as f:
+def GenerateTestTypes(dest):
+    with open(dest, "w") as f:
         f.writelines(typed_python_codegen(
             NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
-            NamedTupleIntFloat=NamedTuple(a=OneOf(int, float, bool), b=float),
+            NamedTupleIntFloatDesc=NamedTuple(a=OneOf(int, float, bool), b=float, desc=str),
             NamedTupleBoolListOfInt=NamedTuple(X=bool, Y=ListOf(int)),
             NamedTupleAttrAndValues=NamedTuple(attributes=TupleOf(str), values=TupleOf(int))
         ))
-    return 0
+
+
+def main(argv):
+    parser = argparse.ArgumentParser(description='Generate types')
+    parser.add_argument('dest', nargs='?', default='DefaultGeneratedTestTypes.hpp')
+    parser.add_argument('-t', '--testTypes', action='store_true')
+    args = parser.parse_args()
+
+    if args.testTypes:
+        GenerateTestTypes(args.dest)
 
 
 if __name__ == "__main__":
