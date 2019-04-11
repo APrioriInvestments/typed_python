@@ -7,8 +7,8 @@ from object_database.web.cells.cells import (
     augmentToBeUnique,
     sessionState,
     ensureSubscribedType,
-    createTask,
     ensureSubscribedSchema,
+    wrapCallback,
 
     # Classes
     GeventPipe,

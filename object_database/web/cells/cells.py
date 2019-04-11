@@ -54,6 +54,9 @@ def registerDisplay(type, **context):
 
 def context(contextKey):
     """During cell evaluation, lookup context from our parent cell by name."""
+    if not hasattr(_cur_cell, 'cell'):
+        raise Exception("Please call 'context' from within a message or cell update function.")
+
     return _cur_cell.cell.getContext(contextKey)
 
 
@@ -86,6 +89,21 @@ def multiReplace(msg, replacements):
         replacements.keys(), msg)
 
     return "".join(outChunks)
+
+
+def wrapCallback(callback):
+    """Make a version of callback that will run on the main cells ui thread when invoked.
+
+    This must be called from within a 'cell' or message update.
+    """
+    cells = _cur_cell.cell.cells
+
+    def realCallback(*args, **kwargs):
+        cells.scheduleCallback(lambda: callback(*args, **kwargs))
+
+    realCallback.__name__ = callback.__name__
+
+    return realCallback
 
 
 def augmentToBeUnique(listOfItems):
@@ -167,8 +185,8 @@ class Cells:
         # used by _newID to generate unique identifiers
         self._id = 0
 
-        # a list of pending task objects
-        self._tasks = queue.Queue()
+        # a list of pending callbacks that want to run on the main thread
+        self._callbacks = queue.Queue()
 
         self._logger = logging.getLogger(__name__)
 
@@ -178,53 +196,31 @@ class Cells:
 
         self._addCell(self._root, parent=None)
 
-    def createTask(self, owningCell, taskFun):
-        """Create a long-running task (such as a task that acquires data) that can push content into slots.
-
-        Tasks are run in the order received by a set of worker threads. They can interact
-        with object_db, and write into slots.
-
-        Tasks are callables that are invoked as
-
-            task(owningCell, shouldStop)
-
-        where 'owningCell' is the cell that created the task, 'shouldStop' is a threading.Event that
-        we set if we know the task should stop (because we've navigated away from the cell
-        that produced it.)
-
-        Tasks should use 'owningCell' to create transactions and views because it will have the
-        correct serialization context.
-        """
-        self._tasks.put((owningCell, taskFun))
-
-    def markStopProcessingTasks(self):
-        """Our calling context is leaving, so we should stop processing."""
-        self._shouldStopProcessingTasks.set()
-
-    def processTasks(self):
-        while not self._shouldStopProcessingTasks.is_set():
-            self.processOneTask()
-
-    def processOneTask(self):
+    def _processCallbacks(self):
+        """Execute any callbacks that have been scheduled to run on the main UI thread."""
         try:
-            creatingCell, task = self._tasks.get(timeout=.25)
-            if creatingCell.isActive():
+            while True:
+                callback = self._callbacks.get(block=False)
+
                 try:
-                    self._logger.info(
-                        "Starting task %s with %s remaining", task, self._tasks.qsize())
-                    t0 = time.time()
-                    _cur_cell.isProcessingTask = True
-                    task(creatingCell, self._shouldStopProcessingTasks)
-                    self._logger.info("Task %s took %s",
-                                      task, time.time() - t0)
+                    callback()
                 except Exception:
                     self._logger.error(
-                        "Unexpected Exception in cells.processTasks:\n%s", traceback.format_exc())
-                finally:
-                    _cur_cell.isProcessingTask = False
-            return True
+                        "Callback %s threw an unexpected exception:\n%s",
+                        callback,
+                        traceback.format_exc()
+                    )
         except queue.Empty:
-            return False
+            return
+
+    def scheduleCallback(self, callback):
+        """Schedule a callback that will execute on the main cells thread as soon as possible.
+
+        Code in other threads shouldn't modify cells or slots. Cells that want to trigger
+        asynchronous work can do so and then push content back into Slot objects using these callbacks.
+        """
+        self._callbacks.put(callback)
+        self._gEventHasTransactions.trigger()
 
     def withRoot(self, root_cell, serialization_context=None, session_state=None):
         self._root.setChild(
@@ -265,10 +261,6 @@ class Cells:
 
     def wait(self):
         self._gEventHasTransactions.wait()
-
-    def markSlotDirtyForNextRecompute(self, slot):
-        self._dirtySlots.add(slot)
-        self._gEventHasTransactions.trigger()
 
     def _onTransaction(self, *trans):
         self._transactionQueue.put(trans)
@@ -347,7 +339,7 @@ class Cells:
         self._nodesToBroadcast.add(node)
 
     def renderMessages(self):
-        self._processDirtySlots()
+        self._processCallbacks()
         self._recalculateCells()
 
         res = []
@@ -383,13 +375,6 @@ class Cells:
 
         return res
 
-    def _processDirtySlots(self):
-        slots = list(self._dirtySlots)
-        self._dirtySlots.clear()
-
-        for slot in slots:
-            slot.absorbPendingWrite()
-
     def _recalculateCells(self):
         # handle all the transactions so far
         old_queue = self._transactionQueue
@@ -412,7 +397,7 @@ class Cells:
                 try:
                     _cur_cell.cell = n
                     _cur_cell.isProcessingMessage = False
-                    _cur_cell.isProcessingTask = False
+                    _cur_cell.isProcessingCell = True
                     while True:
                         try:
                             n.prepare()
@@ -442,7 +427,7 @@ class Cells:
                 finally:
                     _cur_cell.cell = None
                     _cur_cell.isProcessingMessage = False
-                    _cur_cell.isProcessingTask = False
+                    _cur_cell.isProcessingCell = False
 
                 newChildren = set(n.children.values())
 
@@ -512,7 +497,6 @@ class Slot:
 
     def __init__(self, value=None):
         self._value = value
-        self._pendingValue = value
         self._subscribedCells = set()
         self._lock = threading.Lock()
 
@@ -534,14 +518,10 @@ class Slot:
         with self._lock:
             # we can only create a dependency if we're being read
             # as part of a cell's state recalculation.
-            if (_cur_cell.cell and not getattr(_cur_cell, 'isProcessingMessage', False) and
-                    not getattr(_cur_cell, 'isProcessingTask', False)):
+            if getattr(_cur_cell, 'cell', None) is not None and getattr(_cur_cell, 'isProcessingCell', False):
                 self._subscribedCells.add(_cur_cell.cell)
 
-            if getattr(_cur_cell, "isProcessingTask", False):
-                return self._pendingValue
-            else:
-                return self._value
+            return self._value
 
     def set(self, val):
         """Write to a slot.
@@ -551,38 +531,16 @@ class Slot:
         is synchronous.
         """
         with self._lock:
-            if getattr(_cur_cell, "isProcessingTask", False):
-                if val == self._pendingValue:
-                    return
+            if val == self._value:
+                return
 
-                self._pendingValue = val
+            self._value = val
 
-                if self._cells:
-                    self._cells.markSlotDirtyForNextRecompute(self)
-            else:
-                if val == self._value:
-                    return
+            for c in self._subscribedCells:
+                logging.debug("Setting value %s triggering cell %s", val, c)
+                c.markDirty()
 
-                self._value = val
-                self._pendingValue = val
-
-                for c in self._subscribedCells:
-                    c.markDirty()
-                self._subscribedCells = set()
-
-    def absorbPendingWrite(self):
-        """Update our value and dirty any listening cells.
-
-        If our pending value hasn't actually changed, do nothing.
-        """
-        if self._value == self._pendingValue:
-            return
-
-        self._value = self._pendingValue
-
-        for c in self._subscribedCells:
-            c.markDirty()
-        self._subscribedCells = set()
+            self._subscribedCells = set()
 
 
 class SessionState(object):
@@ -739,7 +697,7 @@ class Cell:
             try:
                 _cur_cell.cell = self
                 _cur_cell.isProcessingMessage = True
-                _cur_cell.isProcessingTask = False
+                _cur_cell.isProcessingCell = False
 
                 with self.transaction():
                     self.onMessage(*args)
@@ -757,7 +715,7 @@ class Cell:
             finally:
                 _cur_cell.cell = None
                 _cur_cell.isProcessingMessage = False
-                _cur_cell.isProcessingTask = False
+                _cur_cell.isProcessingCell = False
 
     def withSerializationContext(self, context):
         self.serializationContext = context
@@ -909,6 +867,7 @@ class Cell:
 
     def setContext(self, key, val):
         self.context[key] = val
+        return self
 
     def getContext(self, contextKey):
         if contextKey in self.context:
@@ -2409,11 +2368,6 @@ def ensureSubscribedType(t, lazy=False):
         )
 
 
-def createTask(task):
-    """Create a long-running task from within an executing cell. See Cells.createTask."""
-    return _cur_cell.cell.cells.createTask(_cur_cell.cell, task)
-
-
 def ensureSubscribedSchema(t, lazy=False):
     if not current_transaction().db().isSubscribedToSchema(t):
         raise SubscribeAndRetry(
@@ -2927,7 +2881,7 @@ class Plot(Cell):
             ])
         )
         self.children = {
-            '____chart_updater__': _PlotUpdater(self),
+            '____chart_updater__': Subscribed(lambda: _PlotUpdater(self)),
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 

@@ -441,10 +441,6 @@ class ActiveWebService(ServiceBase):
                 session_state=sessionState
             )
 
-            cellsTaskThread = threading.Thread(target=cells.processTasks)
-            cellsTaskThread.daemon = True
-            cellsTaskThread.start()
-
             timestamps = []
 
             lastDumpTimestamp = time.time()
@@ -584,8 +580,6 @@ class ActiveWebService(ServiceBase):
                 sessionId,
                 len(self.sessionStates[sessionId])
             )
-
-            cells.markStopProcessingTasks()
 
             if reader:
                 reader.join()

@@ -12,8 +12,6 @@ def waitForCellsCondition(cells: Cells, condition, timeout=10.0):
 
         if not condRes:
             time.sleep(.1)
-            while cells.processOneTask():
-                pass
             cells.renderMessages()
         else:
             return condRes
