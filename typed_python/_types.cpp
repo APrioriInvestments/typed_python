@@ -664,13 +664,13 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     if (actualType->getTypeCategory() == Type::TypeCategory::catTupleOf) {
         return PyLong_FromLong(
-            ((::TupleOfType*)actualType)->refcount(((PyInstance*)a1)->dataPtr())
+            ((::TupleOfType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
             );
     }
 
     if (actualType->getTypeCategory() == Type::TypeCategory::catListOf) {
         return PyLong_FromLong(
-            ((::ListOfType*)actualType)->refcount(((PyInstance*)a1)->dataPtr())
+            ((::ListOfType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
             );
     }
 

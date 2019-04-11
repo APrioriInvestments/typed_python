@@ -206,7 +206,7 @@ PyObject* PyVersionedIdSet::addTransaction(PyVersionedIdSet* self, PyObject* arg
         Type* addedType = PyInstance::extractTypeFrom((PyTypeObject*)added->ob_type);
         Type* removedType = PyInstance::extractTypeFrom((PyTypeObject*)removed->ob_type);
 
-        static TupleOf* tupleOfObjectId = TupleOf::Make(Int64::Make());
+        static TupleOfType* tupleOfObjectId = TupleOfType::Make(Int64::Make());
 
         auto& idSet = *self->idSet;
 
