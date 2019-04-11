@@ -1757,11 +1757,11 @@ class Popover(Cell):
             .set_attribute('style', self._divStyle())
             .with_children(
                 HTMLElement.a()
-                .set_attribute('container', 'body')
                 .set_attribute('href', '#popmain_%s' % self.identity)
                 .set_attribute('data-toggle', 'popover')
                 .set_attribute('data-trigger', 'focus')
                 .set_attribute('data-bind', '#pop_%s' % self.identity)
+                .set_attribute('data-placement', 'bottom')
                 .set_attribute('role', 'button')
                 .add_classes(['btn', 'btn-xs'])
                 .add_child(HTMLTextContent('____contents__')),
@@ -1772,9 +1772,6 @@ class Popover(Cell):
                     HTMLElement.div()
                     .set_attribute('id', 'pop_%s' % self.identity)
                     .with_children(
-                        HTMLElement.div()
-                        .add_class('data-placement')
-                        .add_child(HTMLTextContent('bottom')),
 
                         HTMLElement.div()
                         .add_class('data-title')
@@ -1791,7 +1788,6 @@ class Popover(Cell):
                 )
             )
         )
-        self._logger.info(self.contents)
 
     def sortsAs(self):
         if '____title__' in self.children:
