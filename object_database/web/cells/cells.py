@@ -1753,11 +1753,11 @@ class Popover(Cell):
         }
 
     def recalculate(self):
-        self.contents = str(
-            HTMLElement.div()
+        self.contents = str(HTMLElement.div()
             .set_attribute('style', self._divStyle())
             .with_children(
                 HTMLElement.a()
+                .set_attribute('container', 'body')
                 .set_attribute('href', '#popmain_%s' % self.identity)
                 .set_attribute('data-toggle', 'popover')
                 .set_attribute('data-trigger', 'focus')
@@ -1770,7 +1770,7 @@ class Popover(Cell):
                 .set_attribute('style', 'display:none;')
                 .add_child(
                     HTMLElement.div()
-                    .set_attribute('id', '#pop_%s' % self.identity)
+                    .set_attribute('id', 'pop_%s' % self.identity)
                     .with_children(
                         HTMLElement.div()
                         .add_class('data-placement')
@@ -1791,6 +1791,7 @@ class Popover(Cell):
                 )
             )
         )
+        self._logger.info(self.contents)
 
     def sortsAs(self):
         if '____title__' in self.children:
