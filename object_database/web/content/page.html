@@ -99,8 +99,12 @@
          content: function () {
              return getChildProp(this, 'content');
          },
-         placement: function () {
-             return getChildProp(this, 'placement');
+         placement: function (popoverEl, triggeringEl) {
+             let placement = triggeringEl.dataset.placement;
+             if(placement == undefined){
+                 return "bottom";
+             }
+             return placement;
          }
      });
      $('.popover-dismiss').popover({
@@ -136,7 +140,7 @@ $(function () {
     });
 })
 const getChildProp = function(el, child) {
-  return $('.data-' + child, $(el).attr('data-bind')).html();
+     return $('.data-' + child, $(el).attr('data-bind')).html();
 };
 
 $('[data-poload]').on('show.bs.dropdown', function (arg) {
