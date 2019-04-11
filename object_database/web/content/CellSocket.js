@@ -208,11 +208,10 @@ class CellSocket {
                 JSON.stringify({
                     "ACK": this.currentBuffer.buffer.length
                 }));
-            let percentage = Math.round(100*this.currentBuffer.buffer.length / (this.currentBuuffer.remaining + this.currentBuffer.buffer.length));
+            let percentage = Math.round(100*this.currentBuffer.buffer.length / (this.currentBuffer.remaining + this.currentBuffer.buffer.length));
             let total = Math.round((this.currentBuffer.remaining + this.currentBuffer.buffer.length) / (1024 / 32));
             let progressStr = `(Downloaded ${percentage}% of ${total} MB)`;
             this.setLargeDownloadDisplay(progressStr);
-
         }
 
         if(this.currentBuffer.remaining > 0){
@@ -221,9 +220,12 @@ class CellSocket {
 
         this.setLargeDownloadDisplay("");
 
-        let update = JSON.parse(this.currentBuffer.buffer.join(''));
+        let joinedBuffer = this.currentBuffer.buffer.join('')
+
         this.currentBuffer.remaining = null;
         this.currentBuffer.buffer = null;
+
+        let update = JSON.parse(joinedBuffer);
 
         if(update == 'postscripts'){
             // updatePopovers();
