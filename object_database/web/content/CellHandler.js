@@ -62,8 +62,12 @@ class CellHandler {
             content: function () {
                 return getChildProp(this, 'content');
             },
-            placement: function () {
-                return getChildProp(this, 'placement');
+            placement: function (popperEl, triggeringEl) {
+                let placement = triggeringEl.dataset.placement;
+                if(placement == undefined){
+                    return "bottom";
+                }
+                return placement;
             }
         });
         $('.popover-dismiss').popover({
@@ -87,7 +91,7 @@ class CellHandler {
         // Elsewhere, update popovers first
         // Now we evaluate scripts coming
         // across the wire.
-        updatePopovers();
+        this.updatePopovers();
         while(this.postscripts.length){
             let postscript = this.postscripts.pop();
             try{
