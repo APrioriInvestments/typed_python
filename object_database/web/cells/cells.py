@@ -1753,7 +1753,8 @@ class Popover(Cell):
         }
 
     def recalculate(self):
-        self.contents = str(HTMLElement.div()
+        self.contents = str(
+            HTMLElement.div()
             .set_attribute('style', self._divStyle())
             .with_children(
                 HTMLElement.a()
@@ -2360,7 +2361,8 @@ class ButtonGroup(Cell):
     def recalculate(self):
         self.children = {
             f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
-        innerButtons = HTMLTextContent(" ".join(f"____{i}__" for i in range(len(self.buttons))))
+        innerButtons = HTMLTextContent(
+            " ".join(f"____{i}__" for i in range(len(self.buttons))))
         self.contents = str(
             HTMLElement.div()
             .add_class('btn-group')
