@@ -89,28 +89,7 @@
 
      return new Float64Array(buf)
  }
- function updatePopovers() {
-     $('[data-toggle="popover"]').popover({
-         html: true,
-         container: 'body',
-         title: function () {
-             return getChildProp(this, 'title');
-         },
-         content: function () {
-             return getChildProp(this, 'content');
-         },
-         placement: function (popoverEl, triggeringEl) {
-             let placement = triggeringEl.dataset.placement;
-             if(placement == undefined){
-                 return "bottom";
-             }
-             return placement;
-         }
-     });
-     $('.popover-dismiss').popover({
-         trigger: 'focus'
-     });
- }
+ 
 </script>
 </head>
 <body>
