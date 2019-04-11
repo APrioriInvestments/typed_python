@@ -162,7 +162,11 @@ def main(argv):
     args = parser.parse_args()
 
     if args.testTypes:
-        GenerateTestTypes(args.dest)
+        try:
+            GenerateTestTypes(args.dest)
+        except Exception:
+            return 1
+    return 0
 
 
 if __name__ == "__main__":
