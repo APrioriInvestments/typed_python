@@ -4,9 +4,9 @@
 
 class PyDictInstance : public PyInstance {
 public:
-    typedef Dict modeled_type;
+    typedef DictType modeled_type;
 
-    Dict* type();
+    DictType* type();
 
     PyObject* tp_iter_concrete();
 
@@ -36,13 +36,13 @@ public:
 
     static PyMethodDef* typeMethodsConcrete();
 
-    static void mirrorTypeInformationIntoPyTypeConcrete(Dict* dictT, PyTypeObject* pyType);
+    static void mirrorTypeInformationIntoPyTypeConcrete(DictType* dictT, PyTypeObject* pyType);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
 
-    static void copyConstructFromPythonInstanceConcrete(Dict* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
+    static void copyConstructFromPythonInstanceConcrete(DictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 };
 
 

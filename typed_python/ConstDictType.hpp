@@ -3,7 +3,7 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
-class ConstDict : public Type {
+class ConstDictType : public Type {
     class layout {
     public:
         std::atomic<int64_t> refcount;
@@ -15,7 +15,7 @@ class ConstDict : public Type {
     };
 
 public:
-    ConstDict(Type* key, Type* value) :
+    ConstDictType(Type* key, Type* value) :
             Type(TypeCategory::catConstDict),
             m_key(key),
             m_value(value)
@@ -37,7 +37,7 @@ public:
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    static ConstDict* Make(Type* key, Type* value);
+    static ConstDictType* Make(Type* key, Type* value);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {

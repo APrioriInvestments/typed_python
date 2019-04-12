@@ -42,8 +42,8 @@ class PointerTo;
 class ListOfType;
 class NamedTuple;
 class Tuple;
-class Dict;
-class ConstDict;
+class DictType;
+class ConstDictType;
 class Alternative;
 class ConcreteAlternative;
 class PythonSubclass;
@@ -206,9 +206,9 @@ public:
             case catTuple:
                 return f(*(Tuple*)this);
             case catDict:
-                return f(*(Dict*)this);
+                return f(*(DictType*)this);
             case catConstDict:
-                return f(*(ConstDict*)this);
+                return f(*(ConstDictType*)this);
             case catAlternative:
                 return f(*(Alternative*)this);
             case catConcreteAlternative:

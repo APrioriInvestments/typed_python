@@ -1,6 +1,6 @@
 #include "AllTypes.hpp"
 
-void Dict::_forwardTypesMayHaveChanged() {
+void DictType::_forwardTypesMayHaveChanged() {
     m_name = "Dict(" + m_key->name() + "->" + m_value->name() + ")";
     m_size = sizeof(void*);
     m_is_default_constructible = true;
@@ -9,36 +9,36 @@ void Dict::_forwardTypesMayHaveChanged() {
     m_key_value_pair_type = Tuple::Make({m_key, m_value});
 }
 
-bool Dict::isBinaryCompatibleWithConcrete(Type* other) {
+bool DictType::isBinaryCompatibleWithConcrete(Type* other) {
     if (other->getTypeCategory() != m_typeCategory) {
         return false;
     }
 
-    Dict* otherO = (Dict*)other;
+    DictType* otherO = (DictType*)other;
 
     return m_key->isBinaryCompatibleWith(otherO->m_key) &&
         m_value->isBinaryCompatibleWith(otherO->m_value);
 }
 
 // static
-Dict* Dict::Make(Type* key, Type* value) {
+DictType* DictType::Make(Type* key, Type* value) {
     static std::mutex guard;
 
     std::lock_guard<std::mutex> lock(guard);
 
-    static std::map<std::pair<Type*, Type*>, Dict*> m;
+    static std::map<std::pair<Type*, Type*>, DictType*> m;
 
     auto lookup_key = std::make_pair(key,value);
 
     auto it = m.find(lookup_key);
     if (it == m.end()) {
-        it = m.insert(std::make_pair(lookup_key, new Dict(key, value))).first;
+        it = m.insert(std::make_pair(lookup_key, new DictType(key, value))).first;
     }
 
     return it->second;
 }
 
-void Dict::repr(instance_ptr self, ReprAccumulator& stream) {
+void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
     PushReprState isNew(stream, self);
 
     if (!isNew) {
@@ -68,12 +68,12 @@ void Dict::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "}";
 }
 
-int32_t Dict::hash32(instance_ptr left) {
+int32_t DictType::hash32(instance_ptr left) {
     throw std::logic_error(name() + " is not hashable");
 }
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
-bool Dict::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if (pyComparisonOp != Py_NE && pyComparisonOp != Py_EQ) {
         throw std::runtime_error("Ordered comparison not supported between objects of type " + name());
     }
@@ -109,43 +109,43 @@ bool Dict::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
-int64_t Dict::refcount(instance_ptr self) const {
+int64_t DictType::refcount(instance_ptr self) const {
     layout& record = **(layout**)self;
 
     return record.refcount;
 }
 
-int64_t Dict::slotCount(instance_ptr self) const {
+int64_t DictType::slotCount(instance_ptr self) const {
     layout& record = **(layout**)self;
 
     return record.items_reserved;
 }
 
-bool Dict::slotPopulated(instance_ptr self, size_t slot) const {
+bool DictType::slotPopulated(instance_ptr self, size_t slot) const {
     layout& record = **(layout**)self;
 
     return record.items_populated[slot];
 }
 
-instance_ptr Dict::keyAtSlot(instance_ptr self, size_t offset) const {
+instance_ptr DictType::keyAtSlot(instance_ptr self, size_t offset) const {
     layout& record = **(layout**)self;
 
     return record.items + m_bytes_per_key_value_pair * offset;
 }
 
-instance_ptr Dict::valueAtSlot(instance_ptr self, size_t offset) const {
+instance_ptr DictType::valueAtSlot(instance_ptr self, size_t offset) const {
     layout& record = **(layout**)self;
 
     return record.items + m_bytes_per_key_value_pair * offset + m_bytes_per_key;
 }
 
-int64_t Dict::size(instance_ptr self) const {
+int64_t DictType::size(instance_ptr self) const {
     layout& record = **(layout**)self;
 
     return record.hash_table_count;
 }
 
-instance_ptr Dict::lookupValueByKey(instance_ptr self, instance_ptr key) const {
+instance_ptr DictType::lookupValueByKey(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
     int32_t keyHash = m_key->hash32(key);
@@ -161,7 +161,7 @@ instance_ptr Dict::lookupValueByKey(instance_ptr self, instance_ptr key) const {
     return 0;
 }
 
-bool Dict::deleteKey(instance_ptr self, instance_ptr key) const {
+bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
     int32_t keyHash = m_key->hash32(key);
@@ -179,7 +179,7 @@ bool Dict::deleteKey(instance_ptr self, instance_ptr key) const {
     return false;
 }
 
-instance_ptr Dict::insertKey(instance_ptr self, instance_ptr key) const {
+instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
     int32_t keyHash = m_key->hash32(key);
@@ -193,7 +193,7 @@ instance_ptr Dict::insertKey(instance_ptr self, instance_ptr key) const {
     return record.items + slot * m_bytes_per_key_value_pair + m_bytes_per_key;
 }
 
-void Dict::constructor(instance_ptr self) {
+void DictType::constructor(instance_ptr self) {
     (*(layout**)self) = (layout*)malloc(sizeof(layout));
 
     layout& record = **(layout**)self;
@@ -203,7 +203,7 @@ void Dict::constructor(instance_ptr self) {
     record.refcount += 1;
 }
 
-void Dict::destroy(instance_ptr self) {
+void DictType::destroy(instance_ptr self) {
     layout& record = **(layout**)self;
 
     if (record.refcount.fetch_sub(1) == 1) {
@@ -222,12 +222,12 @@ void Dict::destroy(instance_ptr self) {
     }
 }
 
-void Dict::copy_constructor(instance_ptr self, instance_ptr other) {
+void DictType::copy_constructor(instance_ptr self, instance_ptr other) {
     (*(layout**)self) = (*(layout**)other);
     (*(layout**)self)->refcount++;
 }
 
-void Dict::assign(instance_ptr self, instance_ptr other) {
+void DictType::assign(instance_ptr self, instance_ptr other) {
     layout* old = (*(layout**)self);
 
     (*(layout**)self) = (*(layout**)other);

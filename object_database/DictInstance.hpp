@@ -17,7 +17,7 @@ public:
             mKeyType(keyType),
             mValueType(valueType)
     {
-        mInstance = Instance::create(Dict::Make(keyType, valueType));
+        mInstance = Instance::create(DictType::Make(keyType, valueType));
     }
 
     Type* getKeyType() const {
@@ -29,15 +29,15 @@ public:
     }
 
     value_type* lookupKey(const key_type& key) {
-        return (value_type*)((Dict*)mInstance.type())->lookupValueByKey(mInstance.data(), (instance_ptr)&key);
+        return (value_type*)((DictType*)mInstance.type())->lookupValueByKey(mInstance.data(), (instance_ptr)&key);
     }
 
     value_type* insertKey(const key_type& key) {
-        return (value_type*)((Dict*)mInstance.type())->insertKey(mInstance.data(), (instance_ptr)&key);
+        return (value_type*)((DictType*)mInstance.type())->insertKey(mInstance.data(), (instance_ptr)&key);
     }
 
     bool deleteKey(const key_type& key) {
-        return ((Dict*)mInstance.type())->deleteKey(mInstance.data(), (instance_ptr)&key);
+        return ((DictType*)mInstance.type())->deleteKey(mInstance.data(), (instance_ptr)&key);
     }
 
     value_type* lookupOrInsert(const key_type& key) {
@@ -51,7 +51,7 @@ public:
     }
 
     size_t size() const {
-        return ((Dict*)mInstance.type())->size(mInstance.data());
+        return ((DictType*)mInstance.type())->size(mInstance.data());
     }
 
 private:

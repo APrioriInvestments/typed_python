@@ -1,7 +1,7 @@
 #include "PyConstDictInstance.hpp"
 
-ConstDict* PyConstDictInstance::type() {
-    return (ConstDict*)extractTypeFrom(((PyObject*)this)->ob_type);
+ConstDictType* PyConstDictInstance::type() {
+    return (ConstDictType*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
 // static
@@ -286,7 +286,7 @@ PyMethodDef* PyConstDictInstance::typeMethodsConcrete() {
     };
 }
 
-void PyConstDictInstance::mirrorTypeInformationIntoPyTypeConcrete(ConstDict* constDictT, PyTypeObject* pyType) {
+void PyConstDictInstance::mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType) {
     //expose 'ElementType' as a member of the type object
     PyDict_SetItemString(pyType->tp_dict, "KeyType",
             typePtrToPyTypeRepresentation(constDictT->keyType())

@@ -476,14 +476,14 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     }
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catConstDict) {
-        serializeNativeType(((ConstDict*)nativeType)->keyType(), b);
-        serializeNativeType(((ConstDict*)nativeType)->valueType(), b);
+        serializeNativeType(((ConstDictType*)nativeType)->keyType(), b);
+        serializeNativeType(((ConstDictType*)nativeType)->valueType(), b);
         return;
     }
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catDict) {
-        serializeNativeType(((Dict*)nativeType)->keyType(), b);
-        serializeNativeType(((Dict*)nativeType)->valueType(), b);
+        serializeNativeType(((DictType*)nativeType)->keyType(), b);
+        serializeNativeType(((DictType*)nativeType)->valueType(), b);
         return;
     }
 
@@ -656,14 +656,14 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
         Type* keyType = deserializeNativeType(b);
         Type* valueType = deserializeNativeType(b);
 
-        return ::Dict::Make(keyType, valueType);
+        return ::DictType::Make(keyType, valueType);
     }
 
     if (category == Type::TypeCategory::catConstDict) {
         Type* keyType = deserializeNativeType(b);
         Type* valueType = deserializeNativeType(b);
 
-        return ::ConstDict::Make(keyType, valueType);
+        return ::ConstDictType::Make(keyType, valueType);
     }
 
     if (category == Type::TypeCategory::catTupleOf) {

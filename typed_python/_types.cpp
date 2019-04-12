@@ -90,7 +90,7 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
     }
 
     PyObject* typeObj = (PyObject*)PyInstance::typeObj(
-        ConstDict::Make(types[0],types[1])
+        ConstDictType::Make(types[0],types[1])
         );
 
     return incref(typeObj);
@@ -113,7 +113,7 @@ PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
 
     return incref(
         (PyObject*)PyInstance::typeObj(
-            Dict::Make(types[0],types[1])
+            DictType::Make(types[0],types[1])
             )
         );
 }
@@ -666,12 +666,12 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
 
     if (actualType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         return PyLong_FromLong(
-            ((::ConstDict*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
+            ((::ConstDictType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
             );
     }
     if (actualType->getTypeCategory() == Type::TypeCategory::catDict) {
         return PyLong_FromLong(
-            ((::Dict*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
+            ((::DictType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
             );
     }
     if (actualType->getTypeCategory() == Type::TypeCategory::catAlternative) {
