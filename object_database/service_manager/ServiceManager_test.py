@@ -580,7 +580,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         # after 2 seconds, we should be redeployed, but give Travis a bit more time
         if os.environ.get('TRAVIS_CI', None) is not None:
-            time.sleep(5.0)
+            time.sleep(10.0)
 
         with self.database.view():
             instances_redeployed = service_schema.ServiceInstance.lookupAll()
