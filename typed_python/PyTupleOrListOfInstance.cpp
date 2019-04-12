@@ -474,7 +474,6 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
         PyObjectHolder value(PyTuple_GetItem(args, 0));
 
         PyListOfInstance* self_w = (PyListOfInstance*)o;
-        PyInstance* value_w = (PyInstance*)(PyObject*)value;
 
         Type* value_type = extractTypeFrom(value->ob_type);
 

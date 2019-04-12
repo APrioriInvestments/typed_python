@@ -121,8 +121,6 @@ void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffe
         PyObject *key, *value;
         Py_ssize_t pos = 0;
 
-        int i = 0;
-
         while (PyDict_Next(o, &pos, &key, &value)) {
             serializePythonObject(key, b);
             serializePythonObject(value, b);

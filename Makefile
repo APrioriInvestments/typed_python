@@ -18,11 +18,10 @@ TP_LIB_PATH ?= build/lib.linux-x86_64-3.6/typed_python
 ODB_BUILD_PATH ?= build/temp.linux-x86_64-3.6/object_database
 ODB_LIB_PATH ?= build/lib.linux-x86_64-3.6/object_database
 
-CPP_FLAGS = -std=c++14 -O2 -Wall -pthread -DNDEBUG -g -fwrapv               \
-            -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIC              \
-            -Wformat -Werror=format-security -Wdate-time                    \
-            -Wno-sign-compare -Wno-narrowing                                \
-            -Wno-unused-variable -Wno-int-in-bool-context                   \
+CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
+            -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
+            -Wformat  -Werror=format-security  -Wdate-time                  \
+            -Wno-sign-compare  -Wno-narrowing  -Wno-int-in-bool-context     \
             -I$(VIRTUAL_ENV)/include/python3.6m                             \
             -I$(VIRTUAL_ENV)/lib/python3.6/site-packages/numpy/core/include \
             -I/usr/include/python3.6m                                       \

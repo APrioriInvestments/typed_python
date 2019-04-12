@@ -132,7 +132,6 @@ bool unpackTupleToStringAndObjects(PyObject* tuple, std::vector<std::pair<std::s
 
     for (int i = 0; i < PyTuple_Size(tuple); ++i) {
         PyObjectHolder entry(PyTuple_GetItem(tuple, i));
-        Type* targetType = NULL;
 
         if (!PyTuple_Check(entry) || PyTuple_Size(entry) != 2
                 || !PyUnicode_Check(PyTuple_GetItem(entry, 0))

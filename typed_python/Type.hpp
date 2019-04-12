@@ -309,8 +309,6 @@ public:
     Type* guaranteeForwardsResolvedConcrete(resolve_py_callable_to_type& resolver) {
         typedef Type* type_ptr;
 
-        bool didSomething = false;
-
         visitReferencedTypes([&](type_ptr& t) {
             t = t->guaranteeForwardsResolved(resolver);
         });

@@ -39,8 +39,7 @@ extra_compile_args = [
     '-Werror=format-security',
     '-std=c++14',
     '-Wno-sign-compare',
-    '-Wno-narrowing',
-    '-Wno-unused-variable'
+    '-Wno-narrowing'
 ]
 
 ext_modules = [

@@ -412,8 +412,6 @@ public:
             curNAP = m_next_and_prior.lookupKey(ObjectAndVersion(objectId, curVersion));
         }
 
-        transaction_id priorVersion = curNAP->priorId;
-
         NextAndPrior* curInteriorNAP = m_next_and_prior.insertKey(objIdAndVersion);
 
         //this can reallocate the table, so we need to reload both

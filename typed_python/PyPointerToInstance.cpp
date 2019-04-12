@@ -114,7 +114,6 @@ PyObject* PyPointerToInstance::pointerGet(PyObject* o, PyObject* args) {
 //static
 PyObject* PyPointerToInstance::pointerCast(PyObject* o, PyObject* args) {
     PyInstance* self_w = (PyInstance*)o;
-    PointerTo* pointerT = (PointerTo*)extractTypeFrom(o->ob_type);
 
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "PointerTo.cast takes one argument");
