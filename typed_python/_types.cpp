@@ -1035,8 +1035,6 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
     PyObject *key, *value;
     Py_ssize_t pos = 0;
 
-    int i = 0;
-
     while (kwargs && PyDict_Next(kwargs, &pos, &key, &value)) {
         assert(PyUnicode_Check(key));
 

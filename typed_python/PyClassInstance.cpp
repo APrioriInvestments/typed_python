@@ -184,10 +184,6 @@ std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name,
         PyTuple_SetItem(targetArgTuple, 2, incref(arg1)); //steals a reference
     }
 
-    // FIXME: why am I not getting a warning about unused var 'threw'
-    bool threw = false;
-    bool ran = false;
-
     auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, targetArgTuple, nullptr);
     if (res.first) {
         return res;
