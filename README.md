@@ -14,6 +14,9 @@ there, or compile a couple of small but performance-critical functions. As you
 add more type information, more of your program can be compiled. Everything
 can still run in interpreter without compilation if you want.
 
+Nativepython is generously supported by [A Priori Investments](www.aprioriinvestments.com), a quantitative
+hedge fund in New York.  If you're interested in working with us, drop us a line at info@aprioriinvestments.com.
+
 ## Where did this come from?
 
 Every time I (Braxton) find myself writing a lot of  Python code, I eventually
