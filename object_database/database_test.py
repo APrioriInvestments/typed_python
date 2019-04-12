@@ -1801,6 +1801,9 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
             self.assertEqual(list(Counter.lookupAll(k=123)), [c])
             self.assertEqual(list(Counter.lookupAll(k=124)), [])
 
+        with db1.transaction():
+            c.k = 124
+
     def test_throughput(self):
         pass
 

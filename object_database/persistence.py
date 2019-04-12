@@ -22,6 +22,8 @@ from typed_python import serialize, deserialize, OneOf
 
 KeyType = OneOf(ObjectFieldId, IndexId, FieldId, "identityRoot", "types")
 
+SetValue = OneOf(int, bytes)
+
 
 class InMemoryPersistence(object):
     def __init__(self, db=0):
@@ -212,8 +214,8 @@ class RedisPersistence(object):
                     time.sleep(1.0)
 
             if vals:
-                # set members are integers
-                self.cache[key] = set([int(k) for k in vals])
+                # set members are encoded as bytes but must be a 'SetValue'
+                self.cache[key] = set([deserialize(SetValue, k) for k in vals])
                 return self.cache[key]
             else:
                 return set()
@@ -234,15 +236,14 @@ class RedisPersistence(object):
                     self.getSetMembers(key)
 
                 for to_add_val in to_add:
-                    # to_add_val is an int
-                    pipe.sadd(serialize(KeyType, key), to_add_val)
+                    pipe.sadd(serialize(KeyType, key), serialize(SetValue, to_add_val))
 
             for key, to_remove in (setRemoves or {}).items():
                 if key not in self.cache:
                     self.getSetMembers(key)
 
                 for to_remove_val in to_remove:
-                    pipe.srem(serialize(KeyType, key), to_remove_val)
+                    pipe.srem(serialize(KeyType, key), serialize(SetValue, to_remove_val))
 
             pipe.execute()
 
