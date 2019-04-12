@@ -48,7 +48,7 @@ def parseLogfileToInstanceid(fname):
     if not fname.endswith(".log.txt") or "-" not in fname:
         return
     try:
-        return int(fname.split("-")[-1][:-8])
+        return int(fname.split("-")[-1])
     except ValueError:
         return
 
@@ -204,7 +204,7 @@ class SubprocessServiceManager(ServiceManager):
                 for file in os.listdir(self.logfileDirectory):
                     instanceId = parseLogfileToInstanceid(file)
 
-                    if instanceId and self.isLiveService(instanceId):
+                    if instanceId is not None and self.isLiveService(instanceId):
                         if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
                             os.makedirs(os.path.join(self.logfileDirectory, "old"))
                         shutil.move(
