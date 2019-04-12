@@ -21,7 +21,7 @@
 
 #include <unordered_map>
 
-class Dict : public Type {
+class DictType : public Type {
 public:
     class layout {
     public:
@@ -383,7 +383,7 @@ public:
     };
 
 public:
-    Dict(Type* key, Type* value) :
+    DictType(Type* key, Type* value) :
             Type(TypeCategory::catDict),
             m_key(key),
             m_value(value)
@@ -405,7 +405,7 @@ public:
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 
-    static Dict* Make(Type* key, Type* value);
+    static DictType* Make(Type* key, Type* value);
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {

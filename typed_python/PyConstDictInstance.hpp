@@ -20,9 +20,9 @@
 
 class PyConstDictInstance : public PyInstance {
 public:
-    typedef ConstDict modeled_type;
+    typedef ConstDictType modeled_type;
 
-    ConstDict* type();
+    ConstDictType* type();
 
     PyObject* tp_iter_concrete();
 
@@ -46,13 +46,13 @@ public:
 
     static PyMethodDef* typeMethodsConcrete();
 
-    static void mirrorTypeInformationIntoPyTypeConcrete(ConstDict* constDictT, PyTypeObject* pyType);
+    static void mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
         return true;
     }
 
-    static void copyConstructFromPythonInstanceConcrete(ConstDict* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyDict_Check(pyRepresentation)) {
             dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
 

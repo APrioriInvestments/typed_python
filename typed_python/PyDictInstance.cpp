@@ -16,8 +16,8 @@
 
 #include "PyDictInstance.hpp"
 
-Dict* PyDictInstance::type() {
-    return (Dict*)extractTypeFrom(((PyObject*)this)->ob_type);
+DictType* PyDictInstance::type() {
+    return (DictType*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
 // static
@@ -282,7 +282,7 @@ PyMethodDef* PyDictInstance::typeMethodsConcrete() {
     };
 }
 
-void PyDictInstance::mirrorTypeInformationIntoPyTypeConcrete(Dict* dictT, PyTypeObject* pyType) {
+void PyDictInstance::mirrorTypeInformationIntoPyTypeConcrete(DictType* dictT, PyTypeObject* pyType) {
     //expose 'ElementType' as a member of the type object
     PyDict_SetItemString(pyType->tp_dict, "KeyType",
             typePtrToPyTypeRepresentation(dictT->keyType())
@@ -293,7 +293,7 @@ void PyDictInstance::mirrorTypeInformationIntoPyTypeConcrete(Dict* dictT, PyType
 }
 
 
-void PyDictInstance::copyConstructFromPythonInstanceConcrete(Dict* dictType, instance_ptr dictTgt, PyObject* pyRepresentation, bool isExplicit) {
+void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType, instance_ptr dictTgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyDict_Check(pyRepresentation)) {
         dictType->constructor(dictTgt);
 
