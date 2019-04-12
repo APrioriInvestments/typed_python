@@ -218,6 +218,7 @@ class CellsHTMLTests(unittest.TestCase):
 
     def test_contextual_display_html_valid(self):
         cell = ContextualDisplay(object)
+        cell.cells = self.cells
         cell.recalculate()
         html = cell.contents
         self.assertHTMLNotEmpty(html)

@@ -1582,7 +1582,8 @@ class ContextualDisplay(Cell):
         return Traceback(f"Invalid object of type {type(self.obj)}")
 
     def recalculate(self):
-        self.children = {"____child__": self.getChild()}
+        with self.view():
+            self.children = {"____child__": self.getChild()}
 
 
 class Subscribed(Cell):
