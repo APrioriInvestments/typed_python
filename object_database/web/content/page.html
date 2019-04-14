@@ -9,6 +9,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ace.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.2/ext-language_tools.js"></script>
+<script src="https://unpkg.com/maquette@3.3.0/dist/maquette.umd.js"></script>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/handsontable/6.2.2/handsontable.full.css"></link>
 
@@ -24,16 +25,43 @@
 <link rel="stylesheet" href="/content/object_database.css"/>
 
 <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
 <script src="/content/CellSocket.js"></script>
 <script src="/content/CellHandler.js"></script>
 
 <script>
+	// This is the initial render function. It is called when "DOMContentLoaded"
+	// event is fired with the actual rendering handled by the maquette.projector
+	// (see below under `document.addEventListener('DOMContentLoaded',...)`
+	// TODO: potentially this should all be moved to CellHandler
+	function render() {
+		return h("div", {}, [
+			h("div", {id: "page_root"}, [
+				h("div.container-fluid", {}, [
+					h("div.card", {class: "mt-5"}, [
+						h("div.card-body", {}, ["Loading..."])
+					])
+				])
+			]),
+			h("div", {id: "holding_pen", style: "display:none"}, [])
+		])
+	}
+</script>
+
+<script>
+ // maquette vdom setup
+ // maquette.h is the maquette virtual hyperscript func for vdom interaction 
+ var h = maquette.h;
+ var projector = maquette.createProjector();
+
  var langTools = ace.require("ace/ext/language_tools");
  var aceEditors = {};
  var handsOnTables = {}; // Not sure what this is or where it's used
  
  const cellSocket = new CellSocket();
- const cellHandler = new CellHandler();
+ const cellHandler = new CellHandler(h, projector);
  cellSocket.onPostscripts(cellHandler.handlePostscript);
  cellSocket.onMessage(cellHandler.handleMessage);
  cellSocket.onClose(cellHandler.showConnectionClosed);
@@ -41,9 +69,13 @@
      console.error("SOCKET ERROR: ", err);
  });
  document.addEventListener('DOMContentLoaded', () => {
+	   projector.append(document.body, render);
      cellSocket.connect();
  });
 
+</script>
+
+<script>
  function mapPlotlyData(d) {
      if (d.timestamp !== undefined) {
          d.timestamp = unpackHexFloats(d.timestamp)
@@ -89,28 +121,7 @@
 
      return new Float64Array(buf)
  }
- 
 </script>
-</head>
-<body>
-<div id="page_root">
-  <div class="container-fluid">
-    <div class="card mt-5">
-      <div class="card-body">
-        Loading...
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id='holding_pen' style="display:none"></div>
-
-<script
-  src="https://code.jquery.com/jquery-3.3.1.min.js"
-  integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
-  crossorigin="anonymous"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
-<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
 
 <script>
 $(function () {
@@ -132,5 +143,10 @@ $('[data-poload]').on('show.bs.dropdown', function (arg) {
 })
 
 </script>
+</head>
+
+<!-- END OF SCRIPTS -->
+
+<body>
 </body>
-<html>
+</html>
