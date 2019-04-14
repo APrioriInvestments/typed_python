@@ -9,14 +9,20 @@
  * plans to change this structure to be more flexible
  * and so the API of this class will change greatly.
  */
+
 class CellHandler {
-    constructor(){
+    constructor(h, projector){
+		// props
+		this.h = h;
+		this.projector = projector;
+
         // Instance Props
         this.postscripts = [];
         this.cells = {};
 
         // Bind Instance Methods
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
+		this.connectionClosedView = this.connectionClosedView.bind(this);
         this.handlePostscript = this.handlePostscript.bind(this);
         this.handleMessage = this.handleMessage.bind(this);
 
@@ -28,12 +34,8 @@ class CellHandler {
      * disconnected.
      */
     showConnectionClosed(){
-        document.getElementById("page_root").innerHTML = `
-            <main role="main" class="container">
-              <div class='alert alert-primary center-block mt-5'>
-                Disconnected!
-              </div>
-            </main>`;
+		this.projector.replace(document.getElementById("page_root"),
+			this.connectionClosedView)
     }
 
     /**
@@ -122,7 +124,12 @@ class CellHandler {
         }
 
         if(message.discard !== undefined){
-            this.cells[message.id].remove();
+			// Instead of removing the node we replace with the a
+			// `display:none` style node which effectively removes it
+			// from the DOM
+            this.projector.replace(this.cells[message.id], () => {
+				return h("div", {style: "display:none"}, []); 
+			});
         } else if(message.id !== undefined){
             // A dictionary of ids within the object to replace.
             // Targets are real ids of other objects.
@@ -144,6 +151,7 @@ class CellHandler {
                 if(this.cells[message.id].parentNode === null){
                     this.cells["holding_pen"].appendChild(this.cells[message.id]);
                 }
+
                 this.cells[message.id].parentNode.replaceChild(
                     element,
                     this.cells[message.id]
@@ -171,6 +179,7 @@ class CellHandler {
 
                 if(target != null){
                     target.parentNode.replaceChild(source, target);
+					// this.projector.replace(source, () => {return h(target)});
                 } else {
                     debugger;
                     console.log("In message ", message, " couldn't find ", replacementKey);
@@ -194,5 +203,17 @@ class CellHandler {
         let element = document.createElement("div");
         element.innerHTML = html;
         return element.children[0];
+    }
+
+    /**
+     * Helper function that generates the vdom Node for
+	 * to be display when connection closes
+     */
+    connectionClosedView(){
+		return this.h("main.container", {role: "main"}, [
+			this.h("div", {class: "alert alert-primary center-block mt-5"}, [
+				"Disconnected"
+			])
+		])
     }
 }
