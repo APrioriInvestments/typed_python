@@ -1,9 +1,7 @@
-numpy
-flask
-boto3
 beautifulsoup4
+boto3
 flask
-flask_cors
+flask-cors
 flask-login
 flask-sockets
 flask-wtf
@@ -15,8 +13,8 @@ nose
 numpy
 psutil
 pytz
+py_w3c
 pyyaml
 redis
 requests
 websockets
-py_w3c

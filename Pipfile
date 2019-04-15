@@ -4,30 +4,31 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-nose = "*"
-flake8 = "*"
 autopep8 = "*"
 beautifulsoup4 = "*"
+flake8 = "*"
+nose = "*"
 py_w3c = "*"
 
 [packages]
-redis = "*"
+boto3 = "*"
+flask = "*"
+flask-cors = "*"
+flask-login = "*"
+flask-sockets = "*"
+flask-wtf = "*"
 gevent = "*"
+ldap3 = "*"
+llvmlite = "*"
 lz4 = "*"
 numpy = "*"
 psutil = "*"
-flask-sockets = "*"
-flask-cors = "*"
+pytz = "*"
+pyyaml = "*"
+redis = "*"
 requests = "*"
 websockets = "*"
-llvmlite = "*"
 nativepython = {editable = true,path = "."}
-boto3 = "*"
-pyyaml = "*"
-ldap3 = "*"
-flask-login = "*"
-flask-wtf = "*"
-pytz = "*"
 
 [requires]
 python_version = "3.6"
