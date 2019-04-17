@@ -172,7 +172,6 @@ class CellHandler {
                 if(target != null){
                     target.parentNode.replaceChild(source, target);
                 } else {
-                    debugger;
                     console.log("In message ", message, " couldn't find ", replacementKey);
                 }
             });
