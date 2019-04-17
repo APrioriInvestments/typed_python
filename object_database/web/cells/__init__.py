@@ -56,6 +56,7 @@ from object_database.web.cells.cells import (
     Sheet,
     Plot,
     _PlotUpdater,
+    AsyncDropdown
 )
 
 from object_database.web.cells.CellsTestMixin import CellsTestMixin
