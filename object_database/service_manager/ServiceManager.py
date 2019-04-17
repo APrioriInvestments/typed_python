@@ -312,12 +312,11 @@ class ServiceManager(object):
                     return h
 
     def _updateService(self, service, actual_records):
-        service.unbootable_count = 0
-
         while service.effectiveTargetCount() > len(actual_records):
             host = self._pickHost(service)
             if not host:
-                service.unbootable_count = service.effectiveTargetCount() - len(actual_records)
+                if service.unbootable_count != service.effectiveTargetCount() - len(actual_records):
+                    service.unbootable_count = service.effectiveTargetCount() - len(actual_records)
                 return
             else:
                 host.gbRamUsed = host.gbRamUsed + service.gbRamUsed
@@ -331,6 +330,9 @@ class ServiceManager(object):
             )
 
             actual_records.append(instance)
+
+        if service.unbootable_count:
+            service.unbootable_count = 0
 
         while service.effectiveTargetCount() < len(actual_records):
             sInst = actual_records.pop()

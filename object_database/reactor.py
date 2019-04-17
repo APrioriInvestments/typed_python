@@ -228,6 +228,7 @@ class Reactor:
                 seenKeys.update(view._indexReads)
 
             with ViewWatcher(onViewClose):
+                logging.getLogger(__name__).info("Reactor %s recalculating", self.reactorFunction)
                 functionResult = self.reactorFunction()
 
             if hadWrites[0]:
