@@ -23,6 +23,11 @@ import pytz
 import lz4.frame
 import logging
 
+try:
+    from google.protobuf.message import Message as GoogleProtobufMessage
+except ImportError:
+    GoogleProtobufMessage = None
+
 _reconstruct = numpy.array([1, 2, 3]).__reduce__()[0]
 _ndarray = numpy.ndarray
 
@@ -201,6 +206,8 @@ class SerializationContext(object):
             @param inst: an instance to be serialized
             @return a representation object or None
         '''
+        if GoogleProtobufMessage is not None and isinstance(inst, GoogleProtobufMessage):
+            return (type(inst), (), inst.SerializeToString())
 
         if isinstance(inst, type):
             isTF = isTypeFunctionType(inst)
@@ -260,6 +267,10 @@ class SerializationContext(object):
         return None
 
     def setInstanceStateFromRepresentation(self, instance, representation):
+        if GoogleProtobufMessage is not None and isinstance(instance, GoogleProtobufMessage):
+            instance.ParseFromString(representation)
+            return True
+
         if isinstance(instance, datetime.datetime):
             return True
 
