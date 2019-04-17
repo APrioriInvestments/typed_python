@@ -1456,6 +1456,69 @@ class Dropdown(Cell):
         fun = self.headersAndLambdas[msgFrame['ix']][1]
         fun()
 
+class AsyncDropdown(Cell):
+    def __init__(self, contentCellFunc):
+        super().__init__()
+        self.slot = Slot(False)
+        self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc)
+        self.children = {'____contents__': self.contentCell}
+
+    def recalculate(self):
+        inlinescript = self.getInlineScript()
+        self.contents = str(
+            HTMLElement.div()
+            .add_class('btn-group')
+            .with_children(
+                HTMLElement.a()
+                .add_classes(['btn', 'btn-xs', 'btn-outline-secondary'])
+                .add_child(HTMLTextContent('TITLE')),
+
+                HTMLElement.button()
+                .add_classes(['btn', 'btn-xs',
+                              'btn-outline-secondary',
+                              'dropdown-toggle',
+                              'dropdown-toggle-split'])
+                .set_attribute('type', 'button')
+                .set_attribute('id', '%s-dropdownMenuButton' % self.identity)
+                .set_attribute('data-toggle', 'dropdown')
+                .set_attribute('onclick', inlinescript),
+
+                HTMLTextContent('____contents__')
+            )
+        )
+
+    def getInlineScript(self):
+       template = """
+        cellSocket.sendString(JSON.stringify({'event': 'dropdown', 'target_cell': '__target__',
+        'isOpen': __is_open__}))
+        """
+       template = template.replace('__target__', self.identity)
+       return template.replace('__is_open__', str(self.slot.get()).lower())
+
+    def onMessage(self, messageFrame):
+        self._logger.info(messageFrame)
+        if messageFrame['event'] == 'dropdown':
+            if messageFrame['isOpen']:
+                self.slot.set(False)
+            else:
+                self.slot.set(True)
+
+class AsyncDropdownContent(Cell):
+    def __init__(self, slot, contentFunc):
+        super().__init__()
+        self.loadingCell = Text("Loading")
+        self.contentCell = Subscribed(lambda: contentFunc() if slot.get() else self.loadingCell)
+        self.children = {
+            '____contents__': self.contentCell
+        }
+
+    def recalculate(self):
+        elementId = ('dropdownContent-%s' % self.identity)
+        self.contents = str(
+            HTMLElement.div()
+            .set_attribute('id', elementId)
+            .add_class('dropdown-menu')
+            .add_child(HTMLTextContent('____contents__')))
 
 class Container(Cell):
     def __init__(self, child=None):
