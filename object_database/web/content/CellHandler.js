@@ -19,6 +19,7 @@ class CellHandler {
         // Instance Props
         this.postscripts = [];
         this.cells = {};
+		this.DOMParser = new DOMParser();
 
         // Bind Instance Methods
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
@@ -181,7 +182,6 @@ class CellHandler {
                     target.parentNode.replaceChild(source, target);
 					// this.projector.replace(source, () => {return h(target)});
                 } else {
-                    debugger;
                     console.log("In message ", message, " couldn't find ", replacementKey);
                 }
             });
@@ -202,6 +202,7 @@ class CellHandler {
     htmlToDomEl(html){
         let element = document.createElement("div");
         element.innerHTML = html;
+		this.htmlToVDomEl(html);
         return element.children[0];
     }
 
@@ -216,4 +217,42 @@ class CellHandler {
 			])
 		])
     }
+
+    /**
+     * Helper function that takes some incoming
+     * HTML string and returns a maquette hyperscript
+	 * VDOM element from it.
+	 * This uses the internal browser DOMparser() to generate the html
+	 * structure from the raw string and then recursively build the 
+	 * VDOM element
+     * @param {string} html - The markup to
+     * transform into a real element.
+     */
+    htmlToVDomEl(html){
+		let dom = this.DOMParser.parseFromString(html, "text/html")
+        let element = dom.body.children[0];
+        return this._domElToVdomEl(element);
+    }
+
+	_domElToVdomEl(domEl) {
+		let tagName = domEl.tagName.toLocaleLowerCase();
+		let attrs = {}
+		let index;
+		for (index = 0; index < domEl.attributes.length; index++){
+			let item = domEl.attributes.item(index)
+			attrs[item.name] = item.value;
+		}
+
+		if (domEl.childElementCount === 0) {
+			return h(tagName, attrs, [domEl.textContent])
+		}
+		
+		let children = [];
+		for (index = 0; index < domEl.children.length; index++){
+			let child = domEl.children[index]
+			children.push(this._domElToVdomEl(child));
+		}
+		return h(tagName, attrs, children);
+	}
+
 }
