@@ -70,7 +70,6 @@ from py_w3c.validators.html.validator import HTMLValidator
 import logging
 import unittest
 import threading
-import time
 
 test_schema = Schema("core.web.test")
 
@@ -791,6 +790,7 @@ class CellsTests(unittest.TestCase):
         open state.
         """
         changedCell = Text("Changed")
+
         def handler():
             return changedCell
 
