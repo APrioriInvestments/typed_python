@@ -306,7 +306,7 @@ class DropdownTestService(ServiceBase):
 
     @staticmethod
     def delayAndDisplay():
-        time.sleep(3)
+        time.sleep(1)
         return Text('NOW WE HAVE LOADED')
 
 happy = Schema("core.test.happy")
