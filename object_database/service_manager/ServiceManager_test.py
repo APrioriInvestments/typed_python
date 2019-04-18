@@ -309,7 +309,10 @@ class DropdownTestService(ServiceBase):
         time.sleep(1)
         return Text('NOW WE HAVE LOADED')
 
+
 happy = Schema("core.test.happy")
+
+
 @happy.define
 class Happy:
     i = int

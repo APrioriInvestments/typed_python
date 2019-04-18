@@ -1456,6 +1456,7 @@ class Dropdown(Cell):
         fun = self.headersAndLambdas[msgFrame['ix']][1]
         fun()
 
+
 class AsyncDropdown(Cell):
     """A Bootstrap-styled Dropdown Cell
 
@@ -1523,18 +1524,18 @@ class AsyncDropdown(Cell):
         )
 
     def getInlineScript(self):
-       """Binds a specific call to the JS
-       side `cellHandler` who now has a
-       special method for dealing with initial
-       dropdown events. We dynamically pass the
-       Cell identity as the arg and add this as
-       an `onclick` inline method to the
-       Dropdown's `button` element
-       """
-       template = """
-       cellHandler.dropdownInitialBindFor('__target__')
-       """.replace('__target__', self.identity)
-       return template
+        """Binds a specific call to the JS
+        side `cellHandler` who now has a
+        special method for dealing with initial
+        dropdown events. We dynamically pass the
+        Cell identity as the arg and add this as
+        an `onclick` inline method to the
+        Dropdown's `button` element
+        """
+        template = """
+        cellHandler.dropdownInitialBindFor('__target__')
+        """.replace('__target__', self.identity)
+        return template
 
     def onMessage(self, messageFrame):
         """On `dropdown` events sent to this
@@ -1543,6 +1544,7 @@ class AsyncDropdown(Cell):
         """
         if messageFrame['event'] == 'dropdown':
             self.slot.set(not messageFrame['isOpen'])
+
 
 class AsyncDropdownContent(Cell):
     """A dynamic content cell designed for use
@@ -1609,6 +1611,7 @@ class AsyncDropdownContent(Cell):
             .set_attribute('id', elementId)
             .add_child(HTMLTextContent(str(self.identity)))
             .add_child(HTMLTextContent('____contents__')))
+
 
 class Container(Cell):
     def __init__(self, child=None):
