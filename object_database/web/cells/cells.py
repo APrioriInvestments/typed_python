@@ -1457,7 +1457,38 @@ class Dropdown(Cell):
         fun()
 
 class AsyncDropdown(Cell):
+    """A Bootstrap-styled Dropdown Cell
+
+    whose dropdown-menu contents can be loaded
+    asynchronously each time the dropdown is opened.
+
+    Example
+    -------
+    The following dropdown will display a
+    Text cell that displays "LOADING" for
+    a second before switching to a different
+    Text cell that says "NOW CONTENT HAS LOADED"::
+        def someDisplayMethod():
+            def delayAndDisplay():
+                time.sleep(1)
+                return Text('NOW CONTENT HAS LOADED')
+
+            return Card(
+                AsyncDropdown(delayAndDisplay)
+            )
+
+    """
     def __init__(self, contentCellFunc):
+        """
+        Parameters
+        ----------
+        contentCellFunc: Function or Lambda
+            A lambda or function that will
+            return a Cell to display asynchronously.
+            Usually some computation that takes time
+            is performed first, then the Cell gets
+            returned
+        """
         super().__init__()
         self.slot = Slot(False)
         self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc)
@@ -1471,7 +1502,7 @@ class AsyncDropdown(Cell):
             .with_children(
                 HTMLElement.a()
                 .add_classes(['btn', 'btn-xs', 'btn-outline-secondary'])
-                .add_child(HTMLTextContent('TITLE')),
+                .add_child(HTMLTextContent('%s' % self.identity)),
 
                 HTMLElement.button()
                 .add_classes(['btn', 'btn-xs',
@@ -1481,43 +1512,102 @@ class AsyncDropdown(Cell):
                 .set_attribute('type', 'button')
                 .set_attribute('id', '%s-dropdownMenuButton' % self.identity)
                 .set_attribute('data-toggle', 'dropdown')
-                .set_attribute('onclick', inlinescript),
+                .set_attribute('onclick', inlinescript)
+                .set_attribute('data-firstclick', 'true'),
 
-                HTMLTextContent('____contents__')
+                HTMLElement.div()
+                .set_attribute('id', '%s-dropdownContentWrapper')
+                .add_classes(['dropdown-menu'])
+                .add_child(HTMLTextContent('____contents__'))
             )
         )
 
     def getInlineScript(self):
+       """Binds a specific call to the JS
+       side `cellHandler` who now has a
+       special method for dealing with initial
+       dropdown events. We dynamically pass the
+       Cell identity as the arg and add this as
+       an `onclick` inline method to the
+       Dropdown's `button` element
+       """
        template = """
-        cellSocket.sendString(JSON.stringify({'event': 'dropdown', 'target_cell': '__target__',
-        'isOpen': __is_open__}))
-        """
-       template = template.replace('__target__', self.identity)
-       return template.replace('__is_open__', str(self.slot.get()).lower())
+       cellHandler.dropdownInitialBindFor('__target__')
+       """.replace('__target__', self.identity)
+       return template
 
     def onMessage(self, messageFrame):
-        self._logger.info(messageFrame)
+        """On `dropdown` events sent to this
+        Cell over the socket, we will be told
+        whether the dropdown menu is open or not
+        """
         if messageFrame['event'] == 'dropdown':
-            if messageFrame['isOpen']:
-                self.slot.set(False)
-            else:
-                self.slot.set(True)
+            self.slot.set(not messageFrame['isOpen'])
 
 class AsyncDropdownContent(Cell):
+    """A dynamic content cell designed for use
+
+    inside of a parent `AsyncDropdown` Cell.
+
+    Notes
+    -----
+    This Cell should only be used by `AsyncDropdown`.
+
+    Because of the nature of slots and rendering,
+    we needed to decompose the actual Cell that
+    is dynamically updated using `Subscribed` into
+    a separate unit from `AsyncDropdown`.
+
+    Without this separate decomposition,
+    the entire Cell would be replaced on
+    the front-end, meaning the drawer would never open
+    or close since Dropdowns render closed initially.
+    """
     def __init__(self, slot, contentFunc):
+        """
+        Parameters
+        ----------
+        slot: Slot
+            A slot that contains a Boolean value
+            that tells this cell whether it is in
+            the open or closed state on the front
+            end. Changes are used to update the
+            loading of dynamic Cells to display
+            on open.
+        contentFunc: Function or Lambda
+            A function or lambda that will return
+            a Cell to display. Will be called whenever
+            the Dropdown is opened. This gets passed
+            from the parent `AsyncDropdown`
+        """
         super().__init__()
+        self.slot = slot
+        self.contentFunc = contentFunc
         self.loadingCell = Text("Loading")
-        self.contentCell = Subscribed(lambda: contentFunc() if slot.get() else self.loadingCell)
+        self.contentCell = Subscribed(self.changeHandler)
         self.children = {
             '____contents__': self.contentCell
         }
+
+    def changeHandler(self):
+        """If the slot is true, the
+        dropdown is open and we call the
+        `contentFunc` to get something to
+        display. Until then, we show the
+        Loading message.
+        """
+        slotState = self.slot.get()
+        if slotState:
+            return self.contentFunc()
+        else:
+            return self.loadingCell
 
     def recalculate(self):
         elementId = ('dropdownContent-%s' % self.identity)
         self.contents = str(
             HTMLElement.div()
             .set_attribute('id', elementId)
-            .add_class('dropdown-menu')
+            .add_child(HTMLTextContent(str(self.identity)))
             .add_child(HTMLTextContent('____contents__')))
 
 class Container(Cell):
