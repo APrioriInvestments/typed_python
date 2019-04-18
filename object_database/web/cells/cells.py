@@ -1516,7 +1516,7 @@ class AsyncDropdown(Cell):
                 .set_attribute('data-firstclick', 'true'),
 
                 HTMLElement.div()
-                .set_attribute('id', '%s-dropdownContentWrapper')
+                .set_attribute('id', '%s-dropdownContentWrapper' % self.identity)
                 .add_classes(['dropdown-menu'])
                 .add_child(HTMLTextContent('____contents__'))
             )
