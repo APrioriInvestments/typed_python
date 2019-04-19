@@ -20,6 +20,7 @@ from object_database.web.cells import (
     Card,
     CardTitle,
     Cells,
+    CircleLoader,
     Clickable,
     Code,
     CodeEditor,
@@ -444,7 +445,7 @@ class CellsHTMLTests(unittest.TestCase):
         def handler():
             return Text("RESULT")
 
-        cell = AsyncDropdown(handler)
+        cell = AsyncDropdown('Untitled', handler)
         cell.cells = self.cells
 
         # Initial render
@@ -457,12 +458,19 @@ class CellsHTMLTests(unittest.TestCase):
         def handler():
             return Text("RESULT")
 
-        cell = AsyncDropdown(handler)
+        cell = AsyncDropdown('Untitled', handler)
         cell.cells = self.cells
 
         # Async changed render
         cell.recalculate()
         cell.slot.set(True)
+        html = cell.contents
+        self.assertHTMLNotEmpty(html)
+        self.assertHTMLValid(html)
+
+    def test_circle_loeader_html_valid(self):
+        cell = CircleLoader()
+        cell.recalculate()
         html = cell.contents
         self.assertHTMLNotEmpty(html)
         self.assertHTMLValid(html)
@@ -794,7 +802,7 @@ class CellsTests(unittest.TestCase):
         def handler():
             return changedCell
 
-        dropdown = AsyncDropdown(handler)
+        dropdown = AsyncDropdown('Untitled', handler)
         dropdown.contentCell.loadingCell = Text("INITIAL")
         self.cells.withRoot(dropdown)
         self.cells.renderMessages()

@@ -1457,6 +1457,20 @@ class Dropdown(Cell):
         fun()
 
 
+class CircleLoader(Cell):
+    """A simple circular loading indicator
+    """
+    def __init__(self):
+        super().__init__()
+
+    def recalculate(self):
+        self.contents = str(
+            HTMLElement.div()
+            .add_class('spinner-grow')
+            .set_attribute('role', 'status')
+        )
+
+
 class AsyncDropdown(Cell):
     """A Bootstrap-styled Dropdown Cell
 
@@ -1479,20 +1493,29 @@ class AsyncDropdown(Cell):
             )
 
     """
-    def __init__(self, contentCellFunc):
+    def __init__(self, labelText, contentCellFunc, loadingIndicatorCell=None):
         """
         Parameters
         ----------
+        labelText: String
+            A label for the dropdown
         contentCellFunc: Function or Lambda
             A lambda or function that will
             return a Cell to display asynchronously.
             Usually some computation that takes time
             is performed first, then the Cell gets
             returned
+        loadingIndicatorCell: Cell
+            A cell that will be displayed while
+            the content of the contentCellFunc is
+            loading. Defaults to CircleLoader.
         """
         super().__init__()
         self.slot = Slot(False)
-        self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc)
+        self.labelText = labelText
+        if not loadingIndicatorCell:
+            loadingIndicatorCell = CircleLoader()
+        self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc, loadingIndicatorCell)
         self.children = {'____contents__': self.contentCell}
 
     def recalculate(self):
@@ -1503,7 +1526,7 @@ class AsyncDropdown(Cell):
             .with_children(
                 HTMLElement.a()
                 .add_classes(['btn', 'btn-xs', 'btn-outline-secondary'])
-                .add_child(HTMLTextContent('%s' % self.identity)),
+                .add_child(HTMLTextContent(self.labelText)),
 
                 HTMLElement.button()
                 .add_classes(['btn', 'btn-xs',
@@ -1565,7 +1588,7 @@ class AsyncDropdownContent(Cell):
     the front-end, meaning the drawer would never open
     or close since Dropdowns render closed initially.
     """
-    def __init__(self, slot, contentFunc):
+    def __init__(self, slot, contentFunc, loadingIndicatorCell):
         """
         Parameters
         ----------
@@ -1581,11 +1604,14 @@ class AsyncDropdownContent(Cell):
             a Cell to display. Will be called whenever
             the Dropdown is opened. This gets passed
             from the parent `AsyncDropdown`
+        loadingIndicatorCell: Cell
+            A Cell that will be displayed while
+            the content from contentFunc is loading
         """
         super().__init__()
         self.slot = slot
         self.contentFunc = contentFunc
-        self.loadingCell = Text("Loading")
+        self.loadingCell = loadingIndicatorCell
         self.contentCell = Subscribed(self.changeHandler)
         self.children = {
             '____contents__': self.contentCell
@@ -1609,7 +1635,6 @@ class AsyncDropdownContent(Cell):
         self.contents = str(
             HTMLElement.div()
             .set_attribute('id', elementId)
-            .add_child(HTMLTextContent(str(self.identity)))
             .add_child(HTMLTextContent('____contents__')))
 
 
