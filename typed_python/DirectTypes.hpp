@@ -628,7 +628,7 @@ public:
         getType()->constructor((instance_ptr)&mLayout);
     }
 
-    ~OneOf() {
+    ~OneOf<T1, Ts...>() {
         getType()->destroy((instance_ptr)&mLayout);
     }
 
