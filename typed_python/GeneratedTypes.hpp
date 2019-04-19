@@ -306,7 +306,7 @@ public:
             [](instance_ptr p) {BinOp_Type->constructor(p);});
     }
     Bexpress_BinOp( const Bexpress& left1,  const String& op1,  const Bexpress& right1) {
-        Bexpress_BinOp(); 
+        Bexpress_BinOp();
         left() = left1;
         op() = op1;
         right() = right1;
