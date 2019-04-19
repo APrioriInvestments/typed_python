@@ -475,15 +475,15 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    OneOf() {
+    OneOf<T1, Ts...>() {
         getType()->constructor((instance_ptr)&mLayout);
     }
 
-    ~OneOf() {
+    ~OneOf<T1, Ts...>() {
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    OneOf(const OneOf& other)
+    OneOf<T1, Ts...>(const OneOf<T1, Ts...>& other)
     {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
@@ -491,14 +491,14 @@ public:
                );
     }
 
-    OneOf(OneOf<T1, Ts...>::layout* l) {
+    OneOf<T1, Ts...>(OneOf<T1, Ts...>::layout* l) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&l
                );
     }
 
-    OneOf& operator=(const OneOf& other)
+    OneOf<T1, Ts...>& operator=(const OneOf<T1, Ts...>& other)
     {
         getType()->assign(
                (instance_ptr)&mLayout,
