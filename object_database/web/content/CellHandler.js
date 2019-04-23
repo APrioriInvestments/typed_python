@@ -167,7 +167,6 @@ class CellHandler {
 				}
 			}
             this.cells[message.id] = velement;
-		}
 
             // Now wire in replacements 
             Object.keys(replacements).forEach((replacementKey, idx) => {
