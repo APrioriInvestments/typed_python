@@ -124,13 +124,25 @@ class CellHandler {
             this.cells["holding_pen"] = document.getElementById("holding_pen");
         }
 
+		// With the exception of `page_root` and `holding_pen` id nodes, all
+		// elements in this.cells are virtual. Dependig on whether we are adding a
+		// new node, or manipulating an existing, we neeed to work with the underlying
+		// DOM node. Hence if this.cell[message.id] is a vdom element we use its 
+		// underlying domNode element when in operations like this.projector.replace()
+		let cell = this.cells[message.id];
+		if (cell !== undefined && cell.domNode !== undefined) {
+			cell = cell.domNode;
+		}
+
         if(message.discard !== undefined){
 			// Instead of removing the node we replace with the a
 			// `display:none` style node which effectively removes it
 			// from the DOM
-            this.projector.replace(this.cells[message.id], () => {
-				return h("div", {style: "display:none"}, []); 
-			});
+			if (cell.parentNode !== null) {
+				this.projector.replace(cell, () => {
+					return h("div", {style: "display:none"}, []); 
+				});
+			}
         } else if(message.id !== undefined){
             // A dictionary of ids within the object to replace.
             // Targets are real ids of other objects.
@@ -138,7 +150,7 @@ class CellHandler {
             let velement = this.htmlToVDomEl(message.contents, message.id);
 
             // Install the element into the dom
-            if(this.cells[message.id] === undefined){
+            if(cell === undefined){
                 // This is a totally new node.
                 // For the moment, add it to the
                 // holding pen.
@@ -148,14 +160,14 @@ class CellHandler {
                 // Replace the existing copy of
                 // the node with this incoming
                 // copy.
-                if(this.cells[message.id].parentNode === null){
+                if(cell.parentNode === null){
 					this.projector.append(this.cells["holding_pen"], () => {return velement})
-
-                }
-				this.projector.replace(this.cells[message.id], () => {return velement})
-				this.projector.scheduleRender();
-                this.cells[message.id] = velement;
-            }
+                } else {
+					this.projector.replace(cell, () => {return velement})
+				}
+			}
+            this.cells[message.id] = velement;
+		}
 
             // Now wire in replacements 
             Object.keys(replacements).forEach((replacementKey, idx) => {
@@ -175,7 +187,6 @@ class CellHandler {
 
                 if(target != null){
 					this.projector.replace(target, () => {return source});
-					this.projector.scheduleRender();
                 } else {
                     console.log("In message ", message, " couldn't find ", replacementKey);
                 }
