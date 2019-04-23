@@ -135,7 +135,6 @@ class CellHandler {
             // A dictionary of ids within the object to replace.
             // Targets are real ids of other objects.
             let replacements = message.replacements;
-            let element = this.htmlToDomEl(message.contents);
             let velement = this.htmlToVDomEl(message.contents, message.id);
 
             // Install the element into the dom
@@ -143,30 +142,22 @@ class CellHandler {
                 // This is a totally new node.
                 // For the moment, add it to the
                 // holding pen.
-                // this.cells["holding_pen"].appendChild(element);
 				this.projector.append(this.cells["holding_pen"], () => {return velement})
-				// this.projector.renderNow();
                 this.cells[message.id] = velement;
-                // element.id = message.id;
             } else {
                 // Replace the existing copy of
                 // the node with this incoming
                 // copy.
                 if(this.cells[message.id].parentNode === null){
-                    // this.cells["holding_pen"].appendChild(this.cells[message.id]);
 					this.projector.append(this.cells["holding_pen"], () => {return velement})
 
                 }
-                // this.cells[message.id].parentNode.replaceChild(
-                //    element,
-                //    this.cells[message.id]
-                //);
 				this.projector.replace(this.cells[message.id], () => {return velement})
+				this.projector.scheduleRender();
                 this.cells[message.id] = velement;
-                // element.id = message.id;
             }
 
-            // Now wire in its children
+            // Now wire in replacements 
             Object.keys(replacements).forEach((replacementKey, idx) => {
                 let target = document.getElementById(replacementKey);
                 let source = null;
@@ -174,19 +165,17 @@ class CellHandler {
                     // This is actually a new node.
                     // We'll define it later in the
                     // event stream.
-                    this.cells[replacements[replacementKey]] = document.createElement("div");
-                    source = this.cells[replacements[replacementKey]];
-                    source.id = replacements[replacementKey];
+					source = this.h("div", {id: replacementKey}, [])
+                    this.cells[replacements[replacementKey]] = source; 
 					this.projector.append(this.cells["holding_pen"], () => {return source})
-                    // this.cells["holding_pen"].appendChild(source);
                 } else {
                     // Not a new node
                     source = this.cells[replacements[replacementKey]];
                 }
 
                 if(target != null){
-                    // target.parentNode.replaceChild(source, target);
 					this.projector.replace(target, () => {return source});
+					this.projector.scheduleRender();
                 } else {
                     console.log("In message ", message, " couldn't find ", replacementKey);
                 }
@@ -196,83 +185,6 @@ class CellHandler {
         if(message.postscript !== undefined){
             this.postscripts.push(message.postscript);
         }
-    }
-
-    handleMessageNew(message){
-        if(this.cells["page_root"] == undefined){
-            this.cells["page_root"] = document.getElementById("page_root");
-            this.cells["holding_pen"] = document.getElementById("holding_pen");
-        }
-
-        if(message.discard !== undefined){
-			// Instead of removing the node we replace with the a
-			// `display:none` style node which effectively removes it
-			// from the DOM
-            this.projector.replace(this.cells[message.id], () => {
-				return h("div", {style: "display:none"}, []); 
-			});
-        } else if(message.id !== undefined){
-            // A dictionary of ids within the object to replace.
-            // Targets are real ids of other objects.
-            let replacements = message.replacements;
-            let velement = this.htmlToVDomEl(message.contents);
-
-            // Install the element into the dom
-            if(this.cells[message.id] === undefined){
-                // This is a totally new node.
-                // For the moment, add it to the
-                // holding pen.
-                // this.cells["holding_pen"].appendChild(element);
-				// this.projector.append(this.cells["holding_pen"], () => {return velement})
-                // this.cells[message.id] = element;
-                // element.id = message.id;
-				let ok = 'ok'
-            } else {
-				this.projector.replace(document.getElementById(message.id), () => {return velement});
-            }
-
-            // Now wire in its children
-            Object.keys(replacements).forEach((replacementKey, idx) => {
-                let target = document.getElementById(replacementKey);
-                let source = null;
-                if(this.cells[replacements[replacementKey]] === undefined){
-                    // This is actually a new node.
-                    // We'll define it later in the
-                    // event stream.
-                    this.cells[replacements[replacementKey]] = document.createElement("div");
-                    source = this.cells[replacements[replacementKey]];
-                    source.id = replacements[replacementKey];
-                    this.cells["holding_pen"].appendChild(source);
-                } else {
-                    // Not a new node
-                    source = this.cells[replacements[replacementKey]];
-                }
-
-                if(target != null){
-                    target.parentNode.replaceChild(source, target);
-					// this.projector.replace(source, () => {return h(target)});
-                } else {
-                    console.log("In message ", message, " couldn't find ", replacementKey);
-                }
-            });
-        }
-
-        if(message.postscript !== undefined){
-            this.postscripts.push(message.postscript);
-        }
-    }
-    /**
-     * Helper function that takes some incoming
-     * HTML string and returns a DOM-instantiated
-     * element from it.
-     * @param {string} html - The markup to
-     * transform into a real element.
-     */
-    htmlToDomEl(html){
-        let element = document.createElement("div");
-        element.innerHTML = html;
-		this.htmlToVDomEl(html);
-        return element.children[0];
     }
 
     /**
