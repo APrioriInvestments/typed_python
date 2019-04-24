@@ -42,6 +42,7 @@ class GridLayout():
             styles.add_style('display', 'grid')
 
         self._make_row_style_on(styles)
+        self._make_column_style_on(styles)
         return styles
 
     def _make_row_style_on(self, styles):
@@ -62,7 +63,7 @@ class GridLayout():
                 stream.write("repeat({}, {}) ".format(track_val[1], track_val[0]))
             else:
                 stream.write("{} ".format(track_val[0]))
-        styles.add_style('grid-template-columns')
+        styles.add_style('grid-template-columns', stream.getvalue().rstrip())
 
     @staticmethod
     def _counted_list_for(main_list):

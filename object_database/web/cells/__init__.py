@@ -60,8 +60,6 @@ from object_database.web.cells.cells import (
     ColorCell
 )
 
-from object_database.web.cells import *
-
 from object_database.web.cells.CellsTestMixin import CellsTestMixin
 
 from object_database.web.cells.util import waitForCellsCondition

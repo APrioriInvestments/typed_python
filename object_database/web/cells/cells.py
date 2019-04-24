@@ -3104,7 +3104,7 @@ class ColorCell(Cell):
         self.color = color
 
     def recalculate(self):
-        return str(
+        self.contents = str(
             HTMLElement.div()
             .set_attribute('style', 'background-color:%s;' % self.color)
             .add_classes(['cell', 'color-cell'])
