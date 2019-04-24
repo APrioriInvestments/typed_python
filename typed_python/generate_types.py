@@ -8,7 +8,7 @@ def gen_named_tuple_type(name, **kwargs):
     items = kwargs.items()
     keys = kwargs.keys()
     revkeys = list(keys)[::-1]
-    ret = []
+    ret = list()
     ret.append(f'// Generated NamedTuple {name}')
     for key, value in items:
         ret.append(f'//    {key}={value}')
@@ -80,7 +80,7 @@ def gen_named_tuple_type(name, **kwargs):
     ret.append('    static Type* getType() {')
     ret.append(f'        static Type* t = {name}::getType();')
     ret.append('        if (t->bytecount() != bytecount) {')
-    ret.append('            throw std::runtime_error("somehow we have the wrong bytecount!");')
+    ret.append(f'            throw std::runtime_error("{name} somehow we have the wrong bytecount!");')
     ret.append('        }')
     ret.append('        return t;')
     ret.append('    }')
@@ -92,15 +92,31 @@ def gen_named_tuple_type(name, **kwargs):
     return [e + '\n' for e in ret]
 
 
+def return_type(set_of_types):
+    list_of_types = list(set_of_types)
+    if len(list_of_types) == 0:
+        return 'None'  # shouldn't happen
+    if len(list_of_types) == 1:
+        return list_of_types[0]
+    return 'OneOf<' + ','.join(list_of_types) + '>'
+
+
 # d is dictionary subtype->named_tuple,
 # where named_tuple is represented as [(param, type),...]
 def gen_alternative_type(name, d):
     nts = d.keys()
-    ret = []
-    ret.append(f'// Generated Alternative {name}')
-    ret.append(f'//    {name}=')
+    members = dict()  # set of possible types for each member
     for nt in nts:
-        ret.append('//   {}=({})'.format(nt, ", ".join([f'{a}={t}' for a, t in d[nt]])))
+        for a, t in d[nt]:
+            rt = resolved(t)
+            if a in members:
+                members[a].add(rt)
+            else:
+                members[a] = {rt}
+    ret = list()
+    ret.append(f'// Generated Alternative {name}=')
+    for nt in nts:
+        ret.append('//     {}=({})'.format(nt, ", ".join([f'{a}={resolved(t)}' for a, t in d[nt]])))
     ret.append('')
     for nt in nts:
         ret.append(f'class {name}_{nt};')
@@ -114,25 +130,18 @@ def gen_alternative_type(name, d):
     ret.append('')
     for nt in nts:
         ret.append(f'    static NamedTuple* {nt}_Type;')
-        for a, t in d[nt]:
-            ret.append(f'    typedef {t} {nt}_{a}_type;')
-        for i, (a, _) in enumerate(d[nt]):
-            ret.append(f'    static const int {nt}_size{i+1} = sizeof({nt}_{a}_type);')
     ret.append('')
-    ret.append('    static Alternative* getType() {')
-    ret.append(f'        static Alternative* t = Alternative::Make("{name}", {{')
-    ret.append(f',\n'.join([f'            {{"{nt}", {nt}_Type}}' for nt in nts]))
-    ret.append('        }, {});')
-    ret.append('        return t;')
-    ret.append('    }')
-    ret.append(f'    ~{name}();')
-    ret.append(f'    {name}(); // only if the whole alternative is default initializable')
-    ret.append(f'    {name}(const {name}& in);')
-    ret.append(f'    {name}& operator=(const {name}& other);')
+    ret.append('    static Alternative* getType();')
+    ret.append(f'    ~{name}() {{ getType()->destroy((instance_ptr)&mLayout); }}')
+    ret.append(f'    {name}() {{ getType()->constructor((instance_ptr)&mLayout); }}')
+    ret.append(f'    {name}(const {name}& in) '
+               '{ getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }')
+    ret.append(f'    {name}& operator=(const {name}& other) '
+               '{ getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }')
     ret.append('')
     for nt in nts:
         ret.append(f'    static {name} {nt}('
-                   + ", ".join([f'{nt}_{a}_type {a}' for a, _ in d[nt]])
+                   + ", ".join([f'const {resolved(t)}& {a}' for a, t in d[nt]])
                    + ');')
     ret.append('')
     ret.append('    e::kind which() const { return (e::kind)mLayout->which; }')
@@ -146,21 +155,57 @@ def gen_alternative_type(name, d):
     for nt in nts:
         ret.append(f'    bool is{nt}() const {{ return which() == e::{nt}; }}')
     ret.append('')
-    ret.append('    // Accessors for elements of all subtypes here')
-    ret.append('    // But account for element name overlap and type differences...')
-    for nt in nts:
-        for a, _ in d[nt]:
-            ret.append(f'    // const {nt}_{a}_type& {a}() const {{}}')
-    ret.append('    Alternative::layout* getLayout() const { return mLayout; }')
-    ret.append('private:')
+    ret.append('    // Accessors for members')
+    for m in members:
+        # TODO: support members with multiple potential types
+        m_type = return_type(members[m])
+        ret.append(f'    const {m_type}& {m}() const;')
+    ret.append('')
+    ret.append('protected:')
     ret.append('    Alternative::layout *mLayout;')
+    ret.append('};')
+    ret.append('')
+    ret.append('template <>')
+    ret.append(f'class TypeDetails<{name}*> {{')
+    ret.append('public:')
+    ret.append('    static Type* getType() {')
+    ret.append(f'        static Type* t = new Forward(0, "{name}");')
+    ret.append('        return t;')
+    ret.append('    }')
+    ret.append('    static const uint64_t bytecount = sizeof(void*);')
     ret.append('};')
     ret.append('')
     for nt in nts:
         ret.append(f'NamedTuple* {name}::{nt}_Type = NamedTuple::Make(')
-        ret.append('    {' + ", ".join([f'TypeDetails<{nt}_{a}_type>::getType()' for a, _ in d[nt]]) + '},')
+        ret.append('    {' + ", ".join([f'TypeDetails<{t}>::getType()' for _, t in d[nt]]) + '},')
         ret.append('    {' + ", ".join([f'"{a}"' for a, _ in d[nt]]) + '}')
         ret.append(');')
+        ret.append('')
+    ret.append('// static')
+    ret.append(f'Alternative* {name}::getType() {{')
+    ret.append(f'    static Alternative* t = Alternative::Make("{name}", {{')
+    ret.append(f',\n'.join([f'        {{"{nt}", {nt}_Type}}' for nt in nts]))
+    ret.append('    }, {});')
+    for nt in nts:
+        for _, t in d[nt]:
+            if t.endswith('*'):
+                ret.append(f'    {nt}_Type->directResolveForward(TypeDetails<{name}*>::getType(), t);')
+                break
+    ret.append('    return t;')
+    ret.append('}')
+    ret.append('')
+    ret.append('template <>')
+    ret.append(f'class TypeDetails<{name}> {{')
+    ret.append('public:')
+    ret.append('    static Type* getType() {')
+    ret.append(f'        static Type* t = {name}::getType();')
+    ret.append('        if (t->bytecount() != bytecount) {')
+    ret.append(f'            throw std::runtime_error("{name} somehow we have the wrong bytecount!");')
+    ret.append('        }')
+    ret.append('        return t;')
+    ret.append('    }')
+    ret.append('    static const uint64_t bytecount = sizeof(void*);')
+    ret.append('};')
     ret.append('')
     for nt in nts:
         ret.append(f'class {name}_{nt} : public {name} {{')
@@ -174,71 +219,60 @@ def gen_alternative_type(name, d):
         ret.append('')
         ret.append(f'    {name}_{nt}() {{ ')
         ret.append('        getType()->constructor(')
-        ret.append('            (instance_ptr)getLayout(),')
+        ret.append('            (instance_ptr)&mLayout,')
         ret.append(f'            [](instance_ptr p) {{{nt}_Type->constructor(p);}});')
         ret.append('    }')
         ret.append(f'    {name}_{nt}('
-                   + ", ".join([f'{nt}_{a}_type {a}1' for a, _ in d[nt]])
+                   + ", ".join([f' const {resolved(t)}& {a}1' for a, t in d[nt]])
                    + f') {{')
         ret.append(f'        {name}_{nt}(); ')
         for a, _ in d[nt]:
             ret.append(f'        {a}() = {a}1;')
-        ret.append('     }')
+        ret.append('    }')
         ret.append(f'    {name}_{nt}(const {name}_{nt}& other) {{')
-        ret.append(f'        getType()->copy_constructor((instance_ptr)getLayout(), '
-                   '(instance_ptr)other.getLayout());')
+        ret.append(f'        getType()->copy_constructor((instance_ptr)&mLayout, '
+                   '(instance_ptr)&other.mLayout);')
         ret.append('    }')
         ret.append(f'    {name}_{nt}& operator=(const {name}_{nt}& other) {{')
-        ret.append('         getType()->assign((instance_ptr)getLayout(), (instance_ptr)other.getLayout());')
+        ret.append('         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);')
+        ret.append('         return *this;')
         ret.append('    }')
         ret.append(f'    ~{name}_{nt}() {{')
-        ret.append(f'        getType()->destroy((instance_ptr)getLayout());')
+        ret.append(f'        getType()->destroy((instance_ptr)&mLayout);')
         ret.append('    }')
         ret.append('')
-        for i, (a, _) in enumerate(d[nt]):
-            offset = '' if i == 0 else ' + ' + ' + '.join([f'{nt}_size' + str(j) for j in range(1, i+1)])
-            ret.append(f'    {nt}_{a}_type& {a}() const {{ return *({nt}_{a}_type*)(getLayout()->data{offset}); }}')
+        for i, (a, t) in enumerate(d[nt]):
+            offset = '' if i == 0 else ' + ' + ' + '.join([f'size' + str(j) for j in range(1, i + 1)])
+            ret.append(f'    {resolved(t)}& {a}() const {{ return *({resolved(t)}*)(mLayout->data{offset}); }}')
+        ret.append('private:')
+        for i, (_, t) in list(enumerate(d[nt]))[:-1]:
+            ret.append(f'    static const int size{i + 1} = sizeof({resolved(t)});')
         ret.append('};')
         ret.append('')
-    ret.append('template <>')
-    ret.append(f'class TypeDetails<{name}> {{')
-    ret.append('public:')
-    ret.append('    static Type* getType() {')
-    ret.append(f'        static Type* t = {name}::getType();')
-    ret.append('        if (t->bytecount() != bytecount) {')
-    ret.append('            throw std::runtime_error("somehow we have the wrong bytecount!");')
-    ret.append('        }')
-    ret.append('        return t;')
-    ret.append('    }')
-    ret.append('    static const uint64_t bytecount = sizeof(void*);')
-    ret.append('};')
+        ret.append(f'{name} {name}::{nt}('
+                   + ", ".join([f'const {resolved(t)}& {a}' for a, t in d[nt]])
+                   + ') {')
+        ret.append(f'    return {name}_{nt}('
+                   + ', '.join([a for a, _ in d[nt]])
+                   + ');')
+        ret.append('}')
+        ret.append('')
+    for m in members:
+        m_type = return_type(members[m])
+        ret.append(f'const {m_type}& {name}::{m}() const {{')
+        fallthrough_needed = False
+        for nt in nts:
+            if m in [e[0] for e in d[nt]]:
+                ret.append(f'    if (is{nt}())')
+                ret.append(f'        return (({name}_{nt}*)this)->{m}();')
+            else:
+                fallthrough_needed = True
+        if fallthrough_needed:
+            ret.append(f'    throw std::runtime_error("\\"{name}\\" subtype does not contain \\"{m}\\"");')
+        ret.append('}')
+        ret.append('')
+    ret.append(f'// END Generated Alternative {name}')
     ret.append('')
-    return [e + '\n' for e in ret]
-
-
-fwd_decls = set()
-
-
-def gen_forward_declarations(element_types):
-    ret = []
-    for t in element_types:
-        if t.__typed_python_category__ == 'Forward':
-            forward_type_name = str(t)[8:-2]    # just for now!
-            if forward_type_name not in fwd_decls:
-                fwd_decls.add(forward_type_name)
-                ret.append(f"class {forward_type_name};")
-                ret.append("")
-                ret.append('template <>')
-                ret.append(f'class TypeDetails<{forward_type_name}*> {{')
-                ret.append('public:')
-                ret.append('    static Type* getType() {')
-                ret.append('        static Type* t = PointerTo::Make(Int64::Make());  '
-                           '// forward types are not actually constructed')
-                ret.append('        return t;')
-                ret.append('    }')
-                ret.append('    static const uint64_t bytecount = sizeof(void*);')
-                ret.append('};')
-                ret.append('')
     return [e + '\n' for e in ret]
 
 
@@ -285,10 +319,14 @@ def cpp_type(py_type):
             ', '.join([cpp_type(t) for t in py_type.Types])
         )
     if cat == 'Forward':
-        return str(py_type)[8:-2] + '*'  # just for now! no forward resolution
+        return str(py_type)[8:-2] + '*'  # just for now!
     if cat == 'NamedTuple' or cat == 'Alternative':
         return cpp_type_mapping[py_type]
     return 'undefined_type'
+
+
+def resolved(t):
+    return t[:-1] if t.endswith('*') else t
 
 
 def typed_python_codegen(**kwargs):
@@ -298,17 +336,15 @@ def typed_python_codegen(**kwargs):
             ret += gen_named_tuple_type(k, **{n: cpp_type(t) for n, t in zip(v.ElementNames, v.ElementTypes)})
             cpp_type_mapping[v] = k
         elif v.__typed_python_category__ == 'Alternative':
-            for e in v.__typed_python_alternatives__:
-                ret += gen_forward_declarations(e.ElementType.ElementTypes)
             d = {nt.Name:
                  [(a, cpp_type(t)) for a, t in zip(nt.ElementType.ElementNames, nt.ElementType.ElementTypes)]
-                 for nt in v.__typed_python_alternatives__ }
+                 for nt in v.__typed_python_alternatives__}
             ret += gen_alternative_type(k, d)
             cpp_type_mapping[v] = k
     return ret
 
 
-def GenerateTestTypes(dest):
+def generate_some_types(dest):
     Bexpress = lambda: Bexpress
     Bexpress = Alternative(
         "BooleanExpr",
@@ -327,7 +363,7 @@ def GenerateTestTypes(dest):
     )
     with open(dest, 'w') as f:
         f.writelines(typed_python_codegen(
-            A=Alternative( 'A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str} ),
+            A=Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str}),
             Bexpress=Bexpress,
             NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
             Choice=NamedTuple(A=NamedTuple(X=str, Y=str), B=Bexpress),
@@ -345,7 +381,7 @@ def main(argv):
 
     if args.testTypes:
         try:
-            GenerateTestTypes(args.dest)
+            generate_some_types(args.dest)
         except Exception:
             return 1
     return 0
