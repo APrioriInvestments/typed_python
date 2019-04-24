@@ -32,22 +32,22 @@
 <script src="/content/CellHandler.js"></script>
 
 <script>
-	// This is the initial render function. It is called when "DOMContentLoaded"
-	// event is fired with the actual rendering handled by the maquette.projector
-	// (see below under `document.addEventListener('DOMContentLoaded',...)`
-	// TODO: potentially this should all be moved to CellHandler
-	function render() {
-		return h("div", {}, [
-			h("div", {id: "page_root"}, [
-				h("div.container-fluid", {}, [
-					h("div.card", {class: "mt-5"}, [
-						h("div.card-body", {}, ["Loading..."])
-					])
-				])
-			]),
-			h("div", {id: "holding_pen", style: "display:none"}, [])
-		])
-	}
+ // This is the initial render function. It is called when "DOMContentLoaded"
+ // event is fired with the actual rendering handled by the maquette.projector
+ // (see below under `document.addEventListener('DOMContentLoaded',...)`
+ // TODO: potentially this should all be moved to CellHandler
+ function render() {
+     return h("div", {}, [
+	 h("div", {id: "page_root"}, [
+	     h("div.container-fluid", {}, [
+		 h("div.card", {class: "mt-5"}, [
+		     h("div.card-body", {}, ["Loading..."])
+		 ])
+	     ])
+	 ]),
+	 h("div", {id: "holding_pen", style: "display:none"}, [])
+     ]);
+ }
 </script>
 
 <script>

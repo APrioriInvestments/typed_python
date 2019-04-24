@@ -12,14 +12,14 @@
 
 class CellHandler {
     constructor(h, projector){
-		// props
-		this.h = h;
-		this.projector = projector;
+	// props
+	this.h = h;
+	this.projector = projector;
 
         // Instance Props
         this.postscripts = [];
         this.cells = {};
-		this.DOMParser = new DOMParser();
+	this.DOMParser = new DOMParser();
 
         // Bind Instance Methods
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
@@ -35,8 +35,10 @@ class CellHandler {
      * disconnected.
      */
     showConnectionClosed(){
-		this.projector.replace(document.getElementById("page_root"),
-			this.connectionClosedView)
+	this.projector.replace(
+            document.getElementById("page_root"),
+	    this.connectionClosedView
+        );
     }
 
     /**
@@ -124,25 +126,25 @@ class CellHandler {
             this.cells["holding_pen"] = document.getElementById("holding_pen");
         }
 
-		// With the exception of `page_root` and `holding_pen` id nodes, all
-		// elements in this.cells are virtual. Dependig on whether we are adding a
-		// new node, or manipulating an existing, we neeed to work with the underlying
-		// DOM node. Hence if this.cell[message.id] is a vdom element we use its 
-		// underlying domNode element when in operations like this.projector.replace()
-		let cell = this.cells[message.id];
-		if (cell !== undefined && cell.domNode !== undefined) {
-			cell = cell.domNode;
-		}
+	// With the exception of `page_root` and `holding_pen` id nodes, all
+	// elements in this.cells are virtual. Dependig on whether we are adding a
+	// new node, or manipulating an existing, we neeed to work with the underlying
+	// DOM node. Hence if this.cell[message.id] is a vdom element we use its
+	// underlying domNode element when in operations like this.projector.replace()
+	let cell = this.cells[message.id];
+	if (cell !== undefined && cell.domNode !== undefined) {
+	    cell = cell.domNode;
+	}
 
         if(message.discard !== undefined){
-			// Instead of removing the node we replace with the a
-			// `display:none` style node which effectively removes it
-			// from the DOM
-			if (cell.parentNode !== null) {
-				this.projector.replace(cell, () => {
-					return h("div", {style: "display:none"}, []); 
-				});
-			}
+	    // Instead of removing the node we replace with the a
+	    // `display:none` style node which effectively removes it
+	    // from the DOM
+	    if (cell.parentNode !== null) {
+		this.projector.replace(cell, () => {
+		    return h("div", {style: "display:none"}, []);
+		});
+	    }
         } else if(message.id !== undefined){
             // A dictionary of ids within the object to replace.
             // Targets are real ids of other objects.
@@ -154,21 +156,25 @@ class CellHandler {
                 // This is a totally new node.
                 // For the moment, add it to the
                 // holding pen.
-				this.projector.append(this.cells["holding_pen"], () => {return velement})
+		this.projector.append(this.cells["holding_pen"], () => {
+                    return velement;
+                });
                 this.cells[message.id] = velement;
             } else {
                 // Replace the existing copy of
                 // the node with this incoming
                 // copy.
                 if(cell.parentNode === null){
-					this.projector.append(this.cells["holding_pen"], () => {return velement})
+		    this.projector.append(this.cells["holding_pen"], () => {
+                        return velement;
+                    });
                 } else {
-					this.projector.replace(cell, () => {return velement})
-				}
-			}
+		    this.projector.replace(cell, () => {return velement});
+		}
+	    }
             this.cells[message.id] = velement;
 
-            // Now wire in replacements 
+            // Now wire in replacements
             Object.keys(replacements).forEach((replacementKey, idx) => {
                 let target = document.getElementById(replacementKey);
                 let source = null;
@@ -176,16 +182,20 @@ class CellHandler {
                     // This is actually a new node.
                     // We'll define it later in the
                     // event stream.
-					source = this.h("div", {id: replacementKey}, [])
+		    source = this.h("div", {id: replacementKey}, []);
                     this.cells[replacements[replacementKey]] = source; 
-					this.projector.append(this.cells["holding_pen"], () => {return source})
+		    this.projector.append(this.cells["holding_pen"], () => {
+                        return source;
+                    });
                 } else {
                     // Not a new node
                     source = this.cells[replacements[replacementKey]];
                 }
 
                 if(target != null){
-					this.projector.replace(target, () => {return source});
+		    this.projector.replace(target, () => {
+                        return source;
+                    });
                 } else {
                     console.log("In message ", message, " couldn't find ", replacementKey);
                 }
@@ -199,51 +209,50 @@ class CellHandler {
 
     /**
      * Helper function that generates the vdom Node for
-	 * to be display when connection closes
+     * to be display when connection closes
      */
     connectionClosedView(){
-		return this.h("main.container", {role: "main"}, [
-			this.h("div", {class: "alert alert-primary center-block mt-5"}, [
-				"Disconnected"
-			])
-		])
+	return this.h("main.container", {role: "main"}, [
+	    this.h("div", {class: "alert alert-primary center-block mt-5"}, [
+		"Disconnected"
+	    ])
+	]);
     }
 
     /**
      * Helper function that takes some incoming
      * HTML string and returns a maquette hyperscript
-	 * VDOM element from it.
-	 * This uses the internal browser DOMparser() to generate the html
-	 * structure from the raw string and then recursively build the 
-	 * VDOM element
+     * VDOM element from it.
+     * This uses the internal browser DOMparser() to generate the html
+     * structure from the raw string and then recursively build the 
+     * VDOM element
      * @param {string} html - The markup to
      * transform into a real element.
      */
     htmlToVDomEl(html, id){
-		let dom = this.DOMParser.parseFromString(html, "text/html")
+	let dom = this.DOMParser.parseFromString(html, "text/html");
         let element = dom.body.children[0];
         return this._domElToVdomEl(element, id);
     }
 
-	_domElToVdomEl(domEl, id) {
-		let tagName = domEl.tagName.toLocaleLowerCase();
-		let attrs = {id: id}
-		let index;
-		for (index = 0; index < domEl.attributes.length; index++){
-			let item = domEl.attributes.item(index)
-			attrs[item.name] = item.value.trim();
-		}
-
-		if (domEl.childElementCount === 0) {
-			return h(tagName, attrs, [domEl.textContent])
-		}
-		
-		let children = [];
-		for (index = 0; index < domEl.children.length; index++){
-			let child = domEl.children[index]
-			children.push(this._domElToVdomEl(child));
-		}
-		return h(tagName, attrs, children);
+    _domElToVdomEl(domEl, id) {
+	let tagName = domEl.tagName.toLocaleLowerCase();
+	let attrs = {id: id};
+	let index;
+	for (index = 0; index < domEl.attributes.length; index++){
+	    let item = domEl.attributes.item(index);
+	    attrs[item.name] = item.value.trim();
 	}
 
+	if (domEl.childElementCount === 0) {
+	    return h(tagName, attrs, [domEl.textContent]);
+	}
+
+	let children = [];
+	for (index = 0; index < domEl.children.length; index++){
+	    let child = domEl.children[index];
+	    children.push(this._domElToVdomEl(child));
+	}
+	return h(tagName, attrs, children);
+    }
 }
