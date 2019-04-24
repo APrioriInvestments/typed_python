@@ -2,7 +2,7 @@
 
 # basic socket io setup
 
-from flask import Flask, jsonify  # , render_template
+from flask import Flask  # jsonify , render_template
 from flask_socketio import SocketIO, emit
 
 app = Flask(__name__)
