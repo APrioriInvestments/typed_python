@@ -30,6 +30,10 @@ public:
             m_types(types),
             m_names(names)
     {
+        m_directNeedsResolution = false;
+        for (auto& typePtr: m_types)
+            if (typePtr->getTypeCategory() == catForward)
+                m_directNeedsResolution = true;
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -112,6 +116,15 @@ public:
     const std::vector<std::string>& getNames() const {
         return m_names;
     }
+    void directResolveForward(Type* fwd, Type* target) {
+        if (m_directNeedsResolution) {
+            for (auto& typePtr: m_types)
+                if (typePtr == fwd)
+                    typePtr = target;
+            _forwardTypesMayHaveChanged();
+            m_directNeedsResolution = false;
+        }
+    }
 protected:
     template<class subtype>
     static subtype* MakeSubtype(const std::vector<Type*>& types, const std::vector<std::string>& names) {
@@ -134,6 +147,7 @@ protected:
     std::vector<Type*> m_types;
     std::vector<size_t> m_byte_offsets;
     std::vector<std::string> m_names;
+    bool m_directNeedsResolution;
 };
 
 class NamedTuple : public CompositeType {
