@@ -29,9 +29,8 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
-    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, BasicGrid, ColorCell
 )
-from object_database.web.cells.GridCell import BasicGrid, ColorCell
 
 from object_database import (
     Schema, Indexed, core_schema,

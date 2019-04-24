@@ -56,6 +56,8 @@ from object_database.web.cells.cells import (
     Sheet,
     Plot,
     _PlotUpdater,
+    BasicGrid,
+    ColorCell
 )
 
 from object_database.web.cells import *
