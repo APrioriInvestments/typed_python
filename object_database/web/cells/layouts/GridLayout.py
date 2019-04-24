@@ -1,4 +1,3 @@
-import object_database.web.cells as cells
 from object_database.web.html.styles import StyleAttributes
 from io import StringIO
 
@@ -31,6 +30,10 @@ class GridLayout():
             self.col_mapping = col_mapping
         self.num_columns = num_columns
 
+    def get_style_inline(self):
+        styles = self._make_styles()
+        return styles.as_string()
+
     def _make_styles(self):
         styles = StyleAttributes()
         if self.inline:
@@ -39,6 +42,7 @@ class GridLayout():
             styles.add_style('display', 'grid')
 
         self._make_row_style_on(styles)
+        return styles
 
     def _make_row_style_on(self, styles):
         stream = StringIO()
@@ -49,6 +53,16 @@ class GridLayout():
             else:
                 stream.write("{} ".format(track_val[0]))
         styles.add_style('grid-template-rows', stream.getvalue().rstrip())
+
+    def _make_column_style_on(self, styles):
+        stream = StringIO()
+        counted_list = self._counted_list_for(self.col_mapping)
+        for track_val in counted_list:
+            if track_val[1] > 1:
+                stream.write("repeat({}, {}) ".format(track_val[1], track_val[0]))
+            else:
+                stream.write("{} ".format(track_val[0]))
+        styles.add_style('grid-template-columns')
 
     @staticmethod
     def _counted_list_for(main_list):

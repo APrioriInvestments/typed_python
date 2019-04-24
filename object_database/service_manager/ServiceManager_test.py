@@ -31,6 +31,7 @@ from object_database.web.cells import (
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
     Sheet, ensureSubscribedType, SubscribeAndRetry, Expands
 )
+from object_database.web.cells.GridCell import BasicGrid, ColorCell
 
 from object_database import (
     Schema, Indexed, core_schema,
@@ -293,6 +294,21 @@ class GraphDisplayService(ServiceBase):
         return {"feigenbaum": {'x': numpy.concatenate([values]*(len(fvals)//len(values))), 'y': fvals, 'type': 'scattergl',
                 'mode': 'markers', 'opacity': .5, 'marker': {'size': 2}}}
 
+
+class GridLayoutTestService(ServiceBase):
+    def initialize(self):
+        pass
+
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        return BasicGrid([
+            ColorCell("blue"),
+            ColorCell("green"),
+            ColorCell("red"),
+            ColorCell("yellow")],
+            num_columns=4,
+            num_rows=4
+        )
 
 happy = Schema("core.test.happy")
 @happy.define

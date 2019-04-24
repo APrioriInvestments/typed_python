@@ -24,6 +24,7 @@ from object_database.service_manager.ServiceManager_test import (
     GraphDisplayService,
     TextEditorService,
     HappyService,
+    GridLayoutTestService,
     UninitializableService
 )
 from object_database.web.ActiveWebService import (
@@ -95,6 +96,10 @@ def main(argv=None):
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
                     TextEditorService, "TextEditorService", target_count=1
+                )
+            with database.transaction():
+                service = ServiceManager.createOrUpdateService(
+                    GridLayoutTestService, "GridLayoutTestService", target_count=1
                 )
             while True:
                 time.sleep(.1)
