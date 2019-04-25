@@ -29,7 +29,7 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
-    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, BasicGrid, ColorCell
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, GridView, ColorCell
 )
 
 from object_database import (
@@ -300,7 +300,7 @@ class GridLayoutTestService(ServiceBase):
 
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
-        return BasicGrid([
+        return GridView([
             ColorCell("blue"),
             ColorCell("green"),
             ColorCell("red"),

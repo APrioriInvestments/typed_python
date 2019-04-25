@@ -30,7 +30,6 @@ from object_database.view import RevisionConflictException
 from object_database.view import current_transaction
 from object_database.util import Timer
 from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
-from object_database.web.cells.layouts.GridLayout import GridLayout
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 MAX_TIMEOUT = 1.0
@@ -639,6 +638,7 @@ class Cell:
         self._style = {}
         self.serializationContext = TypedPythonCodebase.coreSerializationContext()
         self.context = {}
+        self.layout = None # A Layout object that encapsulates CSS layout behavior
 
         self._logger = logging.getLogger(__name__)
 
@@ -831,6 +831,17 @@ class Cell:
     def isActive(self):
         """Is this cell installed in the tree and active?"""
         return self.cells and not self.garbageCollected
+
+    def layoutStyle(self):
+        """Returns the StyleAttributes for cell's layout"""
+        if self.layout:
+            return self.layout.get_styles()
+
+    def styleInParentLayout(self):
+        """Return any custom styles based on
+        the type of layout the parent cell has,
+        if any"""
+        pass
 
     def prepareForReuse(self):
         if not self.garbageCollected:
@@ -3075,37 +3086,3 @@ class _PlotUpdater(Cell):
                     """.replace("__identity__", self.chartId)
 
             self._resetSubscriptionsToViewReads(v)
-
-
-class BasicGrid(Cell):
-    def __init__(self, children, num_columns=2, num_rows=2):
-        super().__init__()
-        self.layout = GridLayout(num_columns, num_rows)
-        self.children = {}
-        for i in range(0, len(children)):
-            self.children['____content_child_%s__' % i] = Cell.makeCell(children[i])
-
-    def recalculate(self):
-        child_placeholders = []
-        for child_key, _ in self.children.items():
-            child_placeholders.append(HTMLTextContent(child_key))
-
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', self.layout.get_style_inline())
-            .add_classes(['cell', 'container-cell'])
-            .add_children(child_placeholders)
-        )
-
-
-class ColorCell(Cell):
-    def __init__(self, color):
-        super().__init__()
-        self.color = color
-
-    def recalculate(self):
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', 'background-color:%s;' % self.color)
-            .add_classes(['cell', 'color-cell'])
-        )

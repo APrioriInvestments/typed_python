@@ -55,10 +55,10 @@ from object_database.web.cells.cells import (
     CodeEditor,
     Sheet,
     Plot,
-    _PlotUpdater,
-    BasicGrid,
-    ColorCell
+    _PlotUpdater
 )
+
+from object_database.web.cells.basic_grid import *
 
 from object_database.web.cells.CellsTestMixin import CellsTestMixin
 

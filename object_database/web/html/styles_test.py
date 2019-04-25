@@ -23,6 +23,14 @@ class StyleAttributesTests(unittest.TestCase):
         self.assertTrue(styles._attributes['display'] == 'block')
         self.assertTrue('border-right' in styles._attributes)
 
+    def test_add_style_unique(self):
+        first = StyleAttributes(top='0px', left='50px')
+        second = StyleAttributes(top='100px', display='block')
+        result = first + second
+        self.assertFalse(first is result)
+        self.assertFalse(second is result)
+        self.assertTrue('display' in result._attributes)
+
     def test_add_style_new(self):
         initial_styles = {
             'top': '0px',
@@ -32,6 +40,17 @@ class StyleAttributesTests(unittest.TestCase):
         styles.add_style('display', 'block')
         self.assertTrue('display' in styles._attributes)
         self.assertTrue(styles._attributes['display'] == 'block')
+
+    def test_plus_style_new(self):
+        initial_styles = {
+            'top': '0px',
+            'left': '50px'
+        }
+        styles = StyleAttributes(**initial_styles)
+        other_styles = StyleAttributes(display='block')
+        new_styles = styles + other_styles
+        self.assertTrue('display' in new_styles._attributes)
+        self.assertTrue(new_styles._attributes['display'] == 'block')
 
     def test_add_style_update(self):
         initial_styles = {

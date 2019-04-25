@@ -57,6 +57,7 @@ class StyleAttributes():
             pairs.
         """
         self._attributes.update(aDictionary)
+        return self
 
     def add_style(self, key, val):
         """Adds or updates a single style to
@@ -153,6 +154,13 @@ class StyleAttributes():
             True if no styles are set
         """
         return len(self._attributes.items()) == 0
+
+    def __add__(self, other_styles):
+        """Add two styles together. Merges them into new instance."""
+        result = StyleAttributes(**self._attributes)
+        if other_styles:
+            return result.add_styles(other_styles._attributes)
+        return result
 
     @classmethod
     def inline_string_from(cls, aStyleAttributes):

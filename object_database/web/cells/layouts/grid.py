@@ -34,6 +34,9 @@ class GridLayout():
         styles = self._make_styles()
         return styles.as_string()
 
+    def get_styles(self):
+        return self._make_styles()
+
     def _make_styles(self):
         styles = StyleAttributes()
         if self.inline:
