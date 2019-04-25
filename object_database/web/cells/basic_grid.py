@@ -7,6 +7,7 @@ class GridView(Cell):
     def __init__(self, children, num_columns=2, num_rows=2):
         super().__init__()
         self.layout = GridLayout(num_columns, num_rows)
+        self.layout.grid_gap = '1em'
         self.children = {}
         for i in range(0, len(children)):
             self.children['____content_child_%s__' % i] = Cell.makeCell(children[i])

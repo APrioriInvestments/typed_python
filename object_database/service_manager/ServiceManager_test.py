@@ -298,16 +298,15 @@ class GridLayoutTestService(ServiceBase):
     def initialize(self):
         pass
 
+
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         return GridView([
-            ColorCell("blue"),
+            CodeEditor(),
             ColorCell("green"),
             ColorCell("red"),
-            ColorCell("yellow")],
-            num_columns=4,
-            num_rows=4
-        )
+            ColorCell("yellow")
+        ], num_columns=4, num_rows=4)
 
 happy = Schema("core.test.happy")
 @happy.define

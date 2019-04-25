@@ -10,6 +10,7 @@ class GridLayout():
         # By default, we don't make
         # the grid inline
         self.inline = False
+        self.grid_gap = None
 
 
     def update_rows(self, num_rows, row_mapping):
@@ -43,6 +44,9 @@ class GridLayout():
             styles.add_style('display', 'inline-grid')
         else:
             styles.add_style('display', 'grid')
+
+        if self.grid_gap:
+            styles.add_style('grid-gap', self.grid_gap)
 
         self._make_row_style_on(styles)
         self._make_column_style_on(styles)
