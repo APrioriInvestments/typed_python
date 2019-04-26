@@ -15,7 +15,7 @@ class GridLayout():
 
     def update_rows(self, num_rows, row_mapping):
         if not row_mapping:
-            self.row_mapping = ['1fr' for num in range(num_rows - 1)]
+            self.row_mapping = ['1fr' for num in range(num_rows)]
         elif num_rows != len(row_mapping):
             raise Exception("Number of GridLayout rows does not match provided mapping!")
         else:
@@ -24,7 +24,7 @@ class GridLayout():
 
     def update_columns(self, num_columns, col_mapping):
         if not col_mapping:
-            self.col_mapping = ['1fr' for num in range(num_columns - 1)]
+            self.col_mapping = ['1fr' for num in range(num_columns)]
         elif num_columns != len(col_mapping):
             raise Exception("Number of GridLayout columns does not match provided mapping!")
         else:

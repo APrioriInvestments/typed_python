@@ -26,9 +26,13 @@ class GridView(Cell):
 
     def style(self):
         layout_style = self.layoutStyle()
-        base_style = StyleAttributes(height='80vh', width='80vw')
         in_parent_style = self.styleInParentLayout()
-        return base_style + layout_style + in_parent_style
+        return layout_style + in_parent_style
+
+    def styleInParentLayout(self):
+        if isinstance(self.parent.layout, GridLayout):
+            return None
+        return StyleAttributes(height='80vh', width='80vw')
 
 
 

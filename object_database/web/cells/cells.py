@@ -1158,6 +1158,8 @@ class Sequence(Cell):
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
+            .add_classes(['cell'])
+            .set_attribute('data-cell-type', 'sequence')
             .add_child(HTMLTextContent(sequenceChildrenStr))
         )
 
