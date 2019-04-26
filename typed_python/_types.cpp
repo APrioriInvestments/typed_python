@@ -30,6 +30,7 @@
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
+#include "DirectTypesTest.hpp"
 
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
@@ -819,6 +820,11 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     }
 }
 
+PyObject *cpp_tests(PyObject* nullValue, PyObject* args) {
+    std::cerr << __FUNCTION__ << std::endl;
+    return incref(direct_cpp_tests() ? Py_True : Py_False);
+}
+
 PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isSimple takes 1 positional argument");
@@ -1123,6 +1129,7 @@ static PyMethodDef module_methods[] = {
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
+    {"cpp_tests", (PyCFunction)cpp_tests, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 

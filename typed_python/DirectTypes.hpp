@@ -10,23 +10,18 @@ class String {
             return t;
         }
 
-        String() {
-            mLayout = nullptr;
-        }
+        String():mLayout(0) {}
 
-        explicit String(const char *pc) {
+        explicit String(const char *pc):mLayout(0) {
             getType()->constructor((instance_ptr)&mLayout, 1, strlen(pc), pc);
         }
 
-        explicit String(std::string& s) {
+        explicit String(std::string& s):mLayout(0) {
             getType()->constructor((instance_ptr)&mLayout, 1, s.length(), s.data());
         }
 
-        explicit String(StringType::layout* l) {
-            getType()->assign(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&l
-               );
+        explicit String(StringType::layout* l):mLayout(0) {
+            getType()->constructor((instance_ptr)&mLayout, l->bytes_per_codepoint, l->pointcount, (const char*)l->data);
         }
 
         ~String() {
@@ -63,6 +58,54 @@ class String {
         StringType::layout* getLayout() const {
             return mLayout;
         }
+
+        static inline char cmp(const String& left, const String& right) {
+            return StringType::cmpStatic(left.mLayout, right.mLayout);
+        }
+        bool operator==(const String& right) { return cmp(*this, right) == 0; }
+        bool operator!=(const String& right) { return cmp(*this, right) != 0; }
+        bool operator<(const String& right) { return cmp(*this, right) < 0; }
+        bool operator>(const String& right) { return cmp(*this, right) > 0; }
+        bool operator<=(const String& right) { return cmp(*this, right) <= 0; }
+        bool operator>=(const String& right) { return cmp(*this, right) >= 0; }
+
+        static String concatenate(const String& left, const String& right) {
+            return String(StringType::concatenate(left.getLayout(), right.getLayout()));
+        }
+        String operator+(const String& right) {
+            return String(StringType::concatenate(mLayout, right.getLayout()));
+        }
+        String& operator+=(const String& right) {
+            return *this = String(StringType::concatenate(mLayout, right.getLayout()));
+        }
+        String upper() { return String(StringType::upper(mLayout)); }
+        String lower() { return String(StringType::lower(mLayout)); }
+        int64_t find(const String& sub, int64_t start, int64_t end) { return StringType::find(mLayout, sub.getLayout(), start, end); }
+        int64_t find(const String& sub, int64_t start) { return StringType::find(mLayout, sub.getLayout(), start, mLayout ? mLayout->pointcount : 0); }
+        int64_t find(const String& sub) { return StringType::find(mLayout, sub.getLayout(), 0, mLayout ? mLayout->pointcount : 0); }
+//        ListOf<String> split(const String& sep, int64_t max = -1) {
+//           ListOf<String> ret;
+//           StringType::split(ret.getType()->getLayout(), mLayout, sep.getLayout(), max);
+//           return ret;
+//        }
+//        ListOf<String> split(int64_t max = -1) {
+//           ListOf<String> ret;
+//           StringType::split_3(ret.getType()->getLayout(), mLayout, max);
+//           return ret;
+//        }
+        bool isalpha() { return StringType::isalpha(mLayout); }
+        bool isalnum() { return StringType::isalnum(mLayout); }
+        bool isdecimal() { return StringType::isdecimal(mLayout); }
+        bool isdigit() { return StringType::isdigit(mLayout); }
+        bool islower() { return StringType::islower(mLayout); }
+        bool isnumeric() { return StringType::isnumeric(mLayout); }
+        bool isprintable() { return StringType::isprintable(mLayout); }
+        bool isspace() { return StringType::isspace(mLayout); }
+        bool istitle() { return StringType::istitle(mLayout); }
+        bool isupper() { return StringType::isupper(mLayout); }
+
+        String substr(int64_t start, int64_t stop) { return String(StringType::getsubstr(mLayout, start, stop)); }
+
     private:
         StringType::layout* mLayout;
 };
