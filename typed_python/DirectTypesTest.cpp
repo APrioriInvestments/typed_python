@@ -86,10 +86,32 @@ int test_string() {
     return 0;
 }
 
+int test_list_of() {
+    std::cerr << "start " << __FUNCTION__ << std::endl;
+    ListOf<int64_t> list1;
+    my_assert(list1.count() == 0)
+    my_assert(list1.getLayout()->refcount == 1)
+    ListOf<int64_t> list2({9, 8, 7});
+    my_assert(list2.count() == 3)
+    list2.append(6);
+    my_assert(list2.count() == 4)
+    my_assert(list2.getLayout()->refcount == 1)
+    {
+        ListOf<int64_t> list3 = list2;
+        my_assert(list2.getLayout()->refcount == 2)
+    }
+    my_assert(list2.getLayout()->refcount == 1)
+    my_assert(list2[2] == 7)
+    list2[2] = 42;
+    my_assert(list2[2] == 42)
+    return 0;
+}
+
 int direct_cpp_tests() {
     int ret = 0;
     std::cerr << "start " << __FUNCTION__ << std::endl;
     ret += test_string();
+    ret += test_list_of();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 
