@@ -1,5 +1,6 @@
 #pragma once
 
+#include <vector>
 #include "Type.hpp"
 #include "PyInstance.hpp"
 
@@ -130,7 +131,10 @@ class ListOf {
 public:
     static ListOfType* getType() {
         static ListOfType* t = ListOfType::Make(TypeDetails<element_type>::getType());
-
+        return t;
+    }
+    static Type* getEltType() {
+        static Type* t = getType()->getEltType();
         return t;
     }
 
@@ -152,6 +156,10 @@ public:
         return !mLayout ? 0 : sizeof(*mLayout) + TypeDetails<element_type>::bytecount * mLayout->count;
     }
 
+    size_t count() const {
+        return !mLayout ? 0 : mLayout->count;
+    }
+
     void append(const element_type& e) {
         getType()->append((instance_ptr)&mLayout, (instance_ptr)&e);
     }
@@ -166,8 +174,17 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    ListOf() {
-        mLayout = nullptr;
+    ListOf(): mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout);
+    }
+
+    ListOf(const std::vector<element_type>& v): mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, v.size(),
+            [&](instance_ptr target, int64_t k) {
+                getEltType()->constructor(target);
+                getEltType()->assign(target, (instance_ptr)(&v[k]));
+            }
+        );
     }
 
     ~ListOf() {
@@ -196,6 +213,10 @@ public:
                (instance_ptr)&other.mLayout
                );
         return *this;
+    }
+
+    ListOfType::layout* getLayout() const {
+        return mLayout;
     }
 
 private:
@@ -253,8 +274,8 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    TupleOf() {
-        mLayout = nullptr;
+    TupleOf(): mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout);
     }
 
     ~TupleOf() {
@@ -336,8 +357,8 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    Dict() {
-        mLayout = nullptr;
+    Dict(): mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout);
     }
 
     ~Dict() {
@@ -421,8 +442,8 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    ConstDict() {
-        mLayout = nullptr;
+    ConstDict(): mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout);
     }
 
     ~ConstDict() {
