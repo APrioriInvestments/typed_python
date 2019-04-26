@@ -1,10 +1,13 @@
 #include "DirectTypes.hpp"
 #include "DirectTypesTest.hpp"
 
-#define my_assert(cond) if (!(cond)) { std::cerr << " failure at " << __FILE__ << " line " << std::dec << __LINE__ << std::endl; return 1; }
+#define my_assert(cond) if (!(cond)) { std::cerr << "  failure: " << #cond << std::endl << "  " << __FILE__ << " line " << std::dec << __LINE__ << std::endl; return 1; }
+#define test_fn_header() std::cerr << " Start " << __FUNCTION__ << "()" << std::endl;
+
+void errlog(std::string a) { std::cerr << a << std::endl; }
 
 int test_string() {
-    std::cerr << "start " << __FUNCTION__ << std::endl;
+    test_fn_header()
     String s1("abc");
     StringType::layout* l = s1.getLayout();
     my_assert(l->pointcount == 3)
@@ -83,11 +86,28 @@ int test_string() {
 
     my_assert(String("a") > String("A"))
     my_assert(String("abc") < String("abcd"))
+
+    String s5("one two three four");
+    ListOf<String> parts = s5.split();
+    my_assert(parts.count() == 4)
+    my_assert(parts[0] == String("one"))
+    my_assert(parts[1] == String("two"))
+    my_assert(parts[2] == String("three"))
+    my_assert(parts[3] == String("four"))
+    parts = s5.split(String("t"));
+    my_assert(parts.count() == 3)
+    my_assert(parts[0] == String("one "))
+    my_assert(parts[1] == String("wo "))
+    my_assert(parts[2] == String("hree four"))
+    parts = s5.split(2);
+    my_assert(parts.count() == 3)
+    parts = s5.split(String("t"), 1);
+    my_assert(parts.count() == 2)
     return 0;
 }
 
 int test_list_of() {
-    std::cerr << "start " << __FUNCTION__ << std::endl;
+    test_fn_header()
     ListOf<int64_t> list1;
     my_assert(list1.count() == 0)
     my_assert(list1.getLayout()->refcount == 1)
@@ -99,6 +119,8 @@ int test_list_of() {
     {
         ListOf<int64_t> list3 = list2;
         my_assert(list2.getLayout()->refcount == 2)
+        ListOf<int64_t> list4(list3);
+        my_assert(list2.getLayout()->refcount == 3)
     }
     my_assert(list2.getLayout()->refcount == 1)
     my_assert(list2[2] == 7)
@@ -107,11 +129,31 @@ int test_list_of() {
     return 0;
 }
 
+int test_tuple_of() {
+    test_fn_header()
+    TupleOf<int64_t> t1;
+    my_assert(t1.count() == 0)
+    TupleOf<int64_t> t2({10, 12, 14, 16});
+    my_assert(t2.getLayout()->refcount == 1)
+    my_assert(t2.count() == 4)
+    my_assert(t2.getLayout()->refcount == 1)
+    {
+        TupleOf<int64_t> t3 = t2;
+        my_assert(t2.getLayout()->refcount == 2)
+        TupleOf<int64_t> t4(t3);
+        my_assert(t2.getLayout()->refcount == 3)
+    }
+    my_assert(t2.getLayout()->refcount == 1)
+    my_assert(t2[2] == 14)
+    return 0;
+}
+
 int direct_cpp_tests() {
     int ret = 0;
-    std::cerr << "start " << __FUNCTION__ << std::endl;
+    std::cerr << "Start " << __FUNCTION__ << "()" << std::endl;
     ret += test_string();
     ret += test_list_of();
+    ret += test_tuple_of();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 
