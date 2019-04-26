@@ -247,7 +247,7 @@ int test_one_of() {
 }
 
 int test_list_of() {
-    std::cerr << "start " << __FUNCTION__ << std::endl;
+    test_fn_header()
     ListOf<int64_t> list1;
     my_assert(list1.count() == 0)
     my_assert(list1.getLayout()->refcount == 1)
@@ -259,11 +259,32 @@ int test_list_of() {
     {
         ListOf<int64_t> list3 = list2;
         my_assert(list2.getLayout()->refcount == 2)
+        ListOf<int64_t> list4(list3);
+        my_assert(list2.getLayout()->refcount == 3)
     }
     my_assert(list2.getLayout()->refcount == 1)
     my_assert(list2[2] == 7)
     list2[2] = 42;
     my_assert(list2[2] == 42)
+    return 0;
+}
+
+int test_tuple_of() {
+    test_fn_header()
+    TupleOf<int64_t> t1;
+    my_assert(t1.count() == 0)
+    TupleOf<int64_t> t2({10, 12, 14, 16});
+    my_assert(t2.getLayout()->refcount == 1)
+    my_assert(t2.count() == 4)
+    my_assert(t2.getLayout()->refcount == 1)
+    {
+        TupleOf<int64_t> t3 = t2;
+        my_assert(t2.getLayout()->refcount == 2)
+        TupleOf<int64_t> t4(t3);
+        my_assert(t2.getLayout()->refcount == 3)
+    }
+    my_assert(t2.getLayout()->refcount == 1)
+    my_assert(t2[2] == 14)
     return 0;
 }
 
