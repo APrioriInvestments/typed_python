@@ -30,6 +30,7 @@ from object_database.view import RevisionConflictException
 from object_database.view import current_transaction
 from object_database.util import Timer
 from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
+from object_database.web.html.styles import StyleAttributes
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 MAX_TIMEOUT = 1.0
@@ -638,7 +639,9 @@ class Cell:
         self._style = {}
         self.serializationContext = TypedPythonCodebase.coreSerializationContext()
         self.context = {}
+
         self.layout = None # A Layout object that encapsulates CSS layout behavior
+        self.baseStyles = StyleAttributes()
 
         self._logger = logging.getLogger(__name__)
 
