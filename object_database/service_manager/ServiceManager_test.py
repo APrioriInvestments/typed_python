@@ -31,7 +31,7 @@ from object_database.web.cells import (
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
     Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, GridView, ColorCell
 )
-
+from object_database.web.cells.layouts import GridLayout
 from object_database import (
     Schema, Indexed, core_schema,
     service_schema, current_transaction
@@ -301,11 +301,25 @@ class GridLayoutTestService(ServiceBase):
 
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        nestedGridCell = ColorCell("rgb(150, 150, 150)",
+                                   [
+                                       ColorCell("blue"),
+                                       ColorCell("red"),
+                                       ColorCell("green")])
+        nestedGridCell.baseStyles.add_styles({
+            'grid-row-start': '1',
+            'grid-row-end': 'span 2',
+            'grid-column-start': '1',
+            'grid-column-end': 'span 2'
+        })
+        nestedGridCell.layout = GridLayout()
+
         return GridView([
             CodeEditor(),
             ColorCell("green"),
             ColorCell("red"),
-            ColorCell("yellow")
+            nestedGridCell,
+            ColorCell("yellow"),
         ], num_columns=4, num_rows=4)
 
 happy = Schema("core.test.happy")
