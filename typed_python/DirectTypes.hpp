@@ -566,13 +566,15 @@ struct TypeIndex<T, k, T1, Ts...> {
 template<class... Ts>
 class OneOf;
 
-template<class T1, class... Ts>
-class OneOf<T1, Ts...> {
+// k is the 0-based index of type T1, assuming we started with OneOfEx<0, ...>
+// OneOf<...> is defined to be OneOfEx<0, ...>
+template<int k, class T1, class... Ts>
+class OneOfEx<k, T1, Ts...> : OneOfEx<k+1, Ts...> {
 public:
     static const size_t m_datasize = std::max(TypeDetails<T1>::bytecount, OneOf<Ts...>::m_datasize);
     struct layout {
         uint8_t which;
-        uint8_t data[OneOf<T1, Ts...>::m_datasize];
+        uint8_t data[OneOfEx<k, T1, Ts...>::m_datasize];
     };
 
     const layout* getLayout() const { return &mLayout; }
@@ -583,10 +585,10 @@ public:
         return t;
     }
 
-    static OneOf<T1, Ts...> fromPython(PyObject* p) {
-        OneOf<T1, Ts...>::layout* l = nullptr;
+    static OneOfEx<k, T1, Ts...> fromPython(PyObject* p) {
+        OneOfEx<k, T1, Ts...>::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (OneOf<T1, Ts...>)l;
+        return (OneOfEx<k, T1, Ts...>)l;
     }
 
     std::pair<Type*, instance_ptr> unwrap() {
@@ -626,10 +628,24 @@ public:
 
     OneOf() {
         getType()->constructor((instance_ptr)&mLayout);
+        const std::vector<Type*>& types = getType()->getTypes();
+        Type* typ = types[k];
+        if (typ == TypeDetails<T1>::getType()) {
+            mLayout.which = k;
+            typ->copy_constructor((instance_ptr)&mLayout.data, (instance_ptr)&o);
+        }
     }
 
-    ~OneOf<T1, Ts...>() {
-        getType()->destroy((instance_ptr)&mLayout);
+    OneOfEx() {
+        // We want only the first constructor, not the constructors from parent (fewer template parameters) classes
+        if (k==0)
+            getType()->constructor((instance_ptr)&mLayout);
+    }
+
+    ~OneOfEx() {
+        // We want only the first destructor, not the destructors from parent (fewer template parameters) classes
+        if (k==0)
+            getType()->destroy((instance_ptr)&mLayout);
     }
 
     OneOf(const OneOf<T1, Ts...>& other)
@@ -647,7 +663,7 @@ public:
                );
     }
 
-    OneOf<T1, Ts...>& operator=(const OneOf<T1, Ts...>& other)
+    OneOfEx<k, T1, Ts...>& operator=(const OneOfEx<k, T1, Ts...>& other)
     {
         getType()->assign(
                (instance_ptr)&mLayout,
@@ -659,25 +675,22 @@ private:
     layout mLayout;
 };
 
-template <>
-class OneOf<> {
+template <int k>
+class OneOfEx<k> {
 public:
     static const size_t m_datasize = 0;
 };
 
-template<class... Ts>
-class TypeDetails<OneOf<Ts...>> {
+template<int k, class... Ts>
+class TypeDetails<OneOfEx<k, Ts...>> {
 public:
     static Type* getType() {
-        static Type* t = OneOf<Ts...>::getType();
+        static Type* t = OneOfEx<k, Ts...>::getType();
         if (t->bytecount() != bytecount) {
             throw std::runtime_error("somehow we have the wrong bytecount!");
         }
         return t;
     }
 
-    static const uint64_t bytecount = 1 + OneOf<Ts...>::m_datasize;
+    static const uint64_t bytecount = 1 + OneOfEx<k, Ts...>::m_datasize;
 };
-
-
-
