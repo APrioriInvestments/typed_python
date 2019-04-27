@@ -126,6 +126,12 @@ int test_list_of() {
     my_assert(list2[2] == 7)
     list2[2] = 42;
     my_assert(list2[2] == 42)
+    ListOf<String> list4({String("ab"), String("cd")});
+    my_assert(list4.count() == 2)
+    my_assert(list4[0] == String("ab"))
+    my_assert(list4[1] == String("cd"))
+    list4[1] = String("replace");
+    my_assert(list4[1] == String("replace"))
     return 0;
 }
 
@@ -148,12 +154,51 @@ int test_tuple_of() {
     return 0;
 }
 
+int test_dict() {
+    test_fn_header()
+    Dict<bool, int64_t> d1;
+    d1.insertKeyValue(false, 13);
+    d1.insertKeyValue(true, 17);
+    const int64_t *pv = d1.lookupValueByKey(false);
+    my_assert(pv);
+    my_assert(*pv == 13);
+    pv = d1.lookupValueByKey(true);
+    my_assert(pv);
+    my_assert(*pv == 17);
+    my_assert(d1.getLayout()->refcount == 1)
+    bool deleted = d1.deleteKey(true);
+    my_assert(deleted)
+    pv = d1.lookupValueByKey(true);
+    my_assert(pv == 0)
+    {
+        Dict<bool, int64_t>d2 = d1;
+        Dict<bool, int64_t>d3 = d2;
+        my_assert(d1.getLayout()->refcount == 3)
+    }
+    my_assert(d1.getLayout()->refcount == 1)
+    Dict<String, String> d4;
+    d4.insertKeyValue(String("first"), String("1st"));
+    d4.insertKeyValue(String("second"), String("2nd"));
+    d4.insertKeyValue(String("third"), String("3rd"));
+    const String *ps = d4.lookupValueByKey(String("second"));
+    my_assert(ps);
+    my_assert(*ps == String("2nd"));
+    return 0;
+}
+
+int test_one_of() {
+    test_fn_header()
+    OneOf<bool, int> o1;
+    return 0;
+}
+
 int direct_cpp_tests() {
     int ret = 0;
     std::cerr << "Start " << __FUNCTION__ << "()" << std::endl;
     ret += test_string();
     ret += test_list_of();
     ret += test_tuple_of();
+    ret += test_dict();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 
