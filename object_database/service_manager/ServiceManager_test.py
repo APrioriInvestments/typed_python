@@ -294,10 +294,37 @@ class GraphDisplayService(ServiceBase):
                 'mode': 'markers', 'opacity': .5, 'marker': {'size': 2}}}
 
 
-class GridLayoutTestService(ServiceBase):
+class FlexLayoutTestService(ServiceBase):
     def initialize(self):
         pass
 
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        nestedGridCell = ColorCell("rgb(150, 150, 150)",
+                                   [
+                                       ColorCell("blue"),
+                                       ColorCell("blue"),
+                                       ColorCell("blue")])
+        nestedGridCell.baseStyles.add_styles({
+            'grid-row-start': '1',
+            'grid-row-end': 'span 2',
+            'grid-column-start': '1',
+            'grid-column-end': 'span 2'
+        })
+        nestedGridCell.layout = GridLayout()
+
+        return GridView([
+            CodeEditor(),
+            ColorCell("green"),
+            ColorCell("red"),
+            nestedGridCell,
+            ColorCell("yellow"),
+        ], num_columns=4, num_rows=4)
+
+
+class GridLayoutTestService(ServiceBase):
+    def initialize(self):
+        pass
 
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):

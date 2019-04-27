@@ -18,6 +18,7 @@ from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
 from object_database.web.html.styles import StyleAttributes
 from object_database.web.cells.layouts import GridLayout
 
+
 class GridView(Cell):
     def __init__(self, children, num_columns=2, num_rows=2):
         super().__init__()

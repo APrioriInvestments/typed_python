@@ -2,6 +2,7 @@ import unittest
 from object_database.web.cells.layouts.GridLayout import GridLayout
 from object_database.web.html.styles import StyleAttributes
 
+
 class GridLayoutTests(unittest.TestCase):
     def setUp(self):
         pass
