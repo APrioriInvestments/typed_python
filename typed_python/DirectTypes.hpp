@@ -228,110 +228,110 @@ public:
 };
 
 class String {
-    public:
-        static StringType* getType() {
-            static StringType* t = StringType::Make();
-            return t;
-        }
+public:
+    static StringType* getType() {
+        static StringType* t = StringType::Make();
+        return t;
+    }
 
-        String():mLayout(0) {}
+    String():mLayout(0) {}
 
-        explicit String(const char *pc):mLayout(0) {
-            getType()->constructor((instance_ptr)&mLayout, 1, strlen(pc), pc);
-        }
+    explicit String(const char *pc):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, 1, strlen(pc), pc);
+    }
 
-        explicit String(std::string& s):mLayout(0) {
-            getType()->constructor((instance_ptr)&mLayout, 1, s.length(), s.data());
-        }
+    explicit String(std::string& s):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, 1, s.length(), s.data());
+    }
 
-        explicit String(StringType::layout* l):mLayout(0) {
-            getType()->constructor((instance_ptr)&mLayout, l->bytes_per_codepoint, l->pointcount, (const char*)l->data);
-        }
+    explicit String(StringType::layout* l):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, l->bytes_per_codepoint, l->pointcount, (const char*)l->data);
+    }
 
-        ~String() {
-            StringType::destroyStatic((instance_ptr)&mLayout);
-        }
+    ~String() {
+        StringType::destroyStatic((instance_ptr)&mLayout);
+    }
 
-        String(const String& other)
-        {
-            getType()->copy_constructor(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&other.mLayout
-               );
-        }
+    String(const String& other)
+    {
+        getType()->copy_constructor(
+           (instance_ptr)&mLayout,
+           (instance_ptr)&other.mLayout
+           );
+    }
 
-        String& operator=(const String& other)
-        {
-            getType()->assign(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&other.mLayout
-               );
-            return *this;
-        }
+    String& operator=(const String& other)
+    {
+        getType()->assign(
+           (instance_ptr)&mLayout,
+           (instance_ptr)&other.mLayout
+           );
+        return *this;
+    }
 
-        template<class buf_t>
-        void serialize(buf_t& buffer) {
-            getType()->serialize<buf_t>((instance_ptr)&mLayout, buffer);
-        }
+    template<class buf_t>
+    void serialize(buf_t& buffer) {
+        getType()->serialize<buf_t>((instance_ptr)&mLayout, buffer);
+    }
 
-        template<class buf_t>
-        void deserialize(buf_t& buffer) {
-            getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
-        }
+    template<class buf_t>
+    void deserialize(buf_t& buffer) {
+        getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
+    }
 
-        StringType::layout* getLayout() const {
-            return mLayout;
-        }
+    static inline char cmp(const String& left, const String& right) {
+        return StringType::cmpStatic(left.mLayout, right.mLayout);
+    }
+    bool operator==(const String& right) const { return cmp(*this, right) == 0; }
+    bool operator!=(const String& right) const { return cmp(*this, right) != 0; }
+    bool operator<(const String& right) const { return cmp(*this, right) < 0; }
+    bool operator>(const String& right) const { return cmp(*this, right) > 0; }
+    bool operator<=(const String& right) const { return cmp(*this, right) <= 0; }
+    bool operator>=(const String& right) const { return cmp(*this, right) >= 0; }
 
-        static inline char cmp(const String& left, const String& right) {
-            return StringType::cmpStatic(left.mLayout, right.mLayout);
-        }
-        bool operator==(const String& right) { return cmp(*this, right) == 0; }
-        bool operator!=(const String& right) { return cmp(*this, right) != 0; }
-        bool operator<(const String& right) { return cmp(*this, right) < 0; }
-        bool operator>(const String& right) { return cmp(*this, right) > 0; }
-        bool operator<=(const String& right) { return cmp(*this, right) <= 0; }
-        bool operator>=(const String& right) { return cmp(*this, right) >= 0; }
+    static String concatenate(const String& left, const String& right) {
+        return String(StringType::concatenate(left.getLayout(), right.getLayout()));
+    }
+    String operator+(const String& right) {
+        return String(StringType::concatenate(mLayout, right.getLayout()));
+    }
+    String& operator+=(const String& right) {
+        return *this = String(StringType::concatenate(mLayout, right.getLayout()));
+    }
+    String upper() const { return String(StringType::upper(mLayout)); }
+    String lower() const { return String(StringType::lower(mLayout)); }
+    int64_t find(const String& sub, int64_t start, int64_t end) const { return StringType::find(mLayout, sub.getLayout(), start, end); }
+    int64_t find(const String& sub, int64_t start) const { return StringType::find(mLayout, sub.getLayout(), start, mLayout ? mLayout->pointcount : 0); }
+    int64_t find(const String& sub) const { return StringType::find(mLayout, sub.getLayout(), 0, mLayout ? mLayout->pointcount : 0); }
+    ListOf<String> split(const String& sep, int64_t max = -1) const {
+       ListOf<String> ret;
+       StringType::split(ret.getLayout(), mLayout, sep.getLayout(), max);
+       return ret;
+    }
+    ListOf<String> split(int64_t max = -1) {
+       ListOf<String> ret;
+       StringType::split_3(ret.getLayout(), mLayout, max);
+       return ret;
+    }
+    bool isalpha() const { return StringType::isalpha(mLayout); }
+    bool isalnum() const { return StringType::isalnum(mLayout); }
+    bool isdecimal() const { return StringType::isdecimal(mLayout); }
+    bool isdigit() const { return StringType::isdigit(mLayout); }
+    bool islower() const { return StringType::islower(mLayout); }
+    bool isnumeric() const { return StringType::isnumeric(mLayout); }
+    bool isprintable() const { return StringType::isprintable(mLayout); }
+    bool isspace() const { return StringType::isspace(mLayout); }
+    bool istitle() const { return StringType::istitle(mLayout); }
+    bool isupper() const { return StringType::isupper(mLayout); }
 
-        static String concatenate(const String& left, const String& right) {
-            return String(StringType::concatenate(left.getLayout(), right.getLayout()));
-        }
-        String operator+(const String& right) {
-            return String(StringType::concatenate(mLayout, right.getLayout()));
-        }
-        String& operator+=(const String& right) {
-            return *this = String(StringType::concatenate(mLayout, right.getLayout()));
-        }
-        String upper() { return String(StringType::upper(mLayout)); }
-        String lower() { return String(StringType::lower(mLayout)); }
-        int64_t find(const String& sub, int64_t start, int64_t end) { return StringType::find(mLayout, sub.getLayout(), start, end); }
-        int64_t find(const String& sub, int64_t start) { return StringType::find(mLayout, sub.getLayout(), start, mLayout ? mLayout->pointcount : 0); }
-        int64_t find(const String& sub) { return StringType::find(mLayout, sub.getLayout(), 0, mLayout ? mLayout->pointcount : 0); }
-        ListOf<String> split(const String& sep, int64_t max = -1) {
-           ListOf<String> ret;
-           StringType::split(ret.getLayout(), mLayout, sep.getLayout(), max);
-           return ret;
-        }
-        ListOf<String> split(int64_t max = -1) {
-           ListOf<String> ret;
-           StringType::split_3(ret.getLayout(), mLayout, max);
-           return ret;
-        }
-        bool isalpha() { return StringType::isalpha(mLayout); }
-        bool isalnum() { return StringType::isalnum(mLayout); }
-        bool isdecimal() { return StringType::isdecimal(mLayout); }
-        bool isdigit() { return StringType::isdigit(mLayout); }
-        bool islower() { return StringType::islower(mLayout); }
-        bool isnumeric() { return StringType::isnumeric(mLayout); }
-        bool isprintable() { return StringType::isprintable(mLayout); }
-        bool isspace() { return StringType::isspace(mLayout); }
-        bool istitle() { return StringType::istitle(mLayout); }
-        bool isupper() { return StringType::isupper(mLayout); }
+    String substr(int64_t start, int64_t stop) const { return String(StringType::getsubstr(mLayout, start, stop)); }
 
-        String substr(int64_t start, int64_t stop) { return String(StringType::getsubstr(mLayout, start, stop)); }
+    StringType::layout* getLayout() const {
+        return mLayout;
+    }
 
-    private:
-        StringType::layout* mLayout;
+private:
+    StringType::layout* mLayout;
 };
 
 template<>
@@ -411,8 +411,26 @@ public:
                );
         return *this;
     }
-    const value_type lookupValueByKey(key_type k) {
-        return *(value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
+
+    void insertKeyValue(const key_type& k, const value_type& v) {
+        value_type *pv = (value_type*)getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k);
+        if (pv) {
+            TypeDetails<value_type>::getType()->assign((instance_ptr)pv,(instance_ptr)&v);
+        } else {
+            pv = (value_type*)getType()->insertKey((instance_ptr)&mLayout, (instance_ptr)&k);
+            TypeDetails<value_type>::getType()->copy_constructor((instance_ptr)pv, (instance_ptr)&v);
+        }
+    }
+    const value_type* lookupValueByKey(const key_type&  k) const {
+        return (value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
+    }
+
+    bool deleteKey(const key_type& k) {
+        return getType()->deleteKey((instance_ptr)&mLayout, (instance_ptr)&k);
+    }
+
+    DictType::layout* getLayout() const {
+        return mLayout;
     }
 
 private:
@@ -496,8 +514,13 @@ public:
                );
         return *this;
     }
-    const value_type lookupValueByKey(key_type k) {
-        return *(value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
+
+    const value_type* lookupValueByKey(const key_type&  k) const {
+        return (value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
+    }
+
+    ConstDictType::layout* getLayout() const {
+        return mLayout;
     }
 
 private:
@@ -518,16 +541,18 @@ public:
     static const uint64_t bytecount = sizeof(void*);
 };
 
-template<class... Ts>
-class OneOf;
+template<int k, class... Ts>
+class OneOfEx;
 
-template<class T1, class... Ts>
-class OneOf<T1, Ts...> {
+// k is the 0-based index of type T1, assuming we started with OneOfEx<0, ...>
+// OneOf<...> is defined to be OneOfEx<0, ...>
+template<int k, class T1, class... Ts>
+class OneOfEx<k, T1, Ts...> : OneOfEx<k+1, Ts...> {
 public:
-    static const size_t m_datasize = std::max(TypeDetails<T1>::bytecount, OneOf<Ts...>::m_datasize);
-    class layout {
+    static const size_t m_datasize = std::max(TypeDetails<T1>::bytecount, OneOfEx<k, Ts...>::m_datasize);
+    struct layout {
         uint8_t which;
-        uint8_t data[OneOf<T1, Ts...>::m_datasize];
+        uint8_t data[OneOfEx<k, T1, Ts...>::m_datasize];
     };
 private:
     layout mLayout;
@@ -538,10 +563,10 @@ public:
         return t;
     }
 
-    static OneOf<T1, Ts...> fromPython(PyObject* p) {
-        OneOf<T1, Ts...>::layout* l = nullptr;
+    static OneOfEx<k, T1, Ts...> fromPython(PyObject* p) {
+        OneOfEx<k, T1, Ts...>::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (OneOf<T1, Ts...>)l;
+        return (OneOfEx<k, T1, Ts...>)l;
     }
 
     std::pair<Type*, instance_ptr> unwrap() {
@@ -562,15 +587,30 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    OneOf<T1, Ts...>() {
+    OneOfEx(const T1& o) {
+        //std::cerr << "OneOf constructor " << TypeDetails<T1>::getType()->name() << std::endl;
         getType()->constructor((instance_ptr)&mLayout);
+        const std::vector<Type*>& types = getType()->getTypes();
+        Type* typ = types[k];
+        if (typ == TypeDetails<T1>::getType()) {
+            mLayout.which = k;
+            typ->copy_constructor((instance_ptr)&mLayout.data, (instance_ptr)&o);
+        }
     }
 
-    ~OneOf<T1, Ts...>() {
-        getType()->destroy((instance_ptr)&mLayout);
+    OneOfEx() {
+        // We want only the first constructor, not the constructors from parent (fewer template parameters) classes
+        if (k==0)
+            getType()->constructor((instance_ptr)&mLayout);
     }
 
-    OneOf<T1, Ts...>(const OneOf<T1, Ts...>& other)
+    ~OneOfEx() {
+        // We want only the first destructor, not the destructors from parent (fewer template parameters) classes
+        if (k==0)
+            getType()->destroy((instance_ptr)&mLayout);
+    }
+
+    OneOfEx(const OneOfEx<k, T1, Ts...>& other)
     {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
@@ -578,14 +618,14 @@ public:
                );
     }
 
-    OneOf<T1, Ts...>(OneOf<T1, Ts...>::layout* l) {
+    OneOfEx(OneOfEx<k, T1, Ts...>::layout* l) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&l
                );
     }
 
-    OneOf<T1, Ts...>& operator=(const OneOf<T1, Ts...>& other)
+    OneOfEx<k, T1, Ts...>& operator=(const OneOfEx<k, T1, Ts...>& other)
     {
         getType()->assign(
                (instance_ptr)&mLayout,
@@ -595,22 +635,25 @@ public:
     }
 };
 
-template <>
-class OneOf<> {
+template <int k>
+class OneOfEx<k> {
 public:
     static const size_t m_datasize = 0;
 };
 
-template<class... Ts>
-class TypeDetails<OneOf<Ts...>> {
+template<int k, class... Ts>
+class TypeDetails<OneOfEx<k, Ts...>> {
 public:
     static Type* getType() {
-        static Type* t = OneOf<Ts...>::getType();
+        static Type* t = OneOfEx<k, Ts...>::getType();
         if (t->bytecount() != bytecount) {
             throw std::runtime_error("somehow we have the wrong bytecount!");
         }
         return t;
     }
 
-    static const uint64_t bytecount = 1 + OneOf<Ts...>::m_datasize;
+    static const uint64_t bytecount = 1 + OneOfEx<k, Ts...>::m_datasize;
 };
+
+template<class... Ts>
+using OneOf = OneOfEx<0, Ts...>;
