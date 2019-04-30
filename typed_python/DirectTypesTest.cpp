@@ -8,11 +8,13 @@ void errlog(std::string a) { std::cerr << a << std::endl; }
 
 int test_string() {
     test_fn_header()
+
     String s1("abc");
     StringType::layout* l = s1.getLayout();
     my_assert(l->pointcount == 3)
     my_assert(l->bytes_per_codepoint == 1)
     std::string s2a("abc");
+
     String s2(s2a);
     my_assert(s1 == s2)
     {
@@ -27,16 +29,19 @@ int test_string() {
     }
     my_assert(s1.getLayout()->refcount == 1)
     my_assert(s2.getLayout()->refcount == 1)
+
     s2 = s1.upper();
     my_assert(s2 == String("ABC"))
     my_assert(s2.getLayout()->refcount == 1)
     s2 = s2.lower();
     my_assert(s2 == String("abc"))
     my_assert(s2.getLayout()->refcount == 1)
+
     String s3("abcxy");
     my_assert(s3.getLayout()->pointcount == 5)
     my_assert(s3.find(String("cx")) == 2)
     my_assert(s3.substr(1,4) == String("bcx"))
+
     String a1("DEF");
     String a2("ghij");
     String a3("K");
@@ -51,6 +56,7 @@ int test_string() {
     s = a1 + a2 + a3 + a4;
     my_assert(s == String("DEFghijKmno"))
     my_assert(s.getLayout()->refcount == 1)
+
     String s4("test");
     s4 = s4;
     my_assert(s4.getLayout()->refcount == 1)
@@ -63,6 +69,7 @@ int test_string() {
     s2 = String("123");
     s2 = String("xyz");
     s2 = String("ASD");
+
     my_assert(String("aBc").isalpha())
     my_assert(!String("a3Bc").isalpha())
     my_assert(String("a3Bc").isalnum())
@@ -108,14 +115,17 @@ int test_string() {
 
 int test_list_of() {
     test_fn_header()
+
     ListOf<int64_t> list1;
     my_assert(list1.count() == 0)
     my_assert(list1.getLayout()->refcount == 1)
+
     ListOf<int64_t> list2({9, 8, 7});
     my_assert(list2.count() == 3)
     list2.append(6);
     my_assert(list2.count() == 4)
     my_assert(list2.getLayout()->refcount == 1)
+
     {
         ListOf<int64_t> list3 = list2;
         my_assert(list2.getLayout()->refcount == 2)
@@ -126,6 +136,7 @@ int test_list_of() {
     my_assert(list2[2] == 7)
     list2[2] = 42;
     my_assert(list2[2] == 42)
+
     ListOf<String> list4({String("ab"), String("cd")});
     my_assert(list4.count() == 2)
     my_assert(list4[0] == String("ab"))
@@ -137,12 +148,15 @@ int test_list_of() {
 
 int test_tuple_of() {
     test_fn_header()
+
     TupleOf<int64_t> t1;
     my_assert(t1.count() == 0)
+
     TupleOf<int64_t> t2({10, 12, 14, 16});
     my_assert(t2.getLayout()->refcount == 1)
     my_assert(t2.count() == 4)
     my_assert(t2.getLayout()->refcount == 1)
+
     {
         TupleOf<int64_t> t3 = t2;
         my_assert(t2.getLayout()->refcount == 2)
@@ -156,6 +170,7 @@ int test_tuple_of() {
 
 int test_dict() {
     test_fn_header()
+
     Dict<bool, int64_t> d1;
     d1.insertKeyValue(false, 13);
     d1.insertKeyValue(true, 17);
@@ -170,12 +185,14 @@ int test_dict() {
     my_assert(deleted)
     pv = d1.lookupValueByKey(true);
     my_assert(pv == 0)
+
     {
         Dict<bool, int64_t>d2 = d1;
         Dict<bool, int64_t>d3 = d2;
         my_assert(d1.getLayout()->refcount == 3)
     }
     my_assert(d1.getLayout()->refcount == 1)
+
     Dict<String, String> d4;
     d4.insertKeyValue(String("first"), String("1st"));
     d4.insertKeyValue(String("second"), String("2nd"));
@@ -188,7 +205,34 @@ int test_dict() {
 
 int test_one_of() {
     test_fn_header()
-    OneOf<bool, int> o1;
+
+    OneOf<bool, String> o1(true);
+    my_assert(o1.getLayout()->which == 0)
+
+    OneOf<bool, String> o2(String("true"));
+    my_assert(o2.getLayout()->which == 1)
+
+    OneOf<bool, String, TupleOf<int>> o3;
+    bool b;
+    String s;
+    TupleOf<int> t;
+    o3 = TupleOf<int>({9,8,7});
+    my_assert(o3.getLayout()->which == 2)
+    my_assert(!o3.getValue(b));
+    my_assert(!o3.getValue(s));
+    my_assert(o3.getValue(t));
+    my_assert(t.count() == 3);
+    my_assert(t[0] == 9 && t[1] == 8 && t[2] == 7);
+
+    o3 = false;
+    my_assert(o3.getLayout()->which == 0)
+    my_assert(o3.getValue(b))
+    my_assert(b == false)
+
+    o3 = String("yes");
+    my_assert(o3.getLayout()->which == 1)
+    my_assert(o3.getValue(s));
+    my_assert(s == String("yes"))
     return 0;
 }
 
@@ -199,6 +243,7 @@ int direct_cpp_tests() {
     ret += test_list_of();
     ret += test_tuple_of();
     ret += test_dict();
+    ret += test_one_of();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 
