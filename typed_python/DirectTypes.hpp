@@ -618,10 +618,8 @@ public:
 
     template <class T>
     OneOf(const T& o) {
-        //std::cerr << "OneOf constructor " << getType()->name() << "/" << TypeDetails<T>::getType()->name() << std::endl;
         getType()->constructor((instance_ptr)&mLayout);
         static const int k = TypeIndex<T, 0, T1, Ts...>::value;
-        //std::cerr << std::hex << (uint64_t)&mLayout << "  " << k << std::endl;
         mLayout.which = k;
         getType()->getTypes()[k]->copy_constructor((instance_ptr)&mLayout.data, (instance_ptr)&o);
     }
