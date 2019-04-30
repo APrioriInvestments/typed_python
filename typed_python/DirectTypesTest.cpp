@@ -246,6 +246,32 @@ int test_one_of() {
     return 0;
 }
 
+int test_named_tuple() {
+    test_fn_header()
+
+    NamedTupleTwoStrings t1;
+    t1.X() = String("one");
+    t1.Y() = String("two");
+    NamedTupleTwoStrings t2(t1);
+    my_assert(t2.X() == String("one"))
+    my_assert(t2.Y() == String("two"))
+    NamedTupleTwoStrings t3 = t1;
+    my_assert(t3.X() == String("one"))
+    my_assert(t3.Y() == String("two"))
+
+    NamedTupleBoolIntStr t4(true, 4321, String("y"));
+    my_assert(t4.b() == true)
+    my_assert(t4.i() == 4321)
+    my_assert(t4.s() == String("y"))
+    t4.b() = false;
+    t4.i() = 9;
+    t4.s() = String("n");
+    my_assert(t4.b() == false)
+    my_assert(t4.i() == 9)
+    my_assert(t4.s() == String("n"))
+    return 0;
+}
+
 int direct_cpp_tests() {
     int ret = 0;
     std::cerr << "Start " << __FUNCTION__ << "()" << std::endl;
@@ -254,6 +280,7 @@ int direct_cpp_tests() {
     ret += test_tuple_of();
     ret += test_dict();
     ret += test_one_of();
+    ret += test_named_tuple();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 
