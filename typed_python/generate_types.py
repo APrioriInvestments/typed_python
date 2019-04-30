@@ -71,6 +71,24 @@ def gen_named_tuple_type(name, **kwargs):
     ret.append('            throw;')
     ret.append('        }')
     ret.append('    }')
+    ret.append('')
+
+    ret.append(f'    {name}(' + ', '.join([f'const {key}_type& {key}_val' for key in keys]) + ') {')
+    for key in keys:
+        ret.append(f'        bool init{key} = false;')
+    ret.append('        try {')
+    for key in keys:
+        ret.append(f'            new (&{key}()) {key}_type({key}_val);')
+        ret.append(f'            init{key} = true;')
+    ret.append('        } catch(...) {')
+    ret.append('            try {')
+    for key in revkeys:
+        ret.append(f'                if (init{key}) {key}().~{key}_type();')
+    ret.append('            } catch(...) {')
+    ret.append('            }')
+    ret.append('            throw;')
+    ret.append('        }')
+    ret.append('    }')
     ret.append('};')
     ret.append('')
 
@@ -85,8 +103,10 @@ def gen_named_tuple_type(name, **kwargs):
     ret.append('        return t;')
     ret.append('    }')
     ret.append('    static const uint64_t bytecount = ')
-    ret.append(' +\n'. join([f'        sizeof({name}::{key}_type)' for key in keys]) + ';')
+    ret.append(' +\n'.join([f'        sizeof({name}::{key}_type)' for key in keys]) + ';')
     ret.append('};')
+    ret.append('')
+    ret.append(f'// END Generated NamedTuple {name}')
     ret.append('')
 
     return [e + '\n' for e in ret]
@@ -366,6 +386,7 @@ def generate_some_types(dest):
             A=Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str}),
             Bexpress=Bexpress,
             NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
+            NamedTupleBoolIntStr=NamedTuple(b=bool, i=int, s=str),
             Choice=NamedTuple(A=NamedTuple(X=str, Y=str), B=Bexpress),
             NamedTupleIntFloatDesc=NamedTuple(a=OneOf(int, float, bool), b=float, desc=str),
             NamedTupleBoolListOfInt=NamedTuple(X=bool, Y=ListOf(int)),

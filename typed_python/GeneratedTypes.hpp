@@ -496,6 +496,24 @@ public:
             throw;
         }
     }
+
+    NamedTupleTwoStrings(const X_type& X_val, const Y_type& Y_val) {
+        bool initX = false;
+        bool initY = false;
+        try {
+            new (&X()) X_type(X_val);
+            initX = true;
+            new (&Y()) Y_type(Y_val);
+            initY = true;
+        } catch(...) {
+            try {
+                if (initY) Y().~Y_type();
+                if (initX) X().~X_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
 };
 
 template <>
@@ -512,6 +530,120 @@ public:
         sizeof(NamedTupleTwoStrings::X_type) +
         sizeof(NamedTupleTwoStrings::Y_type);
 };
+
+// END Generated NamedTuple NamedTupleTwoStrings
+
+// Generated NamedTuple NamedTupleBoolIntStr
+//    b=bool
+//    i=int64_t
+//    s=String
+class NamedTupleBoolIntStr {
+public:
+    typedef bool b_type;
+    typedef int64_t i_type;
+    typedef String s_type;
+    b_type& b() const { return *(b_type*)(data); }
+    i_type& i() const { return *(i_type*)(data + size1); }
+    s_type& s() const { return *(s_type*)(data + size1 + size2); }
+private:
+    static const int size1 = sizeof(b_type);
+    static const int size2 = sizeof(i_type);
+    static const int size3 = sizeof(s_type);
+    uint8_t data[size1 + size2 + size3];
+public:
+    static NamedTuple* getType() {
+        static NamedTuple* t = NamedTuple::Make({
+                TypeDetails<NamedTupleBoolIntStr::b_type>::getType(),
+                TypeDetails<NamedTupleBoolIntStr::i_type>::getType(),
+                TypeDetails<NamedTupleBoolIntStr::s_type>::getType()
+            },{
+                "b",
+                "i",
+                "s"
+            });
+        return t;
+        }
+    NamedTupleBoolIntStr& operator = (const NamedTupleBoolIntStr& other) {
+        b() = other.b();
+        i() = other.i();
+        s() = other.s();
+        return *this;
+    }
+
+    NamedTupleBoolIntStr(const NamedTupleBoolIntStr& other) {
+        new (&b()) b_type(other.b());
+        new (&i()) i_type(other.i());
+        new (&s()) s_type(other.s());
+    }
+
+    ~NamedTupleBoolIntStr() {
+        s().~s_type();
+        i().~i_type();
+        b().~b_type();
+    }
+
+    NamedTupleBoolIntStr() {
+        bool initb = false;
+        bool initi = false;
+        bool inits = false;
+        try {
+            new (&b()) b_type();
+            initb = true;
+            new (&i()) i_type();
+            initi = true;
+            new (&s()) s_type();
+            inits = true;
+        } catch(...) {
+            try {
+                if (inits) s().~s_type();
+                if (initi) i().~i_type();
+                if (initb) b().~b_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
+
+    NamedTupleBoolIntStr(const b_type& b_val, const i_type& i_val, const s_type& s_val) {
+        bool initb = false;
+        bool initi = false;
+        bool inits = false;
+        try {
+            new (&b()) b_type(b_val);
+            initb = true;
+            new (&i()) i_type(i_val);
+            initi = true;
+            new (&s()) s_type(s_val);
+            inits = true;
+        } catch(...) {
+            try {
+                if (inits) s().~s_type();
+                if (initi) i().~i_type();
+                if (initb) b().~b_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
+};
+
+template <>
+class TypeDetails<NamedTupleBoolIntStr> {
+public:
+    static Type* getType() {
+        static Type* t = NamedTupleBoolIntStr::getType();
+        if (t->bytecount() != bytecount) {
+            throw std::runtime_error("NamedTupleBoolIntStr somehow we have the wrong bytecount!");
+        }
+        return t;
+    }
+    static const uint64_t bytecount = 
+        sizeof(NamedTupleBoolIntStr::b_type) +
+        sizeof(NamedTupleBoolIntStr::i_type) +
+        sizeof(NamedTupleBoolIntStr::s_type);
+};
+
+// END Generated NamedTuple NamedTupleBoolIntStr
 
 // Generated NamedTuple Choice
 //    A=NamedTupleTwoStrings
@@ -570,6 +702,24 @@ public:
             throw;
         }
     }
+
+    Choice(const A_type& A_val, const B_type& B_val) {
+        bool initA = false;
+        bool initB = false;
+        try {
+            new (&A()) A_type(A_val);
+            initA = true;
+            new (&B()) B_type(B_val);
+            initB = true;
+        } catch(...) {
+            try {
+                if (initB) B().~B_type();
+                if (initA) A().~A_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
 };
 
 template <>
@@ -586,6 +736,8 @@ public:
         sizeof(Choice::A_type) +
         sizeof(Choice::B_type);
 };
+
+// END Generated NamedTuple Choice
 
 // Generated NamedTuple NamedTupleIntFloatDesc
 //    a=OneOf<int64_t, double, bool>
@@ -657,6 +809,28 @@ public:
             throw;
         }
     }
+
+    NamedTupleIntFloatDesc(const a_type& a_val, const b_type& b_val, const desc_type& desc_val) {
+        bool inita = false;
+        bool initb = false;
+        bool initdesc = false;
+        try {
+            new (&a()) a_type(a_val);
+            inita = true;
+            new (&b()) b_type(b_val);
+            initb = true;
+            new (&desc()) desc_type(desc_val);
+            initdesc = true;
+        } catch(...) {
+            try {
+                if (initdesc) desc().~desc_type();
+                if (initb) b().~b_type();
+                if (inita) a().~a_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
 };
 
 template <>
@@ -674,6 +848,8 @@ public:
         sizeof(NamedTupleIntFloatDesc::b_type) +
         sizeof(NamedTupleIntFloatDesc::desc_type);
 };
+
+// END Generated NamedTuple NamedTupleIntFloatDesc
 
 // Generated NamedTuple NamedTupleBoolListOfInt
 //    X=bool
@@ -732,6 +908,24 @@ public:
             throw;
         }
     }
+
+    NamedTupleBoolListOfInt(const X_type& X_val, const Y_type& Y_val) {
+        bool initX = false;
+        bool initY = false;
+        try {
+            new (&X()) X_type(X_val);
+            initX = true;
+            new (&Y()) Y_type(Y_val);
+            initY = true;
+        } catch(...) {
+            try {
+                if (initY) Y().~Y_type();
+                if (initX) X().~X_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
 };
 
 template <>
@@ -748,6 +942,8 @@ public:
         sizeof(NamedTupleBoolListOfInt::X_type) +
         sizeof(NamedTupleBoolListOfInt::Y_type);
 };
+
+// END Generated NamedTuple NamedTupleBoolListOfInt
 
 // Generated NamedTuple NamedTupleAttrAndValues
 //    attributes=TupleOf<String>
@@ -806,6 +1002,24 @@ public:
             throw;
         }
     }
+
+    NamedTupleAttrAndValues(const attributes_type& attributes_val, const values_type& values_val) {
+        bool initattributes = false;
+        bool initvalues = false;
+        try {
+            new (&attributes()) attributes_type(attributes_val);
+            initattributes = true;
+            new (&values()) values_type(values_val);
+            initvalues = true;
+        } catch(...) {
+            try {
+                if (initvalues) values().~values_type();
+                if (initattributes) attributes().~attributes_type();
+            } catch(...) {
+            }
+            throw;
+        }
+    }
 };
 
 template <>
@@ -822,4 +1036,6 @@ public:
         sizeof(NamedTupleAttrAndValues::attributes_type) +
         sizeof(NamedTupleAttrAndValues::values_type);
 };
+
+// END Generated NamedTuple NamedTupleAttrAndValues
 
