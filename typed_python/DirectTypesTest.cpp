@@ -226,13 +226,23 @@ int test_one_of() {
 
     o3 = false;
     my_assert(o3.getLayout()->which == 0)
+    my_assert(!o3.getValue(s));
+    my_assert(!o3.getValue(t));
     my_assert(o3.getValue(b))
     my_assert(b == false)
 
     o3 = String("yes");
     my_assert(o3.getLayout()->which == 1)
+    my_assert(!o3.getValue(b))
+    my_assert(!o3.getValue(t));
     my_assert(o3.getValue(s));
     my_assert(s == String("yes"))
+
+    // fails:
+//    OneOf<OneOf<bool, String>, OneOf<int32_t, String>> o4;
+//    o4 = String("a");
+//    o4 = (int32_t)9;
+//    o4 = true;
     return 0;
 }
 
