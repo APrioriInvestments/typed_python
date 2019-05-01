@@ -368,7 +368,7 @@ int test_named_tuple() {
     return 0;
 }
 
-// Depends on generated types A and Bexpress in GeneratedTypes.hpp
+// Depends on generated types A and Overlap in GeneratedTypes.hpp
 int test_alternative() {
     test_fn_header()
 
@@ -402,6 +402,24 @@ int test_alternative() {
         my_assert(a4.getLayout()->refcount == 3)
     }
     my_assert(a2.getLayout()->refcount == 1)
+
+    Overlap o1 = Overlap::Sub1(true, 2);
+    my_assert(o1.isSub1())
+    bool val1;
+    o1.b().getValue(val1);
+    my_assert(val1 == true)
+
+    o1 = Overlap::Sub2(String("over"), TupleOf<String>({String("a"), String("b")}));
+    my_assert(o1.isSub2())
+    String val2;
+    o1.b().getValue(val2);
+    my_assert(val2 == String("over"))
+
+    o1 = Overlap::Sub3(45);
+    my_assert(o1.isSub3())
+    int64_t val3;
+    o1.b().getValue(val3);
+    my_assert(val3 == 45)
 
 //  These fail (unresolved forwards)
 //    errlog("b0");

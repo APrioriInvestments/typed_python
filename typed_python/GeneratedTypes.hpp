@@ -1,3 +1,216 @@
+// Generated Alternative Overlap=
+//     Sub1=(b=bool, c=int64_t)
+//     Sub2=(b=String, c=TupleOf<String>)
+//     Sub3=(b=int64_t)
+
+class Overlap_Sub1;
+class Overlap_Sub2;
+class Overlap_Sub3;
+
+class Overlap {
+public:
+    struct e {
+        enum kind { Sub1=0, Sub2=1, Sub3=2 };
+    };
+
+    static NamedTuple* Sub1_Type;
+    static NamedTuple* Sub2_Type;
+    static NamedTuple* Sub3_Type;
+
+    static Alternative* getType();
+    ~Overlap() { getType()->destroy((instance_ptr)&mLayout); }
+    Overlap():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
+    Overlap(e::kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
+    Overlap(const Overlap& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
+    Overlap& operator=(const Overlap& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
+
+    static Overlap Sub1(const bool& b, const int64_t& c);
+    static Overlap Sub2(const String& b, const TupleOf<String>& c);
+    static Overlap Sub3(const int64_t& b);
+
+    e::kind which() const { return (e::kind)mLayout->which; }
+
+    template <class F>
+    auto check(const F& f) {
+        if (isSub1()) { return f(*(Overlap_Sub1*)this); }
+        if (isSub2()) { return f(*(Overlap_Sub2*)this); }
+        if (isSub3()) { return f(*(Overlap_Sub3*)this); }
+    }
+
+    bool isSub1() const { return which() == e::Sub1; }
+    bool isSub2() const { return which() == e::Sub2; }
+    bool isSub3() const { return which() == e::Sub3; }
+
+    // Accessors for members
+    OneOf<bool,int64_t,String> b() const;
+    OneOf<TupleOf<String>,int64_t> c() const;
+
+    Alternative::layout* getLayout() const { return mLayout; }
+protected:
+    Alternative::layout *mLayout;
+};
+
+template <>
+class TypeDetails<Overlap*> {
+public:
+    static Type* getType() {
+        static Type* t = new Forward(0, "Overlap");
+        return t;
+    }
+    static const uint64_t bytecount = sizeof(void*);
+};
+
+NamedTuple* Overlap::Sub1_Type = NamedTuple::Make(
+    {TypeDetails<bool>::getType(), TypeDetails<int64_t>::getType()},
+    {"b", "c"}
+);
+
+NamedTuple* Overlap::Sub2_Type = NamedTuple::Make(
+    {TypeDetails<String>::getType(), TypeDetails<TupleOf<String>>::getType()},
+    {"b", "c"}
+);
+
+NamedTuple* Overlap::Sub3_Type = NamedTuple::Make(
+    {TypeDetails<int64_t>::getType()},
+    {"b"}
+);
+
+// static
+Alternative* Overlap::getType() {
+    static Alternative* t = Alternative::Make("Overlap", {
+        {"Sub1", Sub1_Type},
+        {"Sub2", Sub2_Type},
+        {"Sub3", Sub3_Type}
+    }, {});
+    return t;
+}
+
+template <>
+class TypeDetails<Overlap> {
+public:
+    static Type* getType() {
+        static Type* t = Overlap::getType();
+        if (t->bytecount() != bytecount) {
+            throw std::runtime_error("Overlap somehow we have the wrong bytecount!");
+        }
+        return t;
+    }
+    static const uint64_t bytecount = sizeof(void*);
+};
+
+class Overlap_Sub1 : public Overlap {
+public:
+    static ConcreteAlternative* getType() {
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), e::Sub1);
+        return t;
+    }
+    static Alternative* getAlternative() { return Overlap::getType(); }
+
+    Overlap_Sub1():Overlap(e::Sub1) {}
+    Overlap_Sub1( const bool& b1,  const int64_t& c1):Overlap(e::Sub1) {
+        b() = b1;
+        c() = c1;
+    }
+    Overlap_Sub1(const Overlap_Sub1& other):Overlap(e::Sub1) {
+        getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+    }
+    Overlap_Sub1& operator=(const Overlap_Sub1& other) {
+         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+         return *this;
+    }
+    ~Overlap_Sub1() {}
+
+    bool& b() const { return *(bool*)(mLayout->data); }
+    int64_t& c() const { return *(int64_t*)(mLayout->data + size1); }
+private:
+    static const int size1 = sizeof(bool);
+};
+
+Overlap Overlap::Sub1(const bool& b, const int64_t& c) {
+    return Overlap_Sub1(b, c);
+}
+
+class Overlap_Sub2 : public Overlap {
+public:
+    static ConcreteAlternative* getType() {
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), e::Sub2);
+        return t;
+    }
+    static Alternative* getAlternative() { return Overlap::getType(); }
+
+    Overlap_Sub2():Overlap(e::Sub2) {}
+    Overlap_Sub2( const String& b1,  const TupleOf<String>& c1):Overlap(e::Sub2) {
+        b() = b1;
+        c() = c1;
+    }
+    Overlap_Sub2(const Overlap_Sub2& other):Overlap(e::Sub2) {
+        getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+    }
+    Overlap_Sub2& operator=(const Overlap_Sub2& other) {
+         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+         return *this;
+    }
+    ~Overlap_Sub2() {}
+
+    String& b() const { return *(String*)(mLayout->data); }
+    TupleOf<String>& c() const { return *(TupleOf<String>*)(mLayout->data + size1); }
+private:
+    static const int size1 = sizeof(String);
+};
+
+Overlap Overlap::Sub2(const String& b, const TupleOf<String>& c) {
+    return Overlap_Sub2(b, c);
+}
+
+class Overlap_Sub3 : public Overlap {
+public:
+    static ConcreteAlternative* getType() {
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), e::Sub3);
+        return t;
+    }
+    static Alternative* getAlternative() { return Overlap::getType(); }
+
+    Overlap_Sub3():Overlap(e::Sub3) {}
+    Overlap_Sub3( const int64_t& b1):Overlap(e::Sub3) {
+        b() = b1;
+    }
+    Overlap_Sub3(const Overlap_Sub3& other):Overlap(e::Sub3) {
+        getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+    }
+    Overlap_Sub3& operator=(const Overlap_Sub3& other) {
+         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+         return *this;
+    }
+    ~Overlap_Sub3() {}
+
+    int64_t& b() const { return *(int64_t*)(mLayout->data); }
+private:
+};
+
+Overlap Overlap::Sub3(const int64_t& b) {
+    return Overlap_Sub3(b);
+}
+
+OneOf<bool,int64_t,String> Overlap::b() const {
+    if (isSub1())
+        return OneOf<bool,int64_t,String>(((Overlap_Sub1*)this)->b());
+    if (isSub2())
+        return OneOf<bool,int64_t,String>(((Overlap_Sub2*)this)->b());
+    if (isSub3())
+        return OneOf<bool,int64_t,String>(((Overlap_Sub3*)this)->b());
+    throw std::runtime_error("\"Overlap\" subtype does not contain \"b\"");
+}
+
+OneOf<TupleOf<String>,int64_t> Overlap::c() const {
+    if (isSub1())
+        return OneOf<TupleOf<String>,int64_t>(((Overlap_Sub1*)this)->c());
+    if (isSub2())
+        return OneOf<TupleOf<String>,int64_t>(((Overlap_Sub2*)this)->c());
+    throw std::runtime_error("\"Overlap\" subtype does not contain \"c\"");
+}
+
+// END Generated Alternative Overlap
+
 // Generated Alternative A=
 //     Sub1=(b=int64_t, c=int64_t)
 //     Sub2=(d=String, e=String)
@@ -36,10 +249,10 @@ public:
     bool isSub2() const { return which() == e::Sub2; }
 
     // Accessors for members
-    const int64_t& b() const;
-    const int64_t& c() const;
-    const String& d() const;
-    const String& e() const;
+    int64_t b() const;
+    int64_t c() const;
+    String d() const;
+    String e() const;
 
     Alternative::layout* getLayout() const { return mLayout; }
 protected:
@@ -152,25 +365,25 @@ A A::Sub2(const String& d, const String& e) {
     return A_Sub2(d, e);
 }
 
-const int64_t& A::b() const {
+int64_t A::b() const {
     if (isSub1())
         return ((A_Sub1*)this)->b();
     throw std::runtime_error("\"A\" subtype does not contain \"b\"");
 }
 
-const int64_t& A::c() const {
+int64_t A::c() const {
     if (isSub1())
         return ((A_Sub1*)this)->c();
     throw std::runtime_error("\"A\" subtype does not contain \"c\"");
 }
 
-const String& A::d() const {
+String A::d() const {
     if (isSub2())
         return ((A_Sub2*)this)->d();
     throw std::runtime_error("\"A\" subtype does not contain \"d\"");
 }
 
-const String& A::e() const {
+String A::e() const {
     if (isSub2())
         return ((A_Sub2*)this)->e();
     throw std::runtime_error("\"A\" subtype does not contain \"e\"");
@@ -200,7 +413,7 @@ public:
     static Alternative* getType();
     ~Bexpress() { getType()->destroy((instance_ptr)&mLayout); }
     Bexpress():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
-    Bexpress(e::kind k):mLayout(0) { getType(); ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
+    Bexpress(e::kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
     Bexpress(const Bexpress& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
     Bexpress& operator=(const Bexpress& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
 
@@ -222,10 +435,10 @@ public:
     bool isLeaf() const { return which() == e::Leaf; }
 
     // Accessors for members
-    const Bexpress& left() const;
-    const String& op() const;
-    const Bexpress& right() const;
-    const bool& value() const;
+    Bexpress left() const;
+    String op() const;
+    Bexpress right() const;
+    bool value() const;
 
     Alternative::layout* getLayout() const { return mLayout; }
 protected:
@@ -285,7 +498,7 @@ public:
 class Bexpress_BinOp : public Bexpress {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), e::BinOp);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), e::BinOp);
         return t;
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
@@ -325,7 +538,7 @@ Bexpress Bexpress::BinOp(const Bexpress& left, const String& op, const Bexpress&
 class Bexpress_UnaryOp : public Bexpress {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), e::UnaryOp);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), e::UnaryOp);
         return t;
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
@@ -357,7 +570,7 @@ Bexpress Bexpress::UnaryOp(const String& op, const Bexpress& right) {
 class Bexpress_Leaf : public Bexpress {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), e::Leaf);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), e::Leaf);
         return t;
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
@@ -383,13 +596,13 @@ Bexpress Bexpress::Leaf(const bool& value) {
     return Bexpress_Leaf(value);
 }
 
-const Bexpress& Bexpress::left() const {
+Bexpress Bexpress::left() const {
     if (isBinOp())
         return ((Bexpress_BinOp*)this)->left();
     throw std::runtime_error("\"Bexpress\" subtype does not contain \"left\"");
 }
 
-const String& Bexpress::op() const {
+String Bexpress::op() const {
     if (isBinOp())
         return ((Bexpress_BinOp*)this)->op();
     if (isUnaryOp())
@@ -397,7 +610,7 @@ const String& Bexpress::op() const {
     throw std::runtime_error("\"Bexpress\" subtype does not contain \"op\"");
 }
 
-const Bexpress& Bexpress::right() const {
+Bexpress Bexpress::right() const {
     if (isBinOp())
         return ((Bexpress_BinOp*)this)->right();
     if (isUnaryOp())
@@ -405,7 +618,7 @@ const Bexpress& Bexpress::right() const {
     throw std::runtime_error("\"Bexpress\" subtype does not contain \"right\"");
 }
 
-const bool& Bexpress::value() const {
+bool Bexpress::value() const {
     if (isLeaf())
         return ((Bexpress_Leaf*)this)->value();
     throw std::runtime_error("\"Bexpress\" subtype does not contain \"value\"");
