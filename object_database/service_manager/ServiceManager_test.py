@@ -302,9 +302,9 @@ class FlexLayoutTestService(ServiceBase):
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         nestedGridCell = ColorCell("rgb(150, 150, 150)",
                                    [
-                                       ColorCell("blue"),
-                                       ColorCell("blue"),
-                                       ColorCell("blue")])
+                                       ColorCell("red"),
+                                       ColorCell("red"),
+                                       ColorCell("red")])
         nestedGridCell.baseStyles.add_styles({
             'grid-row-start': '1',
             'grid-row-end': 'span 2',
