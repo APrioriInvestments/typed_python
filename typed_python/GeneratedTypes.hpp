@@ -16,7 +16,8 @@ public:
 
     static Alternative* getType();
     ~A() { getType()->destroy((instance_ptr)&mLayout); }
-    A() { getType()->constructor((instance_ptr)&mLayout); }
+    A():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
+    A(e::kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
     A(const A& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
     A& operator=(const A& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
 
@@ -40,6 +41,7 @@ public:
     const String& d() const;
     const String& e() const;
 
+    Alternative::layout* getLayout() const { return mLayout; }
 protected:
     Alternative::layout *mLayout;
 };
@@ -94,26 +96,19 @@ public:
     }
     static Alternative* getAlternative() { return A::getType(); }
 
-    A_Sub1() { 
-        getType()->constructor(
-            (instance_ptr)&mLayout,
-            [](instance_ptr p) {Sub1_Type->constructor(p);});
-    }
-    A_Sub1( const int64_t& b1,  const int64_t& c1) {
-        A_Sub1(); 
+    A_Sub1():A(e::Sub1) {}
+    A_Sub1( const int64_t& b1,  const int64_t& c1):A(e::Sub1) {
         b() = b1;
         c() = c1;
     }
-    A_Sub1(const A_Sub1& other) {
+    A_Sub1(const A_Sub1& other):A(e::Sub1) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     A_Sub1& operator=(const A_Sub1& other) {
          getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
          return *this;
     }
-    ~A_Sub1() {
-        getType()->destroy((instance_ptr)&mLayout);
-    }
+    ~A_Sub1() {}
 
     int64_t& b() const { return *(int64_t*)(mLayout->data); }
     int64_t& c() const { return *(int64_t*)(mLayout->data + size1); }
@@ -133,26 +128,19 @@ public:
     }
     static Alternative* getAlternative() { return A::getType(); }
 
-    A_Sub2() { 
-        getType()->constructor(
-            (instance_ptr)&mLayout,
-            [](instance_ptr p) {Sub2_Type->constructor(p);});
-    }
-    A_Sub2( const String& d1,  const String& e1) {
-        A_Sub2(); 
+    A_Sub2():A(e::Sub2) {}
+    A_Sub2( const String& d1,  const String& e1):A(e::Sub2) {
         d() = d1;
         e() = e1;
     }
-    A_Sub2(const A_Sub2& other) {
+    A_Sub2(const A_Sub2& other):A(e::Sub2) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     A_Sub2& operator=(const A_Sub2& other) {
          getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
          return *this;
     }
-    ~A_Sub2() {
-        getType()->destroy((instance_ptr)&mLayout);
-    }
+    ~A_Sub2() {}
 
     String& d() const { return *(String*)(mLayout->data); }
     String& e() const { return *(String*)(mLayout->data + size1); }
@@ -211,7 +199,8 @@ public:
 
     static Alternative* getType();
     ~Bexpress() { getType()->destroy((instance_ptr)&mLayout); }
-    Bexpress() { getType()->constructor((instance_ptr)&mLayout); }
+    Bexpress():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
+    Bexpress(e::kind k):mLayout(0) { getType(); ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
     Bexpress(const Bexpress& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
     Bexpress& operator=(const Bexpress& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
 
@@ -238,6 +227,7 @@ public:
     const Bexpress& right() const;
     const bool& value() const;
 
+    Alternative::layout* getLayout() const { return mLayout; }
 protected:
     Alternative::layout *mLayout;
 };
@@ -300,7 +290,7 @@ public:
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
 
-    Bexpress_BinOp() { 
+    Bexpress_BinOp() {
         getType()->constructor(
             (instance_ptr)&mLayout,
             [](instance_ptr p) {BinOp_Type->constructor(p);});
@@ -311,16 +301,14 @@ public:
         op() = op1;
         right() = right1;
     }
-    Bexpress_BinOp(const Bexpress_BinOp& other) {
+    Bexpress_BinOp(const Bexpress_BinOp& other):Bexpress(e::BinOp) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Bexpress_BinOp& operator=(const Bexpress_BinOp& other) {
          getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
          return *this;
     }
-    ~Bexpress_BinOp() {
-        getType()->destroy((instance_ptr)&mLayout);
-    }
+    ~Bexpress_BinOp() {}
 
     Bexpress& left() const { return *(Bexpress*)(mLayout->data); }
     String& op() const { return *(String*)(mLayout->data + size1); }
@@ -342,26 +330,19 @@ public:
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
 
-    Bexpress_UnaryOp() { 
-        getType()->constructor(
-            (instance_ptr)&mLayout,
-            [](instance_ptr p) {UnaryOp_Type->constructor(p);});
-    }
-    Bexpress_UnaryOp( const String& op1,  const Bexpress& right1) {
-        Bexpress_UnaryOp(); 
+    Bexpress_UnaryOp():Bexpress(e::UnaryOp) {}
+    Bexpress_UnaryOp( const String& op1,  const Bexpress& right1):Bexpress(e::UnaryOp) {
         op() = op1;
         right() = right1;
     }
-    Bexpress_UnaryOp(const Bexpress_UnaryOp& other) {
+    Bexpress_UnaryOp(const Bexpress_UnaryOp& other):Bexpress(e::UnaryOp) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Bexpress_UnaryOp& operator=(const Bexpress_UnaryOp& other) {
          getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
          return *this;
     }
-    ~Bexpress_UnaryOp() {
-        getType()->destroy((instance_ptr)&mLayout);
-    }
+    ~Bexpress_UnaryOp() {}
 
     String& op() const { return *(String*)(mLayout->data); }
     Bexpress& right() const { return *(Bexpress*)(mLayout->data + size1); }
@@ -381,25 +362,18 @@ public:
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
 
-    Bexpress_Leaf() { 
-        getType()->constructor(
-            (instance_ptr)&mLayout,
-            [](instance_ptr p) {Leaf_Type->constructor(p);});
-    }
-    Bexpress_Leaf( const bool& value1) {
-        Bexpress_Leaf(); 
+    Bexpress_Leaf():Bexpress(e::Leaf) {}
+    Bexpress_Leaf( const bool& value1):Bexpress(e::Leaf) {
         value() = value1;
     }
-    Bexpress_Leaf(const Bexpress_Leaf& other) {
+    Bexpress_Leaf(const Bexpress_Leaf& other):Bexpress(e::Leaf) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Bexpress_Leaf& operator=(const Bexpress_Leaf& other) {
          getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
          return *this;
     }
-    ~Bexpress_Leaf() {
-        getType()->destroy((instance_ptr)&mLayout);
-    }
+    ~Bexpress_Leaf() {}
 
     bool& value() const { return *(bool*)(mLayout->data); }
 private:
