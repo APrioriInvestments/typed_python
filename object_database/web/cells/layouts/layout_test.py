@@ -72,3 +72,24 @@ class FlexLayoutTests(unittest.TestCase):
         result = style.get_style('flex-direction')
         expected = 'column-reverse'
         self.assertEqual(expected, result)
+
+    def test_align_options_style(self):
+        layout = FlexLayout(wrap="wrap", align_items="stretch")
+        layout._make_styles()
+        style = layout.get_styles()
+        result = style.get_style('display')
+        expected = 'flex'
+        result = style.get_style('display')
+        self.assertEqual(expected, result)
+        result = style.get_style('flex-wrap')
+        expected = 'wrap'
+        self.assertEqual(expected, result)
+        result = style.get_style('align-items')
+        expected = 'stretch'
+        self.assertEqual(expected, result)
+
+    def test_align_options_assert(self):
+        with self.assertRaises(Exception):
+            FlexLayout(wrap="BADINPUT")
+        with self.assertRaises(Exception):
+            FlexLayout(justify_content="BADINPUT")

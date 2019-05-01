@@ -15,7 +15,7 @@
 import abc
 
 
-class BaseLayout(abc.ABCMeta):
+class BaseLayout(abc.ABC):
     """A Layout base ABC class.
 
     Not to to be used directly.

@@ -27,7 +27,9 @@ class FlexLayout(BaseLayout):
     StyleAttributes objects and can return these to any
     consumers of its behaviors.
     """
-    def __init__(self, direction="row", reverse=False):
+    def __init__(self, direction="row", reverse=False, wrap="nowrap",
+                 justify_content="flex-start", align_items="stretch",
+                 align_content="flex-start"):
         """
         Parameters
         ----------
@@ -36,11 +38,42 @@ class FlexLayout(BaseLayout):
         reverse: Bool
             Reverses the natural order of either rows or
             columns.
+        wrap: Str
+            "nowrap", "wrap" or "wrap-reverse"
+        justify_content : Str
+            "flex-start", "flex-end", "center", "space-between",
+            "space-around", "space-evenly"
+        align_items: Str
+            "stretch", "flex-start", "flex-end", "center", "baseline"
+        align_content: Str
+            "flex-start", "flex-end", "center", "space-between",
+            "space-around", "stretch"
+
         """
-        assert direction in ["row", "column"], ("flex direction must be one"
-                                                " of 'row' or 'column'.")
+        dir_ops = ["row", "column"]
+        assert direction in dir_ops, ("flex direction must be one of %s."
+                                      % ", ".join(dir_ops))
+        wrap_ops = ["nowrap", "wrap", "wrap-reverse"]
+        assert wrap in wrap_ops, ("flex wrap must be one of must be one of %s."
+                                  % ", ".join(wrap_ops))
+        jc_ops = ["flex-start", "flex-end", "center", "space-between",
+                  "space-around", "space-evenly"]
+        assert justify_content in jc_ops, ("flex justify-contentmust be one"
+                                           " of must be one of %s."
+                                           % ", ".join(wrap_ops))
+        ai_ops = ["stretch", "flex-start", "flex-end", "center", "baseline"]
+        assert align_items in ai_ops, ("flex align-items must be on of %s."
+                                       % ", ".join(ai_ops))
+        ac_ops = ["flex-start", "flex-end", "center", "space-between",
+                  "space-around", "stretch"]
+        assert align_content in ac_ops, ("flex align-items must be on of %s." %
+                                         ", ".join(ac_ops))
         self.direction = direction
         self.reverse = reverse
+        self.wrap = wrap
+        self.justify_content = justify_content
+        self.align_items = align_items
+        self.align_content = align_content
 
     def get_style_inline(self):
         """Returns this layout's CSS style for inline HTML.
@@ -84,5 +117,9 @@ class FlexLayout(BaseLayout):
             reverse = ""
 
         styles.add_style('flex-direction', self.direction + reverse)
+        styles.add_style('flex-wrap', self.wrap)
+        styles.add_style('justify-content', self.justify_content)
+        styles.add_style('align-items', self.align_items)
+        styles.add_style('align-content', self.align_content)
 
         return styles
