@@ -129,8 +129,11 @@ int test_list_of() {
     {
         ListOf<int64_t> list3 = list2;
         my_assert(list2.getLayout()->refcount == 2)
+        my_assert(list3.getLayout()->refcount == 2)
         ListOf<int64_t> list4(list3);
         my_assert(list2.getLayout()->refcount == 3)
+        my_assert(list3.getLayout()->refcount == 3)
+        my_assert(list4.getLayout()->refcount == 3)
     }
     my_assert(list2.getLayout()->refcount == 1)
     my_assert(list2[2] == 7)
@@ -160,8 +163,11 @@ int test_tuple_of() {
     {
         TupleOf<int64_t> t3 = t2;
         my_assert(t2.getLayout()->refcount == 2)
+        my_assert(t3.getLayout()->refcount == 2)
         TupleOf<int64_t> t4(t3);
         my_assert(t2.getLayout()->refcount == 3)
+        my_assert(t3.getLayout()->refcount == 3)
+        my_assert(t4.getLayout()->refcount == 3)
     }
     my_assert(t2.getLayout()->refcount == 1)
     my_assert(t2[2] == 14)
@@ -188,8 +194,12 @@ int test_dict() {
 
     {
         Dict<bool, int64_t>d2 = d1;
+        my_assert(d1.getLayout()->refcount == 2)
+        my_assert(d2.getLayout()->refcount == 2)
         Dict<bool, int64_t>d3 = d2;
         my_assert(d1.getLayout()->refcount == 3)
+        my_assert(d2.getLayout()->refcount == 3)
+        my_assert(d3.getLayout()->refcount == 3)
     }
     my_assert(d1.getLayout()->refcount == 1)
 
@@ -272,6 +282,79 @@ int test_named_tuple() {
     return 0;
 }
 
+// Depends on generated types A and Bexpress in GeneratedTypes.hpp
+int test_alternative() {
+    test_fn_header()
+
+    A_Sub1 asub1(12, 34);
+    my_assert(asub1.isSub1())
+    my_assert(!asub1.isSub2())
+    my_assert(asub1.b() == 12)
+    my_assert(asub1.c() == 34)
+    A_Sub2 asub2(String("this"), String("that"));
+    my_assert(!asub2.isSub1())
+    my_assert(asub2.isSub2())
+    my_assert(asub2.d() == String("this"))
+    my_assert(asub2.e() == String("that"))
+
+    A a1 = A_Sub1(111, 222);
+    my_assert(a1.isSub1())
+    my_assert(!a1.isSub2())
+    my_assert(a1.b() == 111)
+    my_assert(a1.c() == 222)
+    A a2 = A_Sub2(String("this"), String("that"));
+    my_assert(!a2.isSub1())
+    my_assert(a2.isSub2())
+    my_assert(a2.d() == String("this"))
+    my_assert(a2.e() == String("that"))
+    my_assert(a2.getLayout()->refcount == 1)
+    {
+        A a3(a2);
+        A a4 = a2;
+        my_assert(a2.getLayout()->refcount == 3)
+        my_assert(a3.getLayout()->refcount == 3)
+        my_assert(a4.getLayout()->refcount == 3)
+    }
+    my_assert(a2.getLayout()->refcount == 1)
+
+//  These fail (unresolved forwards)
+//    errlog("b0");
+//    Bexpress b0;
+//    errlog("b1");
+//    Bexpress b1 = Bexpress_Leaf(true);
+//    errlog("b2");
+//    Bexpress b2 = Bexpress_Leaf(false);
+//    errlog("b3");
+//    Bexpress b3 = Bexpress_Leaf(true);
+//    errlog("b4");
+//    Bexpress b4 = Bexpress_Leaf(false);
+//    errlog("b5");
+//    Bexpress b5 = Bexpress_BinOp(b1, String("and"), b2);
+//    errlog("b6");
+//    Bexpress b6 = Bexpress_UnaryOp(String("not"), b3);
+//    errlog("b7");
+//    Bexpress b7 = Bexpress_BinOp(b6, String("and"), b4);
+//    errlog("b8");
+//    Bexpress b8 = Bexpress_BinOp(b5, String("or"), b7);
+//    my_assert(b1.isLeaf())
+//    my_assert(b2.isLeaf())
+//    my_assert(b3.isLeaf())
+//    my_assert(b4.isLeaf())
+//    my_assert(b5.isBinOp())
+//    my_assert(b6.isUnaryOp())
+//    my_assert(b7.isBinOp())
+//    my_assert(b8.isBinOp())
+//    my_assert(b8.left().isBinOp())
+//    my_assert(b8.right().isBinOp())
+//    my_assert(b8.left().left().isLeaf())
+//    my_assert(b8.left().right().isLeaf())
+//    my_assert(b8.right().left().isUnaryOp())
+//    my_assert(b8.right().right().isLeaf())
+//    my_assert(b8.right().left().right().isLeaf())
+
+    return 0;
+}
+
 int direct_cpp_tests() {
     int ret = 0;
     std::cerr << "Start " << __FUNCTION__ << "()" << std::endl;
@@ -281,6 +364,7 @@ int direct_cpp_tests() {
     ret += test_dict();
     ret += test_one_of();
     ret += test_named_tuple();
+    ret += test_alternative();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 
