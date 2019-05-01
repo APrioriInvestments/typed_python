@@ -38,7 +38,7 @@ SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
 UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
 TP_O_FILES = $(TP_BUILD_PATH)/all.o
 ODB_O_FILES = $(ODB_BUILD_PATH)/all.o
-GENERATEDTYPES = $(TP_SRC_PATH)/GeneratedTestTypes.hpp
+GENERATEDTYPES = $(TP_SRC_PATH)/GeneratedTypes0.hpp
 
 ##########################################################################
 #  MAIN RULES
@@ -98,7 +98,7 @@ unicodeprops: ./unicodeprops.py
 .PHONY: generatetesttypes
 generatetesttypes: $(TP_SRC_PATH)/generate_types.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(TP_SRC_PATH)/generate_types.py --testTypes $(TP_SRC_PATH)/TestGeneratedTypes.hpp
+	python3 $(TP_SRC_PATH)/generate_types.py --testTypes $(GENERATEDTYPES)
 
 .PHONY: cpptests
 cpptests: $(TP_SRC_PATH)/direct_types_test.py
