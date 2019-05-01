@@ -179,9 +179,8 @@ def gen_alternative_type(name, d):
     ret.append('')
     ret.append('    // Accessors for members')
     for m in members:
-        # TODO: support members with multiple potential types
         m_type = return_type(members[m])
-        ret.append(f'    const {m_type}& {m}() const;')
+        ret.append(f'    {m_type} {m}() const;')
     ret.append('')
     ret.append('    Alternative::layout* getLayout() const { return mLayout; }')
     ret.append('protected:')
@@ -234,7 +233,7 @@ def gen_alternative_type(name, d):
         ret.append(f'class {name}_{nt} : public {name} {{')
         ret.append('public:')
         ret.append('    static ConcreteAlternative* getType() {')
-        ret.append(f'        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), e::{nt});')
+        ret.append(f'        static ConcreteAlternative* t = ConcreteAlternative::Make({name}::getType(), e::{nt});')
         ret.append('        return t;')
         ret.append('    }')
         ret.append(f'    static Alternative* getAlternative() {{ return {name}::getType(); }}')
@@ -275,16 +274,16 @@ def gen_alternative_type(name, d):
         ret.append('')
     for m in members:
         m_type = return_type(members[m])
-        ret.append(f'const {m_type}& {name}::{m}() const {{')
-        fallthrough_needed = False
+        multiple_types = (len(members[m]) > 1)
+        ret.append(f'{m_type} {name}::{m}() const {{')
         for nt in nts:
             if m in [e[0] for e in d[nt]]:
                 ret.append(f'    if (is{nt}())')
-                ret.append(f'        return (({name}_{nt}*)this)->{m}();')
-            else:
-                fallthrough_needed = True
-        if fallthrough_needed:
-            ret.append(f'    throw std::runtime_error("\\"{name}\\" subtype does not contain \\"{m}\\"");')
+                if multiple_types:
+                    ret.append(f'        return {m_type}((({name}_{nt}*)this)->{m}());')
+                else:
+                    ret.append(f'        return (({name}_{nt}*)this)->{m}();')
+        ret.append(f'    throw std::runtime_error("\\"{name}\\" subtype does not contain \\"{m}\\"");')
         ret.append('}')
         ret.append('')
     ret.append(f'// END Generated Alternative {name}')
@@ -379,6 +378,8 @@ def generate_some_types(dest):
     )
     with open(dest, 'w') as f:
         f.writelines(typed_python_codegen(
+            Overlap=Alternative('Overlap', Sub1={'b': bool, 'c': int}, Sub2={'b': str, 'c': TupleOf(str)},
+                                Sub3={'b': int}),
             A=Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str}),
             Bexpress=Bexpress,
             NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
