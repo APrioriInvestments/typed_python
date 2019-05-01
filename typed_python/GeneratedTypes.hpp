@@ -341,6 +341,7 @@ public:
     }
     static Alternative* getAlternative() { return A::getType(); }
 
+
     A_Sub2():A(e::Sub2) {}
     A_Sub2( const String& d1,  const String& e1):A(e::Sub2) {
         d() = d1;

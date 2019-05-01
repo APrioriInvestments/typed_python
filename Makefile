@@ -105,6 +105,11 @@ cpptests: $(TP_SRC_PATH)/direct_types_test.py
 	. $(VIRTUAL_ENV)/bin/activate; \
 	python3 $(TP_SRC_PATH)/direct_types_test.py --test
 
+.PHONY: cpptests
+cpptests: $(TP_SRC_PATH)/direct_types_test.py
+	. $(VIRTUAL_ENV)/bin/activate; \
+	python3 $(TP_SRC_PATH)/direct_types_test.py --test
+
 .PHONY: clean
 clean:
 	rm -rf build/
