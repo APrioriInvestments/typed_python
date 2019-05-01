@@ -153,7 +153,9 @@ def gen_alternative_type(name, d):
     ret.append('')
     ret.append('    static Alternative* getType();')
     ret.append(f'    ~{name}() {{ getType()->destroy((instance_ptr)&mLayout); }}')
-    ret.append(f'    {name}() {{ getType()->constructor((instance_ptr)&mLayout); }}')
+    ret.append(f'    {name}():mLayout(0) {{ getType()->constructor((instance_ptr)&mLayout); }}')
+    ret.append(f'    {name}(e::kind k):mLayout(0) {{ '
+               'ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }')
     ret.append(f'    {name}(const {name}& in) '
                '{ getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }')
     ret.append(f'    {name}& operator=(const {name}& other) '
@@ -181,6 +183,7 @@ def gen_alternative_type(name, d):
         m_type = return_type(members[m])
         ret.append(f'    const {m_type}& {m}() const;')
     ret.append('')
+    ret.append('    Alternative::layout* getLayout() const { return mLayout; }')
     ret.append('protected:')
     ret.append('    Alternative::layout *mLayout;')
     ret.append('};')
@@ -237,19 +240,14 @@ def gen_alternative_type(name, d):
         ret.append(f'    static Alternative* getAlternative() {{ return {name}::getType(); }}')
         # ret.append(f'    static NamedTuple* elementType() {{ return {nt}_Type; }}')
         ret.append('')
-        ret.append(f'    {name}_{nt}() {{ ')
-        ret.append('        getType()->constructor(')
-        ret.append('            (instance_ptr)&mLayout,')
-        ret.append(f'            [](instance_ptr p) {{{nt}_Type->constructor(p);}});')
-        ret.append('    }')
+        ret.append(f'    {name}_{nt}():{name}(e::{nt}) {{}}')
         ret.append(f'    {name}_{nt}('
                    + ", ".join([f' const {resolved(t)}& {a}1' for a, t in d[nt]])
-                   + f') {{')
-        ret.append(f'        {name}_{nt}(); ')
+                   + f'):{name}(e::{nt}) {{')
         for a, _ in d[nt]:
             ret.append(f'        {a}() = {a}1;')
         ret.append('    }')
-        ret.append(f'    {name}_{nt}(const {name}_{nt}& other) {{')
+        ret.append(f'    {name}_{nt}(const {name}_{nt}& other):{name}(e::{nt}) {{')
         ret.append(f'        getType()->copy_constructor((instance_ptr)&mLayout, '
                    '(instance_ptr)&other.mLayout);')
         ret.append('    }')
@@ -257,9 +255,7 @@ def gen_alternative_type(name, d):
         ret.append('         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);')
         ret.append('         return *this;')
         ret.append('    }')
-        ret.append(f'    ~{name}_{nt}() {{')
-        ret.append(f'        getType()->destroy((instance_ptr)&mLayout);')
-        ret.append('    }')
+        ret.append(f'    ~{name}_{nt}() {{}}')
         ret.append('')
         for i, (a, t) in enumerate(d[nt]):
             offset = '' if i == 0 else ' + ' + ' + '.join([f'size' + str(j) for j in range(1, i + 1)])
