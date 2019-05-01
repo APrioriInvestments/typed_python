@@ -29,9 +29,10 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
-    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, GridView, ColorCell
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, GridView,
+    ColorCell, FlexView
 )
-from object_database.web.cells.layouts import GridLayout
+from object_database.web.cells.layouts import GridLayout, FlexLayout
 from object_database import (
     Schema, Indexed, core_schema,
     service_schema, current_transaction
@@ -299,27 +300,30 @@ class FlexLayoutTestService(ServiceBase):
         pass
 
     @staticmethod
-    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
-        nestedGridCell = ColorCell("rgb(150, 150, 150)",
-                                   [
-                                       ColorCell("red"),
-                                       ColorCell("red"),
-                                       ColorCell("red")])
-        nestedGridCell.baseStyles.add_styles({
-            'grid-row-start': '1',
-            'grid-row-end': 'span 2',
-            'grid-column-start': '1',
-            'grid-column-end': 'span 2'
-        })
-        nestedGridCell.layout = GridLayout()
+    def serviceDisplay(serviceObject, instance=None, objType=None,
+                       queryArgs=None):
+        basicCell1 = ColorCell("red")
+        basicCell1.baseStyles.add_styles({"height": "20%"})
+        basicCell2 = ColorCell("red")
+        basicCell2.baseStyles.add_styles({"height": "20%"})
+        basicCell3 = ColorCell("red")
+        basicCell3.baseStyles.add_styles({"height": "20%"})
+        nestedFlexCell = ColorCell("rgb(150, 150, 150)", [basicCell1,
+                                                          basicCell2,
+                                                          basicCell3])
+        nestedFlexCell.baseStyles.add_styles({"width": "20%"})
+        nestedFlexCell.layout = FlexLayout(direction="column",
+                                           justify_content="space-around")
 
-        return GridView([
-            CodeEditor(),
-            ColorCell("green"),
-            ColorCell("red"),
-            nestedGridCell,
-            ColorCell("yellow"),
-        ], num_columns=4, num_rows=4)
+        child1 = ColorCell("green")
+        child1.baseStyles.add_styles({"width": "15%"})
+        child2 = ColorCell("red")
+        child2.baseStyles.add_styles({"width": "15%"})
+        child3 = ColorCell("yellow")
+        child3.baseStyles.add_styles({"width": "15%"})
+        child4 = ColorCell("blue")
+        child4.baseStyles.add_styles({"width": "15%"})
+        return FlexView([child1, child2, child3, child4, nestedFlexCell])
 
 
 class GridLayoutTestService(ServiceBase):
