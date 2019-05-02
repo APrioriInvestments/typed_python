@@ -1,6 +1,7 @@
 import unittest
 from object_database.web.cells.layouts.grid import GridLayout
 from object_database.web.cells.layouts.flex import FlexLayout
+from object_database.web.cells.layouts.flex_child import FlexChildStyler
 from object_database.web.html.styles import StyleAttributes
 
 
@@ -93,3 +94,79 @@ class FlexLayoutTests(unittest.TestCase):
             FlexLayout(wrap="BADINPUT")
         with self.assertRaises(Exception):
             FlexLayout(justify_content="BADINPUT")
+
+
+class FlexChildStylerTests(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def test_order(self):
+        layout = FlexChildStyler()
+        layout._make_styles()
+        style = layout.get_styles()
+        result = style.get_style('order')
+        expected = '0'
+        self.assertEqual(expected, result)
+        layout = FlexChildStyler(order=-1)
+        style = layout.get_styles()
+        result = style.get_style('order')
+        expected = '-1'
+        self.assertEqual(expected, result)
+
+    def test_flex_grow(self):
+        layout = FlexChildStyler()
+        layout._make_styles()
+        style = layout.get_styles()
+        result = style.get_style('flex-grow')
+        expected = '0'
+        self.assertEqual(expected, result)
+        layout = FlexChildStyler(flex_grow=-1)
+        style = layout.get_styles()
+        result = style.get_style('flex-grow')
+        expected = '-1'
+        self.assertEqual(expected, result)
+
+    def test_flex_shrink(self):
+        layout = FlexChildStyler()
+        layout._make_styles()
+        style = layout.get_styles()
+        result = style.get_style('flex-shrink')
+        expected = '1'
+        self.assertEqual(expected, result)
+        layout = FlexChildStyler(flex_shrink=-1)
+        style = layout.get_styles()
+        result = style.get_style('flex-shrink')
+        expected = '-1'
+        self.assertEqual(expected, result)
+
+    def test_flex_basis(self):
+        layout = FlexChildStyler()
+        layout._make_styles()
+        style = layout.get_styles()
+        result = style.get_style('flex-basis')
+        expected = 'auto'
+        self.assertEqual(expected, result)
+        layout = FlexChildStyler(flex_basis="25%")
+        style = layout.get_styles()
+        result = style.get_style('flex-basis')
+        expected = '25%'
+        self.assertEqual(expected, result)
+
+    def test_align_self(self):
+        layout = FlexChildStyler()
+        layout._make_styles()
+        style = layout.get_styles()
+        result = style.get_style('align-self')
+        expected = 'auto'
+        self.assertEqual(expected, result)
+        layout = FlexChildStyler(align_self="flex-start")
+        style = layout.get_styles()
+        result = style.get_style('align-self')
+        expected = 'flex-start'
+        self.assertEqual(expected, result)
+
+    def test_align_options_assert(self):
+        with self.assertRaises(Exception):
+            FlexLayout(order="BADINPUT")
+        with self.assertRaises(Exception):
+            FlexLayout(flex_basis="BADINPUT")
