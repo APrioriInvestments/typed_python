@@ -15,6 +15,7 @@
 from object_database.web.html.styles import StyleAttributes
 from object_database.web.cells.layouts.styler import Styler
 
+
 class GridChildStyler(Styler):
     """A Styler for generating styles for children of GridLayouts.
 
