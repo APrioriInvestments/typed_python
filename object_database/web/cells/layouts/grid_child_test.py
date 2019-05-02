@@ -1,6 +1,6 @@
 import unittest
 from object_database.web.cells.layouts.grid_child import GridChildStyler
-from object_database.web.html.styles import StyleAttributes
+
 
 class GridChildStylerTests(unittest.TestCase):
     def setUp(self):

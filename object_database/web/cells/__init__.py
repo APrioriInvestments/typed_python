@@ -58,7 +58,7 @@ from object_database.web.cells.cells import (
     _PlotUpdater
 )
 
-from object_database.web.cells.basic_grid import *
+from object_database.web.cells.basic_grid import GridView, GridViewWithSidebar, ColorCell
 
 from object_database.web.cells.basic_flex import FlexView
 

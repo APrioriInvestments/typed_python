@@ -1,6 +1,7 @@
 import unittest
 from object_database.web.html.styles import StyleAttributes
 
+
 class StyleAttributesTests(unittest.TestCase):
     def setUp(self):
         pass

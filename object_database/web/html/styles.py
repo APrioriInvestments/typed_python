@@ -20,6 +20,7 @@ and inline HTML strings from those values
 """
 from io import StringIO
 
+
 class StyleAttributes():
     """CSS Style Attributes class.
 

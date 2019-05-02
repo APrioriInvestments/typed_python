@@ -58,7 +58,6 @@ class GridLayout(Styler):
         """A CSS value for gap between cells"""
         self.grid_gap = None
 
-
     def update_rows(self, num_rows, row_mapping):
         """Updates the mapping for the grid rows.
 

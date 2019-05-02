@@ -640,7 +640,7 @@ class Cell:
         self.serializationContext = TypedPythonCodebase.coreSerializationContext()
         self.context = {}
 
-        self.layout = None # A Layout object that encapsulates CSS layout behavior
+        self.layout = None  # A Layout object that encapsulates CSS layout behavior
         self.baseStyles = StyleAttributes()
 
         self._logger = logging.getLogger(__name__)

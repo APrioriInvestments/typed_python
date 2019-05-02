@@ -372,6 +372,7 @@ class GridLayoutTestService(ServiceBase):
             ColorCell("yellow"),
         ], num_columns=4, num_rows=4)
 
+
 class GridLayoutSidebarTestService(ServiceBase):
     def initialize(self):
         pass
@@ -380,16 +381,16 @@ class GridLayoutSidebarTestService(ServiceBase):
     def serviceDisplay(serviceObject, instance=None, objType=None,
                        queryArgs=None):
         nestedContent = ColorCell("red",
-                                      [
-                                          ColorCell("green"),
-                                          CodeEditor(),
-                                          ColorCell("blue")])
+                                  [ColorCell("green"),
+                                   CodeEditor(),
+                                   ColorCell("blue")])
         nestedContent.layout = GridLayout()
         sidebar = ColorCell("yellow")
         footer = ColorCell("rgb(150, 150, 150)")
         view = GridViewWithSidebar(sidebar, nestedContent, footer)
         view.baseStyles = StyleAttributes(width="90vw", height="90vh")
         return view
+
 
 happy = Schema("core.test.happy")
 @happy.define

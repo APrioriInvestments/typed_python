@@ -95,4 +95,3 @@ class FlexChildStyler(Styler):
         styles.add_style('align-self', self.align_self)
 
         return styles
-

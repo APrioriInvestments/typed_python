@@ -19,6 +19,7 @@ from object_database.web.html.styles import StyleAttributes
 from object_database.web.cells.layouts import GridLayout
 from object_database.web.cells.layouts import GridChildStyler
 
+
 class GridView(Cell):
     def __init__(self, children, num_columns=2, num_rows=2):
         super().__init__()
@@ -49,6 +50,7 @@ class GridView(Cell):
         if isinstance(self.parent.layout, GridLayout):
             return None
         return StyleAttributes(height='80vh', width='80vw')
+
 
 class GridViewWithSidebar(Cell):
     def __init__(self, sidebarCell, contentCell, footerCell=None):
