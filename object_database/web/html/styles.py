@@ -155,6 +155,26 @@ class StyleAttributes():
         """
         return len(self._attributes.items()) == 0
 
+    def append(self, other_styles):
+        """Adds the passed StyleAttributes object to current
+        instance.
+
+        Note that any common attributes will be overwritten
+        by those in the passed-in object.
+
+        Also note this is a mutating method and is
+        therefore different from __add__
+
+        Parameters
+        ----------
+        other_styles: StyleAttributes
+            An object whose styles will be
+            copied into the current instance.
+        """
+        # Skip if None
+        if other_styles:
+            self.add_styles(other_styles.as_dict())
+
     def __add__(self, other_styles):
         """Add two styles together. Merges them into new instance."""
         result = StyleAttributes(**self._attributes)

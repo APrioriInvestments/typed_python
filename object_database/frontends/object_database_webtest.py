@@ -25,6 +25,7 @@ from object_database.service_manager.ServiceManager_test import (
     TextEditorService,
     HappyService,
     GridLayoutTestService,
+    GridLayoutSidebarTestService,
     FlexLayoutTestService,
     UninitializableService
 )
@@ -101,6 +102,12 @@ def main(argv=None):
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
                     GridLayoutTestService, "GridLayoutTestService", target_count=1
+                )
+            with database.transaction():
+                service = ServiceManager.createOrUpdateService(
+                    GridLayoutSidebarTestService,
+                    "GridLayoutSidebarTestService",
+                    target_count=1
                 )
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(

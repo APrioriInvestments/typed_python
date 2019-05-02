@@ -30,9 +30,10 @@ from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
     Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, GridView,
-    ColorCell, FlexView
+    ColorCell, FlexView, GridViewWithSidebar
 )
 from object_database.web.cells.layouts import GridLayout, FlexLayout
+from object_database.web.html.styles import StyleAttributes
 from object_database import (
     Schema, Indexed, core_schema,
     service_schema, current_transaction
@@ -352,6 +353,24 @@ class GridLayoutTestService(ServiceBase):
             nestedGridCell,
             ColorCell("yellow"),
         ], num_columns=4, num_rows=4)
+
+class GridLayoutSidebarTestService(ServiceBase):
+    def initialize(self):
+        pass
+
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None,
+                       queryArgs=None):
+        nestedContent = ColorCell("red",
+                                      [
+                                          ColorCell("green"),
+                                          ColorCell("blue")])
+        nestedContent.layout = GridLayout()
+        sidebar = ColorCell("yellow")
+        footer = ColorCell("rgb(150, 150, 150)")
+        view = GridViewWithSidebar(sidebar, nestedContent, footer)
+        view.baseStyles = StyleAttributes(width="90vw", height="90vh")
+        return view
 
 happy = Schema("core.test.happy")
 @happy.define
