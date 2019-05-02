@@ -364,6 +364,7 @@ class GridLayoutSidebarTestService(ServiceBase):
         nestedContent = ColorCell("red",
                                       [
                                           ColorCell("green"),
+                                          CodeEditor(),
                                           ColorCell("blue")])
         nestedContent.layout = GridLayout()
         sidebar = ColorCell("yellow")

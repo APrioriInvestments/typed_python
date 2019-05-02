@@ -101,7 +101,7 @@ class GridViewWithSidebar(Cell):
         sidebar_styler = GridChildStyler(row_span=2)
         content_styler = GridChildStyler(row_span=2)
         if self.footerCell:
-            footer_styler = GridChildStyler(column_span=2)
+            footer_styler = GridChildStyler(column_start=2, column_span=1)
             self.footerCell.baseStyles.append(footer_styler.get_styles())
         self.sidebarCell.baseStyles.append(sidebar_styler.get_styles())
         self.contentCell.baseStyles.append(content_styler.get_styles())
