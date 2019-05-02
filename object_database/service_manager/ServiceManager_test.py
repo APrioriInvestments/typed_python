@@ -32,7 +32,7 @@ from object_database.web.cells import (
     Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, GridView,
     ColorCell, FlexView, GridViewWithSidebar
 )
-from object_database.web.cells.layouts import GridLayout, FlexLayout
+from object_database.web.cells.layouts import GridLayout, FlexLayout, FlexChildStyler
 from object_database.web.html.styles import StyleAttributes
 from object_database import (
     Schema, Indexed, core_schema,
@@ -303,7 +303,7 @@ class FlexLayoutTestService(ServiceBase):
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None,
                        queryArgs=None):
-        basicCell1 = ColorCell("red")
+        basicCell1 = ColorCell("red", ["I am basic Cell"])
         basicCell1.baseStyles.add_styles({"height": "20%"})
         basicCell2 = ColorCell("red")
         basicCell2.baseStyles.add_styles({"height": "20%"})
@@ -312,19 +312,37 @@ class FlexLayoutTestService(ServiceBase):
         nestedFlexCell = ColorCell("rgb(150, 150, 150)", [basicCell1,
                                                           basicCell2,
                                                           basicCell3])
-        nestedFlexCell.baseStyles.add_styles({"width": "20%"})
+        nestedFlexCell.baseStyles.add_styles({"width": "15%"})
         nestedFlexCell.layout = FlexLayout(direction="column",
                                            justify_content="space-around")
 
+        basicChildCell1 = ColorCell("blue", ["I am flex child cell. Order 2."])
+        basicChildCell1.baseStyles.append(FlexChildStyler(order=2).get_styles())
+        basicChildCell1.baseStyles.add_styles({"height": "20%"})
+        basicChildCell2 = ColorCell("yellow", ["I am flex child cell. Order "
+                                               "1."])
+        basicChildCell2.baseStyles.append(FlexChildStyler(order=1).get_styles())
+        basicChildCell2.baseStyles.add_styles({"height": "20%"})
+        basicChildCell3 = ColorCell("red", ["I am flex child cell. Order 3."])
+        basicChildCell3.baseStyles.append(FlexChildStyler(order=3).get_styles())
+        basicChildCell3.baseStyles.add_styles({"height": "20%"})
+        nestedFlexChildCell = ColorCell("rgb(150, 150, 150)",
+                                        [basicChildCell1, basicChildCell2,
+                                         basicChildCell3])
+
+        nestedFlexChildCell.baseStyles.add_styles({"width": "15%"})
+        nestedFlexChildCell.layout = FlexLayout(direction="column",
+                                                justify_content="space-around")
         child1 = ColorCell("green")
-        child1.baseStyles.add_styles({"width": "15%"})
+        child1.baseStyles.add_styles({"width": "10%"})
         child2 = ColorCell("red")
-        child2.baseStyles.add_styles({"width": "15%"})
+        child2.baseStyles.add_styles({"width": "10%"})
         child3 = ColorCell("yellow")
-        child3.baseStyles.add_styles({"width": "15%"})
+        child3.baseStyles.add_styles({"width": "10%"})
         child4 = ColorCell("blue")
-        child4.baseStyles.add_styles({"width": "15%"})
-        return FlexView([child1, child2, child3, child4, nestedFlexCell])
+        child4.baseStyles.add_styles({"width": "10%"})
+        return FlexView([child1, child2, child3, child4, nestedFlexCell,
+                         nestedFlexChildCell])
 
 
 class GridLayoutTestService(ServiceBase):
