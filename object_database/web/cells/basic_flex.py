@@ -12,21 +12,24 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-"""Example consumer of GridLayout"""
+"""Example consumer of FlexLayout"""
 from object_database.web.cells import Cell
 from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
 from object_database.web.html.styles import StyleAttributes
-from object_database.web.cells.layouts import GridLayout
+from object_database.web.cells.layouts import FlexLayout
 
 
-class GridView(Cell):
-    def __init__(self, children, num_columns=2, num_rows=2):
+class FlexView(Cell):
+    "An example layout. Not for prod."
+    def __init__(self, children, direction="row",
+                 justify_content="space-around"):
         super().__init__()
-        self.layout = GridLayout(num_columns, num_rows)
-        self.layout.grid_gap = '1em'
+        self.layout = FlexLayout(direction=direction,
+                                 justify_content=justify_content)
         self.children = {}
         for i in range(0, len(children)):
-            self.children['____content_child_%s__' % i] = Cell.makeCell(children[i])
+            self.children['____content_child_%s__' % i] = Cell.makeCell(
+                children[i])
 
     def recalculate(self):
         child_placeholders = []
@@ -36,7 +39,7 @@ class GridView(Cell):
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self.style().as_string())
-            .add_classes(['cell', 'container-cell', 'grid-container'])
+            .add_classes(['cell', 'container-cell', 'flex-container'])
             .add_children(child_placeholders)
         )
 
@@ -46,9 +49,10 @@ class GridView(Cell):
         return layout_style + in_parent_style
 
     def styleInParentLayout(self):
-        if isinstance(self.parent.layout, GridLayout):
+        if isinstance(self.parent.layout, FlexLayout):
             return None
         return StyleAttributes(height='80vh', width='80vw')
+
 
 class ColorCell(Cell):
     """Just an example. Not for prod."""

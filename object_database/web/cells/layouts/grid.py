@@ -22,11 +22,12 @@ Like other Layout objects, GridLayout interfaces with
 StyleAttributes objects and can return these to any
 consumers of its behaviors.
 """
+from object_database.web.cells.layouts.layout import BaseLayout
 from object_database.web.html.styles import StyleAttributes
 from io import StringIO
 
 
-class GridLayout():
+class GridLayout(BaseLayout):
     def __init__(self, num_rows=2, num_columns=2, row_mapping=None, col_mapping=None):
         """
         Parameters
