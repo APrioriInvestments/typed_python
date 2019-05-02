@@ -13,9 +13,9 @@
 #   limitations under the License.
 
 from object_database.web.html.styles import StyleAttributes
+from object_database.web.cells.layouts.styler import Styler
 
-
-class GridChildStyler(object):
+class GridChildStyler(Styler):
     """A Styler for generating styles for children of GridLayouts.
 
         This class represents a partial implementation of the
@@ -77,6 +77,16 @@ class GridChildStyler(object):
         row = self._make_row_styles()
         return column + row
 
+    def get_style_inline(self):
+        """Returns a string of inline-formatted styling
+        suited for inline HTML elements.
+
+        Returns
+        -------
+        String
+            An HTML inline formatted style string.
+        """
+        return self.get_styles().as_string()
 
     def _make_column_styles(self):
         """Returns a StyleAttributes instance for

@@ -15,8 +15,17 @@
 import abc
 
 
-class BaseLayout(abc.ABC):
-    """A Layout base ABC class.
+class Styler(abc.ABC):
+    """Abstract CSS Styler.
+
+    A Styler is any class that responds
+    with a configured StyleAttribtues
+    object via its `get_styles()`
+    method.
+
+    Subclasses include Layouts and other
+    objects that are used to conveniently
+    and easily create CSS styles.
 
     Not to to be used directly.
 

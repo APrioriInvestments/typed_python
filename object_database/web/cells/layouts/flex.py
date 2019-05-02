@@ -12,11 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.web.cells.layouts.layout import BaseLayout
+from object_database.web.cells.layouts.styler import Styler
 from object_database.web.html.styles import StyleAttributes
 
 
-class FlexLayout(BaseLayout):
+class FlexLayout(Styler):
     """A Layout properties object that represents a CSS Flex.
 
     FlexLayout represents the parent element container of any
