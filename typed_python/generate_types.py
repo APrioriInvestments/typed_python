@@ -111,6 +111,7 @@ def gen_named_tuple_type(name, **kwargs):
 
     return [e + '\n' for e in ret]
 
+
 def return_type(set_of_types):
     list_of_types = list(set_of_types)
     if len(list_of_types) == 0:
