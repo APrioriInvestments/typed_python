@@ -13,12 +13,14 @@
 #   limitations under the License.
 
 from object_database.web.cells import (
+    AsyncDropdown,
     Badge,
     Button,
     ButtonGroup,
     Card,
     CardTitle,
     Cells,
+    CircleLoader,
     Clickable,
     Code,
     CodeEditor,
@@ -439,6 +441,40 @@ class CellsHTMLTests(unittest.TestCase):
         self.assertHTMLNotEmpty(html)
         self.assertHTMLValid(html)
 
+    def test_async_dropdown_initial_html_valid(self):
+        def handler():
+            return Text("RESULT")
+
+        cell = AsyncDropdown('Untitled', handler)
+        cell.cells = self.cells
+
+        # Initial render
+        cell.recalculate()
+        html = cell.contents
+        self.assertHTMLNotEmpty(html)
+        self.assertHTMLValid(html)
+
+    def test_async_dropdown_changed_html_valid(self):
+        def handler():
+            return Text("RESULT")
+
+        cell = AsyncDropdown('Untitled', handler)
+        cell.cells = self.cells
+
+        # Async changed render
+        cell.recalculate()
+        cell.slot.set(True)
+        html = cell.contents
+        self.assertHTMLNotEmpty(html)
+        self.assertHTMLValid(html)
+
+    def test_circle_loeader_html_valid(self):
+        cell = CircleLoader()
+        cell.recalculate()
+        html = cell.contents
+        self.assertHTMLNotEmpty(html)
+        self.assertHTMLValid(html)
+
 
 class CellsTests(unittest.TestCase):
     @classmethod
@@ -754,3 +790,28 @@ class CellsTests(unittest.TestCase):
         self.assertTrue(self.cells.findChildrenByTag("large display 1"))
         self.assertTrue(self.cells.findChildrenByTag("sized display 2"))
         self.assertTrue(self.cells.findChildrenByTag("display 3"))
+
+    def test_async_dropdown_changes(self):
+        """Ensure that AsyncDropdown shows
+        the loading child first, then the
+        rendered child after changing the
+        open state.
+        """
+        changedCell = Text("Changed")
+
+        def handler():
+            return changedCell
+
+        dropdown = AsyncDropdown('Untitled', handler)
+        dropdown.contentCell.loadingCell = Text("INITIAL")
+        self.cells.withRoot(dropdown)
+        self.cells.renderMessages()
+
+        # Initial
+        self.assertTrue(dropdown in self.cells)
+        self.assertTrue(dropdown.contentCell.loadingCell in self.cells)
+
+        # Changed
+        dropdown.slot.set(True)
+        self.cells.renderMessages()
+        self.assertTrue(changedCell in self.cells)

@@ -172,7 +172,6 @@ class CellHandler {
                 if(target != null){
                     target.parentNode.replaceChild(source, target);
                 } else {
-                    debugger;
                     console.log("In message ", message, " couldn't find ", replacementKey);
                 }
             });
@@ -194,5 +193,56 @@ class CellHandler {
         let element = document.createElement("div");
         element.innerHTML = html;
         return element.children[0];
+    }
+
+    /**
+     * This is a (hopefully temporary) hack
+     * that will intercept the first time a
+     * dropdown carat is clicked and bind
+     * Bootstrap Dropdown event handlers
+     * to it that should be bound to the
+     * identified cell. We are forced to do this
+     * because the current Cells infrastructure
+     * does not have flexible event binding/handling.
+     * @param {string} cellId - The ID of the cell
+     * to identify in the socket callback we will
+     * bind to open and close events on dropdown
+     */
+    dropdownInitialBindFor(cellId){
+        let elementId = cellId + '-dropdownMenuButton';
+        let element = document.getElementById(elementId);
+        if(!element){
+            throw Error('Element of id ' + elementId + ' doesnt exist!');
+        }
+        let dropdownMenu = element.parentElement;
+        let firstTimeClicked = element.dataset.firstclick == 'true';
+        if(firstTimeClicked){
+            $(dropdownMenu).on('show.bs.dropdown', function(){
+                cellSocket.sendString(JSON.stringify({
+                    event: 'dropdown',
+                    target_cell: cellId,
+                    isOpen: false
+                }));
+            });
+            $(dropdownMenu).on('hide.bs.dropdown', function(){
+                cellSocket.sendString(JSON.stringify({
+                    event: 'dropdown',
+                    target_cell: cellId,
+                    isOpen: true
+                }));
+            });
+
+            // Now expire the first time clicked
+            element.dataset.firstclick = 'false';
+        }
+    }
+
+    /**
+     * Unsafely executes any passed in string
+     * as if it is valid JS against the global
+     * window state.
+     */
+    static unsafelyExecute(aString){
+        window.exec(aString);
     }
 }

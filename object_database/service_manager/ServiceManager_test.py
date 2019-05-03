@@ -29,7 +29,7 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
-    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown
 )
 
 from object_database import (
@@ -294,7 +294,25 @@ class GraphDisplayService(ServiceBase):
                 'mode': 'markers', 'opacity': .5, 'marker': {'size': 2}}}
 
 
+class DropdownTestService(ServiceBase):
+    def initialize(self):
+        pass
+
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        return Card(
+            AsyncDropdown('Dropdown', DropdownTestService.delayAndDisplay)
+        )
+
+    @staticmethod
+    def delayAndDisplay():
+        time.sleep(1)
+        return Text('NOW WE HAVE LOADED')
+
+
 happy = Schema("core.test.happy")
+
+
 @happy.define
 class Happy:
     i = int

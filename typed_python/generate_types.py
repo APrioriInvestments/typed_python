@@ -111,7 +111,6 @@ def gen_named_tuple_type(name, **kwargs):
 
     return [e + '\n' for e in ret]
 
-
 def return_type(set_of_types):
     list_of_types = list(set_of_types)
     if len(list_of_types) == 0:
@@ -234,6 +233,7 @@ def gen_alternative_type(name, d):
         ret.append(f'class {name}_{nt} : public {name} {{')
         ret.append('public:')
         ret.append('    static ConcreteAlternative* getType() {')
+
         ret.append(f'        static ConcreteAlternative* t = ConcreteAlternative::Make({name}::getType(), e::{nt});')
         ret.append('        return t;')
         ret.append('    }')
