@@ -248,7 +248,7 @@ int test_one_of() {
     my_assert(o3.getValue(s));
     my_assert(s == String("yes"))
 
-    // fails:
+    // fails, since the template doesn't collapse contained OneOf types:
 //    OneOf<OneOf<bool, String>, OneOf<int32_t, String>> o4;
 //    o4 = String("a");
 //    o4 = (int32_t)9;
@@ -335,40 +335,45 @@ int test_alternative() {
     o1.b().getValue(val3);
     my_assert(val3 == 45)
 
-//  These fail (unresolved forwards)
-//    errlog("b0");
-//    Bexpress b0;
-//    errlog("b1");
-//    Bexpress b1 = Bexpress_Leaf(true);
-//    errlog("b2");
-//    Bexpress b2 = Bexpress_Leaf(false);
-//    errlog("b3");
-//    Bexpress b3 = Bexpress_Leaf(true);
-//    errlog("b4");
-//    Bexpress b4 = Bexpress_Leaf(false);
-//    errlog("b5");
-//    Bexpress b5 = Bexpress_BinOp(b1, String("and"), b2);
-//    errlog("b6");
-//    Bexpress b6 = Bexpress_UnaryOp(String("not"), b3);
-//    errlog("b7");
-//    Bexpress b7 = Bexpress_BinOp(b6, String("and"), b4);
-//    errlog("b8");
-//    Bexpress b8 = Bexpress_BinOp(b5, String("or"), b7);
-//    my_assert(b1.isLeaf())
-//    my_assert(b2.isLeaf())
-//    my_assert(b3.isLeaf())
-//    my_assert(b4.isLeaf())
-//    my_assert(b5.isBinOp())
-//    my_assert(b6.isUnaryOp())
-//    my_assert(b7.isBinOp())
-//    my_assert(b8.isBinOp())
-//    my_assert(b8.left().isBinOp())
-//    my_assert(b8.right().isBinOp())
-//    my_assert(b8.left().left().isLeaf())
-//    my_assert(b8.left().right().isLeaf())
-//    my_assert(b8.right().left().isUnaryOp())
-//    my_assert(b8.right().right().isLeaf())
-//    my_assert(b8.right().left().right().isLeaf())
+    Bexpress_Leaf b0;
+    Bexpress b1 = Bexpress_Leaf(true);
+    Bexpress b2 = Bexpress_Leaf(false);
+    Bexpress b3 = Bexpress_Leaf(true);
+    Bexpress b4 = Bexpress_Leaf(false);
+    Bexpress b5 = Bexpress_BinOp(b1, String("and"), b2);
+    Bexpress b6 = Bexpress_UnaryOp(String("not"), b3);
+    Bexpress b7 = Bexpress_BinOp(b6, String("and"), b4);
+    Bexpress b8 = Bexpress_BinOp(b5, String("or"), b7);
+    my_assert(b1.isLeaf())
+    my_assert(b1.value() == true)
+    my_assert(b2.isLeaf())
+    my_assert(b2.value() == false)
+    my_assert(b3.isLeaf())
+    my_assert(b3.value() == true)
+    my_assert(b4.isLeaf())
+    my_assert(b4.value() == false)
+    my_assert(b5.isBinOp())
+    my_assert(b5.op() == String("and"))
+    my_assert(b6.isUnaryOp())
+    my_assert(b6.op() == String("not"))
+    my_assert(b7.isBinOp())
+    my_assert(b7.op() == String("and"))
+    my_assert(b8.isBinOp())
+    my_assert(b8.op() == String("or"))
+    my_assert(b8.left().isBinOp())
+    my_assert(b8.left().op() == String("and"))
+    my_assert(b8.right().isBinOp())
+    my_assert(b8.right().op() == String("and"))
+    my_assert(b8.left().left().isLeaf())
+    my_assert(b8.left().left().value() == true)
+    my_assert(b8.left().right().isLeaf())
+    my_assert(b8.left().right().value() == false)
+    my_assert(b8.right().left().isUnaryOp())
+    my_assert(b8.right().left().op() == String("not"))
+    my_assert(b8.right().right().isLeaf())
+    my_assert(b8.right().right().value() == false)
+    my_assert(b8.right().left().right().isLeaf())
+    my_assert(b8.right().left().right().value() == true)
 
     return 0;
 }
