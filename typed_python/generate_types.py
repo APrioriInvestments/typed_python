@@ -190,8 +190,8 @@ def gen_alternative_type(name, d):
     ret.append('template <>')
     ret.append(f'class TypeDetails<{name}*> {{')
     ret.append('public:')
-    ret.append('    static Type* getType() {')
-    ret.append(f'        static Type* t = new Forward(0, "{name}");')
+    ret.append('    static Forward* getType() {')
+    ret.append(f'        static Forward* t = new Forward(0, "{name}");')
     ret.append('        return t;')
     ret.append('    }')
     ret.append('    static const uint64_t bytecount = sizeof(void*);')
@@ -208,11 +208,12 @@ def gen_alternative_type(name, d):
     ret.append(f'    static Alternative* t = Alternative::Make("{name}", {{')
     ret.append(f',\n'.join([f'        {{"{nt}", {nt}_Type}}' for nt in nts]))
     ret.append('    }, {});')
-    for nt in nts:
-        for _, t in d[nt]:
-            if t.endswith('*'):
-                ret.append(f'    {nt}_Type->directResolveForward(TypeDetails<{name}*>::getType(), t);')
-                break
+    ret.append('    static bool once = false;')
+    ret.append('    if (!once) {')
+    ret.append('        once = true;')
+    ret.append(f'        TypeDetails<{name}*>::getType()->setTarget(t);')
+    ret.append(f'        Type *t1 = t->guaranteeForwardsResolved([](void* p) {{ return (Type*)0; }});')
+    ret.append('    }')
     ret.append('    return t;')
     ret.append('}')
     ret.append('')
@@ -363,6 +364,9 @@ def generate_some_types(dest):
     Bexpress = lambda: Bexpress
     Bexpress = Alternative(
         "BooleanExpr",
+        Leaf={
+            "value": bool
+        },
         BinOp={
             "left": Bexpress,
             "op": str,
@@ -371,16 +375,13 @@ def generate_some_types(dest):
         UnaryOp={
             "op": str,
             "right": Bexpress
-        },
-        Leaf={
-            "value": bool
         }
     )
     with open(dest, 'w') as f:
         f.writelines(typed_python_codegen(
+            A=Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str}),
             Overlap=Alternative('Overlap', Sub1={'b': bool, 'c': int}, Sub2={'b': str, 'c': TupleOf(str)},
                                 Sub3={'b': int}),
-            A=Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str}),
             Bexpress=Bexpress,
             NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
             NamedTupleBoolIntStr=NamedTuple(b=bool, i=int, s=str),

@@ -32,6 +32,21 @@ public:
         m_name = name;
     }
 
+    // this constructor is for c++ direct types
+    Forward(std::string name) :
+        Type(TypeCategory::catForward),
+        mTarget(nullptr),
+        mDefinition(nullptr)
+    {
+        m_references_unresolved_forwards = true;
+        m_name = name;
+    }
+
+    // this method is for c++ direct types
+    void setTarget(Type* target) {
+        mTarget = target;
+    }
+
     Type* getTarget() const {
         return mTarget;
     }
@@ -43,7 +58,6 @@ public:
         }
 
         Type* t = resolver(mDefinition);
-
         if (!t) {
             m_failed_resolution = true;
         }
@@ -68,6 +82,12 @@ public:
     }
 
     void _forwardTypesMayHaveChanged() {
+        // This is only meant to be triggered when we are resolving c++ forward references,
+        // (which lack the python mDefinition).
+        // Without resetting m_references_unresolved_forwards, we would only resolve a single c++ reference
+        // Maybe there is a better place for this.
+        if (!mDefinition)
+            m_references_unresolved_forwards = true;
     }
 
     void resolveDuringSerialization(Type* newTarget) {
