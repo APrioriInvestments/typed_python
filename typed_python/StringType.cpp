@@ -792,39 +792,3 @@ void StringType::assign(instance_ptr self, instance_ptr other) {
     destroy((instance_ptr)&old);
 }
 
-bool Bytes::isBinaryCompatibleWithConcrete(Type* other) {
-    if (other->getTypeCategory() != m_typeCategory) {
-        return false;
-    }
-
-    return true;
-}
-
-void Bytes::repr(instance_ptr self, ReprAccumulator& stream) {
-    stream << "b" << "'";
-    long bytes = count(self);
-    uint8_t* base = eltPtr(self,0);
-
-    static char hexDigits[] = "0123456789abcdef";
-
-    for (long k = 0; k < bytes;k++) {
-        if (base[k] == '\'') {
-            stream << "\\'";
-        } else if (base[k] == '\r') {
-            stream << "\\r";
-        } else if (base[k] == '\n') {
-            stream << "\\n";
-        } else if (base[k] == '\t') {
-            stream << "\\t";
-        } else if (base[k] == '\\') {
-            stream << "\\\\";
-        } else if (isprint(base[k])) {
-            stream << base[k];
-        } else {
-            stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
-        }
-    }
-
-    stream << "'";
-}
-

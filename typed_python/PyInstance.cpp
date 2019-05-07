@@ -1215,9 +1215,9 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
     }
     if (PyBytes_Check(inst)) {
         return Instance::createAndInitialize(
-            Bytes::Make(),
+            BytesType::Make(),
             [&](instance_ptr i) {
-                Bytes::Make()->constructor(i, PyBytes_GET_SIZE(inst), PyBytes_AsString(inst));
+                BytesType::Make()->constructor(i, PyBytes_GET_SIZE(inst), PyBytes_AsString(inst));
             }
         );
     }
@@ -1297,7 +1297,7 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
     }
 
     if (arg == Py_None) {
-        return None::Make();
+        return NoneType::Make();
     }
 
     if (PyFunction_Check(arg)) {
@@ -1319,13 +1319,13 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
             return Float64::Make();
         }
         if (pyType == Py_None->ob_type) {
-            return None::Make();
+            return NoneType::Make();
         }
         if (pyType == &PyBool_Type) {
             return Bool::Make();
         }
         if (pyType == &PyBytes_Type) {
-            return Bytes::Make();
+            return BytesType::Make();
         }
         if (pyType == &PyUnicode_Type) {
             return StringType::Make();

@@ -37,7 +37,7 @@ class SerializationBuffer;
 class DeserializationBuffer;
 
 class Type;
-class None;
+class NoneType;
 class Bool;
 class UInt8;
 class UInt16;
@@ -50,7 +50,7 @@ class Int64;
 class Float32;
 class Float64;
 class StringType;
-class Bytes;
+class BytesType;
 class OneOfType;
 class Value;
 class TupleOfType;
@@ -180,7 +180,7 @@ public:
     auto check(const T& f) -> decltype(f(*this)) {
         switch (m_typeCategory) {
             case catNone:
-                return f(*(None*)this);
+                return f(*(NoneType*)this);
             case catBool:
                 return f(*(Bool*)this);
             case catUInt8:
@@ -202,7 +202,7 @@ public:
             case catString:
                 return f(*(StringType*)this);
             case catBytes:
-                return f(*(Bytes*)this);
+                return f(*(BytesType*)this);
             case catFloat32:
                 return f(*(Float32*)this);
             case catFloat64:

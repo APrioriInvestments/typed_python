@@ -113,6 +113,30 @@ int test_string() {
     return 0;
 }
 
+int test_bytes() {
+    test_fn_header()
+    Bytes b1(7, "\x03\x02\x01\x00\x01\x02\x03\x04");
+    Bytes b2(6, "\x00\x00\x00\x00\x01\x00\x00");
+    my_assert(b1.getLayout()->bytecount == 7)
+    my_assert(b2.getLayout()->bytecount == 6)
+    Bytes b3 = b1 + b2;
+    my_assert(b3.getLayout()->bytecount == 13)
+    my_assert(b3.getLayout()->refcount == 1)
+    {
+        Bytes b4(b3);
+        my_assert(b3.getLayout()->refcount == 2)
+        my_assert(b4.getLayout()->refcount == 2)
+        Bytes b5 = b3;
+        my_assert(b3.getLayout()->refcount == 3)
+        my_assert(b4.getLayout()->refcount == 3)
+        my_assert(b5.getLayout()->refcount == 3)
+    }
+    my_assert(b3.getLayout()->refcount == 1)
+
+
+    return 0;
+}
+
 int test_list_of() {
     test_fn_header()
 
@@ -210,6 +234,34 @@ int test_dict() {
     const String *ps = d4.lookupValueByKey(String("second"));
     my_assert(ps);
     my_assert(*ps == String("2nd"));
+    return 0;
+}
+
+int test_const_dict() {
+    test_fn_header()
+
+    ConstDict<String, int64_t> c1({ {String("a"), 5}, {String("c"), 7}, {String("b"), 6}});
+
+    const int64_t *pv = c1.lookupValueByKey(String("a"));
+    my_assert(pv)
+    my_assert(*pv == 5)
+    pv = c1.lookupValueByKey(String("b"));
+    my_assert(pv)
+    my_assert(*pv == 6)
+    pv = c1.lookupValueByKey(String("c"));
+    my_assert(pv)
+    my_assert(*pv == 7)
+    {
+        ConstDict<String, int64_t>c2(c1);
+        my_assert(c1.getLayout()->refcount == 2)
+        my_assert(c2.getLayout()->refcount == 2)
+        ConstDict<String, int64_t>c3 = c1;
+        my_assert(c1.getLayout()->refcount == 3)
+        my_assert(c2.getLayout()->refcount == 3)
+        my_assert(c3.getLayout()->refcount == 3)
+    }
+    my_assert(c1.getLayout()->refcount == 1)
+
     return 0;
 }
 
@@ -378,16 +430,31 @@ int test_alternative() {
     return 0;
 }
 
+int test_none() {
+    test_fn_header()
+
+    OneOf<None, bool> o1(true);
+    my_assert(o1.getLayout()->which == 1)
+    None n;
+    OneOf<None, bool> o2(n);
+    my_assert(o2.getLayout()->which == 0)
+
+    return 0;
+}
+
 int direct_cpp_tests() {
     int ret = 0;
     std::cerr << "Start " << __FUNCTION__ << "()" << std::endl;
     ret += test_string();
+    ret += test_bytes();
     ret += test_list_of();
     ret += test_tuple_of();
     ret += test_dict();
+    ret += test_const_dict();
     ret += test_one_of();
     ret += test_named_tuple();
     ret += test_alternative();
+    ret += test_none();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;
 

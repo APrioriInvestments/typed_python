@@ -16,7 +16,7 @@
 
 #include "AllTypes.hpp"
 
-int32_t Bytes::hash32(instance_ptr left) {
+int32_t BytesType::hash32(instance_ptr left) {
     Hash32Accumulator acc((int)getTypeCategory());
 
     if (!(*(layout**)left)) {
@@ -37,7 +37,7 @@ int32_t Bytes::hash32(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
-bool Bytes::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool BytesType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     if ( !(*(layout**)left) && !(*(layout**)right) ) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
@@ -68,7 +68,35 @@ bool Bytes::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
 }
 
-Bytes::layout* Bytes::concatenate(layout* lhs, layout* rhs) {
+// static
+char BytesType::cmpStatic(layout* left, layout* right) {
+    if ( !left && !right ) {
+        return 0;
+    }
+    if ( !left && right ) {
+        return -1;
+    }
+    if ( left && !right ) {
+        return 1;
+    }
+
+    int commonCount = std::min(left->bytecount, right->bytecount);
+    char res = 0;
+    res = byteCompare(left->data, right->data, commonCount);
+    if (res) {
+        return res;
+    }
+    if (left->bytecount < right->bytecount) {
+        return -1;
+    }
+    if (left->bytecount > right->bytecount) {
+        return 1;
+    }
+
+    return 0;
+}
+
+BytesType::layout* BytesType::concatenate(layout* lhs, layout* rhs) {
     if (!rhs && !lhs) {
         return lhs;
     }
@@ -92,7 +120,7 @@ Bytes::layout* Bytes::concatenate(layout* lhs, layout* rhs) {
     return new_layout;
 }
 
-Bytes::layout* Bytes::createFromPtr(const char* data, int64_t length) {
+BytesType::layout* BytesType::createFromPtr(const char* data, int64_t length) {
     layout* new_layout = (layout*)malloc(sizeof(layout) + length);
     new_layout->refcount = 1;
     new_layout->hash_cache = -1;
@@ -103,7 +131,7 @@ Bytes::layout* Bytes::createFromPtr(const char* data, int64_t length) {
     return new_layout;
 }
 
-void Bytes::constructor(instance_ptr self, int64_t count, const char* data) const {
+void BytesType::constructor(instance_ptr self, int64_t count, const char* data) const {
     if (count == 0) {
         *(layout**)self = nullptr;
         return;
@@ -119,7 +147,7 @@ void Bytes::constructor(instance_ptr self, int64_t count, const char* data) cons
     }
 }
 
-instance_ptr Bytes::eltPtr(instance_ptr self, int64_t i) const {
+instance_ptr BytesType::eltPtr(instance_ptr self, int64_t i) const {
     //we don't want to have to return null here, but there is no actual memory to back this.
     if (*(layout**)self == nullptr) {
         return self;
@@ -128,7 +156,7 @@ instance_ptr Bytes::eltPtr(instance_ptr self, int64_t i) const {
     return (*(layout**)self)->data + i;
 }
 
-int64_t Bytes::count(instance_ptr self) const {
+int64_t BytesType::count(instance_ptr self) const {
     if (*(layout**)self == nullptr) {
         return 0;
     }
@@ -136,7 +164,7 @@ int64_t Bytes::count(instance_ptr self) const {
     return (*(layout**)self)->bytecount;
 }
 
-void Bytes::destroy(instance_ptr self) {
+void BytesType::destroy(instance_ptr self) {
     if (!*(layout**)self) {
         return;
     }
@@ -146,14 +174,14 @@ void Bytes::destroy(instance_ptr self) {
     }
 }
 
-void Bytes::copy_constructor(instance_ptr self, instance_ptr other) {
+void BytesType::copy_constructor(instance_ptr self, instance_ptr other) {
     (*(layout**)self) = (*(layout**)other);
     if (*(layout**)self) {
         (*(layout**)self)->refcount++;
     }
 }
 
-void Bytes::assign(instance_ptr self, instance_ptr other) {
+void BytesType::assign(instance_ptr self, instance_ptr other) {
     layout* old = (*(layout**)self);
 
     (*(layout**)self) = (*(layout**)other);
@@ -164,4 +192,41 @@ void Bytes::assign(instance_ptr self, instance_ptr other) {
 
     destroy((instance_ptr)&old);
 }
+
+bool BytesType::isBinaryCompatibleWithConcrete(Type* other) {
+    if (other->getTypeCategory() != m_typeCategory) {
+        return false;
+    }
+
+    return true;
+}
+
+void BytesType::repr(instance_ptr self, ReprAccumulator& stream) {
+    stream << "b" << "'";
+    long bytes = count(self);
+    uint8_t* base = eltPtr(self,0);
+
+    static char hexDigits[] = "0123456789abcdef";
+
+    for (long k = 0; k < bytes;k++) {
+        if (base[k] == '\'') {
+            stream << "\\'";
+        } else if (base[k] == '\r') {
+            stream << "\\r";
+        } else if (base[k] == '\n') {
+            stream << "\\n";
+        } else if (base[k] == '\t') {
+            stream << "\\t";
+        } else if (base[k] == '\\') {
+            stream << "\\\\";
+        } else if (isprint(base[k])) {
+            stream << base[k];
+        } else {
+            stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+        }
+    }
+
+    stream << "'";
+}
+
 

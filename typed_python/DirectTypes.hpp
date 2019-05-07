@@ -227,6 +227,117 @@ public:
     static const uint64_t bytecount = sizeof(void*);
 };
 
+class None {
+public:
+    static NoneType* getType() {
+        static NoneType* t = NoneType::Make();
+        return t;
+    }
+    None() {}
+    ~None() {}
+    None(None& other) {}
+    None& operator=(const None& other) { return *this; }
+};
+
+
+template<>
+class TypeDetails<None> {
+public:
+    static Type* getType() {
+        static Type* t = None::getType();
+        if (t->bytecount() != bytecount) {
+            throw std::runtime_error("somehow we have the wrong bytecount!");
+        }
+        return t;
+    }
+
+    static const uint64_t bytecount = 0;
+};
+
+
+class Bytes {
+public:
+    static BytesType* getType() {
+        static BytesType* t = BytesType::Make();
+        return t;
+    }
+
+    Bytes():mLayout(0) {}
+
+    explicit Bytes(size_t count, const char *pc):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, count, pc);
+    }
+
+    explicit Bytes(BytesType::layout* l):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, l->bytecount, (const char*)l->data);
+    }
+
+    ~Bytes() {
+        getType()->destroy((instance_ptr)&mLayout);
+    }
+
+    Bytes(const Bytes& other)
+    {
+        getType()->copy_constructor(
+           (instance_ptr)&mLayout,
+           (instance_ptr)&other.mLayout
+           );
+    }
+
+    Bytes& operator=(const Bytes& other)
+    {
+        getType()->assign(
+           (instance_ptr)&mLayout,
+           (instance_ptr)&other.mLayout
+           );
+        return *this;
+    }
+
+    template<class buf_t>
+    void serialize(buf_t& buffer) {
+        getType()->serialize<buf_t>((instance_ptr)&mLayout, buffer);
+    }
+
+    template<class buf_t>
+    void deserialize(buf_t& buffer) {
+        getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
+    }
+
+    static inline char cmp(const Bytes& left, const Bytes& right) {
+        return BytesType::cmpStatic(left.mLayout, right.mLayout);
+    }
+    bool operator==(const Bytes& right) const { return cmp(*this, right) == 0; }
+    bool operator!=(const Bytes& right) const { return cmp(*this, right) != 0; }
+    bool operator<(const Bytes& right) const { return cmp(*this, right) < 0; }
+    bool operator>(const Bytes& right) const { return cmp(*this, right) > 0; }
+    bool operator<=(const Bytes& right) const { return cmp(*this, right) <= 0; }
+    bool operator>=(const Bytes& right) const { return cmp(*this, right) >= 0; }
+    static Bytes concatenate(const Bytes& left, const Bytes& right) {
+        return Bytes(BytesType::concatenate(left.getLayout(), right.getLayout()));
+    }
+    Bytes operator+(const Bytes& right) {
+        return Bytes(BytesType::concatenate(mLayout, right.getLayout()));
+    }
+
+    BytesType::layout* getLayout() const { return mLayout; }
+private:
+    BytesType::layout* mLayout;
+};
+
+template<>
+class TypeDetails<Bytes> {
+public:
+    static Type* getType() {
+        static Type* t = BytesType::Make();
+        if (t->bytecount() != bytecount) {
+            throw std::runtime_error("somehow we have the wrong bytecount!");
+        }
+        return t;
+    }
+
+    static const uint64_t bytecount = sizeof(void*);
+};
+
 class String {
 public:
     static StringType* getType() {
@@ -432,7 +543,6 @@ public:
     DictType::layout* getLayout() const {
         return mLayout;
     }
-
 private:
     DictType::layout* mLayout;
 };
@@ -463,14 +573,14 @@ public:
         return t;
     }
 
-    static ConstDict<key_type, value_type> fromPython(PyObject* p) {
+    static ConstDict fromPython(PyObject* p) {
         ConstDictType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return (ConstDict<key_type, value_type>)l;
     }
 
     size_t size() const {
-        return !mLayout ? 0 : sizeof(*mLayout) ; //+ TypeDetails<element_type>::bytecount * mLayout->count;
+        return !mLayout ? 0 : sizeof(*mLayout);
     }
 
     template<class buf_t>
@@ -485,6 +595,20 @@ public:
 
     ConstDict(): mLayout(0) {
         getType()->constructor((instance_ptr)&mLayout);
+    }
+    ConstDict(std::vector<std::pair<key_type, value_type>> initlist):mLayout(0) {
+        size_t count = initlist.size();
+        getType()->constructor((instance_ptr)&mLayout, count, false);
+
+        for (size_t k = 0; k < count; k++) {
+            key_type* pk = (key_type*)getType()->kvPairPtrKey((instance_ptr)&mLayout, k);
+            new ((key_type *)pk) key_type(initlist[k].first);
+            value_type* pv = (value_type*)getType()->kvPairPtrValue((instance_ptr)&mLayout, k);
+            new ((value_type *)pv) value_type(initlist[k].second);
+        }
+        getType()->incKvPairCount((instance_ptr)&mLayout, count);
+        getType()->sortKvPairs((instance_ptr)&mLayout);
+        // TODO: catch constructor exceptions and unwind
     }
 
     ~ConstDict() {
@@ -519,10 +643,32 @@ public:
         return (value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
     }
 
+    //void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
+    ConstDict add(const ConstDict& lhs, const ConstDict& rhs) {
+        ConstDict result;
+        getType()->addDicts((instance_ptr)&lhs->mLayout, (instance_ptr)&rhs->mLayout, (instance_ptr)&result->mLayout);
+        return result;
+    }
+
+    ConstDict operator+(const ConstDict& rhs) {
+        return add(*this, rhs);
+    }
+
+    ConstDict operator+=(const ConstDict& rhs) {
+        getType()->addDicts((instance_ptr)&mLayout, (instance_ptr)&rhs->mLayout, (instance_ptr)&mLayout);
+        return *this;
+    }
+
+    //void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
+    ConstDict subtract(const ConstDict& lhs, TupleOf<key_type> keys) {
+        ConstDict result;
+        getType()->subtractTupleOfKeysFromDict((instance_ptr)&lhs->mLayout, (instance_ptr)&keys->getLayout(), (instance_ptr)&result->mLayout);
+        return result;
+    }
+
     ConstDictType::layout* getLayout() const {
         return mLayout;
     }
-
 private:
     ConstDictType::layout* mLayout;
 };
