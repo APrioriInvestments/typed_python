@@ -237,10 +237,29 @@ int test_dict() {
     return 0;
 }
 
+void dbgo(const ConstDict<String, int64_t>& c) {
+    ConstDictType* t = c.getType();
+    std::cerr << t->name();
+    instance_ptr self = (instance_ptr)&c;
+    std::cerr << "{";
+    int32_t ct = t->count(self);
+    for (long k = 0; k < ct;k++) {
+        if (k > 0) {
+            std::cerr << ", ";
+        }
+
+        String* ps = (String*)t->kvPairPtrKey(self, k);
+        uint64_t *pv = (uint64_t*)t->kvPairPtrValue(self,k);
+        std::cerr << (char)(ps->getLayout()->data[0]) << ": " << (uint64_t)*pv;
+    }
+    std::cerr << "}" << std::endl;
+}
+
 int test_const_dict() {
     test_fn_header()
 
-    ConstDict<String, int64_t> c1({ {String("a"), 5}, {String("c"), 7}, {String("b"), 6}});
+    ConstDict<String, int64_t> c1({{String("a"), 5}, {String("c"), 7}, {String("b"), 6}});
+    my_assert(c1.getLayout()->count == 3)
 
     const int64_t *pv = c1.lookupValueByKey(String("a"));
     my_assert(pv)
@@ -261,6 +280,38 @@ int test_const_dict() {
         my_assert(c3.getLayout()->refcount == 3)
     }
     my_assert(c1.getLayout()->refcount == 1)
+    ConstDict<String, int64_t> c4({{String("d"), 8}, {String("e"), 9}, {String("c"), 222}, {String("f"), 10}, {String("g"), 11}});
+    my_assert(c4.getLayout()->count == 5)
+    ConstDict<String, int64_t> c5 = c1 + c4;
+    my_assert(c5.getLayout()->count == 7)
+    pv = c5.lookupValueByKey(String("c"));
+    my_assert(pv)
+    my_assert(*pv == 222)
+    pv = c5.lookupValueByKey(String("d"));
+    my_assert(pv)
+    my_assert(*pv == 8)
+    pv = c5.lookupValueByKey(String("e"));
+    my_assert(pv)
+    my_assert(*pv == 9)
+    pv = c5.lookupValueByKey(String("f"));
+    my_assert(pv)
+    my_assert(*pv == 10)
+    pv = c5.lookupValueByKey(String("g"));
+    my_assert(pv)
+    my_assert(*pv == 11)
+
+    TupleOf<String> t1({String("b"), String("d"), String("f")});
+    ConstDict<String, int64_t> c6 = c5 - t1;
+    my_assert(c6.getLayout()->count == 4)
+    pv = c6.lookupValueByKey(String("b"));
+    my_assert(!pv)
+    pv = c6.lookupValueByKey(String("d"));
+    my_assert(!pv)
+    pv = c6.lookupValueByKey(String("f"));
+    my_assert(!pv)
+    pv = c6.lookupValueByKey(String("g"));
+    my_assert(pv)
+    my_assert(*pv == 11)
 
     return 0;
 }

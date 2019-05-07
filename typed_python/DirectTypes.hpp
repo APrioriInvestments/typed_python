@@ -643,10 +643,9 @@ public:
         return (value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
     }
 
-    //void addDicts(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
     ConstDict add(const ConstDict& lhs, const ConstDict& rhs) {
         ConstDict result;
-        getType()->addDicts((instance_ptr)&lhs->mLayout, (instance_ptr)&rhs->mLayout, (instance_ptr)&result->mLayout);
+        getType()->addDicts((instance_ptr)&lhs.mLayout, (instance_ptr)&rhs.mLayout, (instance_ptr)&result.mLayout);
         return result;
     }
 
@@ -654,16 +653,16 @@ public:
         return add(*this, rhs);
     }
 
-    ConstDict operator+=(const ConstDict& rhs) {
-        getType()->addDicts((instance_ptr)&mLayout, (instance_ptr)&rhs->mLayout, (instance_ptr)&mLayout);
-        return *this;
+    //void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
+    ConstDict subtract(const ConstDict& lhs, const TupleOf<key_type>& keys) {
+        ConstDict result;
+        TupleOfType::layout *l = keys.getLayout();
+        getType()->subtractTupleOfKeysFromDict((instance_ptr)&lhs.mLayout, (instance_ptr)&l, (instance_ptr)&result.mLayout);
+        return result;
     }
 
-    //void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
-    ConstDict subtract(const ConstDict& lhs, TupleOf<key_type> keys) {
-        ConstDict result;
-        getType()->subtractTupleOfKeysFromDict((instance_ptr)&lhs->mLayout, (instance_ptr)&keys->getLayout(), (instance_ptr)&result->mLayout);
-        return result;
+    ConstDict operator-(const TupleOf<key_type>& keys) {
+        return subtract(*this, keys);
     }
 
     ConstDictType::layout* getLayout() const {
