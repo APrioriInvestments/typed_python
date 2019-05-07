@@ -638,10 +638,10 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
         return ::Float64::Make();
     }
     if (category == Type::TypeCategory::catNone) {
-        return ::None::Make();
+        return ::NoneType::Make();
     }
     if (category == Type::TypeCategory::catBytes) {
-        return ::Bytes::Make();
+        return ::BytesType::Make();
     }
     if (category == Type::TypeCategory::catString) {
         return ::StringType::Make();

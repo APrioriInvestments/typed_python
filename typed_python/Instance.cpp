@@ -20,7 +20,7 @@
 Instance::layout* Instance::allocateNoneLayout() {
     layout* result = (layout*)malloc(sizeof(layout));
     result->refcount = 0;
-    result->type = None::Make();
+    result->type = NoneType::Make();
 
     return result;
 }
