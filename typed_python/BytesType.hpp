@@ -19,7 +19,7 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
-class Bytes : public Type {
+class BytesType : public Type {
 public:
     class layout {
     public:
@@ -29,7 +29,7 @@ public:
         uint8_t data[];
     };
 
-    Bytes() : Type(TypeCategory::catBytes)
+    BytesType() : Type(TypeCategory::catBytes)
     {
         m_name = "Bytes";
         m_is_default_constructible = true;
@@ -78,8 +78,9 @@ public:
     int32_t hash32(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+    static char cmpStatic(layout* left, layout* right);
 
-    static Bytes* Make() { static Bytes res; return &res; }
+    static BytesType* Make() { static BytesType res; return &res; }
 
     void constructor(instance_ptr self, int64_t count, const char* data) const;
 

@@ -76,7 +76,7 @@ Alternative* A::getType() {
     if (!once) {
         once = true;
         TypeDetails<A*>::getType()->setTarget(t);
-        Type *t1 = t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }
@@ -228,7 +228,7 @@ public:
     bool isSub3() const { return which() == e::Sub3; }
 
     // Accessors for members
-    OneOf<int64_t,bool,String> b() const;
+    OneOf<int64_t,String,bool> b() const;
     OneOf<int64_t,TupleOf<String>> c() const;
 
     Alternative::layout* getLayout() const { return mLayout; }
@@ -272,7 +272,7 @@ Alternative* Overlap::getType() {
     if (!once) {
         once = true;
         TypeDetails<Overlap*>::getType()->setTarget(t);
-        Type *t1 = t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }
@@ -383,13 +383,13 @@ Overlap Overlap::Sub3(const int64_t& b) {
     return Overlap_Sub3(b);
 }
 
-OneOf<int64_t,bool,String> Overlap::b() const {
+OneOf<int64_t,String,bool> Overlap::b() const {
     if (isSub1())
-        return OneOf<int64_t,bool,String>(((Overlap_Sub1*)this)->b());
+        return OneOf<int64_t,String,bool>(((Overlap_Sub1*)this)->b());
     if (isSub2())
-        return OneOf<int64_t,bool,String>(((Overlap_Sub2*)this)->b());
+        return OneOf<int64_t,String,bool>(((Overlap_Sub2*)this)->b());
     if (isSub3())
-        return OneOf<int64_t,bool,String>(((Overlap_Sub3*)this)->b());
+        return OneOf<int64_t,String,bool>(((Overlap_Sub3*)this)->b());
     throw std::runtime_error("\"Overlap\" subtype does not contain \"b\"");
 }
 
@@ -493,7 +493,7 @@ Alternative* Bexpress::getType() {
     if (!once) {
         once = true;
         TypeDetails<Bexpress*>::getType()->setTarget(t);
-        Type *t1 = t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }

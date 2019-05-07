@@ -18,9 +18,9 @@
 
 #include "Type.hpp"
 
-class None : public Type {
+class NoneType : public Type {
 public:
-    None() : Type(TypeCategory::catNone)
+    NoneType() : Type(TypeCategory::catNone)
     {
         m_name = "NoneType";
         m_size = 0;
@@ -60,7 +60,7 @@ public:
 
     void assign(instance_ptr self, instance_ptr other) {}
 
-    static None* Make() { static None res; return &res; }
+    static NoneType* Make() { static NoneType res; return &res; }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {

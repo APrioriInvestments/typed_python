@@ -20,9 +20,9 @@
 
 class PyNoneInstance : public PyInstance {
 public:
-    typedef None modeled_type;
+    typedef NoneType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(None* oneOf, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(NoneType* oneOf, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (pyRepresentation == Py_None) {
             return;
         }
@@ -34,11 +34,11 @@ public:
         return true;
     }
 
-    static PyObject* extractPythonObjectConcrete(None* valueType, instance_ptr data) {
+    static PyObject* extractPythonObjectConcrete(NoneType* valueType, instance_ptr data) {
         return incref(Py_None);
     }
 
-    static bool compare_to_python_concrete(None* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    static bool compare_to_python_concrete(NoneType* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
         return cmpResultToBoolForPyOrdering(
             pyComparisonOp,
             other == Py_None ? 0 : 1

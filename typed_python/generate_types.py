@@ -212,7 +212,7 @@ def gen_alternative_type(name, d):
     ret.append('    if (!once) {')
     ret.append('        once = true;')
     ret.append(f'        TypeDetails<{name}*>::getType()->setTarget(t);')
-    ret.append(f'        Type *t1 = t->guaranteeForwardsResolved([](void* p) {{ return (Type*)0; }});')
+    ret.append(f'        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) {{ return (Type*)0; }});')
     ret.append('    }')
     ret.append('    return t;')
     ret.append('}')

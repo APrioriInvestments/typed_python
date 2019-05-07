@@ -242,11 +242,11 @@ PyObject *MakeStringType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::StringType::Make()));
 }
 PyObject *MakeBytesType(PyObject* nullValue, PyObject* args) {
-    return incref((PyObject*)PyInstance::typeObj(::Bytes::Make()));
+    return incref((PyObject*)PyInstance::typeObj(::BytesType::Make()));
 }
 
-PyObject *MakeNoneTypeType(PyObject* nullValue, PyObject* args) {
-    return incref((PyObject*)PyInstance::typeObj(::None::Make()));
+PyObject *MakeNoneType(PyObject* nullValue, PyObject* args) {
+    return incref((PyObject*)PyInstance::typeObj(::NoneType::Make()));
 }
 
 PyObject *RenameType(PyObject* nullValue, PyObject* args) {
@@ -282,7 +282,7 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     PyObjectHolder arg(PyTuple_GetItem(args,0));
 
     if (arg == Py_None) {
-        return incref((PyObject*)PyInstance::typeObj(::None::Make()));
+        return incref((PyObject*)PyInstance::typeObj(::NoneType::Make()));
     }
 
     if (!PyType_Check(arg)) {
@@ -1087,7 +1087,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
 }
 
 static PyMethodDef module_methods[] = {
-    {"NoneType", (PyCFunction)MakeNoneTypeType, METH_VARARGS, NULL},
+    {"NoneType", (PyCFunction)MakeNoneType, METH_VARARGS, NULL},
     {"Bool", (PyCFunction)MakeBoolType, METH_VARARGS, NULL},
     {"Int8", (PyCFunction)MakeInt8Type, METH_VARARGS, NULL},
     {"Int16", (PyCFunction)MakeInt16Type, METH_VARARGS, NULL},
