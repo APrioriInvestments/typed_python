@@ -38,7 +38,7 @@ public:
     }
 
     size_t count() const {
-        return !mLayout ? 0 : mLayout->count;
+        return mLayout ? mLayout->count : 0;
     }
 
     void append(const element_type& e) {
@@ -68,8 +68,7 @@ public:
         );
     }
 
-    ListOf(const ListOf& other)
-    {
+    ListOf(const ListOf& other) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -87,8 +86,7 @@ public:
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    ListOf& operator=(const ListOf& other)
-    {
+    ListOf& operator=(const ListOf& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -110,7 +108,7 @@ public:
     static Type* getType() {
         static Type* t = ListOfType::Make(TypeDetails<element_type>::getType());
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("ListOf: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -147,11 +145,11 @@ public:
     }
 
     size_t size() const {
-        return !mLayout ? 0 : sizeof(*mLayout) + TypeDetails<element_type>::bytecount * mLayout->count;
+        return mLayout ? sizeof(*mLayout) + TypeDetails<element_type>::bytecount * mLayout->count : 0;
     }
 
     size_t count() const {
-        return !mLayout ? 0 : mLayout->count;
+        return mLayout ? mLayout->count : 0;
     }
 
     template<class buf_t>
@@ -168,8 +166,7 @@ public:
         getType()->constructor((instance_ptr)&mLayout);
     }
 
-    TupleOf(const TupleOf& other)
-    {
+    TupleOf(const TupleOf& other) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -196,8 +193,7 @@ public:
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    TupleOf& operator=(const TupleOf& other)
-    {
+    TupleOf& operator=(const TupleOf& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -219,7 +215,7 @@ public:
     static Type* getType() {
         static Type* t = TupleOf<element_type>::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("TupleOf: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -246,7 +242,7 @@ public:
     static Type* getType() {
         static Type* t = None::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("None: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -276,16 +272,14 @@ public:
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    Bytes(const Bytes& other)
-    {
+    Bytes(const Bytes& other) {
         getType()->copy_constructor(
            (instance_ptr)&mLayout,
            (instance_ptr)&other.mLayout
            );
     }
 
-    Bytes& operator=(const Bytes& other)
-    {
+    Bytes& operator=(const Bytes& other) {
         getType()->assign(
            (instance_ptr)&mLayout,
            (instance_ptr)&other.mLayout
@@ -301,6 +295,10 @@ public:
     template<class buf_t>
     void deserialize(buf_t& buffer) {
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
+    }
+
+    size_t count() const {
+        return mLayout ? mLayout->bytecount : 0;
     }
 
     static inline char cmp(const Bytes& left, const Bytes& right) {
@@ -330,7 +328,7 @@ public:
     static Type* getType() {
         static Type* t = BytesType::Make();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("Bytes: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -400,6 +398,10 @@ public:
     bool operator<=(const String& right) const { return cmp(*this, right) <= 0; }
     bool operator>=(const String& right) const { return cmp(*this, right) >= 0; }
 
+    size_t count() const {
+        return mLayout ? mLayout->pointcount : 0;
+    }
+
     static String concatenate(const String& left, const String& right) {
         return String(StringType::concatenate(left.getLayout(), right.getLayout()));
     }
@@ -451,7 +453,7 @@ public:
     static Type* getType() {
         static Type* t = StringType::Make();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("String: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -478,7 +480,7 @@ public:
     }
 
     size_t size() const {
-        return !mLayout ? 0 : sizeof(*mLayout) ; //+ TypeDetails<element_type>::bytecount * mLayout->count;
+        return !mLayout ? 0 : getType()->size((instance_ptr)&mLayout);
     }
 
     template<class buf_t>
@@ -499,8 +501,7 @@ public:
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    Dict(const Dict& other)
-    {
+    Dict(const Dict& other) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -514,8 +515,7 @@ public:
                );
     }
 
-    Dict& operator=(const Dict& other)
-    {
+    Dict& operator=(const Dict& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -553,7 +553,7 @@ public:
     static Type* getType() {
         static Type* t = Dict<key_type, value_type>::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("Dict: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -601,22 +601,39 @@ public:
         getType()->constructor((instance_ptr)&mLayout, count, false);
 
         for (size_t k = 0; k < count; k++) {
-            key_type* pk = (key_type*)getType()->kvPairPtrKey((instance_ptr)&mLayout, k);
-            new ((key_type *)pk) key_type(initlist[k].first);
-            value_type* pv = (value_type*)getType()->kvPairPtrValue((instance_ptr)&mLayout, k);
-            new ((value_type *)pv) value_type(initlist[k].second);
+            bool initkey = false;
+            try {
+                key_type* pk = (key_type*)getType()->kvPairPtrKey((instance_ptr)&mLayout, k);
+                new ((key_type *)pk) key_type(initlist[k].first);
+                initkey = true;
+                value_type* pv = (value_type*)getType()->kvPairPtrValue((instance_ptr)&mLayout, k);
+                new ((value_type *)pv) value_type(initlist[k].second);
+            } catch(...) {
+                try {
+                    if (initkey) {
+                        instance_ptr pk = getType()->kvPairPtrKey((instance_ptr)&mLayout, k);
+                        TypeDetails<key_type>::getType()->destroy(pk);
+                    }
+                    for (size_t j = k - 1; j >= 0; j--) {
+                        instance_ptr pk = getType()->kvPairPtrKey((instance_ptr)&mLayout, j);
+                        TypeDetails<key_type>::getType()->destroy(pk);
+                        instance_ptr pv = getType()->kvPairPtrValue((instance_ptr)&mLayout, j);
+                        TypeDetails<value_type>::getType()->destroy(pv);
+                    }
+                } catch(...) {
+                }
+                throw;
+            }
         }
         getType()->incKvPairCount((instance_ptr)&mLayout, count);
         getType()->sortKvPairs((instance_ptr)&mLayout);
-        // TODO: catch constructor exceptions and unwind
     }
 
     ~ConstDict() {
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    ConstDict(const ConstDict& other)
-    {
+    ConstDict(const ConstDict& other) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -630,8 +647,7 @@ public:
                );
     }
 
-    ConstDict& operator=(const ConstDict& other)
-    {
+    ConstDict& operator=(const ConstDict& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -639,11 +655,15 @@ public:
         return *this;
     }
 
+    size_t count() const {
+        return mLayout ? mLayout->count : 0;
+    }
+
     const value_type* lookupValueByKey(const key_type&  k) const {
         return (value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
     }
 
-    ConstDict add(const ConstDict& lhs, const ConstDict& rhs) {
+    static ConstDict add(const ConstDict& lhs, const ConstDict& rhs) {
         ConstDict result;
         getType()->addDicts((instance_ptr)&lhs.mLayout, (instance_ptr)&rhs.mLayout, (instance_ptr)&result.mLayout);
         return result;
@@ -653,8 +673,7 @@ public:
         return add(*this, rhs);
     }
 
-    //void subtractTupleOfKeysFromDict(instance_ptr lhs, instance_ptr rhs, instance_ptr output) const;
-    ConstDict subtract(const ConstDict& lhs, const TupleOf<key_type>& keys) {
+    static ConstDict subtract(const ConstDict& lhs, const TupleOf<key_type>& keys) {
         ConstDict result;
         TupleOfType::layout *l = keys.getLayout();
         getType()->subtractTupleOfKeysFromDict((instance_ptr)&lhs.mLayout, (instance_ptr)&l, (instance_ptr)&result.mLayout);
@@ -678,7 +697,7 @@ public:
     static Type* getType() {
         static Type* t = ConstDict<key_type, value_type>::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("ConstDict: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -687,7 +706,7 @@ public:
 };
 
 
-// TypeIndex calculates the index k of a type T in a parameter pack Ts...
+// TypeIndex calculates the first index k of a type T in a parameter pack Ts...
 // compile-time error if not found
 template<class T, int k, class... Ts>
 struct TypeIndex;
@@ -719,8 +738,6 @@ public:
         uint8_t which;
         uint8_t data[OneOf<T1, Ts...>::m_datasize];
     };
-
-    const layout* getLayout() const { return &mLayout; }
 
     static OneOfType* getType() {
         static OneOfType* t = OneOfType::Make({TypeDetails<T1>::getType(), TypeDetails<Ts>::getType()...});
@@ -777,8 +794,7 @@ public:
         getType()->destroy((instance_ptr)&mLayout);
     }
 
-    OneOf(const OneOf<T1, Ts...>& other)
-    {
+    OneOf(const OneOf<T1, Ts...>& other) {
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
@@ -792,14 +808,15 @@ public:
                );
     }
 
-    OneOf<T1, Ts...>& operator=(const OneOf<T1, Ts...>& other)
-    {
+    OneOf<T1, Ts...>& operator=(const OneOf<T1, Ts...>& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
                );
         return *this;
     }
+
+    const layout* getLayout() const { return &mLayout; }
 private:
     layout mLayout;
 };
@@ -816,13 +833,10 @@ public:
     static Type* getType() {
         static Type* t = OneOf<Ts...>::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("somehow we have the wrong bytecount!");
+            throw std::runtime_error("OneOf: somehow we have the wrong bytecount!");
         }
         return t;
     }
 
     static const uint64_t bytecount = 1 + OneOf<Ts...>::m_datasize;
 };
-
-
-

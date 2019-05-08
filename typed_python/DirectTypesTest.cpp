@@ -10,9 +10,8 @@ int test_string() {
     test_fn_header()
 
     String s1("abc");
-    StringType::layout* l = s1.getLayout();
-    my_assert(l->pointcount == 3)
-    my_assert(l->bytes_per_codepoint == 1)
+    my_assert(s1.count() == 3)
+    my_assert(s1.getLayout()->bytes_per_codepoint == 1)
     std::string s2a("abc");
 
     String s2(s2a);
@@ -38,9 +37,11 @@ int test_string() {
     my_assert(s2.getLayout()->refcount == 1)
 
     String s3("abcxy");
-    my_assert(s3.getLayout()->pointcount == 5)
+    my_assert(s3.count() == 5)
     my_assert(s3.find(String("cx")) == 2)
     my_assert(s3.substr(1,4) == String("bcx"))
+    my_assert(s3.substr(1,-1) == String("bcx"))
+    my_assert(s3.substr(-3,-2) == String("c"))
 
     String a1("DEF");
     String a2("ghij");
@@ -50,10 +51,10 @@ int test_string() {
     s = a1 + a2;
     my_assert(s == String("DEFghij"))
     my_assert(s.getLayout()->refcount == 1)
-    s = a1 + a2 + a3;
+    s += a3;
     my_assert(s == String("DEFghijK"))
     my_assert(s.getLayout()->refcount == 1)
-    s = a1 + a2 + a3 + a4;
+    s += a4;
     my_assert(s == String("DEFghijKmno"))
     my_assert(s.getLayout()->refcount == 1)
 
@@ -64,11 +65,6 @@ int test_string() {
     my_assert(s4.getLayout()->refcount == 1)
     s4 = String("aaaaaaaaaaaaaaaa");
     my_assert(s4.getLayout()->refcount == 1)
-    s1 = String("aBc");
-    s2 = String("123X56");
-    s2 = String("123");
-    s2 = String("xyz");
-    s2 = String("ASD");
 
     my_assert(String("aBc").isalpha())
     my_assert(!String("a3Bc").isalpha())
@@ -91,6 +87,9 @@ int test_string() {
     my_assert(String("OET").isupper())
     my_assert(!String("OnE Two").isupper())
 
+    my_assert(String("a") < String("b"))
+    my_assert(String("c") <= String("c"))
+    my_assert(String("c") >= String("c"))
     my_assert(String("a") > String("A"))
     my_assert(String("abc") < String("abcd"))
 
@@ -108,8 +107,13 @@ int test_string() {
     my_assert(parts[2] == String("hree four"))
     parts = s5.split(2);
     my_assert(parts.count() == 3)
+    my_assert(parts[0] == String("one"))
+    my_assert(parts[1] == String("two"))
+    my_assert(parts[2] == String("three four"))
     parts = s5.split(String("t"), 1);
     my_assert(parts.count() == 2)
+    my_assert(parts[0] == String("one "))
+    my_assert(parts[1] == String("wo three four"))
     return 0;
 }
 
@@ -117,10 +121,10 @@ int test_bytes() {
     test_fn_header()
     Bytes b1(7, "\x03\x02\x01\x00\x01\x02\x03\x04");
     Bytes b2(6, "\x00\x00\x00\x00\x01\x00\x00");
-    my_assert(b1.getLayout()->bytecount == 7)
-    my_assert(b2.getLayout()->bytecount == 6)
+    my_assert(b1.count() == 7)
+    my_assert(b2.count() == 6)
     Bytes b3 = b1 + b2;
-    my_assert(b3.getLayout()->bytecount == 13)
+    my_assert(b3.count() == 13)
     my_assert(b3.getLayout()->refcount == 1)
     {
         Bytes b4(b3);
@@ -237,29 +241,11 @@ int test_dict() {
     return 0;
 }
 
-void dbgo(const ConstDict<String, int64_t>& c) {
-    ConstDictType* t = c.getType();
-    std::cerr << t->name();
-    instance_ptr self = (instance_ptr)&c;
-    std::cerr << "{";
-    int32_t ct = t->count(self);
-    for (long k = 0; k < ct;k++) {
-        if (k > 0) {
-            std::cerr << ", ";
-        }
-
-        String* ps = (String*)t->kvPairPtrKey(self, k);
-        uint64_t *pv = (uint64_t*)t->kvPairPtrValue(self,k);
-        std::cerr << (char)(ps->getLayout()->data[0]) << ": " << (uint64_t)*pv;
-    }
-    std::cerr << "}" << std::endl;
-}
-
 int test_const_dict() {
     test_fn_header()
 
     ConstDict<String, int64_t> c1({{String("a"), 5}, {String("c"), 7}, {String("b"), 6}});
-    my_assert(c1.getLayout()->count == 3)
+    my_assert(c1.count() == 3)
 
     const int64_t *pv = c1.lookupValueByKey(String("a"));
     my_assert(pv)
@@ -281,9 +267,9 @@ int test_const_dict() {
     }
     my_assert(c1.getLayout()->refcount == 1)
     ConstDict<String, int64_t> c4({{String("d"), 8}, {String("e"), 9}, {String("c"), 222}, {String("f"), 10}, {String("g"), 11}});
-    my_assert(c4.getLayout()->count == 5)
+    my_assert(c4.count() == 5)
     ConstDict<String, int64_t> c5 = c1 + c4;
-    my_assert(c5.getLayout()->count == 7)
+    my_assert(c5.count() == 7)
     pv = c5.lookupValueByKey(String("c"));
     my_assert(pv)
     my_assert(*pv == 222)
@@ -302,7 +288,7 @@ int test_const_dict() {
 
     TupleOf<String> t1({String("b"), String("d"), String("f")});
     ConstDict<String, int64_t> c6 = c5 - t1;
-    my_assert(c6.getLayout()->count == 4)
+    my_assert(c6.count() == 4)
     pv = c6.lookupValueByKey(String("b"));
     my_assert(!pv)
     pv = c6.lookupValueByKey(String("d"));
@@ -385,7 +371,7 @@ int test_named_tuple() {
     return 0;
 }
 
-// Depends on generated types A and Overlap in GeneratedTypes.hpp
+// Depends on generated types A, Overlap, and Bexpress in GeneratedTypes.hpp
 int test_alternative() {
     test_fn_header()
 
