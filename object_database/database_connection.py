@@ -272,7 +272,7 @@ class DatabaseConnection:
         self._transaction_callbacks = {}
         self._connectionMetadata = connectionMetadata or {}
 
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
         # transaction of what's in the KV store
         self._cur_transaction_num = 0
@@ -329,6 +329,9 @@ class DatabaseConnection:
 
         self._auth_token = None
 
+        self._max_tid_by_schema = {}
+        self._max_tid_by_schema_and_type = {}
+
     def getConnectionMetadata(self):
         """Return any data provided to us by the underlying transport.
 
@@ -361,6 +364,35 @@ class DatabaseConnection:
         self.setSerializationContext(
             TypedPythonCodebase.FromRootlevelModule(module).serializationContext
         )
+
+    def currentTransactionId(self):
+        return self._cur_transaction_num
+
+    def currentTransactionIdForSchema(self, schema):
+        return self._max_tid_by_schema.get(schema.name, 0)
+
+    def currentTransactionIdForType(self, dbType):
+        return self._max_tid_by_schema_and_type.get((dbType.__schema__.name, dbType.__qualname__), 0)
+
+    def waitForTransactionId(self, tid):
+        if tid > self._cur_transaction_num:
+            e = threading.Event()
+
+            def handler(*args):
+                if args[-1] >= tid:
+                    e.set()
+
+            with self._lock:
+                # check again, in case the transaction came in while we
+                # were asleep
+                if tid <= self._cur_transaction_num:
+                    return
+
+                self.registerOnTransactionHandler(handler)
+
+            e.wait()
+
+            self.dropTransactionHandler(handler)
 
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
@@ -705,6 +737,8 @@ class DatabaseConnection:
                 key_value = {}
                 priors = {}
 
+                self._markSchemaAndTypeMaxTids(set(k.fieldId for k in msg.writes), msg.transaction_id)
+
                 writes = {k: msg.writes[k] for k in msg.writes}
                 set_adds = {k: msg.set_adds[k] for k in msg.set_adds}
                 set_removes = {k: msg.set_removes[k] for k in msg.set_removes}
@@ -820,6 +854,8 @@ class DatabaseConnection:
                 markedLazy = self._subscription_buildup[lookupTuple]['markedLazy']
                 del self._subscription_buildup[lookupTuple]
 
+                self._markSchemaAndTypeMaxTids(set(v.fieldId for v in values), msg.tid)
+
                 sets = self._indexValuesToSetAdds(index_values)
 
                 if msg.fieldname_and_value is None:
@@ -892,6 +928,18 @@ class DatabaseConnection:
                 event.set()
         else:
             assert False, "unknown message type " + msg._which
+
+    def _markSchemaAndTypeMaxTids(self, fieldIds, tid):
+        for fieldId in fieldIds:
+            fieldDef = self._field_id_to_field_def.get(fieldId)
+            if fieldDef is not None:
+                existing = self._max_tid_by_schema.get(fieldDef.schema, 0)
+                if existing < tid:
+                    self._max_tid_by_schema[fieldDef.schema] = tid
+
+                existing = self._max_tid_by_schema_and_type.get((fieldDef.schema, fieldDef.typename), 0)
+                if existing < tid:
+                    self._max_tid_by_schema_and_type[fieldDef.schema, fieldDef.typename] = tid
 
     def _indexValuesToSetAdds(self, indexValues):
         # indexValues contains (schema:typename:identity:fieldname -> indexHashVal) which builds

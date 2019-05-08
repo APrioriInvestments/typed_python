@@ -1731,6 +1731,48 @@ class ObjectDatabaseTests:
 
         self.assertTrue(len(self.server._version_numbers) < 10)
 
+    def test_max_tid(self):
+        schema1 = Schema("schema1")
+        schema2 = Schema("schema2")
+
+        @schema1.define
+        class T11:
+            k = int
+
+        @schema1.define
+        class T12:
+            k = int
+
+        @schema2.define
+        class T2:
+            k = int
+
+        db1 = self.createNewDb()
+
+        self.assertEqual(db1.currentTransactionId(), 1)
+        for t in [T11, T12, T2]:
+            self.assertEqual(db1.currentTransactionIdForType(t), 0)
+
+        db1.subscribeToSchema(schema1)
+        db1.subscribeToSchema(schema2)
+        with db1.transaction():
+            T11(k=0)
+
+        self.assertEqual(db1.currentTransactionId(), 2)
+        self.assertEqual(db1.currentTransactionIdForType(T11), 2)
+        self.assertEqual(db1.currentTransactionIdForType(T12), 0)
+        self.assertEqual(db1.currentTransactionIdForSchema(schema1), 2)
+        self.assertEqual(db1.currentTransactionIdForSchema(schema2), 0)
+
+        with db1.transaction():
+            T12(k=0)
+
+        self.assertEqual(db1.currentTransactionId(), 3)
+        self.assertEqual(db1.currentTransactionIdForType(T11), 2)
+        self.assertEqual(db1.currentTransactionIdForType(T12), 3)
+        self.assertEqual(db1.currentTransactionIdForSchema(schema1), 3)
+        self.assertEqual(db1.currentTransactionIdForSchema(schema2), 0)
+
 
 class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
     @classmethod
