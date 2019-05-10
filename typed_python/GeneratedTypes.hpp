@@ -7,9 +7,7 @@ class A_Sub2;
 
 class A {
 public:
-    struct e {
-        enum kind { Sub1=0, Sub2=1 };
-    };
+    enum class kind { Sub1=0, Sub2=1 };
 
     static NamedTuple* Sub1_Type;
     static NamedTuple* Sub2_Type;
@@ -17,14 +15,14 @@ public:
     static Alternative* getType();
     ~A() { getType()->destroy((instance_ptr)&mLayout); }
     A():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
-    A(e::kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
+    A(kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
     A(const A& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
     A& operator=(const A& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
 
     static A Sub1(const int64_t& b, const int64_t& c);
     static A Sub2(const String& d, const String& e);
 
-    e::kind which() const { return (e::kind)mLayout->which; }
+    kind which() const { return (kind)mLayout->which; }
 
     template <class F>
     auto check(const F& f) {
@@ -32,8 +30,8 @@ public:
         if (isSub2()) { return f(*(A_Sub2*)this); }
     }
 
-    bool isSub1() const { return which() == e::Sub1; }
-    bool isSub2() const { return which() == e::Sub2; }
+    bool isSub1() const { return which() == kind::Sub1; }
+    bool isSub2() const { return which() == kind::Sub2; }
 
     // Accessors for members
     int64_t b() const;
@@ -97,17 +95,17 @@ public:
 class A_Sub1 : public A {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), e::Sub1);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), static_cast<int>(kind::Sub1));
         return t;
     }
     static Alternative* getAlternative() { return A::getType(); }
 
-    A_Sub1():A(e::Sub1) {}
-    A_Sub1( const int64_t& b1,  const int64_t& c1):A(e::Sub1) {
+    A_Sub1():A(kind::Sub1) {}
+    A_Sub1( const int64_t& b1,  const int64_t& c1):A(kind::Sub1) {
         b() = b1;
         c() = c1;
     }
-    A_Sub1(const A_Sub1& other):A(e::Sub1) {
+    A_Sub1(const A_Sub1& other):A(kind::Sub1) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     A_Sub1& operator=(const A_Sub1& other) {
@@ -129,17 +127,17 @@ A A::Sub1(const int64_t& b, const int64_t& c) {
 class A_Sub2 : public A {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), e::Sub2);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(A::getType(), static_cast<int>(kind::Sub2));
         return t;
     }
     static Alternative* getAlternative() { return A::getType(); }
 
-    A_Sub2():A(e::Sub2) {}
-    A_Sub2( const String& d1,  const String& e1):A(e::Sub2) {
+    A_Sub2():A(kind::Sub2) {}
+    A_Sub2( const String& d1,  const String& e1):A(kind::Sub2) {
         d() = d1;
         e() = e1;
     }
-    A_Sub2(const A_Sub2& other):A(e::Sub2) {
+    A_Sub2(const A_Sub2& other):A(kind::Sub2) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     A_Sub2& operator=(const A_Sub2& other) {
@@ -195,9 +193,7 @@ class Overlap_Sub3;
 
 class Overlap {
 public:
-    struct e {
-        enum kind { Sub1=0, Sub2=1, Sub3=2 };
-    };
+    enum class kind { Sub1=0, Sub2=1, Sub3=2 };
 
     static NamedTuple* Sub1_Type;
     static NamedTuple* Sub2_Type;
@@ -206,7 +202,7 @@ public:
     static Alternative* getType();
     ~Overlap() { getType()->destroy((instance_ptr)&mLayout); }
     Overlap():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
-    Overlap(e::kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
+    Overlap(kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
     Overlap(const Overlap& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
     Overlap& operator=(const Overlap& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
 
@@ -214,7 +210,7 @@ public:
     static Overlap Sub2(const String& b, const TupleOf<String>& c);
     static Overlap Sub3(const int64_t& b);
 
-    e::kind which() const { return (e::kind)mLayout->which; }
+    kind which() const { return (kind)mLayout->which; }
 
     template <class F>
     auto check(const F& f) {
@@ -223,13 +219,13 @@ public:
         if (isSub3()) { return f(*(Overlap_Sub3*)this); }
     }
 
-    bool isSub1() const { return which() == e::Sub1; }
-    bool isSub2() const { return which() == e::Sub2; }
-    bool isSub3() const { return which() == e::Sub3; }
+    bool isSub1() const { return which() == kind::Sub1; }
+    bool isSub2() const { return which() == kind::Sub2; }
+    bool isSub3() const { return which() == kind::Sub3; }
 
     // Accessors for members
-    OneOf<int64_t,String,bool> b() const;
-    OneOf<int64_t,TupleOf<String>> c() const;
+    OneOf<bool,int64_t,String> b() const;
+    OneOf<TupleOf<String>,int64_t> c() const;
 
     Alternative::layout* getLayout() const { return mLayout; }
 protected:
@@ -293,17 +289,17 @@ public:
 class Overlap_Sub1 : public Overlap {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), e::Sub1);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), static_cast<int>(kind::Sub1));
         return t;
     }
     static Alternative* getAlternative() { return Overlap::getType(); }
 
-    Overlap_Sub1():Overlap(e::Sub1) {}
-    Overlap_Sub1( const bool& b1,  const int64_t& c1):Overlap(e::Sub1) {
+    Overlap_Sub1():Overlap(kind::Sub1) {}
+    Overlap_Sub1( const bool& b1,  const int64_t& c1):Overlap(kind::Sub1) {
         b() = b1;
         c() = c1;
     }
-    Overlap_Sub1(const Overlap_Sub1& other):Overlap(e::Sub1) {
+    Overlap_Sub1(const Overlap_Sub1& other):Overlap(kind::Sub1) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Overlap_Sub1& operator=(const Overlap_Sub1& other) {
@@ -325,17 +321,17 @@ Overlap Overlap::Sub1(const bool& b, const int64_t& c) {
 class Overlap_Sub2 : public Overlap {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), e::Sub2);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), static_cast<int>(kind::Sub2));
         return t;
     }
     static Alternative* getAlternative() { return Overlap::getType(); }
 
-    Overlap_Sub2():Overlap(e::Sub2) {}
-    Overlap_Sub2( const String& b1,  const TupleOf<String>& c1):Overlap(e::Sub2) {
+    Overlap_Sub2():Overlap(kind::Sub2) {}
+    Overlap_Sub2( const String& b1,  const TupleOf<String>& c1):Overlap(kind::Sub2) {
         b() = b1;
         c() = c1;
     }
-    Overlap_Sub2(const Overlap_Sub2& other):Overlap(e::Sub2) {
+    Overlap_Sub2(const Overlap_Sub2& other):Overlap(kind::Sub2) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Overlap_Sub2& operator=(const Overlap_Sub2& other) {
@@ -357,16 +353,16 @@ Overlap Overlap::Sub2(const String& b, const TupleOf<String>& c) {
 class Overlap_Sub3 : public Overlap {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), e::Sub3);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Overlap::getType(), static_cast<int>(kind::Sub3));
         return t;
     }
     static Alternative* getAlternative() { return Overlap::getType(); }
 
-    Overlap_Sub3():Overlap(e::Sub3) {}
-    Overlap_Sub3( const int64_t& b1):Overlap(e::Sub3) {
+    Overlap_Sub3():Overlap(kind::Sub3) {}
+    Overlap_Sub3( const int64_t& b1):Overlap(kind::Sub3) {
         b() = b1;
     }
-    Overlap_Sub3(const Overlap_Sub3& other):Overlap(e::Sub3) {
+    Overlap_Sub3(const Overlap_Sub3& other):Overlap(kind::Sub3) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Overlap_Sub3& operator=(const Overlap_Sub3& other) {
@@ -383,21 +379,21 @@ Overlap Overlap::Sub3(const int64_t& b) {
     return Overlap_Sub3(b);
 }
 
-OneOf<int64_t,String,bool> Overlap::b() const {
+OneOf<bool,int64_t,String> Overlap::b() const {
     if (isSub1())
-        return OneOf<int64_t,String,bool>(((Overlap_Sub1*)this)->b());
+        return OneOf<bool,int64_t,String>(((Overlap_Sub1*)this)->b());
     if (isSub2())
-        return OneOf<int64_t,String,bool>(((Overlap_Sub2*)this)->b());
+        return OneOf<bool,int64_t,String>(((Overlap_Sub2*)this)->b());
     if (isSub3())
-        return OneOf<int64_t,String,bool>(((Overlap_Sub3*)this)->b());
+        return OneOf<bool,int64_t,String>(((Overlap_Sub3*)this)->b());
     throw std::runtime_error("\"Overlap\" subtype does not contain \"b\"");
 }
 
-OneOf<int64_t,TupleOf<String>> Overlap::c() const {
+OneOf<TupleOf<String>,int64_t> Overlap::c() const {
     if (isSub1())
-        return OneOf<int64_t,TupleOf<String>>(((Overlap_Sub1*)this)->c());
+        return OneOf<TupleOf<String>,int64_t>(((Overlap_Sub1*)this)->c());
     if (isSub2())
-        return OneOf<int64_t,TupleOf<String>>(((Overlap_Sub2*)this)->c());
+        return OneOf<TupleOf<String>,int64_t>(((Overlap_Sub2*)this)->c());
     throw std::runtime_error("\"Overlap\" subtype does not contain \"c\"");
 }
 
@@ -414,9 +410,7 @@ class Bexpress_UnaryOp;
 
 class Bexpress {
 public:
-    struct e {
-        enum kind { Leaf=0, BinOp=1, UnaryOp=2 };
-    };
+    enum class kind { Leaf=0, BinOp=1, UnaryOp=2 };
 
     static NamedTuple* Leaf_Type;
     static NamedTuple* BinOp_Type;
@@ -425,7 +419,7 @@ public:
     static Alternative* getType();
     ~Bexpress() { getType()->destroy((instance_ptr)&mLayout); }
     Bexpress():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
-    Bexpress(e::kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
+    Bexpress(kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
     Bexpress(const Bexpress& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
     Bexpress& operator=(const Bexpress& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
 
@@ -433,7 +427,7 @@ public:
     static Bexpress BinOp(const Bexpress& left, const String& op, const Bexpress& right);
     static Bexpress UnaryOp(const String& op, const Bexpress& right);
 
-    e::kind which() const { return (e::kind)mLayout->which; }
+    kind which() const { return (kind)mLayout->which; }
 
     template <class F>
     auto check(const F& f) {
@@ -442,9 +436,9 @@ public:
         if (isUnaryOp()) { return f(*(Bexpress_UnaryOp*)this); }
     }
 
-    bool isLeaf() const { return which() == e::Leaf; }
-    bool isBinOp() const { return which() == e::BinOp; }
-    bool isUnaryOp() const { return which() == e::UnaryOp; }
+    bool isLeaf() const { return which() == kind::Leaf; }
+    bool isBinOp() const { return which() == kind::BinOp; }
+    bool isUnaryOp() const { return which() == kind::UnaryOp; }
 
     // Accessors for members
     bool value() const;
@@ -514,16 +508,16 @@ public:
 class Bexpress_Leaf : public Bexpress {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), e::Leaf);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), static_cast<int>(kind::Leaf));
         return t;
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
 
-    Bexpress_Leaf():Bexpress(e::Leaf) {}
-    Bexpress_Leaf( const bool& value1):Bexpress(e::Leaf) {
+    Bexpress_Leaf():Bexpress(kind::Leaf) {}
+    Bexpress_Leaf( const bool& value1):Bexpress(kind::Leaf) {
         value() = value1;
     }
-    Bexpress_Leaf(const Bexpress_Leaf& other):Bexpress(e::Leaf) {
+    Bexpress_Leaf(const Bexpress_Leaf& other):Bexpress(kind::Leaf) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Bexpress_Leaf& operator=(const Bexpress_Leaf& other) {
@@ -543,18 +537,18 @@ Bexpress Bexpress::Leaf(const bool& value) {
 class Bexpress_BinOp : public Bexpress {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), e::BinOp);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), static_cast<int>(kind::BinOp));
         return t;
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
 
-    Bexpress_BinOp():Bexpress(e::BinOp) {}
-    Bexpress_BinOp( const Bexpress& left1,  const String& op1,  const Bexpress& right1):Bexpress(e::BinOp) {
+    Bexpress_BinOp():Bexpress(kind::BinOp) {}
+    Bexpress_BinOp( const Bexpress& left1,  const String& op1,  const Bexpress& right1):Bexpress(kind::BinOp) {
         left() = left1;
         op() = op1;
         right() = right1;
     }
-    Bexpress_BinOp(const Bexpress_BinOp& other):Bexpress(e::BinOp) {
+    Bexpress_BinOp(const Bexpress_BinOp& other):Bexpress(kind::BinOp) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Bexpress_BinOp& operator=(const Bexpress_BinOp& other) {
@@ -578,17 +572,17 @@ Bexpress Bexpress::BinOp(const Bexpress& left, const String& op, const Bexpress&
 class Bexpress_UnaryOp : public Bexpress {
 public:
     static ConcreteAlternative* getType() {
-        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), e::UnaryOp);
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), static_cast<int>(kind::UnaryOp));
         return t;
     }
     static Alternative* getAlternative() { return Bexpress::getType(); }
 
-    Bexpress_UnaryOp():Bexpress(e::UnaryOp) {}
-    Bexpress_UnaryOp( const String& op1,  const Bexpress& right1):Bexpress(e::UnaryOp) {
+    Bexpress_UnaryOp():Bexpress(kind::UnaryOp) {}
+    Bexpress_UnaryOp( const String& op1,  const Bexpress& right1):Bexpress(kind::UnaryOp) {
         op() = op1;
         right() = right1;
     }
-    Bexpress_UnaryOp(const Bexpress_UnaryOp& other):Bexpress(e::UnaryOp) {
+    Bexpress_UnaryOp(const Bexpress_UnaryOp& other):Bexpress(kind::UnaryOp) {
         getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
     }
     Bexpress_UnaryOp& operator=(const Bexpress_UnaryOp& other) {

@@ -143,10 +143,8 @@ def gen_alternative_type(name, d):
     ret.append('')
     ret.append(f'class {name} {{')
     ret.append('public:')
-    ret.append('    struct e {')
-    ret.append('        enum kind {{ {} }};'.format(
+    ret.append('    enum class kind {{ {} }};'.format(
         ", ".join([f'{nt}={i}' for i, nt in enumerate(nts)])))
-    ret.append('    };')
     ret.append('')
     for nt in nts:
         ret.append(f'    static NamedTuple* {nt}_Type;')
@@ -154,7 +152,7 @@ def gen_alternative_type(name, d):
     ret.append('    static Alternative* getType();')
     ret.append(f'    ~{name}() {{ getType()->destroy((instance_ptr)&mLayout); }}')
     ret.append(f'    {name}():mLayout(0) {{ getType()->constructor((instance_ptr)&mLayout); }}')
-    ret.append(f'    {name}(e::kind k):mLayout(0) {{ '
+    ret.append(f'    {name}(kind k):mLayout(0) {{ '
                'ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }')
     ret.append(f'    {name}(const {name}& in) '
                '{ getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }')
@@ -166,7 +164,7 @@ def gen_alternative_type(name, d):
                    + ", ".join([f'const {resolved(t)}& {a}' for a, t in d[nt]])
                    + ');')
     ret.append('')
-    ret.append('    e::kind which() const { return (e::kind)mLayout->which; }')
+    ret.append('    kind which() const { return (kind)mLayout->which; }')
     ret.append('')
     ret.append('    template <class F>')
     ret.append('    auto check(const F& f) {')
@@ -175,7 +173,7 @@ def gen_alternative_type(name, d):
     ret.append('    }')
     ret.append('')
     for nt in nts:
-        ret.append(f'    bool is{nt}() const {{ return which() == e::{nt}; }}')
+        ret.append(f'    bool is{nt}() const {{ return which() == kind::{nt}; }}')
     ret.append('')
     ret.append('    // Accessors for members')
     for m in members:
@@ -235,20 +233,20 @@ def gen_alternative_type(name, d):
         ret.append('public:')
         ret.append('    static ConcreteAlternative* getType() {')
 
-        ret.append(f'        static ConcreteAlternative* t = ConcreteAlternative::Make({name}::getType(), e::{nt});')
+        ret.append(f'        static ConcreteAlternative* t = ConcreteAlternative::Make({name}::getType(), static_cast<int>(kind::{nt}));')
         ret.append('        return t;')
         ret.append('    }')
         ret.append(f'    static Alternative* getAlternative() {{ return {name}::getType(); }}')
         # ret.append(f'    static NamedTuple* elementType() {{ return {nt}_Type; }}')
         ret.append('')
-        ret.append(f'    {name}_{nt}():{name}(e::{nt}) {{}}')
+        ret.append(f'    {name}_{nt}():{name}(kind::{nt}) {{}}')
         ret.append(f'    {name}_{nt}('
                    + ", ".join([f' const {resolved(t)}& {a}1' for a, t in d[nt]])
-                   + f'):{name}(e::{nt}) {{')
+                   + f'):{name}(kind::{nt}) {{')
         for a, _ in d[nt]:
             ret.append(f'        {a}() = {a}1;')
         ret.append('    }')
-        ret.append(f'    {name}_{nt}(const {name}_{nt}& other):{name}(e::{nt}) {{')
+        ret.append(f'    {name}_{nt}(const {name}_{nt}& other):{name}(kind::{nt}) {{')
         ret.append(f'        getType()->copy_constructor((instance_ptr)&mLayout, '
                    '(instance_ptr)&other.mLayout);')
         ret.append('    }')
