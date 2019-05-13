@@ -15,6 +15,7 @@
 from object_database.core_schema import core_schema
 from object_database.service_manager.ServiceSchema import service_schema
 from object_database.service_manager.ServiceBase import ServiceBase, ServiceRuntimeConfig
+from object_database.reactor import Reactor
 
 import logging
 import os
@@ -64,8 +65,7 @@ class ServiceWorker:
         self.serviceWorkerThread.daemon = True
         self.shouldStop = threading.Event()
 
-        self.shutdownPollThread = threading.Thread(target=self.checkForShutdown)
-        self.shutdownPollThread.daemon = True
+        self.shutdownPollReactor = Reactor(self.db, self.checkForShutdown)
 
     def initialize(self):
         assert self.db.waitForCondition(lambda: self.instance.exists(), 5.0)
@@ -98,13 +98,9 @@ class ServiceWorker:
                 return
 
     def checkForShutdown(self):
-        while not self.shouldStop.is_set():
-            with self.db.view():
-                if self.instance.shouldShutdown:
-                    self.shouldStop.set()
-                    return
-
-            time.sleep(1.0)
+        with self.db.view():
+            if self.instance.shouldShutdown:
+                self.shouldStop.set()
 
     def synchronouslyRunService(self):
         self.initialize()
@@ -145,7 +141,7 @@ class ServiceWorker:
 
     def start(self):
         self.serviceWorkerThread.start()
-        self.shutdownPollThread.start()
+        self.shutdownPollReactor.start()
 
     def runAndWaitForShutdown(self):
         self.start()
@@ -155,8 +151,8 @@ class ServiceWorker:
         self.shouldStop.set()
         if self.serviceWorkerThread.isAlive():
             self.serviceWorkerThread.join()
-        if self.shutdownPollThread.isAlive():
-            self.shutdownPollThread.join()
+
+        self.shutdownPollReactor.stop()
 
     def _instantiateServiceObject(self):
         service_type = self.instance.service.instantiateServiceType()
