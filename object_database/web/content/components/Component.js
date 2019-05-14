@@ -24,7 +24,12 @@ class Component {
                 return undefined;
             }
         });
+        this.replacementStrings = {};
         this.children = children;
+
+        // Bind context to methods
+        this.addReplacement = this.addReplacement.bind(this);
+        this.getReplacement = this.getReplacement.bind(this);
     }
 
     render(){
@@ -33,5 +38,19 @@ class Component {
         // method in order to generate
         // some content for the vdom
         throw new Error('You must implement a `render` method on Component objects!');
+    }
+
+    /**
+     * This is a hacky method that allows extended
+     * components to deal cleanly with the replacement
+     * strings that it will use.
+     * Eventually we want to get rid of this.
+     */
+    addReplacement(aLabel, aString){
+        this.replacementStrings[aLabel] = aString;
+    }
+
+    getReplacement(aLabel){
+        return `${this.props.id}${this.replacementStrings[aLabel]}`;
     }
 }
