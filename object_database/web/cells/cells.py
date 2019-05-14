@@ -476,8 +476,13 @@ class Cells:
         res = {
             'id': cell.identity,
             'contents': contents,
-            'replacements': replaceDict
+            'replacements': replaceDict,
+            'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
+            'component_contents': cell.contents  # TODO: TEMP replace when ready
         }
+        # print()
+        # print(str(res))
+        # print()
 
         if cell.postscript:
             res['postscript'] = cell.postscript

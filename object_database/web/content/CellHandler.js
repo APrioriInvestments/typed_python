@@ -11,15 +11,16 @@
  */
 
 class CellHandler {
-    constructor(h, projector){
-	// props
-	this.h = h;
-	this.projector = projector;
+	constructor(h, projector, components){
+		// props
+		this.h = h;
+		this.projector = projector;
+		this.components = components;
 
-        // Instance Props
+		// Instance Props
         this.postscripts = [];
         this.cells = {};
-	this.DOMParser = new DOMParser();
+		this.DOMParser = new DOMParser();
 
         // Bind Instance Methods
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
@@ -149,7 +150,16 @@ class CellHandler {
             // A dictionary of ids within the object to replace.
             // Targets are real ids of other objects.
             let replacements = message.replacements;
-            let velement = this.htmlToVDomEl(message.contents, message.id);
+
+			// TODO: this is a temporary branching, to be removed with a more logical setup. As
+			// of writing if the message coming across is sending a "known" component then we use
+			// the component itself as opposed to building a vdom element from the raw html
+			let component = this.components[message.component_name]
+			if (component === undefined) {
+				var velement = this.htmlToVDomEl(message.contents, message.id);
+			} else {
+				var velement = component(message.id).render();
+			}
 
             // Install the element into the dom
             if(cell === undefined){

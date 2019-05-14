@@ -331,7 +331,6 @@ def writeJsonMessage(message, ws, largeMessageAck, logger, frames_per_ack=10,
         after every frames_per_ackth message
     loggger : logging.logger
     """
-
     msg = json.dumps(message)
 
     # split msg int 64kb frames
@@ -374,7 +373,7 @@ def writeJsonMessage(message, ws, largeMessageAck, logger, frames_per_ack=10,
 
 
 def readThread(ws, cells, largeMessageAck, logger):
-    """Send a message over the websocket.
+    """Read message coming over the websocket.
 
     Note: We have to chunk in 64kb frames
     to keep the websocket from disconnecting on chrome for very large
