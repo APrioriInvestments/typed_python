@@ -19,7 +19,7 @@ class Component {
         Object.defineProperty(this.props, 'contentsId', {
             get: function(){
                 if(this.id){
-                    return `${this.id}____contents__`;
+                    return `${this.id}_____contents__`;
                 }
                 return undefined;
             }
