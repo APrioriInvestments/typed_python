@@ -35,10 +35,10 @@ class CellHandler {
      * disconnected.
      */
     showConnectionClosed(){
-	this.projector.replace(
-            document.getElementById("page_root"),
-	    this.connectionClosedView
-        );
+		this.projector.replace(
+			document.getElementById("page_root"),
+			this.connectionClosedView
+		);
     }
 
     /**
@@ -98,9 +98,9 @@ class CellHandler {
         // across the wire.
         this.updatePopovers();
         while(this.postscripts.length){
-            let postscript = this.postscripts.pop();
-            try{
-                window.eval(postscript);
+			let postscript = this.postscripts.pop();
+            try {
+				window.eval(postscript);
             } catch(e){
                 console.error("ERROR RUNNING POSTSCRIPT", e);
                 console.log(postscript);
@@ -125,27 +125,27 @@ class CellHandler {
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
         }
-
-	// With the exception of `page_root` and `holding_pen` id nodes, all
-	// elements in this.cells are virtual. Dependig on whether we are adding a
-	// new node, or manipulating an existing, we neeed to work with the underlying
-	// DOM node. Hence if this.cell[message.id] is a vdom element we use its
-	// underlying domNode element when in operations like this.projector.replace()
-	let cell = this.cells[message.id];
-	if (cell !== undefined && cell.domNode !== undefined) {
-	    cell = cell.domNode;
-	}
+		// With the exception of `page_root` and `holding_pen` id nodes, all
+		// elements in this.cells are virtual. Dependig on whether we are adding a
+		// new node, or manipulating an existing, we neeed to work with the underlying
+		// DOM node. Hence if this.cell[message.id] is a vdom element we use its
+		// underlying domNode element when in operations like this.projector.replace()
+		let cell = this.cells[message.id];
+		
+		if (cell !== undefined && cell.domNode !== undefined) {
+			cell = cell.domNode;
+		}
 
         if(message.discard !== undefined){
-	    // Instead of removing the node we replace with the a
-	    // `display:none` style node which effectively removes it
-	    // from the DOM
-	    if (cell.parentNode !== null) {
-		this.projector.replace(cell, () => {
-		    return h("div", {style: "display:none"}, []);
-		});
-	    }
-        } else if(message.id !== undefined){
+			// Instead of removing the node we replace with the a
+			// `display:none` style node which effectively removes it
+			// from the DOM
+			if (cell.parentNode !== null) {
+				this.projector.replace(cell, () => {
+					return h("div", {style: "display:none"}, []);
+				});
+			}
+		} else if(message.id !== undefined){
             // A dictionary of ids within the object to replace.
             // Targets are real ids of other objects.
             let replacements = message.replacements;
@@ -156,22 +156,24 @@ class CellHandler {
                 // This is a totally new node.
                 // For the moment, add it to the
                 // holding pen.
-		this.projector.append(this.cells["holding_pen"], () => {
+				this.projector.append(this.cells["holding_pen"], () => {
                     return velement;
                 });
-                this.cells[message.id] = velement;
+				
+				this.cells[message.id] = velement;
             } else {
                 // Replace the existing copy of
                 // the node with this incoming
                 // copy.
                 if(cell.parentNode === null){
-		    this.projector.append(this.cells["holding_pen"], () => {
-                        return velement;
-                    });
-                } else {
-		    this.projector.replace(cell, () => {return velement});
-		}
-	    }
+					this.projector.append(this.cells["holding_pen"], () => {
+						return velement;
+					});
+				} else {
+					this.projector.replace(cell, () => {return velement});
+				}
+			}
+
             this.cells[message.id] = velement;
 
             // Now wire in replacements
@@ -182,19 +184,19 @@ class CellHandler {
                     // This is actually a new node.
                     // We'll define it later in the
                     // event stream.
-		    source = this.h("div", {id: replacementKey}, []);
+					source = this.h("div", {id: replacementKey}, []);
                     this.cells[replacements[replacementKey]] = source; 
-		    this.projector.append(this.cells["holding_pen"], () => {
+					this.projector.append(this.cells["holding_pen"], () => {
                         return source;
                     });
-                } else {
+				} else {
                     // Not a new node
                     source = this.cells[replacements[replacementKey]];
                 }
 
                 if(target != null){
-		    this.projector.replace(target, () => {
-                        return source;
+					this.projector.replace(target, () => {
+						return source;
                     });
                 } else {
                     console.log("In message ", message, " couldn't find ", replacementKey);
@@ -212,11 +214,11 @@ class CellHandler {
      * to be display when connection closes
      */
     connectionClosedView(){
-	return this.h("main.container", {role: "main"}, [
-	    this.h("div", {class: "alert alert-primary center-block mt-5"}, [
-		"Disconnected"
-	    ])
-	]);
+		return this.h("main.container", {role: "main"}, [
+			this.h("div", {class: "alert alert-primary center-block mt-5"},
+				["Disconnected"]
+			)
+		]);
     }
 
     /**
@@ -230,29 +232,31 @@ class CellHandler {
      * transform into a real element.
      */
     htmlToVDomEl(html, id){
-	let dom = this.DOMParser.parseFromString(html, "text/html");
+		let dom = this.DOMParser.parseFromString(html, "text/html");
         let element = dom.body.children[0];
         return this._domElToVdomEl(element, id);
     }
 
     _domElToVdomEl(domEl, id) {
-	let tagName = domEl.tagName.toLocaleLowerCase();
-	let attrs = {id: id};
-	let index;
-	for (index = 0; index < domEl.attributes.length; index++){
-	    let item = domEl.attributes.item(index);
-	    attrs[item.name] = item.value.trim();
-	}
+		let tagName = domEl.tagName.toLocaleLowerCase();
+		let attrs = {id: id};
+		let index;
 
-	if (domEl.childElementCount === 0) {
-	    return h(tagName, attrs, [domEl.textContent]);
-	}
-
-	let children = [];
-	for (index = 0; index < domEl.children.length; index++){
-	    let child = domEl.children[index];
-	    children.push(this._domElToVdomEl(child));
-	}
-	return h(tagName, attrs, children);
+		for (index = 0; index < domEl.attributes.length; index++){
+			let item = domEl.attributes.item(index);
+			attrs[item.name] = item.value.trim();
+		}
+		
+		if (domEl.childElementCount === 0) {
+			return h(tagName, attrs, [domEl.textContent]);
+		}
+		
+		let children = [];
+		for (index = 0; index < domEl.children.length; index++){
+			let child = domEl.children[index];
+			children.push(this._domElToVdomEl(child));
+		}
+		
+		return h(tagName, attrs, children);
     }
 }
