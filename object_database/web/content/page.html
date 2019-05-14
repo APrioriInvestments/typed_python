@@ -63,7 +63,7 @@
  var handsOnTables = {}; // Not sure what this is or where it's used
  
  const cellSocket = new CellSocket();
-const cellHandler = new CellHandler(h, projector, {Card: Card});
+ const cellHandler = new CellHandler(h, projector, {Card});
  cellSocket.onPostscripts(cellHandler.handlePostscript);
  cellSocket.onMessage(cellHandler.handleMessage);
  cellSocket.onClose(cellHandler.showConnectionClosed);
