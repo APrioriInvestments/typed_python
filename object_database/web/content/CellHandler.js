@@ -169,7 +169,7 @@ class CellHandler {
 		this.projector.append(this.cells["holding_pen"], () => {
                     return velement;
                 });
-				
+                
 		this.cells[message.id] = velement;
             } else {
                 // Replace the existing copy of
