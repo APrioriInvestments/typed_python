@@ -5,6 +5,11 @@ __pycache__
 build/
 nativepython.egg-info
 
+# Ignore node modules
+# and evironments EVERYWHERE
+nodeenv
+node_modules
+
 # leading slash means only match at repo-root level
 /.python-version
 /testcert.key
