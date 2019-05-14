@@ -17,7 +17,6 @@ import argparse
 import functools
 import traceback
 import os
-import threading
 import gevent.socket
 import gevent.queue
 
