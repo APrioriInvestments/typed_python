@@ -172,7 +172,8 @@ class CellHandler {
 	    } else {
 		var velement = new component(
                     {
-                        id: message.id
+                        id: message.id,
+                        extraData: message.extra_data
                     },
                     [],
                     message.replacement_keys
