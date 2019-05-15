@@ -479,7 +479,8 @@ class Cells:
             'replacements': replaceDict,
             'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
             'component_contents': cell.contents,  # TODO: TEMP replace when ready
-            'replacement_keys': [k for k in cell.children.keys()]
+            'replacement_keys': [k for k in cell.children.keys()],
+            'extra_data': cell.exportData
         }
         # print()
         # print(str(res))
@@ -646,6 +647,12 @@ class Cell:
         self.context = {}
 
         self._logger = logging.getLogger(__name__)
+
+        # This is for interim JS refactoring.
+        # Cells provide extra data that JS
+        # components will need to know about
+        # when composing DOM.
+        self.exportData = {};
 
     def evaluateWithDependencies(self, fun):
         """Evaluate function within a view and add dependencies for whatever
@@ -1015,6 +1022,8 @@ class Octicon(Cell):
 
     def recalculate(self):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
+        self.exportData['octiconClasses'] = octiconClasses
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.span()
             .add_classes(octiconClasses)
