@@ -30,7 +30,7 @@ class Card extends Component {
                      "data-cell-type": "Card"
                  }, [
             h('div', { class: "card-body p-1" }, [
-                h('div', {id: this.getReplacementWithId('contents')}, [])
+                this.getReplacementElementFor('contents')
             ])
         ]);
     }

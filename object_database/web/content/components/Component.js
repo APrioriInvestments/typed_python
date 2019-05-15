@@ -115,6 +115,8 @@ class Component {
 
         // Bind context to methods
         this.getReplacementWithId = this.getReplacementWithId.bind(this);
+        this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
+        this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
     }
 
     render(){
@@ -144,5 +146,41 @@ class Component {
         }
 
         return `${this.props.id}_${found}`;
+    }
+
+    /**
+     * Respond with a hyperscript object
+     * with an ID-formatted div mapped
+     * with the replacement string.
+     * This is for single replacements only.
+     * Replacement lists (multiple indexed
+     * replacements) should use the
+     * `getReplacementElementsFor()` method.
+     */
+    getReplacementElementFor(replacementName){
+        let replacementId = this.getReplacementWithId(replacementName);
+        if(replacementId == undefined){
+            return null;
+        } else if(Array.isArray(replacementId)){
+            return null;
+        }
+        return h('div', {id: replacementId}, []);
+    }
+
+    /**
+     * Respond with an array of hyperscript
+     * objects that are divs with ids that match
+     * replacement string ids for the kind of
+     * replacement list that is enumerated,
+     * ie `____button_1`, `____button_2__` etc.
+     */
+    getReplacementElementsFor(replacementName){
+        let replacementIds = this.getReplacementWithId(replacementName);
+        if(!Array.isArray(replacementIds)){
+            return null;
+        }
+        return replacementIds.map(replacementId => {
+            return h('div', {id: replacementId}, []);
+        });
     }
 }

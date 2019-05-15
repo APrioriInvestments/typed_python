@@ -18,7 +18,7 @@ class CardTitle extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "CardTitle"
             }, [
-                h('div', {id: this.getReplacementWithId('contents')}, [])
+                this.getReplacementElementFor('contents')
             ])
         );
     }
