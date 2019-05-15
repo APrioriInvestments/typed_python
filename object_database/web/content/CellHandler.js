@@ -10,6 +10,10 @@
  * and so the API of this class will change greatly.
  */
 
+// Temporary only for testing
+// please remove
+window.replacementStrings = new Set();
+
 class CellHandler {
     constructor(h, projector, components){
 	// props
@@ -122,6 +126,14 @@ class CellHandler {
      * be updated.
      */
     handleMessage(message){
+        // For testing only.
+        // Please remove for prod or
+        // before any PRs
+        if(message.replacement_keys){
+            message.replacement_keys.forEach(replacement_name => {
+                window.replacementStrings.add(replacement_name);
+            });
+        }
 	if(this.cells["page_root"] == undefined){
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
@@ -158,7 +170,13 @@ class CellHandler {
 	    if (component === undefined) {
 		var velement = this.htmlToVDomEl(message.contents, message.id);
 	    } else {
-		var velement = new component({id: message.id}).render();
+		var velement = new component(
+                    {
+                        id: message.id
+                    },
+                    [],
+                    message.replacement_keys
+                ).render();
 	    }
 
             // Install the element into the dom
@@ -180,7 +198,7 @@ class CellHandler {
 			return velement;
 		    });
 		} else {
-		    this.projector.replace(cell, () => {return velement});
+		    this.projector.replace(cell, () => {return velement;});
 		}
 	    }
 

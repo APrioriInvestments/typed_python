@@ -5,9 +5,9 @@
 
 
 class CardTitle extends Component {
-    constructor(props){
-        super(props);
-        this.addReplacement('contents', '____contents__');
+    constructor(props, ...args){
+        super(props, ...args);
+        //this.addReplacement('contents', '____contents__');
     }
 
     render(){
@@ -18,8 +18,10 @@ class CardTitle extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "CardTitle"
             }, [
-                h('div', {id: this.getReplacement('contents')}, [])
+                h('div', {id: this.getReplacementWithId('contents')}, [])
             ])
         );
     }
 }
+
+//export {CardTitle, CardTitle as default};

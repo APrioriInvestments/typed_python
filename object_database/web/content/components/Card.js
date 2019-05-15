@@ -16,9 +16,9 @@
     }*/
 
 class Card extends Component {
-    constructor(props){
-        super(props);
-        this.addReplacement('contents', '_____contents__');
+    constructor(props, ...args){
+        super(props, ...args);
+        //this.addReplacement('contents', '_____contents__');
     }
 
     render(){
@@ -30,8 +30,10 @@ class Card extends Component {
                      "data-cell-type": "Card"
                  }, [
             h('div', { class: "card-body p-1" }, [
-                h('div', {id: this.getReplacement('contents')}, [])
+                h('div', {id: this.getReplacementWithId('contents')}, [])
             ])
         ]);
     }
 }
+
+//export {Card, Card as default};

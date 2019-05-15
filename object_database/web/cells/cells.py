@@ -478,7 +478,8 @@ class Cells:
             'contents': contents,
             'replacements': replaceDict,
             'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
-            'component_contents': cell.contents  # TODO: TEMP replace when ready
+            'component_contents': cell.contents,  # TODO: TEMP replace when ready
+            'replacement_keys': [k for k in cell.children.keys()]
         }
         # print()
         # print(str(res))
