@@ -24,9 +24,10 @@ class Card extends Component {
     render(){
         return h('div',
                  {
-                     class: "card",
+                     class: "cell card",
                      id: this.props.id,
-                     "data-cell-id": this.props.id
+                     "data-cell-id": this.props.id,
+                     "data-cell-type": "Card"
                  }, [
             h('div', { class: "card-body p-1" }, [
                 h('div', {id: this.getReplacement('contents')}, [])

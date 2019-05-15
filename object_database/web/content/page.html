@@ -28,10 +28,15 @@
 <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
-<script src="/content/components/Component.js"></script>
-<script src="/content/components/Card.js"></script>
+
+<!-- Cell Handling Infrastructure -->
 <script src="/content/CellSocket.js"></script>
 <script src="/content/CellHandler.js"></script>
+
+<!-- Cell Components -->
+<script src="/content/components/Component.js"></script>
+<script src="/content/components/Card.js"></script>
+<script src="/content/components/CardTitle.js"</script>
 
 <script>
  // This is the initial render function. It is called when "DOMContentLoaded"
@@ -61,9 +66,14 @@
  var langTools = ace.require("ace/ext/language_tools");
  var aceEditors = {};
  var handsOnTables = {}; // Not sure what this is or where it's used
- 
+
+ const availableComponents = {
+     Card,
+     CardTitle
+ };
+
  const cellSocket = new CellSocket();
- const cellHandler = new CellHandler(h, projector, {Card});
+ const cellHandler = new CellHandler(h, projector, availableComponents);
  cellSocket.onPostscripts(cellHandler.handlePostscript);
  cellSocket.onMessage(cellHandler.handleMessage);
  cellSocket.onClose(cellHandler.showConnectionClosed);
