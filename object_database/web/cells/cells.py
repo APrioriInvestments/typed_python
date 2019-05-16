@@ -1037,7 +1037,7 @@ class Badge(Cell):
         super().__init__()
         self.inner = self.makeCell(inner)
         self.style = style
-        self.exportData.badgeStyle = self.style
+        self.exportData['badgeStyle'] = self.style
 
     def sortsAs(self):
         return self.inner.sortsAs()
