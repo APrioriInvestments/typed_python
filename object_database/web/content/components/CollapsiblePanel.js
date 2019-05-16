@@ -21,7 +21,7 @@ class CollapsiblePanel extends Component {
     }
 
     render(){
-        if(this.extraData.isExpanded){
+        if(this.props.extraData.isExpanded){
             return(
                 h('div', {
                     class: "cell container-fluid",
@@ -29,7 +29,7 @@ class CollapsiblePanel extends Component {
                     "data-cell-type": "CollapsiblePanel",
                     "data-expanded": true,
                     id: this.props.id,
-                    style: this.extraData.divStyle
+                    style: this.props.extraData.divStyle
                 }, [
                     h('div', {class: "row flex-nowrap no-gutters"}, [
                         h('div', {class: "col-md-auto"},[
@@ -49,7 +49,7 @@ class CollapsiblePanel extends Component {
                     "data-cell-type": "CollapsiblePanel",
                     "data-expanded": false,
                     id: this.props.id,
-                    style: this.extraData.divStyle
+                    style: this.props.extraData.divStyle
                 }, [this.getReplacementElementFor('content')])
             );
         }
