@@ -1444,6 +1444,13 @@ class Dropdown(Cell):
 
         self.children['____title__'] = self.title
 
+        # Because the items here are not separate cells,
+        # we have to perform an extra hack of a dict
+        # to get the proper data to the temporary
+        # JS Component
+        self.exportData['targetIdentity'] = self.identity
+        self.exportData['dropdownItemInfo'] = {}
+
         for i in range(len(self.headersAndLambdas)):
             header, onDropdown = self.headersAndLambdas[i]
             self.children["____child_%s__" % i] = Cell.makeCell(header)
@@ -1451,9 +1458,11 @@ class Dropdown(Cell):
                 inlineScript = """
                 cellSocket.sendString(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
                 """.replace('__ix__', str(i)).replace('__identity__', self.identity)
+                self.exportData['dropdownItemInfo'][i] = 'callback'
             else:
                 inlineScript = quoteForJs("window.location.href = '%s'"
                                           % (quoteForJs(onDropdown, "'")), '"')
+                self.exportData['dropdownItemInfo'][i] = onDropdown
             childSubstitute = '____child_%s__' % str(i)
             items.append(
                 HTMLElement.a()
