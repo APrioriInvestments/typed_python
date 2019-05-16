@@ -1164,6 +1164,7 @@ class Sequence(Cell):
     def recalculate(self):
         sequenceChildrenStr = '\n'.join("____c_%s__" %
                                         i for i in range(len(self.elements)))
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
