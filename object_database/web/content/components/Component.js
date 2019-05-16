@@ -103,6 +103,12 @@ class ReplacementsHandler {
             unsorted.sort((first, second) => {
                 return first[1] - second[1];
             });
+
+            // Now set the array to a version that filters out
+            // the index values (we no longer need them)
+            this.enumeratedReplacementDict[key] = unsorted.map(item => {
+                return item[0]; // The string (item[1] is the index)
+            });
         });
     }
 }
