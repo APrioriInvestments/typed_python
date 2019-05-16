@@ -33,6 +33,9 @@
 <script src="/content/CellSocket.js"></script>
 <script src="/content/CellHandler.js"></script>
 
+<!-- Debugging Scripts -->
+<script src="/content/cellReporter.js"></script>
+
 <!-- Cell Components -->
 <script src="/content/components/Component.js"></script>
 <script src="/content/components/Card.js"></script>
@@ -43,6 +46,7 @@
 <script src="/content/components/CollapsiblePanel.js"></script>
 <script src="/content/components/Text.js"></script>
 <script src="/content/components/Padding.js"></script>
+<script src="/content/components/Span.js"></script>
 
 <script>
  // This is the initial render function. It is called when "DOMContentLoaded"
@@ -81,7 +85,8 @@
      Badge,
      CollapsiblePanel,
      Text,
-     Padding
+     Padding,
+     Span
  };
 
  const cellSocket = new CellSocket();

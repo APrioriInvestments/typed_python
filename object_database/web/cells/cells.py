@@ -1135,6 +1135,7 @@ class Padding(Cell):
 class Span(Cell):
     def __init__(self, text):
         super().__init__()
+        self.exportData['text'] = text
         self.contents = str(
             HTMLElement.span()
             .add_child(HTMLTextContent(cgi.escape(str(text))))
