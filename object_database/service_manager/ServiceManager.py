@@ -165,7 +165,7 @@ class ServiceManager(object):
                 return True
 
             instances = service_schema.ServiceInstance.lookupAll(service=service)
-            if any(inst.isActive() for inst in instances):
+            if any(not inst.isNotActive() for inst in instances):
                 return False
             return True
 

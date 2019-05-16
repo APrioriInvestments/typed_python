@@ -29,6 +29,8 @@ from object_database import (
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
 VERBOSE = True
+# Turn VERBOSE off on TravisCI because subprocess.PIPE seems to lock things up
+VERBOSE = False if os.environ.get('TRAVIS_CI', None) else VERBOSE
 
 
 class ServiceManagerTestCommon(object):
@@ -59,10 +61,10 @@ class ServiceManagerTestCommon(object):
             logging.getLogger(__name__).getEffectiveLevel()
         )
 
-        if not VERBOSE:
-            kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
+        if VERBOSE:
+            kwargs = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
         else:
-            kwargs = {}
+            kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
 
         try:
             self.server = subprocess.Popen(
@@ -84,9 +86,13 @@ class ServiceManagerTestCommon(object):
         except subprocess.TimeoutExpired:
             pass
         else:
-            raise Exception(
-                f"Failed to start service_manager (retcode:{self.server.returncode})"
-            )
+            msg = f"Failed to start service_manager (retcode:{self.server.returncode})"
+
+            if VERBOSE:
+                error = b''.join(self.server.stderr.readlines())
+                msg += "\n" + error.decode("utf-8")
+
+            raise Exception(msg)
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, *self.schemasToSubscribeTo())

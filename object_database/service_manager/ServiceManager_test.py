@@ -383,6 +383,36 @@ class CrashingService(ServiceBase):
         assert False
 
 
+waiting = Schema("core.test.waiting")
+
+
+@waiting.define
+class Initialized:
+    pass
+
+
+@waiting.define
+class Stopped:
+    pass
+
+
+class WaitForService(ServiceBase):
+    def initialize(self):
+        self.db.subscribeToSchema(waiting)
+
+        with self.db.transaction():
+            assert Initialized.lookupAny() is None
+            Initialized()
+
+    def doWork(self, shouldStop):
+        while not shouldStop.is_set():
+            time.sleep(.5)
+
+        with self.db.transaction():
+            assert Stopped.lookupAny() is None
+            Stopped()
+
+
 def getTestServiceModule(version):
     return {
         'test_service/__init__.py': '',
@@ -490,6 +520,40 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             )
         )
 
+    def test_waitfor_service(self):
+        self.database.subscribeToSchema(waiting)
+        svcName = "WaitForService"
+
+        def test_once(timeout=6.0):
+            with self.database.transaction():
+                self.assertIsNone(Initialized.lookupAny())
+                self.assertIsNone(Stopped.lookupAny())
+                ServiceManager.createOrUpdateService(WaitForService, svcName)
+                ServiceManager.startService(svcName)
+
+            ServiceManager.waitRunning(self.database, svcName, timeout=timeout)
+
+            with self.database.view():
+                self.assertIsNotNone(Initialized.lookupAny())
+
+            with self.database.transaction():
+                ServiceManager.stopService(svcName)
+
+            ServiceManager.waitStopped(self.database, svcName, timeout=timeout)
+
+            with self.database.view():
+                self.assertIsNotNone(Stopped.lookupAny())
+
+            with self.database.transaction():
+                for obj in Initialized.lookupAll():
+                    obj.delete()
+
+                for obj in Stopped.lookupAll():
+                    obj.delete()
+
+        for ix in range(10):
+            test_once()
+
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
             ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
@@ -516,7 +580,11 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_shutdown_hanging_services(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(HangingService, "HangingService", target_count=10)
+            ServiceManager.createOrUpdateService(
+                HangingService,
+                "HangingService",
+                target_count=10
+            )
 
         self.waitForCount(10)
 
