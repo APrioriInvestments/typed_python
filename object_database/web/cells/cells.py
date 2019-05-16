@@ -1109,7 +1109,9 @@ class Text(Cell):
         return self._sortAs
 
     def recalculate(self):
-        escapedText = cgi.escape(str(self.text)) if self.text else "&nbsp;"
+        escapedText = cgi.escape(str(self.text)) if self.text else " "
+        self.exportData['escapedText'] = escapedText
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
