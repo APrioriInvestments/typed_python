@@ -1332,9 +1332,17 @@ class _NavTab(Cell):
         inlineScript = """
         cellSocket.sendString(JSON.stringify({'event': 'click', 'ix': __ix__, 'target_cell': '__identity__'}))
         """.replace('__identity__', self.target).replace('__ix__', str(self.index))
+        self.exportData['clickData'] = {
+            'event': 'click',
+            'ix': str(self.index),
+            'target_cell': self.target
+        }
         navLinkClasses = ['nav-link']
         if self.index == self.slot.get():
             navLinkClasses.append('active')
+            self.exportData['isActive'] = True
+        else:
+            self.exportData['isActive'] = False
         self.contents = str(
             HTMLElement.li()
             .add_class('nav-item')
