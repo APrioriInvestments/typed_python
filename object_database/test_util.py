@@ -110,7 +110,7 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
     if not verbose:
         kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
-        kwargs = dict()
+        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
     server = subprocess.Popen(
         [
@@ -130,9 +130,14 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
     except subprocess.TimeoutExpired:
         pass
     else:
-        raise Exception(
-            f"Failed to start service_manager (retcode:{server.returncode})"
-        )
+        msg = f"Failed to start service_manager (retcode:{server.returncode})"
+
+        if verbose:
+            error = b''.join(server.stderr.readlines())
+            msg += "\n" + error.decode("utf-8")
+
+        raise Exception(msg)
+
     return server
 
 
