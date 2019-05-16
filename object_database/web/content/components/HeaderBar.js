@@ -42,43 +42,46 @@ class HeaderBar extends Component {
     }
 
     makeLeft(){
-        if(!this.replacements.hasReplacement('left')){
-            return null;
+        let innerElements = [];
+        if(this.replacements.hasReplacement('left')){
+            innerElements = this.makeElements('left');
         }
         return (
             h('div', {class: "flex-item", style: "flex-grow:0;"}, [
                 h('div', {
                     class: "flex-container",
                     style: 'display:flex;justify-content:center;align-items:baseline;'
-                }, this.makeElements('left'))
+                }, innerElements)
             ])
         );
     }
 
     makeCenter(){
-        if(!this.replacements.hasReplacement('center')){
-            return null;
+        let innerElements = [];
+        if(this.replacements.hasReplacement('center')){
+            innerElements = this.makeElements('center');
         }
         return (
             h('div', {class: "flex-item", style: "flex-grow:1;"}, [
                 h('div', {
                     class: "flex-container",
                     style: 'display:flex;justify-content:center;align-items:baseline;'
-                }, this.makeElements('center'))
+                }, innerElements)
             ])
         );
     }
 
     makeRight(){
-        if(!this.replacements.hasReplacement('left')){
-            return null;
+        let innerElements = [];
+        if(this.replacements.hasReplacement('right')){
+            innerElements = this.makeElements('right');
         }
         return (
             h('div', {class: "flex-item", style: "flex-grow:0;"}, [
                 h('div', {
                     class: "flex-container",
                     style: 'display:flex;justify-content:center;align-items:baseline;'
-                }, this.makeElements('right'))
+                }, innerElements)
             ])
         );
     }
