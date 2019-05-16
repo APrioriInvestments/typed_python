@@ -42,6 +42,9 @@ class HeaderBar extends Component {
     }
 
     makeLeft(){
+        if(!this.replacements.hasReplacement('left')){
+            return null;
+        }
         return (
             h('div', {class: "flex-item", style: "flex-grow:0;"}, [
                 h('div', {
@@ -53,6 +56,9 @@ class HeaderBar extends Component {
     }
 
     makeCenter(){
+        if(!this.replacements.hasReplacement('center')){
+            return null;
+        }
         return (
             h('div', {class: "flex-item", style: "flex-grow:1;"}, [
                 h('div', {
@@ -64,6 +70,9 @@ class HeaderBar extends Component {
     }
 
     makeRight(){
+        if(!this.replacements.hasReplacement('left')){
+            return null;
+        }
         return (
             h('div', {class: "flex-item", style: "flex-grow:0;"}, [
                 h('div', {

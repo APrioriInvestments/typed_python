@@ -19,6 +19,7 @@ class ReplacementsHandler {
         this.addReplacement = this.addReplacement.bind(this);
         this._processEnumerated = this._processEnumerated.bind(this);
         this._sortEnumeratedValues = this._sortEnumeratedValues.bind(this);
+        this.hasReplacement = this.hasReplacement.bind(this);
     }
 
     addReplacement(replacementName){
@@ -27,6 +28,19 @@ class ReplacementsHandler {
         }
         this.replacementNames.push(replacementName);
         this.processReplacements();
+    }
+
+    hasReplacement(aName){
+        let found = this.replacementDict[aName];
+        if(found && found != undefined){
+            return true;
+        } else {
+            found = this.enumeratedReplacementDict[aName];
+            if(found && found != undefined){
+                return true;
+            }
+        }
+        return false;
     }
 
     getReplacement(replacementName){
