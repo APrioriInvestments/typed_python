@@ -15,7 +15,7 @@ class Button extends Component {
 
     render(){
         return(
-            h('div', {
+            h('button', {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Button",

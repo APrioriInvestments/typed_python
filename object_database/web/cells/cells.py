@@ -2537,15 +2537,16 @@ class ButtonGroup(Cell):
     def recalculate(self):
         self.children = {
             f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
-        innerButtons = HTMLTextContent(
-            " ".join(f"____{i}__" for i in range(len(self.buttons))))
+        innerButtonsText = " ".join(f"____{i}__" for i in range(len(self.buttons)))
         self.contents = str(
             HTMLElement.div()
             .add_class('btn-group')
             .set_attribute('role', 'group')
-            .add_child(innerButtons)
+            .add_child(HTMLTextContent(innerButtonsText))
         )
 
+        # temporary js WS refactoring data
+        self.exportData['innerButtonsText'] = innerButtonsText
 
 class LoadContentsFromUrl(Cell):
     def __init__(self, targetUrl):
