@@ -486,16 +486,6 @@ class Cells:
         # print(str(res))
         # print()
 
-        # For debugging Dropdown shit.
-        # Remove when working properly.
-        if isinstance(cell, Dropdown):
-            the_info = {
-                'id': cell.identity,
-                'children': [k for k in cell.children.keys()]
-            }
-            j = json.dumps(the_info, indent=4)
-            cell._logger.info(j)
-
         if cell.postscript:
             res['postscript'] = cell.postscript
         return res

@@ -46,8 +46,6 @@ class Dropdown extends Component {
     }
 
     makeItems(){
-        console.log(this);
-        console.log(`Making dropdown items for cell ${this.props.id}:`, this.getReplacementElementsFor('child'));
         // For some reason, due again to the Cell implementation,
         // sometimes there are not these child replacements.
         if(!this.replacements.hasReplacement('child')){
@@ -96,7 +94,6 @@ class DropdownItem extends Component {
         // current Cell implementation.
         // This whole component structure should be heavily refactored
         // once the Cells side of things starts to change.
-        console.log('DropdownItem clickhandler triggered!');
         let whatToDo = this.props.dropdownItemInfo[this.props.index.toString()];
         if(whatToDo == 'callback'){
             let responseData = {
@@ -104,7 +101,6 @@ class DropdownItem extends Component {
                 ix: this.props.index,
                 target_cell: this.props.targetIdentity
             };
-            console.log('Sending data:', responseData);
             cellSocket.sendString(JSON.stringify(responseData));
         } else {
             window.location.href = whatToDo;
