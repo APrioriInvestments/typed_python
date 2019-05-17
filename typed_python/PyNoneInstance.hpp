@@ -22,7 +22,7 @@ class PyNoneInstance : public PyInstance {
 public:
     typedef NoneType modeled_type;
 
-    static void copyConstructFromPythonInstanceConcrete(NoneType* oneOf, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    static void copyConstructFromPythonInstanceConcrete(NoneType* none, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (pyRepresentation == Py_None) {
             return;
         }

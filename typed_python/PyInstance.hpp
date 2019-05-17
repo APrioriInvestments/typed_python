@@ -275,7 +275,7 @@ public:
             (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
 
         try {
-            self->initialize(f);
+            self->initialize(f, eltType);
 
             return (PyObject*)self;
         } catch(...) {
@@ -285,8 +285,8 @@ public:
     }
 
     template<class init_func>
-    void initialize(const init_func& i) {
-        Type* type = extractTypeFrom(((PyObject*)this)->ob_type);
+    void initialize(const init_func& i, Type* typeIfKnown = nullptr) {
+        Type* type = typeIfKnown ? typeIfKnown : extractTypeFrom(((PyObject*)this)->ob_type);
         guaranteeForwardsResolvedOrThrow(type);
 
         mIsInitialized = false;
@@ -529,5 +529,11 @@ public:
 
     static PyObject* typePtrToPyTypeRepresentation(Type* t);
 
+    /****
+        Convert a python object passed as a type object to the appropriate Type*.
+
+        This function will unwrap native python types like 'float', 'int', or 'bool'
+        to their appropriate representations, convert constants to singletons, etc.
+    *****/
     static Type* unwrapTypeArgToTypePtr(PyObject* typearg);
 };

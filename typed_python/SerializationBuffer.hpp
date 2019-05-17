@@ -57,6 +57,12 @@ public:
     SerializationBuffer(const SerializationBuffer&) = delete;
     SerializationBuffer& operator=(const SerializationBuffer&) = delete;
 
+    static Bytes serializeSingleBoolToBytes(bool value) {
+        uint8_t existsValue[2] = { WireType::VARINT, value ? 1 : 0 };
+
+        return Bytes((const char*)existsValue, 2);
+    }
+
     void writeBeginBytes(size_t fieldNumber, size_t bytecount) {
         writeUnsignedVarint((fieldNumber << 3) + WireType::BYTES);
         writeUnsignedVarint(bytecount);
@@ -315,6 +321,7 @@ public:
             m_last_compression_point = m_size;
         }
     }
+
     template< class T>
     void write(T i) {
         ensure(sizeof(i));

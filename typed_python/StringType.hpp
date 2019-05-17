@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Type.hpp"
+#include "Unicode.hpp"
 
 class StringType : public Type {
 public:
@@ -83,15 +84,6 @@ public:
 
     //return an increffed string containing the data from the utf-encoded string
     static layout* createFromUtf8(const char* utfEncodedString, int64_t len);
-
-    static size_t bytesForUtf8Codepoint(size_t codepoint);
-
-    template<class codepoint_type>
-    static size_t countUtf8BytesRequiredFor(codepoint_type* codepoints, int64_t sz);
-
-    template<class codepoint_type>
-    static void encodeUtf8(codepoint_type* codepoints, int64_t sz, uint8_t* out);
-
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
         if (other->getTypeCategory() != m_typeCategory) {

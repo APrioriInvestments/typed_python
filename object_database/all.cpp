@@ -4,7 +4,9 @@ with the object_database implementation.
 ******/
 
 #include "_types.cpp"
-#include "PyVersionedObjectsOfType.cpp"
-#include "PyVersionedIdSets.cpp"
+#include "View.cpp"
+#include "PyView.cpp"
+#include "PyDatabaseConnectionState.cpp"
 #include "PyVersionedIdSet.cpp"
+#include "PyDatabaseObjectType.cpp"
 

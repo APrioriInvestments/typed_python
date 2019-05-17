@@ -731,6 +731,8 @@ class CellsTests(unittest.TestCase):
         def workFn(db, cells, iterations=5000):
             with db.view():
                 thing = Thing.lookupAny(k=0)
+                self.assertTrue(thing)
+                self.assertTrue(Thing.lookupAny())
 
             for counter in range(iterations):
                 with db.transaction():
@@ -739,6 +741,7 @@ class CellsTests(unittest.TestCase):
                         thing.delete()
                         thing = Thing(x=counter, k=0)
 
+                    self.assertTrue(Thing.lookupAny())
                     all_things = Thing.lookupAll()
                     self.assertEqual(len(all_things), 1)
                     for anything in all_things:

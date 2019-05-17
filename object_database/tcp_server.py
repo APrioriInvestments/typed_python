@@ -110,7 +110,7 @@ class ClientToServerProtocol(AlgebraicProtocol):
             self.sendMessage(ClientToServer.Heartbeat())
             self.loop.call_later(getHeartbeatInterval(), self.heartbeat)
 
-    def close(self):
+    def close(self, block=False):
         self.loop.call_soon_threadsafe(self._close)
 
     def _close(self):

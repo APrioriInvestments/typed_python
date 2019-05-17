@@ -589,52 +589,6 @@ void decodeUtf8ToTyped(T* target, uint8_t* utf8Str, int64_t bytes_per_codepoint,
     }
 }
 
-template<class codepoint_type>
-void StringType::encodeUtf8(codepoint_type* codepoints, int64_t sz, uint8_t* out) {
-    for (long k = 0; k < sz; k++) {
-        if (codepoints[k] < 0x80) {
-            *(out++) = codepoints[k];
-        } else if (codepoints[k] < 0x800) {
-            *(out++) = ((codepoints[k] & 0b11111000000) >> 6) + 0b11000000;
-            *(out++) = ((codepoints[k] & 0b00000111111)     ) + 0b10000000;
-        } else if (codepoints[k] < 0x10000) {
-            *(out++) = ((codepoints[k] & 0b1111000000000000) >> 12) + 0b11100000;
-            *(out++) = ((codepoints[k] & 0b0000111111000000) >> 6 ) + 0b10000000;
-            *(out++) = ((codepoints[k] & 0b0000000000111111)      ) + 0b10000000;
-        } else {
-            *(out++) = ((codepoints[k] & 0b111000000000000000000) >> 18) + 0b11110000;
-            *(out++) = ((codepoints[k] & 0b000111111000000000000) >> 12) + 0b10000000;
-            *(out++) = ((codepoints[k] & 0b000000000111111000000) >> 6 ) + 0b10000000;
-            *(out++) = ((codepoints[k] & 0b000000000000000111111)      ) + 0b10000000;
-        }
-    }
-}
-
-size_t StringType::bytesForUtf8Codepoint(size_t codepoint) {
-    if (codepoint < 0x80) {
-        return 1;
-    }
-    if (codepoint < 0x800) {
-        return 2;
-    }
-    if (codepoint < 0x10000) {
-        return 3;
-    }
-
-    return 4;
-}
-
-template<class codepoint_type>
-size_t StringType::countUtf8BytesRequiredFor(codepoint_type* codepoints, int64_t sz) {
-    size_t result = 0;
-
-    for (long k = 0; k < sz; k++) {
-        result += bytesForUtf8Codepoint(codepoints[k]);
-    }
-
-    return result;
-}
-
 void StringType::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length) {
     if (bytes_per_codepoint == 1) {
         decodeUtf8ToTyped(target, utf8Str, bytes_per_codepoint, length);
@@ -860,4 +814,3 @@ void StringType::assign(instance_ptr self, instance_ptr other) {
 
     destroy((instance_ptr)&old);
 }
-

@@ -29,6 +29,10 @@ A convenience wrapper around an Instance holding a Dict object.
 template<class key_type, class value_type>
 class DictInstance {
 public:
+    DictInstance() : mKeyType(nullptr), mValueType(nullptr)
+    {
+    }
+
     DictInstance(Type* keyType, Type* valueType) :
             mKeyType(keyType),
             mValueType(valueType)
@@ -54,6 +58,10 @@ public:
 
     bool deleteKey(const key_type& key) {
         return ((DictType*)mInstance.type())->deleteKey(mInstance.data(), (instance_ptr)&key);
+    }
+
+    bool deleteKeyWithUninitializedValue(const key_type& key) {
+        return ((DictType*)mInstance.type())->deleteKeyWithUninitializedValue(mInstance.data(), (instance_ptr)&key);
     }
 
     value_type* lookupOrInsert(const key_type& key) {

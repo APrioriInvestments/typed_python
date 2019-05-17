@@ -12,15 +12,19 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.object import _base, DatabaseObject, Index, Indexed
+import object_database._types as _types
+
+from object_database.object import Index, Indexed
 from types import FunctionType
-from typed_python import ConstDict, NamedTuple, Tuple, TupleOf
+from typed_python import ConstDict, NamedTuple, Tuple, TupleOf, serialize
 
 
 ObjectId = int
 FieldId = int
 ObjectFieldId = NamedTuple(objId=int, fieldId=int, isIndexValue=bool)
-IndexId = NamedTuple(fieldId=int, indexValue=bytes)
+IndexValue = bytes
+IndexId = NamedTuple(fieldId=int, indexValue=IndexValue)
+DatabaseObjectBase = NamedTuple(_identity=int)
 
 TypeDefinition = NamedTuple(fields=TupleOf(str), indices=TupleOf(str))
 SchemaDefinition = ConstDict(str, TypeDefinition)
@@ -33,28 +37,46 @@ def SubscribeLazilyByDefault(t):
     return t
 
 
+def indexValueFor(type, value, serializationContext=None):
+    return serialize(type, value, serializationContext)
+
+
 class Schema:
     """A collection of types that can be used to access data in a database."""
 
     def __init__(self, name):
         self._name = name
-        # Map: typename:str -> cls(DatabaseObject)
+
+        # Map: typename:str -> cls
         self._types = {}
+
+        # set of typename that still need definition
+        self._undefinedTypes = set()
+
+        # Map: typename:str -> type
+        # contains types we have defined on the schema that are not
+        # DatabaseObject types.
         self._supportingTypes = {}
-        # class -> indexname -> fun(object->value)
+
+        # class -> indexname -> tuple(str)
         self._indices = {}
-        # class -> fieldname -> set(indices)
-        self._indexed_fields = {}
-        self._indexTypes = {}
+
+        # class -> indexname -> tuple(str)
+        self._index_types = {}
+
+        # class -> fieldname -> type
+        self._field_types = {}
+
         self._frozen = False
-        # Map: cls(DatabaseObject) -> original_cls
+
+        # Map: cls -> original_cls
         self._types_to_original = {}
 
     def toDefinition(self):
         return SchemaDefinition({
             tname: self.typeToDef(t)
             for tname, t in self._types.items()
-            if issubclass(t, DatabaseObject)
+            if getattr(t, "__is_database_object_type__", False)
         })
 
     def __repr__(self):
@@ -67,9 +89,26 @@ class Schema:
 
     def typeToDef(self, t):
         return TypeDefinition(
-            fields=tuple(t.__types__.keys()) + (" exists",),
-            indices=tuple(self._indices.get(t, {}).keys())
+            fields=sorted(self._field_types[t.__name__]),
+            indices=sorted(self._indices[t.__name__])
         )
+
+    def getType(self, t):
+        return self._types.get(t)
+
+    def fieldType(self, typename, fieldname):
+        """Return the type of the field named 'fieldname' in 'typename'.
+
+        If the field or type is unknown, return None.
+        """
+        return self._field_types.get(typename, {}).get(fieldname, None)
+
+    def indexType(self, typename, fieldname):
+        """Return the type of the field named 'fieldname' in 'typename'.
+
+        If the field or type is unknown, return None.
+        """
+        return self._index_types.get(typename, {}).get(fieldname, None)
 
     @property
     def name(self):
@@ -77,10 +116,7 @@ class Schema:
 
     def freeze(self):
         if not self._frozen:
-            for tname, t in self._types.items():
-                if issubclass(t, DatabaseObject) and t.__types__ is None:
-                    raise Exception("Database subtype %s is not defined." % tname)
-
+            assert not self._undefinedTypes, "Still need definitions for %s" % (", ".join(self._undefinedTypes))
             self._frozen = True
 
     def __setattr__(self, typename, val):
@@ -91,7 +127,6 @@ class Schema:
         assert not self._frozen, "Schema is already frozen."
 
         assert isinstance(val, type)
-        assert not issubclass(val, DatabaseObject)
 
         self._supportingTypes[typename] = val
 
@@ -108,98 +143,92 @@ class Schema:
             if self._frozen:
                 raise AttributeError(typename)
 
-            class cls(DatabaseObject):
-                __object_database_source_class__ = None
-
-            cls.__name__ = typename
-            cls.__qualname__ = typename
-            cls.__schema__ = self
+            cls = _types.createDatabaseObjectType(self, typename)
 
             self._types[typename] = cls
-            self._indices[cls] = {" exists": lambda e: True}
-            self._indexTypes[cls] = {" exists": bool}
-            self._indexed_fields.setdefault(cls, {}).setdefault(" exists", set()).add(' exists')
+            self._indices[typename] = {}
+            self._index_types[typename] = {}
+            self._field_types[typename] = {}
+
+            self._undefinedTypes.add(typename)
 
         return self._types[typename]
 
-    def _addIndex(self, type, prop):
-        assert issubclass(type, DatabaseObject)
-
-        if type not in self._indices:
-            self._indices[type] = {}
-            self._indexTypes[type] = {}
-            self._indexed_fields[type] = {}
-
-        fun = lambda o: getattr(o, prop)
-        index_type = type.__types__[prop]
-
-        self._indices[type][prop] = fun
-        self._indexTypes[type][prop] = index_type
-        self._indexed_fields[type].setdefault(prop, set()).add(prop)
-
-    def _addTupleIndex(self, type, name, props, indexType):
-        assert issubclass(type, DatabaseObject)
-
-        if type not in self._indices:
-            self._indices[type] = {}
-            self._indexTypes[type] = {}
-            self._indexed_fields[type] = set()
-
-        fun = lambda o: indexType(tuple(getattr(o, prop) for prop in props))
-
-        self._indices[type][name] = fun
-        self._indexTypes[type][name] = indexType
-
-        for prop in props:
-            self._indexed_fields[type].setdefault(prop, set()).add(name)
-
     def define(self, cls):
-        assert not cls.__name__.startswith("_"), "Illegal to use _ for first character in database classnames."
+        typename = cls.__name__
+
+        assert not typename.startswith("_"), "Illegal to use _ for first character in database classnames."
         assert not self._frozen, "Schema is already frozen"
 
         # get a type stub
-        t = getattr(self, cls.__name__)
+        t = getattr(self, typename)
+
+        # add the canonical ' exists' property, which we use under the hood to indicate
+        # existence/deletion of an object.
+        self._field_types[typename][' exists'] = bool
+        self._indices[typename][' exists'] = (' exists',)
+        self._index_types[typename][' exists'] = bool
+
+        t.addField(' exists', bool)
+        t.addIndex(' exists', (' exists',))
+
+        # make sure it's not defined yet
+        assert typename in self._undefinedTypes, f"Type {typename} is not undefined."
+        self._undefinedTypes.discard(typename)
+
         self._types_to_original[t] = cls
 
-        # compute baseClasses in order to collect the type's attributes
-        baseClasses = list(cls.__mro__)
-        for i in range(len(baseClasses)):
-            if baseClasses[i] is DatabaseObject:
-                baseClasses = baseClasses[:i]
-                break
+        # compute baseClasses in order to collect the type's attributes but filter out
+        # object and the DatabaseObjectBase
+        baseClasses = [x for x in cls.__mro__ if x not in (object, DatabaseObjectBase)]
 
         properBaseClasses = [self._types_to_original.get(b, b) for b in baseClasses]
 
-        # Collect the type's attributes and populate (_define) the type object
+        # Collect the type's attributes and populate the actual type object
         # Map: name -> type
-        types = {}
+        classMembers = {}
 
         for base in reversed(properBaseClasses):
             for name, val in base.__dict__.items():
-                if not name.startswith('__'):
-                    if isinstance(val, type):
-                        types[name] = val
-                    elif isinstance(val, Indexed) and isinstance(val.obj, type):
-                        types[name] = val.obj
+                classMembers[name] = val
 
-        t._define(**types)
+        for name, val in classMembers.items():
+            isMagic = name[:2] == "__"
 
-        for base in reversed(properBaseClasses):
-            if base not in (DatabaseObject, _base, object):
-                for name, val in base.__dict__.items():
-                    if isinstance(val, Index):
-                        self._addTupleIndex(t, name, val.names, Tuple(*tuple(types[k] for k in val.names)))
-                    if not name.startswith('__') and isinstance(val, Indexed):
-                        self._addIndex(t, name)
-                    elif (not name.startswith("__") or name in ["__str__", "__repr__"]):
-                        if isinstance(val, (FunctionType, staticmethod, property)):
-                            setattr(t, name, val)
-                    elif name == "__init__":
-                        setattr(t, "__odb_initializer__", val)
-                    elif name == "__del__":
-                        setattr(t, "__odb_destructor__", val)
+            if isinstance(val, type) and not isMagic:
+                t.addField(name, val)
+                self._field_types[typename][name] = val
+            elif isinstance(val, Indexed):
+                t.addField(name, val.obj)
+                t.addIndex(name, (name,))
+                self._field_types[typename][name] = val.obj
+                self._indices[typename][name] = (name,)
+                self._index_types[typename][name] = val.obj
+            elif isinstance(val, Index):
+                # do this in a second pass
+                pass
+            elif isinstance(val, property):
+                t.addProperty(name, val.fget, val.fset)
+            elif isinstance(val, staticmethod):
+                t.addStaticMethod(name, val.__func__)
+            elif isinstance(val, FunctionType):
+                t.addMethod(name, val)
+
+        for name, val in classMembers.items():
+            if isinstance(val, Index):
+                t.addIndex(name, tuple(val.names))
+                assert len(val.names)
+
+                self._indices[typename][name] = tuple(val.names)
+
+                if len(val.names) > 1:
+                    self._index_types[typename][name] = Tuple(*[self._field_types[typename][fieldname] for fieldname in val.names])
+                else:
+                    self._index_types[typename][name] = self._field_types[typename][val.names[0]]
+
+        t.finalize()
 
         if hasattr(cls, '__object_database_lazy_subscription__'):
-            t.__object_database_lazy_subscription__ = cls.__object_database_lazy_subscription__
+            t.markLazyByDefault()
 
         return t

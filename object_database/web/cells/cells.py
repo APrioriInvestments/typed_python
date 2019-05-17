@@ -280,7 +280,7 @@ class Cells:
         self._transactionQueue.put(trans)
         self._gEventHasTransactions.trigger()
 
-    def _handleTransaction(self, key_value, priors, set_adds, set_removes, transactionId):
+    def _handleTransaction(self, key_value, set_adds, set_removes, transactionId):
         """ Given the updates coming from a transaction, update self._subscribedCells. """
         for k in list(key_value) + list(set_adds) + list(set_removes):
             if k in self._subscribedCells:
@@ -743,7 +743,7 @@ class Cell:
         self.subscriptions = set()
 
     def _resetSubscriptionsToViewReads(self, view):
-        new_subscriptions = set(view._reads).union(set(view._indexReads))
+        new_subscriptions = set(view.getFieldReads()).union(set(view.getIndexReads()))
 
         for k in new_subscriptions.difference(self.subscriptions):
             self.cells.subscribeCell(self, k)

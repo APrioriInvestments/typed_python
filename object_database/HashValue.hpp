@@ -32,6 +32,14 @@ public:
         }
     }
 
+    HashValue(uint32_t a0, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4) {
+        m_digest[0] = a0;
+        m_digest[1] = a1;
+        m_digest[2] = a2;
+        m_digest[3] = a3;
+        m_digest[4] = a4;
+    }
+
     HashValue(const char* bytes) {
         strncpy((char*)m_digest, bytes, 20);
     }
@@ -59,6 +67,9 @@ public:
         return true;
     }
 
+    const uint32_t* digest() const {
+      return m_digest;
+    }
 private:
     uint32_t m_digest[5];
 };

@@ -12,18 +12,18 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from object_database.schema import ObjectFieldId, IndexId, FieldDefinition, ObjectId
+from object_database.schema import ObjectFieldId, IndexId, FieldDefinition, indexValueFor
 from object_database.messages import ClientToServer, getHeartbeatInterval
 from object_database.core_schema import core_schema
-from object_database.view import View, Transaction, _cur_view, SerializedDatabaseValue
+
+from object_database.view import View, Transaction, _cur_view
 from object_database.reactor import Reactor
-from object_database.identity import IdentityProducer
-import object_database.keymapping as keymapping
-from object_database._types import VersionedIdSet
+from object_database.identity import IDENTITY_BLOCK_SIZE
+from object_database._types import DatabaseConnectionState
 
 from typed_python.SerializationContext import SerializationContext
 from typed_python.Codebase import Codebase as TypedPythonCodebase
-from typed_python import Alternative, Dict, OneOf, TupleOf
+from typed_python import Alternative, Dict, OneOf
 
 import threading
 import logging
@@ -45,227 +45,6 @@ TransactionResult = Alternative(
 )
 
 
-class VersionedBase:
-    def _best_version_offset_for(self, version):
-        i = len(self.version_numbers) - 1
-
-        while i >= 0:
-            if self.version_numbers[i] <= version:
-                return i
-            i -= 1
-
-        return None
-
-    def isEmpty(self):
-        return not self.version_numbers
-
-    def validVersionIncoming(self, version_read, transaction_id):
-        if not self.version_numbers:
-            return True
-        top = self.version_numbers[-1]
-        assert transaction_id > version_read
-        return version_read >= top
-
-    def hasVersionInfoNewerThan(self, tid):
-        if not self.version_numbers:
-            return False
-        return tid < self.version_numbers[-1]
-
-    def newestValue(self):
-        if self.version_numbers:
-            return self.valueForVersion(self.version_numbers[-1])
-        else:
-            return self.valueForVersion(None)
-
-
-class VersionedValue(VersionedBase):
-    def __init__(self):
-        self.version_numbers = []
-        self.values = []
-
-    def setVersionedValue(self, version_number, val):
-        self.version_numbers.append(version_number)
-        self.values.append(val)
-
-    def valueForVersion(self, version):
-        i = self._best_version_offset_for(version)
-
-        if i is None:
-            return None
-
-        return self.values[i]
-
-    def wantsGuaranteedLowestIdMoveForward(self):
-        return len(self.version_numbers) != 1 or self.values[0].serializedByteRep is None
-
-    def moveGuaranteedLowestIdForward(self, version_number):
-        if not self.values:
-            return True
-
-        while self.values and self.version_numbers[0] < version_number:
-            if len(self.values) == 1:
-                if self.values[0].serializedByteRep is None:
-                    # this value was deleted and we can just remove this whole entry
-                    return True
-                else:
-                    self.version_numbers[0] = version_number
-            else:
-                if self.version_numbers[1] <= version_number:
-                    self.values.pop(0)
-                    self.version_numbers.pop(0)
-                else:
-                    self.version_numbers[0] = version_number
-
-    def __repr__(self):
-        return "VersionedValue(ids=%s)" % (self.version_numbers,)
-
-
-class FrozenIdSet:
-    def __init__(self, idSet, transactionId):
-        self.idSet = idSet
-        self.transactionId = transactionId
-
-    def toSet(self):
-        return set(self)
-
-    def __iter__(self):
-        if self.idSet is None:
-            return
-
-        o = self.idSet.lookupFirst(self.transactionId)
-        while o >= 0:
-            yield o
-            o = self.idSet.lookupNext(self.transactionId, o)
-
-    def pickAny(self, toAvoid):
-        for objId in self:
-            if objId not in toAvoid:
-                return objId
-
-
-class ManyVersionedObjects:
-    def __init__(self):
-        # for each version number we have outstanding
-        self._version_number_refcount = {}
-
-        self._min_reffed_version_number = None
-
-        # for each version number, the set of keys that are set with it
-        self._version_number_objects = {}
-
-        # for each key, a VersionedValue or VersionedIdSet
-        self._versioned_objects = {}
-
-    def keycount(self):
-        return len(self._versioned_objects)
-
-    def versionIncref(self, version_number):
-        if version_number not in self._version_number_refcount:
-            self._version_number_refcount[version_number] = 1
-
-            if self._min_reffed_version_number is None:
-                self._min_reffed_version_number = version_number
-            else:
-                self._min_reffed_version_number = min(version_number, self._min_reffed_version_number)
-        else:
-            self._version_number_refcount[version_number] += 1
-
-    def versionDecref(self, version_number):
-        assert version_number in self._version_number_refcount
-
-        self._version_number_refcount[version_number] -= 1
-
-        assert self._version_number_refcount[version_number] >= 0
-
-        if self._version_number_refcount[version_number] == 0:
-            del self._version_number_refcount[version_number]
-
-            if version_number == self._min_reffed_version_number:
-                if not self._version_number_refcount:
-                    self._min_reffed_version_number = None
-                else:
-                    self._min_reffed_version_number = min(self._version_number_refcount)
-
-    def setForVersion(self, key, version_number):
-        if key in self._versioned_objects:
-            return FrozenIdSet(self._versioned_objects[key], version_number)
-
-        return FrozenIdSet(None, version_number)
-
-    def hasDataForKey(self, key):
-        return key in self._versioned_objects
-
-    def valueForVersion(self, key, version_number):
-        return self._versioned_objects[key].valueForVersion(version_number)
-
-    def _object_has_version(self, key, version_number):
-        if version_number not in self._version_number_objects:
-            self._version_number_objects[version_number] = set()
-
-        self._version_number_objects[version_number].add(key)
-
-    def setVersionedValue(self, key, version_number, serialized_val):
-        self._object_has_version(key, version_number)
-
-        if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedValue()
-
-        versioned = self._versioned_objects[key]
-
-        initialValue = versioned.newestValue()
-
-        versioned.setVersionedValue(version_number, SerializedDatabaseValue(serialized_val, {}))
-
-        return initialValue
-
-    def setVersionedAddsAndRemoves(self, key, version_number, adds, removes):
-        self._object_has_version(key, version_number)
-
-        if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedIdSet()
-
-        if adds or removes:
-            self._versioned_objects[key].addTransaction(version_number, adds, removes)
-
-    def setVersionedTailValueStringified(self, key, serialized_val):
-        if key not in self._versioned_objects:
-            self._object_has_version(key, -1)
-            self._versioned_objects[key] = VersionedValue()
-            self._versioned_objects[key].setVersionedValue(-1, SerializedDatabaseValue(serialized_val, {}))
-
-    def updateVersionedAdds(self, key, version_number, adds):
-        self._object_has_version(key, version_number)
-
-        if key not in self._versioned_objects:
-            self._versioned_objects[key] = VersionedIdSet()
-            self._versioned_objects[key].addTransaction(version_number, adds, TupleOf(ObjectId)())
-        else:
-            self._versioned_objects[key].addTransaction(version_number, adds, TupleOf(ObjectId)())
-
-    def cleanup(self, curTransactionId):
-        """Get rid of old objects we don't need to keep around and increase the min_transaction_id"""
-
-        if self._min_reffed_version_number is not None:
-            lowestId = min(self._min_reffed_version_number, curTransactionId)
-        else:
-            lowestId = curTransactionId
-
-        if self._version_number_objects:
-            while min(self._version_number_objects) < lowestId:
-                toCollapse = min(self._version_number_objects)
-
-                for key in self._version_number_objects[toCollapse]:
-                    if key not in self._versioned_objects:
-                        pass
-                    elif self._versioned_objects[key].moveGuaranteedLowestIdForward(lowestId):
-                        del self._versioned_objects[key]
-                    else:
-                        if self._versioned_objects[key].wantsGuaranteedLowestIdMoveForward():
-                            self._object_has_version(key, lowestId)
-
-                del self._version_number_objects[toCollapse]
-
-
 class DatabaseConnection:
     def __init__(self, channel, connectionMetadata=None):
         self._channel = channel
@@ -277,12 +56,14 @@ class DatabaseConnection:
         # transaction of what's in the KV store
         self._cur_transaction_num = 0
 
+        self.serializationContext = TypedPythonCodebase.coreSerializationContext().withoutCompression()
+
         # a datastructure that keeps track of all the different versions of the objects
         # we have mapped in.
-        self._versioned_data = ManyVersionedObjects()
+        self._connection_state = DatabaseConnectionState()
+        self._connection_state.setSerializationContext(self.serializationContext)
+        self._connection_state.setTriggerLazyLoad(self.loadLazyObject)
 
-        # a map from lazy object id to (schema, typename)
-        self._lazy_objects = {}
         self._lazy_object_read_blocks = {}
 
         self.initialized = threading.Event()
@@ -292,6 +73,7 @@ class DatabaseConnection:
         # when the server has acknowledged the schema and given us a definition
         self._schema_response_events = {}
         self._fields_to_field_ids = Dict(FieldDefinition, int)()
+        self._field_id_to_schema_and_typename = {}
         self._field_id_to_field_def = Dict(int, FieldDefinition)()
 
         self.connectionObject = None
@@ -301,20 +83,15 @@ class DatabaseConnection:
 
         self._flushEvents = {}
 
-        # Map: schema.name -> schema
-        self._schemas = {}
+        # set(schema)
+        self._schemas = set()
 
         self._messages_received = 0
 
         self._pendingSubscriptions = {}
 
-        # if we have object-level subscriptions to a particular type (e.g. not everything)
-        # then, this is from (schema, typename) -> {object_id -> transaction_id} so that
-        # we can tell when the subscription should become valid. Subscriptions are permanent
-        # otherwise, if we're subscribed, it's 'Everything'
-        self._schema_and_typename_to_subscription_set = {}
-
-        # from (schema, typename, field_val) -> {'values', 'index_values', 'identities'}
+        # from (schema, typename, fieldname_and_val) -> {'values', 'index_values', 'identities'}
+        # where (fieldname_and_val) is OneOf(None, (str, IndexValue))
         self._subscription_buildup = {}
 
         self._channel.setServerToClientHandler(self._onMessage)
@@ -322,8 +99,6 @@ class DatabaseConnection:
         self._flushIx = 0
 
         self._largeSubscriptionHeartbeatDelay = 0
-
-        self.serializationContext = TypedPythonCodebase.coreSerializationContext().withoutCompression()
 
         self._logger = logging.getLogger(__name__)
 
@@ -357,6 +132,7 @@ class DatabaseConnection:
     def setSerializationContext(self, context):
         assert isinstance(context, SerializationContext), context
         self.serializationContext = context.withoutCompression()
+        self._connection_state.setSerializationContext(self.serializationContext)
         return self
 
     def serializeFromModule(self, module):
@@ -397,13 +173,14 @@ class DatabaseConnection:
     def _stopHeartbeating(self):
         self._channel._stopHeartbeating()
 
-    def disconnect(self):
+    def disconnect(self, block=False):
         self.disconnected.set()
-        self._channel.close()
+        self._connection_state.setTriggerLazyLoad(None)
+        self._channel.close(block=block)
 
     def _noViewsOutstanding(self):
         with self._lock:
-            return not self._versioned_data._version_number_refcount
+            return self._connection_state.outstandingViewCount() == 0
 
     def authenticate(self, token):
         assert self._auth_token is None, "We already authenticated."
@@ -417,8 +194,8 @@ class DatabaseConnection:
         schema.freeze()
 
         with self._lock:
-            if schema.name not in self._schemas:
-                self._schemas[schema.name] = schema
+            if schema not in self._schemas:
+                self._schemas.add(schema)
 
                 schemaDesc = schema.toDefinition()
 
@@ -457,12 +234,16 @@ class DatabaseConnection:
     def subscribeToObject(self, t):
         self.subscribeToObjects([t])
 
+    def subscribeToNone(self, type):
+        self.addSchema(type.__schema__)
+
     def subscribeToObjects(self, objects):
         for t in objects:
             self.addSchema(type(t).__schema__)
+
         self.subscribeMultiple([
             (type(t).__schema__.name, type(t).__qualname__,
-                ("_identity", keymapping.index_value_to_hash(t._identity, self.serializationContext)),
+                ("_identity", indexValueFor(type(t), t, self.serializationContext)),
                 False)
             for t in objects
         ])
@@ -478,31 +259,30 @@ class DatabaseConnection:
         self.addSchema(t.__schema__)
 
         toSubscribe = []
+
         for fieldname, fieldvalue in kwarg.items():
+            indexVal = indexValueFor(
+                t.__schema__.indexType(t.__qualname__, fieldname),
+                fieldvalue,
+                self.serializationContext
+            )
+
             toSubscribe.append((
                 t.__schema__.name,
                 t.__qualname__,
-                (fieldname, keymapping.index_value_to_hash(fieldvalue, self.serializationContext)),
-                self._lazinessForType(t, lazySubscription))
-            )
+                (fieldname, indexVal),
+                self._lazinessForType(t, lazySubscription)
+            ))
 
         return self.subscribeMultiple(toSubscribe, block=block)
 
     def subscribeToType(self, t, block=True, lazySubscription=None):
         self.addSchema(t.__schema__)
 
-        if self._isTypeSubscribedAll(t):
+        if self._connection_state.typeSubscriptionLowestTransaction(t.__schema__.name, t.__qualname__) is not None:
             return ()
 
         return self.subscribeMultiple([(t.__schema__.name, t.__qualname__, None, self._lazinessForType(t, lazySubscription))], block)
-
-    def subscribeToNone(self, t, block=True):
-        self.addSchema(t.__schema__)
-        with self._lock:
-            self._schema_and_typename_to_subscription_set.setdefault(
-                (t.__schema__.name, t.__qualname__), set()
-            )
-        return ()
 
     def subscribeToSchema(self, *schemas, block=True, lazySubscription=None, excluding=()):
         for s in schemas:
@@ -511,7 +291,7 @@ class DatabaseConnection:
         unsubscribedTypes = []
         for schema in schemas:
             for tname, t in schema._types.items():
-                if not self._isTypeSubscribedAll(t) and t not in excluding:
+                if not self.isSubscribedToType(t) and t not in excluding:
                     unsubscribedTypes.append((schema.name, tname, None, self._lazinessForType(t, lazySubscription)))
 
         if unsubscribedTypes:
@@ -520,16 +300,10 @@ class DatabaseConnection:
         return ()
 
     def isSubscribedToSchema(self, schema):
-        return all(self._isTypeSubscribed(t) for t in schema._types.values())
+        return all(self.isSubscribedToType(t) for t in schema._types.values())
 
     def isSubscribedToType(self, t):
-        return self._isTypeSubscribed(t)
-
-    def _isTypeSubscribed(self, t):
-        return (t.__schema__.name, t.__qualname__) in self._schema_and_typename_to_subscription_set
-
-    def _isTypeSubscribedAll(self, t):
-        return self._schema_and_typename_to_subscription_set.get((t.__schema__.name, t.__qualname__)) is Everything
+        return self._connection_state.typeSubscriptionLowestTransaction(t.__schema__.name, t.__qualname__) is not None
 
     def subscribeMultiple(self, subscriptionTuples, block=True):
         with self._lock:
@@ -577,20 +351,6 @@ class DatabaseConnection:
         finally:
             reactor.teardown()
 
-    def _data_key_to_object(self, key):
-        schema_name, typename, identity, fieldname = keymapping.split_data_key(key)
-
-        schema = self._schemas.get(schema_name)
-        if not schema:
-            return None, None
-
-        cls = schema._types.get(typename)
-
-        if cls:
-            return cls.fromIdentity(identity), fieldname
-
-        return None, None
-
     def __str__(self):
         return "DatabaseConnection(%s)" % id(self)
 
@@ -612,11 +372,7 @@ class DatabaseConnection:
 
             assert transaction_id <= self._cur_transaction_num
 
-            view = View(self, transaction_id)
-
-            self._versioned_data.versionIncref(transaction_id)
-
-            return view
+            return View(self, transaction_id)
 
     def transaction(self):
         """Only one transaction may be committed on the current transaction number."""
@@ -624,57 +380,7 @@ class DatabaseConnection:
             if self.disconnected.is_set():
                 raise DisconnectedException()
 
-            view = Transaction(self, self._cur_transaction_num)
-
-            transaction_id = self._cur_transaction_num
-
-            self._versioned_data.versionIncref(transaction_id)
-
-            return view
-
-    def _releaseView(self, view):
-        with self._lock:
-            self._versioned_data.versionDecref(view._transaction_num)
-
-    def isSubscribedToObject(self, object):
-        return not self._suppressKey(object._identity)
-
-    def _suppressKey(self, k):
-        fieldId = k.fieldId
-        identity = k.objId
-
-        if fieldId not in self._field_id_to_field_def:
-            return True
-
-        fieldDef = self._field_id_to_field_def[fieldId]
-
-        subscriptionSet = self._schema_and_typename_to_subscription_set.get((fieldDef.schema, fieldDef.typename))
-
-        if subscriptionSet is Everything:
-            return False
-
-        if isinstance(subscriptionSet, set) and identity in subscriptionSet:
-            return False
-        return True
-
-    def _suppressIdentities(self, index_key, identities):
-        if index_key.fieldId not in self._field_id_to_field_def:
-            return set()
-
-        fieldDef = self._field_id_to_field_def[index_key.fieldId]
-
-        subscriptionSet = self._schema_and_typename_to_subscription_set.get((fieldDef.schema, fieldDef.typename))
-
-        if subscriptionSet is Everything:
-            return identities
-        elif subscriptionSet is None:
-            return set()
-        else:
-            return identities.intersection(subscriptionSet)
-
-    def cleanup(self):
-        with self._lock:
-            self._versioned_data.cleanup(self._cur_transaction_num)
+            return Transaction(self, self._cur_transaction_num)
 
     def _onMessage(self, msg):
         self._messages_received += 1
@@ -717,7 +423,7 @@ class DatabaseConnection:
         elif msg.matches.Initialize:
             with self._lock:
                 self._cur_transaction_num = msg.transaction_num
-                self.identityProducer = IdentityProducer(msg.identity_root)
+                self._connection_state.setIdentityRoot(IDENTITY_BLOCK_SIZE * msg.identity_root)
                 self.connectionObject = core_schema.Connection.fromIdentity(msg.connIdentity)
                 self.initialized.set()
         elif msg.matches.TransactionResult:
@@ -734,37 +440,20 @@ class DatabaseConnection:
                     )
         elif msg.matches.Transaction:
             with self._lock:
-                key_value = {}
-                priors = {}
-
                 self._markSchemaAndTypeMaxTids(set(k.fieldId for k in msg.writes), msg.transaction_id)
 
-                writes = {k: msg.writes[k] for k in msg.writes}
-                set_adds = {k: msg.set_adds[k] for k in msg.set_adds}
-                set_removes = {k: msg.set_removes[k] for k in msg.set_removes}
-
-                for k, val_serialized in writes.items():
-                    if not self._suppressKey(k):
-                        key_value[k] = val_serialized
-
-                        priors[k] = self._versioned_data.setVersionedValue(k, msg.transaction_id, val_serialized)
-
-                for k, a in set_adds.items():
-                    a = self._suppressIdentities(k, set(a))
-
-                    self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, a, set())
-
-                for k, r in set_removes.items():
-                    r = self._suppressIdentities(k, set(r))
-                    self._versioned_data.setVersionedAddsAndRemoves(k, msg.transaction_id, set(), r)
+                self._connection_state.incomingTransaction(
+                    msg.transaction_id,
+                    msg.writes,
+                    msg.set_adds,
+                    msg.set_removes
+                )
 
                 self._cur_transaction_num = msg.transaction_id
 
-                self._versioned_data.cleanup(self._cur_transaction_num)
-
-            for handler in self._onTransactionHandlers:
+            for handler in list(self._onTransactionHandlers):
                 try:
-                    handler(key_value, priors, set_adds, set_removes, msg.transaction_id)
+                    handler(msg.writes, msg.set_adds, msg.set_removes, msg.transaction_id)
                 except Exception:
                     self._logger.error(
                         "_onTransaction handler %s threw an exception:\n%s",
@@ -778,15 +467,22 @@ class DatabaseConnection:
                     self._field_id_to_field_def[fieldId] = fieldDef
                     self._fields_to_field_ids[fieldDef] = fieldId
 
+                    self._field_id_to_schema_and_typename[fieldId] = (fieldDef.schema, fieldDef.fieldname)
+
+                    self._connection_state.setFieldId(
+                        fieldDef.schema,
+                        fieldDef.typename,
+                        fieldDef.fieldname,
+                        fieldId
+                    )
+
                 self._schema_response_events[msg.schema].set()
 
         elif msg.matches.SubscriptionIncrease:
             with self._lock:
-                subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
-                if subscribedIdentities is not Everything:
-                    subscribedIdentities.update(
-                        msg.identities
-                    )
+                for oid in msg.identities:
+                    self._connection_state.markObjectSubscribed(oid, msg.transaction_id)
+
         elif msg.matches.SubscriptionData:
             with self._lock:
                 lookupTuple = (msg.schema, msg.typename, msg.fieldname_and_value)
@@ -805,16 +501,16 @@ class DatabaseConnection:
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
         elif msg.matches.LazyTransactionPriors:
             with self._lock:
-                for k, v in msg.writes.items():
-                    self._versioned_data.setVersionedTailValueStringified(k, v)
+                self._connection_state.incomingTransaction( 0, msg.writes, {}, {})
+
         elif msg.matches.LazyLoadResponse:
             with self._lock:
-                for k, v in msg.values.items():
-                    self._versioned_data.setVersionedTailValueStringified(k, v)
+                self._connection_state.incomingTransaction(0, msg.values, {}, {})
 
-                self._lazy_objects.pop(msg.identity, None)
+                self._connection_state.markObjectNotLazy(msg.identity)
 
                 e = self._lazy_object_read_blocks.pop(msg.identity, None)
+
                 if e:
                     e.set()
 
@@ -860,19 +556,15 @@ class DatabaseConnection:
 
                 if msg.fieldname_and_value is None:
                     if msg.typename is None:
-                        for tname in self._schemas[msg.schema]._types:
-                            self._schema_and_typename_to_subscription_set[msg.schema, tname] = Everything
+                        for typename in self._schemaToType[msg.schema]:
+                            self._connection_state.markTypeSubscribed(msg.schema, typename, msg.tid)
                     else:
-                        self._schema_and_typename_to_subscription_set[msg.schema, msg.typename] = Everything
+                        self._connection_state.markTypeSubscribed(msg.schema, msg.typename, msg.tid)
                 else:
                     assert msg.typename is not None
-                    subscribedIdentities = self._schema_and_typename_to_subscription_set.setdefault((msg.schema, msg.typename), set())
-                    if subscribedIdentities is not Everything:
-                        subscribedIdentities.update(
-                            identities
-                        )
+                    for oid in identities:
+                        self._connection_state.markObjectSubscribed(oid, msg.tid)
 
-                t0 = time.time()
                 heartbeatInterval = getHeartbeatInterval()
 
                 # this is a fault injection to allow us to verify that heartbeating during this
@@ -883,42 +575,13 @@ class DatabaseConnection:
                     )
                     time.sleep(heartbeatInterval)
 
-                totalBytes = 0
-                for k, v in values.items():
-                    if v is not None:
-                        totalBytes += len(v)
-
-                if totalBytes > 1000000:
-                    self._logger.info("Subscription %s loaded %.2f mb of raw data.", lookupTuple, totalBytes / 1024.0 ** 2)
-
                 if markedLazy:
-                    schema_and_typename = lookupTuple[:2]
+                    schema, typename = lookupTuple[:2]
+
                     for i in identities:
-                        self._lazy_objects[i] = schema_and_typename
+                        self._connection_state.markObjectLazy(schema, typename, i)
 
-                for key, val in values.items():
-                    self._versioned_data.setVersionedValue(key, msg.tid, val)
-
-                    # this could take a long time, so we need to keep heartbeating
-                    if time.time() - t0 > heartbeatInterval:
-                        # note that this needs to be 'sendMessage' which sends immediately,
-                        # not, 'write' which queues the message after this function finishes!
-                        self._channel.sendMessage(
-                            ClientToServer.Heartbeat()
-                        )
-                        t0 = time.time()
-
-                for key, setval in sets.items():
-                    self._versioned_data.updateVersionedAdds(key, msg.tid, set(setval))
-
-                    # this could take a long time, so we need to keep heartbeating
-                    if time.time() - t0 > heartbeatInterval:
-                        # note that this needs to be 'sendMessage' which sends immediately,
-                        # not, 'write' which queues the message after this function finishes!
-                        self._channel.sendMessage(
-                            ClientToServer.Heartbeat()
-                        )
-                        t0 = time.time()
+                self._connection_state.incomingTransaction(msg.tid, values, sets, {})
 
                 # this should be inline with the stream of messages coming from the server
                 assert self._cur_transaction_num <= msg.tid
@@ -972,51 +635,18 @@ class DatabaseConnection:
                     t0 = time.time()
         return setAdds
 
-    def _get_versioned_set_data(self, key, transaction_id):
-        with self._lock:
-            if self.disconnected.is_set():
-                raise DisconnectedException()
-
-            return self._versioned_data.setForVersion(key, transaction_id)
-
-    def _get_versioned_object_data(self, key, transaction_id):
-        with self._lock:
-            if self._versioned_data.hasDataForKey(key):
-                return self._versioned_data.valueForVersion(key, transaction_id)
-
-            if self.disconnected.is_set():
-                raise DisconnectedException()
-
-            identity = key.objId
-            if identity not in self._lazy_objects:
-                return None
-
-            event = self._loadLazyObject(identity)
-
-        event.wait()
-
-        with self._lock:
-            if self.disconnected.is_set():
-                raise DisconnectedException()
-
-            if self._versioned_data.hasDataForKey(key):
-                return self._versioned_data.valueForVersion(key, transaction_id)
-
-            return None
-
     def requestLazyObjects(self, objects):
         with self._lock:
             for o in objects:
-                fieldId = self._fields_to_field_ids[
-                    FieldDefinition(schema=o.__schema__.name, typename=type(o).__qualname__, fieldname=" exists")
-                ]
+                self._loadLazyObject(o._identity, type(o).__schema__.name, type(o).__qualname__)
 
-                objFieldId = ObjectFieldId(fieldId=fieldId, objId=o._identity)
+    def loadLazyObject(self, identity, schemaName, typeName):
+        with self._lock:
+            e = self._loadLazyObject(identity, schemaName, typeName)
 
-                if o._identity in self._lazy_objects and not self._versioned_data.hasDataForKey(objFieldId):
-                    self._loadLazyObject(o._identity)
+        e.wait()
 
-    def _loadLazyObject(self, identity):
+    def _loadLazyObject(self, identity, schemaName, typeName):
         e = self._lazy_object_read_blocks.get(identity)
 
         if e:
@@ -1027,32 +657,32 @@ class DatabaseConnection:
         self._channel.write(
             ClientToServer.LoadLazyObject(
                 identity=identity,
-                schema=self._lazy_objects[identity][0],
-                typename=self._lazy_objects[identity][1]
+                schema=schemaName,
+                typename=typeName
             )
         )
 
         return e
 
-    def _set_versioned_object_data(self,
-                                   key_value,
-                                   set_adds,
-                                   set_removes,
-                                   keys_to_check_versions,
-                                   indices_to_check_versions,
-                                   as_of_version,
-                                   confirmCallback
-                                   ):
+    def _createTransaction(self,
+                           key_value,
+                           set_adds,
+                           set_removes,
+                           keys_to_check_versions,
+                           indices_to_check_versions,
+                           as_of_version,
+                           confirmCallback
+                           ):
         assert confirmCallback is not None
 
-        transaction_guid = self.identityProducer.createIdentity()
+        transaction_guid = self._connection_state.allocateIdentity()
 
         self._transaction_callbacks[transaction_guid] = confirmCallback
 
         out_writes = {}
 
         for k, v in key_value.items():
-            out_writes[k] = v.serializedByteRep
+            out_writes[k] = v
             if len(out_writes) > 10000:
                 self._channel.write(
                     ClientToServer.TransactionData(

@@ -17,7 +17,7 @@ import time
 import threading
 import logging
 
-from object_database.schema import ObjectFieldId, IndexId, FieldId
+from object_database.schema import ObjectFieldId, IndexId, FieldId, IndexValue
 from typed_python import serialize, deserialize, OneOf
 
 KeyType = OneOf(ObjectFieldId, IndexId, FieldId, "identityRoot", "types")
@@ -39,9 +39,15 @@ class InMemoryPersistence(object):
 
             assert isinstance(val, bytes), key
 
+            if not isinstance(key, str) and key.isIndexValue and val is not None:
+                return deserialize(IndexValue, val, None)
+
             return val
 
     def set(self, key, value):
+        if not isinstance(key, str) and key.isIndexValue and value is not None:
+            value = serialize(IndexValue, value, None)
+
         assert isinstance(value, bytes) or value is None, (key, value)
 
         with self.lock:

@@ -220,12 +220,12 @@ class Reactor:
                 if hadWrites[0]:
                     return
 
-                if view._writes:
+                if view._view.extractWrites():
                     hadWrites[0] = True
                     return
 
-                seenKeys.update(view._reads)
-                seenKeys.update(view._indexReads)
+                seenKeys.update(view._view.extractReads())
+                seenKeys.update(view._view.extractIndexReads())
 
             with ViewWatcher(onViewClose):
                 logging.getLogger(__name__).info("Reactor %s recalculating", self.reactorFunction)
@@ -245,5 +245,5 @@ class Reactor:
             )
             return None, None
 
-    def _onTransaction(self, key_value, priors, set_adds, set_removes, transactionId):
+    def _onTransaction(self, key_value, set_adds, set_removes, transactionId):
         self._transactionQueue.put(list(key_value) + list(set_adds) + list(set_removes))

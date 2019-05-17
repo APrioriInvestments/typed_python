@@ -98,6 +98,8 @@ public:
 
     void destroy(instance_ptr self);
 
+    static void destroyStatic(instance_ptr self);
+
     void copy_constructor(instance_ptr self, instance_ptr other);
 
     void assign(instance_ptr self, instance_ptr other);

@@ -77,7 +77,7 @@ void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
 
             m_key->repr(l.items + k * m_bytes_per_key_value_pair, stream);
             stream << ": ";
-            m_key->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
+            m_value->repr(l.items + k * m_bytes_per_key_value_pair + m_bytes_per_key, stream);
         }
     }
 
@@ -189,6 +189,22 @@ bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
     if (index >= 0) {
         m_key->destroy(record.items + index * m_bytes_per_key_value_pair);
         m_value->destroy(record.items + index * m_bytes_per_key_value_pair + m_bytes_per_key);
+        return true;
+    }
+
+    return false;
+}
+
+bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr key) const {
+    layout& record = **(layout**)self;
+
+    int32_t keyHash = m_key->hash32(key);
+
+    int32_t index = record.remove(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
+        return m_key->cmp(key, ptr, Py_EQ);
+    });
+
+    if (index >= 0) {
         return true;
     }
 

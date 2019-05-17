@@ -414,10 +414,11 @@ class ActiveWebService(ServiceBase):
         if sessionId is None:
             sessionState = SessionState()
         else:
-            # we keep sessions in a list. This is not great, but if you
-            # bounce your browser, you'll get the session state you just dropped.
-            # if you have several windows open, close a few, and then reopen
-            # you'll get a random one
+            # we keep sessions in a list. If you bounce your browser, you'll get
+            # the session state you just dropped. If you have several windows open, close a few,
+            # and then reopen a page, you'll get a random one. It would be nice if we could
+            # figure out which window had bounced, but sessionIds are global to the browser,
+            # so this is a next-best alternative.
             sessionStateList = self.sessionStates.setdefault(sessionId, [])
             if not sessionStateList:
                 self._logger.info("Creating a new SessionState for %s", sessionId)

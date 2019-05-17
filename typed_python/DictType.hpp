@@ -522,6 +522,8 @@ public:
 
     bool deleteKey(instance_ptr self, instance_ptr key) const;
 
+    bool deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr key) const;
+
     void constructor(instance_ptr self);
 
     void destroy(instance_ptr self);

@@ -14,13 +14,11 @@
 
 from object_database.messages import ClientToServer, ServerToClient
 from object_database.identity import IdentityProducer
-from object_database.schema import FieldDefinition, ObjectFieldId, IndexId
+from object_database.schema import FieldDefinition, ObjectFieldId, IndexId, indexValueFor
 from object_database.core_schema import core_schema
 from object_database.messages import SchemaDefinition
 from object_database.util import Timer
-from object_database.keymapping import index_value_to_hash
-from typed_python import serialize, deserialize, Class, Member, Dict, makeNamedTuple
-
+from typed_python import serialize, deserialize, Class, Member, Dict, makeNamedTuple, NamedTuple
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 import queue
 import time
@@ -29,6 +27,9 @@ import threading
 import traceback
 
 DEFAULT_GC_INTERVAL = 900.0
+
+
+ObjectBase = NamedTuple(_identity=int)
 
 
 class TypeMap(Class):
@@ -225,7 +226,7 @@ class Server:
 
     def _removeOldDeadConnections(self):
         fieldId = self._currentTypeMap().fieldIdFor("core", "Connection", " exists")
-        exists_index = IndexId(fieldId=fieldId, indexValue=index_value_to_hash(True))
+        exists_index = IndexId(fieldId=fieldId, indexValue=indexValueFor(bool, True))
 
         oldIds = self._kvstore.getSetMembers(exists_index)
 
@@ -291,7 +292,7 @@ class Server:
         fieldId = self._currentTypeMap().fieldIdFor("core", "Connection", " exists")
 
         exists_key = ObjectFieldId(objId=identity, fieldId=fieldId)
-        exists_index = IndexId(fieldId=fieldId, indexValue=index_value_to_hash(True))
+        exists_index = IndexId(fieldId=fieldId, indexValue=indexValueFor(bool, True))
         identityRoot = self.allocateNewIdentityRoot()
 
         self._handleNewTransaction(
@@ -312,7 +313,7 @@ class Server:
         fieldId = self._currentTypeMap().fieldIdFor("core", "Connection", " exists")
 
         exists_key = ObjectFieldId(objId=identity, fieldId=fieldId)
-        exists_index = IndexId(fieldId=fieldId, indexValue=index_value_to_hash(True))
+        exists_index = IndexId(fieldId=fieldId, indexValue=indexValueFor(bool, True))
 
         self._handleNewTransaction(
             None,
@@ -420,13 +421,13 @@ class Server:
         typedef = definition[typename]
 
         if msg.fieldname_and_value is None:
-            field, val = " exists", index_value_to_hash(True)
+            field, val = " exists", indexValueFor(bool, True)
         else:
             field, val = msg.fieldname_and_value
 
         if field == '_identity':
-            assert val.startswith(b"int_")  # this is the 'hash representation' of an identity.
-            identities = set([int(val[4:])])
+            # single value identities are encoded as integers
+            identities = set([deserialize(ObjectBase, val)._identity])
         else:
             fieldId = self._currentTypeMap().lookupOrAdd(schema_name, typename, field)
 
@@ -799,7 +800,7 @@ class Server:
 
         return res
 
-    def _broadcastSubscriptionIncrease(self, channel, indexKey, newIds):
+    def _broadcastSubscriptionIncrease(self, channel, indexKey, tid, newIds):
         newIds = list(newIds)
 
         fieldDef = self._currentTypeMap().fieldIdToDef[indexKey.fieldId]
@@ -809,7 +810,8 @@ class Server:
                 schema=fieldDef.schema,
                 typename=fieldDef.typename,
                 fieldname_and_value=(fieldDef.fieldname, indexKey.indexValue),
-                identities=newIds
+                identities=newIds,
+                transaction_id=tid
             )
         )
 
@@ -899,17 +901,6 @@ class Server:
                               indices_to_check_versions,
                               as_of_version
                               ):
-        """Commit a transaction.
-
-        key_value: a map
-            db_key -> (json_representation, database_representation)
-        that we want to commit. We cache the normal_representation for later.
-
-        set_adds: a map:
-            db_key -> set of identities added to an index
-        set_removes: a map:
-            db_key -> set of identities removed from an index
-        """
         self._cur_transaction_num += 1
         transaction_id = self._cur_transaction_num
         assert transaction_id > as_of_version
@@ -935,9 +926,11 @@ class Server:
                 if fieldDef.fieldname == ' exists':
                     if fieldId not in sourceChannel.subscribedFields:
                         sourceChannel.subscribedIds.update(added_identities)
+
                         for new_id in added_identities:
                             self._id_to_channel.setdefault(new_id, set()).add(sourceChannel)
-                        self._broadcastSubscriptionIncrease(sourceChannel, add_index, added_identities)
+
+                        self._broadcastSubscriptionIncrease(sourceChannel, add_index, transaction_id, added_identities)
 
         for key in key_value:
             keysWritingTo.add(key)
@@ -1019,7 +1012,7 @@ class Server:
                         self._id_to_channel.setdefault(new_id, set()).add(channel)
                         channel.subscribedIds.add(new_id)
 
-                    self._broadcastSubscriptionIncrease(channel, index_key, newIds)
+                    self._broadcastSubscriptionIncrease(channel, index_key, transaction_id, newIds)
 
                     idsToAddToTransaction.update(newIds)
 

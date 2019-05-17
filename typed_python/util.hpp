@@ -43,6 +43,13 @@ inline PyObject* incref(PyObject* o) {
     }
     return o;
 }
+
+
+inline PyTypeObject* incref(PyTypeObject* o) {
+    return (PyTypeObject*)incref((PyObject*)o);
+}
+
+
 inline PyObject* decref(PyObject* o) {
     assertHoldingTheGil();
 
@@ -51,6 +58,7 @@ inline PyObject* decref(PyObject* o) {
     }
     return o;
 }
+
 
 class PyObjectHolder {
 protected:
@@ -161,6 +169,10 @@ public:
     PyObjectStealer(PyObjectHolder& other) = delete;
 };
 
+inline PyObject* incref(const PyObjectHolder& o) {
+    return incref((PyObject*)o);
+}
+
 bool unpackTupleToTypes(PyObject* tuple, std::vector<Type*>& out);
 
 bool unpackTupleToStringAndTypes(PyObject* tuple, std::vector<std::pair<std::string, Type*> >& out);
@@ -199,6 +211,26 @@ PyObject* translateExceptionToPyObject(func_type f) {
     } catch(std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return nullptr;
+    }
+}
+
+
+/******
+Call 'f', which must return void, in a block that guards against
+exceptions returning nakedly to the python interpreter. This is meant
+to guard the barrier between Python C callbacks and our internals which
+may use exceptions. Returns -1 on failure, 0 on success.
+******/
+template<class func_type>
+int translateExceptionToPyObjectReturningInt(func_type f) {
+    try {
+        f();
+        return 0;
+    } catch(PythonExceptionSet& e) {
+        return -1;
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return -1;
     }
 }
 

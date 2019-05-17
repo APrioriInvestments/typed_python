@@ -107,6 +107,11 @@ public:
     }
 
     BytesType::layout* getLayout() const { return mLayout; }
+
+    std::string toStdString() const {
+        return std::string(&(*this)[0], &(*this)[0] + size());
+    }
+
 private:
     BytesType::layout* mLayout;
 };

@@ -275,6 +275,7 @@ class TaskService(ServiceBase):
                             state="Unassigned",
                             worker=None
                         )
+                        assert newTaskStatuses[taskName].exists()
 
                     logging.info("Subtask %s depends on %s", task, [str(ts.task) + "/" + str(ts) for ts in newTaskStatuses.values()])
 

@@ -1,10 +1,29 @@
 #include <Python.h>
 #include <numpy/arrayobject.h>
-#include "PyVersionedObjectsOfType.hpp"
+#include "../typed_python/AllTypes.hpp"
+#include "../typed_python/PyInstance.hpp"
 #include "PyVersionedIdSet.hpp"
-#include "PyVersionedIdSets.hpp"
+#include "PyDatabaseObjectType.hpp"
+#include "PyDatabaseConnectionState.hpp"
+#include "PyView.hpp"
+
+PyObject* createDatabaseObjectType(PyObject *none, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"schema", "name", NULL};
+    PyObject* schema;
+    const char* name;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Os", (char**)kwlist, &schema, &name)) {
+        return nullptr;
+    }
+
+    return translateExceptionToPyObject([&] {
+        return (PyObject*)PyDatabaseObjectType::createDatabaseObjectType(schema, name);
+    });
+}
 
 static PyMethodDef module_methods[] = {
+    {"createDatabaseObjectType", (PyCFunction)createDatabaseObjectType, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 
@@ -28,13 +47,13 @@ PyInit__types(void)
     //then additional steps must be taken as per the API documentation.
     import_array();
 
-    if (PyType_Ready(&PyType_VersionedObjectsOfType) < 0)
-        return NULL;
-
     if (PyType_Ready(&PyType_VersionedIdSet) < 0)
         return NULL;
 
-    if (PyType_Ready(&PyType_VersionedIdSets) < 0)
+    if (PyType_Ready(&PyType_DatabaseConnectionState) < 0)
+        return NULL;
+
+    if (PyType_Ready(&PyType_View) < 0)
         return NULL;
 
     PyObject *module = PyModule_Create(&moduledef);
@@ -42,11 +61,9 @@ PyInit__types(void)
     if (module == NULL)
         return NULL;
 
-    Py_INCREF(&PyType_VersionedObjectsOfType);
-
-    PyModule_AddObject(module, "VersionedObjectsOfType", (PyObject *)&PyType_VersionedObjectsOfType);
-    PyModule_AddObject(module, "VersionedIdSets", (PyObject *)&PyType_VersionedIdSets);
     PyModule_AddObject(module, "VersionedIdSet", (PyObject *)&PyType_VersionedIdSet);
+    PyModule_AddObject(module, "DatabaseConnectionState", (PyObject *)&PyType_DatabaseConnectionState);
+    PyModule_AddObject(module, "View", (PyObject *)&PyType_View);
 
     return module;
 }

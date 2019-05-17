@@ -29,8 +29,8 @@ Type* Value::MakeBool(bool i) {
 }
 
 Type* Value::MakeBytes(char* data, size_t count) {
-    return Make(Instance::createAndInitialize(Bytes::Make(), [&](instance_ptr i) {
-        Bytes::Make()->constructor(i, count, data);
+    return Make(Instance::createAndInitialize(BytesType::Make(), [&](instance_ptr i) {
+        BytesType::Make()->constructor(i, count, data);
     }));
 }
 

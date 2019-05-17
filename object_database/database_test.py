@@ -24,15 +24,17 @@ from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.util import configureLogging, genToken
 from object_database.test_util import currentMemUsageMb
+from object_database.TestRedis import TestRedis
 from object_database.reactor import Reactor
+
 import object_database
 import object_database.messages as messages
 import queue
 import unittest
 import tempfile
 import numpy
-import subprocess
 import os
+import traceback
 import threading
 import random
 import time
@@ -224,10 +226,24 @@ class ObjectDatabaseTests:
             x = ObjectWithManyIndices()
 
         with db.transaction() as t:
+            self.assertTrue(x.exists())
             x.x0 = x.x0 + 1
 
             # exists, and x.x0, but not x1 through x9
-            self.assertEqual(len(t._reads), 2)
+            self.assertEqual(len(t.getFieldReads()), 2)
+
+    def test_create_and_delete_is_no_op(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction() as t:
+            x = Object()
+
+            self.assertEqual(len(t.getFieldWrites()), 3)
+
+            x.delete()
+
+            self.assertEqual(len(t.getFieldWrites()), 0)
 
     def test_construct_with_indexed_init(self):
         db = self.createNewDb()
@@ -253,18 +269,23 @@ class ObjectDatabaseTests:
             self.assertEqual(len(DeletedThingWithInit.lookupAll()), 1)
 
     def test_subscribe_excluding(self):
-        db = self.createNewDb()
-        db.subscribeToSchema(schema, excluding=[ThingWithDicts])
+        db1 = self.createNewDb()
+        db2 = self.createNewDb()
 
-        with db.view():
-            with self.assertRaises(Exception):
-                ThingWithDicts.lookupAll()
-            Counter.lookupAll()
+        db1.subscribeToSchema(schema)
+        db2.subscribeToSchema(schema, excluding=[ThingWithDicts])
 
-        db.subscribeToSchema(schema)
+        with db1.transaction():
+            t = ThingWithDicts()
 
-        with db.view():
-            ThingWithDicts.lookupAll()
+        db2.flush()
+        with db2.view():
+            self.assertFalse(t.exists())
+
+        db2.subscribeToType(ThingWithDicts)
+
+        with db2.view():
+            self.assertTrue(t.exists())
 
     def test_subscribe_to_objects(self):
         db1 = self.createNewDb()
@@ -382,7 +403,7 @@ class ObjectDatabaseTests:
                 timeout=2.0*self.PERFORMANCE_FACTOR)
         )
 
-    def test_lazy_subscriptions(self):
+    def checkCallbackTriggersLazyLoad(self, callback, shouldExist=True):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
 
@@ -400,17 +421,48 @@ class ObjectDatabaseTests:
             # the index values when we first subscribe
             self.assertEqual(Counter.lookupAll(k=2), (c,))
 
-        with db2.view():
-            self.assertEqual(c.k, 2)
+        with db2.transaction():
+            callback(c)
 
         self.assertEqual(loadedIDs.get_nowait(), c._identity)
 
         # at this point, the value is loaded
         with db2.view():
-            self.assertEqual(c.x, 3)
+            if shouldExist:
+                self.assertEqual(c.x, 3)
+            else:
+                self.assertFalse(c.exists())
 
         with self.assertRaises(queue.Empty):
             loadedIDs.get_nowait()
+
+    def test_lazy_subscriptions_read(self):
+        self.checkCallbackTriggersLazyLoad(lambda c: self.assertEqual(c.k, 2))
+
+    def test_lazy_subscriptions_write(self):
+        self.checkCallbackTriggersLazyLoad(lambda c: setattr(c, 'k', 20))
+
+    def test_lazy_subscriptions_exists(self):
+        self.checkCallbackTriggersLazyLoad(lambda c: c.exists())
+
+    def test_lazy_subscriptions_delete(self):
+        self.checkCallbackTriggersLazyLoad(lambda c: c.delete(), shouldExist=False)
+
+    def test_lazy_objects_visible_in_own_transaction(self):
+        db = self.createNewDb()
+        db.subscribeToType(Object, lazySubscription=True)
+
+        with db.transaction():
+            o = Object()
+            self.assertTrue(o.exists())
+
+    def test_unsubscribed_objects_visible_in_own_transaction(self):
+        db = self.createNewDb()
+        db.subscribeToNone(Object)
+
+        with db.transaction():
+            o = Object()
+            self.assertTrue(o.exists())
 
     def test_methods(self):
         db = self.createNewDb()
@@ -573,14 +625,26 @@ class ObjectDatabaseTests:
         with db.transaction():
             root = Root()
 
+            self.assertTrue(root.exists())
+
             self.assertTrue(root.obj is None, root.obj)
 
-            root.obj = Object(k=expr.Constant(value=23))
+            o = Object(k=expr.Constant(value=23))
+
+            root.obj = o
+
+            self.assertTrue(root.obj.k == o.k)
+            self.assertTrue(root.obj == o)
+
+        with db.view():
+            self.assertTrue(root.exists())
+            self.assertEqual(root.obj.k.value, 23)
 
         db2 = self.createNewDb()
         db2.subscribeToSchema(schema)
 
         with db2.view():
+            self.assertTrue(root.exists())
             self.assertEqual(root.obj.k.value, 23)
 
     def test_throughput_basic(self):
@@ -599,6 +663,65 @@ class ObjectDatabaseTests:
         with db.view():
             self.assertTrue(root.obj.k.value > 500, root.obj.k.value)
             print(root.obj.k.value, "transactions per second")
+
+    def test_throughput_read(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            root = Root()
+            root.obj = Object(k=expr.Constant(value=1))
+
+        t0 = time.time()
+        with db.transaction():
+            count = 0
+            while time.time() < t0 + 1.0:
+                for _ in range(100):
+                    root.obj
+                count = count + 100
+
+        self.assertGreater(count, 500000 / self.PERFORMANCE_FACTOR)
+        print(count, " reads per second")  # I get about 3mm on my machine.
+
+    def test_throughput_write_within_view(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            c = Counter()
+
+        t0 = time.time()
+        with db.transaction():
+            count = 0
+            while time.time() < t0 + 1.0:
+                for _ in range(100):
+                    c.x = c.x + 1
+                count = count + 100
+
+        self.assertGreater(count, 500000 / self.PERFORMANCE_FACTOR)
+
+        # I get about 2.8mm on my machine.
+        print(count, " in-view writes per second")
+
+    def test_throughput_write_indexed_value_within_view(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            c = Counter()
+
+        t0 = time.time()
+        with db.transaction():
+            count = 0
+            while time.time() < t0 + 1.0:
+                for _ in range(100):
+                    c.k = c.k + 1
+                count = count + 100
+
+        self.assertGreater(count, 50000 / self.PERFORMANCE_FACTOR)
+
+        # I get about 400k on my machine.
+        print(count, " in-view writes with on indexed values per second")
 
     def test_delayed_transactions(self):
         db = self.createNewDb()
@@ -656,7 +779,7 @@ class ObjectDatabaseTests:
 
         objects = {}
         with db.transaction():
-            for i in range(100):
+            for i in range(1000):
                 root = Root()
 
                 e = expr.Constant(value=i)
@@ -672,12 +795,12 @@ class ObjectDatabaseTests:
         count = 0
         reads = 0
         while time.time() < t0 + 1.0:
-            with db.transaction():
-                for i in range(100):
+            with db.view():
+                for i in range(300):
                     count += objects[i].obj.k.value
                     reads += 2
 
-        print(f"Performed {reads} in {time.time() - t0} seconds")
+        print(f"Performed {reads/(time.time()-t0)} per second")
 
     def test_transactions(self):
         db = self.createNewDb()
@@ -696,6 +819,7 @@ class ObjectDatabaseTests:
         vals = []
         for v in views:
             with v:
+                assert root.exists()
                 if root.obj is None:
                     vals.append(None)
                 else:
@@ -768,7 +892,7 @@ class ObjectDatabaseTests:
         # seed the initial state
         with db.transaction():
             for i in range(20):
-                counter = Counter(_identity=i)
+                counter = Counter()
                 counter.k = int(random.random() * 100)
                 counters.append(counter)
 
@@ -828,7 +952,7 @@ class ObjectDatabaseTests:
 
         # we may have one or two for connection objects, and we have two values for every indexed thing
         self.assertLess(self.mem_store.storedStringCount(), 203)
-        self.assertTrue(total_writes > 500)
+        self.assertTrue(total_writes > 500, total_writes)
 
     def test_flush_db_works(self):
         db = self.createNewDb()
@@ -895,6 +1019,19 @@ class ObjectDatabaseTests:
                     t2.commit()
             else:
                 t2.commit()
+
+    def test_indices_lookup_any(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.view():
+            self.assertEqual(Counter.lookupAny(), None)
+
+        with db.transaction():
+            o1 = Counter(k=20)
+
+        with db.view():
+            self.assertEqual(Counter.lookupAny(), o1)
 
     def test_indices(self):
         db = self.createNewDb()
@@ -989,6 +1126,46 @@ class ObjectDatabaseTests:
             o.k = 3
             self.assertEqual(o.x, 11)
 
+    def test_new_objects_are_in_index(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            o = Counter()
+            self.assertTrue(Counter.lookupAny())
+            self.assertTrue(Counter.lookupAll())
+
+        with db.transaction():
+            o = Counter()
+            self.assertTrue(Counter.lookupAny())
+            self.assertEqual(len(Counter.lookupAll()), 2)
+
+        with db.transaction():
+            o.delete()
+            o = Counter()
+            self.assertTrue(Counter.lookupAny())
+            self.assertEqual(len(Counter.lookupAll()), 2)
+
+    def test_deletions_visible(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            obs = [Counter() for _ in range(10)]
+
+        with db.transaction():
+            while obs:
+                # delete a middle object in the list
+                obs.pop(len(obs)//2).delete()
+
+                getId = lambda o: o._identity
+
+                # in-view version of this should be correct
+                self.assertEqual(
+                    sorted(Counter.lookupAll(), key=getId),
+                    sorted(obs, key=getId)
+                )
+
     def test_index_consistency(self):
         db = self.createNewDb()
 
@@ -1000,11 +1177,16 @@ class ObjectDatabaseTests:
             y = int
 
             pair = Index('x', 'y')
+            single = Index('x')
 
         db.subscribeToSchema(schema)
 
         with db.transaction():
             o = Object(x=0, y=0)
+
+        with db.transaction():
+            self.assertEqual(Object.lookupOne(pair=(0, 0)), o)
+            self.assertEqual(Object.lookupOne(single=0), o)
 
         t1 = db.transaction()
         t2 = db.transaction()
@@ -1042,7 +1224,7 @@ class ObjectDatabaseTests:
             x = int
             y = int
 
-        Object.fromIdentity(0)
+        schema.freeze()
 
         with self.assertRaises(AttributeError):
             schema.SomeOtherObject
@@ -1064,7 +1246,7 @@ class ObjectDatabaseTests:
 
         schema.freeze()
 
-    def test_index_functions(self):
+    def test_index_pairs(self):
         db = self.createNewDb()
 
         schema = Schema("test_schema")
@@ -1090,6 +1272,31 @@ class ObjectDatabaseTests:
             with self.assertRaises(Exception):
                 self.assertEqual(Object.lookupAll(pair_index=(10, "hi")), (o1,))
 
+    def test_lookup_in_unsubscribed_index(self):
+        db = self.createNewDb()
+
+        schema = Schema("test_schema")
+
+        @schema.define
+        class Object:
+            k = Indexed(int)
+
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            o = Object(k=10)
+
+        db2 = self.createNewDb()
+
+        with self.assertRaises(Exception):
+            with db2.view():
+                Object.lookupOne(k=10)
+
+        db2.subscribeToSchema(schema)
+
+        with db2.view():
+            self.assertEqual(o, Object.lookupOne(k=10))
+
     def test_indices_update_during_transactions(self):
         db = self.createNewDb()
 
@@ -1113,6 +1320,8 @@ class ObjectDatabaseTests:
             self.assertEqual(Object.lookupAll(k=20), (o1,))
 
             o1.delete()
+
+            self.assertFalse(o1.exists())
 
             self.assertEqual(Object.lookupAll(k=10), ())
             self.assertEqual(Object.lookupAll(k=20), ())
@@ -1590,16 +1799,21 @@ class ObjectDatabaseTests:
         lastSeen = [0]
 
         def readerthread():
-            db1.subscribeToNone(Counter)
-            while not shouldStop[0]:
-                with db1.view():
-                    ct = 0
-                    for x in Counter.lookupAll(k=0):
-                        Counter.lookupAny(k=0)
-                        ct += 1
-                    lastSeen[0] = ct
+            try:
+                db1.subscribeToNone(Counter)
 
-            isOK[0] = True
+                while not shouldStop[0]:
+                    with db1.view():
+                        ct = 0
+                        for x in Counter.lookupAll(k=0):
+                            Counter.lookupAny(k=0)
+                            ct += 1
+                        time.sleep(0.0001)
+                        lastSeen[0] = ct
+
+                isOK[0] = True
+            except BaseException:
+                print("READ THREAD FAILED: ", traceback.format_exc())
 
         r = threading.Thread(target=readerthread)
         r.daemon = True
@@ -1615,8 +1829,7 @@ class ObjectDatabaseTests:
         for i in range(testSize):
             db1.subscribeToObject(counters[i])
             time.sleep(0.001)
-            if i % 100 == 0:
-                print("wrote", i, "of", testSize, "and last saw", lastSeen[0])
+            print("wrote", i, "of", testSize, "and last saw", lastSeen[0])
 
         t0 = time.time()
         while lastSeen[0] != testSize and time.time() - t0 < 1.0:
@@ -1695,7 +1908,7 @@ class ObjectDatabaseTests:
 
         m0 = currentMemUsageMb()
 
-        for passIx in range(3):
+        for passIx in range(10):
             for i in range(1000):
                 with db1.transaction():
                     x = schema.Root()
@@ -1705,13 +1918,10 @@ class ObjectDatabaseTests:
 
             self.server._garbage_collect(intervalOverride=.1)
             print(passIx, currentMemUsageMb())
-            self.assertTrue(currentMemUsageMb() < m0 + 10.0)
+            self.assertLess(currentMemUsageMb() - m0, 10.0)
 
         db1.flush()
         db2.flush()
-
-        db1.cleanup()
-        db2.cleanup()
 
         with db1.view():
             assert len(schema.Root.lookupAll()) == 0
@@ -1719,9 +1929,9 @@ class ObjectDatabaseTests:
         with db2.view():
             assert len(schema.Root.lookupAll()) == 0
 
-        self.assertLess(db1._versioned_data.keycount(), 10)
+        self.assertLess(db1._connection_state.objectCount(), 10)
 
-        self.assertEqual(db1._versioned_data.keycount(), db2._versioned_data.keycount())
+        self.assertEqual(db1._connection_state.objectCount(), db2._connection_state.objectCount())
 
         time.sleep(.1)
 
@@ -1773,6 +1983,49 @@ class ObjectDatabaseTests:
         self.assertEqual(db1.currentTransactionIdForSchema(schema1), 3)
         self.assertEqual(db1.currentTransactionIdForSchema(schema2), 0)
 
+    def test_multiple_serialization_contexts(self):
+        def make(versionString):
+            class Class:
+                vs = versionString
+
+                def f(self):
+                    return self.vs
+
+            context = SerializationContext({"Class": Class})
+
+            schema = Schema("version_test_schema")
+
+            schema.Class = Class
+
+            @schema.define
+            class Object:
+                c = OneOf(None, Class)
+
+            return (schema, context)
+
+        db1 = self.createNewDb()
+
+        schema1, context1 = make("v1")
+        schema2, context2 = make("v2")
+
+        db1.subscribeToSchema(schema1)
+        db1.setSerializationContext(context1)
+
+        with db1.transaction():
+            o = schema1.Object(c=schema1.Class())
+
+        with db1.view():
+            self.assertEqual(o.c.f(), "v1")
+
+        db1.subscribeToSchema(schema2)
+        with db1.view().setSerializationContext(context2):
+            self.assertEqual(len(schema2.Object.lookupAll()), 1)
+            o2 = schema2.Object.lookupOne()
+            self.assertEqual(o2._identity, o._identity)
+            self.assertTrue(o.exists())
+            self.assertTrue(o2.exists())
+            self.assertEqual(o2.c.f(), "v2")
+
 
 class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseTests):
     @classmethod
@@ -1785,23 +2038,11 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         self.auth_token = genToken()
 
         if hasattr(self, 'redisProcess') and self.redisProcess:
-            self.redisProcess.terminate()
-            self.redisProcess.wait()
+            self.redisProcess.tearDown()
 
-        redis_path = "/usr/bin/redis-server"
-        if not os.path.isfile(redis_path):
-            redis_path = "/usr/local/bin/redis-server"
+        self.redisProcess = TestRedis(port=1115)
 
         try:
-            self.redisProcess = subprocess.Popen(
-                [redis_path, '--port', '1115', '--logfile', os.path.join(self.tempDirName, "log.txt"),
-                    "--dbfilename", "db.rdb", "--dir", os.path.join(self.tempDirName)]
-            )
-
-            time.sleep(.5)
-            pollRes = self.redisProcess.poll()
-            assert pollRes is None, pollRes
-
             self.mem_store = RedisPersistence(port=1115)
             self.server = InMemServer(self.mem_store, self.auth_token)
             self.server._gc_interval = .1
@@ -1815,8 +2056,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
 
     def tearDown(self):
         self.server.stop()
-        self.redisProcess.terminate()
-        self.redisProcess.wait()
+        self.redisProcess.tearDown()
         self.redisProcess = None
         self.tempDir.__exit__(None, None, None)
 
@@ -1856,7 +2096,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         pass
 
 
-class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
+class ObjectDatabaseOverChannelTestsInMemory(unittest.TestCase, ObjectDatabaseTests):
     @classmethod
     def setUpClass(cls):
         ObjectDatabaseTests.setUpClass()
@@ -1868,11 +2108,17 @@ class ObjectDatabaseOverChannelTests(unittest.TestCase, ObjectDatabaseTests):
         self.server = InMemServer(self.mem_store, self.auth_token)
         self.server._gc_interval = .1
         self.server.start()
+        self.allConnections = []
 
     def createNewDb(self):
-        return self.server.connect(self.auth_token)
+        conn = self.server.connect(self.auth_token)
+        self.allConnections.append(conn)
+        return conn
 
     def tearDown(self):
+        for c in self.allConnections:
+            c.disconnect(block=True)
+
         self.server.stop()
 
     def test_connection_without_auth_disconnects(self):

@@ -16,6 +16,5 @@
 
 #pragma once
 
-#include <Python.h>
-
-extern PyTypeObject PyType_VersionedObjectsOfType;
+#include "../typed_python/direct_types/all.hpp"
+#include "../typed_python/direct_types/GeneratedTypes.hpp"

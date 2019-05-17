@@ -109,13 +109,6 @@ public:
                );
     }
 
-    explicit OneOf(OneOf<T1, Ts...>::layout* l) {
-        getType()->copy_constructor(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&l
-               );
-    }
-
     OneOf<T1, Ts...>& operator=(const OneOf<T1, Ts...>& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
@@ -126,6 +119,7 @@ public:
 
     const layout* getLayout() const { return &mLayout; }
 private:
+    //steal a reference
     OneOf(layout l): mLayout(l) {
     }
 

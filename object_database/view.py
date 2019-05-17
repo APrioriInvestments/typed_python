@@ -12,15 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import serialize, deserialize
-
-from object_database.keymapping import index_value_to_hash
-
-import object_database
 import logging
 import threading
 import queue
 import time
+
+import object_database._types as _types
 
 LOG_SLOW_COMMIT_THRESHOLD = 1.0
 
@@ -76,34 +73,6 @@ def revisionConflictRetry(f):
     return inner
 
 
-class SerializedDatabaseValue:
-    """A value stored as Json with a python representation."""
-
-    def __init__(self, serializedByteRep, pyRep):
-        assert serializedByteRep is None or isinstance(serializedByteRep, bytes), serializedByteRep
-        self.pyRep = pyRep
-        self.serializedByteRep = serializedByteRep
-
-
-def coerce_value(value, toType):
-    if isinstance(value, toType):
-        return value
-    if hasattr(toType, "__typed_python_category__"):
-        return toType(value)
-    if toType in (int, float, bool):
-        return toType(value)
-
-    raise TypeError("Can't coerce %s to type %s" % (value, toType))
-
-
-def default_initialize(t):
-    if isinstance(None, t):
-        return None
-    if issubclass(t, object_database.object.DatabaseObject):
-        raise FieldNotDefaultInitializable(f"Can't default initialize a {t}")
-    return t()
-
-
 # thread local variable containing the current view or transaction as property 'view',
 # if there is one.
 _cur_view = threading.local()
@@ -117,18 +86,12 @@ class View(object):
         self._db = db
         self._transaction_num = transaction_id
         self.serializationContext = db.serializationContext
-        self._writes = {}
-        self._reads = set()
-        self._indexReads = set()
-        self._set_adds = {}
-        self._set_removes = {}
-        self._t0 = None
-        self._stack = None
+        self._view = _types.View(db._connection_state, transaction_id, self._writeable)
+
         self._insistReadsConsistent = True
         self._insistWritesConsistent = True
         self._insistIndexReadsConsistent = False
         self._confirmCommitCallback = None
-        self._objects_being_constructed = set()
         self._logger = logging.getLogger(__name__)
 
     def db(self):
@@ -136,384 +99,35 @@ class View(object):
 
     def setSerializationContext(self, serializationContext):
         self.serializationContext = serializationContext.withoutCompression()
+        self._view.setSerializationContext(self.serializationContext)
         return self
 
     def transaction_id(self):
         return self._transaction_num
 
-    def getFieldIdFor(self, cls, identity, fieldname, isIndex=False):
-        fieldId = self._db._fields_to_field_ids[
-            object_database.schema.FieldDefinition(
-                schema=cls.__schema__.name,
-                typename=cls.__qualname__,
-                fieldname=fieldname
-            )
-        ]
-        return object_database.schema.ObjectFieldId(objId=identity, fieldId=fieldId)
+    def getFieldReads(self):
+        return self._view.extractReads()
 
-    def getIndexId(self, cls, fieldname, indexValue):
-        key = object_database.schema.FieldDefinition(
-            schema=cls.__schema__.name,
-            typename=cls.__qualname__,
-            fieldname=fieldname
-        )
+    def getFieldWrites(self):
+        return self._view.extractWrites()
 
-        fieldId = self._db._fields_to_field_ids.get(key)
-
-        return object_database.schema.IndexId(
-            fieldId=fieldId,
-            indexValue=index_value_to_hash(indexValue, self.serializationContext)
-        )
-
-    def _new(self, cls, args, kwds):
-        if not self._writeable:
-            raise Exception("Views are static. Please open a transaction.")
-
-        if not self._db._isTypeSubscribed(cls):
-            raise Exception("No subscriptions exist for type %s" % cls)
-
-        if "_identity" in kwds and not args and len(kwds) == 1:
-            identity = kwds["_identity"]
-            kwds = dict(kwds)
-            del kwds["_identity"]
-        else:
-            identity = self._db.identityProducer.createIdentity()
-
-        o = cls.fromIdentity(identity)
-
-        try:
-            self._writes[self.getFieldIdFor(cls, identity, " exists")] = (bool, True)
-
-            if not hasattr(cls, '__types__') or cls.__types__ is None:
-                raise Exception("Please initialize the type object for %s" % str(cls.__qualname__))
-
-            if hasattr(cls, '__odb_initializer__'):
-                self._initialize_index_vals(o, cls, identity)
-
-                cls.__odb_initializer__(o, *args, **kwds)
-
-                for tname, t in cls.__types__.items():
-                    k = self.getFieldIdFor(cls, identity, tname)
-                    if k not in self._writes:
-                        setattr(o, tname, default_initialize(t))
-            else:
-                if args:
-                    raise Exception(f"Default constructor for {cls.__qualname__} doesn't accept positional arguments.")
-
-                self._defaultConstructInstance(cls, o, kwds)
-
-        except Exception:
-            # make sure we leave no trace of this object.
-            for tname in cls.__types__:
-                k = self.getFieldIdFor(cls, identity, tname)
-                if k in self._writes:
-                    del self._writes[k]
-
-            del self._writes[self.getFieldIdFor(cls, identity, " exists")]
-
-            # propagate the exception
-            raise
-
-        return o
-
-    def _initialize_index_vals(self, obj, cls, identity):
-        index_vals = self._compute_index_vals(obj, obj.__schema__._indices.get(cls, {}).keys())
-        self._update_indices(obj, identity, {}, index_vals)
-
-    def _defaultConstructInstance(self, cls, o, kwds):
-        kwds = dict(kwds)
-
-        identity = o._identity
-
-        for tname, t in cls.__types__.items():
-            if tname not in kwds:
-                kwds[tname] = default_initialize(t)
-
-        for kwd, val in kwds.items():
-            if kwd not in cls.__types__:
-                raise TypeError("Unknown field %s on %s" % (kwd, cls))
-
-            targetType = cls.__types__[kwd]
-
-            try:
-                coerced_val = coerce_value(val, targetType)
-            except Exception:
-                raise TypeError(f"Can't coerce {val} to type {targetType} when initializing {kwd} of {cls.__qualname__}")
-
-            self._writes[self.getFieldIdFor(cls, identity, kwd)] = (cls.__types__[kwd], coerced_val)
-
-        if cls in cls.__schema__._indices:
-            for index_name, index_fun in cls.__schema__._indices[cls].items():
-                try:
-                    val = index_fun(o)
-                    if val is not None:
-                        indexType = cls.__schema__._indexTypes[cls][index_name]
-                        ik = self.getIndexId(cls, index_name, coerce_value(val, indexType))
-
-                        self._add_to_index(ik, identity)
-
-                except FieldNotDefaultInitializable:
-                    pass
-
-    def _get(self, obj, identity, field_name, field_type):
-        key = self.getFieldIdFor(type(obj), identity, field_name)
-
-        self._reads.add(key)
-
-        if key in self._writes:
-            if self._writes[key] is None:
-                if not self._db._isTypeSubscribed(type(obj)):
-                    raise Exception("No subscriptions exist for type %s" % obj)
-
-                if not obj.exists():
-                    raise ObjectDoesntExistException(obj)
-
-            res = self._writes[key][1]
-
-            if isinstance(res, (tuple, list)):
-                return res[1]
-
-            return res
-
-        dbValWithPyrep = self._db._get_versioned_object_data(key, self._transaction_num)
-
-        if dbValWithPyrep is None:
-            if not self._db._isTypeSubscribed(type(obj)):
-                raise Exception("No subscriptions exist for type %s" % obj)
-
-            if not obj.exists():
-                raise ObjectDoesntExistException(obj)
-
-        return self.unwrapSerializedDatabaseValue(self.serializationContext, dbValWithPyrep, field_type)
-
-    @staticmethod
-    def unwrapSerializedDatabaseValue(serializationContext, dbValWithPyrep, field_type):
-        assert field_type is not None
-
-        if dbValWithPyrep is None:
-            return default_initialize(field_type)
-
-        if isinstance(dbValWithPyrep, bytes):
-            dbValWithPyrep = SerializedDatabaseValue(dbValWithPyrep, {})
-
-        if dbValWithPyrep.serializedByteRep is None:
-            return default_initialize(field_type)
-
-        if dbValWithPyrep.pyRep.get(serializationContext) is None:
-            dbValWithPyrep.pyRep[serializationContext] = deserialize(field_type, dbValWithPyrep.serializedByteRep, serializationContext)
-
-        return dbValWithPyrep.pyRep[serializationContext]
-
-    def _exists(self, obj, identity):
-        if not self._db._isTypeSubscribed(type(obj)):
-            raise Exception("No subscriptions exist for type %s" % type(obj))
-
-        key = self.getFieldIdFor(type(obj), identity, " exists")
-
-        self._reads.add(key)
-
-        if key in self._writes:
-            return self._writes[key]
-
-        val = self._db._get_versioned_object_data(key, self._transaction_num)
-
-        return val is not None and val.serializedByteRep is not None
-
-    def _delete(self, obj, identity, field_names):
-        if not self._db._isTypeSubscribed(type(obj)):
-            raise Exception("No subscriptions exist for type %s" % obj)
-
-        if not obj.exists():
-            raise ObjectDoesntExistException(obj)
-
-        if hasattr(type(obj), '__odb_destructor__'):
-            type(obj).__odb_destructor__(obj)
-
-        existing_index_vals = self._compute_index_vals(obj, obj.__schema__._indices.get(type(obj), {}).keys())
-
-        for name in field_names:
-            key = self.getFieldIdFor(type(obj), identity, name)
-            self._writes[key] = None
-
-        self._writes[self.getFieldIdFor(type(obj), identity, " exists")] = None
-
-        self._update_indices(obj, identity, existing_index_vals, {})
-
-    def _set(self, obj, identity, field_name, field_type, val):
-        if not self._db._isTypeSubscribed(type(obj)):
-            raise Exception("No subscriptions exist for type %s" % obj)
-
-        if not self._writeable:
-            raise Exception("Views are static. Please open a transaction.")
-
-        if not obj.exists():
-            raise ObjectDoesntExistException(obj)
-
-        key = self.getFieldIdFor(type(obj), identity, field_name)
-
-        indicesChanged = obj.__schema__._indexed_fields[type(obj)].get(field_name, [])
-
-        if not indicesChanged:
-            self._writes[key] = (field_type, val)
-        else:
-            existing_index_vals = self._compute_index_vals(obj, indicesChanged)
-
-            self._writes[key] = (field_type, val)
-
-            new_index_vals = self._compute_index_vals(obj, indicesChanged)
-
-            self._update_indices(obj, identity, existing_index_vals, new_index_vals)
-
-    def _compute_index_vals(self, obj, indicesChanged):
-        existing_index_vals = {}
-
-        for index_name in indicesChanged:
-            index_fun = obj.__schema__._indices[type(obj)][index_name]
-            indexType = obj.__schema__._indexTypes[type(obj)][index_name]
-
-            try:
-                unconvertedVal = index_fun(obj)
-
-                if unconvertedVal is not None and indexType is None:
-                    assert False, (obj, index_name, unconvertedVal)
-
-                existing_index_vals[index_name] = coerce_value(unconvertedVal, indexType) if unconvertedVal is not None else None
-            except FieldNotDefaultInitializable:
-                pass
-
-        return existing_index_vals
-
-    def _update_indices(self, obj, identity, existing_index_vals, new_index_vals):
-        if type(obj) in obj.__schema__._indices:
-            for index_name in obj.__schema__._indices[type(obj)]:
-                new_index_val = new_index_vals.get(index_name, None)
-                cur_index_val = existing_index_vals.get(index_name, None)
-
-                if cur_index_val != new_index_val:
-                    if cur_index_val is not None:
-                        old_index_name = self.getIndexId(type(obj), index_name, cur_index_val)
-                        self._remove_from_index(old_index_name, identity)
-
-                    if new_index_val is not None:
-                        new_index_name = self.getIndexId(type(obj), index_name, new_index_val)
-                        self._add_to_index(new_index_name, identity)
-
-    def _add_to_index(self, index_key, identity):
-        if index_key not in self._set_adds:
-            self._set_adds[index_key] = set()
-            self._set_removes[index_key] = set()
-
-        if identity in self._set_removes[index_key]:
-            self._set_removes[index_key].discard(identity)
-        else:
-            self._set_adds[index_key].add(identity)
-
-    def _remove_from_index(self, index_key, identity):
-        if index_key not in self._set_adds:
-            self._set_adds[index_key] = set()
-            self._set_removes[index_key] = set()
-
-        if identity in self._set_adds[index_key]:
-            self._set_adds[index_key].discard(identity)
-        else:
-            self._set_removes[index_key].add(identity)
-
-    def indexLookup(self, db_type, **kwargs):
-        if not self._db._isTypeSubscribed(db_type):
-            raise Exception("No subscriptions exist for type %s" % db_type)
-
-        assert len(kwargs) == 1, "Can only lookup one index at a time."
-        tname, value = list(kwargs.items())[0]
-
-        if db_type not in db_type.__schema__._indices or tname not in db_type.__schema__._indices[db_type]:
-            raise Exception("No index enabled for %s.%s.%s" % (db_type.__schema__.name, db_type.__qualname__, tname))
-
-        if not hasattr(_cur_view, "view"):
-            raise Exception("Please access indices from within a view.")
-
-        indexType = db_type.__schema__._indexTypes[db_type][tname]
-
-        if indexType is not None:
-            value = coerce_value(value, indexType)
-
-        keyname = self.getIndexId(db_type, tname, value)
-
-        self._indexReads.add(keyname)
-
-        identities = self._db._get_versioned_set_data(keyname, self._transaction_num).toSet()
-        identities = identities.union(self._set_adds.get(keyname, set()))
-        identities = identities.difference(self._set_removes.get(keyname, set()))
-
-        return tuple([db_type.fromIdentity(x) for x in identities])
-
-    def indexLookupAny(self, db_type, **kwargs):
-        if not self._db._isTypeSubscribed(db_type):
-            raise Exception("No subscriptions exist for type %s" % db_type)
-
-        assert len(kwargs) == 1, "Can only lookup one index at a time."
-        tname, value = list(kwargs.items())[0]
-
-        if db_type not in db_type.__schema__._indices or tname not in db_type.__schema__._indices[db_type]:
-            raise Exception("No index enabled for %s.%s.%s" % (db_type.__schema__.name, db_type.__qualname__, tname))
-
-        if not hasattr(_cur_view, "view"):
-            raise Exception("Please access indices from within a view.")
-
-        indexType = db_type.__schema__._indexTypes[db_type][tname]
-
-        if indexType is not None:
-            value = coerce_value(value, indexType)
-
-        keyname = self.getIndexId(db_type, tname, value)
-
-        added = self._set_adds.get(keyname, set())
-        removed = self._set_removes.get(keyname, set())
-
-        if added:
-            return db_type.fromIdentity(list(added)[0])
-
-        self._indexReads.add(keyname)
-
-        res = self._db._get_versioned_set_data(keyname, self._transaction_num).pickAny(removed)
-
-        if res:
-            return db_type.fromIdentity(res)
-
-        return None
-
-    def indexLookupOne(self, lookup_type, **kwargs):
-        if not self._db._isTypeSubscribed(lookup_type):
-            raise Exception("No subscriptions exist for type %s" % lookup_type)
-
-        res = self.indexLookup(lookup_type, **kwargs)
-        if not res:
-            raise Exception("No instances of %s found with %s" % (lookup_type, kwargs))
-        if len(res) != 1:
-            raise Exception("Multiple instances of %s found with %s" % (lookup_type, kwargs))
-        return res[0]
+    def getIndexReads(self):
+        return self._view.extractIndexReads()
 
     def commit(self):
         if not self._writeable:
             raise Exception("Views are static. Please open a transaction.")
 
-        if self._writes:
-            def encode(val):
-                if isinstance(val, tuple) and len(val) == 2 and isinstance(val[0], type):
-                    serializedBytes = serialize(val[0], val[1], self.serializationContext)
-                    return SerializedDatabaseValue(
-                        serializedBytes,
-                        {self.serializationContext: val[1]}
-                    )
+        reads = self._view.extractReads()
+        writes = self._view.extractWrites()
+        indexReads = self._view.extractIndexReads()
+        setAdds = self._view.extractSetAdds()
+        setRemoves = self._view.extractSetRemoves()
 
-                elif val is None:
-                    return SerializedDatabaseValue(val, {})
-                else:
-                    assert False, "bad write: %s" % val
-
-            writes = {key: encode(v) for key, v in self._writes.items()}
+        if writes:
             tid = self._transaction_num
 
-            if (self._set_adds or self._set_removes) and not self._insistReadsConsistent:
+            if (setAdds or setRemoves) and not self._insistReadsConsistent:
                 raise Exception("You can't update an indexed value without read and write consistency.")
 
             if self._confirmCommitCallback is None:
@@ -523,16 +137,16 @@ class View(object):
             else:
                 confirmCallback = self._confirmCommitCallback
 
-            self._db._set_versioned_object_data(
+            self._db._createTransaction(
                 writes,
-                {k: v for k, v in self._set_adds.items() if v},
-                {k: v for k, v in self._set_removes.items() if v},
+                {k: v for k, v in setAdds.items() if v},
+                {k: v for k, v in setRemoves.items() if v},
                 (
-                    self._reads.union(set(writes)) if self._insistReadsConsistent else
+                    set(reads).union(set(writes)) if self._insistReadsConsistent else
                     set(writes) if self._insistWritesConsistent else
                     set()
                 ),
-                self._indexReads if self._insistIndexReadsConsistent else set(),
+                indexReads if self._insistIndexReadsConsistent else set(),
                 tid,
                 confirmCallback
             )
@@ -546,7 +160,7 @@ class View(object):
                 if time.time() - t0 > LOG_SLOW_COMMIT_THRESHOLD:
                     self._logger.info(
                         "Committing %s writes and %s set changes took %.1f seconds",
-                        len(self._writes), len(self._set_adds) + len(self._set_removes), time.time() - t0
+                        len(writes), len(setAdds) + len(setRemoves), time.time() - t0
                     )
 
                 if res.matches.Success:
@@ -568,29 +182,30 @@ class View(object):
             def __enter__(scope):
                 assert not hasattr(_cur_view, 'view')
                 _cur_view.view = self
+                self._view.enter()
 
-            def __exit__(self, *args):
+            def __exit__(scope, *args):
                 del _cur_view.view
+                self._view.exit()
 
         return Scope()
 
     def __enter__(self):
         assert not hasattr(_cur_view, 'view')
         _cur_view.view = self
+        self._view.enter()
         return self
 
     def __exit__(self, type, val, tb):
+        del _cur_view.view
+        self._view.exit()
+
         if hasattr(_cur_view, "watchers"):
             for watcher in _cur_view.watchers:
                 watcher.callback(self, type is None)
 
-        del _cur_view.view
-
-        try:
-            if type is None and self._writes:
-                self.commit()
-        finally:
-            self._db._releaseView(self)
+        if type is None and self._writeable:
+            self.commit()
 
 
 class ViewWatcher:

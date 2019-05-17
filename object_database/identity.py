@@ -14,6 +14,8 @@
 
 import threading
 
+IDENTITY_BLOCK_SIZE = 100000000
+
 
 class IdentityProducer:
     def __init__(self, ix):
@@ -26,5 +28,4 @@ class IdentityProducer:
             count = self.count
             self.count += 1
 
-        ONE_HUNDRED_MILLION = 100000000
-        return self.ix * ONE_HUNDRED_MILLION + count
+        return self.ix * IDENTITY_BLOCK_SIZE + count

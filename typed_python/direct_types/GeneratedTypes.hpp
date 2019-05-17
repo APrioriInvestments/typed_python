@@ -1,3 +1,5 @@
+#pragma once
+
 // Generated Tuple Anon39222656
 //    a0=String
 //    a1=Bytes
@@ -82,7 +84,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(Anon39222656::a0_type) +
         sizeof(Anon39222656::a1_type);
 };
@@ -173,7 +175,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(Anon40676176::a0_type) +
         sizeof(Anon40676176::a1_type);
 };
@@ -264,7 +266,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(Anon40683760::a0_type) +
         sizeof(Anon40683760::a1_type);
 };
@@ -358,7 +360,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(Anon40698976::x_type) +
         sizeof(Anon40698976::y_type);
 };
@@ -469,7 +471,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(ObjectFieldId::objId_type) +
         sizeof(ObjectFieldId::fieldId_type) +
         sizeof(ObjectFieldId::isIndexValue_type);
@@ -564,7 +566,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(IndexId::fieldId_type) +
         sizeof(IndexId::indexValue_type);
 };
@@ -675,7 +677,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(FieldDefinition::schema_type) +
         sizeof(FieldDefinition::typename0_type) +
         sizeof(FieldDefinition::fieldname_type);
@@ -770,7 +772,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(TypeDefinition::fields_type) +
         sizeof(TypeDefinition::indices_type);
 };
@@ -2043,7 +2045,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(NamedTupleTwoStrings::X_type) +
         sizeof(NamedTupleTwoStrings::Y_type);
 };
@@ -2154,7 +2156,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(NamedTupleBoolIntStr::b_type) +
         sizeof(NamedTupleBoolIntStr::i_type) +
         sizeof(NamedTupleBoolIntStr::s_type);
@@ -2249,7 +2251,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(Choice::A_type) +
         sizeof(Choice::B_type);
 };
@@ -2360,7 +2362,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(NamedTupleIntFloatDesc::a_type) +
         sizeof(NamedTupleIntFloatDesc::b_type) +
         sizeof(NamedTupleIntFloatDesc::desc_type);
@@ -2455,7 +2457,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(NamedTupleBoolListOfInt::X_type) +
         sizeof(NamedTupleBoolListOfInt::Y_type);
 };
@@ -2549,7 +2551,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(NamedTupleAttrAndValues::attributes_type) +
         sizeof(NamedTupleAttrAndValues::values_type);
 };
@@ -2672,7 +2674,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount = 
+    static const uint64_t bytecount =
         sizeof(AnonTest::a0_type) +
         sizeof(AnonTest::a1_type) +
         sizeof(AnonTest::a2_type) +

@@ -176,6 +176,7 @@ def generate_some_types(dest):
         }
     )
     with open(dest, 'w') as f:
+        f.write("#pragma once\n")
         f.writelines(typed_python_codegen(
             ObjectFieldId=ObjectFieldId,
             IndexId=IndexId,

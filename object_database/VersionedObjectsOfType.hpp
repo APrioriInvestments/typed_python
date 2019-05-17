@@ -30,9 +30,6 @@ We represent the data using four mappings:
     provided we have more than one. Otherwise no entries exist.
 * a dictionary storing the actual object for each interior (object,version) pair.
 
-We implement these mappings using typed_python Dicts so that compiled
-nativepython can also read from them.
-
 *************/
 
 class VersionedObjectsOfType {
@@ -439,6 +436,10 @@ public:
 
     void registerObjectAndVersion(object_id oid, transaction_id tid) {
         m_version_numbers_to_check[tid].insert(oid);
+    }
+
+    size_t objectCount() const {
+        return m_top_objects.size();
     }
 
 private:

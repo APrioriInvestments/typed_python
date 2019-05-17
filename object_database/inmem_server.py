@@ -32,8 +32,8 @@ class InMemoryChannel:
     def _stopHeartbeating(self):
         self._stopHeartbeatingSet = True
 
-    def close(self):
-        self.stop(block=False)
+    def close(self, block=False):
+        self.stop(block=block)
         self._clientCallback(ServerToClient.Disconnected())
 
     def pumpMessagesFromServer(self):

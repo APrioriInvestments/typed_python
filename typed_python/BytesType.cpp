@@ -165,6 +165,10 @@ int64_t BytesType::count(instance_ptr self) const {
 }
 
 void BytesType::destroy(instance_ptr self) {
+    destroyStatic(self);
+}
+
+void BytesType::destroyStatic(instance_ptr self) {
     if (!*(layout**)self) {
         return;
     }
@@ -228,5 +232,3 @@ void BytesType::repr(instance_ptr self, ReprAccumulator& stream) {
 
     stream << "'";
 }
-
-

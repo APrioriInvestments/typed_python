@@ -1140,7 +1140,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         a = AClass(x=10, y=20.0)
 
-        a2, a2_copy = deserialize(T, serialize(T, (a,a)))
+        a2, a2_copy = deserialize(T, serialize(T, (a, a)))
 
         self.assertEqual(a2.x, 10)
         a2.x = 300
@@ -1149,6 +1149,3 @@ class TypesSerializationTest(unittest.TestCase):
         a2_copy = None
 
         self.assertEqual(refcount(a2), 1)
-
-
-

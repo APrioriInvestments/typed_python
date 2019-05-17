@@ -17,7 +17,8 @@ import object_database
 
 
 class ServiceRuntimeConfig:
-    def __init__(self, serviceTemporaryStorageRoot, authToken, ownIpAddress):
+    def __init__(self, dbConnectionFactory, serviceTemporaryStorageRoot, authToken, ownIpAddress):
+        self.dbConnectionFactory = dbConnectionFactory
         self.serviceTemporaryStorageRoot = serviceTemporaryStorageRoot
         self.authToken = authToken
         self.ownIpAddress = ownIpAddress

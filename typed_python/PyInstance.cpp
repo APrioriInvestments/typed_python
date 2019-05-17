@@ -261,6 +261,10 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
     try {
         Type* eltType = extractTypeFrom(subtype);
 
+        if (!eltType) {
+            throw std::runtime_error("Can't find a TypedPython type for " + std::string(subtype->tp_name));
+        }
+
         if (!guaranteeForwardsResolved(eltType)) {
             return nullptr;
         }
@@ -274,7 +278,7 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
 
                 self->initialize([&](instance_ptr data) {
                     constructFromPythonArguments(data, eltType, args, kwds);
-                });
+                }, eltType);
 
                 return (PyObject*)self;
             } catch(PythonExceptionSet& e) {
@@ -718,7 +722,7 @@ PyBufferProcs* PyInstance::bufferProcs() {
     - All of our types point to the unique instance of PyBufferProcs
 */
 // static
-inline bool PyInstance::isNativeType(PyTypeObject* typeObj) {
+bool PyInstance::isNativeType(PyTypeObject* typeObj) {
     return typeObj->tp_as_buffer == bufferProcs();
 }
 
@@ -778,6 +782,13 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
     auto it = types.find(inType);
     if (it != types.end()) {
         return (PyTypeObject*)it->second;
+    }
+
+    if (inType->getTypeCategory() == ::Type::TypeCategory::catPythonSubclass) {
+        throw std::runtime_error(
+            "a PythonSubclass type object is already known. "
+            "We shouldn't need to create a native type wrapper for it."
+        );
     }
 
     types[inType] = new NativeTypeWrapper { {
@@ -1284,6 +1295,10 @@ Type* PyInstance::tryUnwrapPyInstanceToValueType(PyObject* typearg) {
 
 //static
 PyObject* PyInstance::typePtrToPyTypeRepresentation(Type* t) {
+    if (t->getTypeCategory() == ::Type::TypeCategory::catPythonSubclass) {
+        return (PyObject*)t->getTypeRep();
+    }
+
     return (PyObject*)typeObjInternal(t);
 }
 
