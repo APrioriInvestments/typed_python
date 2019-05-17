@@ -2523,6 +2523,11 @@ class Button(Clickable):
             .add_child(HTMLTextContent('____contents__'))
         )
 
+        # temporary js WS refactoring data
+        self.exportData['classes'] = classList
+        # TODO: this event handling situation must be refactored
+        self.exportData['events'] = {"onclick": self.calculatedOnClick()}
+
 
 class ButtonGroup(Cell):
     def __init__(self, buttons):
