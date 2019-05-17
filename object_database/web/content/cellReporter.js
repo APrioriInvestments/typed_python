@@ -34,8 +34,12 @@ const CellTrackerDef = function(){
                 self.used.add(compName);
             }
         });
-        let allSet = new Set(Object.keys(availableComponents));
-        this.unused = allSet - this.used;
+        this.unused = new Set();
+        Object.keys(availableComponents).forEach(compName => {
+            if(!this.used.has(compName)){
+                this.unused.add(compName);
+            }
+        });
         this.serialize();
     }.bind(this);
 
