@@ -2626,6 +2626,10 @@ class Expands(Cell):
             '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['events'] = {"onclick": inlineScript}
+
         for c in self.children.values():
             if c.cells is not None:
                 c.prepareForReuse()
