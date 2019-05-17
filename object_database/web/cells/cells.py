@@ -940,6 +940,9 @@ class Card(Cell):
 
         self.contents = str(card)
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+
     def sortsAs(self):
         return self.contents.sortsAs()
 
@@ -2495,7 +2498,6 @@ class Clickable(Cell):
         self.exportData['divStyle'] = style
         # TODO: this event handling situation must be refactored
         self.exportData['events'] = {"onclick": self.calculatedOnClick()}
-
 
     def sortsAs(self):
         return self.content.sortsAs()

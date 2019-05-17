@@ -25,6 +25,7 @@ class Card extends Component {
         return h('div',
             { 
                 class: "cell card",
+                style: this.props.extraData.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Card"
