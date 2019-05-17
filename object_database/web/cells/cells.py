@@ -2491,6 +2491,12 @@ class Clickable(Cell):
             .add_child(HTMLTextContent('____contents__'))
         )
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = style
+        # TODO: this event handling situation must be refactored
+        self.exportData['events'] = {"onclick": self.calculatedOnClick()}
+
+
     def sortsAs(self):
         return self.content.sortsAs()
 
