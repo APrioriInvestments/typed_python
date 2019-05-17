@@ -1555,6 +1555,7 @@ class AsyncDropdown(Cell):
         super().__init__()
         self.slot = Slot(False)
         self.labelText = labelText
+        self.exportData['labelText'] = self.labelText
         if not loadingIndicatorCell:
             loadingIndicatorCell = CircleLoader()
         self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc, loadingIndicatorCell)
