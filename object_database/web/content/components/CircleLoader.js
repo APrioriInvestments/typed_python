@@ -7,7 +7,7 @@
 
 
 class CircleLoader extends Component {
-    contructor(props, ...args){
+    constructor(props, ...args){
         super(props, ...args);
     }
 
