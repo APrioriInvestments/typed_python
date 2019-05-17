@@ -184,7 +184,7 @@ class Component {
         } else if(Array.isArray(replacementId)){
             return null;
         }
-        return h('div', {id: replacementId}, []);
+        return h('div', {id: replacementId, key: replacementId}, []);
     }
 
     /**
@@ -200,7 +200,7 @@ class Component {
             return null;
         }
         return replacementIds.map(replacementId => {
-            return h('div', {id: replacementId}, []);
+            return h('div', {id: replacementId, key: replacementId}, []);
         });
     }
 }
