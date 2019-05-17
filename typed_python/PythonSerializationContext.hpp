@@ -107,8 +107,16 @@ public:
     };
 
     PythonSerializationContext(PyObject* typeSetObj) :
-            mContextObj(typeSetObj)
+            mContextObj(typeSetObj),
+            mCompressionEnabled(false)
     {
+        setCompressionEnabled();
+    }
+
+    void setCompressionEnabled();
+
+    bool isCompressionEnabled() const {
+        return mCompressionEnabled;
     }
 
     std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const;
@@ -169,5 +177,7 @@ private:
     void serializePyFrozenSet(PyObject* o, SerializationBuffer& b) const;
 
     PyObject* mContextObj;
+
+    bool mCompressionEnabled;
 };
 

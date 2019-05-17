@@ -29,6 +29,7 @@ class SerializationBuffer {
 public:
     SerializationBuffer(const SerializationContext& context) :
             m_context(context),
+            m_wants_compress(context.isCompressionEnabled()),
             m_buffer(nullptr),
             m_size(0),
             m_reserved(0),
@@ -99,7 +100,7 @@ public:
             reserve(m_size + t + 1024 * 128);
 
             //compress every 10 megs or so
-            if (allowCompression && m_size - m_last_compression_point > 10 * 1024 * 1024) {
+            if (m_wants_compress && allowCompression && m_size - m_last_compression_point > 10 * 1024 * 1024) {
                 compress();
             }
         }
@@ -163,7 +164,9 @@ public:
     }
 
     void finalize() {
-        compress();
+        if (m_wants_compress) {
+            compress();
+        }
     }
 
     void compress() {
@@ -210,6 +213,8 @@ public:
 
 private:
     const SerializationContext& m_context;
+
+    bool m_wants_compress;
 
     uint8_t* m_buffer;
     size_t m_size;

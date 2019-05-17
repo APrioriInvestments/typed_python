@@ -32,7 +32,8 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python import (
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64,
     String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
-    Dict, SerializationContext
+    Dict, SerializationContext,
+    serializeStream, deserializeStream
 )
 
 module_level_testfun = dummy_test_module.testfunction
@@ -332,6 +333,35 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.assertIsInstance(o2, AnObject)
         self.assertEqual(o2.o, 123)
+
+    def test_serialize_stream_integers(self):
+        for someInts in [(1, 2), TupleOf(int)((1, 2)), [1, 2]]:
+            self.assertEqual(
+                serializeStream(int, someInts),
+                b"".join([serialize(int, x) for x in someInts])
+            )
+
+            self.assertEqual(
+                deserializeStream(int, serializeStream(int, someInts)),
+                TupleOf(int)(someInts)
+            )
+
+    def test_serialize_stream_complex(self):
+        T = OneOf(None, float, str, int, ListOf(int))
+
+        for items in [
+                (1, 2),
+                ("hi", None, 10, [1, 2, 3, 4]),
+                ()]:
+            self.assertEqual(
+                serializeStream(T, items),
+                b"".join([serialize(T, x) for x in items])
+            )
+
+            self.assertEqual(
+                deserializeStream(T, serializeStream(T, items)),
+                TupleOf(T)(items)
+            )
 
     def test_serialize_recursive_object(self):
         class AnObject:

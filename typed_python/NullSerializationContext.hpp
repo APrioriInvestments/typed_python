@@ -27,6 +27,9 @@ public:
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const {
         throw std::runtime_error("No serialization plugin provided, so we can't deserialize arbitrary python objects.");
     }
+    virtual bool isCompressionEnabled() const {
+        return false;
+    }
     virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const {
         return std::shared_ptr<ByteBuffer>(new RangeByteBuffer(begin, end));
     }

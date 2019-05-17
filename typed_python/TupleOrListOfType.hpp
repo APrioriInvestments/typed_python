@@ -70,6 +70,17 @@ public:
         });
     }
 
+    //serialize, but don't write a count
+    template<class buf_t>
+    void serializeStream(instance_ptr self, buf_t& buffer) {
+        int32_t ct = count(self);
+        m_element_type->check([&](auto& concrete_type) {
+            for (long k = 0; k < ct;k++) {
+                concrete_type.serialize(this->eltPtr(self,k), buffer);
+            }
+        });
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = buffer.read_uint32();

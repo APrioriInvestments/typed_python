@@ -18,6 +18,16 @@
 #include "AllTypes.hpp"
 #include "PyInstance.hpp"
 
+void PythonSerializationContext::setCompressionEnabled() {
+    PyObjectStealer isEnabled(PyObject_GetAttrString(mContextObj, "compressionEnabled"));
+
+    if (!isEnabled) {
+        throw PythonExceptionSet();
+    }
+
+    mCompressionEnabled = ((PyObject*)isEnabled) == Py_True;
+}
+
 // virtual
 void PythonSerializationContext::serializePythonObject(PyObject* o, SerializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;

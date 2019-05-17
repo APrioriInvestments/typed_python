@@ -106,6 +106,10 @@ public:
         });
     }
 
+    bool isDone() {
+        return !canConsume(1);
+    }
+
     bool canConsume(size_t ct) {
         while (m_size < ct) {
             if (!decompress()) {
@@ -190,27 +194,45 @@ public:
 
 private:
     bool decompress() {
-        if (m_compressed_block_data_remaining < sizeof(uint32_t)) {
-            return false;
+        if (!m_context.isCompressionEnabled()) {
+            if (m_compressed_block_data_remaining == 0) {
+                return false;
+            }
+
+            //it's all one big uncompressed block
+            m_decompressed_buffer.insert(
+                m_decompressed_buffer.end(),
+                m_compressed_blocks,
+                m_compressed_blocks + m_compressed_block_data_remaining
+            );
+            m_size += m_compressed_block_data_remaining;
+            m_read_head = &m_decompressed_buffer[0];
+            m_compressed_block_data_remaining = 0;
+            m_read_head_offset = 0;
+            return true;
+        } else {
+            if (m_compressed_block_data_remaining < sizeof(uint32_t)) {
+                return false;
+            }
+
+            //hold the GIL because we use python to do this
+            PyEnsureGilAcquired acquireTheGil;
+
+            uint32_t bytesToDecompress = *((uint32_t*)m_compressed_blocks);
+
+            if (bytesToDecompress + sizeof(uint32_t) > m_compressed_block_data_remaining) {
+                throw std::runtime_error("Corrupt data: can't decompress this large of a block");
+            }
+
+            m_compressed_blocks += sizeof(uint32_t) + bytesToDecompress;
+            m_compressed_block_data_remaining -= sizeof(uint32_t) + bytesToDecompress;
+
+            std::shared_ptr<ByteBuffer> buf = m_context.decompress(m_compressed_blocks - bytesToDecompress, m_compressed_blocks);
+
+            pushDecompressedBuffer(buf);
+
+            return true;
         }
-
-        //hold the GIL because we use python to do this
-        PyEnsureGilAcquired acquireTheGil;
-
-        uint32_t bytesToDecompress = *((uint32_t*)m_compressed_blocks);
-
-        if (bytesToDecompress + sizeof(uint32_t) > m_compressed_block_data_remaining) {
-            throw std::runtime_error("Corrupt data: can't decompress this large of a block");
-        }
-
-        m_compressed_blocks += sizeof(uint32_t) + bytesToDecompress;
-        m_compressed_block_data_remaining -= sizeof(uint32_t) + bytesToDecompress;
-
-        std::shared_ptr<ByteBuffer> buf = m_context.decompress(m_compressed_blocks - bytesToDecompress, m_compressed_blocks);
-
-        pushDecompressedBuffer(buf);
-
-        return true;
     }
 
     void pushDecompressedBuffer(std::shared_ptr<ByteBuffer> buf) {

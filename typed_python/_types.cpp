@@ -286,7 +286,7 @@ PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     }
 
     if (!PyType_Check(arg)) {
-        PyErr_Format(PyExc_TypeError, "TypeFor expects a python primitive or an existing native value, not %S", arg);
+        PyErr_Format(PyExc_TypeError, "TypeFor expects a python primitive or an existing native value, not %S", (PyObject*)arg);
         return NULL;
     }
 
@@ -734,10 +734,12 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         PyErr_Format(
             PyExc_TypeError,
             "first argument to serialize must be a native type object, not %S",
-            a1
+            (PyObject*)a1
             );
         return NULL;
     }
+
+    PyInstance::guaranteeForwardsResolvedOrThrow(serializeType);
 
     Type* actualType = PyInstance::extractTypeFrom(a2->ob_type);
 
@@ -775,6 +777,82 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
+/**
+    Serializes a container instance as a stream of concatenated messages, and return a pointer to a PyBytes object
+
+    Note: we list the params to be extracted from `args`
+    @param a1: Serialization Type
+    @param a2: Instance
+    @param a3: Serialization Context (optional)
+*/
+PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "serialize takes 2 or 3 positional arguments");
+        return NULL;
+    }
+
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+    PyObjectHolder a3(PyTuple_Size(args) == 3 ? PyTuple_GetItem(args, 2) : nullptr);
+
+    Type* serializeType = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!serializeType) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "first argument to serializeStream must be a native type object, not %S",
+            (PyObject*)a1
+            );
+        return NULL;
+    }
+
+    PyInstance::guaranteeForwardsResolvedOrThrow(serializeType);
+
+    Type* actualType = PyInstance::extractTypeFrom(a2->ob_type);
+
+    std::shared_ptr<SerializationContext> context(new NullSerializationContext());
+    if (a3 && a3 != Py_None) {
+        context.reset(new PythonSerializationContext(a3));
+    }
+
+    SerializationBuffer b(*context);
+
+    try{
+        if (actualType && (actualType->getTypeCategory() == Type::TypeCategory::catListOf ||
+                actualType->getTypeCategory() == Type::TypeCategory::catTupleOf)) {
+            if (((TupleOrListOfType*)actualType)->getEltType() == serializeType) {
+                PyEnsureGilReleased releaseTheGil;
+
+                ((TupleOrListOfType*)actualType)->serializeStream(((PyInstance*)(PyObject*)a2)->dataPtr(), b);
+
+                b.finalize();
+
+                return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
+            }
+        }
+
+        //try to construct a 'serialize type' from the argument and then serialize that
+        TupleOfType* serializeTupleType = TupleOfType::Make(serializeType);
+
+        Instance i = Instance::createAndInitialize(serializeTupleType, [&](instance_ptr p) {
+            PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2);
+        });
+
+        {
+            PyEnsureGilReleased releaseTheGil;
+            serializeTupleType->serializeStream(i.data(), b);
+        }
+
+        b.finalize();
+
+        return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
+        return NULL;
+    }
+}
 
 PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
@@ -788,11 +866,11 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     Type* serializeType = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!serializeType) {
-        PyErr_SetString(PyExc_TypeError, "first argument to serialize must be a native type object");
+        PyErr_SetString(PyExc_TypeError, "first argument to deserialize must be a native type object");
         return NULL;
     }
     if (!PyBytes_Check(a2)) {
-        PyErr_SetString(PyExc_TypeError, "second argument to serialize must be a bytes object");
+        PyErr_SetString(PyExc_TypeError, "second argument to deserialize must be a bytes object");
         return NULL;
     }
 
@@ -809,6 +887,63 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
         Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
             PyEnsureGilReleased releaseTheGil;
             serializeType->deserialize(p, buf);
+        });
+
+        return PyInstance::extractPythonObject(i.data(), i.type());
+    } catch(std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
+        return NULL;
+    }
+}
+
+PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2 && PyTuple_Size(args) != 3) {
+        PyErr_SetString(PyExc_TypeError, "deserialize takes 2 or 3 positional arguments");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+    PyObjectHolder a3(PyTuple_Size(args) == 3 ? PyTuple_GetItem(args, 2) : nullptr);
+
+    Type* serializeType = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!serializeType) {
+        PyErr_SetString(PyExc_TypeError, "first argument to deserialize must be a native type object");
+        return NULL;
+    }
+    if (!PyBytes_Check(a2)) {
+        PyErr_SetString(PyExc_TypeError, "second argument to deserialize must be a bytes object");
+        return NULL;
+    }
+
+    std::shared_ptr<SerializationContext> context(new NullSerializationContext());
+    if (a3 && a3 != Py_None) {
+        context.reset(new PythonSerializationContext(a3));
+    }
+
+    DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a2), PyBytes_GET_SIZE((PyObject*)a2), *context);
+
+    try {
+        PyInstance::guaranteeForwardsResolvedOrThrow(serializeType);
+
+        TupleOfType* tupType = TupleOfType::Make(serializeType);
+
+        PyInstance::guaranteeForwardsResolvedOrThrow(tupType);
+
+        Instance i = Instance::createAndInitialize(tupType, [&](instance_ptr p) {
+            PyEnsureGilReleased releaseTheGil;
+
+            tupType->constructorUnbounded(p, [&](instance_ptr tupElt, int index) {
+                if (buf.isDone()) {
+                    return false;
+                }
+
+                serializeType->deserialize(tupElt, buf);
+
+                return true;
+            });
         });
 
         return PyInstance::extractPythonObject(i.data(), i.type());
@@ -1118,6 +1253,8 @@ static PyMethodDef module_methods[] = {
     {"RenameType", (PyCFunction)RenameType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
+    {"serializeStream", (PyCFunction)serializeStream, METH_VARARGS, NULL},
+    {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},

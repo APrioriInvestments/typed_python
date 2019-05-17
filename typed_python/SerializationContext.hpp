@@ -61,6 +61,7 @@ public:
     virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const = 0;
     virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const = 0;
 
+    virtual bool isCompressionEnabled() const = 0;
     virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const = 0;
     virtual std::shared_ptr<ByteBuffer> decompress(uint8_t* begin, uint8_t* end) const = 0;
 };
