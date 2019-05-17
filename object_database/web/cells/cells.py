@@ -2558,6 +2558,9 @@ class LoadContentsFromUrl(Cell):
             )
         )
 
+        # temporary js WS refactoring data
+        self.exportData['loadTargetId'] = 'loadtarget%s' % self._identity
+
         self.postscript = (
             "$('#loadtarget__identity__').load('__url__')"
             .replace("__identity__", self._identity)
