@@ -38,7 +38,7 @@ public:
         return;
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         int isinst = PyObject_IsInstance(pyRepresentation, (PyObject*)type->pyType());
 
         if (isinst == -1) {

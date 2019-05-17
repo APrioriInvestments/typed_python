@@ -275,7 +275,7 @@ public:
                 );
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation, bool isExplicit) {
         if (isFloat(t->getTypeCategory()))  {
             return PyFloat_Check(pyRepresentation);
         }

@@ -46,7 +46,7 @@ public:
             std::string(pyRepresentation->ob_type->tp_name));
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return PyUnicode_Check(pyRepresentation);
     }
 

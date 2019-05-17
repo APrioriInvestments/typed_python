@@ -26,7 +26,7 @@ public:
         for (long k = 0; k < oneOf->getTypes().size(); k++) {
             Type* subtype = oneOf->getTypes()[k];
 
-            if (pyValCouldBeOfType(subtype, pyRepresentation)) {
+            if (pyValCouldBeOfType(subtype, pyRepresentation, isExplicit)) {
                 try {
                     copyConstructFromPythonInstance(subtype, tgt+1, pyRepresentation);
                     *(uint8_t*)tgt = k;
@@ -42,7 +42,7 @@ public:
             std::string(pyRepresentation->ob_type->tp_name));
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return true;
     }
 

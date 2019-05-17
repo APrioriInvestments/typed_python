@@ -322,7 +322,7 @@ public:
 
     static void tp_dealloc(PyObject* self);
 
-    static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation);
+    static bool pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool isExplicit);
 
     /**
      construct an 'eltType' from a python object at 'tgt'. If 'isExplicit' then we're invoked from an explicit

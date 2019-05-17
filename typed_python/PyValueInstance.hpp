@@ -34,7 +34,7 @@ public:
         }
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* valType, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* valType, PyObject* pyRepresentation, bool isExplicit) {
         return compare_to_python(valType->value().type(), valType->value().data(), pyRepresentation, true, Py_EQ);
     }
 

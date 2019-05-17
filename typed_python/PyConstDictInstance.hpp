@@ -48,7 +48,15 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+        if (!isExplicit) {
+            if (PyDict_Check(pyRepresentation)) {
+                return true;
+            }
+
+            return false;
+        }
+
         return true;
     }
 

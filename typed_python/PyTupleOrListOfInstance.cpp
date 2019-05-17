@@ -28,7 +28,11 @@ ListOfType* PyListOfInstance::type() {
     return (ListOfType*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-bool PyTupleOrListOfInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+bool PyTupleOrListOfInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    if (!isExplicit) {
+        return PyList_Check(pyRepresentation) || PyTuple_Check(pyRepresentation);
+    }
+
     return
         PyTuple_Check(pyRepresentation) ||
         PyList_Check(pyRepresentation) ||

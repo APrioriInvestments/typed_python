@@ -22,7 +22,7 @@ class PyForwardInstance : public PyInstance {
 public:
     typedef Forward modeled_type;
 
-    static bool pyValCouldBeOfTypeConcrete(Type* t, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(Type* t, PyObject* pyRepresentation, bool isExplicit) {
         return false;
     }
 };

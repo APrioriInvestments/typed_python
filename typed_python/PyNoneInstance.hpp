@@ -30,8 +30,8 @@ public:
             std::string(pyRepresentation->ob_type->tp_name));
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
-        return true;
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+        return pyRepresentation == Py_None;
     }
 
     static PyObject* extractPythonObjectConcrete(NoneType* valueType, instance_ptr data) {

@@ -36,7 +36,7 @@ public:
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return true;
     }
 
@@ -61,7 +61,7 @@ public:
 
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return true;
     }
 

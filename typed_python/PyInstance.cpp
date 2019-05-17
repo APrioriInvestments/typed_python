@@ -125,7 +125,7 @@ void PyInstance::tp_dealloc(PyObject* self) {
 }
 
 // static
-bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
+bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool isExplicit) {
     guaranteeForwardsResolvedOrThrow(t);
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
@@ -139,7 +139,8 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation) {
 
         return py_instance_type::pyValCouldBeOfTypeConcrete(
             (typename py_instance_type::modeled_type*)t,
-            pyRepresentation
+            pyRepresentation,
+            isExplicit
             );
     });
 }

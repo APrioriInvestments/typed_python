@@ -44,8 +44,18 @@ public:
         }, type()->getBaseType());
     }
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation) {
-        return true;
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* eltType, PyObject* pyRepresentation, bool isExplicit) {
+        Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
+        if (argType && argType == eltType) {
+            return true;
+        }
+
+        if (argType && argType == eltType->getBaseType()) {
+            return true;
+        }
+
+        return false;
     }
 
     static void constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
