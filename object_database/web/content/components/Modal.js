@@ -27,7 +27,7 @@ class Modal extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Modal",
                 role: "dialog",
-                style: maniStyle
+                style: mainStyle
             }, [
                 h('div', {role: "document", class: "modal-dialog"}, [
                     h('div', {class: "modal-content"}, [

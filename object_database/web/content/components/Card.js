@@ -23,13 +23,13 @@ class Card extends Component {
 
     render(){
         return h('div',
-                 {
-                     class: "cell card",
-                     id: this.props.id,
-                     "data-cell-id": this.props.id,
-                     "data-cell-type": "Card"
-                 }, [
-            h('div', { class: "card-body p-1" }, [
+            { 
+                class: "cell card",
+                id: this.props.id,
+                "data-cell-id": this.props.id,
+                "data-cell-type": "Card"
+            }, 
+            [h('div', { class: "card-body p-1" }, [
                 this.getReplacementElementFor('contents')
             ])
         ]);
