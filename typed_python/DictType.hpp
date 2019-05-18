@@ -414,10 +414,10 @@ public:
         uint32_t id;
         bool isNew;
         std::tie(id, isNew) = buffer.cachePointer(&l, this);
-        buffer.write_uint32(id);
+        buffer.write_uint(id);
 
         if (isNew) {
-            buffer.write_uint32(l.hash_table_count);
+            buffer.write_uint(l.hash_table_count);
 
             for (long k = 0; k < l.items_reserved; k++) {
                 if (l.items_populated[k]) {
@@ -430,7 +430,7 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t id = buffer.read_uint32();
+        int32_t id = buffer.read_uint();
 
         void* ptr = buffer.lookupCachedPointer(id);
 
@@ -447,7 +447,7 @@ public:
         l.refcount++;
         buffer.addCachedPointer(id, *((layout**)self), this);
 
-        int32_t count = buffer.read_uint32();
+        int32_t count = buffer.read_uint();
 
         l.prepareForDeserialization(count, m_bytes_per_key_value_pair);
 

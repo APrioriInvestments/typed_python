@@ -75,13 +75,13 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint8(which(self));
+        buffer.write_uint(which(self));
         m_subtypes[which(self)].second->serialize(eltPtr(self), buffer);
     }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        uint8_t w = buffer.read_uint8();
+        uint8_t w = buffer.read_uint();
         if (w >= m_subtypes.size()) {
             throw std::runtime_error("Corrupt data (alt which)");
         }

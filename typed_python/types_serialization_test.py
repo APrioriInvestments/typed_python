@@ -297,7 +297,6 @@ class TypesSerializationTest(unittest.TestCase):
         self.check_idempotence(d)
 
     def test_serialize_recursive_list(self):
-
         def check_reclist(size):
             init = list(range(size))
             reclist = list(init)

@@ -56,21 +56,37 @@ public:
     SerializationBuffer(const SerializationBuffer&) = delete;
     SerializationBuffer& operator=(const SerializationBuffer&) = delete;
 
-    void write_uint8(uint8_t i) {
+    //write a 'varint' (a la google protobuf encoding)
+    void write_uint(uint64_t i) {
+        while (i >= 128) {
+            write<uint8_t>(128 + (i & 127));
+            i >>= 7;
+        }
         write<uint8_t>(i);
     }
 
-    void write_uint32(uint32_t i) {
-        write<uint32_t>(i);
+    //write a signed 'varint' using zigzag encoding (a la google protobuf)
+    void write_int(int64_t i) {
+        uint64_t val = i < 0 ? -i - 1 : i;
+        val *= 2;
+        if (i < 0) {
+            val += 1;
+        }
+        write_uint(val);
     }
 
-    void write_uint64(uint64_t i) {
-        write<uint64_t>(i);
-    }
+    void writeRegisterType(double v) { write<double>(v); }
+    void writeRegisterType(float v) { write<float>(v); }
 
-    void write_int64(int64_t i) {
-        write<int64_t>(i);
-    }
+    void writeRegisterType(bool v) { write_uint(v); }
+    void writeRegisterType(uint8_t v) { write_uint(v); }
+    void writeRegisterType(uint16_t v) { write_uint(v); }
+    void writeRegisterType(uint32_t v) { write_uint(v); }
+    void writeRegisterType(uint64_t v) { write_uint(v); }
+    void writeRegisterType(int8_t v) { write_int(v); }
+    void writeRegisterType(int16_t v) { write_int(v); }
+    void writeRegisterType(int32_t v) { write_int(v); }
+    void writeRegisterType(int64_t v) { write_int(v); }
 
     void write_double(double i) {
         write<double>(i);
@@ -83,7 +99,7 @@ public:
     }
 
     void write_string(const std::string& s) {
-        write_uint32(s.size());
+        write_uint(s.size());
         write_bytes((uint8_t*)&s[0], s.size());
     }
 
@@ -197,7 +213,9 @@ public:
         } else {
             m_size = m_last_compression_point;
 
-            write_uint32(range.second - range.first);
+            //write an explicit 4 byte size here, not a varint
+            write<uint32_t>(range.second - range.first);
+
             write_bytes(range.first, range.second - range.first, false);
 
             m_last_compression_point = m_size;

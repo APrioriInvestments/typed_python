@@ -35,7 +35,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
     Type* t = PyInstance::extractTypeFrom(o->ob_type);
 
     if (t) {
-        b.write_uint8(T_NATIVE);
+        b.write_uint(T_NATIVE);
         //we have a natural serialization mechanism already
         serializeNativeType(t, b);
 
@@ -44,72 +44,72 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
 
     } else {
         if (o == Py_None) {
-            b.write_uint8(T_NONE);
+            b.write_uint(T_NONE);
         } else
         if (o == Py_True) {
-            b.write_uint8(T_TRUE);
+            b.write_uint(T_TRUE);
         } else
         // The checks for 'True' and 'False' must happen before the test for PyLong
         // because bool is a subtype of int in Python
         if (o == Py_False) {
-            b.write_uint8(T_FALSE);
+            b.write_uint(T_FALSE);
         } else
         if (PyLong_CheckExact(o)) {
-            b.write_uint8(T_LONG);
-            b.write_int64(PyLong_AsLong(o));
+            b.write_uint(T_LONG);
+            b.write_int(PyLong_AsLong(o));
         } else
         if (PyFloat_CheckExact(o)) {
-            b.write_uint8(T_FLOAT);
+            b.write_uint(T_FLOAT);
             b.write_double(PyFloat_AsDouble(o));
         } else
         if (PyComplex_CheckExact(o)) {
             throw std::runtime_error(std::string("`complex` objects cannot be serialized yet"));
         } else
         if (PyBytes_CheckExact(o)) {
-            b.write_uint8(T_BYTES);
-            b.write_uint32(PyBytes_GET_SIZE(o));
+            b.write_uint(T_BYTES);
+            b.write_uint(PyBytes_GET_SIZE(o));
             b.write_bytes((uint8_t*)PyBytes_AsString(o), PyBytes_GET_SIZE(o));
         } else
         if (PyUnicode_CheckExact(o)) {
-            b.write_uint8(T_UNICODE);
+            b.write_uint(T_UNICODE);
             Py_ssize_t sz;
             const char* c = PyUnicode_AsUTF8AndSize(o, &sz);
-            b.write_uint32(sz);
+            b.write_uint(sz);
             b.write_bytes((uint8_t*)c, sz);
         } else
         if (PyList_CheckExact(o)) {
-            b.write_uint8(T_LIST);
+            b.write_uint(T_LIST);
             serializePyList(o, b);
         } else
         if (PyTuple_CheckExact(o)) {
-            b.write_uint8(T_TUPLE);
+            b.write_uint(T_TUPLE);
             serializePyTuple(o, b);
         } else
         if (PySet_CheckExact(o)) {
-            b.write_uint8(T_SET);
+            b.write_uint(T_SET);
             serializePySet(o, b);
         } else
         if (PyFrozenSet_CheckExact(o)) {
-            b.write_uint8(T_FROZENSET);
+            b.write_uint(T_FROZENSET);
             serializePyFrozenSet(o, b);
         } else
         if (PyDict_CheckExact(o)) {
-            b.write_uint8(T_DICT);
+            b.write_uint(T_DICT);
             serializePyDict(o, b);
         } else
         if (PyType_Check(o)) {
             Type* nativeType = PyInstance::extractTypeFrom((PyTypeObject*)o);
 
             if (nativeType) {
-                b.write_uint8(T_NATIVETYPE);
+                b.write_uint(T_NATIVETYPE);
                 serializeNativeType(nativeType, b);
                 return;
             } else {
-                b.write_uint8(T_OBJECT);
+                b.write_uint(T_OBJECT);
                 serializePythonObjectNamedOrAsObj(o, b);
             }
         } else {
-            b.write_uint8(T_OBJECT);
+            b.write_uint(T_OBJECT);
             serializePythonObjectNamedOrAsObj(o, b);
         }
     }
@@ -123,10 +123,10 @@ void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffe
     uint32_t id;
     bool isNew;
     std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
-    b.write_uint32(id);
+    b.write_uint(id);
 
     if (isNew) {
-        b.write_uint32(PyDict_Size(o));
+        b.write_uint(PyDict_Size(o));
 
         PyObject *key, *value;
         Py_ssize_t pos = 0;
@@ -141,7 +141,7 @@ void PythonSerializationContext::serializePyDict(PyObject* o, SerializationBuffe
 PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    uint32_t id = b.read_uint32();
+    uint32_t id = b.read_uint();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
     if (res) {
@@ -154,7 +154,7 @@ PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b
 
     b.addCachedPointer(id, incref(res), anyPyObjType);
 
-    size_t sz = b.read_uint32();
+    size_t sz = b.read_uint();
 
     try {
         for (long k = 0; k < sz; k++) {
@@ -179,14 +179,14 @@ PyObject* PythonSerializationContext::deserializePydict(DeserializationBuffer& b
 PyObject* PythonSerializationContext::deserializePyFrozenSet(DeserializationBuffer &b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    uint32_t id = b.read_uint32();
+    uint32_t id = b.read_uint();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
     if (res) {
         return incref(res);
     }
 
-    size_t sz = b.read_uint32();
+    size_t sz = b.read_uint();
 
     res = PyFrozenSet_New(NULL);
     if (!res) {
@@ -238,7 +238,7 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
     uint32_t id;
     bool isNew;
     std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
-    b.write_uint32(id);
+    b.write_uint(id);
 
     if (!isNew) {
         return;
@@ -254,7 +254,7 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
             throw std::runtime_error(std::string("nameForObject returned a non-string"));
         }
 
-        b.write_uint8(T_OBJECT_NAMED);
+        b.write_uint(T_OBJECT_NAMED);
         b.write_string(std::string(PyUnicode_AsUTF8(typeName)));
         return;
     }
@@ -305,7 +305,7 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         }
 
         //we did nothing interesting
-        b.write_uint8(T_OBJECT_TYPEANDDICT);
+        b.write_uint(T_OBJECT_TYPEANDDICT);
         serializePythonObject((PyObject*)o->ob_type, b);
 
         PyObjectStealer d(PyObject_GenericGetDict(o, nullptr));
@@ -314,7 +314,7 @@ void PythonSerializationContext::serializePythonObjectNamedOrAsObj(PyObject* o, 
         }
         serializePyDict(d, b);
     } else {
-        b.write_uint8(T_OBJECT_REPRESENTATION);
+        b.write_uint(T_OBJECT_REPRESENTATION);
         serializePyRepresentation(representation, b);
     }
 }
@@ -345,13 +345,13 @@ PyObject* PythonSerializationContext::deserializePythonObjectNamedOrAsObj(Deseri
 
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
-    uint32_t id = b.read_uint32();
+    uint32_t id = b.read_uint();
     PyObject* p = (PyObject*)b.lookupCachedPointer(id);
     if (p) {
         return incref(p);
     }
 
-    uint8_t code = b.read_uint8();
+    uint8_t code = b.read_uint();
 
     if (code == T_OBJECT_TYPEANDDICT) {
         //no representation
@@ -449,7 +449,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
             throw std::runtime_error("nameForObject returned something other than None or a string.");
         }
 
-        b.write_uint8(T_OBJECT_NAMED);
+        b.write_uint(T_OBJECT_NAMED);
         b.write_string(std::string(PyUnicode_AsUTF8(nameForObject)));
         return;
     }
@@ -463,25 +463,25 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     }
 
     if (representation != Py_None) {
-        b.write_uint8(T_OBJECT_REPRESENTATION);
+        b.write_uint(T_OBJECT_REPRESENTATION);
 
         serializePyRepresentation(representation, b);
 
         return;
     }
 
-    b.write_uint8(T_NATIVETYPE_BY_CATEGORY);
+    b.write_uint(T_NATIVETYPE_BY_CATEGORY);
 
     if (allowCaching) {
         std::pair<uint32_t, bool> idAndIsNew = b.cachePointerToType(nativeType);
-        b.write_uint32(idAndIsNew.first);
+        b.write_uint(idAndIsNew.first);
 
         if (!idAndIsNew.second) {
             return;
         }
     }
 
-    b.write_uint8(nativeType->getTypeCategory());
+    b.write_uint(nativeType->getTypeCategory());
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catInt64 ||
             nativeType->getTypeCategory() == Type::TypeCategory::catFloat64 ||
@@ -495,7 +495,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
         serializeNativeType(nativeType->getBaseType(), b);
-        b.write_uint32(((ConcreteAlternative*)nativeType)->which());
+        b.write_uint(((ConcreteAlternative*)nativeType)->which());
         return;
     }
 
@@ -522,7 +522,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     }
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catTuple) {
-        b.write_uint32(((CompositeType*)nativeType)->getTypes().size());
+        b.write_uint(((CompositeType*)nativeType)->getTypes().size());
         for (auto t: ((CompositeType*)nativeType)->getTypes()) {
             serializeNativeType(t, b);
         }
@@ -530,7 +530,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     }
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
-        b.write_uint32(((CompositeType*)nativeType)->getTypes().size());
+        b.write_uint(((CompositeType*)nativeType)->getTypes().size());
         for (long k = 0; k < ((CompositeType*)nativeType)->getTypes().size(); k++) {
             b.write_string(((CompositeType*)nativeType)->getNames()[k]);
             serializeNativeType(((CompositeType*)nativeType)->getTypes()[k], b, true);
@@ -539,7 +539,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
     }
 
     if (nativeType->getTypeCategory() == Type::TypeCategory::catOneOf) {
-        b.write_uint32(((OneOfType*)nativeType)->getTypes().size());
+        b.write_uint(((OneOfType*)nativeType)->getTypes().size());
         for (auto t: ((OneOfType*)nativeType)->getTypes()) {
             serializeNativeType(t, b);
         }
@@ -567,7 +567,7 @@ void PythonSerializationContext::serializeNativeType(Type* nativeType, Serializa
 Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b, bool allowCaching) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    uint8_t style = b.read_uint8();
+    uint8_t style = b.read_uint();
 
     if (style == T_OBJECT_NAMED) {
         //it's a named type
@@ -616,7 +616,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
         return deserializeNativeTypeUncached(b);
     }
 
-    int32_t typePtrId = b.read_uint32();
+    int32_t typePtrId = b.read_uint();
     Type* cachedTypePtr = (Type*)b.lookupCachedPointer(typePtrId);
 
     if (cachedTypePtr) {
@@ -640,7 +640,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
 Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    uint8_t category = b.read_uint8();
+    uint8_t category = b.read_uint();
     if (category == Type::TypeCategory::catInt64) {
         return ::Int64::Make();
     }
@@ -665,7 +665,7 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
         if (base->getTypeCategory() != Type::TypeCategory::catAlternative) {
             throw std::runtime_error("corrupt data: expected an Alternative type here");
         }
-        uint32_t which = b.read_uint32();
+        uint32_t which = b.read_uint();
 
         Alternative* a = (Alternative*)base;
         if (which >= a->subtypes().size()) {
@@ -704,7 +704,7 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
 
     if (category == Type::TypeCategory::catTuple) {
         std::vector<Type*> types;
-        size_t count = b.read_uint32();
+        size_t count = b.read_uint();
         for (long k = 0; k < count; k++) {
             types.push_back(deserializeNativeType(b));
         }
@@ -714,7 +714,7 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
     if (category == Type::TypeCategory::catNamedTuple) {
         std::vector<Type*> types;
         std::vector<std::string> names;
-        size_t count = b.read_uint32();
+        size_t count = b.read_uint();
         for (long k = 0; k < count; k++) {
             names.push_back(b.readString());
             types.push_back(deserializeNativeType(b, true));
@@ -724,7 +724,7 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
 
     if (category == Type::TypeCategory::catOneOf) {
         std::vector<Type*> types;
-        size_t count = b.read_uint32();
+        size_t count = b.read_uint();
         for (long k = 0; k < count; k++) {
             types.push_back(deserializeNativeType(b));
         }
@@ -755,7 +755,7 @@ Type* PythonSerializationContext::deserializeNativeTypeUncached(DeserializationB
 PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuffer& b) const {
     PyEnsureGilAcquired acquireTheGil;
 
-    uint8_t code = b.read_uint8();
+    uint8_t code = b.read_uint();
     if (code == T_LIST) {
         return deserializePyList(b);
     } else
@@ -799,7 +799,7 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     } else
     if (code == T_UNICODE) {
         PyObject* result;
-        uint32_t sz = b.read_uint32();
+        uint32_t sz = b.read_uint();
         b.read_bytes_fun(sz, [&](uint8_t* ptr) {
             result = PyUnicode_DecodeUTF8((const char*)ptr, sz, nullptr);
             if (!result) {
@@ -810,7 +810,7 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
     } else
     if (code == T_BYTES) {
         PyObject* result;
-        uint32_t sz = b.read_uint32();
+        uint32_t sz = b.read_uint();
         b.read_bytes_fun(sz, [&](uint8_t* ptr) {
             result = PyBytes_FromStringAndSize((const char*)ptr, sz);
         });
@@ -820,7 +820,7 @@ PyObject* PythonSerializationContext::deserializePythonObject(DeserializationBuf
         return PyFloat_FromDouble(b.read_double());
     } else
     if (code == T_LONG) {
-        return PyLong_FromLong(b.read_int64());
+        return PyLong_FromLong(b.read_int());
     }
 
     throw std::runtime_error("corrupt data: invalid deserialization code");
@@ -835,12 +835,12 @@ inline void PythonSerializationContext::serializeIndexable(PyObject* o, Serializ
     uint32_t id;
     bool isNew;
     std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
-    b.write_uint32(id);
+    b.write_uint(id);
 
     if (isNew) {
         size_t sz = size_fn(o);
 
-        b.write_uint32(sz);
+        b.write_uint(sz);
 
         for (long k = 0; k < sz; k++) {
             serializePythonObject(get_item_fn(o, k), b);
@@ -854,14 +854,14 @@ inline PyObject* PythonSerializationContext::deserializeIndexable(Deserializatio
 
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
-    uint32_t id = b.read_uint32();
+    uint32_t id = b.read_uint();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
     if (res) {
         return incref(res);
     }
 
-    size_t sz = b.read_uint32();
+    size_t sz = b.read_uint();
 
     res = factory_fn(sz);
     b.addCachedPointer(id, incref(res), anyPyObjType);
@@ -887,12 +887,12 @@ inline void PythonSerializationContext::serializeIterable(PyObject* o, Serializa
     uint32_t id;
     bool isNew;
     std::tie(id, isNew) = b.cachePointer(o, anyPyObjType);
-    b.write_uint32(id);
+    b.write_uint(id);
 
     if (isNew) {
         size_t sz = size_fn(o);
 
-        b.write_uint32(sz);
+        b.write_uint(sz);
         PyObject* iter = PyObject_GetIter(o);
         if (!iter) {
             return;
@@ -913,14 +913,14 @@ inline PyObject* PythonSerializationContext::deserializeIterable(Deserialization
 
     static Type* anyPyObjType = PythonObjectOfType::AnyPyObject();
 
-    uint32_t id = b.read_uint32();
+    uint32_t id = b.read_uint();
 
     PyObject* res = (PyObject*)b.lookupCachedPointer(id);
     if (res) {
         return incref(res);
     }
 
-    size_t sz = b.read_uint32();
+    size_t sz = b.read_uint();
 
     res = factory_fn(NULL);
     if (!res) {

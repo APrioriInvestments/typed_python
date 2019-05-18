@@ -58,7 +58,7 @@ public:
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = count(self);
-        buffer.write_uint32(ct);
+        buffer.write_uint(ct);
         for (long k = 0; k < ct;k++) {
             m_key->serialize(kvPairPtrKey(self,k),buffer);
             m_value->serialize(kvPairPtrValue(self,k),buffer);
@@ -67,7 +67,7 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint32();
+        int32_t ct = buffer.read_uint();
 
         if (!buffer.canConsume(ct) && m_bytes_per_key_value_pair) {
             throw std::runtime_error("Corrupt data (dictcount)");

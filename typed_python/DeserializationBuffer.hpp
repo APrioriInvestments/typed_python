@@ -52,18 +52,36 @@ public:
     DeserializationBuffer(const DeserializationBuffer&) = delete;
     DeserializationBuffer& operator=(const DeserializationBuffer&) = delete;
 
-    uint8_t read_uint8() {
-        return read<uint8_t>();
+
+    //read a 'varint' (a la google protobuf encoding).
+    uint64_t read_uint() {
+        uint64_t accumulator = 0;
+
+        uint64_t shift = 0;
+
+        while (true) {
+            uint64_t value = read<uint8_t>();
+            accumulator += (value & 127) << shift;
+            shift += 7;
+
+            if (value < 128) {
+                return accumulator;
+            }
+        }
     }
-    uint32_t read_uint32() {
-        return read<uint32_t>();
+
+    //write a signed 'varint' using zigzag encoding (a la google protobuf)
+    int64_t read_int() {
+        uint64_t val = read_uint();
+
+        bool isNegative = val & 1;
+        val >>= 1;
+        if (isNegative) {
+            return -val-1;
+        }
+        return val;
     }
-    uint64_t read_uint64() {
-        return read<uint64_t>();
-    }
-    int64_t read_int64() {
-        return read<int64_t>();
-    }
+
     double read_double() {
         return read<double>();
     }
@@ -100,7 +118,7 @@ public:
     }
 
     std::string readString() {
-        int32_t sz = read_uint32();
+        int32_t sz = read_uint();
         return read_bytes_fun(sz, [&](uint8_t* ptr) {
             return std::string(ptr, ptr + sz);
         });
@@ -169,9 +187,48 @@ public:
         return ptr;
     }
 
-    template<class T>
-    void readInto(T* out) {
-        *out = read<T>();
+    void readRegisterType(double* out) {
+        *out = read<double>();
+    }
+
+    void readRegisterType(float* out) {
+        *out = read<double>();
+    }
+
+    void readRegisterType(bool* out) {
+        *out = read_uint();
+    }
+
+    void readRegisterType(uint8_t* out) {
+        *out = read_uint();
+    }
+
+    void readRegisterType(uint16_t* out) {
+        *out = read_uint();
+    }
+
+    void readRegisterType(uint32_t* out) {
+        *out = read_uint();
+    }
+
+    void readRegisterType(uint64_t* out) {
+        *out = read_uint();
+    }
+
+    void readRegisterType(int8_t* out) {
+        *out = read_int();
+    }
+
+    void readRegisterType(int16_t* out) {
+        *out = read_int();
+    }
+
+    void readRegisterType(int32_t* out) {
+        *out = read_int();
+    }
+
+    void readRegisterType(int64_t* out) {
+        *out = read_int();
     }
 
     template<class T>

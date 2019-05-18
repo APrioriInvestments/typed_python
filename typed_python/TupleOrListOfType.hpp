@@ -62,7 +62,7 @@ public:
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
         int32_t ct = count(self);
-        buffer.write_uint32(ct);
+        buffer.write_uint(ct);
         m_element_type->check([&](auto& concrete_type) {
             for (long k = 0; k < ct;k++) {
                 concrete_type.serialize(this->eltPtr(self,k),buffer);
@@ -83,7 +83,7 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint32();
+        int32_t ct = buffer.read_uint();
 
         if (!buffer.canConsume(ct) && m_element_type->bytecount()) {
             throw std::runtime_error("Corrupt data (count)");

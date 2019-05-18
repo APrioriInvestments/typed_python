@@ -101,15 +101,15 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint32(count(self));
-        buffer.write_uint8(bytes_per_codepoint(self));
+        buffer.write_uint(count(self));
+        buffer.write_uint(bytes_per_codepoint(self));
         buffer.write_bytes(eltPtr(self,0), bytes_per_codepoint(self) * count(self));
     }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint32();
-        uint8_t bytes_per = buffer.read_uint8();
+        int32_t ct = buffer.read_uint();
+        uint8_t bytes_per = buffer.read_uint();
 
         if (bytes_per != 1 && bytes_per != 2 && bytes_per != 4) {
             throw std::runtime_error("Corrupt data (bytes per unicode character): "

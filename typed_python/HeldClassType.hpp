@@ -109,7 +109,7 @@ public:
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
         for (long k = 0; k < m_members.size();k++) {
-            bool isInitialized = buffer.read_uint8();
+            bool isInitialized = buffer.read_uint();
             if (isInitialized) {
                 std::get<1>(m_members[k])->deserialize(eltPtr(self,k),buffer);
                 setInitializationFlag(self, k);
@@ -122,10 +122,10 @@ public:
         for (long k = 0; k < m_members.size();k++) {
             bool isInitialized = checkInitializationFlag(self, k);
             if (isInitialized) {
-                buffer.write_uint8(true);
+                buffer.write_uint(true);
                 std::get<1>(m_members[k])->serialize(eltPtr(self,k),buffer);
             } else {
-                buffer.write_uint8(false);
+                buffer.write_uint(false);
             }
         }
     }

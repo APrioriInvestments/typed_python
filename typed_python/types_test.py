@@ -524,7 +524,7 @@ class NativeTypesTests(unittest.TestCase):
 
         typedInts = t(ints)
 
-        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 4)  # 4 bytes for size of list
+        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 3)  # 3 bytes for size of list
         self.assertEqual(tuple(typedInts), ints)
 
     def test_tuple_of_one_of_multi(self):
@@ -536,7 +536,7 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(
             len(serialize(t, typedThings)),
-            sum(2 if isinstance(t, bool) else 9 for t in someThings) + 4
+            sum(2 if isinstance(t, bool) else 3 for t in someThings) + 3
         )
 
         self.assertEqual(tuple(typedThings), someThings)
@@ -1185,18 +1185,59 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(OneOf(None, NTSubclass)(None) is None)
         self.assertTrue(OneOf(None, NTSubclass)(inst) == inst)
 
+    def test_serialization_integers(self):
+        self.assertEqual(serialize(int, 0), b"\x00")
+        self.assertEqual(serialize(int, 1), b"\x02")
+        self.assertEqual(serialize(int, 2), b"\x04")
+        self.assertEqual(serialize(int, 64), b"\x80\x01")
+        self.assertEqual(serialize(int, -1), b"\x01")
+
+    def test_serialization_primitives(self):
+        def checkCanSerialize(x):
+            self.assertEqual(x, deserialize(type(x), serialize(type(x), x)), x)
+
+        checkCanSerialize(0)
+        checkCanSerialize(1)
+        checkCanSerialize(2)
+        checkCanSerialize(4)
+        checkCanSerialize(8)
+        checkCanSerialize(16)
+        checkCanSerialize(32)
+        checkCanSerialize(64)
+        checkCanSerialize(128)
+        checkCanSerialize(-1)
+        checkCanSerialize(290)
+        checkCanSerialize(1000)
+        checkCanSerialize(99.5)
+        checkCanSerialize("hi")
+        checkCanSerialize(b"bye")
+        checkCanSerialize(None)
+        checkCanSerialize(True)
+        checkCanSerialize(False)
+
     def test_serialization(self):
         ints = TupleOf(int)((1, 2, 3, 4))
 
         self.assertEqual(
             len(serialize(TupleOf(int), ints)),
-            36
+            5
         )
+
+        def varintBytecount(value):
+            """the length (in bytes) of a varint"""
+            res = 1
+            while value > 64:
+                res += 1
+                value /= 128
+            return res
 
         while len(ints) < 1000000:
             ints = ints + ints
             t0 = time.time()
-            self.assertEqual(len(serialize(TupleOf(int), ints)), len(ints) * 8 + 4)
+
+            expectedBytecount = sum(varintBytecount(i) for i in ints) + varintBytecount(len(ints))
+            self.assertEqual(len(serialize(TupleOf(int), ints)), expectedBytecount)
+
             print(time.time() - t0, " for ", len(ints))
 
     def test_serialization_roundtrip(self):

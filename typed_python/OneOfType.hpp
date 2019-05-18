@@ -51,7 +51,7 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        uint8_t which = buffer.read_uint8();
+        uint8_t which = buffer.read_uint();
         if (which >= m_types.size()) {
             throw std::runtime_error("Corrupt OneOf");
         }
@@ -61,7 +61,7 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint8(*(uint8_t*)self);
+        buffer.write_uint(*(uint8_t*)self);
         m_types[*((uint8_t*)self)]->serialize(self+1, buffer);
     }
 

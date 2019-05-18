@@ -78,12 +78,12 @@ public:
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        buffer.readInto((T*)self);
+        buffer.readRegisterType((T*)self);
     }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write(*(T*)self);
+        buffer.writeRegisterType(*(T*)self);
     }
 };
 

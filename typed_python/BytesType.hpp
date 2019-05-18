@@ -42,13 +42,13 @@ public:
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint32(count(self));
+        buffer.write_uint(count(self));
         buffer.write_bytes(eltPtr(self, 0), count(self));
     }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint32();
+        int32_t ct = buffer.read_uint();
 
         if (!buffer.canConsume(ct)) {
             throw std::runtime_error("Corrupt data (bytes)");
