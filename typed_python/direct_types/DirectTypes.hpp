@@ -1,14 +1,47 @@
 #pragma once
 
 #include <vector>
-#include "Type.hpp"
-#include "PyInstance.hpp"
+#include "../Type.hpp"
+#include "../PyInstance.hpp"
 
 
 //templates for TupleOf, ListOf, Dict, ConstDict, OneOf
 template<class element_type>
 class ListOf {
 public:
+    class iterator_type {
+    public:
+        iterator_type(ListOfType::layout* in_tuple, int64_t in_offset) :
+            m_tuple(in_tuple),
+            m_offset(in_offset)
+        {}
+
+        bool operator!=(const iterator_type& other) const {
+            return m_tuple != other.m_tuple || m_offset != other.m_offset;
+        }
+
+        bool operator==(const iterator_type& other) const {
+            return m_tuple == other.m_tuple && m_offset == other.m_offset;
+        }
+
+        iterator_type& operator++() {
+            m_offset++;
+            return *this;
+        }
+
+        iterator_type operator++(int) {
+            return iterator_type(m_tuple, m_offset++);
+        }
+
+        const element_type& operator*() const {
+            return *(element_type*)getType()->eltPtr((instance_ptr)&m_tuple, m_offset);
+        }
+
+    private:
+        ListOfType::layout* m_tuple;
+        int64_t m_offset;
+    };
+
     static ListOfType* getType() {
         static ListOfType* t = ListOfType::Make(TypeDetails<element_type>::getType());
         return t;
@@ -25,6 +58,10 @@ public:
         return (ListOf<element_type>)l;
     }
 
+    PyObject* toPython() {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, getType());
+    }
+
     element_type& operator[](int64_t offset) {
        return *(element_type*)((uint8_t*)mLayout->data + TypeDetails<element_type>::bytecount * offset);
     }
@@ -34,10 +71,6 @@ public:
     }
 
     size_t size() const {
-        return !mLayout ? 0 : sizeof(*mLayout) + TypeDetails<element_type>::bytecount * mLayout->count;
-    }
-
-    size_t count() const {
         return mLayout ? mLayout->count : 0;
     }
 
@@ -98,6 +131,14 @@ public:
         return mLayout;
     }
 
+    iterator_type begin() const {
+        return iterator_type(mLayout, 0);
+    }
+
+    iterator_type end() const {
+        return iterator_type(mLayout, size());
+    }
+
 private:
     ListOfType::layout* mLayout;
 };
@@ -119,6 +160,39 @@ public:
 template<class element_type>
 class TupleOf {
 public:
+    class iterator_type {
+    public:
+        iterator_type(TupleOfType::layout* in_tuple, int64_t in_offset) :
+            m_tuple(in_tuple),
+            m_offset(in_offset)
+        {}
+
+        bool operator!=(const iterator_type& other) const {
+            return m_tuple != other.m_tuple || m_offset != other.m_offset;
+        }
+
+        bool operator==(const iterator_type& other) const {
+            return m_tuple == other.m_tuple && m_offset == other.m_offset;
+        }
+
+        iterator_type& operator++() {
+            m_offset++;
+            return *this;
+        }
+
+        iterator_type operator++(int) {
+            return iterator_type(m_tuple, m_offset++);
+        }
+
+        const element_type& operator*() const {
+            return *(element_type*)getType()->eltPtr((instance_ptr)&m_tuple, m_offset);
+        }
+
+    private:
+        TupleOfType::layout* m_tuple;
+        int64_t m_offset;
+    };
+
     static TupleOfType* getType() {
         static TupleOfType* t = TupleOfType::Make(TypeDetails<element_type>::getType());
 
@@ -136,6 +210,27 @@ public:
         return (TupleOf<element_type>)l;
     }
 
+    //repeatedly call 'F' with a pointer to an uninitialized element_type and an index.
+    //stop when it returns 'false'
+    template<class F>
+    static TupleOf<element_type> createUnbounded(const F& allocator) {
+        TupleOfType::layout* layoutPtr = nullptr;
+
+        getType()->constructorUnbounded((instance_ptr)&layoutPtr, [&](instance_ptr tgt, int64_t index) {
+            return allocator((element_type*)tgt, index);
+        });
+
+        return TupleOf<element_type>(layoutPtr);
+    }
+
+    PyObject* toPython() {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, getType());
+    }
+
+    PyObject* toPython(Type* elementTypeOverride) {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, ::TupleOfType::Make(elementTypeOverride));
+    }
+
     element_type& operator[](int64_t offset) {
        return *(element_type*)((uint8_t*)mLayout->data + TypeDetails<element_type>::bytecount * offset);
     }
@@ -145,10 +240,6 @@ public:
     }
 
     size_t size() const {
-        return mLayout ? sizeof(*mLayout) + TypeDetails<element_type>::bytecount * mLayout->count : 0;
-    }
-
-    size_t count() const {
         return mLayout ? mLayout->count : 0;
     }
 
@@ -193,6 +284,11 @@ public:
         getType()->destroy((instance_ptr)&mLayout);
     }
 
+    template<class other_t>
+    TupleOf<other_t> cast() {
+        return TupleOf<other_t>(mLayout);
+    }
+
     TupleOf& operator=(const TupleOf& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
@@ -203,6 +299,14 @@ public:
 
     TupleOfType::layout* getLayout() const {
         return mLayout;
+    }
+
+    iterator_type begin() const {
+        return iterator_type(mLayout, 0);
+    }
+
+    iterator_type end() const {
+        return iterator_type(mLayout, size());
     }
 
 private:
@@ -260,8 +364,16 @@ public:
 
     Bytes():mLayout(0) {}
 
-    explicit Bytes(size_t count, const char *pc):mLayout(0) {
-        getType()->constructor((instance_ptr)&mLayout, count, pc);
+    explicit Bytes(const char *pc, size_t bytecount):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, bytecount, pc);
+    }
+
+    explicit Bytes(const char *pc):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, strlen(pc), pc);
+    }
+
+    explicit Bytes(const std::string& s):mLayout(0) {
+        getType()->constructor((instance_ptr)&mLayout, s.length(), s.data());
     }
 
     explicit Bytes(BytesType::layout* l):mLayout(0) {
@@ -297,8 +409,12 @@ public:
         getType()->deserialize<buf_t>((instance_ptr)&mLayout, buffer);
     }
 
-    size_t count() const {
-        return mLayout ? mLayout->bytecount : 0;
+    size_t size() const {
+        return getType()->count((instance_ptr)&mLayout);
+    }
+
+    int32_t hashValue() const {
+        return getType()->hash32((instance_ptr)&mLayout);
     }
 
     static inline char cmp(const Bytes& left, const Bytes& right) {
@@ -310,11 +426,21 @@ public:
     bool operator>(const Bytes& right) const { return cmp(*this, right) > 0; }
     bool operator<=(const Bytes& right) const { return cmp(*this, right) <= 0; }
     bool operator>=(const Bytes& right) const { return cmp(*this, right) >= 0; }
+
+    const uint8_t& operator[](size_t s) const {
+        return *(uint8_t*)getType()->eltPtr((instance_ptr)&mLayout, s);
+    }
+
     static Bytes concatenate(const Bytes& left, const Bytes& right) {
         return Bytes(BytesType::concatenate(left.getLayout(), right.getLayout()));
     }
+
     Bytes operator+(const Bytes& right) {
         return Bytes(BytesType::concatenate(mLayout, right.getLayout()));
+    }
+
+    Bytes& operator+=(const Bytes& right) {
+        return *this = Bytes(BytesType::concatenate(mLayout, right.getLayout()));
     }
 
     BytesType::layout* getLayout() const { return mLayout; }
@@ -349,7 +475,7 @@ public:
         getType()->constructor((instance_ptr)&mLayout, 1, strlen(pc), pc);
     }
 
-    explicit String(std::string& s):mLayout(0) {
+    explicit String(const std::string& s):mLayout(0) {
         getType()->constructor((instance_ptr)&mLayout, 1, s.length(), s.data());
     }
 
@@ -378,6 +504,14 @@ public:
         return *this;
     }
 
+    String& operator=(const char* other) {
+        return *this = String(other);
+    }
+
+    String& operator=(const std::string& other) {
+        return *this = String(other);
+    }
+
     template<class buf_t>
     void serialize(buf_t& buffer) {
         getType()->serialize<buf_t>((instance_ptr)&mLayout, buffer);
@@ -398,8 +532,8 @@ public:
     bool operator<=(const String& right) const { return cmp(*this, right) <= 0; }
     bool operator>=(const String& right) const { return cmp(*this, right) >= 0; }
 
-    size_t count() const {
-        return mLayout ? mLayout->pointcount : 0;
+    size_t size() const {
+        return getType()->count((instance_ptr)&mLayout);
     }
 
     static String concatenate(const String& left, const String& right) {
@@ -479,6 +613,10 @@ public:
         return (Dict<key_type, value_type>)l;
     }
 
+    PyObject* toPython() {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, getType());
+    }
+
     size_t size() const {
         return !mLayout ? 0 : getType()->size((instance_ptr)&mLayout);
     }
@@ -523,6 +661,17 @@ public:
         return *this;
     }
 
+    value_type& operator[](const key_type& k) {
+        value_type *pv = (value_type*)getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k);
+
+        if (!pv) {
+            pv = (value_type*)getType()->insertKey((instance_ptr)&mLayout, (instance_ptr)&k);
+            TypeDetails<value_type>::getType()->constructor((instance_ptr)pv);
+        }
+
+        return *pv;
+    }
+
     void insertKeyValue(const key_type& k, const value_type& v) {
         value_type *pv = (value_type*)getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k);
         if (pv) {
@@ -564,6 +713,43 @@ public:
 template<class key_type, class value_type>
 class ConstDict {
 public:
+    class iterator_type {
+    public:
+        iterator_type(ConstDictType::layout* in_dict, int64_t in_offset) :
+                m_dict(in_dict),
+                m_offset(in_offset)
+        {
+        }
+
+        bool operator!=(const iterator_type& other) const {
+            return m_dict != other.m_dict || m_offset != other.m_offset;
+        }
+
+        bool operator==(const iterator_type& other) const {
+            return m_dict == other.m_dict && m_offset == other.m_offset;
+        }
+
+        iterator_type& operator++() {
+            m_offset++;
+            return *this;
+        }
+
+        iterator_type operator++(int) {
+            return iterator_type(m_dict, m_offset++);
+        }
+
+        std::pair<key_type&, value_type&> operator*() const {
+            return std::pair<key_type&, value_type&>(
+                *(key_type*)getType()->kvPairPtrKey((instance_ptr)&m_dict, m_offset),
+                *(value_type*)getType()->kvPairPtrValue((instance_ptr)&m_dict, m_offset)
+            );
+        }
+
+    private:
+        ConstDictType::layout* m_dict;
+        int64_t m_offset;
+    };
+
     static ConstDictType* getType() {
         static ConstDictType* t = ConstDictType::Make(
             TypeDetails<key_type>::getType(),
@@ -579,8 +765,9 @@ public:
         return (ConstDict<key_type, value_type>)l;
     }
 
+    // returns the number of items in the ConstDict
     size_t size() const {
-        return !mLayout ? 0 : sizeof(*mLayout);
+        return !mLayout ? 0 : getType()->count((instance_ptr)&mLayout);
     }
 
     template<class buf_t>
@@ -655,10 +842,6 @@ public:
         return *this;
     }
 
-    size_t count() const {
-        return mLayout ? mLayout->count : 0;
-    }
-
     const value_type* lookupValueByKey(const key_type&  k) const {
         return (value_type*)(getType()->lookupValueByKey((instance_ptr)&mLayout, (instance_ptr)&k));
     }
@@ -687,6 +870,15 @@ public:
     ConstDictType::layout* getLayout() const {
         return mLayout;
     }
+
+    iterator_type begin() const {
+        return iterator_type(mLayout, 0);
+    }
+
+    iterator_type end() const {
+        return iterator_type(mLayout, size());
+    }
+
 private:
     ConstDictType::layout* mLayout;
 };
@@ -697,7 +889,7 @@ public:
     static Type* getType() {
         static Type* t = ConstDict<key_type, value_type>::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("ConstDict: somehow we have the wrong bytecount!");
+            throw std: :runtime_error("ConstDict: somehow we have the wrong bytecount!");
         }
         return t;
     }
@@ -762,10 +954,6 @@ public:
             return false;
         getType()->getTypes()[k]->copy_constructor((instance_ptr)&o, (instance_ptr)&mLayout.data);
         return true;
-    }
-
-    size_t size() const {
-        return sizeof(layout);
     }
 
     template<class buf_t>

@@ -38,7 +38,8 @@ SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
 UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
 TP_O_FILES = $(TP_BUILD_PATH)/all.o
 ODB_O_FILES = $(ODB_BUILD_PATH)/all.o
-GENERATEDTYPES = $(TP_SRC_PATH)/GeneratedTypes0.hpp
+DT_SRC_PATH = $(TP_SRC_PATH)/direct_types
+GENERATEDTYPES = $(DT_SRC_PATH)/GeneratedTypes0.hpp
 
 ##########################################################################
 #  MAIN RULES
@@ -96,14 +97,14 @@ unicodeprops: ./unicodeprops.py
 	$(PYTHON) ./unicodeprops.py > $(UNICODEPROPS)
 
 .PHONY: generatetesttypes
-generatetesttypes: $(TP_SRC_PATH)/generate_types.py
+generatetesttypes: $(DT_SRC_PATH)/generate_types.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(TP_SRC_PATH)/generate_types.py --testTypes $(GENERATEDTYPES)
+	python3 $(DT_SRC_PATH)/generate_types.py --testTypes $(GENERATEDTYPES)
 
 .PHONY: cpptests
-cpptests: $(TP_SRC_PATH)/direct_types_test.py
+cpptests: $(DT_SRC_PATH)/direct_types_test.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(TP_SRC_PATH)/direct_types_test.py --test
+	python3 $(DT_SRC_PATH)/direct_types_test.py --test
 
 .PHONY: clean
 clean:

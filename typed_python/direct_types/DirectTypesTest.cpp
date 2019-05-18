@@ -1,4 +1,5 @@
-#include "DirectTypes.hpp"
+#include "all.hpp"
+//#include "GeneratedTypes.hpp"
 #include "DirectTypesTest.hpp"
 
 #define my_assert(cond) if (!(cond)) { std::cerr << "  failure: " << #cond << std::endl << "  " << __FILE__ << " line " << std::dec << __LINE__ << std::endl; return 1; }
@@ -10,7 +11,7 @@ int test_string() {
     test_fn_header()
 
     String s1("abc");
-    my_assert(s1.count() == 3)
+    my_assert(s1.size() == 3)
     my_assert(s1.getLayout()->bytes_per_codepoint == 1)
     std::string s2a("abc");
 
@@ -37,7 +38,7 @@ int test_string() {
     my_assert(s2.getLayout()->refcount == 1)
 
     String s3("abcxy");
-    my_assert(s3.count() == 5)
+    my_assert(s3.size() == 5)
     my_assert(s3.find(String("cx")) == 2)
     my_assert(s3.substr(1,4) == String("bcx"))
     my_assert(s3.substr(1,-1) == String("bcx"))
@@ -95,23 +96,23 @@ int test_string() {
 
     String s5("one two three four");
     ListOf<String> parts = s5.split();
-    my_assert(parts.count() == 4)
+    my_assert(parts.size() == 4)
     my_assert(parts[0] == String("one"))
     my_assert(parts[1] == String("two"))
     my_assert(parts[2] == String("three"))
     my_assert(parts[3] == String("four"))
     parts = s5.split(String("t"));
-    my_assert(parts.count() == 3)
+    my_assert(parts.size() == 3)
     my_assert(parts[0] == String("one "))
     my_assert(parts[1] == String("wo "))
     my_assert(parts[2] == String("hree four"))
     parts = s5.split(2);
-    my_assert(parts.count() == 3)
+    my_assert(parts.size() == 3)
     my_assert(parts[0] == String("one"))
     my_assert(parts[1] == String("two"))
     my_assert(parts[2] == String("three four"))
     parts = s5.split(String("t"), 1);
-    my_assert(parts.count() == 2)
+    my_assert(parts.size() == 2)
     my_assert(parts[0] == String("one "))
     my_assert(parts[1] == String("wo three four"))
     return 0;
@@ -119,12 +120,12 @@ int test_string() {
 
 int test_bytes() {
     test_fn_header()
-    Bytes b1(7, "\x03\x02\x01\x00\x01\x02\x03\x04");
-    Bytes b2(6, "\x00\x00\x00\x00\x01\x00\x00");
-    my_assert(b1.count() == 7)
-    my_assert(b2.count() == 6)
+    Bytes b1("\x03\x02\x01\x00\x01\x02\x03\x04", 7);
+    Bytes b2("\x00\x00\x00\x00\x01\x00\x00", 6);
+    my_assert(b1.size() == 7)
+    my_assert(b2.size() == 6)
     Bytes b3 = b1 + b2;
-    my_assert(b3.count() == 13)
+    my_assert(b3.size() == 13)
     my_assert(b3.getLayout()->refcount == 1)
     {
         Bytes b4(b3);
@@ -145,13 +146,13 @@ int test_list_of() {
     test_fn_header()
 
     ListOf<int64_t> list1;
-    my_assert(list1.count() == 0)
+    my_assert(list1.size() == 0)
     my_assert(list1.getLayout()->refcount == 1)
 
     ListOf<int64_t> list2({9, 8, 7});
-    my_assert(list2.count() == 3)
+    my_assert(list2.size() == 3)
     list2.append(6);
-    my_assert(list2.count() == 4)
+    my_assert(list2.size() == 4)
     my_assert(list2.getLayout()->refcount == 1)
 
     {
@@ -169,11 +170,23 @@ int test_list_of() {
     my_assert(list2[2] == 42)
 
     ListOf<String> list4({String("ab"), String("cd")});
-    my_assert(list4.count() == 2)
+    my_assert(list4.size() == 2)
     my_assert(list4[0] == String("ab"))
     my_assert(list4[1] == String("cd"))
     list4[1] = String("replace");
     my_assert(list4[1] == String("replace"))
+
+    int64_t sum1 = 0;
+    for (int64_t e: list2) {
+        sum1 += e;
+    }
+    my_assert(sum1 == 65)
+
+    int64_t sum2 = 0;
+    for (auto it = begin(list2); it != end(list2); it++) {
+        sum2 += *it;
+    }
+    my_assert(sum2 == 65)
     return 0;
 }
 
@@ -181,11 +194,11 @@ int test_tuple_of() {
     test_fn_header()
 
     TupleOf<int64_t> t1;
-    my_assert(t1.count() == 0)
+    my_assert(t1.size() == 0)
 
     TupleOf<int64_t> t2({10, 12, 14, 16});
     my_assert(t2.getLayout()->refcount == 1)
-    my_assert(t2.count() == 4)
+    my_assert(t2.size() == 4)
     my_assert(t2.getLayout()->refcount == 1)
 
     {
@@ -199,6 +212,18 @@ int test_tuple_of() {
     }
     my_assert(t2.getLayout()->refcount == 1)
     my_assert(t2[2] == 14)
+
+    int64_t sum1 = 0;
+    for (int64_t e: t2) {
+        sum1 += e;
+    }
+    my_assert(sum1 == 52)
+
+    int64_t sum2 = 0;
+    for (auto it = begin(t2); it != end(t2); it++) {
+        sum2 += *it;
+    }
+    my_assert(sum2 == 52)
     return 0;
 }
 
@@ -238,6 +263,8 @@ int test_dict() {
     const String *ps = d4.lookupValueByKey(String("second"));
     my_assert(ps);
     my_assert(*ps == String("2nd"));
+    my_assert(d4[String("first")] == String("1st"))
+    my_assert(d4[String("third")] == String("3rd"))
     return 0;
 }
 
@@ -245,7 +272,7 @@ int test_const_dict() {
     test_fn_header()
 
     ConstDict<String, int64_t> c1({{String("a"), 5}, {String("c"), 7}, {String("b"), 6}});
-    my_assert(c1.count() == 3)
+    my_assert(c1.size() == 3)
 
     const int64_t *pv = c1.lookupValueByKey(String("a"));
     my_assert(pv)
@@ -267,9 +294,9 @@ int test_const_dict() {
     }
     my_assert(c1.getLayout()->refcount == 1)
     ConstDict<String, int64_t> c4({{String("d"), 8}, {String("e"), 9}, {String("c"), 222}, {String("f"), 10}, {String("g"), 11}});
-    my_assert(c4.count() == 5)
+    my_assert(c4.size() == 5)
     ConstDict<String, int64_t> c5 = c1 + c4;
-    my_assert(c5.count() == 7)
+    my_assert(c5.size() == 7)
     pv = c5.lookupValueByKey(String("c"));
     my_assert(pv)
     my_assert(*pv == 222)
@@ -288,7 +315,7 @@ int test_const_dict() {
 
     TupleOf<String> t1({String("b"), String("d"), String("f")});
     ConstDict<String, int64_t> c6 = c5 - t1;
-    my_assert(c6.count() == 4)
+    my_assert(c6.size() == 4)
     pv = c6.lookupValueByKey(String("b"));
     my_assert(!pv)
     pv = c6.lookupValueByKey(String("d"));
@@ -320,7 +347,7 @@ int test_one_of() {
     my_assert(!o3.getValue(b));
     my_assert(!o3.getValue(s));
     my_assert(o3.getValue(t));
-    my_assert(t.count() == 3);
+    my_assert(t.size() == 3);
     my_assert(t[0] == 9 && t[1] == 8 && t[2] == 7);
 
     o3 = false;

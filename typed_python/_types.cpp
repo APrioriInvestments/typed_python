@@ -30,7 +30,7 @@
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
-#include "DirectTypesTest.hpp"
+#include "direct_types/DirectTypesTest.hpp"
 
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {

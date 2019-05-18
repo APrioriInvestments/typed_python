@@ -43,5 +43,5 @@
 #include "ClassType.hpp"
 #include "BoundMethodType.hpp"
 
-#include "DirectTypes.hpp"
-#include "GeneratedTypes.hpp"
+#include "direct_types/all.hpp"
+#include "direct_types/GeneratedTypes.hpp"
