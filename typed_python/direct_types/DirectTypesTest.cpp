@@ -234,11 +234,11 @@ int test_dict() {
     d1.insertKeyValue(false, 13);
     d1.insertKeyValue(true, 17);
     const int64_t *pv = d1.lookupValueByKey(false);
-    my_assert(pv);
-    my_assert(*pv == 13);
+    my_assert(pv)
+    my_assert(*pv == 13)
     pv = d1.lookupValueByKey(true);
-    my_assert(pv);
-    my_assert(*pv == 17);
+    my_assert(pv)
+    my_assert(*pv == 17)
     my_assert(d1.getLayout()->refcount == 1)
     bool deleted = d1.deleteKey(true);
     my_assert(deleted)
@@ -261,10 +261,25 @@ int test_dict() {
     d4.insertKeyValue(String("second"), String("2nd"));
     d4.insertKeyValue(String("third"), String("3rd"));
     const String *ps = d4.lookupValueByKey(String("second"));
-    my_assert(ps);
-    my_assert(*ps == String("2nd"));
+    my_assert(ps)
+    my_assert(*ps == String("2nd"))
     my_assert(d4[String("first")] == String("1st"))
     my_assert(d4[String("third")] == String("3rd"))
+
+    String k;
+    String v;
+    for (auto e: d4) {
+        k += e.first;
+        v += e.second;
+    }
+    my_assert(k == String("firstsecondthird"))
+    my_assert(v == String("1st2nd3rd"))
+
+    String s;
+    for (auto it = begin(d4); it != end(d4); ++it) {
+        s += (*it).first + String(":") + (*it).second + String(" ");
+    }
+    my_assert(s == String("first:1st second:2nd third:3rd "))
     return 0;
 }
 
@@ -331,6 +346,15 @@ int test_const_dict() {
     my_assert(pv)
     my_assert(*pv == 11)
 
+    String k;
+    int64_t sum = 0;
+    for (auto e: c5) {
+        k += e.first;
+        sum += e.second;
+    }
+    my_assert(k == String("abcdefg"))
+    my_assert(sum == 5+6+222+8+9+10+11)
+
     TupleOf<String> t1({String("b"), String("d"), String("f")});
     ConstDict<String, int64_t> c6 = c5 - t1;
     my_assert(c6.size() == 4)
@@ -344,6 +368,14 @@ int test_const_dict() {
     my_assert(pv)
     my_assert(*pv == 11)
 
+    String k2;
+    int64_t sum2 = 0;
+    for (auto it = begin(c6); it != end(c6); ++it) {
+        k2 += (*it).first;
+        sum2 += (*it).second;
+    }
+    my_assert(k2 == String("aceg"))
+    my_assert(sum2 == 5+222+9+11)
     return 0;
 }
 
@@ -362,24 +394,24 @@ int test_one_of() {
     TupleOf<int> t;
     o3 = TupleOf<int>({9,8,7});
     my_assert(o3.getLayout()->which == 2)
-    my_assert(!o3.getValue(b));
-    my_assert(!o3.getValue(s));
-    my_assert(o3.getValue(t));
-    my_assert(t.size() == 3);
-    my_assert(t[0] == 9 && t[1] == 8 && t[2] == 7);
+    my_assert(!o3.getValue(b))
+    my_assert(!o3.getValue(s))
+    my_assert(o3.getValue(t))
+    my_assert(t.size() == 3)
+    my_assert(t[0] == 9 && t[1] == 8 && t[2] == 7)
 
     o3 = false;
     my_assert(o3.getLayout()->which == 0)
-    my_assert(!o3.getValue(s));
-    my_assert(!o3.getValue(t));
+    my_assert(!o3.getValue(s))
+    my_assert(!o3.getValue(t))
     my_assert(o3.getValue(b))
     my_assert(b == false)
 
     o3 = String("yes");
     my_assert(o3.getLayout()->which == 1)
     my_assert(!o3.getValue(b))
-    my_assert(!o3.getValue(t));
-    my_assert(o3.getValue(s));
+    my_assert(!o3.getValue(t))
+    my_assert(o3.getValue(s))
     my_assert(s == String("yes"))
 
     // fails, since the template doesn't collapse contained OneOf types:

@@ -58,9 +58,9 @@ public:
     }
 
     static OneOf<T1, Ts...> fromPython(PyObject* p) {
-        OneOf<T1, Ts...>::layout* l = nullptr;
+        OneOf<T1, Ts...>::layout l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (OneOf<T1, Ts...>)l;
+        return OneOf<T1, Ts...>(l);
     }
 
     std::pair<Type*, instance_ptr> unwrap() {
@@ -126,6 +126,9 @@ public:
 
     const layout* getLayout() const { return &mLayout; }
 private:
+    OneOf(layout l): mLayout(l) {
+    }
+
     layout mLayout;
 };
 

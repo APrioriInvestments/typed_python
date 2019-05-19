@@ -72,7 +72,7 @@ public:
     static ConstDict fromPython(PyObject* p) {
         ConstDictType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (ConstDict<key_type, value_type>)l;
+        return ConstDict<key_type, value_type>(l);
     }
 
     // returns the number of items in the ConstDict
@@ -137,13 +137,6 @@ public:
                );
     }
 
-    ConstDict(ConstDictType::layout* l) {
-        getType()->copy_constructor(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&l
-               );
-    }
-
     ConstDict& operator=(const ConstDict& other) {
         getType()->assign(
                (instance_ptr)&mLayout,
@@ -190,6 +183,10 @@ public:
     }
 
 private:
+    ConstDict(ConstDictType::layout* l): mLayout(l) {
+        // deliberately stealing a reference
+    }
+
     ConstDictType::layout* mLayout;
 };
 

@@ -21,6 +21,50 @@
 template<class key_type, class value_type>
 class Dict {
 public:
+    class iterator_type {
+    public:
+        iterator_type(DictType::layout* in_dict, int64_t in_offset) :
+            m_dict(in_dict),
+            m_offset(in_offset)
+        {}
+
+        bool operator!=(const iterator_type& other) const {
+            return m_dict != other.m_dict || m_offset != other.m_offset;
+        }
+
+        bool operator==(const iterator_type& other) const {
+            return m_dict == other.m_dict && m_offset == other.m_offset;
+        }
+
+        int64_t increment() {
+            int64_t initial = m_offset;
+            m_offset++;
+            while (m_offset < m_dict->items_reserved && !m_dict->items_populated[m_offset])
+                m_offset++;
+            return initial;
+        }
+
+        iterator_type& operator++() {
+            (void)increment();
+            return *this;
+        }
+
+        iterator_type operator++(int) {
+            return iterator_type(m_dict, increment());
+        }
+
+        std::pair<key_type&, value_type&> operator*() const {
+            return std::pair<key_type&, value_type&>(
+                *(key_type*)getType()->keyAtSlot((instance_ptr)&m_dict, m_offset),
+                *(value_type*)getType()->valueAtSlot((instance_ptr)&m_dict, m_offset)
+            );
+        }
+
+    private:
+        DictType::layout* m_dict;
+        int64_t m_offset;
+    };
+
     static DictType* getType() {
         static DictType* t = DictType::Make(
             TypeDetails<key_type>::getType(),
@@ -33,7 +77,7 @@ public:
     static Dict<key_type, value_type> fromPython(PyObject* p) {
         DictType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (Dict<key_type, value_type>)l;
+        return Dict<key_type, value_type>(l);
     }
 
     PyObject* toPython() {
@@ -66,13 +110,6 @@ public:
         getType()->copy_constructor(
                (instance_ptr)&mLayout,
                (instance_ptr)&other.mLayout
-               );
-    }
-
-    Dict(DictType::layout* l) {
-        getType()->copy_constructor(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&l
                );
     }
 
@@ -115,7 +152,20 @@ public:
     DictType::layout* getLayout() const {
         return mLayout;
     }
+
+    iterator_type begin() const {
+        return iterator_type(mLayout, 0);
+    }
+
+    iterator_type end() const {
+        return iterator_type(mLayout, mLayout ? mLayout->items_reserved: 0);
+    }
+
 private:
+    Dict(DictType::layout* l): mLayout(l) {
+        // deliberately stealing a reference
+    }
+
     DictType::layout* mLayout;
 };
 

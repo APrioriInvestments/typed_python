@@ -69,7 +69,7 @@ public:
     static TupleOf<element_type> fromPython(PyObject* p) {
         TupleOfType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (TupleOf<element_type>)l;
+        return TupleOf<element_type>(l);
     }
 
     //repeatedly call 'F' with a pointer to an uninitialized element_type and an index.
@@ -126,13 +126,6 @@ public:
                );
     }
 
-    TupleOf(TupleOfType::layout* l) {
-        getType()->copy_constructor(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&l
-               );
-    }
-
     TupleOf(const std::vector<element_type>& v): mLayout(0) {
         getType()->constructor((instance_ptr)&mLayout, v.size(),
             [&](instance_ptr target, int64_t k) {
@@ -172,6 +165,10 @@ public:
     }
 
 private:
+    TupleOf(TupleOfType::layout* l): mLayout(l) {
+        // deliberately stealing a reference
+    }
+
     TupleOfType::layout* mLayout;
 };
 
