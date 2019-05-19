@@ -96,7 +96,7 @@ public:
     static String concatenate(const String& left, const String& right) {
         return String(StringType::concatenate(left.getLayout(), right.getLayout()));
     }
-    String operator+(const String& right) {
+    String operator+(const String& right) const {
         return String(StringType::concatenate(mLayout, right.getLayout()));
     }
     String& operator+=(const String& right) {
