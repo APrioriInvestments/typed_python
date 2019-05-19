@@ -98,7 +98,7 @@ public:
         return Bytes(BytesType::concatenate(left.getLayout(), right.getLayout()));
     }
 
-    Bytes operator+(const Bytes& right) {
+    Bytes operator+(const Bytes& right) const {
         return Bytes(BytesType::concatenate(mLayout, right.getLayout()));
     }
 

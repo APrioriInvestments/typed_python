@@ -24,17 +24,17 @@ class ListOf {
 public:
     class iterator_type {
     public:
-        iterator_type(ListOfType::layout* in_tuple, int64_t in_offset) :
-            m_tuple(in_tuple),
+        iterator_type(ListOfType::layout* in_list, int64_t in_offset) :
+            m_list(in_list),
             m_offset(in_offset)
         {}
 
         bool operator!=(const iterator_type& other) const {
-            return m_tuple != other.m_tuple || m_offset != other.m_offset;
+            return m_list != other.m_list || m_offset != other.m_offset;
         }
 
         bool operator==(const iterator_type& other) const {
-            return m_tuple == other.m_tuple && m_offset == other.m_offset;
+            return m_list == other.m_list && m_offset == other.m_offset;
         }
 
         iterator_type& operator++() {
@@ -43,15 +43,15 @@ public:
         }
 
         iterator_type operator++(int) {
-            return iterator_type(m_tuple, m_offset++);
+            return iterator_type(m_list, m_offset++);
         }
 
         const element_type& operator*() const {
-            return *(element_type*)getType()->eltPtr((instance_ptr)&m_tuple, m_offset);
+            return *(element_type*)getType()->eltPtr((instance_ptr)&m_list, m_offset);
         }
 
     private:
-        ListOfType::layout* m_tuple;
+        ListOfType::layout* m_list;
         int64_t m_offset;
     };
 
@@ -68,7 +68,7 @@ public:
     static ListOf<element_type> fromPython(PyObject* p) {
         ListOfType::layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
-        return (ListOf<element_type>)l;
+        return ListOf<element_type>(l);
     }
 
     PyObject* toPython() {
@@ -121,13 +121,6 @@ public:
                );
     }
 
-    ListOf(ListOfType::layout* l) {
-        getType()->copy_constructor(
-               (instance_ptr)&mLayout,
-               (instance_ptr)&l
-               );
-    }
-
     ~ListOf() {
         getType()->destroy((instance_ptr)&mLayout);
     }
@@ -153,6 +146,10 @@ public:
     }
 
 private:
+    ListOf(ListOfType::layout* l): mLayout(l) {
+        // deliberately stealing a reference
+    }
+
     ListOfType::layout* mLayout;
 };
 
