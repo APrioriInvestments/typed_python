@@ -14,6 +14,15 @@ env:
 install:
   - pip install pipenv
   - pipenv install --dev --deploy
+  - sudo apt-get install -y gdb  # install gdb
+
+before_script:
+  - ulimit -c unlimited -S       # enable core dumps
+
+after_failure:
+  - PYTHON_EXECUTABLE=$(python3 -c "import sys; print(sys.executable)")
+  - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1) # find core file
+  - if [[ -f "$COREFILE" ]]; then gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch; fi
 
 script:
   - make testcert.cert
