@@ -15,6 +15,7 @@
 ******************************************************************************/
 
 #include "AllTypes.hpp"
+#include "../typed_python/Format.hpp"
 
 bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
     if (other->getTypeCategory() == TypeCategory::catConcreteAlternative) {
@@ -32,6 +33,14 @@ bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
 }
 
 void ConcreteAlternative::_forwardTypesMayHaveChanged() {
+    if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
+      throw std::runtime_error(
+        "invalid alternative index: " +
+        format(m_which) + " not in [0," +
+        format(m_alternative->subtypes().size()) + ")"
+      );
+    }
+
     m_base = m_alternative;
     m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
     m_size = m_alternative->bytecount();
@@ -61,6 +70,14 @@ ConcreteAlternative* ConcreteAlternative::Make(Alternative* alt, int64_t which) 
     auto it = m.find(keytype(alt ,which));
 
     if (it == m.end()) {
+        if (which < 0 || which >= alt->subtypes().size()) {
+          throw std::runtime_error(
+            "invalid alternative index: " +
+            format(which) + " not in [0," +
+            format(alt->subtypes().size()) + ")"
+          );
+        }
+
         it = m.insert(
             std::make_pair(keytype(alt,which), new ConcreteAlternative(alt,which))
             ).first;
