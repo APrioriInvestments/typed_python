@@ -146,7 +146,7 @@ public:
     }
 
 private:
-    ListOf(ListOfType::layout* l): mLayout(l) {
+    explicit ListOf(ListOfType::layout* l): mLayout(l) {
         // deliberately stealing a reference
     }
 

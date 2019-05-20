@@ -165,7 +165,7 @@ public:
     }
 
 private:
-    TupleOf(TupleOfType::layout* l): mLayout(l) {
+    explicit TupleOf(TupleOfType::layout* l): mLayout(l) {
         // deliberately stealing a reference
     }
 

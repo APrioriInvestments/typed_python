@@ -41,11 +41,6 @@ def gen_tuple_type(name, *args):
     for i, (key, value) in enumerate(items):
         offset = '' if i == 0 else ' + ' + ' + '.join([f'size' + str(j) for j in range(1, i + 1)])
         ret.append(f'    {key}_type& {key}() const {{ return *({key}_type*)(data{offset}); }}')
-    ret.append('private:')
-    for i, key in enumerate(keys):
-        ret.append(f'    static const int size{i + 1} = sizeof({key}_type);')
-    ret.append('    uint8_t data[{}];'.format(' + '.join(['size' + str(i) for i in range(1, len(keys) + 1)])))
-    ret.append('public:')
     ret.append('    static Tuple* getType() {')
     ret.append('        static Tuple* t = Tuple::Make({')
     ret.append(',\n'.join(
@@ -53,6 +48,18 @@ def gen_tuple_type(name, *args):
     ret.append('            });')
     ret.append('        return t;')
     ret.append('        }')
+    ret.append('')
+
+    ret.append(f'    static {name} fromPython(PyObject* p) {{')
+    ret.append(f'        {name} l;')
+    ret.append('        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);')
+    ret.append('        return l;')
+    ret.append('    }')
+    ret.append('')
+    ret.append('    PyObject* toPython() {')
+    ret.append('        return PyInstance::extractPythonObject((instance_ptr)this, getType());')
+    ret.append('    }')
+    ret.append('')
 
     ret.append(f'    {name}& operator = (const {name}& other) {{')
     for key in keys:
@@ -91,22 +98,27 @@ def gen_tuple_type(name, *args):
     ret.append('    }')
     ret.append('')
 
-    ret.append(f'    {name}(' + ', '.join([f'const {key}_type& {key}_val' for key in keys]) + ') {')
-    for key in keys:
-        ret.append(f'        bool init{key} = false;')
-    ret.append('        try {')
-    for key in keys:
-        ret.append(f'            new (&{key}()) {key}_type({key}_val);')
-        ret.append(f'            init{key} = true;')
-    ret.append('        } catch(...) {')
-    ret.append('            try {')
-    for key in revkeys:
-        ret.append(f'                if (init{key}) {key}().~{key}_type();')
-    ret.append('            } catch(...) {')
-    ret.append('            }')
-    ret.append('            throw;')
-    ret.append('        }')
-    ret.append('    }')
+    if len(keys) > 0:
+        ret.append(f'    {name}(' + ', '.join([f'const {key}_type& {key}_val' for key in keys]) + ') {')
+        for key in keys:
+            ret.append(f'        bool init{key} = false;')
+        ret.append('        try {')
+        for key in keys:
+            ret.append(f'            new (&{key}()) {key}_type({key}_val);')
+            ret.append(f'            init{key} = true;')
+        ret.append('        } catch(...) {')
+        ret.append('            try {')
+        for key in revkeys:
+            ret.append(f'                if (init{key}) {key}().~{key}_type();')
+        ret.append('            } catch(...) {')
+        ret.append('            }')
+        ret.append('            throw;')
+        ret.append('        }')
+        ret.append('    }')
+    ret.append('private:')
+    for i, key in enumerate(keys):
+        ret.append(f'    static const int size{i + 1} = sizeof({key}_type);')
+    ret.append('    uint8_t data[{}];'.format(' + '.join(['size' + str(i) for i in range(1, len(keys) + 1)])))
     ret.append('};')
     ret.append('')
 
@@ -124,7 +136,7 @@ def gen_tuple_type(name, *args):
     ret.append(' +\n'.join([f'        sizeof({name}::{key}_type)' for key in keys]) + ';')
     ret.append('};')
     ret.append('')
-    ret.append(f'// END Generated NamedTuple {name}')
+    ret.append(f'// END Generated Tuple {name}')
     ret.append('')
 
     return [e + '\n' for e in ret]

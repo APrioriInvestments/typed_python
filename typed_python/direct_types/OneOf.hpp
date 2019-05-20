@@ -119,8 +119,7 @@ public:
 
     const layout* getLayout() const { return &mLayout; }
 private:
-    //steal a reference
-    OneOf(layout l): mLayout(l) {
+    explicit OneOf(layout l): mLayout(l) {
     }
 
     layout mLayout;
