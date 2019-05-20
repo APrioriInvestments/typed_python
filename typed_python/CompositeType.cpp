@@ -51,6 +51,11 @@ void CompositeType::_forwardTypesMayHaveChanged() {
             m_is_default_constructible = false;
         }
     }
+
+    for (int i = 0; i < m_types.size(); i++) {
+        m_serialize_typecodes.push_back(i);
+        m_serialize_typecodes_to_position[i] = i;
+    }
 }
 
 bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {

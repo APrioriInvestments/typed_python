@@ -74,34 +74,42 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint(which(self));
-        m_subtypes[which(self)].second->serialize(eltPtr(self), buffer);
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeBeginSingle(fieldNumber);
+        m_subtypes[which(self)].second->serialize(eltPtr(self), buffer, which(self));
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        uint8_t w = buffer.read_uint();
-        if (w >= m_subtypes.size()) {
-            throw std::runtime_error("Corrupt data (alt which)");
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        if (wireType != WireType::SINGLE) {
+            throw std::runtime_error("Corrupt data (Alternative expects a SINGLE wire type)");
+        }
+
+        std::pair<size_t, size_t> fieldAndWire = buffer.readFieldNumberAndWireType();
+        size_t which = fieldAndWire.first;
+
+        if (which >= m_subtypes.size()) {
+            throw std::runtime_error("Corrupt data (Alternative field number was out of bounds)");
         }
 
         if (m_all_alternatives_empty) {
-            *(uint8_t*)self = w;
+            *(uint8_t*)self = which;
+            //still need to consume whatever is in this message
+            m_subtypes[which].second->deserialize(self, buffer, fieldAndWire.second);
             return;
         }
 
         *(layout**)self = (layout*)malloc(
             sizeof(layout) +
-            m_subtypes[w].second->bytecount()
+            m_subtypes[which].second->bytecount()
             );
 
         layout& record = **(layout**)self;
 
         record.refcount = 1;
-        record.which = w;
+        record.which = which;
 
-        m_subtypes[w].second->deserialize(record.data, buffer);
+        m_subtypes[which].second->deserialize(record.data, buffer, fieldAndWire.second);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);

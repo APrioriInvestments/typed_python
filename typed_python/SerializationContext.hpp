@@ -17,6 +17,7 @@
 #pragma once
 
 #include <memory>
+#include "WireType.hpp"
 
 class SerializationBuffer;
 class DeserializationBuffer;
@@ -58,8 +59,8 @@ class SerializationContext {
 public:
     virtual ~SerializationContext() {};
 
-    virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const = 0;
-    virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const = 0;
+    virtual void serializePythonObject(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const = 0;
+    virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const = 0;
 
     virtual bool isCompressionEnabled() const = 0;
     virtual std::shared_ptr<ByteBuffer> compress(uint8_t* begin, uint8_t* end) const = 0;

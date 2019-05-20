@@ -408,60 +408,93 @@ public:
     static DictType* Make(Type* key, Type* value);
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         layout& l = **(layout**)self;
 
         uint32_t id;
         bool isNew;
         std::tie(id, isNew) = buffer.cachePointer(&l, this);
-        buffer.write_uint(id);
 
-        if (isNew) {
-            buffer.write_uint(l.hash_table_count);
+        if (!isNew) {
+            buffer.writeBeginSingle(fieldNumber);
+            buffer.writeUnsignedVarintObject(0, id);
+            return;
+        }
 
-            for (long k = 0; k < l.items_reserved; k++) {
-                if (l.items_populated[k]) {
-                    m_key->serialize(l.items + m_bytes_per_key_value_pair * k, buffer);
-                    m_value->serialize(l.items + m_bytes_per_key_value_pair * k + m_bytes_per_key, buffer);
-                }
+        buffer.writeBeginCompound(fieldNumber);
+        buffer.writeUnsignedVarintObject(0, id);
+        buffer.writeUnsignedVarintObject(0, l.hash_table_count);
+
+        size_t slotsWritten = 2;
+        for (long k = 0; k < l.items_reserved; k++) {
+            if (l.items_populated[k]) {
+                m_key->serialize(l.items + m_bytes_per_key_value_pair * k, buffer, 0);
+                m_value->serialize(l.items + m_bytes_per_key_value_pair * k + m_bytes_per_key, buffer, 0);
+                slotsWritten += 2;
             }
+        }
+
+        buffer.writeEndCompound();
+
+        if (slotsWritten != l.hash_table_count * 2 + 2) {
+            throw std::runtime_error("invalid hash table encountered: count not in line with items_reserved");
         }
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t id = buffer.read_uint();
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        size_t count;
+        size_t id;
+        bool wasFromId = false;
 
-        void* ptr = buffer.lookupCachedPointer(id);
+        size_t valuesRead = buffer.consumeCompoundMessageWithImpliedFieldNumbers(wireType,
+            [&](size_t fieldNumber, size_t subWireType) {
+                if (fieldNumber == 0) {
+                    assertWireTypesEqual(subWireType, WireType::VARINT);
+                    id = buffer.readUnsignedVarint();
 
-        if (ptr) {
-            *((layout**)self) = (layout*)ptr;
-            (*(layout**)self)->refcount++;
-            return;
+                    void* ptr = buffer.lookupCachedPointer(id);
+
+                    if (ptr) {
+                        *((layout**)self) = (layout*)ptr;
+                        (*(layout**)self)->refcount++;
+                        wasFromId = true;
+                    }
+                } else if (fieldNumber == 1) {
+                    assertWireTypesEqual(subWireType, WireType::VARINT);
+                    count = buffer.readUnsignedVarint();
+
+                    constructor(self);
+
+                    layout& l = **((layout**)self);
+                    buffer.addCachedPointer(id, &l, this);
+                    l.refcount++;
+
+                    l.prepareForDeserialization(count, m_bytes_per_key_value_pair);
+                } else {
+                    layout& l = **((layout**)self);
+
+                    size_t keyIx = (fieldNumber - 2) / 2;
+                    bool isKey = fieldNumber % 2 == 0;
+                    if (isKey) {
+                        m_key->deserialize(l.items + m_bytes_per_key_value_pair * keyIx, buffer, subWireType);
+                    } else {
+                        m_value->deserialize(l.items + m_bytes_per_key_value_pair * keyIx + m_bytes_per_key, buffer, subWireType);
+                    }
+                }
+        });
+
+        if (!wasFromId) {
+            if ((valuesRead - 2) / 2 != count) {
+                throw std::runtime_error("Invalid Dict found.");
+            }
+
+            layout& l = **((layout**)self);
+            l.buildHashTableAfterDeserialization(
+                m_bytes_per_key_value_pair,
+                [&](instance_ptr ptr) { return m_key->hash32(ptr); }
+                );
         }
-
-        constructor(self);
-        layout& l = **((layout**)self);
-
-        //incref it before putting it in.
-        l.refcount++;
-        buffer.addCachedPointer(id, *((layout**)self), this);
-
-        int32_t count = buffer.read_uint();
-
-        l.prepareForDeserialization(count, m_bytes_per_key_value_pair);
-
-        for (long k = 0; k < count; k++) {
-            m_key->deserialize(l.items + m_bytes_per_key_value_pair * k, buffer);
-            m_value->deserialize(l.items + m_bytes_per_key_value_pair * k + m_bytes_per_key, buffer);
-        }
-
-        l.buildHashTableAfterDeserialization(
-            m_bytes_per_key_value_pair,
-            [&](instance_ptr ptr) { return m_key->hash32(ptr); }
-            );
-
-        l.checkInvariants("after deserialization");
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);

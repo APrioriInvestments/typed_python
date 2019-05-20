@@ -24,7 +24,7 @@ class ConstDictType : public Type {
     public:
         std::atomic<int64_t> refcount;
         int32_t hash_cache;
-        int32_t count;
+        int32_t count; //the actual number of items in the tree (in total)
         int32_t subpointers; //if 0, then all values are inline as pairs of (key,value)
                              //otherwise, its an array of '(key, ConstDict(key,value))'
         uint8_t data[];
@@ -56,28 +56,44 @@ public:
     static ConstDictType* Make(Type* key, Type* value);
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = count(self);
-        buffer.write_uint(ct);
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        size_t ct = count(self);
+
+        buffer.writeBeginCompound(fieldNumber);
+        buffer.writeUnsignedVarintObject(0, ct);
         for (long k = 0; k < ct;k++) {
-            m_key->serialize(kvPairPtrKey(self,k),buffer);
-            m_value->serialize(kvPairPtrValue(self,k),buffer);
+            m_key->serialize(kvPairPtrKey(self,k),buffer, 0);
+            m_value->serialize(kvPairPtrValue(self,k),buffer, 0);
         }
+
+        buffer.writeEndCompound();
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint();
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        int32_t ct = -1;
 
-        if (!buffer.canConsume(ct) && m_bytes_per_key_value_pair) {
-            throw std::runtime_error("Corrupt data (dictcount)");
-        }
+        size_t valuesRead = buffer.consumeCompoundMessageWithImpliedFieldNumbers(wireType,
+            [&](size_t fieldNumber, size_t subWireType) {
+                if (fieldNumber == 0) {
+                    if (subWireType != WireType::VARINT) {
+                        throw std::runtime_error("Corrupt ConstDict");
+                    }
+                    ct = buffer.readUnsignedVarint();
+                    constructor(self, ct, false);
+                } else {
+                    size_t keyIx = (fieldNumber - 1) / 2;
+                    bool isKey = fieldNumber % 2;
+                    if (isKey) {
+                        m_key->deserialize(kvPairPtrKey(self, keyIx), buffer, subWireType);
+                    } else {
+                        m_value->deserialize(kvPairPtrValue(self, keyIx), buffer, subWireType);
+                    }
+                }
+        });
 
-        constructor(self, ct, false);
-
-        for (long k = 0; k < ct;k++) {
-            m_key->deserialize(kvPairPtrKey(self,k),buffer);
-            m_value->deserialize(kvPairPtrValue(self,k),buffer);
+        if (ct == -1 || (valuesRead - 1) / 2 != ct) {
+            throw std::runtime_error("Corrupt ConstDict.");
         }
 
         incKvPairCount(self, ct);
@@ -112,7 +128,6 @@ public:
     int64_t refcount(instance_ptr self) const;
 
     int64_t count(instance_ptr self) const;
-
 
     int64_t size(instance_ptr self) const;
 

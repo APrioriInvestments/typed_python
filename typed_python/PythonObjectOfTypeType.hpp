@@ -65,14 +65,14 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         PyObject* p = *(PyObject**)self;
-        buffer.getContext().serializePythonObject(p, buffer);
+        buffer.getContext().serializePythonObject(p, buffer, fieldNumber);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-         *(PyObject**)self = buffer.getContext().deserializePythonObject(buffer);
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+         *(PyObject**)self = buffer.getContext().deserializePythonObject(buffer, wireType);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);

@@ -50,19 +50,30 @@ public:
     std::string computeName() const;
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        uint8_t which = buffer.read_uint();
-        if (which >= m_types.size()) {
-            throw std::runtime_error("Corrupt OneOf");
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        bool hitOne = false;
+
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t subWireType) {
+            if (hitOne) {
+                throw std::runtime_error("Corrupt OneOf had multiple fields.");
+            }
+
+            if (fieldNumber < m_types.size()) {
+                *(uint8_t*)self = fieldNumber;
+                m_types[fieldNumber]->deserialize(self+1, buffer, subWireType);
+                hitOne = true;
+            }
+        });
+
+        if (!hitOne) {
+            constructor(self);
         }
-        *(uint8_t*)self = which;
-        m_types[which]->deserialize(self+1, buffer);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint(*(uint8_t*)self);
-        m_types[*((uint8_t*)self)]->serialize(self+1, buffer);
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeBeginSingle(fieldNumber);
+        m_types[*((uint8_t*)self)]->serialize(self+1, buffer, *(uint8_t*)self);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);
@@ -94,4 +105,3 @@ public:
 private:
     std::vector<Type*> m_types;
 };
-

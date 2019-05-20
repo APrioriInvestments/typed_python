@@ -84,26 +84,32 @@ private:
 class PythonSerializationContext : public SerializationContext {
 public:
     //enums in our protocol (serialized as uint8_t)
-    enum {
-        T_NATIVE,   //a native type, followed by instance data
-        T_OBJECT,   //an object written either with a representation, or as a type and a dict, or as a name
-        T_LIST,
-        T_TUPLE,
-        T_SET,
-        T_FROZENSET,
-        T_DICT,
-        T_NONE,
-        T_TRUE,
-        T_FALSE,
-        T_UNICODE,
-        T_BYTES,
-        T_FLOAT,
-        T_LONG,      //currently serialized as an int64_t which is completely wrong.
-        T_NATIVETYPE,
-        T_OBJECT_NAMED,
-        T_OBJECT_TYPEANDDICT,
-        T_OBJECT_REPRESENTATION,
-        T_NATIVETYPE_BY_CATEGORY
+    class FieldNumbers {
+    public:
+        enum {
+            MEMO = 0, //a varint encoding the ID of the object in the memo stream.
+                      //if this memo has been defined already in the stream, no other
+                      //fields should be present in the stream.
+            NATIVE_TYPE = 1, //an encoded native type.
+                             //field 0 is the type category. Fields above that encode
+                             //type-detail arguments
+            NATIVE_INSTANCE = 2, //field 0 is the type, field 1 is the data.
+            OBJECT_NAME = 3, //a string encoding the name of the object in the current codebase
+            OBJECT_TYPEANDDICT = 4, //an object where the object's python type is encoded as
+                                    //field 0, and the dictionary is encoded as field 1
+            OBJECT_REPRESENTATION = 5, //a python object representing an objects' representation
+            FLOAT = 6, //the object is a 64-bit float
+            LONG = 7, //the object is a varint encoding a python long
+            BOOL = 8, //the object is a varint encoding a python bool (1 for true, 0 for False)
+            LIST = 9, //the object is a list with items encoded by index in a child compound
+            TUPLE = 10, //the object is a tuple
+            SET = 11, //the object is a set
+            DICT = 12, //the object is a dict with keys and values encoded in alternating order
+            NONE = 13, //the object is an empty compound encoding None.
+            UNICODE = 14, //the object is a BYTES encoding a utf8-encoded string
+            BYTES = 15, //the object is a BYTES encoding actual the actual bytes
+            FROZENSET = 16, //the object is a frozenset with items encoded by index
+        };
     };
 
     PythonSerializationContext(PyObject* typeSetObj) :
@@ -125,56 +131,60 @@ public:
 
     std::shared_ptr<ByteBuffer> compressOrDecompress(uint8_t* begin, uint8_t* end, bool compress) const;
 
-    virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const;
-
-    void serializePyDict(PyObject* o, SerializationBuffer& b) const;
-
-    PyObject* deserializePydict(DeserializationBuffer& b) const;
-
-    PyObject* deserializePyFrozenSet(DeserializationBuffer &b) const;
+    virtual void serializePythonObject(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const;
 
     void serializePythonObjectNamedOrAsObj(PyObject* o, SerializationBuffer& b) const;
 
-    PyObject* deserializePythonObjectNamedOrAsObj(DeserializationBuffer& b) const;
+    void serializePythonObjectRepresentation(PyObject* o, SerializationBuffer& b) const;
 
-    void serializeNativeType(Type* nativeType, SerializationBuffer& b, bool allowCaching=false) const;
+    //serialize a native type in the format we'd expect for a python object
+    //which means we write a compound message which is either a NATIVE_TYPE, or an OBJECT_NAME
+    void serializeNativeType(Type* nativeType, SerializationBuffer& b) const;
 
-    Type* deserializeNativeType(DeserializationBuffer& b, bool allowCaching=false) const;
+    void serializeNativeTypeInCompound(Type* nativeType, SerializationBuffer& b, size_t fieldNumber) const;
 
-    Type* deserializeNativeTypeUncached(DeserializationBuffer& b) const;
+    Type* deserializeNativeType(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
-    virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const;
+    Instance deserializeNativeInstance(DeserializationBuffer& b, size_t wireType) const;
 
-    void serializePyRepresentation(PyObject* representation, SerializationBuffer& b) const;
+    virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const;
 
-    PyObject* deserializePyRepresentation(DeserializationBuffer& b, int32_t objectId) const;
+    Type* deserializePythonObjectExpectingNativeType(DeserializationBuffer& b, size_t wireType) const;
+
+    PyObject* deserializePythonObjectFromName(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
+
+    PyObject* deserializePythonObjectFromTypeAndDict(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
+
+    PyObject* deserializePythonObjectFromRepresentation(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
 private:
-    template<class Size_Fn, class GetItem_Fn>
-    inline void serializeIndexable(PyObject* o, SerializationBuffer& b, Size_Fn size_fn, GetItem_Fn get_item_fn) const;
-
     template<class Factory_Fn, class SetItem_Fn>
-    inline PyObject* deserializeIndexable(DeserializationBuffer& b, Factory_Fn factory_fn, SetItem_Fn set_item_fn) const;
+    inline PyObject* deserializeIndexable(DeserializationBuffer& b, size_t wireType, Factory_Fn factory_fn, SetItem_Fn set_item_and_steal_ref_fn, int64_t memo) const;
 
-    template<class Size_Fn>
-    inline void serializeIterable(PyObject* o, SerializationBuffer& b, Size_Fn size_fn) const;
+    void serializeIterable(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const;
 
     template<class Factory_Fn, class AddItem_Fn, class Clear_Fn>
-    inline PyObject* deserializeIterable(DeserializationBuffer &b, Factory_Fn factory_fn, AddItem_Fn add_item_fn, Clear_Fn clear_fn) const;
+    inline PyObject* deserializeIterable(DeserializationBuffer &b, size_t wireType, Factory_Fn factory_fn, AddItem_Fn add_item_fn, Clear_Fn clear_fn, int64_t memo) const;
 
     void serializePyList(PyObject* o, SerializationBuffer& b) const;
 
-    PyObject* deserializePyList(DeserializationBuffer& b) const;
+    PyObject* deserializePyList(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     void serializePyTuple(PyObject* o, SerializationBuffer& b) const;
 
-    PyObject* deserializePyTuple(DeserializationBuffer& b) const;
+    PyObject* deserializePyTuple(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     void serializePySet(PyObject* o, SerializationBuffer& b) const;
 
-    PyObject* deserializePySet(DeserializationBuffer &b) const;
+    PyObject* deserializePySet(DeserializationBuffer &b, size_t wireType, int64_t memo) const;
+
+    void serializePyDict(PyObject* o, SerializationBuffer& b) const;
+
+    PyObject* deserializePyDict(DeserializationBuffer& b, size_t wireType, int64_t memo) const;
 
     void serializePyFrozenSet(PyObject* o, SerializationBuffer& b) const;
+
+    PyObject* deserializePyFrozenSet(DeserializationBuffer &b, size_t wireType, int64_t memo) const;
 
     PyObject* mContextObj;
 

@@ -21,6 +21,7 @@
 #include <map>
 #include <set>
 #include "Type.hpp"
+#include "WireType.hpp"
 
 class Type;
 class SerializationContext;
@@ -56,8 +57,39 @@ public:
     SerializationBuffer(const SerializationBuffer&) = delete;
     SerializationBuffer& operator=(const SerializationBuffer&) = delete;
 
+    void writeBeginBytes(size_t fieldNumber, size_t bytecount) {
+        writeUnsignedVarint((fieldNumber << 3) + WireType::BYTES);
+        writeUnsignedVarint(bytecount);
+    }
+
+    void writeEmpty(size_t fieldNumber) {
+        writeUnsignedVarint((fieldNumber << 3) + WireType::EMPTY);
+    };
+
+    void writeBeginSingle(size_t fieldNumber) {
+        writeUnsignedVarint((fieldNumber << 3) + WireType::SINGLE);
+    };
+
+    void writeBeginCompound(size_t fieldNumber) {
+        writeUnsignedVarint((fieldNumber << 3) + WireType::BEGIN_COMPOUND);
+    }
+
+    void writeEndCompound() {
+        writeUnsignedVarint(WireType::END_COMPOUND);
+    }
+
+    void writeUnsignedVarintObject(size_t fieldNumber, uint64_t i) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeUnsignedVarint(i);
+    }
+
+    void writeSignedVarintObject(size_t fieldNumber, uint64_t i) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeSignedVarint(i);
+    }
+
     //write a 'varint' (a la google protobuf encoding)
-    void write_uint(uint64_t i) {
+    void writeUnsignedVarint(uint64_t i) {
         while (i >= 128) {
             write<uint8_t>(128 + (i & 127));
             i >>= 7;
@@ -66,40 +98,73 @@ public:
     }
 
     //write a signed 'varint' using zigzag encoding (a la google protobuf)
-    void write_int(int64_t i) {
+    void writeSignedVarint(int64_t i) {
         uint64_t val = i < 0 ? -i - 1 : i;
         val *= 2;
         if (i < 0) {
             val += 1;
         }
-        write_uint(val);
+        writeUnsignedVarint(val);
     }
 
-    void writeRegisterType(double v) { write<double>(v); }
-    void writeRegisterType(float v) { write<float>(v); }
-
-    void writeRegisterType(bool v) { write_uint(v); }
-    void writeRegisterType(uint8_t v) { write_uint(v); }
-    void writeRegisterType(uint16_t v) { write_uint(v); }
-    void writeRegisterType(uint32_t v) { write_uint(v); }
-    void writeRegisterType(uint64_t v) { write_uint(v); }
-    void writeRegisterType(int8_t v) { write_int(v); }
-    void writeRegisterType(int16_t v) { write_int(v); }
-    void writeRegisterType(int32_t v) { write_int(v); }
-    void writeRegisterType(int64_t v) { write_int(v); }
-
-    void write_double(double i) {
-        write<double>(i);
+    void writeRegisterType(size_t fieldNumber, double v) {
+        writeUnsignedVarint(WireType::BITS_64 + (fieldNumber << 3));
+        write<double>(v);
     }
 
-    void write_bytes(uint8_t* ptr, size_t bytecount, bool allowCompression = true) {
-        ensure(bytecount, allowCompression);
-        memcpy(m_buffer+m_size, ptr, bytecount);
-        m_size += bytecount;
+    void writeRegisterType(size_t fieldNumber, float v) {
+        writeUnsignedVarint(WireType::BITS_32 + (fieldNumber << 3));
+        write<float>(v);
     }
 
-    void write_string(const std::string& s) {
-        write_uint(s.size());
+    void writeRegisterType(size_t fieldNumber, bool v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeUnsignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, uint8_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeUnsignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, uint16_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeUnsignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, uint32_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeUnsignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, uint64_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeUnsignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, int8_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeSignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, int16_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeSignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, int32_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeSignedVarint(v);
+    }
+
+    void writeRegisterType(size_t fieldNumber, int64_t v) {
+        writeUnsignedVarint(WireType::VARINT + (fieldNumber << 3));
+        writeSignedVarint(v);
+    }
+
+    void writeStringObject(size_t fieldNumber, const std::string& s) {
+        writeUnsignedVarint(WireType::BYTES + (fieldNumber << 3));
+        writeUnsignedVarint(s.size());
         write_bytes((uint8_t*)&s[0], s.size());
     }
 
@@ -109,6 +174,27 @@ public:
 
     size_t size() const {
         return m_size;
+    }
+
+    //nakedly write bytes into the stream
+    void write_bytes(uint8_t* ptr, size_t bytecount, bool allowCompression = true) {
+        ensure(bytecount, allowCompression);
+        memcpy(m_buffer+m_size, ptr, bytecount);
+        m_size += bytecount;
+    }
+
+    uint8_t* prepare_bytes(size_t bytecount, bool allowCompression = true) {
+        ensure(bytecount, allowCompression);
+
+        uint8_t* bytes = m_buffer + m_size;
+
+        m_size += bytecount;
+
+        return bytes;
+    }
+
+    void write_byte(uint8_t byte) {
+        write<uint8_t>(byte);
     }
 
     void ensure(size_t t, bool allowCompression=true) {
@@ -144,7 +230,8 @@ public:
             before we put it in the cache, and decref it when the buffer
             is destroyed. The type object _must_ be a pointer-layout-style
             object (PyObject, Dict, ConstDict, Class, etc.) since we assume
-            the pointer is the actual held representation.
+            the pointer is the actual held representation. If this argument
+            is null, then we simply copy the pointer with no incref semantics.
         @return - an std::pair containing its cache ID (the size of the cache)
                 and 'false' if the pointer was already in the cache.
     */
@@ -152,13 +239,20 @@ public:
         auto it = m_idToPointerCache.find(t);
         if (it == m_idToPointerCache.end()) {
             void* otherPointer;
-            objType->copy_constructor((instance_ptr)&otherPointer, (instance_ptr)&t);
+
+            if (objType) {
+                objType->copy_constructor((instance_ptr)&otherPointer, (instance_ptr)&t);
+            } else {
+                otherPointer = t;
+            }
 
             if (otherPointer != t) {
                 throw std::runtime_error("Pointer-copy stash semantics didn't work with type " + objType->name());
             }
 
-            m_pointersNeedingDecref[objType].push_back(otherPointer);
+            if (objType) {
+                m_pointersNeedingDecref[objType].push_back(otherPointer);
+            }
 
             uint32_t id = m_idToPointerCache.size();
             m_idToPointerCache[t] = id;
@@ -228,6 +322,17 @@ public:
         m_size += sizeof(i);
     }
 
+    void startSerializing(Type* nativeType) {
+        if (m_types_being_serialized.find(nativeType) != m_types_being_serialized.end()) {
+            throw std::runtime_error("Can't serialize recursive unnamed types.");
+        }
+
+        m_types_being_serialized.insert(nativeType);
+    }
+
+    void stopSerializing(Type* nativeType) {
+        m_types_being_serialized.erase(nativeType);
+    }
 
 private:
     const SerializationContext& m_context;
@@ -242,4 +347,25 @@ private:
     std::map<void*, int32_t> m_idToPointerCache;
 
     std::map<Type*, std::vector<void*>> m_pointersNeedingDecref;
+
+    std::set<Type*> m_types_being_serialized;
 };
+
+class MarkTypeBeingSerialized {
+public:
+    MarkTypeBeingSerialized(Type* type, SerializationBuffer& buffer) :
+            m_type(type),
+            m_buffer(buffer)
+    {
+        m_buffer.startSerializing(type);
+    }
+
+    ~MarkTypeBeingSerialized() {
+        m_buffer.stopSerializing(m_type);
+    }
+
+private:
+    Type* m_type;
+    SerializationBuffer& m_buffer;
+};
+

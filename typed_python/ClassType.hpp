@@ -80,21 +80,58 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        *(layout**)self = (layout*)malloc(
-            sizeof(layout) + m_heldClass->bytecount()
-            );
+    void deserialize(instance_ptr self, buf_t& buffer, size_t inWireType) {
+        int64_t id = -1;
+        bool hasMemo = false;
 
-        layout& record = **(layout**)self;
-        record.refcount = 1;
+        buffer.consumeCompoundMessage(inWireType, [&](size_t fieldNumber, size_t wireType) {
+            if (fieldNumber == 0) {
+                assertWireTypesEqual(wireType, WireType::VARINT);
+                id = buffer.readUnsignedVarint();
 
-        m_heldClass->deserialize(record.data, buffer);
+                void* ptr = buffer.lookupCachedPointer(id);
+
+                if (ptr) {
+                    hasMemo = true;
+                    copy_constructor(self, (instance_ptr)&ptr);
+                }
+            }
+            if (fieldNumber == 1) {
+                if (id == -1 || hasMemo) {
+                    throw std::runtime_error("Corrupt Class instance");
+                }
+
+                *(layout**)self = (layout*)malloc(
+                    sizeof(layout) + m_heldClass->bytecount()
+                    );
+                layout& record = **(layout**)self;
+                record.refcount = 2;
+
+                buffer.addCachedPointer(id, *((layout**)self), this);
+
+                m_heldClass->deserialize(record.data, buffer, wireType);
+            }
+        });
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         layout& l = **(layout**)self;
-        m_heldClass->serialize(l.data, buffer);
+
+        uint32_t id;
+        bool isNew;
+        std::tie(id, isNew) = buffer.cachePointer(&l, this);
+
+        if (!isNew) {
+            buffer.writeBeginSingle(fieldNumber);
+            buffer.writeUnsignedVarintObject(0, id);
+            return;
+        }
+
+        buffer.writeBeginCompound(fieldNumber);
+        buffer.writeUnsignedVarintObject(0, id);
+        m_heldClass->serialize(l.data, buffer, 1);
+        buffer.writeEndCompound();
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);

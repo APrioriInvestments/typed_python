@@ -277,11 +277,13 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        assertWireTypesEqual(wireType, WireType::EMPTY);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeEmpty(fieldNumber);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream) {

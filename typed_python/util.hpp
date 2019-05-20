@@ -109,8 +109,45 @@ public:
         return m_ptr;
     }
 
+    operator PyTypeObject*() const {
+        return (PyTypeObject*)m_ptr;
+    }
+
     PyObject* operator->() const {
         return m_ptr;
+    }
+
+    void set(PyObject* val) {
+        if (val == m_ptr) {
+            return;
+        }
+        if (val) {
+            incref(val);
+        }
+        if (m_ptr) {
+            decref(m_ptr);
+        }
+
+        m_ptr = val;
+    }
+
+    //pull the pointer out without decrefing it
+    PyObject* extract() {
+        PyObject* result = m_ptr;
+        m_ptr = nullptr;
+        return result;
+    }
+
+    //reset the pointer to null and decref existing
+    PyObject* release() {
+        PyObject* result = m_ptr;
+
+        if (m_ptr) {
+            decref(m_ptr);
+            m_ptr = nullptr;
+        }
+
+        return result;
     }
 
 protected:

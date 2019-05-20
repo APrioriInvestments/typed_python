@@ -17,6 +17,7 @@
 #pragma once
 
 #include "Type.hpp"
+#include "WireType.hpp"
 #include <stdexcept>
 #include <stdlib.h>
 #include <vector>
@@ -52,9 +53,14 @@ public:
     DeserializationBuffer(const DeserializationBuffer&) = delete;
     DeserializationBuffer& operator=(const DeserializationBuffer&) = delete;
 
+    uint64_t readUnsignedVarintObject() {
+        auto res = readFieldNumberAndWireType();
+        assertWireTypesEqual(res.second, WireType::VARINT);
+        return readUnsignedVarint();
+    }
 
     //read a 'varint' (a la google protobuf encoding).
-    uint64_t read_uint() {
+    uint64_t readUnsignedVarint() {
         uint64_t accumulator = 0;
 
         uint64_t shift = 0;
@@ -71,8 +77,8 @@ public:
     }
 
     //write a signed 'varint' using zigzag encoding (a la google protobuf)
-    int64_t read_int() {
-        uint64_t val = read_uint();
+    int64_t readSignedVarint() {
+        uint64_t val = readUnsignedVarint();
 
         bool isNegative = val & 1;
         val >>= 1;
@@ -80,6 +86,124 @@ public:
             return -val-1;
         }
         return val;
+    }
+
+    std::pair<size_t, size_t> readFieldNumberAndWireType() {
+        size_t val = readUnsignedVarint();
+        return std::make_pair(val >> 3, val & 7);
+    }
+
+    //read a single message and drop it. Returns the wire type of the discarded message.
+    size_t readMessageAndDiscard() {
+        std::pair<size_t, size_t> fieldAndWire = readFieldNumberAndWireType();
+        finishReadingMessageAndDiscard(fieldAndWire.second);
+        return fieldAndWire.second;
+    }
+
+    //finish a message whose field and wire type we've read
+    void finishReadingMessageAndDiscard(size_t wireType) {
+        if (wireType == WireType::EMPTY) {
+            return;
+        }
+
+        if (wireType == WireType::VARINT) {
+            //read a VARINT and just discard it
+            readUnsignedVarint();
+            return;
+        }
+
+        if (wireType == WireType::BITS_32) {
+            read<int32_t>();
+            return;
+        }
+
+        if (wireType == WireType::BITS_64) {
+            read<int64_t>();
+            return;
+        }
+
+        if (wireType == WireType::BYTES) {
+            size_t bytecount = readUnsignedVarint();
+            read_bytes_fun(bytecount, [&](uint8_t* ptr) {});
+            return;
+        }
+
+        if (wireType == WireType::SINGLE) {
+            readMessageAndDiscard();
+            return;
+        }
+
+        if (wireType == WireType::BEGIN_COMPOUND) {
+            while (readMessageAndDiscard() != WireType::END_COMPOUND) {
+                //do nothing
+            }
+            return;
+        }
+
+        if (wireType == WireType::END_COMPOUND) {
+            return;
+        }
+
+        throw std::runtime_error("Corrupt message with invalid wire type found.");
+    }
+
+    void finishCompoundMessage(size_t wireType, bool assertEmpty=true) {
+        if (wireType == WireType::EMPTY || wireType == WireType::SINGLE) {
+            return;
+        }
+
+        while (readMessageAndDiscard() != WireType::END_COMPOUND) {
+            //do nothing
+            if (assertEmpty) {
+                throw std::runtime_error("Still have unprocessed messages.");
+            }
+        }
+    }
+
+    template<class callback_type>
+    void consumeCompoundMessage(size_t wireType, const callback_type& callback) {
+        if (wireType == WireType::EMPTY) {
+            return;
+        }
+
+        if (wireType == WireType::SINGLE) {
+            auto fieldAndWiretype = readFieldNumberAndWireType();
+            callback(fieldAndWiretype.first, fieldAndWiretype.second);
+            return;
+        }
+
+        if (wireType != WireType::BEGIN_COMPOUND) {
+            throw std::runtime_error("Invalid wire type for compound message.");
+        }
+
+        while (true) {
+            auto fieldAndWiretype = readFieldNumberAndWireType();
+
+
+            if (fieldAndWiretype.second == WireType::END_COMPOUND) {
+                return;
+            }
+
+            callback(fieldAndWiretype.first, fieldAndWiretype.second);
+        }
+    }
+
+    //consume a compound message consisting of all-zero field ids, and replace the
+    //zeros with the message number in the stream. We do this for containers classes
+    //where the positional information is actually meaningful.
+    template<class callback_type>
+    int64_t consumeCompoundMessageWithImpliedFieldNumbers(size_t wireType, const callback_type& callback) {
+        int64_t messageCount = 0;
+
+        consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t wireType) {
+            if (fieldNumber != 0) {
+                throw std::runtime_error("Expected all zero field numbers");
+            }
+
+            callback(messageCount++, wireType);
+        });
+
+        return messageCount;
     }
 
     double read_double() {
@@ -117,8 +241,8 @@ public:
         m_pos += bytecount;
     }
 
-    std::string readString() {
-        int32_t sz = read_uint();
+    std::string readStringObject() {
+        int32_t sz = readUnsignedVarint();
         return read_bytes_fun(sz, [&](uint8_t* ptr) {
             return std::string(ptr, ptr + sz);
         });
@@ -187,48 +311,85 @@ public:
         return ptr;
     }
 
-    void readRegisterType(double* out) {
+    void skipNextEncodedValue() {
+        throw std::runtime_error("not implemented yet");
+    }
+
+    void readRegisterType(double* out, size_t wireType) {
+        if (wireType != WireType::BITS_64) {
+            throw std::runtime_error("Invalid wire format: expected BITS_64");
+        }
         *out = read<double>();
     }
 
-    void readRegisterType(float* out) {
-        *out = read<double>();
+    void readRegisterType(float* out, size_t wireType) {
+        if (wireType != WireType::BITS_32) {
+            throw std::runtime_error("Invalid wire format: expected BITS_32");
+        }
+        *out = read<float>();
     }
 
-    void readRegisterType(bool* out) {
-        *out = read_uint();
+    void readRegisterType(bool* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readUnsignedVarint();
     }
 
-    void readRegisterType(uint8_t* out) {
-        *out = read_uint();
+    void readRegisterType(uint8_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readUnsignedVarint();
     }
 
-    void readRegisterType(uint16_t* out) {
-        *out = read_uint();
+    void readRegisterType(uint16_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readUnsignedVarint();
     }
 
-    void readRegisterType(uint32_t* out) {
-        *out = read_uint();
+    void readRegisterType(uint32_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readUnsignedVarint();
     }
 
-    void readRegisterType(uint64_t* out) {
-        *out = read_uint();
+    void readRegisterType(uint64_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readUnsignedVarint();
     }
 
-    void readRegisterType(int8_t* out) {
-        *out = read_int();
+    void readRegisterType(int8_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readSignedVarint();
     }
 
-    void readRegisterType(int16_t* out) {
-        *out = read_int();
+    void readRegisterType(int16_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readSignedVarint();
     }
 
-    void readRegisterType(int32_t* out) {
-        *out = read_int();
+    void readRegisterType(int32_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readSignedVarint();
     }
 
-    void readRegisterType(int64_t* out) {
-        *out = read_int();
+    void readRegisterType(int64_t* out, size_t wireType) {
+        if (wireType != WireType::VARINT) {
+            throw std::runtime_error("Invalid wire format: expected VARINT");
+        }
+        *out = readSignedVarint();
     }
 
     template<class T>

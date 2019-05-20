@@ -21,10 +21,10 @@
 
 class NullSerializationContext : public SerializationContext {
 public:
-    virtual void serializePythonObject(PyObject* o, SerializationBuffer& b) const {
+    virtual void serializePythonObject(PyObject* o, SerializationBuffer& b, size_t fieldNumber) const {
         throw std::runtime_error("No serialization plugin provided, so we can't serialize arbitrary python objects.");
     }
-    virtual PyObject* deserializePythonObject(DeserializationBuffer& b) const {
+    virtual PyObject* deserializePythonObject(DeserializationBuffer& b, size_t wireType) const {
         throw std::runtime_error("No serialization plugin provided, so we can't deserialize arbitrary python objects.");
     }
     virtual bool isCompressionEnabled() const {

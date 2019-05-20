@@ -78,39 +78,41 @@ void updateTypeRepForType(Type* t, PyTypeObject* pyType);
 
 class Type {
 public:
+    //the indices are part of the binary serialization format (except for 'Forward'),
+    //so don't change them.
     enum TypeCategory {
-        catNone,
-        catBool,
-        catUInt8,
-        catUInt16,
-        catUInt32,
-        catUInt64,
-        catInt8,
-        catInt16,
-        catInt32,
-        catInt64,
-        catString,
-        catBytes,
-        catFloat32,
-        catFloat64,
-        catValue,
-        catOneOf,
-        catTupleOf,
-        catPointerTo,
-        catListOf,
-        catNamedTuple,
-        catTuple,
-        catDict,
-        catConstDict,
-        catAlternative,
-        catConcreteAlternative, //concrete Alternative subclass
-        catPythonSubclass, //subclass of a nativepython type
-        catPythonObjectOfType, //a python object that matches 'isinstance' on a particular type
-        catBoundMethod,
-        catClass,
-        catHeldClass,
-        catFunction,
-        catForward
+        catNone = 0,
+        catBool = 1,
+        catUInt8 = 2,
+        catUInt16 = 3,
+        catUInt32 = 4,
+        catUInt64 = 5,
+        catInt8 = 6,
+        catInt16 = 7,
+        catInt32 = 8,
+        catInt64 = 9,
+        catString = 10,
+        catBytes = 11,
+        catFloat32 = 12,
+        catFloat64 = 13,
+        catValue = 14,
+        catOneOf = 15,
+        catTupleOf = 16,
+        catPointerTo = 17,
+        catListOf = 18,
+        catNamedTuple = 19,
+        catTuple = 20,
+        catDict = 21,
+        catConstDict = 22,
+        catAlternative = 23,
+        catConcreteAlternative = 24, //concrete Alternative subclass
+        catPythonSubclass = 25, //subclass of a nativepython type
+        catPythonObjectOfType = 26, //a python object that matches 'isinstance' on a particular type
+        catBoundMethod = 27,
+        catClass = 28,
+        catHeldClass = 29,
+        catFunction = 30,
+        catForward = 31
     };
 
     TypeCategory getTypeCategory() const {
@@ -151,20 +153,20 @@ public:
     int32_t hash32(instance_ptr left);
 
     template<class buf_t>
-    void serialize(instance_ptr left, buf_t& buffer) {
+    void serialize(instance_ptr left, buf_t& buffer, size_t fieldNumber) {
         assertForwardsResolved();
 
         return this->check([&](auto& subtype) {
-            return subtype.serialize(left, buffer);
+            return subtype.serialize(left, buffer, fieldNumber);
         });
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr left, buf_t& buffer) {
+    void deserialize(instance_ptr left, buf_t& buffer, size_t wireType) {
         assertForwardsResolved();
 
         return this->check([&](auto& subtype) {
-            return subtype.deserialize(left, buffer);
+            return subtype.deserialize(left, buffer, wireType);
         });
     }
 

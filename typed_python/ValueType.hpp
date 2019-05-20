@@ -48,11 +48,13 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeEmpty(fieldNumber);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        assertWireTypesEqual(wireType, WireType::EMPTY);
     }
 
     void constructor(instance_ptr self) {}

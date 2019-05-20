@@ -19,8 +19,6 @@
 #include <string>
 #include "Type.hpp"
 
-class DeserializationBuffer;
-
 typedef uint8_t* instance_ptr;
 
 
@@ -40,8 +38,6 @@ private:
     static layout* noneLayout();
 
 public:
-    static Instance deserialized(Type* t, DeserializationBuffer& buf);
-
     static Instance create(bool val);
 
     static Instance create(long val);

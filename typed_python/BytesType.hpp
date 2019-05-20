@@ -41,17 +41,21 @@ public:
     void repr(instance_ptr self, ReprAccumulator& stream);
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint(count(self));
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeBeginBytes(fieldNumber, count(self));
         buffer.write_bytes(eltPtr(self, 0), count(self));
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint();
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        if (wireType != WireType::BYTES) {
+            throw std::runtime_error("Corrupt data (expected BYTES wire type)");
+        }
+
+        size_t ct = buffer.readUnsignedVarint();
 
         if (!buffer.canConsume(ct)) {
-            throw std::runtime_error("Corrupt data (bytes)");
+            throw std::runtime_error("Corrupt data (not enough data in the stream)");
         }
 
         constructor(self, ct, nullptr);

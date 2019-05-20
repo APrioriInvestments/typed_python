@@ -53,13 +53,13 @@ public:
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        m_base->serialize(self,buffer);
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        m_base->serialize(self, buffer, fieldNumber);
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        m_base->deserialize(self,buffer);
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        m_base->deserialize(self, buffer, wireType);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream) {

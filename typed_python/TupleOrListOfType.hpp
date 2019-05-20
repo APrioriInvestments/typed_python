@@ -59,38 +59,14 @@ public:
         m_name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
     }
 
-    template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = count(self);
-        buffer.write_uint(ct);
-        m_element_type->check([&](auto& concrete_type) {
-            for (long k = 0; k < ct;k++) {
-                concrete_type.serialize(this->eltPtr(self,k),buffer);
-            }
-        });
-    }
-
     //serialize, but don't write a count
     template<class buf_t>
     void serializeStream(instance_ptr self, buf_t& buffer) {
         int32_t ct = count(self);
         m_element_type->check([&](auto& concrete_type) {
             for (long k = 0; k < ct;k++) {
-                concrete_type.serialize(this->eltPtr(self,k), buffer);
+                concrete_type.serialize(this->eltPtr(self,k), buffer, 0);
             }
-        });
-    }
-
-    template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint();
-
-        if (!buffer.canConsume(ct) && m_element_type->bytecount()) {
-            throw std::runtime_error("Corrupt data (count)");
-        }
-
-        constructor(self, ct, [&](instance_ptr tgt, int k) {
-            m_element_type->deserialize(tgt, buffer);
         });
     }
 
@@ -231,6 +207,75 @@ public:
     void resize(instance_ptr self, size_t count, instance_ptr value);
 
     void copyListObject(instance_ptr target, instance_ptr src);
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        size_t ct = count(self);
+
+        uint32_t id;
+        bool isNew;
+        std::tie(id, isNew) = buffer.cachePointer(*(void**)self, this);
+
+        if (!isNew) {
+            buffer.writeBeginSingle(fieldNumber);
+            buffer.writeUnsignedVarintObject(0, id);
+            return;
+        }
+
+        buffer.writeBeginCompound(fieldNumber);
+        buffer.writeUnsignedVarintObject(0, id);
+        buffer.writeUnsignedVarintObject(0, ct);
+
+        m_element_type->check([&](auto& concrete_type) {
+            for (long k = 0; k < ct; k++) {
+                concrete_type.serialize(this->eltPtr(self,k), buffer, 0);
+            }
+        });
+
+        buffer.writeEndCompound();
+    }
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        assertNonemptyCompoundWireType(wireType);
+
+        size_t id = buffer.readUnsignedVarintObject();
+
+        void* ptr = buffer.lookupCachedPointer(id);
+
+        if (ptr) {
+            ((layout**)self)[0] = (layout*)ptr;
+            ((layout**)self)[0]->refcount++;
+            buffer.finishCompoundMessage(wireType);
+            return;
+        }
+
+        size_t ct = buffer.readUnsignedVarintObject();
+
+        if (ct == 0) {
+            constructor(self);
+            buffer.addCachedPointer(id, *((layout**)self), this);
+        } else {
+            constructor(self, ct, [&](instance_ptr tgt, int k) {
+                if (k == 0) {
+                    buffer.addCachedPointer(id, *((layout**)self), this);
+                    (*(layout**)self)->refcount++;
+                }
+
+                auto fieldAndWire = buffer.readFieldNumberAndWireType();
+                if (fieldAndWire.first) {
+                    throw std::runtime_error("Corrupt data (count)");
+                }
+                if (fieldAndWire.second == WireType::END_COMPOUND) {
+                    throw std::runtime_error("Corrupt data (count)");
+                }
+
+                m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
+            });
+        }
+
+        buffer.finishCompoundMessage(wireType);
+    }
 };
 
 class TupleOfType : public TupleOrListOfType {
@@ -238,6 +283,57 @@ public:
     TupleOfType(Type* type) : TupleOrListOfType(type, true)
     {
     }
+
+
+    template<class buf_t>
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        size_t ct = count(self);
+
+        if (ct == 0) {
+            buffer.writeEmpty(fieldNumber);
+            return;
+        }
+
+        buffer.writeBeginCompound(fieldNumber);
+
+        buffer.writeUnsignedVarintObject(0, ct);
+
+        m_element_type->check([&](auto& concrete_type) {
+            for (long k = 0; k < ct; k++) {
+                concrete_type.serialize(this->eltPtr(self,k), buffer, 0);
+            }
+        });
+
+        buffer.writeEndCompound();
+    }
+
+
+    template<class buf_t>
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        if (wireType == WireType::EMPTY) {
+            *(layout**)self = nullptr;
+            return;
+        }
+
+        assertNonemptyCompoundWireType(wireType);
+
+        size_t ct = buffer.readUnsignedVarintObject();
+
+        constructor(self, ct, [&](instance_ptr tgt, int k) {
+            auto fieldAndWire = buffer.readFieldNumberAndWireType();
+            if (fieldAndWire.first) {
+                throw std::runtime_error("Corrupt data (count)");
+            }
+            if (fieldAndWire.second == WireType::END_COMPOUND) {
+                throw std::runtime_error("Corrupt data (count)");
+            }
+
+            m_element_type->deserialize(tgt, buffer, fieldAndWire.second);
+        });
+
+        buffer.finishCompoundMessage(wireType);
+    }
+
 
     static TupleOfType* Make(Type* elt);
 };

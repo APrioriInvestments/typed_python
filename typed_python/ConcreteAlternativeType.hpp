@@ -59,13 +59,13 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        m_alternative->deserialize(self,buffer);
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        m_alternative->deserialize(self, buffer, wireType);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        m_alternative->serialize(self,buffer);
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        m_alternative->serialize(self, buffer, fieldNumber);
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {

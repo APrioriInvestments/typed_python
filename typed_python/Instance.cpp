@@ -32,14 +32,6 @@ Instance::layout* Instance::noneLayout() {
     return noneLayout;
 }
 
-Instance Instance::deserialized(Type* t, DeserializationBuffer& buf) {
-    t->assertForwardsResolved();
-
-    return createAndInitialize(t, [&](instance_ptr tgt) {
-        t->deserialize(tgt, buf);
-    });
-}
-
 Instance Instance::create(bool val) {
     return create(Bool::Make(), (instance_ptr)&val);
 }

@@ -18,6 +18,7 @@
 
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
+#include <unordered_map>
 
 class CompositeType : public Type {
 public:
@@ -30,6 +31,12 @@ public:
             m_types(types),
             m_names(names)
     {
+        m_directNeedsResolution = false;
+        for (auto& typePtr: m_types)
+            if (typePtr->getTypeCategory() == catForward)
+                m_directNeedsResolution = true;
+
+        _forwardTypesMayHaveChanged();
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -54,17 +61,66 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
+    /*******
+
+        deserialize a named tuple using field codes.
+
+        we decode an id for each field type. fields we don't recognize
+        are discarded. fields that are not mentioned are default-initialized.
+
+    ********/
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        for (long k = 0; k < getTypes().size();k++) {
-            getTypes()[k]->deserialize(eltPtr(self,k),buffer);
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        //some versions of GCC appear to crash if you use variable-length arrays for this.
+        uint8_t* initialized = (uint8_t*)alloca(m_types.size());
+
+        for (long k = 0; k < m_types.size();k++) {
+            initialized[k] = false;
+        }
+
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t subWireType) {
+            auto it = m_serialize_typecodes_to_position.find(fieldNumber);
+            if (it != m_serialize_typecodes_to_position.end()) {
+                initialized[it->second] = true;
+                getTypes()[it->second]->deserialize(eltPtr(self, it->second), buffer, subWireType);
+            } else {
+                buffer.finishReadingMessageAndDiscard(subWireType);
+            }
+        });
+
+        for (long k = 0; k < m_types.size();k++) {
+            if (!initialized[k]) {
+                getTypes()[k]->constructor(eltPtr(self, k));
+            }
         }
     }
 
+    /*******
+
+        serialize a named tuple using field codes.
+
+        we write a field count, and then an id before each field, followed
+        by the field data.
+
+    ********/
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        if (getTypes().size() == 0) {
+            buffer.writeEmpty(fieldNumber);
+            return;
+        }
+        if (getTypes().size() == 1) {
+            buffer.writeBeginSingle(fieldNumber);
+        } else {
+            buffer.writeBeginCompound(fieldNumber);
+        }
+
         for (long k = 0; k < getTypes().size();k++) {
-            getTypes()[k]->serialize(eltPtr(self,k),buffer);
+            getTypes()[k]->serialize(eltPtr(self,k), buffer, m_serialize_typecodes[k]);
+        }
+
+        if (getTypes().size() > 1) {
+            buffer.writeEndCompound();
         }
     }
 
@@ -124,9 +180,9 @@ protected:
 
         static std::map<keytype, subtype*> m;
 
-        auto it = m.find(keytype(types,names));
+        auto it = m.find(keytype(types, names));
         if (it == m.end()) {
-            it = m.insert(std::make_pair(keytype(types,names), new subtype(types,names))).first;
+            it = m.insert(std::make_pair(keytype(types, names), new subtype(types, names))).first;
         }
 
         return it->second;
@@ -135,6 +191,9 @@ protected:
     std::vector<Type*> m_types;
     std::vector<size_t> m_byte_offsets;
     std::vector<std::string> m_names;
+    std::vector<size_t> m_serialize_typecodes; //codes to use when serializing/deserializing
+    std::unordered_map<size_t, size_t> m_serialize_typecodes_to_position; //codes to use when serializing/deserializing
+    bool m_directNeedsResolution;
 };
 
 class NamedTuple : public CompositeType {
@@ -149,7 +208,7 @@ public:
     void _forwardTypesMayHaveChanged();
 
     static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
-        return MakeSubtype<NamedTuple>(types,names);
+        return MakeSubtype<NamedTuple>(types, names);
     }
 };
 

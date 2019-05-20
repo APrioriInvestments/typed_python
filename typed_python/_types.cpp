@@ -744,8 +744,16 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
     Type* actualType = PyInstance::extractTypeFrom(a2->ob_type);
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
-    if (a3 && a3 != Py_None) {
-        context.reset(new PythonSerializationContext(a3));
+
+    try {
+        if (a3 && a3 != Py_None) {
+            context.reset(new PythonSerializationContext(a3));
+        }
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
+        return NULL;
     }
 
     SerializationBuffer b(*context);
@@ -755,7 +763,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
             //the simple case
             PyEnsureGilReleased releaseTheGil;
 
-            actualType->serialize(((PyInstance*)(PyObject*)a2)->dataPtr(), b);
+            actualType->serialize(((PyInstance*)(PyObject*)a2)->dataPtr(), b, 0);
         } else {
             //try to construct a 'serialize type' from the argument and then serialize that
             Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
@@ -764,7 +772,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 
             PyEnsureGilReleased releaseTheGil;
 
-            i.type()->serialize(i.data(), b);
+            i.type()->serialize(i.data(), b, 0);
         }
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
@@ -811,8 +819,16 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
     Type* actualType = PyInstance::extractTypeFrom(a2->ob_type);
 
     std::shared_ptr<SerializationContext> context(new NullSerializationContext());
-    if (a3 && a3 != Py_None) {
-        context.reset(new PythonSerializationContext(a3));
+
+    try{
+        if (a3 && a3 != Py_None) {
+            context.reset(new PythonSerializationContext(a3));
+        }
+    } catch (std::exception& e) {
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
+    } catch(PythonExceptionSet& e) {
+        return NULL;
     }
 
     SerializationBuffer b(*context);
@@ -886,7 +902,8 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
 
         Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
             PyEnsureGilReleased releaseTheGil;
-            serializeType->deserialize(p, buf);
+            auto fieldAndWireType = buf.readFieldNumberAndWireType();
+            serializeType->deserialize(p, buf, fieldAndWireType.second);
         });
 
         return PyInstance::extractPythonObject(i.data(), i.type());
@@ -896,6 +913,167 @@ PyObject *deserialize(PyObject* nullValue, PyObject* args) {
     } catch(PythonExceptionSet& e) {
         return NULL;
     }
+}
+
+PyObject *decodeSerializedObject(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "validateSerializedObject takes 1 bytes argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    if (!PyBytes_Check(a1)) {
+        PyErr_SetString(PyExc_TypeError, "first argument to validateSerializedObject must be a bytes object");
+        return NULL;
+    }
+
+    std::shared_ptr<SerializationContext> context(new NullSerializationContext());
+
+    DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a1), PyBytes_GET_SIZE((PyObject*)a1), *context);
+
+    std::function<PyObject* (size_t)> decode = [&](size_t wireType) {
+        if (wireType == WireType::VARINT) {
+            return PyLong_FromLong(buf.readSignedVarint());
+        }
+        if (wireType == WireType::EMPTY) {
+            return PyList_New(0);
+        }
+        if (wireType == WireType::BITS_32) {
+            float f = buf.read<float>();
+            Instance i((instance_ptr)&f, ::Float32::Make());
+
+            return PyInstance::fromInstance(i);
+        }
+        if (wireType == WireType::BITS_64) {
+            return PyFloat_FromDouble(buf.read<double>());
+        }
+        if (wireType == WireType::BYTES) {
+            size_t count = buf.readUnsignedVarint();
+            return buf.read_bytes_fun(count, [&](uint8_t* bytes) {
+                return PyBytes_FromStringAndSize((const char*)bytes, count);
+            });
+        }
+        if (wireType == WireType::SINGLE) {
+            auto fieldAndWire = buf.readFieldNumberAndWireType();
+
+            PyObjectStealer res(decode(fieldAndWire.second));
+
+            PyObjectStealer result(PyList_New(0));
+            PyObjectStealer key(PyLong_FromLong(fieldAndWire.first));
+            PyObjectStealer tup(PyTuple_Pack(2, (PyObject*)key, (PyObject*)res));
+            PyList_Append(result, tup);
+            return incref(result);
+        }
+        if (wireType == WireType::BEGIN_COMPOUND) {
+            PyObjectStealer result(PyList_New(0));
+
+            while (true) {
+                auto fieldAndWire = buf.readFieldNumberAndWireType();
+
+                if (fieldAndWire.second == WireType::END_COMPOUND) {
+                    return incref(result);
+                }
+
+                PyObjectStealer res(decode(fieldAndWire.second));
+
+                PyObjectStealer key(PyLong_FromLong(fieldAndWire.first));
+                //(PyObject*) are because this is a variadic function and doesn't cast the pointers
+                //correctly
+                PyObjectStealer tup(PyTuple_Pack(2, (PyObject*)key, (PyObject*)res));
+                PyList_Append(result, tup);
+            }
+        }
+        throw std::runtime_error("Invalid wire type encountered.");
+    };
+
+    return translateExceptionToPyObject([&](){
+        auto msg = buf.readFieldNumberAndWireType();
+
+        PyObjectStealer res(decode(msg.second));
+
+        if (!buf.isDone()) {
+            PyObjectStealer resDict(PyDict_New());
+            PyDict_SetItemString(resDict, "result", res);
+            PyDict_SetItemString(
+                resDict,
+                "remainingBytes",
+                PyBytes_FromStringAndSize(
+                    (const char*)PyBytes_AsString(a1) + buf.pos(),
+                    PyBytes_GET_SIZE((PyObject*)a1) - buf.pos()
+                )
+            );
+
+            return incref(resDict);
+        }
+
+        return incref(res);
+    });
+}
+
+PyObject *validateSerializedObject(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "validateSerializedObject takes 1 bytes argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    if (!PyBytes_Check(a1)) {
+        PyErr_SetString(PyExc_TypeError, "first argument to validateSerializedObject must be a bytes object");
+        return NULL;
+    }
+
+    std::shared_ptr<SerializationContext> context(new NullSerializationContext());
+
+    DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a1), PyBytes_GET_SIZE((PyObject*)a1), *context);
+
+    return translateExceptionToPyObject([&](){
+        try {
+            buf.readMessageAndDiscard();
+
+            if (buf.isDone()) {
+                return incref(Py_None);
+            }
+
+            std::ostringstream remaining;
+            remaining << PyBytes_GET_SIZE((PyObject*)a1) - buf.pos();
+            throw std::runtime_error(
+                "Stream had " +
+                remaining.str() +
+                " bytes remaining to process."
+            );
+        } catch(std::exception& e) {
+            return PyUnicode_FromString(e.what());
+        }
+    });
+}
+
+PyObject *validateSerializedObjectStream(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1) {
+        PyErr_SetString(PyExc_TypeError, "validateSerializedObjectStream takes 1 bytes argument");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+
+    if (!PyBytes_Check(a1)) {
+        PyErr_SetString(PyExc_TypeError, "first argument to validateSerializedObjectStream must be a bytes object");
+        return NULL;
+    }
+
+    std::shared_ptr<SerializationContext> context(new NullSerializationContext());
+
+    DeserializationBuffer buf((uint8_t*)PyBytes_AsString(a1), PyBytes_GET_SIZE((PyObject*)a1), *context);
+
+    return translateExceptionToPyObject([&](){
+        try {
+            while (!buf.isDone()) {
+                buf.readMessageAndDiscard();
+            }
+
+            return incref(Py_None);
+        } catch(std::exception& e) {
+            return PyUnicode_FromString(e.what());
+        }
+    });
 }
 
 PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
@@ -940,7 +1118,8 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
                     return false;
                 }
 
-                serializeType->deserialize(tupElt, buf);
+                auto fieldAndWireType = buf.readFieldNumberAndWireType();
+                serializeType->deserialize(tupElt, buf, fieldAndWireType.second);
 
                 return true;
             });
@@ -1253,6 +1432,9 @@ static PyMethodDef module_methods[] = {
     {"RenameType", (PyCFunction)RenameType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
+    {"decodeSerializedObject", (PyCFunction)decodeSerializedObject, METH_VARARGS, NULL},
+    {"validateSerializedObject", (PyCFunction)validateSerializedObject, METH_VARARGS, NULL},
+    {"validateSerializedObjectStream", (PyCFunction)validateSerializedObjectStream, METH_VARARGS, NULL},
     {"serializeStream", (PyCFunction)serializeStream, METH_VARARGS, NULL},
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},

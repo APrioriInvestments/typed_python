@@ -23,6 +23,7 @@ import numpy
 import datetime
 import pytz
 import gc
+import pprint
 import tempfile
 import typed_python.dummy_test_module as dummy_test_module
 
@@ -30,11 +31,13 @@ from typed_python.Codebase import Codebase
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64,
-    String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
+    NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64, Class,
+    Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Dict, SerializationContext,
-    serializeStream, deserializeStream
+    serializeStream, deserializeStream, decodeSerializedObject
 )
+
+from typed_python._types import refcount
 
 module_level_testfun = dummy_test_module.testfunction
 
@@ -230,8 +233,14 @@ sc = SerializationContext({
 
 def ping_pong(obj, serialization_context=None):
     serialization_context = serialization_context or SerializationContext()
-    s = serialization_context.serialize(obj)
-    return serialization_context.deserialize(s)
+    s = serialization_context.withoutCompression().serialize(obj)
+    try:
+        return serialization_context.withoutCompression().deserialize(s)
+    except Exception:
+        print("FAILED TO DECODE:")
+        print(s)
+        print(pprint.PrettyPrinter(indent=2).pprint(decodeSerializedObject(s)))
+        raise
 
 
 class TypesSerializationTest(unittest.TestCase):
@@ -277,7 +286,7 @@ class TypesSerializationTest(unittest.TestCase):
 
         self.check_idempotence(())
         self.check_idempotence((1,))
-        self.check_idempotence((1, 2, 3))
+        self.check_idempotence([])
         self.check_idempotence({})
         self.check_idempotence({"key": "value"})
         self.check_idempotence({"key": "value", "key2": "value2"})
@@ -291,6 +300,9 @@ class TypesSerializationTest(unittest.TestCase):
         self.check_idempotence(int)
         self.check_idempotence(object)
         self.check_idempotence(type)
+
+        self.check_idempotence(TupleOf(int))
+        self.check_idempotence(TupleOf(int)([0x08]))
 
     def test_serialize_python_dict(self):
         d = {1: 2, 3: '4', '5': 6, 7.0: b'8'}
@@ -407,14 +419,14 @@ class TypesSerializationTest(unittest.TestCase):
         ts = SerializationContext({'f': f})
         self.assertIs(ping_pong(f, ts), f)
 
-    def test_serialize_alternatives(self):
+    def test_serialize_alternatives_as_types(self):
         A = Alternative("A", X={'a': int}, Y={'a': lambda: A})
 
         ts = SerializationContext({'A': A})
+        self.assertIs(ping_pong(A, ts), A)
         self.assertIs(ping_pong(A.X, ts), A.X)
 
     def test_serialize_lambdas(self):
-
         def check(f, args):
             self.assertEqual(f(*args), ping_pong(f)(*args))
 
@@ -564,14 +576,14 @@ class TypesSerializationTest(unittest.TestCase):
         self.serializeInLoop(lambda: numpy.array([[1, 2, 3], [2, 3, 4]]))
         self.serializeInLoop(lambda: numpy.ones(2000))
 
-    def test_serializing_anonymous_recursive_named_tuples(self):
-        NT = NamedTuple(x=OneOf(int, float), y=OneOf(int, lambda: NT))
+    def test_serializing_anonymous_recursive_types(self):
+        NT = TupleOf(lambda: NT)
 
-        nt = NT(x=10, y=NT(x=20, y=2))
+        # right now we don't allow this. When we move to a more proper model for declarint
+        # forward types, this should work better.
 
-        nt_ponged = ping_pong(nt)
-
-        self.assertEqual(nt_ponged.y.x, 20)
+        with self.assertRaises(Exception):
+            ping_pong(NT)
 
     def test_serializing_named_tuples_in_loop(self):
         NT = NamedTuple(x=OneOf(int, float), y=OneOf(int, lambda: NT))
@@ -1100,7 +1112,8 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(d2['recurses']['recurses']['hi'], 'bye')
 
     def test_serialize_dict_doesnt_leak(self):
-        d = Dict(int, int)({i: i+1 for i in range(100)})
+        T = Dict(int, int)
+        d = T({i: i+1 for i in range(100)})
         x = SerializationContext({})
 
         usage = currentMemUsageMb()
@@ -1108,3 +1121,34 @@ class TypesSerializationTest(unittest.TestCase):
             x.deserialize(x.serialize(d))
 
         self.assertLess(currentMemUsageMb(), usage+1)
+
+    def test_serialize_named_tuples_with_extra_fields(self):
+        T1 = NamedTuple(x=int)
+        T2 = NamedTuple(x=int, y=float, z=str)
+
+        self.assertEqual(
+            deserialize(T2, serialize(T1, T1(x=10))),
+            T2(x=10, y=0.0, z="")
+        )
+
+    def test_serialize_classes(self):
+        class AClass(Class):
+            x = Member(int)
+            y = Member(float)
+
+        T = Tuple(AClass, AClass)
+
+        a = AClass(x=10, y=20.0)
+
+        a2, a2_copy = deserialize(T, serialize(T, (a,a)))
+
+        self.assertEqual(a2.x, 10)
+        a2.x = 300
+        self.assertEqual(a2_copy.x, 300)
+
+        a2_copy = None
+
+        self.assertEqual(refcount(a2), 1)
+
+
+

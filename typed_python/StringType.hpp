@@ -42,7 +42,11 @@ public:
 
     static int64_t bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length);
 
+    //decode a utf8 string. note that 'length' is the number of codepoints, not the number of bytes
     static void decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length);
+
+    //count the number of codepoints in a utf8 encoded bytestream
+    static size_t countUtf8Codepoints(const uint8_t* utfData, size_t bytecount);
 
     //return an increffed layout containing a copy of lhs at the desired number of codepoints
     static layout* upgradeCodePoints(layout* lhs, int32_t newBytesPerCodepoint);
@@ -80,6 +84,15 @@ public:
     //return an increffed string containing the data from the utf-encoded string
     static layout* createFromUtf8(const char* utfEncodedString, int64_t len);
 
+    static size_t bytesForUtf8Codepoint(size_t codepoint);
+
+    template<class codepoint_type>
+    static size_t countUtf8BytesRequiredFor(codepoint_type* codepoints, int64_t sz);
+
+    template<class codepoint_type>
+    static void encodeUtf8(codepoint_type* codepoints, int64_t sz, uint8_t* out);
+
+
     bool isBinaryCompatibleWithConcrete(Type* other) {
         if (other->getTypeCategory() != m_typeCategory) {
             return false;
@@ -100,31 +113,40 @@ public:
     static StringType* Make() { static StringType res; return &res; }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.write_uint(count(self));
-        buffer.write_uint(bytes_per_codepoint(self));
-        buffer.write_bytes(eltPtr(self,0), bytes_per_codepoint(self) * count(self));
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        if (bytes_per_codepoint(self) == 1) {
+            size_t bytecount = countUtf8BytesRequiredFor((uint8_t*)eltPtr(self, 0), count(self));
+
+            buffer.writeBeginBytes(fieldNumber, bytecount);
+
+            encodeUtf8((uint8_t*)eltPtr(self, 0), count(self), buffer.prepare_bytes(bytecount));
+        } else if (bytes_per_codepoint(self) == 2) {
+            size_t bytecount = countUtf8BytesRequiredFor((uint16_t*)eltPtr(self, 0), count(self));
+
+            buffer.writeBeginBytes(fieldNumber, bytecount);
+
+            encodeUtf8((uint16_t*)eltPtr(self, 0), count(self), buffer.prepare_bytes(bytecount));
+        } else if (bytes_per_codepoint(self) == 4) {
+            size_t bytecount = countUtf8BytesRequiredFor((uint32_t*)eltPtr(self, 0), count(self));
+
+            buffer.writeBeginBytes(fieldNumber, bytecount);
+
+            encodeUtf8((uint32_t*)eltPtr(self, 0), count(self), buffer.prepare_bytes(bytecount));
+        } else {
+            throw std::runtime_error("corrupt bytes-per-codepoint");
+        }
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        int32_t ct = buffer.read_uint();
-        uint8_t bytes_per = buffer.read_uint();
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        assertWireTypesEqual(wireType, WireType::BYTES);
 
-        if (bytes_per != 1 && bytes_per != 2 && bytes_per != 4) {
-            throw std::runtime_error("Corrupt data (bytes per unicode character): "
-                + std::to_string(bytes_per) + " " + std::to_string(ct) + ". pos is " + std::to_string(buffer.pos()));
-        }
+        int32_t ct = buffer.readUnsignedVarint();
 
-        if (!buffer.canConsume(ct)) {
-            throw std::runtime_error("Corrupt data (stringsize)");
-        }
-
-        constructor(self, bytes_per, ct, nullptr);
-
-        if (ct) {
-            buffer.read_bytes(eltPtr(self,0), bytes_per * ct);
-        }
+        buffer.read_bytes_fun(ct, [&](const uint8_t* bytes) {
+            size_t codepointCount = countUtf8Codepoints(bytes, ct);
+            *(layout**)self = createFromUtf8((const char*)bytes, codepointCount);
+        });
     }
 
     int32_t hash32(instance_ptr left);

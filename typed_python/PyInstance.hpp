@@ -294,6 +294,10 @@ public:
         mIsInitialized = true;
     }
 
+    static PyObject* fromInstance(const Instance& instance) {
+        return extractPythonObject(instance.data(), instance.type());
+    }
+
     PyInstance* duplicate() {
         return (PyInstance*)initialize(type(), [&](instance_ptr out) {
             type()->copy_constructor(out, dataPtr());

@@ -114,13 +114,14 @@ class TestMultithreading(unittest.TestCase):
         self.assertEqual(_types.refcount(instance), 1)
 
     def test_serialize_is_parallel(self):
-        x = ListOf(int)()
-        x.resize(1000000)
-        sc = SerializationContext({})
+        T = ListOf(int)
+        x = T()
+        x.resize(100000)
+        sc = SerializationContext({}).withoutCompression()
 
         def f():
             for i in range(10):
-                sc.deserialize(sc.serialize(x))
+                sc.deserialize(sc.serialize(x, T), T)
 
         ratios = []
         for i in range(10):

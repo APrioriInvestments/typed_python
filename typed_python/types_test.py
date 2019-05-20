@@ -524,7 +524,7 @@ class NativeTypesTests(unittest.TestCase):
 
         typedInts = t(ints)
 
-        self.assertEqual(len(serialize(t, typedInts)), len(ints) + 3)  # 3 bytes for size of list
+        self.assertEqual(len(serialize(t, typedInts)), len(ints) * 2 + 6)  # 3 bytes for extra flags
         self.assertEqual(tuple(typedInts), ints)
 
     def test_tuple_of_one_of_multi(self):
@@ -536,7 +536,10 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(
             len(serialize(t, typedThings)),
-            sum(2 if isinstance(t, bool) else 3 for t in someThings) + 3
+            sum(3 if isinstance(t, bool) else 4 for t in someThings) +
+            2 +  # two bytes for begin / end flags
+            2 +  # two bytes for the id
+            2    # two bytes for the size
         )
 
         self.assertEqual(tuple(typedThings), someThings)
@@ -1185,13 +1188,6 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(OneOf(None, NTSubclass)(None) is None)
         self.assertTrue(OneOf(None, NTSubclass)(inst) == inst)
 
-    def test_serialization_integers(self):
-        self.assertEqual(serialize(int, 0), b"\x00")
-        self.assertEqual(serialize(int, 1), b"\x02")
-        self.assertEqual(serialize(int, 2), b"\x04")
-        self.assertEqual(serialize(int, 64), b"\x80\x01")
-        self.assertEqual(serialize(int, -1), b"\x01")
-
     def test_serialization_primitives(self):
         def checkCanSerialize(x):
             self.assertEqual(x, deserialize(type(x), serialize(type(x), x)), x)
@@ -1215,18 +1211,13 @@ class NativeTypesTests(unittest.TestCase):
         checkCanSerialize(True)
         checkCanSerialize(False)
 
-    def test_serialization(self):
+    def test_serialization_bytecounts(self):
         ints = TupleOf(int)((1, 2, 3, 4))
-
-        self.assertEqual(
-            len(serialize(TupleOf(int), ints)),
-            5
-        )
 
         def varintBytecount(value):
             """the length (in bytes) of a varint"""
             res = 1
-            while value > 64:
+            while value >= 128:
                 res += 1
                 value /= 128
             return res
@@ -1235,7 +1226,11 @@ class NativeTypesTests(unittest.TestCase):
             ints = ints + ints
             t0 = time.time()
 
-            expectedBytecount = sum(varintBytecount(i) for i in ints) + varintBytecount(len(ints))
+            expectedBytecount = (
+                sum(varintBytecount(0) + varintBytecount(i) for i in ints) +
+                (varintBytecount(0) * 3) + varintBytecount(len(ints))
+            )
+
             self.assertEqual(len(serialize(TupleOf(int), ints)), expectedBytecount)
 
             print(time.time() - t0, " for ", len(ints))
@@ -1248,13 +1243,37 @@ class NativeTypesTests(unittest.TestCase):
             values = producer.all()
             for v in values:
                 ser = serialize(type(v), v)
+
                 v2 = deserialize(type(v), ser)
+
                 ser2 = serialize(type(v), v2)
 
                 self.assertTrue(type(v2) is type(v))
                 self.assertEqual(ser, ser2)
                 self.assertEqual(str(v), str(v2))
-                self.assertEqual(v, v2)
+                self.assertEqual(v, v2, (v, v2, type(v), type(v2), type(v) is type(v2)))
+
+    def test_create_invalid_tuple(self):
+        with self.assertRaises(TypeError):
+            Tuple((int, int))
+
+    def test_roundtrip_tuple(self):
+        T = Tuple(str, bool, str)
+        v = T(('1', False, ''))
+
+        v2 = deserialize(T, serialize(T, v))
+
+        self.assertEqual(v, v2)
+
+    def test_roundtrip_alternative(self):
+        A = Alternative("A", a0=dict(x_0=None))
+        T = NamedTuple(x0=A, x1=bool)
+
+        v = T(x0=A.a0(), x1=True)
+
+        v2 = deserialize(T, serialize(T, v))
+
+        self.assertEqual(v, v2)
 
     def test_serialize_doesnt_leak(self):
         T = TupleOf(int)

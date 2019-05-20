@@ -77,13 +77,13 @@ public:
     }
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
-        buffer.readRegisterType((T*)self);
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
+        buffer.readRegisterType((T*)self, wireType);
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
-        buffer.writeRegisterType(*(T*)self);
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeRegisterType(fieldNumber, *(T*)self);
     }
 };
 

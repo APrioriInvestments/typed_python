@@ -97,7 +97,7 @@ public:
             m_staticFunctions,
             m_propertyFunctions,
             m_classMembers
-            );
+        );
     }
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
@@ -107,27 +107,33 @@ public:
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
     template<class buf_t>
-    void deserialize(instance_ptr self, buf_t& buffer) {
+    void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         for (long k = 0; k < m_members.size();k++) {
-            bool isInitialized = buffer.read_uint();
-            if (isInitialized) {
-                std::get<1>(m_members[k])->deserialize(eltPtr(self,k),buffer);
-                setInitializationFlag(self, k);
-            }
+            clearInitializationFlag(self, k);
         }
+
+        buffer.consumeCompoundMessage(wireType, [&](size_t fieldNumber, size_t subWireType) {
+            if (fieldNumber < m_members.size()) {
+                getMemberType(fieldNumber)->deserialize(eltPtr(self,fieldNumber), buffer, subWireType);
+                setInitializationFlag(self, fieldNumber);
+            } else {
+                buffer.finishReadingMessageAndDiscard(subWireType);
+            }
+        });
     }
 
     template<class buf_t>
-    void serialize(instance_ptr self, buf_t& buffer) {
+    void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
+        buffer.writeBeginCompound(fieldNumber);
+
         for (long k = 0; k < m_members.size();k++) {
             bool isInitialized = checkInitializationFlag(self, k);
             if (isInitialized) {
-                buffer.write_uint(true);
-                std::get<1>(m_members[k])->serialize(eltPtr(self,k),buffer);
-            } else {
-                buffer.write_uint(false);
+                std::get<1>(m_members[k])->serialize(eltPtr(self,k),buffer, k);
             }
         }
+
+        buffer.writeEndCompound();
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);

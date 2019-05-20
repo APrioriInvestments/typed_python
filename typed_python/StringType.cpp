@@ -508,27 +508,46 @@ int64_t StringType::bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int
             //one byte encoded here
             length -= 1;
             utf8Str++;
-        }
-
-        if (utf8Str[0] >> 5 == 0b110) {
+        } else if (utf8Str[0] >> 5 == 0b110) {
             length -= 1;
             utf8Str+=2;
             bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
-        }
-
-        if (utf8Str[0] >> 4 == 0b1110) {
+        } else if (utf8Str[0] >> 4 == 0b1110) {
             length -= 1;
             utf8Str += 3;
             bytes_per_codepoint = std::max<int64_t>(2, bytes_per_codepoint);
-        }
-
-        if (utf8Str[0] >> 3 == 0b11110) {
+        } else if (utf8Str[0] >> 3 == 0b11110) {
             length -= 1;
             utf8Str+=4;
             bytes_per_codepoint = std::max<int64_t>(4, bytes_per_codepoint);
+        } else {
+            throw std::runtime_error("Improperly formatted unicode string.");
         }
     }
     return bytes_per_codepoint;
+}
+
+size_t StringType::countUtf8Codepoints(const uint8_t*utfData, size_t bytecount) {
+    size_t result = 0;
+    size_t k = 0;
+
+    while (k < bytecount) {
+        result += 1;
+
+        if (utfData[k] >> 7 == 0) {
+            k += 1;
+        } else if ((utfData[k] >> 5) == 0b110) {
+            k += 2;
+        } else if ((utfData[k] >> 4) == 0b1110) {
+            k += 3;
+        } else if ((utfData[k] >> 3) == 0b11110) {
+            k += 4;
+        } else {
+            throw std::runtime_error("corrupt utf8 data stream.");
+        }
+    }
+
+    return result;
 }
 
 template<class T>
@@ -570,6 +589,52 @@ void decodeUtf8ToTyped(T* target, uint8_t* utf8Str, int64_t bytes_per_codepoint,
     }
 }
 
+template<class codepoint_type>
+void StringType::encodeUtf8(codepoint_type* codepoints, int64_t sz, uint8_t* out) {
+    for (long k = 0; k < sz; k++) {
+        if (codepoints[k] < 0x80) {
+            *(out++) = codepoints[k];
+        } else if (codepoints[k] < 0x800) {
+            *(out++) = ((codepoints[k] & 0b11111000000) >> 6) + 0b11000000;
+            *(out++) = ((codepoints[k] & 0b00000111111)     ) + 0b10000000;
+        } else if (codepoints[k] < 0x10000) {
+            *(out++) = ((codepoints[k] & 0b1111000000000000) >> 12) + 0b11100000;
+            *(out++) = ((codepoints[k] & 0b0000111111000000) >> 6 ) + 0b10000000;
+            *(out++) = ((codepoints[k] & 0b0000000000111111)      ) + 0b10000000;
+        } else {
+            *(out++) = ((codepoints[k] & 0b111000000000000000000) >> 18) + 0b11110000;
+            *(out++) = ((codepoints[k] & 0b000111111000000000000) >> 12) + 0b10000000;
+            *(out++) = ((codepoints[k] & 0b000000000111111000000) >> 6 ) + 0b10000000;
+            *(out++) = ((codepoints[k] & 0b000000000000000111111)      ) + 0b10000000;
+        }
+    }
+}
+
+size_t StringType::bytesForUtf8Codepoint(size_t codepoint) {
+    if (codepoint < 0x80) {
+        return 1;
+    }
+    if (codepoint < 0x800) {
+        return 2;
+    }
+    if (codepoint < 0x10000) {
+        return 3;
+    }
+
+    return 4;
+}
+
+template<class codepoint_type>
+size_t StringType::countUtf8BytesRequiredFor(codepoint_type* codepoints, int64_t sz) {
+    size_t result = 0;
+
+    for (long k = 0; k < sz; k++) {
+        result += bytesForUtf8Codepoint(codepoints[k]);
+    }
+
+    return result;
+}
+
 void StringType::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_per_codepoint, int64_t length) {
     if (bytes_per_codepoint == 1) {
         decodeUtf8ToTyped(target, utf8Str, bytes_per_codepoint, length);
@@ -583,6 +648,10 @@ void StringType::decodeUtf8To(uint8_t* target, uint8_t* utf8Str, int64_t bytes_p
 }
 
 StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int64_t length) {
+    if (!length) {
+        return nullptr;
+    }
+
     int64_t bytes_per_codepoint = bytesPerCodepointRequiredForUtf8((uint8_t*)utfEncodedString, length);
 
     int64_t new_byteCount = sizeof(layout) + length * bytes_per_codepoint;
