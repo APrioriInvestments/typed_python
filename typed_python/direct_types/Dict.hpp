@@ -162,7 +162,7 @@ public:
     }
 
 private:
-    Dict(DictType::layout* l): mLayout(l) {
+    explicit Dict(DictType::layout* l): mLayout(l) {
         // deliberately stealing a reference
     }
 

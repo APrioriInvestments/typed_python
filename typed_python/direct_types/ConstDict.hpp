@@ -183,7 +183,7 @@ public:
     }
 
 private:
-    ConstDict(ConstDictType::layout* l): mLayout(l) {
+    explicit ConstDict(ConstDictType::layout* l): mLayout(l) {
         // deliberately stealing a reference
     }
 

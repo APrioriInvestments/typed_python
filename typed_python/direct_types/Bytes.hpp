@@ -25,6 +25,16 @@ public:
         return t;
     }
 
+    static Bytes fromPython(PyObject* p) {
+        BytesType::layout* l = nullptr;
+        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        return Bytes(l);
+    }
+
+    PyObject* toPython() {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, getType());
+    }
+
     Bytes():mLayout(0) {}
 
     explicit Bytes(const char *pc, size_t bytecount):mLayout(0) {
@@ -37,10 +47,6 @@ public:
 
     explicit Bytes(const std::string& s):mLayout(0) {
         getType()->constructor((instance_ptr)&mLayout, s.length(), s.data());
-    }
-
-    explicit Bytes(BytesType::layout* l):mLayout(0) {
-        getType()->constructor((instance_ptr)&mLayout, l->bytecount, (const char*)l->data);
     }
 
     ~Bytes() {
@@ -113,6 +119,10 @@ public:
     }
 
 private:
+    explicit Bytes(BytesType::layout* l): mLayout(l) {
+        // deliberately stealing a reference
+    }
+
     BytesType::layout* mLayout;
 };
 

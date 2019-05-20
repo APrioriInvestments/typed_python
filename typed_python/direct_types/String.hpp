@@ -26,6 +26,16 @@ public:
         return t;
     }
 
+    static String fromPython(PyObject* p) {
+        StringType::layout* l = nullptr;
+        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        return String(l);
+    }
+
+    PyObject* toPython() {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, getType());
+    }
+
     String():mLayout(0) {}
 
     explicit String(const char *pc):mLayout(0) {
@@ -34,10 +44,6 @@ public:
 
     explicit String(const std::string& s):mLayout(0) {
         getType()->constructor((instance_ptr)&mLayout, 1, s.length(), s.data());
-    }
-
-    explicit String(StringType::layout* l):mLayout(0) {
-        getType()->constructor((instance_ptr)&mLayout, l->bytes_per_codepoint, l->pointcount, (const char*)l->data);
     }
 
     ~String() {
@@ -130,11 +136,13 @@ public:
 
     String substr(int64_t start, int64_t stop) const { return String(StringType::getsubstr(mLayout, start, stop)); }
 
-    StringType::layout* getLayout() const {
-        return mLayout;
-    }
+    StringType::layout* getLayout() const { return mLayout; }
 
 private:
+    explicit String(StringType::layout* l): mLayout(l) {
+        // deliberately stealing a reference
+    }
+
     StringType::layout* mLayout;
 };
 
