@@ -69,7 +69,9 @@ void Alternative::_forwardTypesMayHaveChanged() {
                     subtype_pair.first + " defined twice.");
         }
 
-        m_arg_positions[subtype_pair.first] = m_arg_positions.size();
+        size_t argPosition = m_arg_positions.size();
+
+        m_arg_positions[subtype_pair.first] = argPosition;
 
         if (subtype_pair.second->is_default_constructible() && !m_is_default_constructible) {
             m_is_default_constructible = true;
