@@ -2496,12 +2496,12 @@ class Table(Cell):
             )
         )
 
-        print("THIS IS INSANE TABLE DATA")
-        print("first row")
-        print(str(firstRowElement))
-        print("rows")
-        [print(r) for r in rowElements]
-        print()
+        # print("THIS IS INSANE TABLE DATA")
+        # print("first row")
+        # print(str(firstRowElement))
+        # print("rows")
+        # [print(r) for r in rowElements]
+        # print()
 
         # temporary js WS refactoring data
         self.exportData['rowDisplayText'] = rowDisplay
