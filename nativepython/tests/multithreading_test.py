@@ -114,9 +114,12 @@ class TestMultithreading(unittest.TestCase):
         self.assertEqual(_types.refcount(instance), 1)
 
     def test_serialize_is_parallel(self):
+        if os.environ.get('TRAVIS_CI', None):
+            return
+
         T = ListOf(int)
         x = T()
-        x.resize(100000)
+        x.resize(1000000)
         sc = SerializationContext({}).withoutCompression()
 
         def f():
@@ -140,9 +143,5 @@ class TestMultithreading(unittest.TestCase):
 
         ratio = ratios[5]
 
-        # expect the ratio to be close to 1, but have some error margin, especially on Travis
-        # where we don't really get two cores
-        if os.environ.get('TRAVIS_CI', None):
-            self.assertTrue(ratio >= .8 and ratio < 1.75, ratios)
-        else:
-            self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
+        # expect the ratio to be close to 1, but have some error margin
+        self.assertTrue(ratio >= .8 and ratio < 1.2, ratios)
