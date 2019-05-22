@@ -1854,6 +1854,9 @@ class Subscribed(Cell):
 
             self._resetSubscriptionsToViewReads(v)
 
+            # temporary js WS refactoring data
+            self.exportData['divStyle'] = self._divStyle()
+
 
 class SubscribedSequence(Cell):
     def __init__(self, itemsFun, rendererFun, asColumns=False):
@@ -1940,6 +1943,11 @@ class SubscribedSequence(Cell):
                 .set_attribute('style', self._divStyle())
                 .add_child(HTMLTextContent("\n".join(spineChildren)))
             )
+
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['asColumns'] = self.asColumns
+        self.exportData['numSpineChildren'] = len(self.spine)
 
 
 class Popover(Cell):
