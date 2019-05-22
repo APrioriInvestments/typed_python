@@ -33,6 +33,9 @@
 <script src="/content/CellSocket.js"></script>
 <script src="/content/CellHandler.js"></script>
 
+<!-- Debugging Scripts -->
+<script src="/content/cellReporter.js"></script>
+
 <!-- Cell Components -->
 <script src="/content/components/Component.js"></script>
 <script src="/content/components/Card.js"></script>
@@ -46,6 +49,21 @@
 <script src="/content/components/ButtonGroup.js"></script>
 <script src="/content/components/Clickable.js"></script>
 //<script src="/content/components/Table.js"></script>
+<script src="/content/components/CollapsiblePanel.js"></script>
+<script src="/content/components/Text.js"></script>
+<script src="/content/components/Padding.js"></script>
+<script src="/content/components/Span.js"></script>
+<script src="/content/components/Sequence.js"></script>
+<script src="/content/components/Columns.js"></script>
+<script src="/content/components/HeaderBar.js"></script>
+<script src="/content/components/LargePendingDownloadDisplay.js"></script>
+<script src="/content/components/_NavTab.js"></script>
+<script src="/content/components/Tabs.js"></script>
+<script src="/content/components/Dropdown.js"></script>
+<script src="/content/components/CircleLoader.js"></script>
+<script src="/content/components/AsyncDropdown.js"></script>
+<script src="/content/components/Container.js"></script>
+<script src="/content/components/Traceback.js"></script>
 
 <script>
  // This is the initial render function. It is called when "DOMContentLoaded"
@@ -77,6 +95,7 @@
  var handsOnTables = {}; // Not sure what this is or where it's used
 
  const availableComponents = {
+<<<<<<< HEAD
    Badge,
    Button,
    ButtonGroup,
@@ -88,6 +107,29 @@
    Modal,
    Octicon,
    // Table,
+=======
+     Card,
+     CardTitle,
+     Modal,
+     Octicon,
+     Badge,
+     CollapsiblePanel,
+     Text,
+     Padding,
+     Span,
+     Sequence,
+     Columns,
+     LargePendingDownloadDisplay,
+     HeaderBar,
+     _NavTab,
+     Tabs,
+     Dropdown,
+     AsyncDropdown,
+     AsyncDropdownContent,
+     CircleLoader,
+     Container,
+     Traceback
+>>>>>>> origin/eric-components-3
  };
 
  const cellSocket = new CellSocket();

@@ -19,6 +19,7 @@ class ReplacementsHandler {
         this.addReplacement = this.addReplacement.bind(this);
         this._processEnumerated = this._processEnumerated.bind(this);
         this._sortEnumeratedValues = this._sortEnumeratedValues.bind(this);
+        this.hasReplacement = this.hasReplacement.bind(this);
     }
 
     addReplacement(replacementName){
@@ -27,6 +28,19 @@ class ReplacementsHandler {
         }
         this.replacementNames.push(replacementName);
         this.processReplacements();
+    }
+
+    hasReplacement(aName){
+        let found = this.replacementDict[aName];
+        if(found && found != undefined){
+            return true;
+        } else {
+            found = this.enumeratedReplacementDict[aName];
+            if(found && found != undefined){
+                return true;
+            }
+        }
+        return false;
     }
 
     getReplacement(replacementName){
@@ -103,6 +117,12 @@ class ReplacementsHandler {
             unsorted.sort((first, second) => {
                 return first[1] - second[1];
             });
+
+            // Now set the array to a version that filters out
+            // the index values (we no longer need them)
+            this.enumeratedReplacementDict[key] = unsorted.map(item => {
+                return item[0]; // The string (item[1] is the index)
+            });
         });
     }
 }
@@ -164,7 +184,7 @@ class Component {
         } else if(Array.isArray(replacementId)){
             return null;
         }
-        return h('div', {id: replacementId}, []);
+        return h('div', {id: replacementId, key: replacementId}, []);
     }
 
     /**
@@ -180,7 +200,7 @@ class Component {
             return null;
         }
         return replacementIds.map(replacementId => {
-            return h('div', {id: replacementId}, []);
+            return h('div', {id: replacementId, key: replacementId}, []);
         });
     }
 }

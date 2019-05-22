@@ -1040,7 +1040,7 @@ class Badge(Cell):
         super().__init__()
         self.inner = self.makeCell(inner)
         self.style = style
-        self.exportData.badgeStyle = self.style
+        self.exportData['badgeStyle'] = self.style
 
     def sortsAs(self):
         return self.inner.sortsAs()
@@ -1067,6 +1067,8 @@ class CollapsiblePanel(Cell):
 
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
+        self.exportData['isExpanded'] = expanded;
+        self.exportData['divStyle'] = self._divStyle()
         if expanded:
             self.contents = str(
                 HTMLElement.div()
@@ -1110,7 +1112,9 @@ class Text(Cell):
         return self._sortAs
 
     def recalculate(self):
-        escapedText = cgi.escape(str(self.text)) if self.text else "&nbsp;"
+        escapedText = cgi.escape(str(self.text)) if self.text else " "
+        self.exportData['escapedText'] = escapedText
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
@@ -1134,6 +1138,7 @@ class Padding(Cell):
 class Span(Cell):
     def __init__(self, text):
         super().__init__()
+        self.exportData['text'] = text
         self.contents = str(
             HTMLElement.span()
             .add_child(HTMLTextContent(cgi.escape(str(text))))
@@ -1162,6 +1167,7 @@ class Sequence(Cell):
     def recalculate(self):
         sequenceChildrenStr = '\n'.join("____c_%s__" %
                                         i for i in range(len(self.elements)))
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
@@ -1178,6 +1184,7 @@ class Columns(Cell):
     def __init__(self, *elements):
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
+        self.exportData['divStyle'] = self._divStyle()
 
         self.elements = elements
         self.children = {"____c_%s__" %
@@ -1199,6 +1206,7 @@ class Columns(Cell):
                 .add_children(innerChildren)
             )
         )
+
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1327,9 +1335,17 @@ class _NavTab(Cell):
         inlineScript = """
         cellSocket.sendString(JSON.stringify({'event': 'click', 'ix': __ix__, 'target_cell': '__identity__'}))
         """.replace('__identity__', self.target).replace('__ix__', str(self.index))
+        self.exportData['clickData'] = {
+            'event': 'click',
+            'ix': str(self.index),
+            'target_cell': self.target
+        }
         navLinkClasses = ['nav-link']
         if self.index == self.slot.get():
             navLinkClasses.append('active')
+            self.exportData['isActive'] = True
+        else:
+            self.exportData['isActive'] = False
         self.contents = str(
             HTMLElement.li()
             .add_class('nav-item')
@@ -1431,6 +1447,13 @@ class Dropdown(Cell):
 
         self.children['____title__'] = self.title
 
+        # Because the items here are not separate cells,
+        # we have to perform an extra hack of a dict
+        # to get the proper data to the temporary
+        # JS Component
+        self.exportData['targetIdentity'] = self.identity
+        self.exportData['dropdownItemInfo'] = {}
+
         for i in range(len(self.headersAndLambdas)):
             header, onDropdown = self.headersAndLambdas[i]
             self.children["____child_%s__" % i] = Cell.makeCell(header)
@@ -1438,9 +1461,11 @@ class Dropdown(Cell):
                 inlineScript = """
                 cellSocket.sendString(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
                 """.replace('__ix__', str(i)).replace('__identity__', self.identity)
+                self.exportData['dropdownItemInfo'][i] = 'callback'
             else:
                 inlineScript = quoteForJs("window.location.href = '%s'"
                                           % (quoteForJs(onDropdown, "'")), '"')
+                self.exportData['dropdownItemInfo'][i] = onDropdown
             childSubstitute = '____child_%s__' % str(i)
             items.append(
                 HTMLElement.a()
@@ -1472,6 +1497,7 @@ class Dropdown(Cell):
         )
 
     def onMessage(self, msgFrame):
+        self._logger.info(msgFrame)
         fun = self.headersAndLambdas[msgFrame['ix']][1]
         fun()
 
@@ -1532,6 +1558,7 @@ class AsyncDropdown(Cell):
         super().__init__()
         self.slot = Slot(False)
         self.labelText = labelText
+        self.exportData['labelText'] = self.labelText
         if not loadingIndicatorCell:
             loadingIndicatorCell = CircleLoader()
         self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc, loadingIndicatorCell)
