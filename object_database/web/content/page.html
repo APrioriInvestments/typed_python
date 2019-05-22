@@ -48,7 +48,9 @@
 <script src="/content/components/Button.js"></script>
 <script src="/content/components/ButtonGroup.js"></script>
 <script src="/content/components/Clickable.js"></script>
-//<script src="/content/components/Table.js"></script>
+<!--
+<script src="/content/components/Table.js"></script>
+-->
 <script src="/content/components/CollapsiblePanel.js"></script>
 <script src="/content/components/Text.js"></script>
 <script src="/content/components/Padding.js"></script>
@@ -95,41 +97,33 @@
  var handsOnTables = {}; // Not sure what this is or where it's used
 
  const availableComponents = {
-<<<<<<< HEAD
-   Badge,
+	 AsyncDropdown,
+	 AsyncDropdownContent,
+	 Badge,
    Button,
    ButtonGroup,
    Card,
    CardTitle,
+	 CircleLoader,
    Clickable,
+	 CollapsiblePanel,
+	 Columns,
+	 Container,
+	 Dropdown,
    Expands,
+	 HeaderBar,
    LoadContentsFromUrl,
+	 LargePendingDownloadDisplay,
    Modal,
    Octicon,
+	 Padding,
+	 Sequence,
+	 Span,
    // Table,
-=======
-     Card,
-     CardTitle,
-     Modal,
-     Octicon,
-     Badge,
-     CollapsiblePanel,
-     Text,
-     Padding,
-     Span,
-     Sequence,
-     Columns,
-     LargePendingDownloadDisplay,
-     HeaderBar,
-     _NavTab,
-     Tabs,
-     Dropdown,
-     AsyncDropdown,
-     AsyncDropdownContent,
-     CircleLoader,
-     Container,
-     Traceback
->>>>>>> origin/eric-components-3
+	 Text,
+	 Tabs,
+	 Traceback,
+	 _NavTab,
  };
 
  const cellSocket = new CellSocket();
