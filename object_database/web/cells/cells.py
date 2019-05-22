@@ -1991,6 +1991,10 @@ class Popover(Cell):
             )
         )
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['width'] = self.width
+
     def sortsAs(self):
         if '____title__' in self.children:
             return self.children['____title__'].sortsAs()
