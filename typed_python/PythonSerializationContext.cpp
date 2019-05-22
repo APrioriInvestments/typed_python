@@ -719,6 +719,10 @@ Type* PythonSerializationContext::deserializePythonObjectExpectingNativeType(Des
         throw std::runtime_error("Expected a native type but didn't get one.");
     }
 
+    if (nativeType->references_unresolved_forwards()) {
+        PyInstance::guaranteeForwardsResolvedOrThrow(nativeType);
+    }
+
     return nativeType;
 }
 
