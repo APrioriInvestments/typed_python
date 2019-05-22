@@ -2215,6 +2215,10 @@ class SingleLineTextBox(Cell):
             element.set_attribute('pattern', self.pattern)
         self.contents = str(element)
 
+        # temporary js WS refactoring data
+        if self.pattern:
+            self.exportData['pattern'] = self.pattern
+
     def onMessage(self, msgFrame):
         self.slot.set(msgFrame['text'])
 
