@@ -2155,6 +2155,10 @@ class Grid(Cell):
             )
         )
 
+        self.exportData['rowNum'] = len(self.rows)
+        self.exportData['colNum'] = len(self.cols)
+        self.exportData['hasTopHeader'] = (self.rowLabelFun is not None)
+
 
 class SortWrapper:
     def __init__(self, x):
