@@ -36,13 +36,16 @@ class SubscribedSequence extends Component {
 
     makeChildren(){
         if(this.props.extraData.asColumns){
-            return this.getReplacementElementsFor('child').map(childElement => {
+            let formattedChildren = this.getReplacementElementsFor('child').map(childElement => {
                 return(
                     h('div', {class: "col-sm", key: childElement.id}, [
                         h('span', {}, [childElement])
                     ])
                 );
             });
+            return (
+                h('div', {class: "row flex-nowrap", key: `${this.props.id}-spine-wrapper`}, formattedChildren)
+            );
         } else {
             return (
                 h('div', {key: `${this.props.id}-spine-wrapper`}, this.getReplacementElementsFor('child'))
