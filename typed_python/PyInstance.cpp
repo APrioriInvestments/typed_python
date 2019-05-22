@@ -41,6 +41,7 @@
 #include "PyPythonObjectOfTypeInstance.hpp"
 #include "PyOneOfInstance.hpp"
 #include "PyForwardInstance.hpp"
+#include "PyEmbeddedMessageInstance.hpp"
 
 // static
 bool PyInstance::guaranteeForwardsResolved(Type* t) {

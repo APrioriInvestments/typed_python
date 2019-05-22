@@ -100,6 +100,67 @@ public:
         return fieldAndWire.second;
     }
 
+    //copy a message to an output buffer
+    template<class buffer_type>
+    void copyMessageToOtherBuffer(size_t wireType, buffer_type& outBuffer) {
+        if (wireType == WireType::EMPTY) {
+            return;
+        }
+
+        if (wireType == WireType::VARINT) {
+            //read a VARINT and just discard it
+            outBuffer.writeUnsignedVarint(readUnsignedVarint());
+            return;
+        }
+
+        if (wireType == WireType::BITS_32) {
+            outBuffer.write(read<int32_t>());
+            return;
+        }
+
+        if (wireType == WireType::BITS_64) {
+            outBuffer.write(read<int64_t>());
+            return;
+        }
+
+        if (wireType == WireType::BYTES) {
+            size_t bytecount = readUnsignedVarint();
+            outBuffer.writeUnsignedVarint(bytecount);
+
+            read_bytes_fun(bytecount, [&](uint8_t* ptr) {
+                outBuffer.write_bytes(ptr, bytecount);
+            });
+
+            return;
+        }
+
+        if (wireType == WireType::SINGLE) {
+            auto fieldAndWire = readFieldNumberAndWireType();
+            outBuffer.writeUnsignedVarint((fieldAndWire.first << 3) + fieldAndWire.second);
+            copyMessageToOtherBuffer(fieldAndWire.second, outBuffer);
+            return;
+        }
+
+        if (wireType == WireType::BEGIN_COMPOUND) {
+            while (true) {
+                auto fieldAndWire = readFieldNumberAndWireType();
+                outBuffer.writeUnsignedVarint((fieldAndWire.first << 3) + fieldAndWire.second);
+                if (fieldAndWire.second == WireType::END_COMPOUND) {
+                    break;
+                } else {
+                    copyMessageToOtherBuffer(fieldAndWire.second, outBuffer);
+                }
+            }
+            return;
+        }
+
+        if (wireType == WireType::END_COMPOUND) {
+            return;
+        }
+
+        throw std::runtime_error("Corrupt message with invalid wire type found.");
+    }
+
     //finish a message whose field and wire type we've read
     void finishReadingMessageAndDiscard(size_t wireType) {
         if (wireType == WireType::EMPTY) {

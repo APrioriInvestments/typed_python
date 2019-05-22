@@ -46,6 +46,7 @@ public:
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
 
+        _forwardTypesMayHaveChanged();
         forwardTypesMayHaveChanged();
     }
 
@@ -62,6 +63,11 @@ public:
             visitor(t);
             assert(t == subtype_pair.second);
         }
+        for (long k = 0; k < m_subtypes.size(); k++) {
+            Type* t = concreteSubtype(k);
+            visitor(t);
+        }
+
         for (auto& method_pair: m_methods) {
             Type* t = (Type*)method_pair.second;
             visitor(t);
@@ -152,6 +158,8 @@ public:
     const std::map<std::string, Function*>& getMethods() const {
         return m_methods;
     }
+
+    Type* concreteSubtype(size_t which);
 
 private:
     bool m_all_alternatives_empty;

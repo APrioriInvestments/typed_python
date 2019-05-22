@@ -244,7 +244,9 @@ PyObject *MakeStringType(PyObject* nullValue, PyObject* args) {
 PyObject *MakeBytesType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::BytesType::Make()));
 }
-
+PyObject *MakeEmbeddedMessageType(PyObject* nullValue, PyObject* args) {
+    return incref((PyObject*)PyInstance::typeObj(::EmbeddedMessageType::Make()));
+}
 PyObject *MakeNoneType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::NoneType::Make()));
 }
@@ -1429,6 +1431,7 @@ static PyMethodDef module_methods[] = {
     {"Function", (PyCFunction)MakeFunctionType, METH_VARARGS, NULL},
     {"BoundMethod", (PyCFunction)MakeBoundMethodType, METH_VARARGS, NULL},
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
+    {"EmbeddedMessage", (PyCFunction)MakeEmbeddedMessageType, METH_VARARGS, NULL},
     {"RenameType", (PyCFunction)RenameType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},

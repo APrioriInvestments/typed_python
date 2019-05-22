@@ -33,7 +33,7 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python import (
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64, Class,
     Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
-    Dict, SerializationContext,
+    Dict, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject
 )
 
@@ -1149,3 +1149,17 @@ class TypesSerializationTest(unittest.TestCase):
         a2_copy = None
 
         self.assertEqual(refcount(a2), 1)
+
+    def test_embedded_messages(self):
+        T = NamedTuple(x=TupleOf(int))
+        T_with_message = NamedTuple(x=EmbeddedMessage)
+        T_with_two_messages = NamedTuple(x=EmbeddedMessage, y=EmbeddedMessage)
+        T2 = NamedTuple(x=TupleOf(int), y=TupleOf(int))
+
+        t = T(x=(1, 2, 3, 4))
+        tm = deserialize(T_with_message, serialize(T, t))
+        tm2 = T_with_two_messages(x=tm.x, y=tm.x)
+        t2 = deserialize(T2, serialize(T_with_two_messages, tm2))
+
+        self.assertEqual(t2.x, t.x)
+        self.assertEqual(t2.y, t.x)

@@ -50,6 +50,7 @@ class PyPythonSubclassInstance;
 class PyPythonObjectOfTypeInstance;
 class PyOneOfInstance;
 class PyForwardInstance;
+class PyEmbeddedMessageInstance;
 
 template<class T>
 class PyRegisterTypeInstance;
@@ -122,6 +123,8 @@ public:
                 return f(*(PyFunctionInstance*)obj);
             case Type::TypeCategory::catBoundMethod:
                 return f(*(PyBoundMethodInstance*)obj);
+            case Type::TypeCategory::catEmbeddedMessage:
+                return f(*(PyEmbeddedMessageInstance*)obj);
             case Type::TypeCategory::catNone:
             case Type::TypeCategory::catInt64:
             case Type::TypeCategory::catFloat64:
@@ -199,6 +202,8 @@ public:
                 return f((PyStringInstance*)nullptr);
             case Type::TypeCategory::catBytes:
                 return f((PyBytesInstance*)nullptr);
+            case Type::TypeCategory::catEmbeddedMessage:
+                return f((PyEmbeddedMessageInstance*)nullptr);
             case Type::TypeCategory::catOneOf:
                 return f((PyOneOfInstance*)nullptr);
             case Type::TypeCategory::catForward:

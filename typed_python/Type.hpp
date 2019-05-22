@@ -69,6 +69,7 @@ class HeldClass;
 class Function;
 class BoundMethod;
 class Forward;
+class EmbeddedMessageType;
 
 typedef uint8_t* instance_ptr;
 
@@ -112,7 +113,8 @@ public:
         catClass = 28,
         catHeldClass = 29,
         catFunction = 30,
-        catForward = 31
+        catForward = 31, //this will be deprecated
+        catEmbeddedMessage = 32
     };
 
     TypeCategory getTypeCategory() const {
@@ -245,6 +247,8 @@ public:
                 return f(*(BoundMethod*)this);
             case catForward:
                 return f(*(Forward*)this);
+            case catEmbeddedMessage:
+                return f(*(EmbeddedMessageType*)this);
             default:
                 throw std::runtime_error("Invalid type found");
         }

@@ -56,6 +56,8 @@ compile the entire group all at once.
 #include "TupleOrListOfType.cpp"
 #include "Type.cpp"
 
+#include "SerializationBuffer.cpp"
+
 #include "direct_types/DirectTypesTest.cpp"
 
 

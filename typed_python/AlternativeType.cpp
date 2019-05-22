@@ -197,6 +197,20 @@ Alternative* Alternative::Make(std::string name,
     return new Alternative(name, types, methods);
 }
 
+Type* Alternative::concreteSubtype(size_t which) {
+    if (!m_subtypes_concrete.size()) {
+        for (long k = 0; k < m_subtypes.size(); k++) {
+            m_subtypes_concrete.push_back(ConcreteAlternative::Make(this, k));
+        }
+    }
+
+    if (which < 0 || which >= m_subtypes_concrete.size()) {
+        throw std::runtime_error("Invalid alternative index.");
+    }
+
+    return m_subtypes_concrete[which];
+}
+
 Type* Alternative::pickConcreteSubclassConcrete(instance_ptr data) {
     if (!m_subtypes_concrete.size()) {
         for (long k = 0; k < m_subtypes.size(); k++) {
