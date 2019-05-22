@@ -20,6 +20,8 @@ class ReplacementsHandler {
         this._processEnumerated = this._processEnumerated.bind(this);
         this._sortEnumeratedValues = this._sortEnumeratedValues.bind(this);
         this.hasReplacement = this.hasReplacement.bind(this);
+        this._processEnumeratedMultiDim = this._processEnumeratedMultiDim.bind(this);
+        this._sortMultiDimensionalFor = this._sortMultiDimensionalFor.bind(this);
     }
 
     addReplacement(replacementName){
@@ -62,7 +64,7 @@ class ReplacementsHandler {
         this.replacementNames.forEach(name => {
             let nameParts = [];
             let isEnumerated = false;
-            let enumeratedVal = null;
+            let enumeratedValues = [];
 
             // First, remove all the underscores
             // to get a list of real tokens
@@ -81,7 +83,7 @@ class ReplacementsHandler {
                     nameParts.push(token);
                 } else {
                     isEnumerated = true;
-                    enumeratedVal = num;
+                    enumeratedValues.push(num);
                 }
             });
 
@@ -91,7 +93,7 @@ class ReplacementsHandler {
 
             let replacementKey = nameParts.join('-');
             if(isEnumerated){
-                this._processEnumerated(name, replacementKey, enumeratedVal);
+                this._processEnumerated(name, replacementKey, enumeratedValues);
             } else {
                 this.replacementDict[replacementKey] = name;
             }
@@ -104,11 +106,14 @@ class ReplacementsHandler {
         this._sortEnumeratedValues();
     }
 
-    _processEnumerated(name, replacementKey, index){
+    _processEnumerated(name, replacementKey, enumeratedVals){
+        if(enumeratedVals.length > 1){
+            this._processEnumeratedMultiDim(name, replacementKey, enumeratedVals);
+        }
         if(this.enumeratedReplacementDict[replacementKey] == undefined){
             this.enumeratedReplacementDict[replacementKey] = [];
         }
-        this.enumeratedReplacementDict[replacementKey].push([name, index]);
+        this.enumeratedReplacementDict[replacementKey].push([name, enumeratedVals[0]]);
     }
 
     _sortEnumeratedValues(){
@@ -124,6 +129,37 @@ class ReplacementsHandler {
                 return item[0]; // The string (item[1] is the index)
             });
         });
+    }
+
+    _processEnumeratedMultiDim(name, key, values){
+        // For now we only handle two dimensions.
+        if(this.enumeratedReplacementDict[key] == undefined){
+            this.enumeratedReplacementDict[key] = {};
+        }
+        let activeReplacement = this.enumeratedReplacementDict[key];
+        // First dimension
+        if(activeReplacement[values[0]] == undefined){
+            activeReplacement[values[0]] = {};
+        }
+        let firstDimension = activeReplacement[values[0]];
+        // Second dimension
+        firstDimension[values[1]] = name;
+        this.sortMultiDimensionalFor(key);
+    }
+
+    _sortMultiDimensionalFor(replName){
+        let activeReplacement = this.enumeratedReplacementDict[replName];
+        let firstDim = Object.keys(activeReplacement).sort((first, second) => {
+            return (parseInt(first) - parseInt(second));
+        }).map(secondDim => {
+            return secondDim;
+        });
+        let result = firstDim.map(secondDimDict => {
+            let secondDim = Object.keys(secondDimDict).sort((first, second) => {
+                return (parseInt(first) - parseInt(second));
+            });
+        });
+        this.enumeratedReplacementDict[replName] = result;
     }
 }
 
@@ -160,8 +196,18 @@ class Component {
         }
 
         if(Array.isArray(found)){
-            return found.map(name => {
-                return `${this.props.id}_${name}`;
+            return found.map(item => {
+                // If this mapping has two dimensions,
+                // we need to return an array of arrays
+                // with the names in the second dimension
+                if(Array.isArray(item)){
+                    return item.map(name => {
+                        return `${this.props.id}_${name}`;
+                    });
+                }
+                // Otherwise it's just an array of
+                // names
+                return `${this.props.id}_${item}`;
             });
         }
 
@@ -200,6 +246,16 @@ class Component {
             return null;
         }
         return replacementIds.map(replacementId => {
+            // If this is a two-dimensional structure,
+            // then the second dimension indices are the
+            // ids.
+            if(Array.isArray(replacementId)){
+                return replacementId.map(innerId => {
+                    return h('div', {id: replacementId, key: replacementId}, []);
+                });
+            }
+            // Otherwise this is a one dimensional array
+            // whose indices are just the replacementID structures
             return h('div', {id: replacementId, key: replacementId}, []);
         });
     }
