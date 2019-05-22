@@ -2447,6 +2447,12 @@ class Table(Cell):
                     lambda: self.curPage.set(str(int(self.curPage.get())+1))
                 ).nowrap()
             )
+        # NOTE:
+        # It is unclear where the following children are
+        # rendered here:
+        # ____right__
+        # ____left__
+        # ____page__
 
         headerElements = []
         for colIndex in range(len(self.cols)):
@@ -2513,8 +2519,8 @@ class Table(Cell):
 
         # temporary js WS refactoring data
         self.exportData['rowDisplayText'] = rowDisplay
-        self.exportData['cols'] = len(self.cols)
-        self.exportData['rows'] = len(self.rows)
+        self.exportData['numColumns'] = len(self.cols)
+        self.exportData['numRows'] = len(self.rows)
 
 
 class Clickable(Cell):
