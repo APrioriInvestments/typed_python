@@ -32,12 +32,12 @@ class SubscribedSequence extends Component {
             let spineChildren = [];
             for (var c = 0; c < this.props.extraData.numSpineChildren; c++){
                 spineChildren.push(
-                    h("div", {class: "col-sm"}, [
+                    h("div", {class: "col-sm", id: "spin_child_" + c}, [
                         h("span", {}, ["____child_" + c + "__"]) // TODO: does this make sense?
                     ])
                 )
             }
-            return h("div", {class: "row flex-nowrap"}, [spineChildren]);
+            return h("div", {class: "row flex-nowrap"}, spineChildren);
         }
 
         let spineChildren = "";
