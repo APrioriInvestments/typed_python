@@ -3,7 +3,7 @@ class CodeEditor extends Component {
         super(props, ...args);
         this.editor = null;
         // used to schedule regular server updates
-        this.SERVER_UPDATE_DELAY_MS = 200;
+        this.SERVER_UPDATE_DELAY_MS = 1;
         this.editorStyle = 'width:100%;height:100%;margin:auto;border:1px solid lightgray;';
 
         this.setupEditor = this.setupEditor.bind(this);
@@ -13,7 +13,7 @@ class CodeEditor extends Component {
 
     componentDidLoad() {
 
-        // this.setupEditor();
+        this.setupEditor();
 
         if (this.editor === null) {
             console.log("editor component loaded but failed to setup editor")
@@ -46,7 +46,7 @@ class CodeEditor extends Component {
 
             // this.setupKeybindings()
 
-            // this.changeHandler()
+            this.changeHandler()
         }
     }
 
@@ -67,7 +67,7 @@ class CodeEditor extends Component {
         let editorId = "editor" + this.props.id;
         // TODO These are global var defined in page.html
         // we should do something about this.
-        
+
         // here we bing and inset the editor into the div rendered by
         // this.render()
         this.editor = ace.edit(editorId);
@@ -76,40 +76,44 @@ class CodeEditor extends Component {
     }
 
     changeHandler() {
+	console.log("setting changeHandler")
+	var editorId = this.props.id;
+	var editor = this.editor;
+	var SERVER_UPDATE_DELAY_MS = this.SERVER_UPDATE_DELAY_MS;
         this.editor.session.on(
             "change",
             function(delta) {
                 // WS
                 let responseData = {
                     event: 'editor_change',
-                    'target_cell': this.props.id,
+                    'target_cell': editorId,
                     data: delta
                 }
                 cellSocket.sendString(JSON.stringify(responseData));
                 //record that we just edited
-                this.editor.last_edit_millis = Date.now()
-                //schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms
-                //that will update the server, but only if the user has stopped typing.
-                
-                window.setTimeout(function() {
-                    if (Date.now() - this.editor.last_edit_millis >= this.SERVER_UPDATE_DELAY_MS) {
-                        //save our current state to the remote buffer
-                        this.editor.current_iteration += 1;
-                        this.editor.last_edit_millis = Date.now()
-                        this.editor.last_edit_sent_text = this.editor.getValue()
-                        // WS
-                        let responseData = {
-                            event: 'editing',
-                            'target_cell': this.props.id,
-                            buffer: this.editor.getValue(),
-                            selection: this.editor.selection.getRange(),
-                            iteration: this.editor.current_iteration
-                        }
-                        cellSocket.sendString(JSON.stringify(responseData));
-                    }
-                }, this.SERVER_UPDATE_DELAY_MS + 2) //note the 2ms grace period
+                editor.last_edit_millis = Date.now()
             }
         )
+	//schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms
+	//that will update the server, but only if the user has stopped typing.
+	// TODO unclear if this is owrking properly
+	window.setTimeout(function() {
+	    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
+		//save our current state to the remote buffer
+		editor.current_iteration += 1;
+		editor.last_edit_millis = Date.now()
+		editor.last_edit_sent_text = editor.getValue()
+		// WS
+		let responseData = {
+		    event: 'editing',
+		    'target_cell': editorId,
+		    buffer: editor.getValue(),
+		    selection: editor.selection.getRange(),
+		    iteration: editor.current_iteration
+		}
+		cellSocket.sendString(JSON.stringify(responseData));
+	    }
+	}, SERVER_UPDATE_DELAY_MS + 2) //note the 2ms grace period
     }
 
     setupKeybindings() {

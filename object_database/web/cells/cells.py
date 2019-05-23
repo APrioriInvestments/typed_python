@@ -2803,70 +2803,7 @@ class CodeEditor(Cell):
         self.postscript = """
             var editor = ace.edit("editor__identity__");
             aceEditors["editor__identity__"] = editor
-            editor.last_edit_millis = Date.now()
-
-            console.log("setting up editor with " )
-            editor.setTheme("ace/theme/textmate");
-            editor.session.setMode("ace/mode/python");
-            editor.setAutoScrollEditorIntoView(true);
-            editor.session.setUseSoftTabs(true);
-            editor.setValue("__text__");
-        """.replace("__text__", quoteForJs(self.initialText, '"'))
-
-        if self.autocomplete:
-            self.postscript += """
-            editor.setOptions({enableBasicAutocompletion: true});
-            editor.setOptions({enableLiveAutocompletion: true});
-            """
-
-        if self.fontSize is not None:
-            self.postscript += """
-            editor.setOption("fontSize", %s);
-            """ % self.fontSize
-
-        if self.minLines is not None:
-            self.postscript += """
-                editor.setOption("minLines", __minlines__);
-            """.replace("__minlines__", str(self.minLines))
-
-        if self.noScroll:
-            self.postscript += """
-                editor.setOption("maxLines", Infinity);
-            """
-
-        self.postscript += """
-            editor.session.on('change', function(delta) {
-                cellSocket.sendString(
-                    JSON.stringify(
-                        {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta}
-                        )
-                    )
-                //record that we just edited
-                editor.last_edit_millis = Date.now()
-
-                //schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms that will update the server,
-                //but only if the user has stopped typing.
-                SERVER_UPDATE_DELAY_MS = 200
-
-                window.setTimeout(function() {
-                    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
-                        //save our current state to the remote buffer
-                        editor.current_iteration += 1;
-                        editor.last_edit_millis = Date.now()
-                        editor.last_edit_sent_text = editor.getValue()
-
-                        cellSocket.sendString(
-                            JSON.stringify(
-                                {'event': 'editing', 'target_cell': '__identity__',
-                                'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
-                                'iteration': editor.current_iteration
-                                }
-                                )
-                            )
-                    }
-                }, SERVER_UPDATE_DELAY_MS + 2) //2ms for a little grace period.
-            });
-            """
+        """
 
         for kb in self.keybindings:
             self.postscript += """
