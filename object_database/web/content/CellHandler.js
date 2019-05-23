@@ -144,7 +144,7 @@ class CellHandler {
 	// DOM node. Hence if this.cell[message.id] is a vdom element we use its
 	// underlying domNode element when in operations like this.projector.replace()
 	let cell = this.cells[message.id];
-	
+
 	if (cell !== undefined && cell.domNode !== undefined) {
 	    cell = cell.domNode;
 	}
@@ -189,7 +189,7 @@ class CellHandler {
 		this.projector.append(this.cells["holding_pen"], () => {
                     return velement;
                 });
-                
+
 		this.cells[message.id] = velement;
             } else {
                 // Replace the existing copy of

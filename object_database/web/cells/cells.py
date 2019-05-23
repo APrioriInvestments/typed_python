@@ -2788,6 +2788,18 @@ class CodeEditor(Cell):
                 .set_attribute('style', editorStyle)
             )
         )
+
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['initialText'] = self.initialText
+        self.exportData['autocomplete'] = self.autocomplete
+        self.exportData['noScroll'] = self.noScroll
+        if self.fontSize is not None:
+            self.exportData['fontSize'] = self.fontSize
+        if self.minLines is not None:
+            self.exportData['minLines'] = self.minLines
+        # self.exportData['keybindings'] = self.keybindings
+
         self.postscript = """
             var editor = ace.edit("editor__identity__");
             aceEditors["editor__identity__"] = editor
@@ -2881,6 +2893,12 @@ class CodeEditor(Cell):
         self.postscript = self.postscript.replace(
             "__identity__", self.identity)
 
+        print()
+        print("CODEEDITOR")
+        print()
+        print(self.postscript)
+        print()
+
     def sendCurrentStateToBrowser(self, newSlotState):
         if self.cells is not None:
             # if self.identity is None, then we have not been installed in the tree yet
@@ -2909,6 +2927,9 @@ class CodeEditor(Cell):
                 .replace("__text__", quoteForJs(newSlotState[1], '"'))
                 .replace("__iteration__", str(newSlotState[0]))
             )
+            print()
+            print("WHOA SENDING CURRENT STATE TO BROWSER")
+            print()
         else:
             self.initialText = newSlotState[1]
 

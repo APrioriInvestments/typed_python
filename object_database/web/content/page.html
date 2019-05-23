@@ -72,7 +72,8 @@
 <script src="/content/components/SubscribedSequence.js"></script>
 <script src="/content/components/ContextualDisplay.js"></script>
 <script src="/content/components/SingleLineTextBox.js"></script>
-<script src="/content/components/Table2.js"></script>
+<script src="/content/components/CodeEditor.js"></script>
+<!-- <script src="/content/components/Table2.js"></script> -->
 
 <script>
  // This is the initial render function. It is called when "DOMContentLoaded"
@@ -95,7 +96,7 @@
 
 <script>
  // maquette vdom setup
- // maquette.h is the maquette virtual hyperscript func for vdom interaction 
+ // maquette.h is the maquette virtual hyperscript func for vdom interaction
  var h = maquette.h;
  var projector = maquette.createProjector();
 
@@ -114,6 +115,7 @@
 	 CircleLoader,
    Clickable,
    Code,
+   CodeEditor,
 	 CollapsiblePanel,
 	 Columns,
 	 Container,
@@ -132,7 +134,7 @@
 	 Span,
    Subscribed,
    SubscribedSequence,
-   Table,
+   // Table,
 	 Tabs,
 	 Text,
 	 Traceback,
