@@ -6,126 +6,9 @@
 
 // NOTE: For the moment we assume global
 // availability of the `h` hyperscript
-// constructor.
+// constructor and the ReplacementsHandler util class.
 //import {h} from 'maquette';
-
-class ReplacementsHandler {
-    constructor(initialReplacements = []){
-        this.replacementNames = initialReplacements;
-        this.processReplacements();
-
-        // Bind context to methods
-        this.processReplacements = this.processReplacements.bind(this);
-        this.addReplacement = this.addReplacement.bind(this);
-        this._processEnumerated = this._processEnumerated.bind(this);
-        this._sortEnumeratedValues = this._sortEnumeratedValues.bind(this);
-        this.hasReplacement = this.hasReplacement.bind(this);
-    }
-
-    addReplacement(replacementName){
-        if(this.replacementNames.includes(replacementName)){
-            return;
-        }
-        this.replacementNames.push(replacementName);
-        this.processReplacements();
-    }
-
-    hasReplacement(aName){
-        let found = this.replacementDict[aName];
-        if(found && found != undefined){
-            return true;
-        } else {
-            found = this.enumeratedReplacementDict[aName];
-            if(found && found != undefined){
-                return true;
-            }
-        }
-        return false;
-    }
-
-    getReplacement(replacementName){
-        // Checks the plain dict first and
-        // if nothing is present, tries
-        // the enumerated value dict.
-        // Will return undefined if both fail
-        let initial = this.replacementDict[replacementName];
-        if(initial != undefined){
-            return initial;
-        }
-        initial = this.enumeratedReplacementDict[replacementName];
-        return initial;
-    }
-
-    processReplacements(){
-        this.replacementDict = {};
-        this.enumeratedReplacementDict = {};
-        this.replacementNames.forEach(name => {
-            let nameParts = [];
-            let isEnumerated = false;
-            let enumeratedVal = null;
-
-            // First, remove all the underscores
-            // to get a list of real tokens
-            let tokens = name.split('_').filter(item => {
-                return item != '';
-            });
-
-            // See if any of the tokens are numbers.
-            // If not, they are hyphenated name parts
-            // that can be used as keys. Otherwise
-            // this is an enumerated kind of replacement
-            // key like `____button_1__` etc/
-            tokens.forEach(token => {
-                let num = parseInt(token);
-                if(isNaN(num)){
-                    nameParts.push(token);
-                } else {
-                    isEnumerated = true;
-                    enumeratedVal = num;
-                }
-            });
-
-            if(nameParts.length == 0){
-                throw Error(`Could not process replacement name for ${name}`);
-            }
-
-            let replacementKey = nameParts.join('-');
-            if(isEnumerated){
-                this._processEnumerated(name, replacementKey, enumeratedVal);
-            } else {
-                this.replacementDict[replacementKey] = name;
-            }
-        });
-
-        // Sort the enumerated dict values by the index,
-        // ripping those indices out. This ensures that
-        // each enumerated list of replacements is in the
-        // correct order
-        this._sortEnumeratedValues();
-    }
-
-    _processEnumerated(name, replacementKey, index){
-        if(this.enumeratedReplacementDict[replacementKey] == undefined){
-            this.enumeratedReplacementDict[replacementKey] = [];
-        }
-        this.enumeratedReplacementDict[replacementKey].push([name, index]);
-    }
-
-    _sortEnumeratedValues(){
-        Object.keys(this.enumeratedReplacementDict).forEach(key => {
-            let unsorted = this.enumeratedReplacementDict[key];
-            unsorted.sort((first, second) => {
-                return first[1] - second[1];
-            });
-
-            // Now set the array to a version that filters out
-            // the index values (we no longer need them)
-            this.enumeratedReplacementDict[key] = unsorted.map(item => {
-                return item[0]; // The string (item[1] is the index)
-            });
-        });
-    }
-}
+//import {ReplacementsHandler} from './util/ReplacementsHandler';
 
 class Component {
     constructor(props = {}, children = [], replacements = []){
@@ -134,7 +17,6 @@ class Component {
         this.replacements = new ReplacementsHandler(replacements);
 
         // Bind context to methods
-        this.getReplacementWithId = this.getReplacementWithId.bind(this);
         this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
         this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
     }
@@ -148,43 +30,20 @@ class Component {
     }
 
     /**
-     * This is a hacky method that allows extended
-     * components to deal cleanly with the replacement
-     * strings that it will use.
-     * Eventually we want to get rid of this.
-     */
-    getReplacementWithId(replacementName){
-        let found = this.replacements.getReplacement(replacementName);
-        if(found == undefined){
-            return found;
-        }
-
-        if(Array.isArray(found)){
-            return found.map(name => {
-                return `${this.props.id}_${name}`;
-            });
-        }
-
-        return `${this.props.id}_${found}`;
-    }
-
-    /**
-     * Respond with a hyperscript object
-     * with an ID-formatted div mapped
-     * with the replacement string.
-     * This is for single replacements only.
-     * Replacement lists (multiple indexed
-     * replacements) should use the
-     * `getReplacementElementsFor()` method.
+     * Responds with a hyperscript object
+     * that represents a div that is formatted
+     * already for the regular replacement.
+     * This only works for regular type replacements.
+     * For enumerated replacements, use
+     * #getReplacementElementsFor()
      */
     getReplacementElementFor(replacementName){
-        let replacementId = this.getReplacementWithId(replacementName);
-        if(replacementId == undefined){
-            return null;
-        } else if(Array.isArray(replacementId)){
-            return null;
+        let replacement = this.replacements.getReplacementFor(replacementName);
+        if(replacement){
+            let newId = `${this.props.id}_${replacement}`;
+            return h('div', {id: newId, key: newId}, []);
         }
-        return h('div', {id: replacementId, key: replacementId}, []);
+        return null;
     }
 
     /**
@@ -195,12 +54,14 @@ class Component {
      * ie `____button_1`, `____button_2__` etc.
      */
     getReplacementElementsFor(replacementName){
-        let replacementIds = this.getReplacementWithId(replacementName);
-        if(!Array.isArray(replacementIds)){
+        if(!this.replacements.hasReplacement(replacementName)){
             return null;
         }
-        return replacementIds.map(replacementId => {
-            return h('div', {id: replacementId, key: replacementId}, []);
+        return this.replacements.mapReplacementsFor(replacementName, replacement => {
+            let newId = `${this.props.id}_${replacement}`;
+            return (
+                h('div', {id: newId, key: newId})
+            );
         });
     }
 }

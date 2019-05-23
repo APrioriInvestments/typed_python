@@ -8,6 +8,7 @@ nativepython.egg-info
 # Ignore node modules
 # and evironments EVERYWHERE
 nodeenv
+.nodeenv
 node_modules
 
 # leading slash means only match at repo-root level

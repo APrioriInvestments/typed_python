@@ -1,3 +1,10 @@
+/**
+ * About Replacements
+ * ------------------
+ * This component has a single
+ * enumerated replacement:
+ * * `child`
+ */
 class SubscribedSequence extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -10,14 +17,14 @@ class SubscribedSequence extends Component {
 
     render(){
         return h('div',
-            { 
+            {
                 class: this.makeClass(),
                 style: this.props.extraData.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "SubscribedSequence"
             }, [this.makeChildren()]
-        )
+        );
     }
 
     makeClass() {
@@ -27,25 +34,23 @@ class SubscribedSequence extends Component {
         return "cell subscribedSequence";
     }
 
-    makeChildren() {
-        if (this.props.extraData.asColumns) {
-            let spineChildren = [];
-            for (var c = 0; c < this.props.extraData.numSpineChildren; c++){
-                spineChildren.push(
-                    h("div", {class: "col-sm", id: "spin_child_" + c}, [
-                        h("span", {}, ["____child_" + c + "__"]) // TODO: does this make sense?
+    makeChildren(){
+        if(this.props.extraData.asColumns){
+            let formattedChildren = this.getReplacementElementsFor('child').map(childElement => {
+                return(
+                    h('div', {class: "col-sm", key: childElement.id}, [
+                        h('span', {}, [childElement])
                     ])
-                )
-            }
-            return h("div", {class: "row flex-nowrap"}, spineChildren);
+                );
+            });
+            return (
+                h('div', {class: "row flex-nowrap", key: `${this.props.id}-spine-wrapper`}, formattedChildren)
+            );
+        } else {
+            return (
+                h('div', {key: `${this.props.id}-spine-wrapper`}, this.getReplacementElementsFor('child'))
+            );
         }
-
-        let spineChildren = "";
-        for (var c = 0; c < this.props.extraData.numSpineChildren; c++){
-            spineChildren += "____child_" + c + "__"; //TODO: does this make sense?
-        }
-        return h("div", {}, [spineChildren]);
-
     }
 }
 
