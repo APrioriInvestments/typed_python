@@ -50,7 +50,7 @@ class Table extends Component {
     }
 
     _theadStyle(){
-        return "border-bottom:black;border-bottom-style:solid;border-bottom-width:thin;";
+        return "border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;";
     }
 
     _makeHeaderElements(){
@@ -75,8 +75,9 @@ class Table extends Component {
                     }, [childElement])
                 );
             });
+            let indexElement = h('td', {}, [`${rowIdx + 1}`]);
             return (
-                h('tr', {key: `${this.props.id}-tr-${rowIdx}`}, columns)
+                h('tr', {key: `${this.props.id}-tr-${rowIdx}`}, [indexElement, ...columns])
             );
         });
     }
