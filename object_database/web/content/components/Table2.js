@@ -5,6 +5,7 @@
 //import {Component} from './Component';
 //import {h} from 'maquette';
 
+
 /**
  * About Replacements
  * ------------------
@@ -29,6 +30,7 @@ class Table extends Component {
         this._makeRowElements = this._makeRowElements.bind(this);
         this._makeFirstRowElement = this._makeFirstRowElement.bind(this);
         this._theadStyle = this._theadStyle.bind(this);
+        this._getRowDisplayElements = this._getRowDisplayElements.bind(this);
     }
 
     render(){
@@ -61,6 +63,7 @@ class Table extends Component {
     }
 
     _makeRowElements(){
+        debugger;
         // Note: rows are the *first* dimension
         // in the 2-dimensional array returned
         // by getting the `child` replacement elements.
@@ -85,13 +88,25 @@ class Table extends Component {
                 h('th', {style: "vertical-align:top;"}, [
                     h('div', {class: "card"}, [
                         h('div', {class: "card-body p-1"}, [
-                            this.extraData.rowDisplayText,
+                            ...this._getRowDisplayElements(),
                             ...headerElements
                         ])
                     ])
                 ])
             ])
         );
+    }
+
+    _getRowDisplayElements(){
+        return [
+            this.getReplacementElementFor('left'),
+            " ",
+            this.getReplacementElementFor('right'),
+            " Page ",
+            this.getReplacementElementFor('page'),
+            " of ",
+            this.props.extraData.totalPages.toString()
+        ];
     }
 }
 

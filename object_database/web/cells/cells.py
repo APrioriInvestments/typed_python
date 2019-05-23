@@ -2522,7 +2522,7 @@ class Table(Cell):
         # print()
 
         # temporary js WS refactoring data
-        self.exportData['rowDisplayText'] = rowDisplay
+        self.exportData['totalPages'] = totalPages
         self.exportData['numColumns'] = len(self.cols)
         self.exportData['numRows'] = len(self.rows)
 
