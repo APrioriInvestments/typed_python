@@ -19,6 +19,7 @@ class Component {
         // Bind context to methods
         this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
         this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
+        this.componentDidLoad = this.componentDidLoad.bind(this);
     }
 
     render(){
@@ -29,6 +30,14 @@ class Component {
         throw new Error('You must implement a `render` method on Component objects!');
     }
 
+    /**
+     * Object that extend from me could overwrite this method.
+     * It is to be used for lifecylce management and is to be called
+     * after the components loads.
+    */
+    componentDidLoad() {
+        return null;
+    }
     /**
      * Responds with a hyperscript object
      * that represents a div that is formatted

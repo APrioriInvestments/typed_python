@@ -166,18 +166,19 @@ class CellHandler {
 	    // TODO: this is a temporary branching, to be removed with a more logical setup. As
 	    // of writing if the message coming across is sending a "known" component then we use
 	    // the component itself as opposed to building a vdom element from the raw html
-	    let component = this.components[message.component_name];
-	    if (component === undefined) {
+	    let componentClass = this.components[message.component_name];
+	    if (componentClass === undefined) {
 		var velement = this.htmlToVDomEl(message.contents, message.id);
 	    } else {
-		var velement = new component(
+		var component = new componentClass(
                     {
                         id: message.id,
                         extraData: message.extra_data
                     },
                     [],
                     message.replacement_keys
-                ).render();
+                );
+                var velement = component.render()
 	    }
 
             // Install the element into the dom
@@ -202,6 +203,11 @@ class CellHandler {
 		    this.projector.replace(cell, () => {return velement;});
 		}
 	    }
+
+	    if (componentClass !== undefined) {
+                // after initial load, lifecylce management;
+                component.componentDidLoad();
+            }
 
             this.cells[message.id] = velement;
 
