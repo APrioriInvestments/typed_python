@@ -109,6 +109,16 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(f(20), 60)
         self.assertEqual(f(10), 30)
 
+    def test_in_to_out(self):
+        def identity(x: In) -> Out:
+            return x
+
+        compiled_identity = Runtime.singleton().compile(identity)
+
+        self.assertIsInstance(compiled_identity(0.5), float)
+        self.assertIsInstance(compiled_identity(0.0), float)
+        self.assertIsInstance(compiled_identity(1), int)
+
     def test_binary_operators(self):
         r = Runtime.singleton()
 

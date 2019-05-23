@@ -32,7 +32,7 @@ public:
 
     static std::pair<bool, PyObject*> tryToCallAnyOverload(const Function* f, PyObject* self, PyObject* args, PyObject* kwargs);
 
-    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs);
+    static std::pair<bool, PyObject*> tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly);
 
     //perform a linear scan of all specializations contained in overload and attempt to dispatch to each one.
     //returns <true, result or none> if we dispatched.

@@ -306,7 +306,8 @@ class NativeClassTypesTests(unittest.TestCase):
             def f(self, **kwargs: TupleOf(int)):  # noqa: F811
                 return "named tuple of ints"
 
-        self.assertEqual(C().f(1), float)
+        self.assertEqual(C().f(1.0), float)
+        self.assertEqual(C().f(1), "any")
         self.assertEqual(C().f("asdf"), "any")
         self.assertEqual(C().f("asdf", "asdf2"), "string list")
         self.assertEqual(C().f(1, 2), "int list")
@@ -356,7 +357,7 @@ class NativeClassTypesTests(unittest.TestCase):
                 return "named tuple of ints"
 
         for thing in [C(), C]:
-            self.assertEqual(thing.f(1), float)
+            self.assertEqual(thing.f(1.0), float)
             self.assertEqual(thing.f("asdf"), "any")
             self.assertEqual(thing.f("asdf", "asdf2"), "string list")
             self.assertEqual(thing.f(1, 2), "int list")
@@ -447,7 +448,7 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(WithGetitem()["hi"], "Str")
 
         with self.assertRaises(TypeError):
-            WithGetitem()[1.2]
+            WithGetitem()[None]
 
     def test_class_with_len(self):
         class WithLen(Class):

@@ -22,9 +22,10 @@ class NativeFunctionTypesTests(unittest.TestCase):
             return x + 1
 
         self.assertEqual(f(2), 3)
+        self.assertEqual(f(2.5), 3)
 
         with self.assertRaises(TypeError):
-            f(3.5)
+            f(None)
 
         self.assertEqual(len(f.overloads), 1)
         o = f.overloads[0]

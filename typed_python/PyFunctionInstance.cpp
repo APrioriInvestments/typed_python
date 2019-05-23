@@ -24,13 +24,18 @@ Function* PyFunctionInstance::type() {
 std::pair<bool, PyObject*>
 PyFunctionInstance::tryToCallAnyOverload(const Function* f, PyObject* self,
                                          PyObject* args, PyObject* kwargs) {
-    for (const auto& overload: f->getOverloads()) {
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallOverload(overload, self, args, kwargs);
-        if (res.first) {
-            return res;
+    //first try to match arguments with no explicit conversion.
+    //if that fails, try explicit conversion
+    for (long tryToConvertExplicitly = 0; tryToConvertExplicitly <= 1; tryToConvertExplicitly++) {
+        for (const auto& overload: f->getOverloads()) {
+            std::pair<bool, PyObject*> res =
+                PyFunctionInstance::tryToCallOverload(overload, self, args, kwargs, tryToConvertExplicitly);
+            if (res.first) {
+                return res;
+            }
         }
     }
+
     std::string argTupleTypeDesc = PyFunctionInstance::argTupleTypeDescription(args, kwargs);
 
     PyErr_Format(
@@ -43,7 +48,7 @@ PyFunctionInstance::tryToCallAnyOverload(const Function* f, PyObject* self,
 }
 
 // static
-std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs) {
+std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function::Overload& f, PyObject* self, PyObject* args, PyObject* kwargs, bool convertExplicitly) {
     PyObjectStealer targetArgTuple(PyTuple_New(PyTuple_Size(args)+(self?1:0)));
     Function::Matcher matcher(f);
 
@@ -72,11 +77,17 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
             try {
                 PyObject* targetObj =
                     PyInstance::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                        copyConstructFromPythonInstance(targetType, data, elt);
+                        copyConstructFromPythonInstance(targetType, data, elt, convertExplicitly);
                     });
 
                 PyTuple_SetItem(targetArgTuple, write_slot++, targetObj);
-            } catch(...) {
+            }
+            catch(PythonExceptionSet& e) {
+                PyErr_Clear();
+                //not a valid conversion, but keep going
+                return std::make_pair(false, nullptr);
+            }
+            catch(...) {
                 //not a valid conversion, but keep going
                 return std::make_pair(false, nullptr);
             }
@@ -111,11 +122,16 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
                 try {
                     PyObjectStealer convertedValue(
                         PyInstance::initializePythonRepresentation(targetType, [&](instance_ptr data) {
-                            copyConstructFromPythonInstance(targetType, data, value);
+                            copyConstructFromPythonInstance(targetType, data, value, convertExplicitly);
                         })
                     );
 
                     PyDict_SetItem(newKwargs, key, convertedValue);
+                }
+                catch(PythonExceptionSet& e) {
+                    PyErr_Clear();
+                    //not a valid conversion, but keep going
+                    return std::make_pair(false, nullptr);
                 } catch(...) {
                     //not a valid conversion
                     return std::make_pair(false, nullptr);
@@ -151,7 +167,7 @@ std::pair<bool, PyObject*> PyFunctionInstance::tryToCallOverload(const Function:
     if (f.getReturnType()) {
         try {
             PyObject* newRes = PyInstance::initializePythonRepresentation(f.getReturnType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(f.getReturnType(), data, result);
+                    copyConstructFromPythonInstance(f.getReturnType(), data, result, true);
                 });
             return std::make_pair(true, newRes);
         } catch (std::exception& e) {
@@ -322,10 +338,12 @@ PyObject* PyFunctionInstance::createOverloadPyRepresentation(Function* f) {
 }
 
 PyObject* PyFunctionInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
-    for (const auto& overload: type()->getOverloads()) {
-        std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, args, kwargs);
-        if (res.first) {
-            return res.second;
+    for (long convertExplicitly = 0; convertExplicitly <= 1; convertExplicitly++) {
+        for (const auto& overload: type()->getOverloads()) {
+            std::pair<bool, PyObject*> res = PyFunctionInstance::tryToCallOverload(overload, nullptr, args, kwargs, convertExplicitly);
+            if (res.first) {
+                return res.second;
+            }
         }
     }
 

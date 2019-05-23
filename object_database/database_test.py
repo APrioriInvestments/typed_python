@@ -287,6 +287,17 @@ class ObjectDatabaseTests:
         with db2.view():
             self.assertTrue(t.exists())
 
+    def test_can_convert_numpy_int(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            c = Counter(x=numpy.int64(10))
+            c.k = numpy.int64(20)
+
+        with db.view():
+            self.assertEqual(c.k, 20)
+
     def test_subscribe_to_objects(self):
         db1 = self.createNewDb()
         db1.subscribeToSchema(schema)

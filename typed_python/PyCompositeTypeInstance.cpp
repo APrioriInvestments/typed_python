@@ -119,7 +119,7 @@ void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* name
                 Type* eltType = namedTupleT->getTypes()[k];
                 PyObject* o = PyDict_GetItemString(kwargs, namedTupleT->getNames()[k].c_str());
                 if (o) {
-                    copyConstructFromPythonInstance(eltType, eltPtr, o);
+                    copyConstructFromPythonInstance(eltType, eltPtr, o, true);
                     actuallyUsed++;
                 }
                 else if (eltType->is_default_constructible()) {

@@ -23,19 +23,39 @@ public:
     typedef OneOfType modeled_type;
 
     static void copyConstructFromPythonInstanceConcrete(OneOfType* oneOf, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-        for (long k = 0; k < oneOf->getTypes().size(); k++) {
-            Type* subtype = oneOf->getTypes()[k];
+        auto tryToConvert = [&](bool usingExplicit) {
+          for (long k = 0; k < oneOf->getTypes().size(); k++) {
+              Type* subtype = oneOf->getTypes()[k];
 
-            if (pyValCouldBeOfType(subtype, pyRepresentation, isExplicit)) {
-                try {
-                    copyConstructFromPythonInstance(subtype, tgt+1, pyRepresentation);
-                    *(uint8_t*)tgt = k;
-                    return;
-                } catch(PythonExceptionSet& e) {
-                    PyErr_Clear();
-                } catch(...) {
-                }
-            }
+              if (pyValCouldBeOfType(subtype, pyRepresentation, usingExplicit)) {
+                  try {
+                      copyConstructFromPythonInstance(subtype, tgt+1, pyRepresentation, usingExplicit);
+                      *(uint8_t*)tgt = k;
+                      return true;
+                  } catch(PythonExceptionSet& e) {
+                      PyErr_Clear();
+                  } catch(...) {
+                  }
+              }
+          }
+
+          return false;
+        };
+
+        if (isExplicit) {
+          //first try to convert it _not_ explicitly, so that direct conversions work
+          if (tryToConvert(false)) {
+            return;
+          }
+
+          //the allow agressive conversion
+          if (tryToConvert(true)) {
+            return;
+          }
+        } else {
+          if (tryToConvert(false)) {
+            return;
+          }
         }
 
         throw std::logic_error("Can't initialize a " + oneOf->name() + " from an instance of " +

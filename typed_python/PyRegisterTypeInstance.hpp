@@ -173,28 +173,6 @@ public:
     static void copyConstructFromPythonInstanceConcrete(RegisterType<T>* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         Type::TypeCategory cat = eltType->getTypeCategory();
 
-        if (isInteger(cat) || cat == Type::TypeCategory::catBool) {
-            if (PyLong_Check(pyRepresentation)) {
-                ((T*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-                return;
-            }
-            if (PyFloat_Check(pyRepresentation) && isExplicit) {
-                ((T*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-                return;
-            }
-        }
-
-        if (isFloat(cat)) {
-            if (PyLong_Check(pyRepresentation)) {
-                ((T*)tgt)[0] = PyLong_AsLong(pyRepresentation);
-                return;
-            }
-            if (PyFloat_Check(pyRepresentation)) {
-                ((T*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
-                return;
-            }
-        }
-
         if (Type* other = extractTypeFrom(pyRepresentation->ob_type)) {
             Type::TypeCategory otherCat = other->getTypeCategory();
 
@@ -246,6 +224,68 @@ public:
             }
         }
 
+        if (isExplicit) {
+            //if this is an explicit cast, use python's internal type conversion
+            //mechanisms, which will call methods like __bool__, __int__, or __float__ on
+            //objects that have conversions defined.
+            if (cat == Type::TypeCategory::catBool) {
+                int result = PyObject_IsTrue(pyRepresentation);
+                if (result == -1) {
+                    throw PythonExceptionSet();
+                }
+
+                ((T*)tgt)[0] = (result == 1);
+                return;
+            }
+            if (isInteger(cat)) {
+                long l = PyLong_AsLong(pyRepresentation);
+                if (l == -1 && PyErr_Occurred()) {
+                    throw PythonExceptionSet();
+                }
+
+                ((T*)tgt)[0] = l;
+                return;
+            }
+
+            if (isFloat(cat)) {
+                double d = PyFloat_AsDouble(pyRepresentation);
+                if (d == -1.0 && PyErr_Occurred()) {
+                    throw PythonExceptionSet();
+                }
+
+                ((T*)tgt)[0] = d;
+                return;
+            }
+        } else {
+            //if not explicit, we need to only convert types that have a direct
+            //correspondence
+            if (cat == Type::TypeCategory::catBool) {
+                if (PyBool_Check(pyRepresentation)) {
+                    int result = PyObject_IsTrue(pyRepresentation);
+                    if (result == -1) {
+                        throw PythonExceptionSet();
+                    }
+
+                    ((T*)tgt)[0] = (result == 1);
+                    return;
+                }
+            }
+
+            if (isInteger(cat)) {
+                if (PyLong_CheckExact(pyRepresentation)) {
+                    ((T*)tgt)[0] = PyLong_AsLong(pyRepresentation);
+                    return;
+                }
+            }
+
+            if (isFloat(cat)) {
+                if (PyFloat_Check(pyRepresentation)) {
+                    ((T*)tgt)[0] = PyFloat_AsDouble(pyRepresentation);
+                    return;
+                }
+            }
+        }
+
         PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
     }
 
@@ -277,14 +317,43 @@ public:
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* t, PyObject* pyRepresentation, bool isExplicit) {
         if (isFloat(t->getTypeCategory()))  {
-            return PyFloat_Check(pyRepresentation);
+            if (PyFloat_Check(pyRepresentation)) {
+                return true;
+            }
+
+            if (!isExplicit) {
+                return false;
+            }
+
+            if (!pyRepresentation->ob_type->tp_as_number) {
+                return false;
+            }
+
+            return pyRepresentation->ob_type->tp_as_number->nb_float != nullptr;
         }
 
         if (isInteger(t->getTypeCategory()))  {
-            return PyLong_CheckExact(pyRepresentation);
+            if (PyLong_Check(pyRepresentation)) {
+                return true;
+            }
+
+            if (!isExplicit) {
+                return false;
+            }
+
+            if (!pyRepresentation->ob_type->tp_as_number) {
+                return false;
+            }
+
+            return pyRepresentation->ob_type->tp_as_number->nb_int != nullptr;
+
         }
 
         if (t->getTypeCategory() == Type::TypeCategory::catBool) {
+            if (isExplicit) {
+                return true;
+            }
+
             return PyBool_Check(pyRepresentation);
         }
 

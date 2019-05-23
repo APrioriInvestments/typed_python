@@ -365,7 +365,7 @@ int PyDatabaseObjectType::tp_init(PyObject* self, PyObject* args, PyObject* kwar
 
             try {
                 typedArgs[argName] = Instance(argType, [&](instance_ptr tgt) {
-                    PyInstance::copyConstructFromPythonInstance(argType, tgt, value);
+                    PyInstance::copyConstructFromPythonInstance(argType, tgt, value, true);
                 });
             } catch(std::exception& e) {
                 throw std::runtime_error(
@@ -447,7 +447,7 @@ int PyDatabaseObjectType::tp_setattro(PyObject *o, PyObject* attrName, PyObject*
             Type* fieldType = fieldIt->second;
 
             Instance i(fieldType, [&](instance_ptr tgt) {
-                PyInstance::copyConstructFromPythonInstance(fieldType, tgt, attrVal);
+                PyInstance::copyConstructFromPythonInstance(fieldType, tgt, attrVal, true);
             });
 
             setFieldValue(obType, oid, attr, fieldType, i.data());

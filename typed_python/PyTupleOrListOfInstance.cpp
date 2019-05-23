@@ -115,7 +115,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
                             throw InternalPyException();
                         }
 
-                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o);
+                        PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o, true);
                     }
                 });
         });
@@ -266,7 +266,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         tupT->constructor(tgt, PyTuple_Size(pyRepresentation),
             [&](uint8_t* eltPtr, int64_t k) {
                 PyObjectHolder arg(PyTuple_GetItem(pyRepresentation,k));
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, arg);
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, arg, isExplicit);
                 }
             );
         return;
@@ -275,7 +275,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         tupT->constructor(tgt, PyList_Size(pyRepresentation),
             [&](uint8_t* eltPtr, int64_t k) {
                 PyObjectHolder listItem(PyList_GetItem(pyRepresentation,k));
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, listItem);
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, listItem, isExplicit);
                 }
             );
         return;
@@ -296,7 +296,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
                     throw std::logic_error("Set ran out of elements.");
                 }
 
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item);
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item, isExplicit);
             });
 
         return;
@@ -321,7 +321,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
                     return false;
                 }
 
-                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item);
+                PyInstance::copyConstructFromPythonInstance(tupT->getEltType(), eltPtr, item, isExplicit);
 
                 return true;
             });
@@ -489,7 +489,7 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
             self_w->type()->append(self_w->dataPtr(), value_w->dataPtr());
         } else {
             Instance temp(eltType, [&](instance_ptr data) {
-                PyInstance::copyConstructFromPythonInstance(eltType, data, value);
+                PyInstance::copyConstructFromPythonInstance(eltType, data, value, true);
             });
 
             self_w->type()->append(self_w->dataPtr(), temp.data());
@@ -575,7 +575,7 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
         } else {
             if (PyTuple_Size(args) == 2) {
                 Instance temp(eltType, [&](instance_ptr data) {
-                    PyInstance::copyConstructFromPythonInstance(eltType, data, PyTuple_GetItem(args, 1));
+                    PyInstance::copyConstructFromPythonInstance(eltType, data, PyTuple_GetItem(args, 1), true);
                 });
 
                 self_w->type()->resize(self_w->dataPtr(), size, temp.data());
@@ -679,7 +679,7 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
                 );
         } else {
             Instance toAssign(eltType, [&](instance_ptr data) {
-                PyInstance::copyConstructFromPythonInstance(eltType, data, value);
+                PyInstance::copyConstructFromPythonInstance(eltType, data, value, true);
             });
 
             eltType->assign(

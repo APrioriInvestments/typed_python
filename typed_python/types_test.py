@@ -1503,6 +1503,10 @@ class NativeTypesTests(unittest.TestCase):
             (1, 2, 3), TupleOf(int)([1, 2, 3])
         )
 
+    def test_can_convert_numpy_scalars(self):
+        self.assertEqual(OneOf(int, float)(numpy.int64(10)), 10)
+        self.assertEqual(OneOf(int, float)(numpy.float64(10.5)), 10.5)
+
     def test_other_bitness_types(self):
         # verify we can cast around non-64-bit values in a way that matches numpy
         typeAndNumpyType = [
@@ -1613,6 +1617,44 @@ class NativeTypesTests(unittest.TestCase):
     def test_list_of_indexing_with_numpy_ints(self):
         x = ListOf(ListOf(int))([[1, 2, 3], [4, 5, 6]])
         self.assertEqual(x[numpy.int64(0)][numpy.int64(0)], 1)
+
+    def test_dispatch_tries_without_conversion_first(self):
+        class ClassWithForcedConversion(Class):
+            def f(self, x: float):
+                return "float"
+
+        class ClassWithBoth(Class):
+            def f(self, x: float):
+                return "float"
+
+            def f(self, x: int):  # noqa: F811
+                return "int"
+
+            def f(self, x: bool):  # noqa: F811
+                return "bool"
+
+        # swap the order
+        class ClassWithBoth2(Class):
+            def f(self, x: bool):
+                return "bool"
+
+            def f(self, x: int):  # noqa: F811
+                return "int"
+
+            def f(self, x: float):  # noqa: F811
+                return "float"
+
+        self.assertEqual(ClassWithForcedConversion().f(10), "float")
+        self.assertEqual(ClassWithForcedConversion().f(10.5), "float")
+        self.assertEqual(ClassWithForcedConversion().f(True), "float")
+
+        self.assertEqual(ClassWithBoth().f(10), "int")
+        self.assertEqual(ClassWithBoth().f(10.5), "float")
+        self.assertEqual(ClassWithBoth().f(True), "bool")
+
+        self.assertEqual(ClassWithBoth2().f(10), "int")
+        self.assertEqual(ClassWithBoth2().f(10.5), "float")
+        self.assertEqual(ClassWithBoth2().f(True), "bool")
 
     def test_error_message_on_bad_dispatch(self):
         @Function
@@ -1823,3 +1865,10 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertFalse(isSimple(OneOf(int, X)))
         self.assertTrue(isSimple(OneOf(int, float)))
+
+    def test_oneof_picks_best_choice(self):
+        T = OneOf(float, int, bool)
+
+        self.assertIsInstance(T(1.5), float)
+        self.assertIsInstance(T(1), int)
+        self.assertIsInstance(T(True), bool)
