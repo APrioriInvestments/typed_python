@@ -3049,93 +3049,20 @@ class Sheet(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = (
-            (
-                """
-                function model(opts) { return {} }
+        # Deleted the postscript that was here.
+        # Should now be implemented completely
+        # in the JS side component.
 
-                function property(index) {
-                  return function (row) {
-                    return row[index]
-                  }
-                }
-
-                function SyntheticIntegerArray(size) {
-                    this.length = size
-                    this.cache = {}
-                    this.push = function() { }
-                    this.splice = function() {}
-
-                    this.slice = function(low, high) {
-                        if (high === undefined) {
-                            high = this.length
-                        }
-
-                        res = Array(high-low)
-                        initLow = low
-                        while (low < high) {
-                            out = this.cache[low]
-                            if (out === undefined) {
-                                cellSocket.sendString(JSON.stringify(
-                                    {'event':'sheet_needs_data',
-                                     'target_cell': '__identity__',
-                                     'data': low
-                                     }
-                                    ))
-                                out = emptyRow
-                            }
-                            res[low-initLow] = out
-                            low = low + 1
-                        }
-
-                        return res
-                    }
-                }
-
-                var data = new SyntheticIntegerArray(__rows__)
-                var container = document.getElementById('sheet__identity__');
-
-                var colnames = [__column_names__]
-                var columns = []
-                var emptyRow = []
-
-                for (var i = 0; i < colnames.length; i++) {
-                    columns.push({data: property(i)})
-                    emptyRow.push("")
-                }
-
-                var currentTable = new Handsontable(container, {
-                    data: data,
-                    dataSchema: model,
-                    colHeaders: colnames,
-                    columns: columns,
-                    rowHeaders: true,
-                    rowHeaderWidth: 100,
-                    viewportRowRenderingOffset: 100,
-                    autoColumnSize: false,
-                    autoRowHeight: false,
-                    manualColumnResize: true,
-                    colWidths: __col_width__,
-                    rowHeights: 23,
-                    readOnly: true,
-                    ManualRowMove: false
-                    });
-                handsOnTables["__identity__"] = {
-                        table: currentTable,
-                        lastCellClicked: {row: -100, col:-100},
-                        dblClicked: true
-                }
-                """ +
-                (self._addHandsontableOnCellDblClick()
-                 if "onCellDblClick" in self._hookfns else "")
-            )
-            .replace("__identity__", self._identity)
-            .replace("__rows__", str(self.rowCount))
-            .replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames))
-            .replace("__col_width__", json.dumps(self.colWidth))
-        )
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['columnNames'] = [x for x in self.columnNames]
+        self.exportData['rowCount'] = self.rowCount
+        self.exportData['columnWidth'] = self.colWidth
+        self.exportData['handlesDoubleClick'] = ("onCellDblClick" in self._hookfns)
 
     def onMessage(self, msgFrame):
+        """TODO: We will need to update the Cell lifecycle
+        and data handling before we can move this
+        to the JS side"""
 
         if msgFrame["event"] == 'sheet_needs_data':
             row = msgFrame['data']
