@@ -74,6 +74,7 @@
 <script src="/content/components/SingleLineTextBox.js"></script>
 <script src="/content/components/CodeEditor.js"></script>
 <script src="/content/components/Table.js"></script>
+<script src="/content/components/Grid.js"></script>
 
 <script>
  // This is the initial render function. It is called when "DOMContentLoaded"
@@ -105,40 +106,41 @@
  var handsOnTables = {}; // Not sure what this is or where it's used
 
  const availableComponents = {
-	 AsyncDropdown,
-	 AsyncDropdownContent,
-	 Badge,
-   Button,
-   ButtonGroup,
-   Card,
-   CardTitle,
-	 CircleLoader,
-   Clickable,
-   Code,
-   CodeEditor,
-	 CollapsiblePanel,
-	 Columns,
-	 Container,
-   ContextualDisplay,
-	 Dropdown,
-   Expands,
-	 HeaderBar,
-   LoadContentsFromUrl,
-	 LargePendingDownloadDisplay,
-   Modal,
-   Octicon,
-	 Padding,
-   Popover,
-	 Sequence,
-   SingleLineTextBox,
-	 Span,
-   Subscribed,
-   SubscribedSequence,
-   Table,
-	 Tabs,
-	 Text,
-	 Traceback,
-	 _NavTab,
+     AsyncDropdown,
+     AsyncDropdownContent,
+     Badge,
+     Button,
+     ButtonGroup,
+     Card,
+     CardTitle,
+     CircleLoader,
+     Clickable,
+     Code,
+     CodeEditor,
+     CollapsiblePanel,
+     Columns,
+     Container,
+     ContextualDisplay,
+     Dropdown,
+     Expands,
+     HeaderBar,
+     LoadContentsFromUrl,
+     LargePendingDownloadDisplay,
+     Modal,
+     Octicon,
+     Padding,
+     Popover,
+     Sequence,
+     SingleLineTextBox,
+     Span,
+     Subscribed,
+     SubscribedSequence,
+     Table,
+     Tabs,
+     Text,
+     Traceback,
+     _NavTab,
+     Grid
  };
 
  const cellSocket = new CellSocket();

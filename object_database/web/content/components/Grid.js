@@ -58,7 +58,7 @@ class Grid extends Component {
                 );
             });
             let rowLabelEl = null;
-            if(this.hasReplacement('rowlabel')){
+            if(this.replacements.hasReplacement('rowlabel')){
                 rowLabelEl = h('th', {key: `${this.props.id}-grid-rowlbl-${rowIdx}`}, [
                     this.getReplacementElementsFor('rowlabel')[rowIdx]
                 ]);
