@@ -92,28 +92,29 @@ class CodeEditor extends Component {
                 cellSocket.sendString(JSON.stringify(responseData));
                 //record that we just edited
                 editor.last_edit_millis = Date.now()
+
+		//schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms
+		//that will update the server, but only if the user has stopped typing.
+		// TODO unclear if this is owrking properly
+		window.setTimeout(function() {
+		    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
+			//save our current state to the remote buffer
+			editor.current_iteration += 1;
+			editor.last_edit_millis = Date.now()
+			editor.last_edit_sent_text = editor.getValue()
+			// WS
+			let responseData = {
+			    event: 'editing',
+			    'target_cell': editorId,
+			    buffer: editor.getValue(),
+			    selection: editor.selection.getRange(),
+			    iteration: editor.current_iteration
+			}
+			cellSocket.sendString(JSON.stringify(responseData));
+		    }
+		}, SERVER_UPDATE_DELAY_MS + 2) //note the 2ms grace period
             }
         )
-	//schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms
-	//that will update the server, but only if the user has stopped typing.
-	// TODO unclear if this is owrking properly
-	window.setTimeout(function() {
-	    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
-		//save our current state to the remote buffer
-		editor.current_iteration += 1;
-		editor.last_edit_millis = Date.now()
-		editor.last_edit_sent_text = editor.getValue()
-		// WS
-		let responseData = {
-		    event: 'editing',
-		    'target_cell': editorId,
-		    buffer: editor.getValue(),
-		    selection: editor.selection.getRange(),
-		    iteration: editor.current_iteration
-		}
-		cellSocket.sendString(JSON.stringify(responseData));
-	    }
-	}, SERVER_UPDATE_DELAY_MS + 2) //note the 2ms grace period
     }
 
     setupKeybindings() {

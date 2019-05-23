@@ -2828,9 +2828,6 @@ class CodeEditor(Cell):
                 .replace("__text__", quoteForJs(newSlotState[1], '"'))
                 .replace("__iteration__", str(newSlotState[0]))
             )
-            print()
-            print("WHOA SENDING CURRENT STATE TO BROWSER")
-            print()
         else:
             self.initialText = newSlotState[1]
 
