@@ -36,6 +36,9 @@
 <!-- Debugging Scripts -->
 <script src="/content/cellReporter.js"></script>
 
+<!-- Component Utilities -->
+<script src="/content/components/util/ReplacementsHandler.js"></script>
+
 <!-- Cell Components -->
 <script src="/content/components/Component.js"></script>
 <script src="/content/components/Card.js"></script>
@@ -48,9 +51,6 @@
 <script src="/content/components/Button.js"></script>
 <script src="/content/components/ButtonGroup.js"></script>
 <script src="/content/components/Clickable.js"></script>
-<!--
-<script src="/content/components/Table.js"></script>
--->
 <script src="/content/components/CollapsiblePanel.js"></script>
 <script src="/content/components/Text.js"></script>
 <script src="/content/components/Padding.js"></script>
@@ -102,38 +102,37 @@
  var handsOnTables = {}; // Not sure what this is or where it's used
 
  const availableComponents = {
-	 AsyncDropdown,
-	 AsyncDropdownContent,
-	 Badge,
-   Button,
-   ButtonGroup,
-   Card,
-   CardTitle,
-	 CircleLoader,
-   Clickable,
-   Code,
-	 CollapsiblePanel,
-	 Columns,
-	 Container,
-   ContextualDisplay,
-	 Dropdown,
-   Expands,
-	 HeaderBar,
-   LoadContentsFromUrl,
-	 LargePendingDownloadDisplay,
-   Modal,
-   Octicon,
-	 Padding,
-   Popover,
-	 Sequence,
-	 Span,
-   Subscribed,
-   SubscribedSequence,
-   // Table,
-	 Tabs,
-	 Text,
-	 Traceback,
-	 _NavTab,
+     AsyncDropdown,
+     AsyncDropdownContent,
+     Badge,
+     Button,
+     ButtonGroup,
+     Card,
+     CardTitle,
+     CircleLoader,
+     Clickable,
+     Code,
+     CollapsiblePanel,
+     Columns,
+     Container,
+     ContextualDisplay,
+     Dropdown,
+     Expands,
+     HeaderBar,
+     LoadContentsFromUrl,
+     LargePendingDownloadDisplay,
+     Modal,
+     Octicon,
+     Padding,
+     Popover,
+     Sequence,
+     Span,
+     Subscribed,
+     SubscribedSequence,
+     Tabs,
+     Text,
+     Traceback,
+     _NavTab
  };
 
  const cellSocket = new CellSocket();
