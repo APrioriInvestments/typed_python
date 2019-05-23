@@ -44,7 +44,7 @@ class CodeEditor extends Component {
                 this.editor.setOption("minLines", this.props.extraData.minLines);
             }
 
-            // this.setupKeybindings()
+            this.setupKeybindings()
 
             this.changeHandler()
         }
@@ -117,6 +117,7 @@ class CodeEditor extends Component {
     }
 
     setupKeybindings() {
+        console.log("setting up keybindings")
         this.props.extraData.keybindings.map((kb) => {
             this.editor.commands.addCommand(
                 {

@@ -2798,43 +2798,7 @@ class CodeEditor(Cell):
             self.exportData['fontSize'] = self.fontSize
         if self.minLines is not None:
             self.exportData['minLines'] = self.minLines
-        # self.exportData['keybindings'] = self.keybindings
-
-        self.postscript = """
-            var editor = ace.edit("editor__identity__");
-            aceEditors["editor__identity__"] = editor
-        """
-
-        for kb in self.keybindings:
-            self.postscript += """
-            editor.commands.addCommand({
-                name: 'cmd___key__',
-                bindKey: {win: 'Ctrl-__key__',  mac: 'Command-__key__'},
-                exec: function(editor) {
-                    editor.current_iteration += 1;
-                    editor.last_edit_millis = Date.now()
-                    editor.last_edit_sent_text = editor.getValue()
-
-                    cellSocket.sendString(
-                        JSON.stringify(
-                            {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
-                            'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
-                            'iteration': editor.current_iteration}
-                            )
-                        )
-                },
-                readOnly: true // false if this command should not apply in readOnly mode
-            });
-            """.replace("__key__", kb)
-
-        self.postscript = self.postscript.replace(
-            "__identity__", self.identity)
-
-        print()
-        print("CODEEDITOR")
-        print()
-        print(self.postscript)
-        print()
+        self.exportData['keybindings'] = [k for k in self.keybindings.keys()]
 
     def sendCurrentStateToBrowser(self, newSlotState):
         if self.cells is not None:
