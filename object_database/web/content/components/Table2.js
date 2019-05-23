@@ -89,11 +89,11 @@ class Table extends Component {
                 h('th', {style: "vertical-align:top;"}, [
                     h('div', {class: "card"}, [
                         h('div', {class: "card-body p-1"}, [
-                            ...this._getRowDisplayElements(),
-                            ...headerElements
+                            ...this._getRowDisplayElements()
                         ])
                     ])
-                ])
+                ]),
+                ...headerElements
             ])
         );
     }
@@ -101,12 +101,8 @@ class Table extends Component {
     _getRowDisplayElements(){
         return [
             this.getReplacementElementFor('left'),
-            " ",
             this.getReplacementElementFor('right'),
-            " Page ",
             this.getReplacementElementFor('page'),
-            " of ",
-            this.props.extraData.totalPages.toString()
         ];
     }
 }
