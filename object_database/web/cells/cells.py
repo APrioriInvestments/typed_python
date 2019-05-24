@@ -3101,43 +3101,7 @@ class Plot(Cell):
             '____chart_updater__': Subscribed(lambda: _PlotUpdater(self)),
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
-
-        self.postscript = """
-            console.log("Creating a new plotly chart.")
-            plotDiv = document.getElementById('plot__identity__');
-            Plotly.plot(
-                plotDiv,
-                [],
-                {
-                    margin: {t : 30, l: 30, r: 30, b:30 },
-                    xaxis: {rangeslider: {visible: false}}
-                },
-                { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
-                    modeBarButtons: [ ['pan2d'], ['zoom2d'], ['zoomIn2d'], ['zoomOut2d'] ] }
-                );
-            plotDiv.on('plotly_relayout',
-                function(eventdata){
-                    if (plotDiv.is_server_defined_move === true) {
-                        return
-                    }
-                    //if we're sending a string, then its a date object, and we want to send
-                    // a timestamp
-                    if (typeof(eventdata['xaxis.range[0]']) === 'string') {
-                        eventdata = Object.assign({},eventdata)
-                        eventdata["xaxis.range[0]"] = Date.parse(eventdata["xaxis.range[0]"]) / 1000.0
-                        eventdata["xaxis.range[1]"] = Date.parse(eventdata["xaxis.range[1]"]) / 1000.0
-                    }
-
-                    cellSocket.sendString(JSON.stringify(
-                        {'event':'plot_layout',
-                         'target_cell': '__identity__',
-                         'data': eventdata
-                         }
-                        )
-                    )
-                });
-
-            """.replace("__identity__", self._identity)
+        self.postscript = ""
 
     def onMessage(self, msgFrame):
         d = msgFrame['data']
