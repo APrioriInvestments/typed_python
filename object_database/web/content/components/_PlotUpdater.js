@@ -13,7 +13,7 @@ class _PlotUpdater extends Component {
         return h('div',
             {
                 class: "cell",
-                id: "plot" + this.props.extraData.plotId,
+                id: this.props.id,
                 style: "display: none",
                 "data-cell-id": this.props.id,
                 "data-cell-type": "_PlotUpdater"
