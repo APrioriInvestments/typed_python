@@ -3103,6 +3103,9 @@ class Plot(Cell):
         }
         self.postscript = ""
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+
     def onMessage(self, msgFrame):
         d = msgFrame['data']
         curVal = self.curXYRanges.get() or ((None, None), (None, None))
