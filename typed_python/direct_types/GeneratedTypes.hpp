@@ -1,9 +1,8 @@
 #pragma once
-
-// Generated Tuple Anon39222656
+// Generated Tuple Anon39611216
 //    a0=String
 //    a1=Bytes
-class Anon43672736 {
+class Anon39611216 {
 public:
     typedef String a0_type;
     typedef Bytes a1_type;
@@ -11,14 +10,14 @@ public:
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     static Tuple* getType() {
         static Tuple* t = Tuple::Make({
-                TypeDetails<Anon43672736::a0_type>::getType(),
-                TypeDetails<Anon43672736::a1_type>::getType()
+                TypeDetails<Anon39611216::a0_type>::getType(),
+                TypeDetails<Anon39611216::a1_type>::getType()
             });
         return t;
         }
 
-    static Anon43672736 fromPython(PyObject* p) {
-        Anon43672736 l;
+    static Anon39611216 fromPython(PyObject* p) {
+        Anon39611216 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -27,23 +26,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon43672736& operator = (const Anon43672736& other) {
+    Anon39611216& operator = (const Anon39611216& other) {
         a0() = other.a0();
         a1() = other.a1();
         return *this;
     }
 
-    Anon43672736(const Anon43672736& other) {
+    Anon39611216(const Anon39611216& other) {
         new (&a0()) a0_type(other.a0());
         new (&a1()) a1_type(other.a1());
     }
 
-    ~Anon43672736() {
+    ~Anon39611216() {
         a1().~a1_type();
         a0().~a0_type();
     }
 
-    Anon43672736() {
+    Anon39611216() {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -61,7 +60,7 @@ public:
         }
     }
 
-    Anon43672736(const a0_type& a0_val, const a1_type& a1_val) {
+    Anon39611216(const a0_type& a0_val, const a1_type& a1_val) {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -85,26 +84,26 @@ private:
 };
 
 template <>
-class TypeDetails<Anon43672736> {
+class TypeDetails<Anon39611216> {
 public:
     static Type* getType() {
-        static Type* t = Anon43672736::getType();
+        static Type* t = Anon39611216::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon43672736 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon39611216 somehow we have the wrong bytecount!");
         }
         return t;
     }
-    static const uint64_t bytecount =
-        sizeof(Anon39222656::a0_type) +
-        sizeof(Anon39222656::a1_type);
+    static const uint64_t bytecount = 
+        sizeof(Anon39611216::a0_type) +
+        sizeof(Anon39611216::a1_type);
 };
 
-// END Generated Tuple Anon43672736
+// END Generated Tuple Anon39611216
 
-// Generated Tuple Anon45070320
+// Generated Tuple Anon41033936
 //    a0=int64_t
 //    a1=int64_t
-class Anon45070320 {
+class Anon41033936 {
 public:
     typedef int64_t a0_type;
     typedef int64_t a1_type;
@@ -112,14 +111,14 @@ public:
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     static Tuple* getType() {
         static Tuple* t = Tuple::Make({
-                TypeDetails<Anon45070320::a0_type>::getType(),
-                TypeDetails<Anon45070320::a1_type>::getType()
+                TypeDetails<Anon41033936::a0_type>::getType(),
+                TypeDetails<Anon41033936::a1_type>::getType()
             });
         return t;
         }
 
-    static Anon45070320 fromPython(PyObject* p) {
-        Anon45070320 l;
+    static Anon41033936 fromPython(PyObject* p) {
+        Anon41033936 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -128,23 +127,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon45070320& operator = (const Anon45070320& other) {
+    Anon41033936& operator = (const Anon41033936& other) {
         a0() = other.a0();
         a1() = other.a1();
         return *this;
     }
 
-    Anon45070320(const Anon45070320& other) {
+    Anon41033936(const Anon41033936& other) {
         new (&a0()) a0_type(other.a0());
         new (&a1()) a1_type(other.a1());
     }
 
-    ~Anon45070320() {
+    ~Anon41033936() {
         a1().~a1_type();
         a0().~a0_type();
     }
 
-    Anon45070320() {
+    Anon41033936() {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -162,7 +161,7 @@ public:
         }
     }
 
-    Anon45070320(const a0_type& a0_val, const a1_type& a1_val) {
+    Anon41033936(const a0_type& a0_val, const a1_type& a1_val) {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -186,26 +185,26 @@ private:
 };
 
 template <>
-class TypeDetails<Anon45070320> {
+class TypeDetails<Anon41033936> {
 public:
     static Type* getType() {
-        static Type* t = Anon45070320::getType();
+        static Type* t = Anon41033936::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon45070320 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon41033936 somehow we have the wrong bytecount!");
         }
         return t;
     }
-    static const uint64_t bytecount =
-        sizeof(Anon40676176::a0_type) +
-        sizeof(Anon40676176::a1_type);
+    static const uint64_t bytecount = 
+        sizeof(Anon41033936::a0_type) +
+        sizeof(Anon41033936::a1_type);
 };
 
-// END Generated Tuple Anon45070320
+// END Generated Tuple Anon41033936
 
-// Generated Tuple Anon45077904
+// Generated Tuple Anon41042080
 //    a0=bool
 //    a1=bool
-class Anon45077904 {
+class Anon41042080 {
 public:
     typedef bool a0_type;
     typedef bool a1_type;
@@ -213,14 +212,14 @@ public:
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     static Tuple* getType() {
         static Tuple* t = Tuple::Make({
-                TypeDetails<Anon45077904::a0_type>::getType(),
-                TypeDetails<Anon45077904::a1_type>::getType()
+                TypeDetails<Anon41042080::a0_type>::getType(),
+                TypeDetails<Anon41042080::a1_type>::getType()
             });
         return t;
         }
 
-    static Anon45077904 fromPython(PyObject* p) {
-        Anon45077904 l;
+    static Anon41042080 fromPython(PyObject* p) {
+        Anon41042080 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -229,23 +228,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon45077904& operator = (const Anon45077904& other) {
+    Anon41042080& operator = (const Anon41042080& other) {
         a0() = other.a0();
         a1() = other.a1();
         return *this;
     }
 
-    Anon45077904(const Anon45077904& other) {
+    Anon41042080(const Anon41042080& other) {
         new (&a0()) a0_type(other.a0());
         new (&a1()) a1_type(other.a1());
     }
 
-    ~Anon45077904() {
+    ~Anon41042080() {
         a1().~a1_type();
         a0().~a0_type();
     }
 
-    Anon45077904() {
+    Anon41042080() {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -263,7 +262,7 @@ public:
         }
     }
 
-    Anon45077904(const a0_type& a0_val, const a1_type& a1_val) {
+    Anon41042080(const a0_type& a0_val, const a1_type& a1_val) {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -287,26 +286,26 @@ private:
 };
 
 template <>
-class TypeDetails<Anon45077904> {
+class TypeDetails<Anon41042080> {
 public:
     static Type* getType() {
-        static Type* t = Anon45077904::getType();
+        static Type* t = Anon41042080::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon45077904 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon41042080 somehow we have the wrong bytecount!");
         }
         return t;
     }
-    static const uint64_t bytecount =
-        sizeof(Anon40683760::a0_type) +
-        sizeof(Anon40683760::a1_type);
+    static const uint64_t bytecount = 
+        sizeof(Anon41042080::a0_type) +
+        sizeof(Anon41042080::a1_type);
 };
 
-// END Generated Tuple Anon45077904
+// END Generated Tuple Anon41042080
 
-// Generated NamedTuple Anon45093120
+// Generated NamedTuple Anon41057728
 //    x=int64_t
 //    y=int64_t
-class Anon45093120 {
+class Anon41057728 {
 public:
     typedef int64_t x_type;
     typedef int64_t y_type;
@@ -314,8 +313,8 @@ public:
     y_type& y() const { return *(y_type*)(data + size1); }
     static NamedTuple* getType() {
         static NamedTuple* t = NamedTuple::Make({
-                TypeDetails<Anon45093120::x_type>::getType(),
-                TypeDetails<Anon45093120::y_type>::getType()
+                TypeDetails<Anon41057728::x_type>::getType(),
+                TypeDetails<Anon41057728::y_type>::getType()
             },{
                 "x",
                 "y"
@@ -323,8 +322,8 @@ public:
         return t;
         }
 
-    static Anon45093120 fromPython(PyObject* p) {
-        Anon45093120 l;
+    static Anon41057728 fromPython(PyObject* p) {
+        Anon41057728 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -333,23 +332,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon45093120& operator = (const Anon45093120& other) {
+    Anon41057728& operator = (const Anon41057728& other) {
         x() = other.x();
         y() = other.y();
         return *this;
     }
 
-    Anon45093120(const Anon45093120& other) {
+    Anon41057728(const Anon41057728& other) {
         new (&x()) x_type(other.x());
         new (&y()) y_type(other.y());
     }
 
-    ~Anon45093120() {
+    ~Anon41057728() {
         y().~y_type();
         x().~x_type();
     }
 
-    Anon45093120() {
+    Anon41057728() {
         bool initx = false;
         bool inity = false;
         try {
@@ -367,7 +366,7 @@ public:
         }
     }
 
-    Anon45093120(const x_type& x_val, const y_type& y_val) {
+    Anon41057728(const x_type& x_val, const y_type& y_val) {
         bool initx = false;
         bool inity = false;
         try {
@@ -391,21 +390,21 @@ private:
 };
 
 template <>
-class TypeDetails<Anon45093120> {
+class TypeDetails<Anon41057728> {
 public:
     static Type* getType() {
-        static Type* t = Anon45093120::getType();
+        static Type* t = Anon41057728::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon45093120 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon41057728 somehow we have the wrong bytecount!");
         }
         return t;
     }
-    static const uint64_t bytecount =
-        sizeof(Anon40698976::x_type) +
-        sizeof(Anon40698976::y_type);
+    static const uint64_t bytecount = 
+        sizeof(Anon41057728::x_type) +
+        sizeof(Anon41057728::y_type);
 };
 
-// END Generated NamedTuple Anon45093120
+// END Generated NamedTuple Anon41057728
 
 // Generated NamedTuple ObjectFieldId
 //    objId=int64_t
@@ -521,7 +520,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(ObjectFieldId::objId_type) +
         sizeof(ObjectFieldId::fieldId_type) +
         sizeof(ObjectFieldId::isIndexValue_type);
@@ -626,7 +625,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(IndexId::fieldId_type) +
         sizeof(IndexId::indexValue_type);
 };
@@ -747,7 +746,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(FieldDefinition::schema_type) +
         sizeof(FieldDefinition::typename0_type) +
         sizeof(FieldDefinition::fieldname_type);
@@ -852,7 +851,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(TypeDefinition::fields_type) +
         sizeof(TypeDefinition::indices_type);
 };
@@ -865,7 +864,7 @@ public:
 //     Heartbeat=()
 //     DefineSchema=(name=String, definition=ConstDict<String, TypeDefinition>)
 //     LoadLazyObject=(schema=String, typename0=String, identity=int64_t)
-//     Subscribe=(schema=String, typename0=OneOf<None, String>, fieldname_and_value=OneOf<None, Anon43672736>, isLazy=bool)
+//     Subscribe=(schema=String, typename0=OneOf<None, String>, fieldname_and_value=OneOf<None, Anon39611216>, isLazy=bool)
 //     Flush=(guid=int64_t)
 //     Authenticate=(token=String)
 
@@ -914,7 +913,7 @@ public:
     static ClientToServer Heartbeat();
     static ClientToServer DefineSchema(const String& name, const ConstDict<String, TypeDefinition>& definition);
     static ClientToServer LoadLazyObject(const String& schema, const String& typename0, const int64_t& identity);
-    static ClientToServer Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon43672736>& fieldname_and_value, const bool& isLazy);
+    static ClientToServer Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon39611216>& fieldname_and_value, const bool& isLazy);
     static ClientToServer Flush(const int64_t& guid);
     static ClientToServer Authenticate(const String& token);
 
@@ -952,9 +951,9 @@ public:
     String name() const;
     ConstDict<String, TypeDefinition> definition() const;
     String schema() const;
-    OneOf<String,OneOf<None, String>> typename0() const;
+    OneOf<OneOf<None, String>,String> typename0() const;
     int64_t identity() const;
-    OneOf<None, Anon43672736> fieldname_and_value() const;
+    OneOf<None, Anon39611216> fieldname_and_value() const;
     bool isLazy() const;
     int64_t guid() const;
     String token() const;
@@ -1001,7 +1000,7 @@ NamedTuple* ClientToServer::LoadLazyObject_Type = NamedTuple::Make(
 );
 
 NamedTuple* ClientToServer::Subscribe_Type = NamedTuple::Make(
-    {TypeDetails<String>::getType(), TypeDetails<OneOf<None, String>>::getType(), TypeDetails<OneOf<None, Anon43672736>>::getType(), TypeDetails<bool>::getType()},
+    {TypeDetails<String>::getType(), TypeDetails<OneOf<None, String>>::getType(), TypeDetails<OneOf<None, Anon39611216>>::getType(), TypeDetails<bool>::getType()},
     {"schema", "typename0", "fieldname_and_value", "isLazy"}
 );
 
@@ -1226,7 +1225,7 @@ public:
     static Alternative* getAlternative() { return ClientToServer::getType(); }
 
     ClientToServer_Subscribe():ClientToServer(kind::Subscribe) {}
-    ClientToServer_Subscribe( const String& schema1,  const OneOf<None, String>& typename01,  const OneOf<None, Anon43672736>& fieldname_and_value1,  const bool& isLazy1):ClientToServer(kind::Subscribe) {
+    ClientToServer_Subscribe( const String& schema1,  const OneOf<None, String>& typename01,  const OneOf<None, Anon39611216>& fieldname_and_value1,  const bool& isLazy1):ClientToServer(kind::Subscribe) {
         schema() = schema1;
         typename0() = typename01;
         fieldname_and_value() = fieldname_and_value1;
@@ -1243,15 +1242,15 @@ public:
 
     String& schema() const { return *(String*)(mLayout->data); }
     OneOf<None, String>& typename0() const { return *(OneOf<None, String>*)(mLayout->data + size1); }
-    OneOf<None, Anon43672736>& fieldname_and_value() const { return *(OneOf<None, Anon43672736>*)(mLayout->data + size1 + size2); }
+    OneOf<None, Anon39611216>& fieldname_and_value() const { return *(OneOf<None, Anon39611216>*)(mLayout->data + size1 + size2); }
     bool& isLazy() const { return *(bool*)(mLayout->data + size1 + size2 + size3); }
 private:
     static const int size1 = sizeof(String);
     static const int size2 = sizeof(OneOf<None, String>);
-    static const int size3 = sizeof(OneOf<None, Anon43672736>);
+    static const int size3 = sizeof(OneOf<None, Anon39611216>);
 };
 
-ClientToServer ClientToServer::Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon43672736>& fieldname_and_value, const bool& isLazy) {
+ClientToServer ClientToServer::Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon39611216>& fieldname_and_value, const bool& isLazy) {
     return ClientToServer_Subscribe(schema, typename0, fieldname_and_value, isLazy);
 }
 
@@ -1377,11 +1376,11 @@ String ClientToServer::schema() const {
     throw std::runtime_error("\"ClientToServer\" subtype does not contain \"schema\"");
 }
 
-OneOf<String,OneOf<None, String>> ClientToServer::typename0() const {
+OneOf<OneOf<None, String>,String> ClientToServer::typename0() const {
     if (isLoadLazyObject())
-        return OneOf<String,OneOf<None, String>>(((ClientToServer_LoadLazyObject*)this)->typename0());
+        return OneOf<OneOf<None, String>,String>(((ClientToServer_LoadLazyObject*)this)->typename0());
     if (isSubscribe())
-        return OneOf<String,OneOf<None, String>>(((ClientToServer_Subscribe*)this)->typename0());
+        return OneOf<OneOf<None, String>,String>(((ClientToServer_Subscribe*)this)->typename0());
     throw std::runtime_error("\"ClientToServer\" subtype does not contain \"typename0\"");
 }
 
@@ -1391,7 +1390,7 @@ int64_t ClientToServer::identity() const {
     throw std::runtime_error("\"ClientToServer\" subtype does not contain \"identity\"");
 }
 
-OneOf<None, Anon43672736> ClientToServer::fieldname_and_value() const {
+OneOf<None, Anon39611216> ClientToServer::fieldname_and_value() const {
     if (isSubscribe())
         return ((ClientToServer_Subscribe*)this)->fieldname_and_value();
     throw std::runtime_error("\"ClientToServer\" subtype does not contain \"fieldname_and_value\"");
@@ -1666,8 +1665,8 @@ public:
     bool isSub3() const { return which() == kind::Sub3; }
 
     // Accessors for members
-    OneOf<String,int64_t,bool> b() const;
-    OneOf<TupleOf<String>,int64_t> c() const;
+    OneOf<int64_t,bool,String> b() const;
+    OneOf<int64_t,TupleOf<String>> c() const;
 
     Alternative::layout* getLayout() const { return mLayout; }
 protected:
@@ -1822,21 +1821,21 @@ Overlap Overlap::Sub3(const int64_t& b) {
     return Overlap_Sub3(b);
 }
 
-OneOf<String,int64_t,bool> Overlap::b() const {
+OneOf<int64_t,bool,String> Overlap::b() const {
     if (isSub1())
-        return OneOf<String,int64_t,bool>(((Overlap_Sub1*)this)->b());
+        return OneOf<int64_t,bool,String>(((Overlap_Sub1*)this)->b());
     if (isSub2())
-        return OneOf<String,int64_t,bool>(((Overlap_Sub2*)this)->b());
+        return OneOf<int64_t,bool,String>(((Overlap_Sub2*)this)->b());
     if (isSub3())
-        return OneOf<String,int64_t,bool>(((Overlap_Sub3*)this)->b());
+        return OneOf<int64_t,bool,String>(((Overlap_Sub3*)this)->b());
     throw std::runtime_error("\"Overlap\" subtype does not contain \"b\"");
 }
 
-OneOf<TupleOf<String>,int64_t> Overlap::c() const {
+OneOf<int64_t,TupleOf<String>> Overlap::c() const {
     if (isSub1())
-        return OneOf<TupleOf<String>,int64_t>(((Overlap_Sub1*)this)->c());
+        return OneOf<int64_t,TupleOf<String>>(((Overlap_Sub1*)this)->c());
     if (isSub2())
-        return OneOf<TupleOf<String>,int64_t>(((Overlap_Sub2*)this)->c());
+        return OneOf<int64_t,TupleOf<String>>(((Overlap_Sub2*)this)->c());
     throw std::runtime_error("\"Overlap\" subtype does not contain \"c\"");
 }
 
@@ -2183,7 +2182,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleTwoStrings::X_type) +
         sizeof(NamedTupleTwoStrings::Y_type);
 };
@@ -2304,7 +2303,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleBoolIntStr::b_type) +
         sizeof(NamedTupleBoolIntStr::i_type) +
         sizeof(NamedTupleBoolIntStr::s_type);
@@ -2409,7 +2408,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(Choice::A_type) +
         sizeof(Choice::B_type);
 };
@@ -2530,7 +2529,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleIntFloatDesc::a_type) +
         sizeof(NamedTupleIntFloatDesc::b_type) +
         sizeof(NamedTupleIntFloatDesc::desc_type);
@@ -2635,7 +2634,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleBoolListOfInt::X_type) +
         sizeof(NamedTupleBoolListOfInt::Y_type);
 };
@@ -2739,7 +2738,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleAttrAndValues::attributes_type) +
         sizeof(NamedTupleAttrAndValues::values_type);
 };
@@ -2747,16 +2746,16 @@ public:
 // END Generated NamedTuple NamedTupleAttrAndValues
 
 // Generated Tuple AnonTest
-//    a0=Dict<Anon45070320, String>
-//    a1=ConstDict<String, OneOf<bool, Anon45077904>>
-//    a2=ListOf<Anon45070320>
-//    a3=TupleOf<Anon45093120>
+//    a0=Dict<Anon41033936, String>
+//    a1=ConstDict<String, OneOf<bool, Anon41042080>>
+//    a2=ListOf<Anon41033936>
+//    a3=TupleOf<Anon41057728>
 class AnonTest {
 public:
-    typedef Dict<Anon45070320, String> a0_type;
-    typedef ConstDict<String, OneOf<bool, Anon45077904>> a1_type;
-    typedef ListOf<Anon45070320> a2_type;
-    typedef TupleOf<Anon45093120> a3_type;
+    typedef Dict<Anon41033936, String> a0_type;
+    typedef ConstDict<String, OneOf<bool, Anon41042080>> a1_type;
+    typedef ListOf<Anon41033936> a2_type;
+    typedef TupleOf<Anon41057728> a3_type;
     a0_type& a0() const { return *(a0_type*)(data); }
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     a2_type& a2() const { return *(a2_type*)(data + size1 + size2); }
@@ -2872,7 +2871,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(AnonTest::a0_type) +
         sizeof(AnonTest::a1_type) +
         sizeof(AnonTest::a2_type) +
