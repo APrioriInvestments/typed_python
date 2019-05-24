@@ -3215,31 +3215,20 @@ class _PlotUpdater(Cell):
             self.postscript = ""
             self.linePlot.error.set(None)
 
+            # temporary js WS refactoring data
+            self.exportData['plotId'] = self.chartId
+            self.exportData['exceptionOccured'] = False
+
             try:
                 jsonDataToDraw = self.calculatedDataJson()
-                self.postscript = (
-                    """
-                    plotDiv = document.getElementById('plot__identity__');
-                    data = __data__.map(mapPlotlyData)
-
-                    Plotly.react(
-                        plotDiv,
-                        data,
-                        plotDiv.layout,
-                        );
-
-                    """
-                    .replace("__identity__", self.chartId)
-                    .replace("__data__", json.dumps(jsonDataToDraw))
-                )
+                self.exportData['plotData'] = jsonDataToDraw
             except SubscribeAndRetry:
                 raise
             except Exception:
+                # temporary js WS refactoring data
+                self.exportData['exceptionOccured'] = True
+
                 self._logger.error(traceback.format_exc())
                 self.linePlot.error.set(traceback.format_exc())
-                self.postscript = """
-                    plotDiv = document.getElementById('plot__identity__');
-                    Plotly.purge(plotDiv)
-                    """.replace("__identity__", self.chartId)
 
             self._resetSubscriptionsToViewReads(v)
