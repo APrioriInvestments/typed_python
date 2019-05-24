@@ -1568,6 +1568,46 @@ class ObjectDatabaseTests:
             r1.stop()
             r1.teardown()
 
+    def test_reactor_with_timestamp_lookup(self):
+        # check the semantics of 'curTimestampIsAfter'
+        t0 = time.time()
+        db = self.createNewDb()
+
+        s = Schema("schema")
+
+        @s.define
+        class Thing:
+            nextUpdate = float
+            timesUpdated = int
+
+        db.subscribeToSchema(s)
+
+        with db.transaction():
+            someThings = [Thing(nextUpdate=t0+0.001, timesUpdated=0) for _ in range(10)]
+
+        def incrementor():
+            with db.transaction():
+                for t in someThings:
+                    if Reactor.curTimestampIsAfter(t.nextUpdate):
+                        t.nextUpdate = t.nextUpdate + 0.01
+                        t.timesUpdated += 1
+
+        def updateCount():
+            with db.view():
+                return sum([x.timesUpdated for x in Thing.lookupAll()])
+
+        r1 = Reactor(db, incrementor)
+
+        while updateCount() < 1000 and time.time() - t0 < 2.0:
+            r1.next(timeout=1.0)
+
+        self.assertTrue(time.time() - t0 < 1.2)
+
+        r1.start()
+        self.assertTrue(db.waitForCondition(lambda: sum(x.timesUpdated for x in Thing.lookupAll()) >= 2000, timeout=2.0))
+        self.assertTrue(time.time() - t0 < 2.2)
+        r1.stop()
+
     def test_reactor_synchronous(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)

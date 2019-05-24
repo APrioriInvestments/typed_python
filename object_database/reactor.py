@@ -26,6 +26,9 @@ class Timeout:
     pass
 
 
+_currentReactor = threading.local()
+
+
 class Reactor:
     """Reactor
 
@@ -95,11 +98,42 @@ class Reactor:
         self._thread.daemon = True
         self._isStarted = False
         self._lastReadKeys = None
+        self._nextWakeup = None
 
         # grab a transaction handler. We need to ensure this is the same object
         # when we deregister it.
         self.transactionHandler = self._onTransaction
         self.db.registerOnTransactionHandler(self.transactionHandler)
+
+    @staticmethod
+    def curTimestamp():
+        """Return the timestamp of the start of the current transaction.
+
+        This does _not_ create a dependency.
+        """
+        return _currentReactor.timestamp
+
+    @staticmethod
+    def curTimestampIsAfter(ts):
+        """Returns True if the timestamp of the current reactor invocation is after 'ts'.
+
+        This allows clients to check if the current time is after a threshold and
+        ensure that they are woken up as soon as that condition is met.
+
+        If this function returns False, then as soon as it would return True it wakes up
+        again.
+        """
+        curTime = getattr(_currentReactor, 'timestamp', None)
+        if curTime is None:
+            raise Exception("No reactor is running.")
+
+        if curTime >= ts:
+            return True
+
+        if _currentReactor.nextWakeup is None or _currentReactor.nextWakeup > ts:
+            _currentReactor.nextWakeup = ts
+
+        return False
 
     def start(self):
         self._isStarted = True
@@ -148,11 +182,11 @@ class Reactor:
             raise Exception("Can't call 'next' if the reactor is being used in threaded mode.")
 
         if self._lastReadKeys is not None:
-            if not self._blockUntilRecalculate(self._lastReadKeys, timeout=timeout):
+            if not self._blockUntilRecalculate(self._lastReadKeys, self._nextWakeup, timeout=timeout):
                 return Timeout
 
         self._drainTransactionQueue()
-        result, self._lastReadKeys = self._calculate(catchRevisionConflicts=False)
+        result, self._lastReadKeys, self._nextWakeup = self._calculate(catchRevisionConflicts=False)
 
         return result
 
@@ -161,24 +195,26 @@ class Reactor:
             """Update as quickly as possible."""
             while self._isStarted:
                 self._drainTransactionQueue()
-                _, readKeys = self._calculate(catchRevisionConflicts=True)
+                _, readKeys, nextWakeup = self._calculate(catchRevisionConflicts=True)
                 if readKeys is not None:
-                    self._blockUntilRecalculate(readKeys, self.maxSleepTime)
+                    self._blockUntilRecalculate(readKeys, nextWakeup, self.maxSleepTime)
 
         except Exception:
             logging.error("Unexpected exception in Reactor loop:\n%s", traceback.format_exc())
 
-    def _blockUntilRecalculate(self, readKeys, timeout):
+    def _blockUntilRecalculate(self, readKeys, nextWakeup, timeout):
         """Wait until we're triggered, or hit a timeout.
 
         Returns:
             True if we were triggered by a key update, False otherwise.
         """
-        if not readKeys and timeout is None:
+        if not readKeys and timeout is None and nextWakeup is None:
             raise Exception("Reactor would block forever.")
 
         curTime = time.time()
         finalTime = curTime + (timeout if timeout is not None else 10**8)
+        if nextWakeup is not None and finalTime > nextWakeup:
+            finalTime = nextWakeup
 
         while curTime < finalTime:
             try:
@@ -188,11 +224,15 @@ class Reactor:
 
             if result is Reactor.STOP:
                 return False
+
             for key in result:
                 if key in readKeys:
                     return True
 
             curTime = time.time()
+
+        if nextWakeup is not None and curTime > nextWakeup:
+            return True
 
         return False
 
@@ -228,13 +268,25 @@ class Reactor:
                 seenKeys.update(view._view.extractIndexReads())
 
             with ViewWatcher(onViewClose):
-                logging.getLogger(__name__).info("Reactor %s recalculating", self.reactorFunction)
-                functionResult = self.reactorFunction()
+                try:
+                    origTimestamp = getattr(_currentReactor, 'timestamp', None)
+                    origWakeup = getattr(_currentReactor, 'nextWakeup', None)
+
+                    _currentReactor.timestamp = time.time()
+                    _currentReactor.nextWakeup = None
+
+                    logging.getLogger(__name__).info("Reactor %s recalculating", self.reactorFunction)
+                    functionResult = self.reactorFunction()
+
+                    nextWakeup = _currentReactor.nextWakeup
+                finally:
+                    _currentReactor.nextWakeup = origWakeup
+                    _currentReactor.timestamp = origTimestamp
 
             if hadWrites[0]:
-                return functionResult, None
+                return functionResult, None, nextWakeup
             else:
-                return functionResult, seenKeys
+                return functionResult, seenKeys, nextWakeup
 
         except RevisionConflictException as e:
             if not catchRevisionConflicts:
@@ -243,7 +295,7 @@ class Reactor:
             logging.getLogger(__name__).info(
                 "Handled a revision conflict on key %s in %s. Retrying." % (e, self.reactorFunction.__name__)
             )
-            return None, None
+            return None, None, None
 
     def _onTransaction(self, key_value, set_adds, set_removes, transactionId):
         self._transactionQueue.put(list(key_value) + list(set_adds) + list(set_removes))
