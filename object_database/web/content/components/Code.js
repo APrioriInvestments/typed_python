@@ -1,20 +1,17 @@
-// Creates a button component
-/*function Code(id) {
-    // TODO: this is some hacky nonsense, but 
-    let contents_id = id + "_____contents__";
+/**
+ * Code Cell Component
+ */
 
-    var card = {
-        render: function() {
-            return h('div', {class: "card", id: id}, [
-                h('div', { class: "card-body p-1" }, [
-                    h('div', {id: contents_id}, [])
-                ])
-            ]);
-        }
-    };
-    return card;
-    }*/
+//import {Component} from './Component';
+//import {h} from 'maquette';
 
+/**
+ * About Replacements
+ * ------------------
+ * This component has a single
+ * regular replacement:
+ * * `child`
+ */
 class Code extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -23,14 +20,14 @@ class Code extends Component {
 
     render(){
         return h('pre',
-            { 
-                class: "cell code",
-                id: this.props.id,
-                "data-cell-type": "Code"
-            }, [
-                h("code", {}, [this.getReplacementElementFor('child')])
-            ]
-        )
+                 {
+                     class: "cell code",
+                     id: this.props.id,
+                     "data-cell-type": "Code"
+                 }, [
+                     h("code", {}, [this.getReplacementElementFor('child')])
+                 ]
+                );
     }
 }
 

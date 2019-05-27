@@ -1,14 +1,13 @@
 /**
  * ButtonGroup Cell Component
  */
-//import {Component} from './Component';
 
+//import {Component} from './Component';
+//import {h} from 'maquette';
 
 class ButtonGroup extends Component {
     constructor(props, ...args){
         super(props, ...args);
-
-        // Bind context to methods
     }
 
     render(){

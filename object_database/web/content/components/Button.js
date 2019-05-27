@@ -1,8 +1,9 @@
 /**
  * Button Cell Component
  */
-//import {Component} from './Component';
 
+//import {Component} from './Component';
+//import {h} from 'maquette';
 
 class Button extends Component {
     constructor(props, ...args){
@@ -26,14 +27,14 @@ class Button extends Component {
         );
     }
 
-    _getEvent(event_name) {
-        return this.props.extraData.events[event_name];
+    _getEvent(eventName) {
+        return this.props.extraData.events[eventName];
     }
 
     _getHTMLClasses(){
         let classString = this.props.extraData.classes.join(" ");
         // remember to trim the class string due to a maquette bug
-        return classString.trim()
+        return classString.trim();
     }
 }
 

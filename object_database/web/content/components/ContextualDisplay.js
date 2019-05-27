@@ -1,13 +1,25 @@
+/**
+ * ContextualDisplay Cell Component
+ */
 
+//import {Component} from './Component';
+//import {h} from 'maquette';
+
+/**
+ * About Replacements
+ * ------------------
+ * This component has a single
+ * regular replacement:
+ * * `child`
+ */
 class ContextualDisplay extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        //this.addReplacement('contents', '_____contents__');
     }
 
     render(){
         return h('div',
-            { 
+            {
                 class: "cell contextualDisplay",
                 id: this.props.id,
                 "data-cell-id": this.props.id,

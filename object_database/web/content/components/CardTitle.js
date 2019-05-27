@@ -1,13 +1,21 @@
 /**
  * CardTitle Cell
  */
+
 // import {Component} from './Component';
+//import {h} from 'maquette';
 
 
+/**
+ * About Replacements
+ * ------------------
+ * This component has  single regular
+ * replacement:
+ * * `contents`
+ */
 class CardTitle extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        //this.addReplacement('contents', '____contents__');
     }
 
     render(){

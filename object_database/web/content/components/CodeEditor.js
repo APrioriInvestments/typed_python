@@ -1,3 +1,10 @@
+/**
+ * CodeEditor Cell Component
+ */
+
+//import {Component} from './Component';
+//import {h} from 'maquette';
+
 class CodeEditor extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -16,10 +23,10 @@ class CodeEditor extends Component {
         this.setupEditor();
 
         if (this.editor === null) {
-            console.log("editor component loaded but failed to setup editor")
+            console.log("editor component loaded but failed to setup editor");
         } else {
-            console.log("setting up editor")
-            this.editor.last_edit_millis = Date.now()
+            console.log("setting up editor");
+            this.editor.last_edit_millis = Date.now();
 
             this.editor.setTheme("ace/theme/textmate");
             this.editor.session.setMode("ace/mode/python");
@@ -44,9 +51,9 @@ class CodeEditor extends Component {
                 this.editor.setOption("minLines", this.props.extraData.minLines);
             }
 
-            this.setupKeybindings()
+            this.setupKeybindings();
 
-            this.changeHandler()
+            this.changeHandler();
         }
     }
 
@@ -72,11 +79,10 @@ class CodeEditor extends Component {
         // this.render()
         this.editor = ace.edit(editorId);
         // TODO: deal with this global editor list
-        aceEditors[editorId] = this.editor
+        aceEditors[editorId] = this.editor;
     }
 
     changeHandler() {
-	console.log("setting changeHandler")
 	var editorId = this.props.id;
 	var editor = this.editor;
 	var SERVER_UPDATE_DELAY_MS = this.SERVER_UPDATE_DELAY_MS;
@@ -88,10 +94,10 @@ class CodeEditor extends Component {
                     event: 'editor_change',
                     'target_cell': editorId,
                     data: delta
-                }
+                };
                 cellSocket.sendString(JSON.stringify(responseData));
                 //record that we just edited
-                editor.last_edit_millis = Date.now()
+                editor.last_edit_millis = Date.now();
 
 		//schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms
 		//that will update the server, but only if the user has stopped typing.
@@ -100,8 +106,8 @@ class CodeEditor extends Component {
 		    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
 			//save our current state to the remote buffer
 			editor.current_iteration += 1;
-			editor.last_edit_millis = Date.now()
-			editor.last_edit_sent_text = editor.getValue()
+			editor.last_edit_millis = Date.now();
+			editor.last_edit_sent_text = editor.getValue();
 			// WS
 			let responseData = {
 			    event: 'editing',
@@ -109,16 +115,16 @@ class CodeEditor extends Component {
 			    buffer: editor.getValue(),
 			    selection: editor.selection.getRange(),
 			    iteration: editor.current_iteration
-			}
+			};
 			cellSocket.sendString(JSON.stringify(responseData));
 		    }
-		}, SERVER_UPDATE_DELAY_MS + 2) //note the 2ms grace period
+		}, SERVER_UPDATE_DELAY_MS + 2); //note the 2ms grace period
             }
-        )
+        );
     }
 
     setupKeybindings() {
-        console.log("setting up keybindings")
+        console.log("setting up keybindings");
         this.props.extraData.keybindings.map((kb) => {
             this.editor.commands.addCommand(
                 {
@@ -138,7 +144,7 @@ class CodeEditor extends Component {
                             'buffer': this.editor.getValue(),
                             'selection': this.editor.selection.getRange(),
                             'iteration': this.editor.current_iteration
-                        }
+                        };
                         cellSocket.sendString(JSON.stringify(responseData));
                     }
                 }

@@ -1,3 +1,18 @@
+/**
+ * Plot Cell Component
+ */
+
+//import {Component} from './Component';
+//import {h} from 'maquette';
+
+/**
+ * About Replacements
+ * ------------------
+ * This component contains the following
+ * regular replacements:
+ * * `chart-updater`
+ * * `error`
+ */
 class Plot extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -29,7 +44,7 @@ class Plot extends Component {
     }
 
     setupPlot(){
-        console.log("Setting up a new plotly chart.")
+        console.log("Setting up a new plotly chart.");
         // TODO These are global var defined in page.html
         // we should do something about this.
         var plotDiv = document.getElementById('plot' + this.props.id);
@@ -51,16 +66,16 @@ class Plot extends Component {
                 //if we're sending a string, then its a date object, and we want to send
                 // a timestamp
                 if (typeof(eventdata['xaxis.range[0]']) === 'string') {
-                    eventdata = Object.assign({},eventdata)
-                    eventdata["xaxis.range[0]"] = Date.parse(eventdata["xaxis.range[0]"]) / 1000.0
-                    eventdata["xaxis.range[1]"] = Date.parse(eventdata["xaxis.range[1]"]) / 1000.0
+                    eventdata = Object.assign({},eventdata);
+                    eventdata["xaxis.range[0]"] = Date.parse(eventdata["xaxis.range[0]"]) / 1000.0;
+                    eventdata["xaxis.range[1]"] = Date.parse(eventdata["xaxis.range[1]"]) / 1000.0;
                 }
 
                 let responseData = {
                     'event':'plot_layout',
                     'target_cell': '__identity__',
                     'data': eventdata
-                }
+                };
                 cellSocket.sendString(JSON.stringify(responseData));
             });
     }

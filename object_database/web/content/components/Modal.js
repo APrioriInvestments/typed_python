@@ -1,7 +1,9 @@
 /**
  * Modal Cell Component
  */
+
 //import {Component} from './Component';
+//import {h} from 'maquette';
 
 /**
  * About Replacements

@@ -106,8 +106,6 @@ class DropdownItem extends Component {
             window.location.href = whatToDo;
         }
     }
-
-
 }
 
 //export {Dropdown, Dropdown as default};

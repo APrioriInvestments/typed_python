@@ -1,9 +1,19 @@
 /**
  * Expands Cell Component
  */
+
 //import {Component} from './Component';
+//import {h} from 'maquette';
 
 
+/**
+ * About Replacements
+ * ------------------
+ * This component has two
+ * regular replacements:
+ * * `icon`
+ * * `child`
+ */
 class Expands extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -23,18 +33,18 @@ class Expands extends Component {
                 [
                     h('div', {
                         style: 'display:inline-block;vertical-align:top',
-                        onclick: this._getEvent('onclick') 
-                    }, 
-                        [this.getReplacementElementFor('icon')]), 
+                        onclick: this._getEvent('onclick')
+                    },
+                        [this.getReplacementElementFor('icon')]),
                     h('div', {style:'display:inline-block'},
-                        [this.getReplacementElementFor('child')]), 
+                        [this.getReplacementElementFor('child')]),
                 ]
             )
         );
     }
 
-    _getEvent(event_name) {
-        return this.props.extraData.events[event_name];
+    _getEvent(eventName) {
+        return this.props.extraData.events[eventName];
     }
 }
 

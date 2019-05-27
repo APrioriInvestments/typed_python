@@ -5,8 +5,6 @@
 //import {Component} from './Component';
 //import {h} from 'maquette';
 
-/** NOTE: Grid and Table are VERY similar... **/
-
 /**
  * About Replacements
  * ------------------

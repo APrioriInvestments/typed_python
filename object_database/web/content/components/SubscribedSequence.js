@@ -1,4 +1,11 @@
 /**
+ * SubscribedSequence Cell Component
+ */
+
+//import {Component} from './Component';
+//import {h} from 'maquette';
+
+/**
  * About Replacements
  * ------------------
  * This component has a single
