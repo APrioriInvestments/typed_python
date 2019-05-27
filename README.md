@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.com/APrioriInvestments/nativepython.svg?branch=dev)](https://travis-ci.com/APrioriInvestments/nativepython.svg?branch=dev)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 # NativePython
 
 The NativePython project is a framework for building high-performance real-time distributed systems in Python.
