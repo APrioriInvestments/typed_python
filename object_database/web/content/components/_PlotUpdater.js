@@ -7,6 +7,7 @@
 //import {Component} from './Component';
 //import {h} from 'maquette';
 
+const MAX_INTERVALS = 25;
 
 class _PlotUpdater extends Component {
     constructor(props, ...args){
@@ -52,16 +53,17 @@ class _PlotUpdater extends Component {
     listenForPlot(){
         let numChecks = 0;
         let plotChecker = window.setInterval(() => {
+            if(numChecks > MAX_INTERVALS){
+                window.clearInterval(plotChecker);
+                console.error(`Could not find matching Plot ${this.props.extraData.plotId} for _PlotUpdater ${this.props.id}`);
+                return;
+            }
             let plotDiv = document.getElementById(`plot${this.props.extraData.plotId}`);
             if(plotDiv){
                 this.runUpdate(plotDiv);
                 window.clearInterval(plotChecker);
             } else {
                 numChecks += 1;
-                if(numChecks > MAX_INTERVALS){
-                    window.clearInterval(plotChecker);
-                    console.error(`Could not find matching Plot ${this.props.extraData.plotId} for _PlotUpdater ${this.props.id}`);
-                }
             }
         }, 50);
     }
