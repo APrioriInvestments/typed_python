@@ -73,10 +73,11 @@
 <script src="/content/components/ContextualDisplay.js"></script>
 <script src="/content/components/SingleLineTextBox.js"></script>
 <script src="/content/components/CodeEditor.js"></script>
+<script src="/content/components/Table.js"></script>
+<script src="/content/components/Grid.js"></script>
+<script src="/content/components/Sheet.js"></script>
 <script src="/content/components/Plot.js"></script>
 <script src="/content/components/_PlotUpdater.js"></script>
-
-<!-- <script src="/content/components/Table2.js"></script> -->
 
 <script>
  // This is the initial render function. It is called when "DOMContentLoaded"
@@ -108,42 +109,44 @@
  var handsOnTables = {}; // Not sure what this is or where it's used
 
  const availableComponents = {
-	 AsyncDropdown,
-	 AsyncDropdownContent,
-	 Badge,
-   Button,
-   ButtonGroup,
-   Card,
-   CardTitle,
-	 CircleLoader,
-   Clickable,
-   Code,
-   CodeEditor,
-	 CollapsiblePanel,
-	 Columns,
-	 Container,
-   ContextualDisplay,
-	 Dropdown,
-   Expands,
-	 HeaderBar,
-   LoadContentsFromUrl,
-	 LargePendingDownloadDisplay,
-   Modal,
-   Octicon,
-	 Padding,
-   Plot,
-   Popover,
-	 Sequence,
-   SingleLineTextBox,
-	 Span,
-   Subscribed,
-   SubscribedSequence,
-   // Table,
-	 Tabs,
-	 Text,
-	 Traceback,
-	 _NavTab,
-   _PlotUpdater,
+     AsyncDropdown,
+     AsyncDropdownContent,
+     Badge,
+     Button,
+     ButtonGroup,
+     Card,
+     CardTitle,
+     CircleLoader,
+     Clickable,
+     Code,
+     CodeEditor,
+     CollapsiblePanel,
+     Columns,
+     Container,
+     ContextualDisplay,
+     Dropdown,
+     Expands,
+     HeaderBar,
+     LoadContentsFromUrl,
+     LargePendingDownloadDisplay,
+     Modal,
+     Octicon,
+     Padding,
+     Popover,
+     Sequence,
+     SingleLineTextBox,
+     Span,
+     Subscribed,
+     SubscribedSequence,
+     Table,
+     Tabs,
+     Text,
+     Traceback,
+     _NavTab,
+     Grid,
+     Sheet,
+     Plot,
+     _PlotUpdater
  };
 
  const cellSocket = new CellSocket();
