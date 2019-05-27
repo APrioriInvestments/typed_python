@@ -652,7 +652,7 @@ class Cell:
         # Cells provide extra data that JS
         # components will need to know about
         # when composing DOM.
-        self.exportData = {};
+        self.exportData = {}
 
     def evaluateWithDependencies(self, fun):
         """Evaluate function within a view and add dependencies for whatever
@@ -1067,7 +1067,7 @@ class CollapsiblePanel(Cell):
 
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
-        self.exportData['isExpanded'] = expanded;
+        self.exportData['isExpanded'] = expanded
         self.exportData['divStyle'] = self._divStyle()
         if expanded:
             self.contents = str(
@@ -1206,7 +1206,6 @@ class Columns(Cell):
                 .add_children(innerChildren)
             )
         )
-
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -2620,6 +2619,7 @@ class ButtonGroup(Cell):
 
         # temporary js WS refactoring data
         self.exportData['innerButtonsText'] = innerButtonsText
+
 
 class LoadContentsFromUrl(Cell):
     def __init__(self, targetUrl):

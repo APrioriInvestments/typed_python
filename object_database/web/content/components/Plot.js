@@ -25,22 +25,18 @@ class Plot extends Component {
     }
 
     render(){
-        return h('div',
-            {
-                class: "cell",
+        return (
+            h('div', {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
-                "data-cell-type": "Plot"
-            },
-            [
-                h('div',
-                    { id: "plot" + this.props.id, style: this.props.extraData.divStyle},
-                    [
-                        this.getReplacementElementFor('chart-updater'),
-                        this.getReplacementElementFor('error')
-                    ]
-                )
-        ]);
+                "data-cell-type": "Plot",
+                class: "cell"
+            }, [
+                h('div', {id: `plot${this.props.id}`, style: this.props.extraData.divStyle}),
+                this.getReplacementElementFor('chart-updater'),
+                this.getReplacementElementFor('error')
+            ])
+        );
     }
 
     setupPlot(){
