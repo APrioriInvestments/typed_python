@@ -126,14 +126,7 @@ class CellHandler {
      * be updated.
      */
     handleMessage(message){
-        // For testing only.
-        // Please remove for prod or
-        // before any PRs
-        if(message.replacement_keys){
-            message.replacement_keys.forEach(replacement_name => {
-                window.replacementStrings.add(replacement_name);
-            });
-        }
+        let newComponents = [];
 	if(this.cells["page_root"] == undefined){
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
@@ -178,7 +171,8 @@ class CellHandler {
                     [],
                     message.replacement_keys
                 );
-                var velement = component.render()
+                var velement = component.render();
+                newComponents.push(component);
 	    }
 
             // Install the element into the dom
@@ -203,11 +197,6 @@ class CellHandler {
 		    this.projector.replace(cell, () => {return velement;});
 		}
 	    }
-
-	    if (componentClass !== undefined) {
-                // after initial load, lifecylce management;
-                component.componentDidLoad();
-            }
 
             this.cells[message.id] = velement;
 
@@ -242,6 +231,13 @@ class CellHandler {
         if(message.postscript !== undefined){
             this.postscripts.push(message.postscript);
         }
+
+        // If we created any new components during this
+        // message handling session, we finally call
+        // their `componentDidLoad` lifecycle methods
+        newComponents.forEach(component => {
+            component.componentDidLoad();
+        });
     }
 
     /**

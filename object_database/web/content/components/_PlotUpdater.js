@@ -6,7 +6,15 @@ class _PlotUpdater extends Component {
     }
 
     componentDidLoad() {
-        this.runUpdate();
+        let plotChecker = window.setInterval(() => {
+            let plotDiv = document.getElementById(`plot${this.props.extraData.plotId}`);
+            console.log('Checking for Plot element...');
+            if(plotDiv){
+                this.runUpdate(plotDiv);
+                window.clearInterval(plotChecker);
+                console.log('Found plot element and clearing interval....');
+            }
+        }, 50);
     }
 
     render(){
@@ -20,17 +28,19 @@ class _PlotUpdater extends Component {
             }, []);
     }
 
-    runUpdate(){
-        console.log("Updating plotly chart.")
+    runUpdate(aDOMElement){
+        console.log("Updating plotly chart.");
         // TODO These are global var defined in page.html
         // we should do something about this.
-        var plotDiv = document.getElementById('plot' + this.props.extraData.plotId);
+        if(!aDOMElement){
+            console.log(`Couldnot find plot ${this.props.extraData.plotId}`);
+        }
         if (this.props.extraData.exceptionOccured) {
             console.log("plot exception occured");
-            Plotly.purge(plotDiv);
+            Plotly.purge(aDOMElement);
         } else {
             let data = this.props.extraData.plotData.map(mapPlotlyData);
-            Plotly.react(plotDiv, data, plotDiv.layout);
+            Plotly.react(aDOMElement, data, aDOMElement.layout);
         }
     }
 }
