@@ -1,20 +1,32 @@
+/**
+ * _PlotUpdater Cell Component
+ * NOTE: Later refactorings should result in
+ * this component becoming obsolete
+ */
+
+//import {Component} from './Component';
+//import {h} from 'maquette';
+
+
 class _PlotUpdater extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
         this.runUpdate = this.runUpdate.bind(this);
+        this.listenForPlot = this.listenForPlot.bind(this);
     }
 
     componentDidLoad() {
-        let plotChecker = window.setInterval(() => {
-            let plotDiv = document.getElementById(`plot${this.props.extraData.plotId}`);
-            console.log('Checking for Plot element...');
-            if(plotDiv){
-                this.runUpdate(plotDiv);
-                window.clearInterval(plotChecker);
-                console.log('Found plot element and clearing interval....');
-            }
-        }, 50);
+        // If we can find a matching Plot element
+        // at this point, we simply update it.
+        // Otherwise we need to 'listen' for when
+        // it finally comes into the DOM.
+        let initialPlotDiv = document.getElementById(`plot${this.props.extraData.plotId}`);
+        if(initialPlotDiv){
+            this.runUpdate(initialPlotDiv);
+        } else {
+            this.listenForPlot();
+        }
     }
 
     render(){
@@ -28,13 +40,36 @@ class _PlotUpdater extends Component {
             }, []);
     }
 
+    /**
+     * In the event that a `_PlotUpdater` has come
+     * over the wire *before* its corresponding
+     * Plot has come over (which appears to be
+     * common), we will set an interval of 50ms
+     * and check for the matching Plot in the DOM
+     * MAX_INTERVALS times, only calling `runUpdate`
+     * once we've found a match.
+     */
+    listenForPlot(){
+        let numChecks = 0;
+        let plotChecker = window.setInterval(() => {
+            let plotDiv = document.getElementById(`plot${this.props.extraData.plotId}`);
+            if(plotDiv){
+                this.runUpdate(plotDiv);
+                window.clearInterval(plotChecker);
+            } else {
+                numChecks += 1;
+                if(numChecks > MAX_INTERVALS){
+                    window.clearInterval(plotChecker);
+                    console.error(`Could not find matching Plot ${this.props.extraData.plotId} for _PlotUpdater ${this.props.id}`);
+                }
+            }
+        }, 50);
+    }
+
     runUpdate(aDOMElement){
         console.log("Updating plotly chart.");
         // TODO These are global var defined in page.html
         // we should do something about this.
-        if(!aDOMElement){
-            console.log(`Couldnot find plot ${this.props.extraData.plotId}`);
-        }
         if (this.props.extraData.exceptionOccured) {
             console.log("plot exception occured");
             Plotly.purge(aDOMElement);
