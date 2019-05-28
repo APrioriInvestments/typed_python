@@ -63,7 +63,6 @@ class Table extends Component {
     }
 
     _makeRowElements(){
-        debugger;
         // Note: rows are the *first* dimension
         // in the 2-dimensional array returned
         // by getting the `child` replacement elements.
