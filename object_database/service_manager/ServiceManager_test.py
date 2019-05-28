@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import ast
 import logging
 import numpy
 import os
@@ -158,16 +159,25 @@ class TextEditorService(ServiceBase):
             TextEditor.lookupAny().code = buffer
 
         def onTextChange(buffer, selection):
-            TextEditor.lookupAny().code = buffer
+            if TextEditor.lookupAny() is not None:
+                TextEditor.lookupAny().code = buffer
 
         ed = CodeEditor(keybindings={'Enter': onEnter}, noScroll=True, minLines=50, onTextChange=onTextChange)
 
         def makePlotData():
-            return {'data': eval(ed.getContents())}
+            # data must be a list or dict here, but this is checked/asserted
+            # down the line in cells. Sending anything that is not a dict/list
+            # will break the entire plot.
+            try:
+                data = ast.literal_eval(ed.getContents())
+            except (AttributeError, SyntaxError):
+                data = {}
+            return {'data': data}
 
         def onCodeChange():
-            if ed.getContents() != TextEditor.lookupAny().code:
-                ed.setContents(TextEditor.lookupAny().code)
+            if TextEditor.lookupAny() is not None:
+                if ed.getContents() != TextEditor.lookupAny().code:
+                    ed.setContents(TextEditor.lookupAny().code)
 
         return Columns(ed, Card(Plot(makePlotData).height("100%").width("100%"))) + Subscribed(onCodeChange)
 
