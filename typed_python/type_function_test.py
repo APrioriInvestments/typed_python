@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext
+from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward, defineForward
 import unittest
 
 
@@ -20,11 +20,12 @@ class TypeFunctionTest(unittest.TestCase):
     def test_basic(self):
         @TypeFunction
         def List(T):
-            return Alternative(
+            ListT = Forward("ListT*")
+            return defineForward(ListT, Alternative(
                 "List",
-                Node={"head": T, "tail": List(T)},
+                Node={"head": T, "tail": ListT},
                 Empty={}
-            )
+            ))
 
         self.assertIs(List(int), List(int))
         self.assertIsNot(List(float), List(int))
@@ -78,11 +79,12 @@ class TypeFunctionTest(unittest.TestCase):
     def test_can_serialize_type_functions(self):
         @TypeFunction
         def List(T):
-            return Alternative(
+            ListT = Forward("ListT*")
+            return defineForward(ListT, Alternative(
                 "List",
-                Node={"head": T, "tail": List(T)},
+                Node={"head": T, "tail": ListT},
                 Empty={}
-            )
+            ))
 
         context = SerializationContext({'List': List})
 

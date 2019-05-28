@@ -17,7 +17,7 @@ import struct
 import numpy
 from typed_python import (
     TupleOf, ListOf, OneOf, Dict,
-    ConstDict, Alternative,
+    ConstDict, Alternative, Forward, defineForward,
     serialize, deserialize, validateSerializedObject, decodeSerializedObject
 )
 
@@ -400,7 +400,8 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         )
 
     def test_recursive_list(self):
-        L = ListOf(OneOf(int, lambda: L))
+        L = Forward("L*")
+        L = defineForward(L, ListOf(OneOf(int, L)))
 
         listInst = L()
         listInst.append(10)

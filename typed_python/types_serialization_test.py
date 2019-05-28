@@ -579,7 +579,8 @@ class TypesSerializationTest(unittest.TestCase):
         self.serializeInLoop(lambda: numpy.ones(2000))
 
     def test_serializing_anonymous_recursive_types(self):
-        NT = TupleOf(lambda: NT)
+        NT = Forward("NT*")
+        NT = defineForward(NT, TupleOf(NT))
 
         # right now we don't allow this. When we move to a more proper model for declarint
         # forward types, this should work better.
@@ -588,7 +589,8 @@ class TypesSerializationTest(unittest.TestCase):
             ping_pong(NT)
 
     def test_serializing_named_tuples_in_loop(self):
-        NT = NamedTuple(x=OneOf(int, float), y=OneOf(int, lambda: NT))
+        NT = Forward("NT*")
+        NT = defineForward(NT, NamedTuple(x=OneOf(int, float), y=OneOf(int, NT)))
 
         context = SerializationContext({'NT': NT})
 
@@ -1102,7 +1104,8 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(d, d2)
 
     def test_serialize_recursive_dict_more(self):
-        D = Dict(str, OneOf(str, lambda: D))
+        D = Forward("D*")
+        D = defineForward(D, Dict(str, OneOf(str, D)))
         x = SerializationContext({"D": D})
 
         d = D()

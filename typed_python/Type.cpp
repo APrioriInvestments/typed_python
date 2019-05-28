@@ -106,13 +106,8 @@ void Type::destroy(instance_ptr self) {
 }
 
 
-#include <thread>
-#include <chrono>
 // common calculations
-// want the subtype-specific calculations to be done exactly once, when the type becomes resolved
 void Type::forwardTypesMayHaveChanged() {
-// TODO: this shouldn't be necessary but might make debugging easier, by setting the name
-// should be able to remove this later
     this->check([&](auto& subtype) { subtype._forwardTypesMayHaveChanged(); });
 
     if (m_resolved)
@@ -122,6 +117,7 @@ void Type::forwardTypesMayHaveChanged() {
     m_resolved = true;
     visitReferencedTypes([&](Type* t) { if (!t->m_resolved) m_resolved = false; });
 
+    // TODO: this doesn't need to be recalculated each time
     visitReferencedTypes([&](Type* t) { if (t != this) {t->m_used_by.insert(this); } });
 
     if (m_resolved) {
@@ -139,7 +135,6 @@ void Type::forwardTypesMayHaveChanged() {
 
         m_is_simple = true;
         visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) m_is_simple = false; });
-
 
         if (mTypeRep) {
             updateTypeRepForType(this, mTypeRep);

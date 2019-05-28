@@ -1865,8 +1865,8 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(isSimple(NamedTuple(x=int)))
         self.assertFalse(isSimple(NamedTuple(x=C)))
 
-        X = lambda: X
-        X = Alternative("X", X={'x': X}, Y={'i': int})
+        X = Forward("X*")
+        X = defineForward(X, Alternative("X", X={'x': X}, Y={'i': int}))
         self.assertFalse(isSimple(X))
         self.assertFalse(isSimple(NamedTuple(x=X)))
 
