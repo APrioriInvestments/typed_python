@@ -378,6 +378,7 @@ instance_ptr ConstDictType::lookupValueByKey(instance_ptr self, instance_ptr key
 }
 
 void ConstDictType::constructor(instance_ptr self, int64_t space, bool isPointerTree) const {
+    assertForwardsResolved();
     if (space == 0) {
         (*(layout**)self) = nullptr;
         return;

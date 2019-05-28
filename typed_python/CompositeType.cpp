@@ -119,6 +119,7 @@ int32_t CompositeType::hash32(instance_ptr left) {
 }
 
 void CompositeType::constructor(instance_ptr self) {
+    assertForwardsResolved();
     if (!m_is_default_constructible) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }

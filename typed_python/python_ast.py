@@ -21,36 +21,37 @@ Python ast directly.
 import ast
 import typed_python.ast_util as ast_util
 import weakref
-from typed_python._types import Alternative, TupleOf, OneOf
+from typed_python._types import Forward, defineForward, Alternative, TupleOf, OneOf
+
 
 # forward declarations.
-Module = lambda: Module
-Statement = lambda: Statement
-Expr = lambda: Expr
-Arg = lambda: Arg
-NumericConstant = lambda: NumericConstant
-ExprContext = lambda: ExprContext
-Slice = lambda: Slice
-BooleanOp = lambda: BooleanOp
-BinaryOp = lambda: BinaryOp
-UnaryOp = lambda: UnaryOp
-ComparisonOp = lambda: ComparisonOp
-Comprehension = lambda: Comprehension
-ExceptionHandler = lambda: ExceptionHandler
-Arguments = lambda: Arguments
-Keyword = lambda: Keyword
-Alias = lambda: Alias
-WithItem = lambda: WithItem
+Module = Forward("Module*")
+Statement = Forward("Statement*")
+Expr = Forward("Expr*")
+Arg = Forward("Arg*")
+NumericConstant = Forward("NumericConstant*")
+ExprContext = Forward("ExprContext*")
+Slice = Forward("Slice*")
+BooleanOp = Forward("BooleanOp*")
+BinaryOp = Forward("BinaryOp*")
+UnaryOp = Forward("UnaryOp*")
+ComparisonOp = Forward("ComparisonOp*")
+Comprehension = Forward("Comprehension*")
+ExceptionHandler = Forward("ExceptionHandler*")
+Arguments = Forward("Arguments*")
+Keyword = Forward("Keyword*")
+Alias = Forward("Alias*")
+WithItem = Forward("WithItem*")
 
-Module = Alternative(
+Module = defineForward(Module, Alternative(
     "Module",
     Module={"body": TupleOf(Statement)},
     Expression={'body': Expr},
     Interactive={'body': TupleOf(Statement)},
     Suite={"body": TupleOf(Statement)}
-)
+))
 
-Statement = Alternative(
+Statement = defineForward(Statement, Alternative(
     "Statement",
     FunctionDef={
         "name": str,
@@ -205,9 +206,9 @@ Statement = Alternative(
         'col_offset': int,
         'filename': str
     }
-)
+))
 
-Expr = Alternative(
+Expr = defineForward(Expr, Alternative(
     "Expr",
     BoolOp={
         "op": BooleanOp,
@@ -366,9 +367,9 @@ Expr = Alternative(
         'col_offset': int,
         'filename': str
     }
-)
+))
 
-NumericConstant = Alternative(
+NumericConstant = defineForward(NumericConstant, Alternative(
     "NumericConstant",
     Int={"value": int},
     Long={"value": str},
@@ -376,9 +377,9 @@ NumericConstant = Alternative(
     None_={},
     Float={"value": float},
     Unknown={}
-)
+))
 
-ExprContext = Alternative(
+ExprContext = defineForward(ExprContext, Alternative(
     "ExprContext",
     Load={},
     Store={},
@@ -386,9 +387,9 @@ ExprContext = Alternative(
     AugLoad={},
     AugStore={},
     Param={}
-)
+))
 
-Slice = Alternative(
+Slice = defineForward(Slice, Alternative(
     "Slice",
     Ellipsis={},
     Slice={
@@ -398,15 +399,15 @@ Slice = Alternative(
     },
     ExtSlice={"dims": TupleOf(Slice)},
     Index={"value": Expr}
-)
+))
 
-BooleanOp = Alternative(
+BooleanOp = defineForward(BooleanOp, Alternative(
     "BooleanOp",
     And={},
     Or={}
-)
+))
 
-BinaryOp = Alternative(
+BinaryOp = defineForward(BinaryOp, Alternative(
     "BinaryOp",
     Add={},
     Sub={},
@@ -420,17 +421,17 @@ BinaryOp = Alternative(
     BitXor={},
     BitAnd={},
     FloorDiv={}
-)
+))
 
-UnaryOp = Alternative(
+UnaryOp = defineForward(UnaryOp, Alternative(
     "UnaryOp",
     Invert={},
     Not={},
     UAdd={},
     USub={}
-)
+))
 
-ComparisonOp = Alternative(
+ComparisonOp = defineForward(ComparisonOp, Alternative(
     "ComparisonOp",
     Eq={},
     NotEq={},
@@ -442,9 +443,9 @@ ComparisonOp = Alternative(
     IsNot={},
     In={},
     NotIn={}
-)
+))
 
-Comprehension = Alternative(
+Comprehension = defineForward(Comprehension, Alternative(
     "Comprehension",
     Item={
         "target": Expr,
@@ -452,9 +453,9 @@ Comprehension = Alternative(
         "ifs": TupleOf(Expr),
         "is_async": bool
     }
-)
+))
 
-ExceptionHandler = Alternative(
+ExceptionHandler = defineForward(ExceptionHandler, Alternative(
     "ExceptionHandler",
     Item={
         "type": OneOf(Expr, None),
@@ -464,9 +465,9 @@ ExceptionHandler = Alternative(
         'col_offset': int,
         'filename': str
     }
-)
+))
 
-Arguments = Alternative(
+Arguments = defineForward(Arguments, Alternative(
     "Arguments",
     Item={
         "args": TupleOf(Arg),
@@ -476,9 +477,9 @@ Arguments = Alternative(
         "kwarg": OneOf(Arg, None),
         "defaults": TupleOf(Expr)
     }
-)
+))
 
-Arg = Alternative(
+Arg = defineForward(Arg, Alternative(
     "Arg",
     Item={
         'arg': str,
@@ -487,31 +488,31 @@ Arg = Alternative(
         'col_offset': int,
         'filename': str
     }
-)
+))
 
-Keyword = Alternative(
+Keyword = defineForward(Keyword, Alternative(
     "Keyword",
     Item={
         "arg": OneOf(None, str),
         "value": Expr
     }
-)
+))
 
-Alias = Alternative(
+Alias = defineForward(Alias, Alternative(
     "Alias",
     Item={
         "name": str,
         "asname": OneOf(str, None)
     }
-)
+))
 
-WithItem = Alternative(
+WithItem = defineForward(WithItem, Alternative(
     "WithItem",
     Item={
         "context_expr": Expr,
         "optional_vars": OneOf(Expr, None),
     }
-)
+))
 
 numericConverters = {
     int: lambda x: NumericConstant.Int(value=x),

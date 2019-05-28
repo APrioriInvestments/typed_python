@@ -28,6 +28,7 @@ public:
             throw std::runtime_error("OneOf types are limited to 255 alternatives in this implementation");
         }
 
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

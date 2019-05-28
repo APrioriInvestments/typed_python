@@ -32,9 +32,6 @@ public:
     void _visitReferencedTypes(const visitor_type& visitor) {
     }
 
-    void _forwardTypesMayHaveChanged() {
-    }
-
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }

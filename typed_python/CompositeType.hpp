@@ -31,12 +31,8 @@ public:
             m_types(types),
             m_names(names)
     {
-        m_directNeedsResolution = false;
-        for (auto& typePtr: m_types)
-            if (typePtr->getTypeCategory() == catForward)
-                m_directNeedsResolution = true;
-
-        _forwardTypesMayHaveChanged();
+        //m_resolved = false;
+        //forwardTypesMayHaveChanged();
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -193,7 +189,6 @@ protected:
     std::vector<std::string> m_names;
     std::vector<size_t> m_serialize_typecodes; //codes to use when serializing/deserializing
     std::unordered_map<size_t, size_t> m_serialize_typecodes_to_position; //codes to use when serializing/deserializing
-    bool m_directNeedsResolution;
 };
 
 class NamedTuple : public CompositeType {
@@ -202,6 +197,7 @@ public:
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 
@@ -217,6 +213,7 @@ public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

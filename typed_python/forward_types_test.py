@@ -12,23 +12,25 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python.internals import forwardToName
-from typed_python import TupleOf, OneOf, Alternative, Class, Member
+# from typed_python.internals import forwardToName
+from typed_python import TupleOf, OneOf, Alternative, Class, Member, Forward, defineForward
 
 
 class NativeForwardTypesTests(unittest.TestCase):
-    def test_forwardToName(self):
-        X = 10
-        self.assertEqual(forwardToName(lambda: X), "X")
-        self.assertEqual(forwardToName(lambda: X+X), "UnknownForward")
+
+    # def test_forwardToName(self):
+    #     X = 10
+    #     self.assertEqual(forwardToName(lambda: X), "X")
+    #     self.assertEqual(forwardToName(lambda: X+X), "UnknownForward")
 
     def test_recursive_alternative(self):
-        List = Alternative(
+        List = Forward("List*")
+        List = defineForward(List, Alternative(
             "List",
-            Node={'head': int, 'tail': lambda: List },
+            Node={'head': int, 'tail': List },
             Leaf={},
             unpack=lambda self: () if self.matches.Leaf else (self.head,) + self.tail.unpack()
-        )
+        ))
 
         # ensure recursive implementation actually works
         lst = List.Leaf()
@@ -38,30 +40,34 @@ class NativeForwardTypesTests(unittest.TestCase):
 
         self.assertEqual(list(lst.unpack()), list(reversed(range(100))))
 
-    def test_instantiating_invalid_forward(self):
-        X = Alternative("X", A={'x': lambda: this_does_not_Exist })  # noqa:F821
-
-        with self.assertRaises(TypeError):
-            X.A()
-
-        this_does_not_exist = int
-
-        # fixing it doesn't help
-        with self.assertRaises(TypeError):
-            X.A()
-
-        # but a new type is OK.
-        X = Alternative("X", A={'x': lambda: this_does_not_exist })
-
-        X.A()
+    # TODO: make this test meaningful?
+    # def test_instantiating_invalid_forward(self):
+    #     X = Alternative("X", A={'x': lambda: this_does_not_Exist })  # noqa:F821
+    #
+    #     with self.assertRaises(TypeError):
+    #         X.A()
+    #
+    #     this_does_not_exist = int
+    #
+    #     # fixing it doesn't help
+    #     with self.assertRaises(TypeError):
+    #         X.A()
+    #
+    #     # but a new type is OK.
+    #     X = Alternative("X", A={'x': lambda: this_does_not_exist })
+    #
+    #     X.A()
 
     def test_mutually_recursive_classes(self):
+        B0 = Forward("B*")
+
         class A(Class):
-            bvals = Member(TupleOf(lambda: B))
+            bvals = Member(TupleOf(B0))
 
         class B(Class):
-            avals = Member(TupleOf(lambda: A))
+            avals = Member(TupleOf(A))
 
+        B0 = defineForward(B0, B)
         a = A()
         b = B()
 
@@ -79,8 +85,9 @@ class NativeForwardTypesTests(unittest.TestCase):
             X()
 
     def test_tuple_of_one_of(self):
-        Y = OneOf(None, lambda: X)
-        X = TupleOf(Y)
+        X = Forward("X*")
+        Y = OneOf(None, X)
+        X = defineForward(X, TupleOf(Y))
 
         str(X)
 
@@ -93,7 +100,8 @@ class NativeForwardTypesTests(unittest.TestCase):
         self.assertEqual(anotherX[0], anX)
 
     def test_deep_forwards_work(self):
-        X = TupleOf(TupleOf(TupleOf(TupleOf(OneOf(None, lambda: X)))))
+        X = Forward("X*")
+        X = defineForward(X, TupleOf(TupleOf(TupleOf(TupleOf(OneOf(None, X))))))
 
         str(X)
 

@@ -382,7 +382,6 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             PyErr_SetString(PyExc_TypeError, "First arg should be a string.");
             return NULL;
         }
-
         PyObjectHolder retType(PyTuple_GetItem(args,1));
         PyObjectHolder funcObj(PyTuple_GetItem(args,2));
         PyObjectHolder argTuple(PyTuple_GetItem(args,3));
@@ -431,8 +430,7 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             if (k1 != Py_None) {
                 argT = PyInstance::unwrapTypeArgToTypePtr(k1);
                 if (!argT) {
-                    PyErr_Format(PyExc_TypeError, "Argument %S has a type argument %S which "
-                            "should be None or a Type.", k0, k1);
+                    PyErr_Format(PyExc_TypeError, "Argument %S has a type argument %S which should be None or a Type.", k0->ob_type, k1->ob_type);
                     return NULL;
                 }
             }
@@ -451,7 +449,6 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
 
                 val = PyTuple_GetItem(k2,0);
             }
-
 
             if (val) {
                 incref(val);
@@ -1231,25 +1228,53 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(t->bytecount());
 }
 
-PyObject *resolveForwards(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1) {
-        PyErr_SetString(PyExc_TypeError, "resolveForwards takes 1 positional argument");
+//PyObject *resolveForwards(PyObject* nullValue, PyObject* args) {
+//    if (PyTuple_Size(args) != 1) {
+//        PyErr_SetString(PyExc_TypeError, "resolveForwards takes 1 positional argument");
+//        return NULL;
+//    }
+//
+//    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+//
+//    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+//
+//    if (!t1) {
+//        return incref(Py_False);
+//    }
+//
+//    if (PyInstance::guaranteeForwardsResolved(t1)) {
+//        return incref(Py_True);
+//    }
+//
+//    return NULL;
+//}
+
+PyObject *defineForward(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "defineForward takes 2 positional arguments");
         return NULL;
     }
 
     PyObjectHolder a1(PyTuple_GetItem(args, 0));
-
     Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-
-    if (!t1) {
-        return incref(Py_False);
+    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catForward) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'defineForward' must be a Forward");
+        return NULL;
     }
 
-    if (PyInstance::guaranteeForwardsResolved(t1)) {
-        return incref(Py_True);
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
+    if (!t2) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'defineForward' must be a Type");
+        return NULL;
+    }
+    Type *t3 = ((Forward*)t1)->define(t2);
+    if (!t3) {
+        PyErr_SetString(PyExc_TypeError, "'defineForward' failure");
+        return NULL;
     }
 
-    return NULL;
+    return incref((PyObject*)PyInstance::typeObj(t3));
 }
 
 PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
@@ -1340,6 +1365,18 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     }
 
     return incref(t1->isBinaryCompatibleWith(t2) ? Py_True : Py_False);
+}
+
+PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
+        PyErr_SetString(PyExc_TypeError, "Forward takes a single string positional argument.");
+        return NULL;
+    }
+    std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
+
+    return incref((PyObject*)PyInstance::typeObj(
+        ::Forward::Make(name)
+        ));
 }
 
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -1444,7 +1481,9 @@ static PyMethodDef module_methods[] = {
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
-    {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
+    {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
+//    {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
+    {"defineForward", (PyCFunction)defineForward, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},

@@ -19,77 +19,70 @@
 #include "Type.hpp"
 #include "ReprAccumulator.hpp"
 
-// forward types are never actually used - they must be removed from the graph before
+// forward types must be resolved (removed from the graph) before
 // any types that contain them can be used.
 class Forward : public Type {
 public:
-    Forward(PyObject* deferredDefinition, std::string name) :
+    Forward() :
         Type(TypeCategory::catForward),
-        mTarget(nullptr),
-        mDefinition(deferredDefinition)
+        mTarget(nullptr)
     {
-        m_references_unresolved_forwards = true;
-        m_name = name;
+        m_name = "unnamed";
+        m_resolved = false;
+        forwardTypesMayHaveChanged();
     }
 
-    // this constructor is for c++ direct types
     Forward(std::string name) :
         Type(TypeCategory::catForward),
-        mTarget(nullptr),
-        mDefinition(nullptr)
+        mTarget(nullptr)
     {
-        m_references_unresolved_forwards = true;
+        m_resolved = false;
         m_name = name;
+        forwardTypesMayHaveChanged();
     }
 
-    // this method is for c++ direct types
-    void setTarget(Type* target) {
+    void _forwardTypesMayHaveChanged() {
+        if (mTarget) {
+            m_resolved = true;
+            m_size = mTarget->bytecount();
+            m_name = mTarget->name();
+        }
+    }
+
+    static Forward* Make() {
+        return new Forward();
+    }
+
+    static Forward* Make(std::string name) {
+        return new Forward(name);
+    }
+
+    // TODO: attach this as a method to the Forward in python, e.g. T=Forward(), T=T.define(...)
+    Type* define(Type* target) {
+        // TODO: check for containment cycles
         mTarget = target;
+        calc_internals_and_propagate();
+
+        return mTarget;
     }
 
     Type* getTarget() const {
         return mTarget;
     }
 
-    template<class resolve_py_callable_to_type>
-    Type* guaranteeForwardsResolvedConcrete(resolve_py_callable_to_type& resolver) {
-        if (mTarget) {
-            return mTarget;
-        }
-
-        Type* t = resolver(mDefinition);
-        if (!t) {
-            m_failed_resolution = true;
-        }
-
-        mTarget = t;
-
-        if (mTarget) {
-            return mTarget;
-        }
-
-        return this;
-    }
-
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {
-        v(mTarget);
+//        if (mTarget)
+//            v(mTarget);
     }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {
-        v(mTarget);
+//        if (mTarget)
+//            v(mTarget);
     }
 
-    void _forwardTypesMayHaveChanged() {
-        // This is only meant to be triggered when we are resolving c++ forward references,
-        // (which lack the python mDefinition).
-        // Without resetting m_references_unresolved_forwards, we would only resolve a single c++ reference
-        // Maybe there is a better place for this.
-        if (!mDefinition)
-            m_references_unresolved_forwards = true;
-    }
-
+    // TODO: is this still needed?
     void resolveDuringSerialization(Type* newTarget) {
         if (mTarget && mTarget != newTarget) {
             throw std::runtime_error("can't resolve a forward type to a new value.");
@@ -100,5 +93,4 @@ public:
 
 private:
     Type* mTarget;
-    PyObject* mDefinition;
 };

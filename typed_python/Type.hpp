@@ -113,7 +113,7 @@ public:
         catClass = 28,
         catHeldClass = 29,
         catFunction = 30,
-        catForward = 31, //this will be deprecated
+        catForward = 31,
         catEmbeddedMessage = 32
     };
 
@@ -259,79 +259,24 @@ public:
     }
 
     void assertForwardsResolved() const {
-        if (m_references_unresolved_forwards) {
+        if (!m_resolved) {
             throw std::logic_error("Type " + m_name + " has unresolved forwards.");
         }
-        if (m_failed_resolution) {
-            throw std::logic_error("Type " + m_name + " failed to resolve.");
-        }
     }
 
-    //this MUST be called while holding the GIL
+    // Doesn't do anything anymore.
+    // Every Type needs to be explicitly defined with resolved components before it can be used
     template<class resolve_py_callable_to_type>
     Type* guaranteeForwardsResolved(const resolve_py_callable_to_type& resolver) {
-        if (m_failed_resolution) {
-            throw std::runtime_error("Type failed to resolve the first time it was triggered.");
-        }
-
-        if (m_checking_for_references_unresolved_forwards) {
-            //it's ok to bail early. the call stack will recurse
-            //back to this point, and during the unwind will ensure
-            //that we check that any forwards are resolved.
-            return this;
-        }
-
-        if (m_references_unresolved_forwards) {
-            m_checking_for_references_unresolved_forwards = true;
-            m_references_unresolved_forwards = false;
-
-            Type* res;
-
-            try {
-                res = this->check([&](auto& subtype) {
-                    return subtype.guaranteeForwardsResolvedConcrete(resolver);
-                });
-            } catch(...) {
-                m_checking_for_references_unresolved_forwards = false;
-                m_failed_resolution = true;
-                throw;
-            }
-
-            m_checking_for_references_unresolved_forwards = false;
-
-            forwardTypesMayHaveChanged();
-
-            if (res != this) {
-                return res->guaranteeForwardsResolved(resolver);
-            }
-
-            return res;
-        }
-
+        assertForwardsResolved();
         return this;
     }
-
-    template<class resolve_py_callable_to_type>
-    Type* guaranteeForwardsResolvedConcrete(resolve_py_callable_to_type& resolver) {
-        typedef Type* type_ptr;
-
-        visitReferencedTypes([&](type_ptr& t) {
-            t = t->guaranteeForwardsResolved(resolver);
-        });
-
-        forwardTypesMayHaveChanged();
-
-        return this;
-    }
-
-    void _forwardTypesMayHaveChanged() {}
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
-
 
     // call subtype.constructor
     void constructor(instance_ptr self);
@@ -375,6 +320,10 @@ public:
         });
     }
 
+    // subtype-specific calculation
+    void _forwardTypesMayHaveChanged() {}
+
+    // common calculations
     void forwardTypesMayHaveChanged();
 
     // call subtype.copy_constructor
@@ -406,8 +355,8 @@ public:
         return m_is_default_constructible;
     }
 
-    bool references_unresolved_forwards() const {
-        return m_references_unresolved_forwards;
+    bool resolved() const {
+        return m_resolved;
     }
 
     bool isBinaryCompatibleWith(Type* other);
@@ -420,6 +369,13 @@ public:
         return m_is_simple;
     }
 
+    void calc_internals_and_propagate() {
+        forwardTypesMayHaveChanged();
+        for (auto u: m_used_by) {
+            u->calc_internals_and_propagate();
+        }
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -429,9 +385,7 @@ protected:
             mTypeRep(nullptr),
             m_base(nullptr),
             m_is_simple(true),
-            m_references_unresolved_forwards(false),
-            m_checking_for_references_unresolved_forwards(false),
-            m_failed_resolution(false)
+            m_resolved(true)
         {}
 
     TypeCategory m_typeCategory;
@@ -451,17 +405,14 @@ protected:
     // or deserialized.
     bool m_is_simple;
 
-    bool m_references_unresolved_forwards;
-
-    bool m_checking_for_references_unresolved_forwards;
+    bool m_resolved;
 
     bool m_failed_resolution;
-
-    std::set<Type*> mUses;
 
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 
     std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
 
+    std::set<Type*> m_used_by;
 };
 

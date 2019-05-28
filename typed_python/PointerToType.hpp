@@ -48,7 +48,8 @@ public:
         return it->second;
     }
 
-    void forwardTypesMayHaveChanged() {
+// TODO: was this supposed to be forwardTypesMayHaveChanged instead of _forwardTypesMayHaveChanged?
+    void _forwardTypesMayHaveChanged() {
         m_name = "PointerTo(" + m_element_type->name() + ")";
     }
 

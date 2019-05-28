@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Tuple, TupleOf, Alternative, NamedTuple, OneOf
+from typed_python import Tuple, TupleOf, Alternative, NamedTuple, OneOf, Forward, defineForward
 import textwrap
 
 
@@ -56,15 +56,16 @@ def raising(e):
     raise e
 
 
-Type = Alternative(
+Type = Forward("Type***")
+Type = defineForward(Type, Alternative(
     "Type",
     Void={},
     Float={'bits': int},
     Int={'bits': int, 'signed': bool},
-    Struct={'element_types': TupleOf(Tuple(str, lambda: Type)), 'name': str},
-    Array={'element_type': lambda: Type, 'count': int},
-    Function={'output': lambda: Type, 'args': TupleOf(lambda: Type), 'varargs': bool, 'can_throw': bool},
-    Pointer={'value_type': lambda: Type},
+    Struct={'element_types': TupleOf(Tuple(str, Type)), 'name': str},
+    Array={'element_type': Type, 'count': int},
+    Function={'output': Type, 'args': TupleOf(Type), 'varargs': bool, 'can_throw': bool},
+    Pointer={'value_type': Type},
     attr_ix=type_attr_ix,
     __str__=type_str,
     pointer=lambda self: Type.Pointer(value_type=self),
@@ -76,7 +77,7 @@ Type = Alternative(
         Constant.NullPointer(value_type=self.value_type) if self.matches.Pointer else
         raising(Exception("Can't make a zero value from %s" % self))
     )
-)
+))
 
 
 def const_truth_value(c):
@@ -108,17 +109,18 @@ def const_str(c):
     assert False, type(c)
 
 
-Constant = Alternative(
+Constant = Forward("Constant*")
+Constant = defineForward(Constant, Alternative(
     "Constant",
     Void={},
     Float={'val': float, 'bits': int},
     Int={'val': int, 'bits': int, 'signed': bool},
-    Struct={'elements': TupleOf(Tuple(str, lambda: Constant))},
+    Struct={'elements': TupleOf(Tuple(str, Constant))},
     ByteArray={'val': bytes},
     NullPointer={'value_type': Type},
     truth_value=const_truth_value,
     __str__=const_str
-)
+))
 
 UnaryOp = Alternative(
     "UnaryOp",
@@ -160,8 +162,8 @@ BinaryOp = Alternative(
 
 
 # loads and stores - no assignments
-Expression = lambda: Expression
-Teardown = lambda: Teardown
+Expression = Forward("Expression*")
+Teardown = Forward("Teardown*")
 
 NamedCallTarget = NamedTuple(
     name=str,
@@ -212,12 +214,12 @@ def teardown_str(self):
     assert False, type(self)
 
 
-Teardown = Alternative(
+Teardown = defineForward(Teardown, Alternative(
     "Teardown",
     ByTag={'tag': str, 'expr': Expression},
     Always={'expr': Expression},
     __str__=teardown_str
-)
+))
 
 
 def expr_concatenate(self, other):
@@ -362,7 +364,7 @@ def expr_is_simple(expr):
     return False
 
 
-Expression = Alternative(
+Expression = defineForward(Expression, Alternative(
     "Expression",
     Constant={'val': Constant},
     Comment={'comment': str, 'expr': Expression},
@@ -441,7 +443,7 @@ Expression = Alternative(
     with_comment=lambda self, c: Expression.Comment(comment=c, expr=self),
     elemPtr=lambda self, *exprs: Expression.ElementPtr(left=self, offsets=[ensureExpr(e) for e in exprs]),
     is_simple=expr_is_simple
-)
+))
 
 
 def ensureExpr(x):

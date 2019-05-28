@@ -261,9 +261,6 @@ public:
         }
     }
 
-    void _forwardTypesMayHaveChanged() {
-    }
-
     static Function* merge(Function* f1, Function* f2) {
         std::vector<Overload> overloads(f1->mOverloads);
         for (auto o: f2->mOverloads) {

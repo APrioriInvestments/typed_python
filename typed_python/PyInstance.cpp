@@ -1135,40 +1135,6 @@ void PyInstance::mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObj
     //noop
 }
 
-// static
-Type* PyInstance::pyFunctionToForward(PyObject* arg) {
-    static PyObject* internalsModule = PyImport_ImportModule("typed_python.internals");
-
-    if (!internalsModule) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.internals");
-    }
-
-    static PyObject* forwardToName = PyObject_GetAttrString(internalsModule, "forwardToName");
-
-    if (!forwardToName) {
-        throw std::runtime_error("Internal error: couldn't find typed_python.internals.makeFunction");
-    }
-
-    PyObjectStealer fRes(
-        PyObject_CallFunctionObjArgs(forwardToName, arg, NULL)
-        );
-
-    std::string fwdName;
-
-    if (!fRes) {
-        fwdName = "<Internal Error>";
-        PyErr_Clear();
-    } else {
-        if (!PyUnicode_Check(fRes)) {
-            fwdName = "<Internal Error>";
-        } else {
-            fwdName = PyUnicode_AsUTF8(fRes);
-        }
-    }
-
-    return new Forward(incref(arg), fwdName);
-}
-
 /**
  *  We are doing this here rather than in Type because we want to create a singleton PyUnicode
  *  object for each type category to make this function ultra fast.
@@ -1317,9 +1283,9 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
         return NoneType::Make();
     }
 
-    if (PyFunction_Check(arg)) {
-        return pyFunctionToForward(arg);
-    }
+//    if (PyFunction_Check(arg)) {
+//        return pyFunctionToForward(arg);
+//    }
 
     return  PyInstance::tryUnwrapPyInstanceToValueType(arg);
 }
@@ -1381,11 +1347,11 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         return valueType;
     }
 
-    if (PyFunction_Check(typearg)) {
-        return pyFunctionToForward(typearg);
-    }
+//    if (PyFunction_Check(typearg)) {
+//        return pyFunctionToForward(typearg);
+//    }
 
-
-    PyErr_Format(PyExc_TypeError, "Cannot convert %S to a native type.", typearg);
+    PyErr_Format(PyExc_TypeError, "Cannot convert to a native type.");
+//    PyErr_Format(PyExc_TypeError, "Cannot convert %S to a native type.", typearg);
     return NULL;
 }

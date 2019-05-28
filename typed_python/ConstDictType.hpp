@@ -36,6 +36,7 @@ public:
             m_key(key),
             m_value(value)
     {
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

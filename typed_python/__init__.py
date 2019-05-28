@@ -20,6 +20,7 @@ from typed_python.hash import sha_hash
 from typed_python.SerializationContext import SerializationContext
 from typed_python.type_filter import TypeFilter
 from typed_python._types import (
+    Forward, defineForward,
     TupleOf, ListOf, Tuple, NamedTuple, OneOf, ConstDict,
     Alternative, Value, serialize, deserialize, serializeStream, deserializeStream,
     PointerTo, Dict, validateSerializedObject, validateSerializedObjectStream, decodeSerializedObject

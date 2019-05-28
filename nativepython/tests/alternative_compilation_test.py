@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Function, Alternative
+from typed_python import TypeFunction, Function, Alternative, Forward, defineForward
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
@@ -38,12 +38,13 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(Simple.C()), Simple.C())
 
     def test_complex_alternative_passing(self):
-        Complex = Alternative(
+        Complex = Forward("Complex*")
+        Complex = defineForward(Complex, Alternative(
             "Complex",
             A={'a': str, 'b': int},
             B={'a': str, 'c': int},
-            C={'a': str, 'd': lambda: Complex}
-        )
+            C={'a': str, 'd': Complex}
+        ))
 
         c = Complex.A(a="hi", b=20)
         c2 = Complex.C(a="hi", d=c)
@@ -115,6 +116,14 @@ class TestAlternativeCompilation(unittest.TestCase):
     def test_matching_recursively(self):
         @TypeFunction
         def Tree(T):
+            TreeType = Forward("TreeType*")
+            TreeType = defineForward(TreeType, Alternative(
+                "Tree",
+                Leaf={'value': T},
+                Node={'left': TreeType, 'right': TreeType}
+            ))
+            return TreeType
+
             return Alternative(
                 "Tree",
                 Leaf={'value': T},

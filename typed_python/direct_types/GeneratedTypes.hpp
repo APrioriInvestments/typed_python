@@ -968,7 +968,7 @@ template <>
 class TypeDetails<ClientToServer*> {
 public:
     static Forward* getType() {
-        static Forward* t = new Forward(0, "ClientToServer");
+        static Forward* t = new Forward("ClientToServer");
         return t;
     }
     static const uint64_t bytecount = sizeof(void*);
@@ -1029,8 +1029,8 @@ Alternative* ClientToServer::getType() {
     static bool once = false;
     if (!once) {
         once = true;
-        TypeDetails<ClientToServer*>::getType()->setTarget(t);
-        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        TypeDetails<ClientToServer*>::getType()->define(t);
+//        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }
@@ -1478,7 +1478,7 @@ template <>
 class TypeDetails<A*> {
 public:
     static Forward* getType() {
-        static Forward* t = new Forward(0, "A");
+        static Forward* t = new Forward("A");
         return t;
     }
     static const uint64_t bytecount = sizeof(void*);
@@ -1503,8 +1503,8 @@ Alternative* A::getType() {
     static bool once = false;
     if (!once) {
         once = true;
-        TypeDetails<A*>::getType()->setTarget(t);
-        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        TypeDetails<A*>::getType()->define(t);
+//        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }
@@ -1678,7 +1678,7 @@ template <>
 class TypeDetails<Overlap*> {
 public:
     static Forward* getType() {
-        static Forward* t = new Forward(0, "Overlap");
+        static Forward* t = new Forward("Overlap");
         return t;
     }
     static const uint64_t bytecount = sizeof(void*);
@@ -1709,8 +1709,8 @@ Alternative* Overlap::getType() {
     static bool once = false;
     if (!once) {
         once = true;
-        TypeDetails<Overlap*>::getType()->setTarget(t);
-        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        TypeDetails<Overlap*>::getType()->define(t);
+//        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }
@@ -1909,7 +1909,7 @@ template <>
 class TypeDetails<Bexpress*> {
 public:
     static Forward* getType() {
-        static Forward* t = new Forward(0, "Bexpress");
+        static Forward* t = new Forward("Bexpress");
         return t;
     }
     static const uint64_t bytecount = sizeof(void*);
@@ -1940,8 +1940,8 @@ Alternative* Bexpress::getType() {
     static bool once = false;
     if (!once) {
         once = true;
-        TypeDetails<Bexpress*>::getType()->setTarget(t);
-        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
+        TypeDetails<Bexpress*>::getType()->define(t);
+//        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) { return (Type*)0; });
     }
     return t;
 }

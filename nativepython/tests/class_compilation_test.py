@@ -24,9 +24,6 @@ def Compiled(f):
     return Runtime.singleton().compile(f)
 
 
-AClass = lambda: AClass
-
-
 class AClass(Class):
     x = Member(int)
     y = Member(float)

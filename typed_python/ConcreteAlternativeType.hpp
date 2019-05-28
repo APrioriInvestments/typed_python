@@ -29,6 +29,7 @@ public:
             m_which(which)
     {
         m_is_simple = false;
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 
@@ -37,14 +38,14 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         Type* t = m_alternative;
-        visitor(t);
+//        visitor(t);
         assert(t == m_alternative);
     }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         Type* t = m_alternative;
-        visitor(t);
+ //       visitor(t);
         assert(t == m_alternative);
     }
 

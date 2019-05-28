@@ -17,7 +17,7 @@ from types import FunctionType
 import typed_python._types as _types
 import typed_python.inspect_override as inspect
 
-from typed_python._types import NamedTuple
+from typed_python._types import NamedTuple, Forward, defineForward
 
 
 class UndefinedBehaviorException(BaseException):
@@ -33,21 +33,21 @@ class UndefinedBehaviorException(BaseException):
 object = object
 
 
-def forwardToName(fwdLambda):
-    """Unwrap a 'forward definition' lambda to a name.
-
-    Maps functions like 'lambda: X' to the string 'X'.
-    """
-    if hasattr(fwdLambda, "__code__"):
-        if fwdLambda.__code__.co_code == b't\x00S\x00':
-            return fwdLambda.__code__.co_names[0]
-        if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
-            return fwdLambda.__code__.co_freevars[0]
-
-    if fwdLambda.__name__ == "<lambda>":
-        return "UnknownForward"
-    else:
-        return fwdLambda.__name__
+# def forwardToName(fwdLambda):
+#     """Unwrap a 'forward definition' lambda to a name.
+#
+#     Maps functions like 'lambda: X' to the string 'X'.
+#     """
+#     if hasattr(fwdLambda, "__code__"):
+#         if fwdLambda.__code__.co_code == b't\x00S\x00':
+#             return fwdLambda.__code__.co_names[0]
+#         if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
+#             return fwdLambda.__code__.co_freevars[0]
+#
+#     if fwdLambda.__name__ == "<lambda>":
+#         return "UnknownForward"
+#     else:
+#         return fwdLambda.__name__
 
 
 class Member:
@@ -156,6 +156,8 @@ class ClassMetaclass(type):
         classMembers = []
         properties = {}
 
+        actualClass = Forward("actualClass*")
+
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
                 members.append((eltName, elt._type, elt._default_value))
@@ -169,20 +171,20 @@ class ClassMetaclass(type):
                     staticFunctions[eltName] = _types.Function(staticFunctions[eltName], makeFunction(eltName, elt.__func__))
             elif isinstance(elt, FunctionType):
                 if eltName not in memberFunctions:
-                    memberFunctions[eltName] = makeFunction(eltName, elt, lambda: actualClass)
+                    memberFunctions[eltName] = makeFunction(eltName, elt, actualClass)
                 else:
-                    memberFunctions[eltName] = _types.Function(memberFunctions[eltName], makeFunction(eltName, elt, lambda: actualClass))
+                    memberFunctions[eltName] = _types.Function(memberFunctions[eltName], makeFunction(eltName, elt, actualClass))
             else:
                 classMembers.append((eltName, elt))
 
-        actualClass = _types.Class(
+        actualClass = defineForward(actualClass, _types.Class(
             name,
             tuple(members),
             tuple(memberFunctions.items()),
             tuple(staticFunctions.items()),
             tuple(properties.items()),
             tuple(classMembers)
-        )
+        ))
         return actualClass
 
 

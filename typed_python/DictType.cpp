@@ -226,6 +226,7 @@ instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
 }
 
 void DictType::constructor(instance_ptr self) {
+    assertForwardsResolved();
     (*(layout**)self) = (layout*)malloc(sizeof(layout));
 
     layout& record = **(layout**)self;

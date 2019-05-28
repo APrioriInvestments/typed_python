@@ -13,7 +13,7 @@
 #   limitations under the License.
 import unittest
 from typed_python import TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    ConstDict, Alternative, _types
+    ConstDict, Alternative, Forward, defineForward
 
 
 class TypesMetadataTest(unittest.TestCase):
@@ -39,13 +39,14 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(ConstDict(str, int).ValueType, Int64)
 
     def test_alternatives(self):
-        X = Alternative(
+        X = Forward("X*")
+        X = defineForward(X, Alternative(
             "X",
             Left={'x': int, 'y': str},
-            Right={'x': lambda: X, 'val': int}
-        )
+            Right={'x': X, 'val': int}
+        ))
 
-        _types.resolveForwards(X)
+        # _types.resolveForwards(X)
 
         self.assertEqual(len(X.__typed_python_alternatives__), 2)
 

@@ -34,7 +34,8 @@ from typed_python import (
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64, Class,
     Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Dict, SerializationContext, EmbeddedMessage,
-    serializeStream, deserializeStream, decodeSerializedObject
+    serializeStream, deserializeStream, decodeSerializedObject,
+    Forward, defineForward
 )
 
 from typed_python._types import refcount
@@ -420,7 +421,8 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(ping_pong(f, ts), f)
 
     def test_serialize_alternatives_as_types(self):
-        A = Alternative("A", X={'a': int}, Y={'a': lambda: A})
+        A = Forward("A*")
+        A = defineForward(A, Alternative("A", X={'a': int}, Y={'a': A}))
 
         ts = SerializationContext({'A': A})
         self.assertIs(ping_pong(A, ts), A)
@@ -600,7 +602,8 @@ class TypesSerializationTest(unittest.TestCase):
         self.serializeInLoop(lambda: TO((1, 2, 3, 4, 5)), context=context)
 
     def test_serializing_alternatives_in_loop(self):
-        AT = Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': lambda: AT})
+        AT = Forward("AT*")
+        AT = defineForward(AT, Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
 
         context = SerializationContext({'AT': AT})
 

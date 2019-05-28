@@ -40,6 +40,7 @@ public:
         m_size = sizeof(void*);
         m_is_default_constructible = true;
 
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

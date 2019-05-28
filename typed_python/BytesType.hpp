@@ -71,8 +71,6 @@ public:
     //return an increffed bytes object containing a pointer to the requisite bytes
     static layout* createFromPtr(const char* data, int64_t len);
 
-    void _forwardTypesMayHaveChanged() {}
-
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 

@@ -46,7 +46,7 @@ public:
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
 
-        _forwardTypesMayHaveChanged();
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

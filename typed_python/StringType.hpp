@@ -93,8 +93,6 @@ public:
         return true;
     }
 
-    void _forwardTypesMayHaveChanged() {}
-
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 

@@ -17,7 +17,7 @@
 import sys
 import argparse
 import traceback
-from typed_python._types import Dict, ConstDict, NamedTuple, Tuple, ListOf, TupleOf, OneOf, Alternative
+from typed_python._types import Dict, ConstDict, NamedTuple, Tuple, ListOf, TupleOf, OneOf, Alternative, Forward, defineForward
 from typed_python.direct_types.generate_tuple import gen_tuple_type
 from typed_python.direct_types.generate_named_tuple import gen_named_tuple_type
 from typed_python.direct_types.generate_alternative import gen_alternative_type
@@ -159,8 +159,8 @@ def generate_some_types(dest):
     Args:
         dest: filename to which to write generated code.
     """
-    Bexpress = lambda: Bexpress
-    Bexpress = Alternative(
+    Bexpress = Forward()
+    Bexpress = defineForward(Bexpress, Alternative(
         "BooleanExpr",
         Leaf={
             "value": bool
@@ -174,7 +174,7 @@ def generate_some_types(dest):
             "op": str,
             "right": Bexpress
         }
-    )
+    ))
     with open(dest, 'w') as f:
         f.write("#pragma once\n")
         f.writelines(typed_python_codegen(

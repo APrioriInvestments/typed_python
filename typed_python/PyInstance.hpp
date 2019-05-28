@@ -522,7 +522,7 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObject* pyType);
 
-    static Type* pyFunctionToForward(PyObject* arg);
+//    static Type* pyFunctionToForward(PyObject* arg);
 
     static Type* tryUnwrapPyInstanceToType(PyObject* arg);
 

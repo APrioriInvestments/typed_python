@@ -105,25 +105,45 @@ void Type::destroy(instance_ptr self) {
     this->check([&](auto& subtype) { subtype.destroy(self); } );
 }
 
+
+#include <thread>
+#include <chrono>
+// common calculations
+// want the subtype-specific calculations to be done exactly once, when the type becomes resolved
 void Type::forwardTypesMayHaveChanged() {
-    m_references_unresolved_forwards = false;
+// TODO: this shouldn't be necessary but might make debugging easier, by setting the name
+// should be able to remove this later
+    this->check([&](auto& subtype) { subtype._forwardTypesMayHaveChanged(); });
 
-    visitReferencedTypes([&](Type* t) {
-        if (!t->isSimple()) {
-            m_is_simple = false;
+    if (m_resolved)
+        return;
+    if (getTypeCategory() == catForward)
+        return;
+    m_resolved = true;
+    visitReferencedTypes([&](Type* t) { if (!t->m_resolved) m_resolved = false; });
+
+    visitReferencedTypes([&](Type* t) { if (t != this) {t->m_used_by.insert(this); } });
+
+    if (m_resolved) {
+        this->check([&](auto& subtype) { subtype._forwardTypesMayHaveChanged(); });
+        int i = 1;
+        visitReferencedTypes(
+            [&](Type*& t) {
+                if (t->getTypeCategory() == catForward) {
+                    Type *newt = ((Forward *)t)->getTarget();
+                    if (newt) {
+                        t = newt;
+                    }
+                }
+            });
+
+        m_is_simple = true;
+        visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) m_is_simple = false; });
+
+
+        if (mTypeRep) {
+            updateTypeRepForType(this, mTypeRep);
         }
-
-        if (t->references_unresolved_forwards()) {
-            m_references_unresolved_forwards = true;
-        }
-    });
-
-    this->check([&](auto& subtype) {
-        subtype._forwardTypesMayHaveChanged();
-    });
-
-    if (mTypeRep) {
-        updateTypeRepForType(this, mTypeRep);
     }
 }
 

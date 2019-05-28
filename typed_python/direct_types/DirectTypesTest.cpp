@@ -283,24 +283,6 @@ int test_dict() {
     return 0;
 }
 
-void dbgo(const ConstDict<String, int64_t>& c) {
-    ConstDictType* t = c.getType();
-    std::cerr << t->name();
-    instance_ptr self = (instance_ptr)&c;
-    std::cerr << "{";
-    int32_t ct = t->count(self);
-    for (long k = 0; k < ct;k++) {
-        if (k > 0) {
-            std::cerr << ", ";
-        }
-
-        String* ps = (String*)t->kvPairPtrKey(self, k);
-        uint64_t *pv = (uint64_t*)t->kvPairPtrValue(self,k);
-        std::cerr << (char)(ps->getLayout()->data[0]) << ": " << (uint64_t)*pv;
-    }
-    std::cerr << "}" << std::endl;
-}
-
 int test_const_dict() {
     test_fn_header()
 
