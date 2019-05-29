@@ -927,7 +927,7 @@ PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
         return nullptr;
     }
 
-    char *attr_name = PyUnicode_AsUTF8(attrName);
+    const char *attr_name = PyUnicode_AsUTF8(attrName);
 
     return specializeForType(o, [&](auto& subtype) {
         return subtype.tp_getattr_concrete(attrName, attr_name);
