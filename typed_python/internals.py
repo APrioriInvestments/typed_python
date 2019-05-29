@@ -17,7 +17,7 @@ from types import FunctionType
 import typed_python._types as _types
 import typed_python.inspect_override as inspect
 
-from typed_python._types import NamedTuple, Forward, defineForward
+from typed_python._types import NamedTuple, Forward
 
 
 class UndefinedBehaviorException(BaseException):
@@ -177,7 +177,7 @@ class ClassMetaclass(type):
             else:
                 classMembers.append((eltName, elt))
 
-        actualClass = defineForward(actualClass, _types.Class(
+        actualClass = actualClass.define(_types.Class(
             name,
             tuple(members),
             tuple(memberFunctions.items()),

@@ -122,7 +122,6 @@ void Type::forwardTypesMayHaveChanged() {
 
     if (m_resolved) {
         this->check([&](auto& subtype) { subtype._forwardTypesMayHaveChanged(); });
-        int i = 1;
         visitReferencedTypes(
             [&](Type*& t) {
                 if (t->getTypeCategory() == catForward) {

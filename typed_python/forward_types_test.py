@@ -13,7 +13,7 @@
 #   limitations under the License.
 import unittest
 # from typed_python.internals import forwardToName
-from typed_python import TupleOf, OneOf, Alternative, Class, Member, Forward, defineForward
+from typed_python import TupleOf, OneOf, Alternative, Class, Member, Forward
 
 
 class NativeForwardTypesTests(unittest.TestCase):
@@ -25,7 +25,7 @@ class NativeForwardTypesTests(unittest.TestCase):
 
     def test_recursive_alternative(self):
         List = Forward("List*")
-        List = defineForward(List, Alternative(
+        List = List.define(Alternative(
             "List",
             Node={'head': int, 'tail': List },
             Leaf={},
@@ -67,7 +67,7 @@ class NativeForwardTypesTests(unittest.TestCase):
         class B(Class):
             avals = Member(TupleOf(A))
 
-        B0 = defineForward(B0, B)
+        B0 = B0.define(B)
         a = A()
         b = B()
 
@@ -87,7 +87,7 @@ class NativeForwardTypesTests(unittest.TestCase):
     def test_tuple_of_one_of(self):
         X = Forward("X*")
         Y = OneOf(None, X)
-        X = defineForward(X, TupleOf(Y))
+        X = X.define(TupleOf(Y))
 
         str(X)
 
@@ -101,7 +101,7 @@ class NativeForwardTypesTests(unittest.TestCase):
 
     def test_deep_forwards_work(self):
         X = Forward("X*")
-        X = defineForward(X, TupleOf(TupleOf(TupleOf(TupleOf(OneOf(None, X))))))
+        X = X.define(TupleOf(TupleOf(TupleOf(TupleOf(OneOf(None, X))))))
 
         str(X)
 

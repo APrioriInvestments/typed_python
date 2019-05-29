@@ -19,7 +19,7 @@ from typed_python import (
     Float32, Float64,
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class, Member,
-    TypeFilter, Function, Forward, defineForward
+    TypeFilter, Function, Forward
 )
 
 from typed_python.test_util import currentMemUsageMb
@@ -1383,7 +1383,7 @@ class NativeTypesTests(unittest.TestCase):
         class ASelfRecursiveClass(Class):
             x = Member(OneOf(None, A0))
 
-        A0 = defineForward(A0, ASelfRecursiveClass)
+        A0 = A0.define(ASelfRecursiveClass)
 
         a = ASelfRecursiveClass()
         a.x = a
@@ -1866,7 +1866,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(isSimple(NamedTuple(x=C)))
 
         X = Forward("X*")
-        X = defineForward(X, Alternative("X", X={'x': X}, Y={'i': int}))
+        X = X.define(Alternative("X", X={'x': X}, Y={'i': int}))
         self.assertFalse(isSimple(X))
         self.assertFalse(isSimple(NamedTuple(x=X)))
 

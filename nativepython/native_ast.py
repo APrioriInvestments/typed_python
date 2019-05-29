@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Tuple, TupleOf, Alternative, NamedTuple, OneOf, Forward, defineForward
+from typed_python import Tuple, TupleOf, Alternative, NamedTuple, OneOf, Forward
 import textwrap
 
 
@@ -57,7 +57,7 @@ def raising(e):
 
 
 Type = Forward("Type***")
-Type = defineForward(Type, Alternative(
+Type = Type.define(Alternative(
     "Type",
     Void={},
     Float={'bits': int},
@@ -110,7 +110,7 @@ def const_str(c):
 
 
 Constant = Forward("Constant*")
-Constant = defineForward(Constant, Alternative(
+Constant = Constant.define(Alternative(
     "Constant",
     Void={},
     Float={'val': float, 'bits': int},
@@ -214,7 +214,7 @@ def teardown_str(self):
     assert False, type(self)
 
 
-Teardown = defineForward(Teardown, Alternative(
+Teardown = Teardown.define(Alternative(
     "Teardown",
     ByTag={'tag': str, 'expr': Expression},
     Always={'expr': Expression},
@@ -364,7 +364,7 @@ def expr_is_simple(expr):
     return False
 
 
-Expression = defineForward(Expression, Alternative(
+Expression = Expression.define(Alternative(
     "Expression",
     Constant={'val': Constant},
     Comment={'comment': str, 'expr': Expression},

@@ -35,7 +35,7 @@ from typed_python import (
     Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
     Dict, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
-    Forward, defineForward
+    Forward
 )
 
 from typed_python._types import refcount
@@ -422,7 +422,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_alternatives_as_types(self):
         A = Forward("A*")
-        A = defineForward(A, Alternative("A", X={'a': int}, Y={'a': A}))
+        A = A.define(Alternative("A", X={'a': int}, Y={'a': A}))
 
         ts = SerializationContext({'A': A})
         self.assertIs(ping_pong(A, ts), A)
@@ -580,7 +580,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serializing_anonymous_recursive_types(self):
         NT = Forward("NT*")
-        NT = defineForward(NT, TupleOf(NT))
+        NT = NT.define(TupleOf(NT))
 
         # right now we don't allow this. When we move to a more proper model for declarint
         # forward types, this should work better.
@@ -590,7 +590,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serializing_named_tuples_in_loop(self):
         NT = Forward("NT*")
-        NT = defineForward(NT, NamedTuple(x=OneOf(int, float), y=OneOf(int, NT)))
+        NT = NT.define(NamedTuple(x=OneOf(int, float), y=OneOf(int, NT)))
 
         context = SerializationContext({'NT': NT})
 
@@ -605,7 +605,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serializing_alternatives_in_loop(self):
         AT = Forward("AT*")
-        AT = defineForward(AT, Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
+        AT = AT.define(Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
 
         context = SerializationContext({'AT': AT})
 
@@ -1105,7 +1105,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_recursive_dict_more(self):
         D = Forward("D*")
-        D = defineForward(D, Dict(str, OneOf(str, D)))
+        D = D.define(D, Dict(str, OneOf(str, D)))
         x = SerializationContext({"D": D})
 
         d = D()

@@ -21,7 +21,7 @@ Python ast directly.
 import ast
 import typed_python.ast_util as ast_util
 import weakref
-from typed_python._types import Forward, defineForward, Alternative, TupleOf, OneOf
+from typed_python._types import Forward, Alternative, TupleOf, OneOf
 
 
 # forward declarations.
@@ -43,7 +43,7 @@ Keyword = Forward("Keyword*")
 Alias = Forward("Alias*")
 WithItem = Forward("WithItem*")
 
-Module = defineForward(Module, Alternative(
+Module = Module.define(Alternative(
     "Module",
     Module={"body": TupleOf(Statement)},
     Expression={'body': Expr},
@@ -51,7 +51,7 @@ Module = defineForward(Module, Alternative(
     Suite={"body": TupleOf(Statement)}
 ))
 
-Statement = defineForward(Statement, Alternative(
+Statement = Statement.define(Alternative(
     "Statement",
     FunctionDef={
         "name": str,
@@ -208,7 +208,7 @@ Statement = defineForward(Statement, Alternative(
     }
 ))
 
-Expr = defineForward(Expr, Alternative(
+Expr = Expr.define(Alternative(
     "Expr",
     BoolOp={
         "op": BooleanOp,
@@ -369,7 +369,7 @@ Expr = defineForward(Expr, Alternative(
     }
 ))
 
-NumericConstant = defineForward(NumericConstant, Alternative(
+NumericConstant = NumericConstant.define(Alternative(
     "NumericConstant",
     Int={"value": int},
     Long={"value": str},
@@ -379,7 +379,7 @@ NumericConstant = defineForward(NumericConstant, Alternative(
     Unknown={}
 ))
 
-ExprContext = defineForward(ExprContext, Alternative(
+ExprContext = ExprContext.define(Alternative(
     "ExprContext",
     Load={},
     Store={},
@@ -389,7 +389,7 @@ ExprContext = defineForward(ExprContext, Alternative(
     Param={}
 ))
 
-Slice = defineForward(Slice, Alternative(
+Slice = Slice.define(Alternative(
     "Slice",
     Ellipsis={},
     Slice={
@@ -401,13 +401,13 @@ Slice = defineForward(Slice, Alternative(
     Index={"value": Expr}
 ))
 
-BooleanOp = defineForward(BooleanOp, Alternative(
+BooleanOp = BooleanOp.define(Alternative(
     "BooleanOp",
     And={},
     Or={}
 ))
 
-BinaryOp = defineForward(BinaryOp, Alternative(
+BinaryOp = BinaryOp.define(Alternative(
     "BinaryOp",
     Add={},
     Sub={},
@@ -423,7 +423,7 @@ BinaryOp = defineForward(BinaryOp, Alternative(
     FloorDiv={}
 ))
 
-UnaryOp = defineForward(UnaryOp, Alternative(
+UnaryOp = UnaryOp.define(Alternative(
     "UnaryOp",
     Invert={},
     Not={},
@@ -431,7 +431,7 @@ UnaryOp = defineForward(UnaryOp, Alternative(
     USub={}
 ))
 
-ComparisonOp = defineForward(ComparisonOp, Alternative(
+ComparisonOp = ComparisonOp.define(Alternative(
     "ComparisonOp",
     Eq={},
     NotEq={},
@@ -445,7 +445,7 @@ ComparisonOp = defineForward(ComparisonOp, Alternative(
     NotIn={}
 ))
 
-Comprehension = defineForward(Comprehension, Alternative(
+Comprehension = Comprehension.define(Alternative(
     "Comprehension",
     Item={
         "target": Expr,
@@ -455,7 +455,7 @@ Comprehension = defineForward(Comprehension, Alternative(
     }
 ))
 
-ExceptionHandler = defineForward(ExceptionHandler, Alternative(
+ExceptionHandler = ExceptionHandler.define(Alternative(
     "ExceptionHandler",
     Item={
         "type": OneOf(Expr, None),
@@ -467,7 +467,7 @@ ExceptionHandler = defineForward(ExceptionHandler, Alternative(
     }
 ))
 
-Arguments = defineForward(Arguments, Alternative(
+Arguments = Arguments.define(Alternative(
     "Arguments",
     Item={
         "args": TupleOf(Arg),
@@ -479,7 +479,7 @@ Arguments = defineForward(Arguments, Alternative(
     }
 ))
 
-Arg = defineForward(Arg, Alternative(
+Arg = Arg.define(Alternative(
     "Arg",
     Item={
         'arg': str,
@@ -490,7 +490,7 @@ Arg = defineForward(Arg, Alternative(
     }
 ))
 
-Keyword = defineForward(Keyword, Alternative(
+Keyword = Keyword.define(Alternative(
     "Keyword",
     Item={
         "arg": OneOf(None, str),
@@ -498,7 +498,7 @@ Keyword = defineForward(Keyword, Alternative(
     }
 ))
 
-Alias = defineForward(Alias, Alternative(
+Alias = Alias.define(Alternative(
     "Alias",
     Item={
         "name": str,
@@ -506,7 +506,7 @@ Alias = defineForward(Alias, Alternative(
     }
 ))
 
-WithItem = defineForward(WithItem, Alternative(
+WithItem = WithItem.define(Alternative(
     "WithItem",
     Item={
         "context_expr": Expr,

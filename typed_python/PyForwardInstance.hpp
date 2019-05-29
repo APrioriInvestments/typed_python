@@ -25,5 +25,36 @@ public:
     static bool pyValCouldBeOfTypeConcrete(Type* t, PyObject* pyRepresentation, bool isExplicit) {
         return false;
     }
+
+    static PyObject* forwardDefine(PyObject *o, PyObject* args) {
+        if (PyTuple_Size(args) != 1) {
+            PyErr_SetString(PyExc_TypeError, "Forward.define takes one argument");
+            return NULL;
+        }
+
+        PyObjectHolder target(PyTuple_GetItem(args,0));
+
+        Forward* self_type = (Forward*)PyInstance::unwrapTypeArgToTypePtr(o);
+        if (!self_type) {
+            PyErr_SetString(PyExc_TypeError, "Forward.define unexpected error");
+            return NULL;
+        }
+        Type* target_type = PyInstance::unwrapTypeArgToTypePtr(target);
+        if (!target_type) {
+            PyErr_SetString(PyExc_TypeError, "Forward.define requires a type argument");
+            return NULL;
+        }
+
+        Type* result = self_type->define(target_type);
+        return incref((PyObject*)PyInstance::typeObj(result));
+    }
+
+    static PyMethodDef* typeMethodsConcrete() {
+        return new PyMethodDef [2] {
+            {"define", (PyCFunction)PyForwardInstance::forwardDefine, METH_VARARGS | METH_CLASS, NULL},
+            {NULL, NULL}
+        };
+    }
+
 };
 

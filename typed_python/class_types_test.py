@@ -18,7 +18,7 @@ import gc
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types, Forward, defineForward
+    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types, Forward
 )
 
 
@@ -74,7 +74,7 @@ class ClassWithInit(Class):
         self.x = x
 
 
-C0 = defineForward(C0, ClassWithInit)
+C0 = C0.define(ClassWithInit)
 
 
 class ClassWithComplexDispatch(Class):

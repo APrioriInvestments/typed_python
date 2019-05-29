@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward, defineForward
+from typed_python import TypeFunction, Class, Alternative, Member, SerializationContext, Forward
 import unittest
 
 
@@ -21,7 +21,7 @@ class TypeFunctionTest(unittest.TestCase):
         @TypeFunction
         def List(T):
             ListT = Forward("ListT*")
-            return defineForward(ListT, Alternative(
+            return ListT.define(Alternative(
                 "List",
                 Node={"head": T, "tail": ListT},
                 Empty={}
@@ -80,7 +80,7 @@ class TypeFunctionTest(unittest.TestCase):
         @TypeFunction
         def List(T):
             ListT = Forward("ListT*")
-            return defineForward(ListT, Alternative(
+            return ListT.define(Alternative(
                 "List",
                 Node={"head": T, "tail": ListT},
                 Empty={}

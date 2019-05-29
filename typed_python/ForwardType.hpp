@@ -57,7 +57,6 @@ public:
         return new Forward(name);
     }
 
-    // TODO: attach this as a method to the Forward in python, e.g. T=Forward(), T=T.define(...)
     Type* define(Type* target) {
         // TODO: check for containment cycles
         mTarget = target;

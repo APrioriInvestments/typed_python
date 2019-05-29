@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Function, Alternative, Forward, defineForward
+from typed_python import TypeFunction, Function, Alternative, Forward
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
@@ -39,7 +39,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_complex_alternative_passing(self):
         Complex = Forward("Complex*")
-        Complex = defineForward(Complex, Alternative(
+        Complex = Complex.define(Alternative(
             "Complex",
             A={'a': str, 'b': int},
             B={'a': str, 'c': int},
@@ -117,7 +117,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         @TypeFunction
         def Tree(T):
             TreeType = Forward("TreeType*")
-            TreeType = defineForward(TreeType, Alternative(
+            TreeType = TreeType.define(Alternative(
                 "Tree",
                 Leaf={'value': T},
                 Node={'left': TreeType, 'right': TreeType}

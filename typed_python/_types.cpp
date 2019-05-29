@@ -1249,33 +1249,33 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
 //    return NULL;
 //}
 
-PyObject *defineForward(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "defineForward takes 2 positional arguments");
-        return NULL;
-    }
-
-    PyObjectHolder a1(PyTuple_GetItem(args, 0));
-    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
-    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catForward) {
-        PyErr_SetString(PyExc_TypeError, "first argument to 'defineForward' must be a Forward");
-        return NULL;
-    }
-
-    PyObjectHolder a2(PyTuple_GetItem(args, 1));
-    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
-    if (!t2) {
-        PyErr_SetString(PyExc_TypeError, "second argument to 'defineForward' must be a Type");
-        return NULL;
-    }
-    Type *t3 = ((Forward*)t1)->define(t2);
-    if (!t3) {
-        PyErr_SetString(PyExc_TypeError, "'defineForward' failure");
-        return NULL;
-    }
-
-    return incref((PyObject*)PyInstance::typeObj(t3));
-}
+//PyObject *defineForward(PyObject* nullValue, PyObject* args) {
+//    if (PyTuple_Size(args) != 2) {
+//        PyErr_SetString(PyExc_TypeError, "defineForward takes 2 positional arguments");
+//        return NULL;
+//    }
+//
+//    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+//    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+//    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catForward) {
+//        PyErr_SetString(PyExc_TypeError, "first argument to 'defineForward' must be a Forward");
+//        return NULL;
+//    }
+//
+//    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+//    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
+//    if (!t2) {
+//        PyErr_SetString(PyExc_TypeError, "second argument to 'defineForward' must be a Type");
+//        return NULL;
+//    }
+//    Type *t3 = ((Forward*)t1)->define(t2);
+//    if (!t3) {
+//        PyErr_SetString(PyExc_TypeError, "'defineForward' failure");
+//        return NULL;
+//    }
+//
+//    return incref((PyObject*)PyInstance::typeObj(t3));
+//}
 
 PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
     native_dispatch_disabled++;
@@ -1368,15 +1368,22 @@ PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
 }
 
 PyObject *MakeForward(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
-        PyErr_SetString(PyExc_TypeError, "Forward takes a single string positional argument.");
+    int num_args = PyTuple_Size(args);
+    if (num_args > 1 || !PyUnicode_Check(PyTuple_GetItem(args,0))) {
+        PyErr_SetString(PyExc_TypeError, "Forward takes a zero or one string positional arguments.");
         return NULL;
     }
-    std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
+    if (num_args == 1) {
+        std::string name = PyUnicode_AsUTF8(PyTuple_GetItem(args,0));
 
-    return incref((PyObject*)PyInstance::typeObj(
-        ::Forward::Make(name)
-        ));
+        return incref((PyObject*)PyInstance::typeObj(
+            ::Forward::Make(name)
+            ));
+    } else {
+        return incref((PyObject*)PyInstance::typeObj(
+            ::Forward::Make()
+            ));
+    }
 }
 
 PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwargs) {
@@ -1483,7 +1490,7 @@ static PyMethodDef module_methods[] = {
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},
 //    {"resolveForwards", (PyCFunction)resolveForwards, METH_VARARGS, NULL},
-    {"defineForward", (PyCFunction)defineForward, METH_VARARGS, NULL},
+//    {"defineForward", (PyCFunction)defineForward, METH_VARARGS, NULL},
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},
