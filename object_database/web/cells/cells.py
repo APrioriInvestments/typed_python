@@ -476,8 +476,15 @@ class Cells:
         res = {
             'id': cell.identity,
             'contents': contents,
-            'replacements': replaceDict
+            'replacements': replaceDict,
+            'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
+            'component_contents': cell.contents,  # TODO: TEMP replace when ready
+            'replacement_keys': [k for k in cell.children.keys()],
+            'extra_data': cell.exportData
         }
+        # print()
+        # print(str(res))
+        # print()
 
         if cell.postscript:
             res['postscript'] = cell.postscript
@@ -640,6 +647,12 @@ class Cell:
         self.context = {}
 
         self._logger = logging.getLogger(__name__)
+
+        # This is for interim JS refactoring.
+        # Cells provide extra data that JS
+        # components will need to know about
+        # when composing DOM.
+        self.exportData = {}
 
     def evaluateWithDependencies(self, fun):
         """Evaluate function within a view and add dependencies for whatever
@@ -927,6 +940,10 @@ class Card(Cell):
 
         self.contents = str(card)
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['padding'] = self.padding
+
     def sortsAs(self):
         return self.contents.sortsAs()
 
@@ -1009,6 +1026,8 @@ class Octicon(Cell):
 
     def recalculate(self):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
+        self.exportData['octiconClasses'] = octiconClasses
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.span()
             .add_classes(octiconClasses)
@@ -1022,6 +1041,7 @@ class Badge(Cell):
         super().__init__()
         self.inner = self.makeCell(inner)
         self.style = style
+        self.exportData['badgeStyle'] = self.style
 
     def sortsAs(self):
         return self.inner.sortsAs()
@@ -1048,6 +1068,8 @@ class CollapsiblePanel(Cell):
 
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
+        self.exportData['isExpanded'] = expanded
+        self.exportData['divStyle'] = self._divStyle()
         if expanded:
             self.contents = str(
                 HTMLElement.div()
@@ -1091,7 +1113,10 @@ class Text(Cell):
         return self._sortAs
 
     def recalculate(self):
-        escapedText = cgi.escape(str(self.text)) if self.text else "&nbsp;"
+        escapedText = cgi.escape(str(self.text)) if self.text else " "
+        self.exportData['escapedText'] = escapedText
+        self.exportData['rawText'] = self.text
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
@@ -1115,6 +1140,7 @@ class Padding(Cell):
 class Span(Cell):
     def __init__(self, text):
         super().__init__()
+        self.exportData['text'] = text
         self.contents = str(
             HTMLElement.span()
             .add_child(HTMLTextContent(cgi.escape(str(text))))
@@ -1143,6 +1169,7 @@ class Sequence(Cell):
     def recalculate(self):
         sequenceChildrenStr = '\n'.join("____c_%s__" %
                                         i for i in range(len(self.elements)))
+        self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
             .set_attribute('style', self._divStyle())
@@ -1159,6 +1186,7 @@ class Columns(Cell):
     def __init__(self, *elements):
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
+        self.exportData['divStyle'] = self._divStyle()
 
         self.elements = elements
         self.children = {"____c_%s__" %
@@ -1308,9 +1336,17 @@ class _NavTab(Cell):
         inlineScript = """
         cellSocket.sendString(JSON.stringify({'event': 'click', 'ix': __ix__, 'target_cell': '__identity__'}))
         """.replace('__identity__', self.target).replace('__ix__', str(self.index))
+        self.exportData['clickData'] = {
+            'event': 'click',
+            'ix': str(self.index),
+            'target_cell': self.target
+        }
         navLinkClasses = ['nav-link']
         if self.index == self.slot.get():
             navLinkClasses.append('active')
+            self.exportData['isActive'] = True
+        else:
+            self.exportData['isActive'] = False
         self.contents = str(
             HTMLElement.li()
             .add_class('nav-item')
@@ -1412,6 +1448,13 @@ class Dropdown(Cell):
 
         self.children['____title__'] = self.title
 
+        # Because the items here are not separate cells,
+        # we have to perform an extra hack of a dict
+        # to get the proper data to the temporary
+        # JS Component
+        self.exportData['targetIdentity'] = self.identity
+        self.exportData['dropdownItemInfo'] = {}
+
         for i in range(len(self.headersAndLambdas)):
             header, onDropdown = self.headersAndLambdas[i]
             self.children["____child_%s__" % i] = Cell.makeCell(header)
@@ -1419,9 +1462,11 @@ class Dropdown(Cell):
                 inlineScript = """
                 cellSocket.sendString(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
                 """.replace('__ix__', str(i)).replace('__identity__', self.identity)
+                self.exportData['dropdownItemInfo'][i] = 'callback'
             else:
                 inlineScript = quoteForJs("window.location.href = '%s'"
                                           % (quoteForJs(onDropdown, "'")), '"')
+                self.exportData['dropdownItemInfo'][i] = onDropdown
             childSubstitute = '____child_%s__' % str(i)
             items.append(
                 HTMLElement.a()
@@ -1453,6 +1498,7 @@ class Dropdown(Cell):
         )
 
     def onMessage(self, msgFrame):
+        self._logger.info(msgFrame)
         fun = self.headersAndLambdas[msgFrame['ix']][1]
         fun()
 
@@ -1513,6 +1559,7 @@ class AsyncDropdown(Cell):
         super().__init__()
         self.slot = Slot(False)
         self.labelText = labelText
+        self.exportData['labelText'] = self.labelText
         if not loadingIndicatorCell:
             loadingIndicatorCell = CircleLoader()
         self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc, loadingIndicatorCell)
@@ -1808,6 +1855,9 @@ class Subscribed(Cell):
 
             self._resetSubscriptionsToViewReads(v)
 
+            # temporary js WS refactoring data
+            self.exportData['divStyle'] = self._divStyle()
+
 
 class SubscribedSequence(Cell):
     def __init__(self, itemsFun, rendererFun, asColumns=False):
@@ -1895,6 +1945,11 @@ class SubscribedSequence(Cell):
                 .add_child(HTMLTextContent("\n".join(spineChildren)))
             )
 
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['asColumns'] = self.asColumns
+        self.exportData['numSpineChildren'] = len(self.spine)
+
 
 class Popover(Cell):
     def __init__(self, contents, title, detail, width=400):
@@ -1944,6 +1999,10 @@ class Popover(Cell):
                 )
             )
         )
+
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['width'] = self.width
 
     def sortsAs(self):
         if '____title__' in self.children:
@@ -2097,6 +2156,10 @@ class Grid(Cell):
             )
         )
 
+        self.exportData['rowNum'] = len(self.rows)
+        self.exportData['colNum'] = len(self.cols)
+        self.exportData['hasTopHeader'] = (self.rowLabelFun is not None)
+
 
 class SortWrapper:
     def __init__(self, x):
@@ -2156,6 +2219,10 @@ class SingleLineTextBox(Cell):
         if self.pattern:
             element.set_attribute('pattern', self.pattern)
         self.contents = str(element)
+
+        # temporary js WS refactoring data
+        if self.pattern:
+            self.exportData['pattern'] = self.pattern
 
     def onMessage(self, msgFrame):
         self.slot.set(msgFrame['text'])
@@ -2389,6 +2456,12 @@ class Table(Cell):
                     lambda: self.curPage.set(str(int(self.curPage.get())+1))
                 ).nowrap()
             )
+        # NOTE:
+        # It is unclear where the following children are
+        # rendered here:
+        # ____right__
+        # ____left__
+        # ____page__
 
         headerElements = []
         for colIndex in range(len(self.cols)):
@@ -2446,6 +2519,18 @@ class Table(Cell):
             )
         )
 
+        # print("THIS IS INSANE TABLE DATA")
+        # print("first row")
+        # print(str(firstRowElement))
+        # print("rows")
+        # [print(r) for r in rowElements]
+        # print()
+
+        # temporary js WS refactoring data
+        self.exportData['totalPages'] = totalPages
+        self.exportData['numColumns'] = len(self.cols)
+        self.exportData['numRows'] = len(self.rows)
+
 
 class Clickable(Cell):
     def __init__(self, content, f, makeBold=False, makeUnderling=False):
@@ -2474,6 +2559,11 @@ class Clickable(Cell):
             .set_attribute('onclick', self.calculatedOnClick())
             .add_child(HTMLTextContent('____contents__'))
         )
+
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = style
+        # TODO: this event handling situation must be refactored
+        self.exportData['events'] = {"onclick": self.calculatedOnClick()}
 
     def sortsAs(self):
         return self.content.sortsAs()
@@ -2507,6 +2597,11 @@ class Button(Clickable):
             .add_child(HTMLTextContent('____contents__'))
         )
 
+        # temporary js WS refactoring data
+        self.exportData['classes'] = classList
+        # TODO: this event handling situation must be refactored
+        self.exportData['events'] = {"onclick": self.calculatedOnClick()}
+
 
 class ButtonGroup(Cell):
     def __init__(self, buttons):
@@ -2515,14 +2610,13 @@ class ButtonGroup(Cell):
 
     def recalculate(self):
         self.children = {
-            f'____{i}__': self.buttons[i] for i in range(len(self.buttons))}
-        innerButtons = HTMLTextContent(
-            " ".join(f"____{i}__" for i in range(len(self.buttons))))
+            f'____button_{i}__': self.buttons[i] for i in range(len(self.buttons))}
+        innerButtonsText = " ".join(f"____button_{i}__" for i in range(len(self.buttons)))
         self.contents = str(
             HTMLElement.div()
             .add_class('btn-group')
             .set_attribute('role', 'group')
-            .add_child(innerButtons)
+            .add_child(HTMLTextContent(innerButtonsText))
         )
 
 
@@ -2541,6 +2635,9 @@ class LoadContentsFromUrl(Cell):
                 .set_attribute('id', 'loadtarget%s' % self._identity)
             )
         )
+
+        # temporary js WS refactoring data
+        self.exportData['loadTargetId'] = 'loadtarget%s' % self._identity
 
         self.postscript = (
             "$('#loadtarget__identity__').load('__url__')"
@@ -2609,6 +2706,10 @@ class Expands(Cell):
             '____child__': self.open if self.isExpanded else self.closed,
             '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
         }
+
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['events'] = {"onclick": inlineScript}
 
         for c in self.children.values():
             if c.cells is not None:
@@ -2686,98 +2787,17 @@ class CodeEditor(Cell):
                 .set_attribute('style', editorStyle)
             )
         )
-        self.postscript = """
-            var editor = ace.edit("editor__identity__");
-            aceEditors["editor__identity__"] = editor
-            editor.last_edit_millis = Date.now()
 
-            console.log("setting up editor with " )
-            editor.setTheme("ace/theme/textmate");
-            editor.session.setMode("ace/mode/python");
-            editor.setAutoScrollEditorIntoView(true);
-            editor.session.setUseSoftTabs(true);
-            editor.setValue("__text__");
-        """.replace("__text__", quoteForJs(self.initialText, '"'))
-
-        if self.autocomplete:
-            self.postscript += """
-            editor.setOptions({enableBasicAutocompletion: true});
-            editor.setOptions({enableLiveAutocompletion: true});
-            """
-
+        # temporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['initialText'] = self.initialText
+        self.exportData['autocomplete'] = self.autocomplete
+        self.exportData['noScroll'] = self.noScroll
         if self.fontSize is not None:
-            self.postscript += """
-            editor.setOption("fontSize", %s);
-            """ % self.fontSize
-
+            self.exportData['fontSize'] = self.fontSize
         if self.minLines is not None:
-            self.postscript += """
-                editor.setOption("minLines", __minlines__);
-            """.replace("__minlines__", str(self.minLines))
-
-        if self.noScroll:
-            self.postscript += """
-                editor.setOption("maxLines", Infinity);
-            """
-
-        self.postscript += """
-            editor.session.on('change', function(delta) {
-                cellSocket.sendString(
-                    JSON.stringify(
-                        {'event': 'editor_change', 'target_cell': '__identity__', 'data': delta}
-                        )
-                    )
-                //record that we just edited
-                editor.last_edit_millis = Date.now()
-
-                //schedule a function to run in 'SERVER_UPDATE_DELAY_MS'ms that will update the server,
-                //but only if the user has stopped typing.
-                SERVER_UPDATE_DELAY_MS = 200
-
-                window.setTimeout(function() {
-                    if (Date.now() - editor.last_edit_millis >= SERVER_UPDATE_DELAY_MS) {
-                        //save our current state to the remote buffer
-                        editor.current_iteration += 1;
-                        editor.last_edit_millis = Date.now()
-                        editor.last_edit_sent_text = editor.getValue()
-
-                        cellSocket.sendString(
-                            JSON.stringify(
-                                {'event': 'editing', 'target_cell': '__identity__',
-                                'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
-                                'iteration': editor.current_iteration
-                                }
-                                )
-                            )
-                    }
-                }, SERVER_UPDATE_DELAY_MS + 2) //2ms for a little grace period.
-            });
-            """
-
-        for kb in self.keybindings:
-            self.postscript += """
-            editor.commands.addCommand({
-                name: 'cmd___key__',
-                bindKey: {win: 'Ctrl-__key__',  mac: 'Command-__key__'},
-                exec: function(editor) {
-                    editor.current_iteration += 1;
-                    editor.last_edit_millis = Date.now()
-                    editor.last_edit_sent_text = editor.getValue()
-
-                    cellSocket.sendString(
-                        JSON.stringify(
-                            {'event': 'keybinding', 'target_cell': '__identity__', 'key': '__key__',
-                            'buffer': editor.getValue(), 'selection': editor.selection.getRange(),
-                            'iteration': editor.current_iteration}
-                            )
-                        )
-                },
-                readOnly: true // false if this command should not apply in readOnly mode
-            });
-            """.replace("__key__", kb)
-
-        self.postscript = self.postscript.replace(
-            "__identity__", self.identity)
+            self.exportData['minLines'] = self.minLines
+        self.exportData['keybindings'] = [k for k in self.keybindings.keys()]
 
     def sendCurrentStateToBrowser(self, newSlotState):
         if self.cells is not None:
@@ -2785,6 +2805,7 @@ class CodeEditor(Cell):
             # so sending ourselves a message makes no sense.
             self.triggerPostscript(
                 """
+                console.log('Calling sendCurrentStateToBrowser in CodeEditor (python)');
                 var editor = aceEditors["editor__identity__"]
 
                 editor.last_edit_millis = Date.now()
@@ -2926,93 +2947,20 @@ class Sheet(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = (
-            (
-                """
-                function model(opts) { return {} }
+        # Deleted the postscript that was here.
+        # Should now be implemented completely
+        # in the JS side component.
 
-                function property(index) {
-                  return function (row) {
-                    return row[index]
-                  }
-                }
-
-                function SyntheticIntegerArray(size) {
-                    this.length = size
-                    this.cache = {}
-                    this.push = function() { }
-                    this.splice = function() {}
-
-                    this.slice = function(low, high) {
-                        if (high === undefined) {
-                            high = this.length
-                        }
-
-                        res = Array(high-low)
-                        initLow = low
-                        while (low < high) {
-                            out = this.cache[low]
-                            if (out === undefined) {
-                                cellSocket.sendString(JSON.stringify(
-                                    {'event':'sheet_needs_data',
-                                     'target_cell': '__identity__',
-                                     'data': low
-                                     }
-                                    ))
-                                out = emptyRow
-                            }
-                            res[low-initLow] = out
-                            low = low + 1
-                        }
-
-                        return res
-                    }
-                }
-
-                var data = new SyntheticIntegerArray(__rows__)
-                var container = document.getElementById('sheet__identity__');
-
-                var colnames = [__column_names__]
-                var columns = []
-                var emptyRow = []
-
-                for (var i = 0; i < colnames.length; i++) {
-                    columns.push({data: property(i)})
-                    emptyRow.push("")
-                }
-
-                var currentTable = new Handsontable(container, {
-                    data: data,
-                    dataSchema: model,
-                    colHeaders: colnames,
-                    columns: columns,
-                    rowHeaders: true,
-                    rowHeaderWidth: 100,
-                    viewportRowRenderingOffset: 100,
-                    autoColumnSize: false,
-                    autoRowHeight: false,
-                    manualColumnResize: true,
-                    colWidths: __col_width__,
-                    rowHeights: 23,
-                    readOnly: true,
-                    ManualRowMove: false
-                    });
-                handsOnTables["__identity__"] = {
-                        table: currentTable,
-                        lastCellClicked: {row: -100, col:-100},
-                        dblClicked: true
-                }
-                """ +
-                (self._addHandsontableOnCellDblClick()
-                 if "onCellDblClick" in self._hookfns else "")
-            )
-            .replace("__identity__", self._identity)
-            .replace("__rows__", str(self.rowCount))
-            .replace("__column_names__", ",".join('"%s"' % quoteForJs(x, '"') for x in self.columnNames))
-            .replace("__col_width__", json.dumps(self.colWidth))
-        )
+        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['columnNames'] = [x for x in self.columnNames]
+        self.exportData['rowCount'] = self.rowCount
+        self.exportData['columnWidth'] = self.colWidth
+        self.exportData['handlesDoubleClick'] = ("onCellDblClick" in self._hookfns)
 
     def onMessage(self, msgFrame):
+        """TODO: We will need to update the Cell lifecycle
+        and data handling before we can move this
+        to the JS side"""
 
         if msgFrame["event"] == 'sheet_needs_data':
             row = msgFrame['data']
@@ -3053,7 +3001,6 @@ class Plot(Cell):
 
     def __init__(self, namedDataSubscriptions, xySlot=None):
         """Initialize a line plot.
-
         namedDataSubscriptions: a map from plot name to a lambda function
             producing either an array, or {x: array, y: array}
         """
@@ -3062,6 +3009,7 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
+        self.exportData['divStyle'] = self._divStyle()
 
     def recalculate(self):
         self.contents = str(
@@ -3081,42 +3029,7 @@ class Plot(Cell):
             '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         }
 
-        self.postscript = """
-            console.log("Creating a new plotly chart.")
-            plotDiv = document.getElementById('plot__identity__');
-            Plotly.plot(
-                plotDiv,
-                [],
-                {
-                    margin: {t : 30, l: 40, r: 30, b:30 },
-                    xaxis: {rangeslider: {visible: false}}
-                },
-                { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
-                    modeBarButtons: [ ['pan2d'], ['zoom2d'], ['zoomIn2d'], ['zoomOut2d'] ] }
-                );
-            plotDiv.on('plotly_relayout',
-                function(eventdata){
-                    if (plotDiv.is_server_defined_move === true) {
-                        return
-                    }
-                    //if we're sending a string, then its a date object, and we want to send
-                    // a timestamp
-                    if (typeof(eventdata['xaxis.range[0]']) === 'string') {
-                        eventdata = Object.assign({},eventdata)
-                        eventdata["xaxis.range[0]"] = Date.parse(eventdata["xaxis.range[0]"]) / 1000.0
-                        eventdata["xaxis.range[1]"] = Date.parse(eventdata["xaxis.range[1]"]) / 1000.0
-                    }
-
-                    cellSocket.sendString(JSON.stringify(
-                        {'event':'plot_layout',
-                         'target_cell': '__identity__',
-                         'data': eventdata
-                         }
-                        )
-                    )
-                });
-
-            """.replace("__identity__", self._identity)
+        self.postscript = ""
 
     def onMessage(self, msgFrame):
         d = msgFrame['data']
@@ -3139,7 +3052,6 @@ class Plot(Cell):
         self.triggerPostscript(f"""
             plotDiv = document.getElementById('plot__identity__');
             newLayout = plotDiv.layout
-
             if (typeof(newLayout.xaxis.range[0]) === 'string') {{
                 formatDate = function(d) {{
                     return (d.getYear() + 1900) + "-" + ("00" + (d.getMonth() + 1)).substr(-2) + "-" +
@@ -3147,7 +3059,6 @@ class Plot(Cell):
                             ("00" + d.getMinutes()).substr(-2) + ":" + ("00" + d.getSeconds()).substr(-2) + "." +
                             ("000000" + d.getMilliseconds()).substr(-3)
                     }};
-
                 newLayout.xaxis.range[0] = formatDate(new Date({low*1000}));
                 newLayout.xaxis.range[1] = formatDate(new Date({high*1000}));
                 newLayout.xaxis.autorange = false;
@@ -3156,15 +3067,11 @@ class Plot(Cell):
                 newLayout.xaxis.range[1] = {high};
                 newLayout.xaxis.autorange = false;
             }}
-
-
             plotDiv.is_server_defined_move = true;
             Plotly.react(plotDiv, plotDiv.data, newLayout);
             plotDiv.is_server_defined_move = false;
-
             console.log("cells.Plot: range for 'plot__identity__' is now " +
                 plotDiv.layout.xaxis.range[0] + " to " + plotDiv.layout.xaxis.range[1])
-
             """.replace("__identity__", self._identity))
 
 
@@ -3177,6 +3084,7 @@ class _PlotUpdater(Cell):
         self.linePlot = linePlot
         self.namedDataSubscriptions = linePlot.namedDataSubscriptions
         self.chartId = linePlot._identity
+        self.exportData['plotId'] = self.chartId
 
     def calculatedDataJson(self):
         series = self.callFun(self.namedDataSubscriptions)
@@ -3229,29 +3137,29 @@ class _PlotUpdater(Cell):
 
             try:
                 jsonDataToDraw = self.calculatedDataJson()
-                self.postscript = (
-                    """
-                    plotDiv = document.getElementById('plot__identity__');
-                    data = __data__.map(mapPlotlyData)
-
-                    Plotly.react(
-                        plotDiv,
-                        data,
-                        plotDiv.layout,
-                        );
-
-                    """
-                    .replace("__identity__", self.chartId)
-                    .replace("__data__", json.dumps(jsonDataToDraw))
-                )
+                self.exportData['plotData'] = jsonDataToDraw
+                self.postscript = ""
             except SubscribeAndRetry:
                 raise
             except Exception:
                 self._logger.error(traceback.format_exc())
                 self.linePlot.error.set(traceback.format_exc())
-                self.postscript = """
+                self.exportData['exceptionOccured'] = traceback.format_exc()
+                self.postscript = (
+                    """
                     plotDiv = document.getElementById('plot__identity__');
-                    Plotly.purge(plotDiv)
-                    """.replace("__identity__", self.chartId)
+                    data = __data__.map(mapPlotlyData)
+                    console.log('Updating plot from python:');
+                    console.log(plotDiv);
+                    console.log(jsonDataToDraw);
+                    Plotly.react(
+                        plotDiv,
+                        data,
+                        plotDiv.layout,
+                        );
+                    """
+                    .replace("__identity__", self.chartId)
+                    .replace("__data__", json.dumps(jsonDataToDraw))
+                )
 
-            self._resetSubscriptionsToViewReads(v)
+                self._resetSubscriptionsToViewReads(v)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2018 Braxton Mckee
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -28,8 +28,10 @@ from object_database.service_manager.ServiceManager_test import (
     UninitializableService,
     DropdownTestService
 )
-from object_database.web.ActiveWebService import (
+from object_database.web.ActiveWebServiceSchema import (
     active_webservice_schema,
+)
+from object_database.web.ActiveWebService import (
     ActiveWebService
 )
 from object_database import (
@@ -56,13 +58,16 @@ def main(argv=None):
 
     with tempfile.TemporaryDirectory() as tmpDirName:
         try:
-            server = start_service_manager(tmpDirName, port, token, loglevel_name=loglevel_name)
+            server = start_service_manager(tmpDirName, port, token,
+                                           loglevel_name=loglevel_name)
 
             database = connect("localhost", port, token, retry=True)
-            database.subscribeToSchema(core_schema, service_schema, active_webservice_schema)
+            database.subscribeToSchema(core_schema, service_schema,
+                                       active_webservice_schema)
 
             with database.transaction():
-                service = ServiceManager.createOrUpdateService(ActiveWebService, "ActiveWebService", target_count=0)
+                service = ServiceManager.createOrUpdateService(
+                    ActiveWebService, "ActiveWebService", target_count=0)
 
             ActiveWebService.configureFromCommandline(
                 database, service,
@@ -84,7 +89,8 @@ def main(argv=None):
 
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
-                    UninitializableService, "UninitializableService", target_count=1
+                    UninitializableService, "UninitializableService",
+                    target_count=1
                 )
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
@@ -98,6 +104,7 @@ def main(argv=None):
                 service = ServiceManager.createOrUpdateService(
                     TextEditorService, "TextEditorService", target_count=1
                 )
+
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
                     DropdownTestService, "DropdownTestService", target_count=1
@@ -131,6 +138,7 @@ def main(argv=None):
                 )
 
             print("SERVER IS BOOTED")
+
             while True:
                 time.sleep(.1)
         finally:

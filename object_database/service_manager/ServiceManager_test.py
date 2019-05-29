@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import ast
 import logging
 import numpy
 import os
@@ -29,7 +30,7 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
-    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown, ButtonGroup, Octicon
 )
 
 from object_database import (
@@ -154,20 +155,32 @@ class TextEditorService(ServiceBase):
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         ensureSubscribedType(TextEditor)
 
+        toEval = Slot("{'x': [1,2,3,4,5], 'y': [1,5,1,5,1]}")
+
         def onEnter(buffer, selection):
+            toEval.set(buffer)
             TextEditor.lookupAny().code = buffer
 
         def onTextChange(buffer, selection):
-            TextEditor.lookupAny().code = buffer
+            if TextEditor.lookupAny() is not None:
+                TextEditor.lookupAny().code = buffer
 
         ed = CodeEditor(keybindings={'Enter': onEnter}, noScroll=True, minLines=50, onTextChange=onTextChange)
 
         def makePlotData():
-            return {'data': eval(ed.getContents())}
+            # data must be a list or dict here, but this is checked/asserted
+            # down the line in cells. Sending anything that is not a dict/list
+            # will break the entire plot.
+            try:
+                data = ast.literal_eval(toEval.get())
+            except (AttributeError, SyntaxError):
+                data = {}
+            return {'data': data}
 
         def onCodeChange():
-            if ed.getContents() != TextEditor.lookupAny().code:
-                ed.setContents(TextEditor.lookupAny().code)
+            if TextEditor.lookupAny() is not None:
+                if ed.getContents() != TextEditor.lookupAny().code:
+                    ed.setContents(TextEditor.lookupAny().code)
 
         return Columns(ed, Card(Plot(makePlotData).height("100%").width("100%"))) + Subscribed(onCodeChange)
 
@@ -335,11 +348,27 @@ class HappyService(ServiceBase):
             return instance.display(queryArgs)
 
         return Card(
-            Subscribed(lambda: Text("There are %s happy objects" % len(Happy.lookupAll()))) +
+            Subscribed(lambda: Text("There are %s happy objects <this should not have lessthans>" % len(Happy.lookupAll()))) +
             Expands(Text("Closed"), Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
         ) + Button("go to google", "http://google.com/") + SubscribedSequence(
             lambda: Happy.lookupAll(),
             lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
+        ) + Subscribed(
+            lambda:
+                ButtonGroup([
+                    Button(
+                        Octicon("list-unordered"),
+                        lambda: None,
+                        active=lambda: True),
+                    Button(
+                        Octicon("terminal"),
+                        lambda: None,
+                        active=lambda: True),
+                    Button(
+                        Octicon("graph"),
+                        lambda: None,
+                        active=lambda: True)
+                ]).nowrap()
         )
 
     def doWork(self, shouldStop):
