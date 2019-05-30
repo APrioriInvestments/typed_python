@@ -13,6 +13,7 @@ env:
 
 install:
   - pip install pipenv
+  - pip install codecov
   - pipenv install --dev --deploy
   - sudo apt-get install -y gdb  # install gdb
 
@@ -27,5 +28,9 @@ after_failure:
 script:
   - make testcert.cert
   - make lint
-  - ./test.py -s
+  - coverage run ./test.py -s
   - pipenv check
+
+# Push the results back to codecov
+after_success:
+  - codecov

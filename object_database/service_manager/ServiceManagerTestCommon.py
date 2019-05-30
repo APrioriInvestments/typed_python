@@ -34,7 +34,7 @@ VERBOSE = False if os.environ.get('TRAVIS_CI', None) else VERBOSE
 
 
 class ServiceManagerTestCommon(object):
-    WAIT_FOR_COUNT_TIMEOUT = 20.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
+    WAIT_FOR_COUNT_TIMEOUT = 40.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
 
     def schemasToSubscribeTo(self):
         """Subclasses can override to extend the schema set."""

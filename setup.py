@@ -12,8 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import setuptools
 import pkg_resources
+import setuptools
+
 from distutils.command.build_ext import build_ext
 from distutils.extension import Extension
 
@@ -73,7 +74,7 @@ setuptools.setup(
     description='Tools for generating machine code using python.',
     author='Braxton Mckee',
     author_email='braxton.mckee@gmail.com',
-    url='https://github.com/braxtonmckee/nativepython',
+    url='https://github.com/aprioriinvestments/nativepython',
     packages=setuptools.find_packages(),
     cmdclass={'build_ext': NumpyBuildExtension},
     ext_modules=ext_modules,
@@ -81,15 +82,24 @@ setuptools.setup(
         'numpy'
     ],
     install_requires=INSTALL_REQUIRES,
+
+    # https://pypi.org/classifiers/
     classifiers=[
-        "Programming Language :: Python :: 3"
+        "License :: OSI Approved :: Apache Software License",
+        "Programming Language :: Python :: 3 :: Only",
     ],
+
+    license="Apache Software License v2.0",
     entry_points={
         'console_scripts': [
             'object_database_webtest=object_database.frontends.object_database_webtest:main',
             'object_database_service_manager=object_database.frontends.service_manager:main',
         ]
     },
+
     include_package_data=True,
+    data_files=[
+        ("", ["requirements.txt"]),
+    ],
     zip_safe=False
 )

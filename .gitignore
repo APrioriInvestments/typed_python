@@ -11,4 +11,5 @@ nativepython.egg-info
 /testcert.cert
 /.venv
 /.eggs
-
+/.coverage
+/.tox
