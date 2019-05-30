@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-# import operator
+import operator
 import time
 import gc
 from typed_python.test_util import currentMemUsageMb
@@ -113,7 +113,6 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.f(x=10), 'x')
         self.assertEqual(c.f(y=10), 'y')
 
-    # TODO: get this test to pass
     def test_class_with_uninitializable(self):
         c = ClassWithInit()
 
@@ -151,14 +150,12 @@ class NativeClassTypesTests(unittest.TestCase):
         gc.collect()
         self.assertLess(currentMemUsageMb() - memUsage, 1.0)
 
-    # TODO: get this test to pass
-    # def test_class_create_doesnt_leak(self):
-    #     self.executeInLoop(lambda: ClassWithInit(cwi=ClassWithInit()))
+    def test_class_create_doesnt_leak(self):
+        self.executeInLoop(lambda: ClassWithInit(cwi=ClassWithInit()))
 
-    # TODO: get this test to pass
-    # def test_class_member_access_doesnt_leak(self):
-    #     x = ClassWithInit(cwi=ClassWithInit())
-    #     self.executeInLoop(lambda: x.cwi.z)
+    def test_class_member_access_doesnt_leak(self):
+        x = ClassWithInit(cwi=ClassWithInit())
+        self.executeInLoop(lambda: x.cwi.z)
 
     def test_class(self):
         with self.assertRaises(TypeError):
@@ -187,18 +184,17 @@ class NativeClassTypesTests(unittest.TestCase):
 
         self.assertEqual(a.x, 10)
 
-    # TODO: get this test to pass
-    # def test_class_holding_class(self):
-    #     e = Exterior()
-    #
-    #     anI = e.i
-    #     anI.x = 10
-    #     self.assertEqual(e.i.x, 10)
-    #
-    #     # verify we get proper referencing to underlying python objects
-    #     anI2 = e.iTup.x
-    #     anI2.x = 10
-    #     self.assertEqual(e.iTup.x.x, 10)
+    def test_class_holding_class(self):
+        e = Exterior()
+
+        anI = e.i
+        anI.x = 10
+        self.assertEqual(e.i.x, 10)
+
+        # verify we get proper referencing to underlying python objects
+        anI2 = e.iTup.x
+        anI2.x = 10
+        self.assertEqual(e.iTup.x.x, 10)
 
     def test_class_stringification(self):
         self.assertEqual(Interior.__qualname__, "Interior")
@@ -446,236 +442,230 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(x.f(NormalPyClass()), "NormalPyClass")
         self.assertEqual(x.f(10), "object")
 
-    # TODO: get this test to pass
-    # def test_class_with_getitem(self):
-    #     class WithGetitem(Class):
-    #         def __getitem__(self, x: int):
-    #             return "Int"
-    #
-    #         def __getitem__(self, x: str):  # noqa: F811
-    #             return "Str"
-    #
-    #     self.assertEqual(WithGetitem()[0], "Int")
-    #     self.assertEqual(WithGetitem()["hi"], "Str")
-    #
-    #     with self.assertRaises(TypeError):
-    #         WithGetitem()[None]
+    def test_class_with_getitem(self):
+        class WithGetitem(Class):
+            def __getitem__(self, x: int):
+                return "Int"
 
-# TODO: get this test to pass
-    # def test_class_with_len(self):
-    #     class WithLen(Class):
-    #         x = Member(int)
-    #
-    #         def __init__(self, x):
-    #             self.x = x
-    #
-    #         def __len__(self):
-    #             return self.x
-    #
-    #     self.assertEqual(len(WithLen(10)), 10)
-    #     self.assertEqual(len(WithLen(0)), 0)
-    #
-    #     with self.assertRaises(ValueError):
-    #         len(WithLen(-1))
-    #
-    #     with self.assertRaises(ValueError):
-    #         len(WithLen(-2))
+            def __getitem__(self, x: str):  # noqa: F811
+                return "Str"
 
-    # TODO: get this test to pass
-    # def test_class_unary_operators(self):
-    #     class WithLotsOfOperators(Class):
-    #         def __neg__(self):
-    #             return "neg"
-    #
-    #         def __pos__(self):
-    #             return "pos"
-    #
-    #         def __abs__(self):
-    #             return "abs"
-    #
-    #         def __invert__(self):
-    #             return "inv"
-    #
-    #         def __int__(self):
-    #             return 10203
-    #
-    #         def __float__(self):
-    #             return 123.5
-    #
-    #         def __index__(self):
-    #             return 2
-    #
-    #     c = WithLotsOfOperators()
-    #
-    #     self.assertEqual(abs(c), "abs")
-    #     self.assertEqual(-c, "neg")
-    #     self.assertEqual(+c, "pos")
-    #     self.assertEqual(~c, "inv")
-    #     self.assertEqual(int(c), 10203)
-    #     self.assertEqual(float(c), 123.5)
-    #     self.assertEqual([1, 2, 3][c], 3)
+        self.assertEqual(WithGetitem()[0], "Int")
+        self.assertEqual(WithGetitem()["hi"], "Str")
 
-    # TODO: get this test to pass
-    # def test_class_binary_operators(self):
-    #     class WithLotsOfOperators(Class):
-    #         def __add__(self, other):
-    #             return (self, "add", other)
-    #
-    #         def __sub__(self, other):
-    #             return (self, "sub", other)
-    #
-    #         def __mul__(self, other):
-    #             return (self, "mul", other)
-    #
-    #         def __mod__(self, other):
-    #             return (self, "mod", other)
-    #
-    #         def __div__(self, other):
-    #             return (self, "div", other)
-    #
-    #         def __floordiv__(self, other):
-    #             return (self, "floordiv", other)
-    #
-    #         def __lshift__(self, other):
-    #             return (self, "lshift", other)
-    #
-    #         def __rshift__(self, other):
-    #             return (self, "rshift", other)
-    #
-    #         def __or__(self, other):
-    #             return (self, "or", other)
-    #
-    #         def __and__(self, other):
-    #             return (self, "and", other)
-    #
-    #         def __xor__(self, other):
-    #             return (self, "xor", other)
-    #
-    #         def __matmul__(self, other):
-    #             return (self, "matmul", other)
-    #
-    #     c = WithLotsOfOperators()
-    #
-    #     self.assertEqual(c+0, (c, "add", 0))
-    #     self.assertEqual(c-0, (c, "sub", 0))
-    #     self.assertEqual(c*0, (c, "mul", 0))
-    #     self.assertEqual(c/0, (c, "div", 0))
-    #     self.assertEqual(c%0, (c, "mod", 0))
-    #     self.assertEqual(c//0, (c, "floordiv", 0))
-    #     self.assertEqual(c<<0, (c, "lshift", 0))
-    #     self.assertEqual(c>>0, (c, "rshift", 0))
-    #     self.assertEqual(c|0, (c, "or", 0))
-    #     self.assertEqual(c&0, (c, "and", 0))
-    #     self.assertEqual(c^0, (c, "xor", 0))
-    #     self.assertEqual(c@0, (c, "matmul", 0))
+        with self.assertRaises(TypeError):
+            WithGetitem()[None]
 
-    # TODO: get this test to pass
-    # def test_class_binary_operators_reverse(self):
-    #     class WithLotsOfOperators(Class):
-    #         def __radd__(self, other):
-    #             return (self, "add", other)
-    #
-    #         def __rsub__(self, other):
-    #             return (self, "sub", other)
-    #
-    #         def __rmul__(self, other):
-    #             return (self, "mul", other)
-    #
-    #         def __rmod__(self, other):
-    #             return (self, "mod", other)
-    #
-    #         def __rdiv__(self, other):
-    #             return (self, "div", other)
-    #
-    #         def __rfloordiv__(self, other):
-    #             return (self, "floordiv", other)
-    #
-    #         def __rlshift__(self, other):
-    #             return (self, "lshift", other)
-    #
-    #         def __rrshift__(self, other):
-    #             return (self, "rshift", other)
-    #
-    #         def __ror__(self, other):
-    #             return (self, "or", other)
-    #
-    #         def __rand__(self, other):
-    #             return (self, "and", other)
-    #
-    #         def __rxor__(self, other):
-    #             return (self, "xor", other)
-    #
-    #         def __rmatmul__(self, other):
-    #             return (self, "matmul", other)
-    #
-    #     c = WithLotsOfOperators()
-    #
-    #     self.assertEqual(0+c, (c, "add", 0))
-    #     self.assertEqual(0-c, (c, "sub", 0))
-    #     self.assertEqual(0*c, (c, "mul", 0))
-    #     self.assertEqual(0/c, (c, "div", 0))
-    #     self.assertEqual(0%c, (c, "mod", 0))
-    #     self.assertEqual(0//c, (c, "floordiv", 0))
-    #     self.assertEqual(0<<c, (c, "lshift", 0))
-    #     self.assertEqual(0>>c, (c, "rshift", 0))
-    #     self.assertEqual(0|c, (c, "or", 0))
-    #     self.assertEqual(0&c, (c, "and", 0))
-    #     self.assertEqual(0^c, (c, "xor", 0))
-    #     self.assertEqual(0@c, (c, "matmul", 0))
+    def test_class_with_len(self):
+        class WithLen(Class):
+            x = Member(int)
 
-    # TODO: get this test to pass
-    # def test_class_binary_inplace_operators(self):
-    #     class WithLotsOfOperators(Class):
-    #         def __iadd__(self, other):
-    #             return (self, "iadd", other)
-    #
-    #         def __isub__(self, other):
-    #             return (self, "isub", other)
-    #
-    #         def __imul__(self, other):
-    #             return (self, "imul", other)
-    #
-    #         def __imod__(self, other):
-    #             return (self, "imod", other)
-    #
-    #         def __itruediv__(self, other):
-    #             return (self, "itruediv", other)
-    #
-    #         def __ifloordiv__(self, other):
-    #             return (self, "ifloordiv", other)
-    #
-    #         def __ilshift__(self, other):
-    #             return (self, "ilshift", other)
-    #
-    #         def __irshift__(self, other):
-    #             return (self, "irshift", other)
-    #
-    #         def __ior__(self, other):
-    #             return (self, "ior", other)
-    #
-    #         def __iand__(self, other):
-    #             return (self, "iand", other)
-    #
-    #         def __ixor__(self, other):
-    #             return (self, "ixor", other)
-    #
-    #         def __imatmul__(self, other):
-    #             return (self, "imatmul", other)
-    #
-    #     c = WithLotsOfOperators()
-    #
-    #     self.assertEqual(operator.iadd(c, 0), (c, "iadd", 0))
-    #     self.assertEqual(operator.isub(c, 0), (c, "isub", 0))
-    #     self.assertEqual(operator.imul(c, 0), (c, "imul", 0))
-    #     self.assertEqual(operator.imod(c, 0), (c, "imod", 0))
-    #     self.assertEqual(operator.itruediv(c, 0), (c, "itruediv", 0))
-    #     self.assertEqual(operator.ifloordiv(c, 0), (c, "ifloordiv", 0))
-    #     self.assertEqual(operator.ilshift(c, 0), (c, "ilshift", 0))
-    #     self.assertEqual(operator.irshift(c, 0), (c, "irshift", 0))
-    #     self.assertEqual(operator.ior(c, 0), (c, "ior", 0))
-    #     self.assertEqual(operator.iand(c, 0), (c, "iand", 0))
-    #     self.assertEqual(operator.ixor(c, 0), (c, "ixor", 0))
-    #     self.assertEqual(operator.imatmul(c, 0), (c, "imatmul", 0))
+            def __init__(self, x):
+                self.x = x
+
+            def __len__(self):
+                return self.x
+
+        self.assertEqual(len(WithLen(10)), 10)
+        self.assertEqual(len(WithLen(0)), 0)
+
+        with self.assertRaises(ValueError):
+            len(WithLen(-1))
+
+        with self.assertRaises(ValueError):
+            len(WithLen(-2))
+
+    def test_class_unary_operators(self):
+        class WithLotsOfOperators(Class):
+            def __neg__(self):
+                return "neg"
+
+            def __pos__(self):
+                return "pos"
+
+            def __abs__(self):
+                return "abs"
+
+            def __invert__(self):
+                return "inv"
+
+            def __int__(self):
+                return 10203
+
+            def __float__(self):
+                return 123.5
+
+            def __index__(self):
+                return 2
+
+        c = WithLotsOfOperators()
+
+        self.assertEqual(abs(c), "abs")
+        self.assertEqual(-c, "neg")
+        self.assertEqual(+c, "pos")
+        self.assertEqual(~c, "inv")
+        self.assertEqual(int(c), 10203)
+        self.assertEqual(float(c), 123.5)
+        self.assertEqual([1, 2, 3][c], 3)
+
+    def test_class_binary_operators(self):
+        class WithLotsOfOperators(Class):
+            def __add__(self, other):
+                return (self, "add", other)
+
+            def __sub__(self, other):
+                return (self, "sub", other)
+
+            def __mul__(self, other):
+                return (self, "mul", other)
+
+            def __mod__(self, other):
+                return (self, "mod", other)
+
+            def __div__(self, other):
+                return (self, "div", other)
+
+            def __floordiv__(self, other):
+                return (self, "floordiv", other)
+
+            def __lshift__(self, other):
+                return (self, "lshift", other)
+
+            def __rshift__(self, other):
+                return (self, "rshift", other)
+
+            def __or__(self, other):
+                return (self, "or", other)
+
+            def __and__(self, other):
+                return (self, "and", other)
+
+            def __xor__(self, other):
+                return (self, "xor", other)
+
+            def __matmul__(self, other):
+                return (self, "matmul", other)
+
+        c = WithLotsOfOperators()
+
+        self.assertEqual(c+0, (c, "add", 0))
+        self.assertEqual(c-0, (c, "sub", 0))
+        self.assertEqual(c*0, (c, "mul", 0))
+        self.assertEqual(c/0, (c, "div", 0))
+        self.assertEqual(c%0, (c, "mod", 0))
+        self.assertEqual(c//0, (c, "floordiv", 0))
+        self.assertEqual(c<<0, (c, "lshift", 0))
+        self.assertEqual(c>>0, (c, "rshift", 0))
+        self.assertEqual(c|0, (c, "or", 0))
+        self.assertEqual(c&0, (c, "and", 0))
+        self.assertEqual(c^0, (c, "xor", 0))
+        self.assertEqual(c@0, (c, "matmul", 0))
+
+    def test_class_binary_operators_reverse(self):
+        class WithLotsOfOperators(Class):
+            def __radd__(self, other):
+                return (self, "add", other)
+
+            def __rsub__(self, other):
+                return (self, "sub", other)
+
+            def __rmul__(self, other):
+                return (self, "mul", other)
+
+            def __rmod__(self, other):
+                return (self, "mod", other)
+
+            def __rdiv__(self, other):
+                return (self, "div", other)
+
+            def __rfloordiv__(self, other):
+                return (self, "floordiv", other)
+
+            def __rlshift__(self, other):
+                return (self, "lshift", other)
+
+            def __rrshift__(self, other):
+                return (self, "rshift", other)
+
+            def __ror__(self, other):
+                return (self, "or", other)
+
+            def __rand__(self, other):
+                return (self, "and", other)
+
+            def __rxor__(self, other):
+                return (self, "xor", other)
+
+            def __rmatmul__(self, other):
+                return (self, "matmul", other)
+
+        c = WithLotsOfOperators()
+
+        self.assertEqual(0+c, (c, "add", 0))
+        self.assertEqual(0-c, (c, "sub", 0))
+        self.assertEqual(0*c, (c, "mul", 0))
+        self.assertEqual(0/c, (c, "div", 0))
+        self.assertEqual(0%c, (c, "mod", 0))
+        self.assertEqual(0//c, (c, "floordiv", 0))
+        self.assertEqual(0<<c, (c, "lshift", 0))
+        self.assertEqual(0>>c, (c, "rshift", 0))
+        self.assertEqual(0|c, (c, "or", 0))
+        self.assertEqual(0&c, (c, "and", 0))
+        self.assertEqual(0^c, (c, "xor", 0))
+        self.assertEqual(0@c, (c, "matmul", 0))
+
+    def test_class_binary_inplace_operators(self):
+        class WithLotsOfOperators(Class):
+            def __iadd__(self, other):
+                return (self, "iadd", other)
+
+            def __isub__(self, other):
+                return (self, "isub", other)
+
+            def __imul__(self, other):
+                return (self, "imul", other)
+
+            def __imod__(self, other):
+                return (self, "imod", other)
+
+            def __itruediv__(self, other):
+                return (self, "itruediv", other)
+
+            def __ifloordiv__(self, other):
+                return (self, "ifloordiv", other)
+
+            def __ilshift__(self, other):
+                return (self, "ilshift", other)
+
+            def __irshift__(self, other):
+                return (self, "irshift", other)
+
+            def __ior__(self, other):
+                return (self, "ior", other)
+
+            def __iand__(self, other):
+                return (self, "iand", other)
+
+            def __ixor__(self, other):
+                return (self, "ixor", other)
+
+            def __imatmul__(self, other):
+                return (self, "imatmul", other)
+
+        c = WithLotsOfOperators()
+
+        self.assertEqual(operator.iadd(c, 0), (c, "iadd", 0))
+        self.assertEqual(operator.isub(c, 0), (c, "isub", 0))
+        self.assertEqual(operator.imul(c, 0), (c, "imul", 0))
+        self.assertEqual(operator.imod(c, 0), (c, "imod", 0))
+        self.assertEqual(operator.itruediv(c, 0), (c, "itruediv", 0))
+        self.assertEqual(operator.ifloordiv(c, 0), (c, "ifloordiv", 0))
+        self.assertEqual(operator.ilshift(c, 0), (c, "ilshift", 0))
+        self.assertEqual(operator.irshift(c, 0), (c, "irshift", 0))
+        self.assertEqual(operator.ior(c, 0), (c, "ior", 0))
+        self.assertEqual(operator.iand(c, 0), (c, "iand", 0))
+        self.assertEqual(operator.ixor(c, 0), (c, "ixor", 0))
+        self.assertEqual(operator.imatmul(c, 0), (c, "imatmul", 0))
 
     def test_class_dispatch_on_tuple_vs_list(self):
         class WithTwoFunctions(Class):

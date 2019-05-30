@@ -37,6 +37,7 @@ public:
         m_name = m_heldClass->name();
         m_is_simple = false;
 
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

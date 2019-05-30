@@ -132,8 +132,10 @@ void Type::forwardTypesMayHaveChanged() {
                 }
             });
 
-        m_is_simple = true;
-        visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) m_is_simple = false; });
+        TypeCategory cat = getTypeCategory();
+        m_is_simple = (cat != catAlternative && cat != catClass && cat != catHeldClass);
+        if (m_is_simple)
+            visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) m_is_simple = false; });
 
         if (mTypeRep) {
             updateTypeRepForType(this, mTypeRep);

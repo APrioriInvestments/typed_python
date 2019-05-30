@@ -247,6 +247,7 @@ public:
         m_is_default_constructible = true;
         m_size = 0;
 
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

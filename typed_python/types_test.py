@@ -1857,10 +1857,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(isSimple(Dict(C, int)))
         self.assertFalse(isSimple(Dict(int, C)))
 
-        # TODO: decide behavior
-        #  Alternative("Alternative") has no reference to the python interpreter.
-        # so should isSimple be True?
-        # self.assertFalse(isSimple(Alternative("Alternative")))
+        self.assertFalse(isSimple(Alternative("Alternative")))
 
         self.assertTrue(isSimple(NamedTuple(x=int)))
         self.assertFalse(isSimple(NamedTuple(x=C)))

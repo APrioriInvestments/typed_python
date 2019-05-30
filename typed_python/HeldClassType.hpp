@@ -47,6 +47,7 @@ public:
         if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
 
+        m_resolved = false;
         forwardTypesMayHaveChanged();
     }
 

@@ -1105,7 +1105,7 @@ class TypesSerializationTest(unittest.TestCase):
 
     def test_serialize_recursive_dict_more(self):
         D = Forward("D*")
-        D = D.define(D, Dict(str, OneOf(str, D)))
+        D = D.define(Dict(str, OneOf(str, D)))
         x = SerializationContext({"D": D})
 
         d = D()

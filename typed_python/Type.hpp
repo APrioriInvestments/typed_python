@@ -369,10 +369,17 @@ public:
         return m_is_simple;
     }
 
-    void calc_internals_and_propagate() {
+    void show_used_by(int depth) {
+        std::cerr << std::string(depth, ' ') << name() << std::endl;
+        for (auto u: m_used_by) {
+            u->show_used_by(depth+1);
+        }
+    }
+
+    void calc_internals_and_propagate(int depth = 0) {
         forwardTypesMayHaveChanged();
         for (auto u: m_used_by) {
-            u->calc_internals_and_propagate();
+            u->calc_internals_and_propagate(depth+1);
         }
     }
 
