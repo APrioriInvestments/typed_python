@@ -30,7 +30,7 @@ from object_database.web.ActiveWebServiceSchema import active_webservice_schema
 from object_database.web.cells import (
     Subscribed, Sequence, Traceback, Span, Button, Octicon, Main, Cells,
     Card, Text, Padding, Tabs, Table, Clickable, Dropdown, Popover,
-    LargePendingDownloadDisplay, MAX_FPS, HeaderBar, SessionState, sessionState
+    LargePendingDownloadDisplay, MAX_FPS, HeaderBar, SessionState
 )
 
 from typed_python import OneOf, TupleOf, ConstDict
