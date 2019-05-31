@@ -30,25 +30,12 @@ from object_database import connect
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
 
-def timestampToFileString(timestamp):
-    struct = time.localtime(timestamp)
-    return "%4d%02d%02d_%02d%02d%02d_%03d" % (
-        struct.tm_year,
-        struct.tm_mon,
-        struct.tm_mday,
-        struct.tm_hour,
-        struct.tm_min,
-        struct.tm_sec,
-        int(timestamp*1000) % 1000
-    )
-
-
 def parseLogfileToInstanceid(fname):
     """Parse a file name and return the integer instance id for the service."""
     if not fname.endswith(".log.txt") or "-" not in fname:
         return
     try:
-        return int(fname.split("-")[-1])
+        return int(fname[:-8].split("-")[-1])
     except ValueError:
         return
 
@@ -91,13 +78,15 @@ class SubprocessServiceManager(ServiceManager):
         self._logger = logging.getLogger(__name__)
 
     def startServiceWorker(self, service, instanceIdentity):
+        assert isinstance(instanceIdentity, int)
+
         with self.db.view():
             if instanceIdentity in self.serviceProcesses:
                 return
 
             with self.lock:
                 logfileName = (
-                    service.name + "-" + timestampToFileString(time.time())
+                    service.name
                     + "-" + str(instanceIdentity) + ".log.txt"
                 )
 
@@ -204,7 +193,7 @@ class SubprocessServiceManager(ServiceManager):
                 for file in os.listdir(self.logfileDirectory):
                     instanceId = parseLogfileToInstanceid(file)
 
-                    if instanceId is not None and self.isLiveService(instanceId):
+                    if instanceId is not None and not self.isLiveService(instanceId):
                         if not os.path.exists(os.path.join(self.logfileDirectory, "old")):
                             os.makedirs(os.path.join(self.logfileDirectory, "old"))
                         shutil.move(

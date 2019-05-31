@@ -17,6 +17,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import time
 
 import object_database
 from object_database.util import genToken
@@ -46,7 +47,11 @@ class ServiceManagerTestCommon(object):
             "Service " + serviceName + " never came up."
         )
 
+    def timeElapsed(self):
+        return time.time() - self.test_start_time
+
     def setUp(self):
+        self.test_start_time = time.time()
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
         self.tempDirectoryName = self.tempDirObj.name
@@ -56,43 +61,35 @@ class ServiceManagerTestCommon(object):
 
         os.makedirs(os.path.join(self.tempDirectoryName, 'source'))
         os.makedirs(os.path.join(self.tempDirectoryName, 'storage'))
+        os.makedirs(os.path.join(self.tempDirectoryName, 'logs'))
+
+        self.logDir = os.path.join(self.tempDirectoryName, 'logs')
 
         logLevelName = logging.getLevelName(
             logging.getLogger(__name__).getEffectiveLevel()
         )
 
         if VERBOSE:
-            kwargs = {'stdout': subprocess.PIPE, 'stderr': subprocess.PIPE}
+            kwargs = {}
         else:
             kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
 
-        try:
-            self.server = subprocess.Popen(
-                [
-                    sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                    'localhost', 'localhost', "8023",
-                    "--run_db",
-                    '--source', os.path.join(self.tempDirectoryName, 'source'),
-                    '--storage', os.path.join(self.tempDirectoryName, 'storage'),
-                    '--service-token', self.token,
-                    '--shutdownTimeout', '1.0',
-                    '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert'),
-                    '--log-level', logLevelName
-                ],
-                **kwargs
-            )
-            # this should throw a subprocess.TimeoutExpired exception if the service did not crash
-            self.server.wait(1.3)
-        except subprocess.TimeoutExpired:
-            pass
-        else:
-            msg = f"Failed to start service_manager (retcode:{self.server.returncode})"
+        self.server = subprocess.Popen(
+            [
+                sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
+                'localhost', 'localhost', "8023",
+                "--run_db",
+                '--logdir', os.path.join(self.tempDirectoryName, 'logs'),
+                '--source', os.path.join(self.tempDirectoryName, 'source'),
+                '--storage', os.path.join(self.tempDirectoryName, 'storage'),
+                '--service-token', self.token,
+                '--shutdownTimeout', '1.0',
+                '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert'),
+                '--log-level', logLevelName
+            ],
+            **kwargs
+        )
 
-            if VERBOSE:
-                error = b''.join(self.server.stderr.readlines())
-                msg += "\n" + error.decode("utf-8")
-
-            raise Exception(msg)
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, *self.schemasToSubscribeTo())

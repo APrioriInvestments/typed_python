@@ -338,14 +338,20 @@ class DatabaseConnection:
 
         return ()
 
-    def waitForCondition(self, cond, timeout):
-        # eventally we will replace this with something that watches the calculation
+    def waitForCondition(self, cond, timeout, maxSleepTime=None):
+        """Wait for 'cond' to return True.
+
+        Cond only gets recalculated when the keys it watches in ODB change.
+
+        If you want to recalculate on a poll as well, set maxSleepTime to
+        the number of seconds between checks.
+        """
         try:
             def checkCondition():
                 with self.view():
                     return cond()
 
-            reactor = Reactor(self, checkCondition)
+            reactor = Reactor(self, checkCondition, maxSleepTime)
 
             return reactor.blockUntilTrue(timeout)
         finally:

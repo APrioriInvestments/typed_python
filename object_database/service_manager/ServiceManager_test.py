@@ -460,6 +460,11 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
     def schemasToSubscribeTo(self):
         return [schema]
 
+    def setCountAndBlock(self, count):
+        with self.database.transaction():
+            ServiceManager.startService("TestService", count)
+        self.waitForCount(count)
+
     def waitForCount(self, count):
         self.assertTrue(
             self.database.waitForCondition(
@@ -766,6 +771,27 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
 
         self.waitForCount(1)
+
+    def test_logfiles_exist_and_get_recycled(self):
+        with self.database.transaction():
+            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+        self.waitForCount(1)
+
+        self.assertTrue(
+            self.database.waitForCondition(lambda: len(os.listdir(self.logDir)) == 1, timeout=5.0, maxSleepTime=0.001)
+        )
+        priorFilename = os.listdir(self.logDir)[0]
+
+        self.setCountAndBlock(0)
+        self.setCountAndBlock(1)
+
+        self.assertTrue(
+            self.database.waitForCondition(lambda: len(os.listdir(self.logDir)) == 2, timeout=5.0, maxSleepTime=0.001)
+        )
+
+        newFilename = [x for x in os.listdir(self.logDir) if x != 'old'][0]
+
+        self.assertNotEqual(priorFilename, newFilename)
 
     def test_deploy_imported_module(self):
         with tempfile.TemporaryDirectory() as tf:
