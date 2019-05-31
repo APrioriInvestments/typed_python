@@ -39,7 +39,7 @@ UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
 TP_O_FILES = $(TP_BUILD_PATH)/all.o
 ODB_O_FILES = $(ODB_BUILD_PATH)/all.o
 DT_SRC_PATH = $(TP_SRC_PATH)/direct_types
-TESTTYPES = $(DT_SRC_PATH)/GeneratedTypes0.hpp
+TESTTYPES = $(DT_SRC_PATH)/GeneratedTypes1.hpp
 TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 
 ##########################################################################
@@ -100,14 +100,9 @@ unicodeprops: ./unicodeprops.py
 .PHONY: generatetesttypes
 generatetesttypes: $(DT_SRC_PATH)/generate_types.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(DT_SRC_PATH)/generate_types.py --testTypes $(TESTTYPES)
+	python3 $(DT_SRC_PATH)/generate_types.py --testTypes3 $(TESTTYPES)
 	. $(VIRTUAL_ENV)/bin/activate; \
 	python3 $(DT_SRC_PATH)/generate_types.py --testTypes2 $(TESTTYPES2)
-
-.PHONY: cpptests
-cpptests: $(DT_SRC_PATH)/direct_types_test.py
-	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(DT_SRC_PATH)/direct_types_test.py --test
 
 .PHONY: clean
 clean:
