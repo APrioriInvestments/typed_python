@@ -15,16 +15,17 @@
 #   limitations under the License.
 
 
-def gen_tuple_type(name, *args):
+def gen_tuple_type(full_name, *args):
     """
     Generate direct c++ wrapper code for a particular Tuple type.
 
     Args:
-        name: string name of this Tuple type
+        full_name: fully specified dotted name from codebase, module.class.subclass. ... .typename
         *args: sequence of python Types
     Returns:
         A list of strings, containing c++ code implementing this wrapper.
     """
+    name = full_name.rsplit('.', 1)[-1]
     keys = ["a" + str(i) for i in range(len(args))]
     items = list(zip(keys, list(args)))
 

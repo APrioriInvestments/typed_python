@@ -77,6 +77,8 @@ typedef void (*compiled_code_entrypoint)(instance_ptr, instance_ptr*);
 
 void updateTypeRepForType(Type* t, PyTypeObject* pyType);
 
+PyObject* getOrSetTypeResolver(PyObject* resolver = nullptr);
+
 class Type {
 public:
     //the indices are part of the binary serialization format (except for 'Forward'),

@@ -265,4 +265,3 @@ void iterate(PyObject* o, func_type f) {
         throw PythonExceptionSet();
     }
 }
-

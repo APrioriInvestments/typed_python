@@ -26,38 +26,30 @@ def return_type(set_of_types):
     return 'OneOf<' + ','.join(list_of_types) + '>'
 
 
-def resolved(t):
-    """Given a type name, return the resolved type name.
-
-    The only defined resolution is from "T*" to "T".
-    If no resolution is possible, return the original type name.
-    """
-    return t[:-1] if t.endswith('*') else t
-
-
-def gen_alternative_type(name, d):
+def gen_alternative_type(full_name, d):
     """Generate direct c++ wrapper code for a particular Alternative type.
 
     Args:
-        name: string name of this Alternative type
+        full_name: fully specified dotted name from codebase, module.class.subclass. ... .typename
         d: dict, where keys are subtypes of this Alternative type,
             and values are corresponding named tuples, represented as a list of (param, type) pairs
     Returns:
         A list of strings, containing c++ code implementing this wrapper.
     """
+    name = full_name.rsplit('.', 1)[-1]
+
     nts = d.keys()
     members = dict()  # set of possible types for each member
     for nt in nts:
         for a, t in d[nt]:
-            rt = resolved(t)
             if a in members:
-                members[a].add(rt)
+                members[a].add(t)
             else:
-                members[a] = {rt}
+                members[a] = {t}
     ret = list()
     ret.append(f'// Generated Alternative {name}=')
     for nt in nts:
-        ret.append('//     {}=({})'.format(nt, ", ".join([f'{a}={resolved(t)}' for a, t in d[nt]])))
+        ret.append('//     {}=({})'.format(nt, ", ".join([f'{a}={t}' for a, t in d[nt]])))
     ret.append('')
     for nt in nts:
         ret.append(f'class {name}_{nt};')
@@ -70,8 +62,16 @@ def gen_alternative_type(name, d):
     for nt in nts:
         ret.append(f'    static NamedTuple* {nt}_Type;')
     ret.append('')
-    ret.append('    static Alternative* getType();')
-    ret.append('')
+    ret.append('    static Alternative* getType() {')
+    ret.append('        PyObject* resolver = getOrSetTypeResolver();')
+    ret.append('        if (!resolver)')
+    ret.append('            throw std::runtime_error("{name}: no resolver");')
+    ret.append(f'        PyObject* res = PyObject_CallMethod(resolver, "resolveTypeByName", "s", "{full_name}");')
+    ret.append('        if (!res)')
+    ret.append(f'            throw std::runtime_error("{name}: did not resolve");')
+    ret.append('        return (Alternative*)PyInstance::unwrapTypeArgToTypePtr(res);')
+    ret.append('    }')
+
     ret.append(f'    static {name} fromPython(PyObject* p) {{')
     ret.append('        Alternative::layout* l = nullptr;')
     ret.append('        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);')
@@ -94,7 +94,7 @@ def gen_alternative_type(name, d):
     ret.append('')
     for nt in nts:
         ret.append(f'    static {name} {nt}('
-                   + ", ".join([f'const {resolved(t)}& {a}' for a, t in d[nt]])
+                   + ", ".join([f'const {t}& {a}' for a, t in d[nt]])
                    + ');')
     ret.append('')
     ret.append('    kind which() const { return (kind)mLayout->which; }')
@@ -119,36 +119,13 @@ def gen_alternative_type(name, d):
     ret.append('    Alternative::layout *mLayout;')
     ret.append('};')
     ret.append('')
-    ret.append('template <>')
-    ret.append(f'class TypeDetails<{name}*> {{')
-    ret.append('public:')
-    ret.append('    static Forward* getType() {')
-    ret.append(f'        static Forward* t = new Forward(0, "{name}");')
-    ret.append('        return t;')
-    ret.append('    }')
-    ret.append('    static const uint64_t bytecount = sizeof(void*);')
-    ret.append('};')
-    ret.append('')
     for nt in nts:
         ret.append(f'NamedTuple* {name}::{nt}_Type = NamedTuple::Make(')
         ret.append('    {' + ", ".join([f'TypeDetails<{t}>::getType()' for _, t in d[nt]]) + '},')
         ret.append('    {' + ", ".join([f'"{a}"' for a, _ in d[nt]]) + '}')
         ret.append(');')
         ret.append('')
-    ret.append('// static')
-    ret.append(f'Alternative* {name}::getType() {{')
-    ret.append(f'    static Alternative* t = Alternative::Make("{name}", {{')
-    ret.append(f',\n'.join([f'        {{"{nt}", {nt}_Type}}' for nt in nts]))
-    ret.append('    }, {});')
-    ret.append('    static bool once = false;')
-    ret.append('    if (!once) {')
-    ret.append('        once = true;')
-    ret.append(f'        TypeDetails<{name}*>::getType()->setTarget(t);')
-    ret.append(f'        t = (Alternative*)t->guaranteeForwardsResolved([](void* p) {{ return (Type*)0; }});')
-    ret.append('    }')
-    ret.append('    return t;')
-    ret.append('}')
-    ret.append('')
+
     ret.append('template <>')
     ret.append(f'class TypeDetails<{name}> {{')
     ret.append('public:')
@@ -176,7 +153,7 @@ def gen_alternative_type(name, d):
         ret.append(f'    {name}_{nt}():{name}(kind::{nt}) {{}}')
         if len(d[nt]) > 0:
             ret.append(f'    {name}_{nt}('
-                       + ", ".join([f' const {resolved(t)}& {a}1' for a, t in d[nt]])
+                       + ", ".join([f' const {t}& {a}1' for a, t in d[nt]])
                        + f'):{name}(kind::{nt}) {{')
             for a, _ in d[nt]:
                 ret.append(f'        {a}() = {a}1;')
@@ -193,14 +170,14 @@ def gen_alternative_type(name, d):
         ret.append('')
         for i, (a, t) in enumerate(d[nt]):
             offset = '' if i == 0 else ' + ' + ' + '.join([f'size' + str(j) for j in range(1, i + 1)])
-            ret.append(f'    {resolved(t)}& {a}() const {{ return *({resolved(t)}*)(mLayout->data{offset}); }}')
+            ret.append(f'    {t}& {a}() const {{ return *({t}*)(mLayout->data{offset}); }}')
         ret.append('private:')
         for i, (_, t) in list(enumerate(d[nt]))[:-1]:
-            ret.append(f'    static const int size{i + 1} = sizeof({resolved(t)});')
+            ret.append(f'    static const int size{i + 1} = sizeof({t});')
         ret.append('};')
         ret.append('')
         ret.append(f'{name} {name}::{nt}('
-                   + ", ".join([f'const {resolved(t)}& {a}' for a, t in d[nt]])
+                   + ", ".join([f'const {t}& {a}' for a, t in d[nt]])
                    + ') {')
         ret.append(f'    return {name}_{nt}('
                    + ', '.join([a for a, _ in d[nt]])
