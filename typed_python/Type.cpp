@@ -169,3 +169,15 @@ bool Type::isBinaryCompatibleWith(Type* other) {
     return isCompatible;
 }
 
+PyObject* getOrSetTypeResolver(PyObject* resolver) {
+    static PyObject* curResolver = nullptr;
+    assertHoldingTheGil();
+    if (!resolver) {
+        return curResolver;
+    }
+
+    decref(curResolver);
+    incref(resolver);
+    curResolver = resolver;
+    return curResolver;
+}

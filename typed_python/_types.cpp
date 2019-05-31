@@ -1452,6 +1452,7 @@ static PyMethodDef module_methods[] = {
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {"cpp_tests", (PyCFunction)cpp_tests, METH_VARARGS, NULL},
+    {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 

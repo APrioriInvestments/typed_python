@@ -17,4 +17,4 @@
 #pragma once
 
 #include "../typed_python/direct_types/all.hpp"
-#include "../typed_python/direct_types/GeneratedTypes.hpp"
+#include "../typed_python/direct_types/ClientToServer.hpp"
