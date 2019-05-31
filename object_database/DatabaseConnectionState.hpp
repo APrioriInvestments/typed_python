@@ -135,6 +135,10 @@ public:
       checkMinId();
    }
 
+   transaction_id getMinId() {
+      return m_min_transaction_id;
+   }
+
    void checkMinId() {
       transaction_id minId = m_cur_transaction_id;
 

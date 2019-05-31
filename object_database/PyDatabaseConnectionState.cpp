@@ -28,6 +28,7 @@ PyMethodDef PyDatabaseConnectionState_methods[] = {
     {"allocateIdentity", (PyCFunction)PyDatabaseConnectionState::allocateIdentity, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setSerializationContext", (PyCFunction)PyDatabaseConnectionState::setSerializationContext, METH_VARARGS | METH_KEYWORDS, NULL},
     {"setFieldId", (PyCFunction)PyDatabaseConnectionState::setFieldId, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getMinTid", (PyCFunction)PyDatabaseConnectionState::getMinTid, METH_VARARGS | METH_KEYWORDS, NULL},
     {"incomingTransaction", (PyCFunction)PyDatabaseConnectionState::incomingTransaction, METH_VARARGS | METH_KEYWORDS, NULL},
     {"markTypeSubscribed", (PyCFunction)PyDatabaseConnectionState::markTypeSubscribed, METH_VARARGS | METH_KEYWORDS, NULL},
     {"markObjectSubscribed", (PyCFunction)PyDatabaseConnectionState::markObjectSubscribed, METH_VARARGS | METH_KEYWORDS, NULL},
@@ -121,6 +122,21 @@ PyObject* PyDatabaseConnectionState::setFieldId(PyDatabaseConnectionState* self,
         self->state->setFieldId(SchemaAndTypeName(schemaname, type_name), fieldname, fieldId);
 
         return incref(Py_None);
+    });
+}
+
+/* static */
+PyObject* PyDatabaseConnectionState::getMinTid(PyDatabaseConnectionState* self, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {NULL};
+
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        return PyLong_FromLong(self->state->getMinId());
     });
 }
 

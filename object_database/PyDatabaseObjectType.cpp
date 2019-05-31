@@ -73,6 +73,7 @@ PyTypeObject* PyDatabaseObjectType::createDatabaseObjectType(PyObject* schema, s
         {"lookupAll", (PyCFunction)PyDatabaseObjectType::pyLookupAll, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"lookupOne", (PyCFunction)PyDatabaseObjectType::pyLookupOne, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"markLazyByDefault", (PyCFunction)PyDatabaseObjectType::pyMarkLazyByDefault, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
+        {"isLazyByDefault", (PyCFunction)PyDatabaseObjectType::pyIsLazyByDefault, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"finalize", (PyCFunction)PyDatabaseObjectType::pyFinalize, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"addField", (PyCFunction)PyDatabaseObjectType::pyAddField, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
         {"addMethod", (PyCFunction)PyDatabaseObjectType::pyAddMethod, METH_VARARGS | METH_KEYWORDS | METH_CLASS, NULL},
@@ -912,6 +913,23 @@ PyObject* PyDatabaseObjectType::pyMarkLazyByDefault(PyObject *databaseType, PyOb
     obType->m_lazy_by_default = true;
 
     return incref(Py_None);
+}
+
+PyObject* PyDatabaseObjectType::pyIsLazyByDefault(PyObject *databaseType, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return nullptr;
+    }
+
+    PyDatabaseObjectType* obType = PyDatabaseObjectType::check(databaseType);
+    if (!obType) {
+        PyErr_Format(PyExc_TypeError, "Expected first argument to be a database type.");
+        return NULL;
+    }
+
+    return incref(obType->m_lazy_by_default ? Py_True : Py_False);
 }
 
 PyObject* PyDatabaseObjectType::pyAddIndex(PyObject *databaseType, PyObject* args, PyObject* kwargs)

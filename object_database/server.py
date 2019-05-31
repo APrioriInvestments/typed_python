@@ -1042,7 +1042,9 @@ class Server:
                 channelsTriggered.update(self._id_to_channel[i])
 
         for channel in channelsTriggeredForPriors:
-            lazy_message = ServerToClient.LazyTransactionPriors(writes=priorValues)  # noqa: F841
+            channel.sendTransaction(
+                ServerToClient.LazyTransactionPriors(writes=priorValues)
+            )
 
         transaction_message = ServerToClient.Transaction(
             writes={k: v for k, v in key_value.items()},

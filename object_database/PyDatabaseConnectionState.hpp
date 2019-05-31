@@ -44,6 +44,8 @@ public:
 
     static PyObject* setFieldId(PyDatabaseConnectionState* self, PyObject* args, PyObject* kwargs);
 
+    static PyObject* getMinTid(PyDatabaseConnectionState* self, PyObject* args, PyObject* kwargs);
+
     static PyObject* setIdentityRoot(PyDatabaseConnectionState* self, PyObject* args, PyObject* kwargs);
 
     static PyObject* allocateIdentity(PyDatabaseConnectionState* self, PyObject* args, PyObject* kwargs);

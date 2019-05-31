@@ -153,6 +153,8 @@ struct PyDatabaseObjectType {
 
   static PyObject* pyMarkLazyByDefault(PyObject *none, PyObject* args, PyObject* kwargs);
 
+  static PyObject* pyIsLazyByDefault(PyObject *none, PyObject* args, PyObject* kwargs);
+
   static PyObject* pyAddIndex(PyObject *none, PyObject* args, PyObject* kwargs);
 
   static PyObject* pyLookupOne(PyObject *none, PyObject* args, PyObject* kwargs);

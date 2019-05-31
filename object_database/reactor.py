@@ -275,7 +275,7 @@ class Reactor:
                     _currentReactor.timestamp = time.time()
                     _currentReactor.nextWakeup = None
 
-                    logging.getLogger(__name__).info("Reactor %s recalculating", self.reactorFunction)
+                    logging.getLogger(__name__).debug("Reactor %s recalculating", self.reactorFunction)
                     functionResult = self.reactorFunction()
 
                     nextWakeup = _currentReactor.nextWakeup

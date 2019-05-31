@@ -55,7 +55,10 @@ ServerToClient = Alternative(
         'identities': OneOf(None, TupleOf(ObjectId)),  # the identities in play if this is an index-level subscription
     },
     LazyTransactionPriors={ 'writes': ConstDict(ObjectFieldId, OneOf(None, bytes)) },
-    LazyLoadResponse={ 'identity': ObjectId, 'values': ConstDict(ObjectFieldId, OneOf(None, bytes)) },
+    LazyLoadResponse={
+        'identity': ObjectId,
+        'values': ConstDict(ObjectFieldId, OneOf(None, bytes))
+    },
     LazySubscriptionData={
         'schema': str,
         'typename': OneOf(None, str),

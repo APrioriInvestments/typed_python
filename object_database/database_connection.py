@@ -251,9 +251,7 @@ class DatabaseConnection:
     def _lazinessForType(self, typeObj, desiredLaziness):
         if desiredLaziness is not None:
             return desiredLaziness
-        if hasattr(typeObj, '__object_database_lazy_subscription__'):
-            return True
-        return False
+        return typeObj.isLazyByDefault()
 
     def subscribeToIndex(self, t, block=True, lazySubscription=None, **kwarg):
         self.addSchema(t.__schema__)
@@ -507,11 +505,11 @@ class DatabaseConnection:
                     self._subscription_buildup[lookupTuple]['identities'].update(msg.identities)
         elif msg.matches.LazyTransactionPriors:
             with self._lock:
-                self._connection_state.incomingTransaction( 0, msg.writes, {}, {})
+                self._connection_state.incomingTransaction(self._connection_state.getMinTid(), msg.writes, {}, {})
 
         elif msg.matches.LazyLoadResponse:
             with self._lock:
-                self._connection_state.incomingTransaction(0, msg.values, {}, {})
+                self._connection_state.incomingTransaction(self._connection_state.getMinTid(), msg.values, {}, {})
 
                 self._connection_state.markObjectNotLazy(msg.identity)
 

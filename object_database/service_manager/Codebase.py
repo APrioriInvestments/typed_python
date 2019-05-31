@@ -98,21 +98,24 @@ class Codebase:
 
         return Codebase(hash=hashval, files=files)
 
-    def instantiate(self, module_name=None):
+    def instantiate(self, module_name=None, codebase_dir_override=None):
         """Instantiate a codebase on disk and load it."""
         with _codebase_lock:
-            assert _codebase_instantiation_dir is not None
+            if codebase_dir_override is None:
+                assert _codebase_instantiation_dir is not None
+                codebase_dir_override = _codebase_instantiation_dir
+
             if self.hash not in _codebase_cache:
                 try:
-                    if not os.path.exists(_codebase_instantiation_dir):
-                        os.makedirs(_codebase_instantiation_dir)
+                    if not os.path.exists(codebase_dir_override):
+                        os.makedirs(codebase_dir_override)
                 except Exception as e:
                     logging.getLogger(__name__).warn(
-                        "Exception trying to make directory '%s'", _codebase_instantiation_dir)
+                        "Exception trying to make directory '%s'", codebase_dir_override)
                     logging.getLogger(__name__).warn(
                         "Exception: %s", e)
 
-                disk_path = os.path.join(_codebase_instantiation_dir, self.hash)
+                disk_path = os.path.join(codebase_dir_override, self.hash)
 
                 # preload the files, since they're lazy.
                 object_database.current_transaction().db().requestLazyObjects(set(self.files.values()))

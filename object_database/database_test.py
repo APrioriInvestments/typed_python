@@ -467,20 +467,61 @@ class ObjectDatabaseTests:
         class Lazy:
             x = int
 
+        self.assertTrue(Lazy.isLazyByDefault())
+        self.assertFalse(Counter.isLazyByDefault())
+
+        lazyObjects = []
+
+        for passIx in range(10):
+            db1 = self.createNewDb()
+            db1.subscribeToType(Lazy)
+
+            with db1.transaction():
+                lazyObjects.append(Lazy(x=len(lazyObjects)))
+
+                for i in range(len(lazyObjects)):
+                    self.assertTrue(lazyObjects[i].exists())
+                    self.assertEqual(lazyObjects[i].x, i)
+
+            db2 = self.createNewDb()
+            db2.subscribeToType(Lazy, lazySubscription=False)
+
+            with db2.view():
+                for i in range(len(lazyObjects)):
+                    self.assertTrue(lazyObjects[i].exists())
+                    self.assertEqual(lazyObjects[i].x, i)
+
+    # this fails because 'lazy' objects are incorrectly implemented. we should
+    # probably just get rid of the idea entirely and make everything 'lazy' at
+    # some level (forcing the server to keep old tid's around)
+    def DISABLEDtest_lazy_priors(self):
+        s = Schema("test")
+
+        @s.define
+        @SubscribeLazilyByDefault
+        class Lazy:
+            x = int
+
         db1 = self.createNewDb()
-        db1.subscribeToSchema(s)
+        db1.subscribeToType(Lazy)
+
+        with db1.transaction():
+            lazy = Lazy(x=1)
 
         db2 = self.createNewDb()
-        db2.subscribeToSchema(s)
+        db2.subscribeToType(Lazy)
 
-        for _ in range(100):
-            with db1.transaction():
-                lazyObj = Lazy(x=1)
+        v = db2.view()
 
-            db2.flush()
-            with db2.view():
-                self.assertTrue(lazyObj.exists())
-                self.assertEqual(lazyObj.x, 1)
+        with db1.transaction():
+            lazy.x = 2
+
+        db2.flush()
+        with v:
+            self.assertEqual(lazy.x, 1)
+
+        with db2.view():
+            self.assertEqual(lazy.x, 2)
 
     def test_lazy_objects_visible_in_own_transaction(self):
         db = self.createNewDb()
