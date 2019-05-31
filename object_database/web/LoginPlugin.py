@@ -121,6 +121,7 @@ class User:
     username = Indexed(str)
     login_expiration = Float64
     login_ip = str
+    userLoginStatus = object
 
     def login(self, login_ip):
         self.login_expiration = time.time() + USER_LOGIN_DURATION

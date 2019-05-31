@@ -30,7 +30,7 @@ from object_database.web.ActiveWebServiceSchema import active_webservice_schema
 from object_database.web.cells import (
     Subscribed, Sequence, Traceback, Span, Button, Octicon, Main, Cells,
     Card, Text, Padding, Tabs, Table, Clickable, Dropdown, Popover,
-    LargePendingDownloadDisplay, MAX_FPS, HeaderBar, SessionState
+    LargePendingDownloadDisplay, MAX_FPS, HeaderBar, SessionState, sessionState
 )
 
 from typed_python import OneOf, TupleOf, ConstDict
@@ -396,6 +396,7 @@ class ActiveWebService(ServiceBase):
                     LargePendingDownloadDisplay(),
                     Octicon('person') + Span(current_username),
                     Span('Authorized Groups: {}'.format(self.authorized_groups_text)),
+                    Subscribed(lambda: active_webservice_schema.User.lookupOne(username=current_username).userLoginStatus),
                     Button(Octicon('sign-out'), '/logout')
                 ]) +
             Main(display)
@@ -413,6 +414,9 @@ class ActiveWebService(ServiceBase):
 
         if sessionId is None:
             sessionState = SessionState()
+            sessionState['user'] = active_webservice_schema.User.lookupOne(
+                username=current_user.username
+            )
         else:
             # we keep sessions in a list. If you bounce your browser, you'll get
             # the session state you just dropped. If you have several windows open, close a few,
