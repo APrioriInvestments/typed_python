@@ -110,7 +110,7 @@ def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="IN
     if not verbose:
         kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
-        kwargs = dict(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        kwargs = dict()
 
     server = subprocess.Popen(
         [
