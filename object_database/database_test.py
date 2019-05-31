@@ -473,12 +473,14 @@ class ObjectDatabaseTests:
         db2 = self.createNewDb()
         db2.subscribeToSchema(s)
 
-        with db1.transaction():
-            lazyObj = Lazy(x=1)
+        for _ in range(100):
+            with db1.transaction():
+                lazyObj = Lazy(x=1)
 
-        with db2.view():
-            self.assertTrue(lazyObj.exists())
-            self.assertEqual(lazyObj.x, 1)
+            db2.flush()
+            with db2.view():
+                self.assertTrue(lazyObj.exists())
+                self.assertEqual(lazyObj.x, 1)
 
     def test_lazy_objects_visible_in_own_transaction(self):
         db = self.createNewDb()
