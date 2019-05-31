@@ -17,6 +17,7 @@
 import os
 import sys
 import tempfile
+import textwrap
 import time
 
 from object_database.service_manager.ServiceManager import ServiceManager
@@ -101,6 +102,35 @@ def main(argv=None):
                 service = ServiceManager.createOrUpdateService(
                     DropdownTestService, "DropdownTestService", target_count=1
                 )
+
+            with database.transaction():
+                ServiceManager.createOrUpdateServiceWithCodebase(
+                    service_schema.Codebase.createFromFiles({
+                        'test_service/__init__.py': '',
+                        'test_service/service.py': textwrap.dedent("""
+                            from object_database.service_manager.ServiceBase import ServiceBase
+
+                            class TestService(ServiceBase):
+                                gbRamUsed = 0
+                                coresUsed = 0
+
+                                def initialize(self):
+                                    with self.db.transaction():
+                                        self.runtimeConfig.serviceInstance.statusMessage = "Loaded"
+
+                                def doWork(self, shouldStop):
+                                    shouldStop.wait()
+
+                                def display(self, queryParams=None):
+                                    return "test service display message"
+                        """)
+                    }),
+                    "test_service.service.TestService",
+                    "TestService",
+                    10
+                )
+
+            print("SERVER IS BOOTED")
             while True:
                 time.sleep(.1)
         finally:

@@ -239,6 +239,9 @@ class ServiceInstance:
     codebase = OneOf(None, service_schema.Codebase)
     connection = Indexed(OneOf(None, core_schema.Connection))
 
+    # a place for messages that are meaningful to users
+    statusMessage = OneOf(None, str)
+
     shouldShutdown = bool
     shutdownTimestamp = OneOf(None, float)
 

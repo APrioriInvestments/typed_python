@@ -110,6 +110,7 @@ class Codebase:
     @staticmethod
     def FromRootlevelPath(rootPath, **kwargs):
         root, files, modules = Codebase._walkDiskRepresentation(rootPath, **kwargs)
+
         codebase = Codebase(root, files, modules)
         return codebase
 

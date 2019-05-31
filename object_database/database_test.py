@@ -15,7 +15,7 @@
 from typed_python import Alternative, TupleOf, OneOf, ConstDict
 from typed_python.SerializationContext import SerializationContext
 
-from object_database.schema import Indexed, Index, Schema
+from object_database.schema import Indexed, Index, Schema, SubscribeLazilyByDefault
 from object_database.core_schema import core_schema
 from object_database.view import RevisionConflictException, DisconnectedException, ObjectDoesntExistException
 from object_database.database_connection import DatabaseConnection
@@ -458,6 +458,27 @@ class ObjectDatabaseTests:
 
     def test_lazy_subscriptions_delete(self):
         self.checkCallbackTriggersLazyLoad(lambda c: c.delete(), shouldExist=False)
+
+    def test_lazy_by_default(self):
+        s = Schema("test")
+
+        @s.define
+        @SubscribeLazilyByDefault
+        class Lazy:
+            x = int
+
+        db1 = self.createNewDb()
+        db1.subscribeToSchema(s)
+
+        db2 = self.createNewDb()
+        db2.subscribeToSchema(s)
+
+        with db1.transaction():
+            lazyObj = Lazy(x=1)
+
+        with db2.view():
+            self.assertTrue(lazyObj.exists())
+            self.assertEqual(lazyObj.x, 1)
 
     def test_lazy_objects_visible_in_own_transaction(self):
         db = self.createNewDb()

@@ -36,12 +36,12 @@ class ServiceWorker:
         self.db.subscribeToType(service_schema.Codebase, lazySubscription=True)
         self.db.subscribeToType(service_schema.File, lazySubscription=True)
 
-        self.runtimeConfig = ServiceRuntimeConfig(dbConnectionFactory, storageRoot, authToken, ownIpAddress)
+        self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
+
+        self.runtimeConfig = ServiceRuntimeConfig(dbConnectionFactory, storageRoot, authToken, ownIpAddress, self.instance)
 
         if not os.path.exists(storageRoot):
             os.makedirs(storageRoot)
-
-        self.instance = service_schema.ServiceInstance.fromIdentity(instance_id)
 
         self.db.subscribeToObject(self.instance)
 
