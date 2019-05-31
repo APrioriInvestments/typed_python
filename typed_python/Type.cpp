@@ -185,12 +185,22 @@ bool Type::isBinaryCompatibleWith(Type* other) {
     return isCompatible;
 }
 
-PyObject* getOrSetTypeResolver(PyObject* resolver) {
+PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {
+    int num_args = 0;
+    if (args)
+        num_args = PyTuple_Size(args);
+    if (num_args > 1) {
+        PyErr_SetString(PyExc_TypeError, "getOrSetTypeResolver takes 0 or 1 positional argument");
+        return NULL;
+    }
     static PyObject* curResolver = nullptr;
     assertHoldingTheGil();
-    if (!resolver) {
+    if (num_args == 0) {
         return curResolver;
     }
+
+    PyObjectHolder resolver(PyTuple_GetItem(args, 0));
+    //std::cerr<<" " << Py_TYPE(module)->tp_name << " " << Py_TYPE(resolver)->tp_name <<std::endl;
 
     decref(curResolver);
     incref(resolver);

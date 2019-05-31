@@ -65,10 +65,10 @@ def gen_alternative_type(full_name, d):
     ret.append('    static Alternative* getType() {')
     ret.append('        PyObject* resolver = getOrSetTypeResolver();')
     ret.append('        if (!resolver)')
-    ret.append('            throw std::runtime_error("{name}: no resolver");')
+    ret.append(f'            throw std::runtime_error("{name}: no resolver");')
     ret.append(f'        PyObject* res = PyObject_CallMethod(resolver, "resolveTypeByName", "s", "{full_name}");')
     ret.append('        if (!res)')
-    ret.append(f'            throw std::runtime_error("{name}: did not resolve");')
+    ret.append(f'            throw std::runtime_error("{full_name}: did not resolve");')
     ret.append('        return (Alternative*)PyInstance::unwrapTypeArgToTypePtr(res);')
     ret.append('    }')
 

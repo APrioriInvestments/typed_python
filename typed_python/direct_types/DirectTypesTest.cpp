@@ -431,100 +431,100 @@ int test_named_tuple() {
 }
 
 // Depends on generated types A and Overlap in GeneratedTypes.hpp
-//int test_alternative() {
-//    test_fn_header()
-//
-//    A_Sub1 asub1(12, 34);
-//    my_assert(asub1.isSub1())
-//    my_assert(!asub1.isSub2())
-//    my_assert(asub1.b() == 12)
-//    my_assert(asub1.c() == 34)
-//    A_Sub2 asub2(String("this"), String("that"));
-//    my_assert(!asub2.isSub1())
-//    my_assert(asub2.isSub2())
-//    my_assert(asub2.d() == String("this"))
-//    my_assert(asub2.e() == String("that"))
-//
-//    A a1 = A_Sub1(111, 222);
-//    my_assert(a1.isSub1())
-//    my_assert(!a1.isSub2())
-//    my_assert(a1.b() == 111)
-//    my_assert(a1.c() == 222)
-//    A a2 = A_Sub2(String("this"), String("that"));
-//    my_assert(!a2.isSub1())
-//    my_assert(a2.isSub2())
-//    my_assert(a2.d() == String("this"))
-//    my_assert(a2.e() == String("that"))
-//    my_assert(a2.getLayout()->refcount == 1)
-//    {
-//        A a3(a2);
-//        A a4 = a2;
-//        my_assert(a2.getLayout()->refcount == 3)
-//        my_assert(a3.getLayout()->refcount == 3)
-//        my_assert(a4.getLayout()->refcount == 3)
-//    }
-//    my_assert(a2.getLayout()->refcount == 1)
-//
-//    Overlap o1 = Overlap::Sub1(true, 2);
-//    my_assert(o1.isSub1())
-//    bool val1;
-//    o1.b().getValue(val1);
-//    my_assert(val1 == true)
-//
-//    o1 = Overlap::Sub2(String("over"), TupleOf<String>({String("a"), String("b")}));
-//    my_assert(o1.isSub2())
-//    String val2;
-//    o1.b().getValue(val2);
-//    my_assert(val2 == String("over"))
-//
-//    o1 = Overlap::Sub3(45);
-//    my_assert(o1.isSub3())
-//    int64_t val3;
-//    o1.b().getValue(val3);
-//    my_assert(val3 == 45)
-//
-////    Bexpress_Leaf b0;
-////    Bexpress b1 = Bexpress_Leaf(true);
-////    Bexpress b2 = Bexpress_Leaf(false);
-////    Bexpress b3 = Bexpress_Leaf(true);
-////    Bexpress b4 = Bexpress_Leaf(false);
-////    Bexpress b5 = Bexpress_BinOp(b1, String("and"), b2);
-////    Bexpress b6 = Bexpress_UnaryOp(String("not"), b3);
-////    Bexpress b7 = Bexpress_BinOp(b6, String("and"), b4);
-////    Bexpress b8 = Bexpress_BinOp(b5, String("or"), b7);
-////    my_assert(b1.isLeaf())
-////    my_assert(b1.value() == true)
-////    my_assert(b2.isLeaf())
-////    my_assert(b2.value() == false)
-////    my_assert(b3.isLeaf())
-////    my_assert(b3.value() == true)
-////    my_assert(b4.isLeaf())
-////    my_assert(b4.value() == false)
-////    my_assert(b5.isBinOp())
-////    my_assert(b5.op() == String("and"))
-////    my_assert(b6.isUnaryOp())
-////    my_assert(b6.op() == String("not"))
-////    my_assert(b7.isBinOp())
-////    my_assert(b7.op() == String("and"))
-////    my_assert(b8.isBinOp())
-////    my_assert(b8.op() == String("or"))
-////    my_assert(b8.left().isBinOp())
-////    my_assert(b8.left().op() == String("and"))
-////    my_assert(b8.right().isBinOp())
-////    my_assert(b8.right().op() == String("and"))
-////    my_assert(b8.left().left().isLeaf())
-////    my_assert(b8.left().left().value() == true)
-////    my_assert(b8.left().right().isLeaf())
-////    my_assert(b8.left().right().value() == false)
-////    my_assert(b8.right().left().isUnaryOp())
-////    my_assert(b8.right().left().op() == String("not"))
-////    my_assert(b8.right().right().isLeaf())
-////    my_assert(b8.right().right().value() == false)
-////    my_assert(b8.right().left().right().isLeaf())
-////    my_assert(b8.right().left().right().value() == true)
-//
-//    return 0;
-//}
+int test_alternative() {
+    test_fn_header()
+
+    A_Sub1 asub1(12, 34);
+    my_assert(asub1.isSub1())
+    my_assert(!asub1.isSub2())
+    my_assert(asub1.b() == 12)
+    my_assert(asub1.c() == 34)
+    A_Sub2 asub2(String("this"), String("that"));
+    my_assert(!asub2.isSub1())
+    my_assert(asub2.isSub2())
+    my_assert(asub2.d() == String("this"))
+    my_assert(asub2.e() == String("that"))
+
+    A a1 = A_Sub1(111, 222);
+    my_assert(a1.isSub1())
+    my_assert(!a1.isSub2())
+    my_assert(a1.b() == 111)
+    my_assert(a1.c() == 222)
+    A a2 = A_Sub2(String("this"), String("that"));
+    my_assert(!a2.isSub1())
+    my_assert(a2.isSub2())
+    my_assert(a2.d() == String("this"))
+    my_assert(a2.e() == String("that"))
+    my_assert(a2.getLayout()->refcount == 1)
+    {
+        A a3(a2);
+        A a4 = a2;
+        my_assert(a2.getLayout()->refcount == 3)
+        my_assert(a3.getLayout()->refcount == 3)
+        my_assert(a4.getLayout()->refcount == 3)
+    }
+    my_assert(a2.getLayout()->refcount == 1)
+
+    Overlap o1 = Overlap::Sub1(true, 2);
+    my_assert(o1.isSub1())
+    bool val1;
+    o1.b().getValue(val1);
+    my_assert(val1 == true)
+
+    o1 = Overlap::Sub2(String("over"), TupleOf<String>({String("a"), String("b")}));
+    my_assert(o1.isSub2())
+    String val2;
+    o1.b().getValue(val2);
+    my_assert(val2 == String("over"))
+
+    o1 = Overlap::Sub3(45);
+    my_assert(o1.isSub3())
+    int64_t val3;
+    o1.b().getValue(val3);
+    my_assert(val3 == 45)
+
+//    Bexpress_Leaf b0;
+//    Bexpress b1 = Bexpress_Leaf(true);
+//    Bexpress b2 = Bexpress_Leaf(false);
+//    Bexpress b3 = Bexpress_Leaf(true);
+//    Bexpress b4 = Bexpress_Leaf(false);
+//    Bexpress b5 = Bexpress_BinOp(b1, String("and"), b2);
+//    Bexpress b6 = Bexpress_UnaryOp(String("not"), b3);
+//    Bexpress b7 = Bexpress_BinOp(b6, String("and"), b4);
+//    Bexpress b8 = Bexpress_BinOp(b5, String("or"), b7);
+//    my_assert(b1.isLeaf())
+//    my_assert(b1.value() == true)
+//    my_assert(b2.isLeaf())
+//    my_assert(b2.value() == false)
+//    my_assert(b3.isLeaf())
+//    my_assert(b3.value() == true)
+//    my_assert(b4.isLeaf())
+//    my_assert(b4.value() == false)
+//    my_assert(b5.isBinOp())
+//    my_assert(b5.op() == String("and"))
+//    my_assert(b6.isUnaryOp())
+//    my_assert(b6.op() == String("not"))
+//    my_assert(b7.isBinOp())
+//    my_assert(b7.op() == String("and"))
+//    my_assert(b8.isBinOp())
+//    my_assert(b8.op() == String("or"))
+//    my_assert(b8.left().isBinOp())
+//    my_assert(b8.left().op() == String("and"))
+//    my_assert(b8.right().isBinOp())
+//    my_assert(b8.right().op() == String("and"))
+//    my_assert(b8.left().left().isLeaf())
+//    my_assert(b8.left().left().value() == true)
+//    my_assert(b8.left().right().isLeaf())
+//    my_assert(b8.left().right().value() == false)
+//    my_assert(b8.right().left().isUnaryOp())
+//    my_assert(b8.right().left().op() == String("not"))
+//    my_assert(b8.right().right().isLeaf())
+//    my_assert(b8.right().right().value() == false)
+//    my_assert(b8.right().left().right().isLeaf())
+//    my_assert(b8.right().left().right().value() == true)
+
+    return 0;
+}
 
 int test_none() {
     test_fn_header()
@@ -549,7 +549,7 @@ int direct_cpp_tests() {
     ret += test_const_dict();
     ret += test_one_of();
     ret += test_named_tuple();
-//    ret += test_alternative();
+    ret += test_alternative();
     ret += test_none();
 
     std::cerr << ret << " test" << (ret == 1 ? "" : "s") << " failed" << std::endl;

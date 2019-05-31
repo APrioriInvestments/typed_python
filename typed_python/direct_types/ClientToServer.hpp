@@ -329,10 +329,10 @@ public:
 
 // END Generated NamedTuple ValueType
 
-// Generated Tuple Anon41789424
+// Generated Tuple Anon28537472
 //    a0=String
 //    a1=Bytes
-class Anon41789424 {
+class Anon28537472 {
 public:
     typedef String a0_type;
     typedef Bytes a1_type;
@@ -340,14 +340,14 @@ public:
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     static Tuple* getType() {
         static Tuple* t = Tuple::Make({
-                TypeDetails<Anon41789424::a0_type>::getType(),
-                TypeDetails<Anon41789424::a1_type>::getType()
+                TypeDetails<Anon28537472::a0_type>::getType(),
+                TypeDetails<Anon28537472::a1_type>::getType()
             });
         return t;
         }
 
-    static Anon41789424 fromPython(PyObject* p) {
-        Anon41789424 l;
+    static Anon28537472 fromPython(PyObject* p) {
+        Anon28537472 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -356,23 +356,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon41789424& operator = (const Anon41789424& other) {
+    Anon28537472& operator = (const Anon28537472& other) {
         a0() = other.a0();
         a1() = other.a1();
         return *this;
     }
 
-    Anon41789424(const Anon41789424& other) {
+    Anon28537472(const Anon28537472& other) {
         new (&a0()) a0_type(other.a0());
         new (&a1()) a1_type(other.a1());
     }
 
-    ~Anon41789424() {
+    ~Anon28537472() {
         a1().~a1_type();
         a0().~a0_type();
     }
 
-    Anon41789424() {
+    Anon28537472() {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -390,7 +390,7 @@ public:
         }
     }
 
-    Anon41789424(const a0_type& a0_val, const a1_type& a1_val) {
+    Anon28537472(const a0_type& a0_val, const a1_type& a1_val) {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -414,21 +414,21 @@ private:
 };
 
 template <>
-class TypeDetails<Anon41789424> {
+class TypeDetails<Anon28537472> {
 public:
     static Type* getType() {
-        static Type* t = Anon41789424::getType();
+        static Type* t = Anon28537472::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon41789424 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon28537472 somehow we have the wrong bytecount!");
         }
         return t;
     }
     static const uint64_t bytecount = 
-        sizeof(Anon41789424::a0_type) +
-        sizeof(Anon41789424::a1_type);
+        sizeof(Anon28537472::a0_type) +
+        sizeof(Anon28537472::a1_type);
 };
 
-// END Generated Tuple Anon41789424
+// END Generated Tuple Anon28537472
 
 // Generated Alternative ClientToServer=
 //     TransactionData=(writes=ConstDict<ObjectFieldId, OneOf<None, Bytes>>, set_adds=ConstDict<IndexId, TupleOf<int64_t>>, set_removes=ConstDict<IndexId, TupleOf<int64_t>>, key_versions=TupleOf<ObjectFieldId>, index_versions=TupleOf<IndexId>, transaction_guid=int64_t)
@@ -436,7 +436,7 @@ public:
 //     Heartbeat=()
 //     DefineSchema=(name=String, definition=ConstDict<String, ValueType>)
 //     LoadLazyObject=(schema=String, typename0=String, identity=int64_t)
-//     Subscribe=(schema=String, typename0=OneOf<None, String>, fieldname_and_value=OneOf<None, Anon41789424>, isLazy=bool)
+//     Subscribe=(schema=String, typename0=OneOf<None, String>, fieldname_and_value=OneOf<None, Anon28537472>, isLazy=bool)
 //     Flush=(guid=int64_t)
 //     Authenticate=(token=String)
 
@@ -465,10 +465,10 @@ public:
     static Alternative* getType() {
         PyObject* resolver = getOrSetTypeResolver();
         if (!resolver)
-            throw std::runtime_error("{name}: no resolver");
+            throw std::runtime_error("ClientToServer: no resolver");
         PyObject* res = PyObject_CallMethod(resolver, "resolveTypeByName", "s", "object_database.database_connection.ClientToServer");
         if (!res)
-            throw std::runtime_error("ClientToServer: did not resolve");
+            throw std::runtime_error("object_database.database_connection.ClientToServer: did not resolve");
         return (Alternative*)PyInstance::unwrapTypeArgToTypePtr(res);
     }
     static ClientToServer fromPython(PyObject* p) {
@@ -492,7 +492,7 @@ public:
     static ClientToServer Heartbeat();
     static ClientToServer DefineSchema(const String& name, const ConstDict<String, ValueType>& definition);
     static ClientToServer LoadLazyObject(const String& schema, const String& typename0, const int64_t& identity);
-    static ClientToServer Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon41789424>& fieldname_and_value, const bool& isLazy);
+    static ClientToServer Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon28537472>& fieldname_and_value, const bool& isLazy);
     static ClientToServer Flush(const int64_t& guid);
     static ClientToServer Authenticate(const String& token);
 
@@ -532,7 +532,7 @@ public:
     String schema() const;
     OneOf<String,OneOf<None, String>> typename0() const;
     int64_t identity() const;
-    OneOf<None, Anon41789424> fieldname_and_value() const;
+    OneOf<None, Anon28537472> fieldname_and_value() const;
     bool isLazy() const;
     int64_t guid() const;
     String token() const;
@@ -569,7 +569,7 @@ NamedTuple* ClientToServer::LoadLazyObject_Type = NamedTuple::Make(
 );
 
 NamedTuple* ClientToServer::Subscribe_Type = NamedTuple::Make(
-    {TypeDetails<String>::getType(), TypeDetails<OneOf<None, String>>::getType(), TypeDetails<OneOf<None, Anon41789424>>::getType(), TypeDetails<bool>::getType()},
+    {TypeDetails<String>::getType(), TypeDetails<OneOf<None, String>>::getType(), TypeDetails<OneOf<None, Anon28537472>>::getType(), TypeDetails<bool>::getType()},
     {"schema", "typename0", "fieldname_and_value", "isLazy"}
 );
 
@@ -773,7 +773,7 @@ public:
     static Alternative* getAlternative() { return ClientToServer::getType(); }
 
     ClientToServer_Subscribe():ClientToServer(kind::Subscribe) {}
-    ClientToServer_Subscribe( const String& schema1,  const OneOf<None, String>& typename01,  const OneOf<None, Anon41789424>& fieldname_and_value1,  const bool& isLazy1):ClientToServer(kind::Subscribe) {
+    ClientToServer_Subscribe( const String& schema1,  const OneOf<None, String>& typename01,  const OneOf<None, Anon28537472>& fieldname_and_value1,  const bool& isLazy1):ClientToServer(kind::Subscribe) {
         schema() = schema1;
         typename0() = typename01;
         fieldname_and_value() = fieldname_and_value1;
@@ -790,15 +790,15 @@ public:
 
     String& schema() const { return *(String*)(mLayout->data); }
     OneOf<None, String>& typename0() const { return *(OneOf<None, String>*)(mLayout->data + size1); }
-    OneOf<None, Anon41789424>& fieldname_and_value() const { return *(OneOf<None, Anon41789424>*)(mLayout->data + size1 + size2); }
+    OneOf<None, Anon28537472>& fieldname_and_value() const { return *(OneOf<None, Anon28537472>*)(mLayout->data + size1 + size2); }
     bool& isLazy() const { return *(bool*)(mLayout->data + size1 + size2 + size3); }
 private:
     static const int size1 = sizeof(String);
     static const int size2 = sizeof(OneOf<None, String>);
-    static const int size3 = sizeof(OneOf<None, Anon41789424>);
+    static const int size3 = sizeof(OneOf<None, Anon28537472>);
 };
 
-ClientToServer ClientToServer::Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon41789424>& fieldname_and_value, const bool& isLazy) {
+ClientToServer ClientToServer::Subscribe(const String& schema, const OneOf<None, String>& typename0, const OneOf<None, Anon28537472>& fieldname_and_value, const bool& isLazy) {
     return ClientToServer_Subscribe(schema, typename0, fieldname_and_value, isLazy);
 }
 
@@ -938,7 +938,7 @@ int64_t ClientToServer::identity() const {
     throw std::runtime_error("\"ClientToServer\" subtype does not contain \"identity\"");
 }
 
-OneOf<None, Anon41789424> ClientToServer::fieldname_and_value() const {
+OneOf<None, Anon28537472> ClientToServer::fieldname_and_value() const {
     if (isSubscribe())
         return ((ClientToServer_Subscribe*)this)->fieldname_and_value();
     throw std::runtime_error("\"ClientToServer\" subtype does not contain \"fieldname_and_value\"");

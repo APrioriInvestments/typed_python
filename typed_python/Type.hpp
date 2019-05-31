@@ -77,7 +77,7 @@ typedef void (*compiled_code_entrypoint)(instance_ptr, instance_ptr*);
 
 void updateTypeRepForType(Type* t, PyTypeObject* pyType);
 
-PyObject* getOrSetTypeResolver(PyObject* resolver = nullptr);
+PyObject* getOrSetTypeResolver(PyObject* module = nullptr, PyObject* args = nullptr);
 
 class Type {
 public:

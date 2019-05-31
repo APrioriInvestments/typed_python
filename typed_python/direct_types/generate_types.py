@@ -20,6 +20,7 @@ import traceback
 from typed_python.Codebase import Codebase
 from typed_python._types import Dict, ConstDict, NamedTuple, Tuple, ListOf, TupleOf, OneOf, Alternative
 from typed_python._types import getOrSetTypeResolver
+from typed_python._types import cpp_tests
 from typed_python.direct_types.generate_tuple import gen_tuple_type
 from typed_python.direct_types.generate_named_tuple import gen_named_tuple_type
 from typed_python.direct_types.generate_alternative import gen_alternative_type
@@ -168,26 +169,32 @@ def typed_python_codegen2(**kwargs):
         if v.__typed_python_category__ in ('Tuple', 'NamedTuple', 'Alternative'):
             if v.__typed_python_category__ == 'Tuple':
                 ret += gen_tuple_type(k, *[cpp_type(t)[0] for t in v.ElementTypes])
-                # for t in v.ElementTypes:
-                #     anon_types.update(cpp_type(t)[1])
             elif v.__typed_python_category__ == 'NamedTuple':
                 ret += gen_named_tuple_type(k, **{avoid_cpp_keywords(n): cpp_type(t)[0] for n, t in zip(v.ElementNames, v.ElementTypes)})
-                # for t in v.ElementTypes:
-                #     anon_types.update(cpp_type(t)[1])
             elif v.__typed_python_category__ == 'Alternative':
                 d = {nt.Name: [(avoid_cpp_keywords(a), cpp_type(t)[0])
                                for a, t in zip(nt.ElementType.ElementNames, nt.ElementType.ElementTypes)]
                      for nt in v.__typed_python_alternatives__}
                 ret += gen_alternative_type(k, d)
-                # for nt in v.__typed_python_alternatives__:
-                #     for t in nt.ElementType.ElementTypes:
-                #         anon_types.update(cpp_type(t)[1])
 
             cpp_type_mapping[v] = k
     return ret
 
 
 def generate_cpp(codebase, t, cpp, verbose=False, produce_code=True):
+    """What are the dependencies of Type t?
+    Update dict of name->Type to include all dependencies of Type t, in an order
+    that is appropriate for code generation
+
+    Args:
+        codebase: Codebase
+        t: Type we want to define
+        cpp: dict of name -> Type
+        verbose: debugging flag
+        produce_code:
+            if true, we want this type and its dependencies
+            if false, we only want the dependencies
+    """
     if t in cpp:
         return
     cat = t.__typed_python_category__
@@ -215,10 +222,18 @@ def generate_cpp(codebase, t, cpp, verbose=False, produce_code=True):
         cpp[name] = t
 
 
-def generate_from_codebase(codebase, dest, one=None, verbose=False):
+def generate_from_codebase(codebase, dest, listOfItems=None, verbose=False):
+    """Generates direct c++ type wrappers from a codebase.
+
+    Specifically, generates code for direct c++ wrappers of test Tuple, NamedTuple, and Alternative types.
+
+    Args:
+        codebase: Codebase
+        dest: filename to which to write generated code.
+    """
     cpp = {}
-    if one:
-        items = [(one, codebase.serializationContext.nameToObject[one])]
+    if listOfItems:
+        items = [(i, codebase.serializationContext.nameToObject[i]) for i in listOfItems]
     else:
         items = codebase.serializationContext.nameToObject.items()
     for n, t in items:
@@ -232,63 +247,76 @@ def generate_from_codebase(codebase, dest, one=None, verbose=False):
         f.writelines(typed_python_codegen2(**cpp))
 
 
-class resolver:
+class cb_resolver:
     def __init__(self, codebase):
         self._codebase = codebase
+        self.resolveTypeByName = lambda s: self._codebase.serializationContext.nameToObject[s]
 
-    def resolveTypeByName(self, s):
-        return self._codebase.serializationContext.nameToObject[s]
+
+A = Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str})
+Overlap = Alternative('Overlap', Sub1={'b': bool, 'c': int}, Sub2={'b': str, 'c': TupleOf(str)}, Sub3={'b': int})
+Bexpress = lambda: Bexpress
+Bexpress = Alternative(
+    "Bexpress",
+    Leaf={
+        "value": bool
+    },
+    BinOp={
+        "left": Bexpress,
+        "op": str,
+        "right": Bexpress,
+    },
+    UnaryOp={
+        "op": str,
+        "right": Bexpress
+    })
+NamedTupleTwoStrings = NamedTuple(X=str, Y=str)
+NamedTupleBoolIntStr = NamedTuple(b=bool, i=int, s=str)
+NamedTupleIntFloatDesc = NamedTuple(a=OneOf(int, float, bool), b=float, desc=str)
+NamedTupleBoolListOfInt = NamedTuple(X=bool, Y=ListOf(int))
+NamedTupleAttrAndValues = NamedTuple(attributes=TupleOf(str), values=TupleOf(int))
+AnonTest = Tuple(
+    Dict(Tuple(int, int), str),
+    ConstDict(str, OneOf(bool, Tuple(bool, bool))),
+    ListOf(Tuple(int, int)),
+    TupleOf(NamedTuple(x=int, y=int))
+)
+Bexpress = Forward("Bexpress*")
+Bexpress = Bexpress.define(Alternative(
+    "BooleanExpr",
+    Leaf={
+        "value": bool
+    },
+    BinOp={
+        "op": str,
+        "left": Bexpress,
+        "right": Bexpress,
+    },
+    UnaryOp={
+        "op": str,
+        "right": Bexpress
 
 
 def generate_some_types(dest):
     """Generates direct c++ type wrappers for testing.
 
     Specifically, generates code for direct c++ wrappers of test Tuple, NamedTuple, and Alternative types.
+    This function will produce Alternatives that are unusable, because Type resolution will fail without a codebase.
 
     Args:
         dest: filename to which to write generated code.
     """
-    Bexpress = Forward("Bexpress*")
-    Bexpress = Bexpress.define(Alternative(
-        "BooleanExpr",
-        Leaf={
-            "value": bool
-        },
-        BinOp={
-            "op": str,
-            "left": Bexpress,
-            "right": Bexpress,
-        },
-        UnaryOp={
-            "op": str,
-            "right": Bexpress
     with open(dest, 'w') as f:
         f.write('#pragma once\n')
         f.writelines(typed_python_codegen(
-            # ObjectFieldId=ObjectFieldId,
-            # IndexId=IndexId,
-            # FieldDefinition=FieldDefinition,
-            # TypeDefinition=TypeDefinition,
-            # SchemaDefinition=SchemaDefinition,
-            # ClientToServer=ClientToServer,
-            # A=A,
-            # Overlap=Overlap,
-            # Bexpress=Bexpress,
-            NamedTupleTwoStrings=NamedTuple(X=str, Y=str),
-            NamedTupleBoolIntStr=NamedTuple(b=bool, i=int, s=str),
-            # Choice=NamedTuple(A=NamedTuple(X=str, Y=str), B=Bexpress),
-            NamedTupleIntFloatDesc=NamedTuple(a=OneOf(int, float, bool), b=float, desc=str),
-            NamedTupleBoolListOfInt=NamedTuple(X=bool, Y=ListOf(int)),
-            NamedTupleAttrAndValues=NamedTuple(attributes=TupleOf(str), values=TupleOf(int)),
-            AnonTest=Tuple(
-                Dict(Tuple(int, int), str),
-                ConstDict(str, OneOf(bool, Tuple(bool, bool))),
-                ListOf(Tuple(int, int)),
-                TupleOf(NamedTuple(x=int, y=int))
-            )
-            # IndexValue=Tuple(int, int, int, int, int),
-            # ObjectFieldId=NamedTuple(objId=int, fieldId=int, isIndexValue=bool),
-            # IndexId=NamedTuple(fieldId=int, indexValue=Tuple(int, int, int, int, int)),
+            A=A,
+            Overlap=Overlap,
+            NamedTupleTwoStrings=NamedTupleTwoStrings,
+            NamedTupleBoolIntStr=NamedTupleBoolIntStr,
+            NamedTupleIntFloatDesc=NamedTupleIntFloatDesc,
+            NamedTupleBoolListOfInt=NamedTupleBoolListOfInt,
+            NamedTupleAttrAndValues=NamedTupleAttrAndValues,
+            AnonTest=AnonTest
         ))
 
 
@@ -298,27 +326,37 @@ def main(argv):
     parser.add_argument('-t', '--testTypes', action='store_true')
     parser.add_argument('-c', '--testTypes2', action='store_true')
     parser.add_argument('-d', '--testTypes3', action='store_true')
-    parser.add_argument('-e', '--testTypes4', action='store_true')
     parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
+    ret = 0
 
     try:
         if args.testTypes:
             generate_some_types(args.dest)
         elif args.testTypes2:
             codebase = Codebase.FromRootlevelPath("object_database")
-            getOrSetTypeResolver(resolver(codebase))
-            generate_from_codebase(codebase, args.dest, "object_database.messages.ClientToServer", verbose=args.verbose)
+            generate_from_codebase(codebase, args.dest, ["object_database.messages.ClientToServer"], verbose=args.verbose)
+            getOrSetTypeResolver(cb_resolver(codebase))
         elif args.testTypes3:
             codebase = Codebase.FromRootlevelPath("typed_python")
-            generate_from_codebase(codebase, args.dest, "typed_python.python_ast.Expr", verbose=args.verbose)
-        elif args.testTypes4:
-            codebase = Codebase.FromRootlevelPath("object_database", verbose=args.verbose)
-            generate_from_codebase(codebase, args.dest)
+            testTypes = [
+                "typed_python.direct_types.generate_types.A",
+                "typed_python.direct_types.generate_types.Overlap",
+                "typed_python.direct_types.generate_types.NamedTupleTwoStrings",
+                "typed_python.direct_types.generate_types.NamedTupleBoolIntStr",
+                "typed_python.direct_types.generate_types.NamedTupleIntFloatDesc",
+                "typed_python.direct_types.generate_types.NamedTupleBoolListOfInt",
+                "typed_python.direct_types.generate_types.NamedTupleAttrAndValues",
+                "typed_python.direct_types.generate_types.AnonTest"
+            ]
+            generate_from_codebase(codebase, args.dest, testTypes, verbose=args.verbose)
+            # generate_from_codebase(codebase, args.dest, "typed_python.python_ast.Expr", verbose=args.verbose)
+            getOrSetTypeResolver(cb_resolver(codebase))
+            ret = cpp_tests()
     except Exception:
         print("FAILED:\n", traceback.format_exc())
         return 1
-    return 0
+    return ret
 
 
 if __name__ == '__main__':
