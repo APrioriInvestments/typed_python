@@ -10,14 +10,10 @@ class A {
 public:
     enum class kind { Sub1=0, Sub2=1 };
 
-    static NamedTuple* Sub1_Type;
-    static NamedTuple* Sub2_Type;
-
     static Alternative* getType() {
         PyObject* resolver = getOrSetTypeResolver();
         if (!resolver)
             throw std::runtime_error("A: no resolver");
-        //std::cerr<<" " << Py_TYPE(resolver)->tp_name <<std::endl;
         PyObject* res = PyObject_CallMethod(resolver, "resolveTypeByName", "s", "typed_python.direct_types.generate_types.A");
         if (!res)
             throw std::runtime_error("typed_python.direct_types.generate_types.A: did not resolve");
@@ -64,16 +60,6 @@ protected:
     explicit A(Alternative::layout* l): mLayout(l) {}
     Alternative::layout *mLayout;
 };
-
-NamedTuple* A::Sub1_Type = NamedTuple::Make(
-    {TypeDetails<int64_t>::getType(), TypeDetails<int64_t>::getType()},
-    {"b", "c"}
-);
-
-NamedTuple* A::Sub2_Type = NamedTuple::Make(
-    {TypeDetails<String>::getType(), TypeDetails<String>::getType()},
-    {"d", "e"}
-);
 
 template <>
 class TypeDetails<A> {
@@ -191,10 +177,6 @@ class Overlap {
 public:
     enum class kind { Sub1=0, Sub2=1, Sub3=2 };
 
-    static NamedTuple* Sub1_Type;
-    static NamedTuple* Sub2_Type;
-    static NamedTuple* Sub3_Type;
-
     static Alternative* getType() {
         PyObject* resolver = getOrSetTypeResolver();
         if (!resolver)
@@ -238,7 +220,7 @@ public:
     bool isSub3() const { return which() == kind::Sub3; }
 
     // Accessors for members
-    OneOf<bool,String,int64_t> b() const;
+    OneOf<String,int64_t,bool> b() const;
     OneOf<int64_t,TupleOf<String>> c() const;
 
     Alternative::layout* getLayout() const { return mLayout; }
@@ -246,21 +228,6 @@ protected:
     explicit Overlap(Alternative::layout* l): mLayout(l) {}
     Alternative::layout *mLayout;
 };
-
-NamedTuple* Overlap::Sub1_Type = NamedTuple::Make(
-    {TypeDetails<bool>::getType(), TypeDetails<int64_t>::getType()},
-    {"b", "c"}
-);
-
-NamedTuple* Overlap::Sub2_Type = NamedTuple::Make(
-    {TypeDetails<String>::getType(), TypeDetails<TupleOf<String>>::getType()},
-    {"b", "c"}
-);
-
-NamedTuple* Overlap::Sub3_Type = NamedTuple::Make(
-    {TypeDetails<int64_t>::getType()},
-    {"b"}
-);
 
 template <>
 class TypeDetails<Overlap> {
@@ -368,13 +335,13 @@ Overlap Overlap::Sub3(const int64_t& b) {
     return Overlap_Sub3(b);
 }
 
-OneOf<bool,String,int64_t> Overlap::b() const {
+OneOf<String,int64_t,bool> Overlap::b() const {
     if (isSub1())
-        return OneOf<bool,String,int64_t>(((Overlap_Sub1*)this)->b());
+        return OneOf<String,int64_t,bool>(((Overlap_Sub1*)this)->b());
     if (isSub2())
-        return OneOf<bool,String,int64_t>(((Overlap_Sub2*)this)->b());
+        return OneOf<String,int64_t,bool>(((Overlap_Sub2*)this)->b());
     if (isSub3())
-        return OneOf<bool,String,int64_t>(((Overlap_Sub3*)this)->b());
+        return OneOf<String,int64_t,bool>(((Overlap_Sub3*)this)->b());
     throw std::runtime_error("\"Overlap\" subtype does not contain \"b\"");
 }
 
@@ -485,7 +452,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleTwoStrings::X_type) +
         sizeof(NamedTupleTwoStrings::Y_type);
 };
@@ -606,7 +573,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleBoolIntStr::b_type) +
         sizeof(NamedTupleBoolIntStr::i_type) +
         sizeof(NamedTupleBoolIntStr::s_type);
@@ -728,7 +695,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleIntFloatDesc::a_type) +
         sizeof(NamedTupleIntFloatDesc::b_type) +
         sizeof(NamedTupleIntFloatDesc::desc_type);
@@ -833,7 +800,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleBoolListOfInt::X_type) +
         sizeof(NamedTupleBoolListOfInt::Y_type);
 };
@@ -937,17 +904,17 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(NamedTupleAttrAndValues::attributes_type) +
         sizeof(NamedTupleAttrAndValues::values_type);
 };
 
 // END Generated NamedTuple NamedTupleAttrAndValues
 
-// Generated Tuple Anon34726784
+// Generated Tuple Anon27165584
 //    a0=int64_t
 //    a1=int64_t
-class Anon34726784 {
+class Anon27165584 {
 public:
     typedef int64_t a0_type;
     typedef int64_t a1_type;
@@ -955,14 +922,14 @@ public:
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     static Tuple* getType() {
         static Tuple* t = Tuple::Make({
-                TypeDetails<Anon34726784::a0_type>::getType(),
-                TypeDetails<Anon34726784::a1_type>::getType()
+                TypeDetails<Anon27165584::a0_type>::getType(),
+                TypeDetails<Anon27165584::a1_type>::getType()
             });
         return t;
         }
 
-    static Anon34726784 fromPython(PyObject* p) {
-        Anon34726784 l;
+    static Anon27165584 fromPython(PyObject* p) {
+        Anon27165584 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -971,23 +938,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon34726784& operator = (const Anon34726784& other) {
+    Anon27165584& operator = (const Anon27165584& other) {
         a0() = other.a0();
         a1() = other.a1();
         return *this;
     }
 
-    Anon34726784(const Anon34726784& other) {
+    Anon27165584(const Anon27165584& other) {
         new (&a0()) a0_type(other.a0());
         new (&a1()) a1_type(other.a1());
     }
 
-    ~Anon34726784() {
+    ~Anon27165584() {
         a1().~a1_type();
         a0().~a0_type();
     }
 
-    Anon34726784() {
+    Anon27165584() {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -1005,7 +972,7 @@ public:
         }
     }
 
-    Anon34726784(const a0_type& a0_val, const a1_type& a1_val) {
+    Anon27165584(const a0_type& a0_val, const a1_type& a1_val) {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -1029,26 +996,26 @@ private:
 };
 
 template <>
-class TypeDetails<Anon34726784> {
+class TypeDetails<Anon27165584> {
 public:
     static Type* getType() {
-        static Type* t = Anon34726784::getType();
+        static Type* t = Anon27165584::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon34726784 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon27165584 somehow we have the wrong bytecount!");
         }
         return t;
     }
     static const uint64_t bytecount = 
-        sizeof(Anon34726784::a0_type) +
-        sizeof(Anon34726784::a1_type);
+        sizeof(Anon27165584::a0_type) +
+        sizeof(Anon27165584::a1_type);
 };
 
-// END Generated Tuple Anon34726784
+// END Generated Tuple Anon27165584
 
-// Generated Tuple Anon34739280
+// Generated Tuple Anon27173904
 //    a0=bool
 //    a1=bool
-class Anon34739280 {
+class Anon27173904 {
 public:
     typedef bool a0_type;
     typedef bool a1_type;
@@ -1056,14 +1023,14 @@ public:
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     static Tuple* getType() {
         static Tuple* t = Tuple::Make({
-                TypeDetails<Anon34739280::a0_type>::getType(),
-                TypeDetails<Anon34739280::a1_type>::getType()
+                TypeDetails<Anon27173904::a0_type>::getType(),
+                TypeDetails<Anon27173904::a1_type>::getType()
             });
         return t;
         }
 
-    static Anon34739280 fromPython(PyObject* p) {
-        Anon34739280 l;
+    static Anon27173904 fromPython(PyObject* p) {
+        Anon27173904 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -1072,23 +1039,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon34739280& operator = (const Anon34739280& other) {
+    Anon27173904& operator = (const Anon27173904& other) {
         a0() = other.a0();
         a1() = other.a1();
         return *this;
     }
 
-    Anon34739280(const Anon34739280& other) {
+    Anon27173904(const Anon27173904& other) {
         new (&a0()) a0_type(other.a0());
         new (&a1()) a1_type(other.a1());
     }
 
-    ~Anon34739280() {
+    ~Anon27173904() {
         a1().~a1_type();
         a0().~a0_type();
     }
 
-    Anon34739280() {
+    Anon27173904() {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -1106,7 +1073,7 @@ public:
         }
     }
 
-    Anon34739280(const a0_type& a0_val, const a1_type& a1_val) {
+    Anon27173904(const a0_type& a0_val, const a1_type& a1_val) {
         bool inita0 = false;
         bool inita1 = false;
         try {
@@ -1130,26 +1097,26 @@ private:
 };
 
 template <>
-class TypeDetails<Anon34739280> {
+class TypeDetails<Anon27173904> {
 public:
     static Type* getType() {
-        static Type* t = Anon34739280::getType();
+        static Type* t = Anon27173904::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon34739280 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon27173904 somehow we have the wrong bytecount!");
         }
         return t;
     }
     static const uint64_t bytecount = 
-        sizeof(Anon34739280::a0_type) +
-        sizeof(Anon34739280::a1_type);
+        sizeof(Anon27173904::a0_type) +
+        sizeof(Anon27173904::a1_type);
 };
 
-// END Generated Tuple Anon34739280
+// END Generated Tuple Anon27173904
 
-// Generated NamedTuple Anon34754928
+// Generated NamedTuple Anon27201024
 //    x=int64_t
 //    y=int64_t
-class Anon34754928 {
+class Anon27201024 {
 public:
     typedef int64_t x_type;
     typedef int64_t y_type;
@@ -1157,8 +1124,8 @@ public:
     y_type& y() const { return *(y_type*)(data + size1); }
     static NamedTuple* getType() {
         static NamedTuple* t = NamedTuple::Make({
-                TypeDetails<Anon34754928::x_type>::getType(),
-                TypeDetails<Anon34754928::y_type>::getType()
+                TypeDetails<Anon27201024::x_type>::getType(),
+                TypeDetails<Anon27201024::y_type>::getType()
             },{
                 "x",
                 "y"
@@ -1166,8 +1133,8 @@ public:
         return t;
         }
 
-    static Anon34754928 fromPython(PyObject* p) {
-        Anon34754928 l;
+    static Anon27201024 fromPython(PyObject* p) {
+        Anon27201024 l;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return l;
     }
@@ -1176,23 +1143,23 @@ public:
         return PyInstance::extractPythonObject((instance_ptr)this, getType());
     }
 
-    Anon34754928& operator = (const Anon34754928& other) {
+    Anon27201024& operator = (const Anon27201024& other) {
         x() = other.x();
         y() = other.y();
         return *this;
     }
 
-    Anon34754928(const Anon34754928& other) {
+    Anon27201024(const Anon27201024& other) {
         new (&x()) x_type(other.x());
         new (&y()) y_type(other.y());
     }
 
-    ~Anon34754928() {
+    ~Anon27201024() {
         y().~y_type();
         x().~x_type();
     }
 
-    Anon34754928() {
+    Anon27201024() {
         bool initx = false;
         bool inity = false;
         try {
@@ -1210,7 +1177,7 @@ public:
         }
     }
 
-    Anon34754928(const x_type& x_val, const y_type& y_val) {
+    Anon27201024(const x_type& x_val, const y_type& y_val) {
         bool initx = false;
         bool inity = false;
         try {
@@ -1234,33 +1201,33 @@ private:
 };
 
 template <>
-class TypeDetails<Anon34754928> {
+class TypeDetails<Anon27201024> {
 public:
     static Type* getType() {
-        static Type* t = Anon34754928::getType();
+        static Type* t = Anon27201024::getType();
         if (t->bytecount() != bytecount) {
-            throw std::runtime_error("Anon34754928 somehow we have the wrong bytecount!");
+            throw std::runtime_error("Anon27201024 somehow we have the wrong bytecount!");
         }
         return t;
     }
     static const uint64_t bytecount = 
-        sizeof(Anon34754928::x_type) +
-        sizeof(Anon34754928::y_type);
+        sizeof(Anon27201024::x_type) +
+        sizeof(Anon27201024::y_type);
 };
 
-// END Generated NamedTuple Anon34754928
+// END Generated NamedTuple Anon27201024
 
 // Generated Tuple AnonTest
-//    a0=Dict<Anon34726784, String>
-//    a1=ConstDict<String, OneOf<bool, Anon34739280>>
-//    a2=ListOf<Anon34726784>
-//    a3=TupleOf<Anon34754928>
+//    a0=Dict<Anon27165584, String>
+//    a1=ConstDict<String, OneOf<bool, Anon27173904>>
+//    a2=ListOf<Anon27165584>
+//    a3=TupleOf<Anon27201024>
 class AnonTest {
 public:
-    typedef Dict<Anon34726784, String> a0_type;
-    typedef ConstDict<String, OneOf<bool, Anon34739280>> a1_type;
-    typedef ListOf<Anon34726784> a2_type;
-    typedef TupleOf<Anon34754928> a3_type;
+    typedef Dict<Anon27165584, String> a0_type;
+    typedef ConstDict<String, OneOf<bool, Anon27173904>> a1_type;
+    typedef ListOf<Anon27165584> a2_type;
+    typedef TupleOf<Anon27201024> a3_type;
     a0_type& a0() const { return *(a0_type*)(data); }
     a1_type& a1() const { return *(a1_type*)(data + size1); }
     a2_type& a2() const { return *(a2_type*)(data + size1 + size2); }
@@ -1376,7 +1343,7 @@ public:
         }
         return t;
     }
-    static const uint64_t bytecount =
+    static const uint64_t bytecount = 
         sizeof(AnonTest::a0_type) +
         sizeof(AnonTest::a1_type) +
         sizeof(AnonTest::a2_type) +
@@ -1384,4 +1351,210 @@ public:
 };
 
 // END Generated Tuple AnonTest
+
+// Generated Alternative Bexpress=
+//     Leaf=(value=bool)
+//     BinOp=(left=Bexpress, op=String, right=Bexpress)
+//     UnaryOp=(op=String, right=Bexpress)
+
+class Bexpress_Leaf;
+class Bexpress_BinOp;
+class Bexpress_UnaryOp;
+
+class Bexpress {
+public:
+    enum class kind { Leaf=0, BinOp=1, UnaryOp=2 };
+
+    static Alternative* getType() {
+        PyObject* resolver = getOrSetTypeResolver();
+        if (!resolver)
+            throw std::runtime_error("Bexpress: no resolver");
+        PyObject* res = PyObject_CallMethod(resolver, "resolveTypeByName", "s", "typed_python.direct_types.generate_types.Bexpress");
+        if (!res)
+            throw std::runtime_error("typed_python.direct_types.generate_types.Bexpress: did not resolve");
+        return (Alternative*)PyInstance::unwrapTypeArgToTypePtr(res);
+    }
+    static Bexpress fromPython(PyObject* p) {
+        Alternative::layout* l = nullptr;
+        PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
+        return Bexpress(l);
+    }
+
+    PyObject* toPython() {
+        return PyInstance::extractPythonObject((instance_ptr)&mLayout, getType());
+    }
+
+    ~Bexpress() { getType()->destroy((instance_ptr)&mLayout); }
+    Bexpress():mLayout(0) { getType()->constructor((instance_ptr)&mLayout); }
+    Bexpress(kind k):mLayout(0) { ConcreteAlternative::Make(getType(), (int64_t)k)->constructor((instance_ptr)&mLayout); }
+    Bexpress(const Bexpress& in) { getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&in.mLayout); }
+    Bexpress& operator=(const Bexpress& other) { getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout); return *this; }
+
+    static Bexpress Leaf(const bool& value);
+    static Bexpress BinOp(const Bexpress& left, const String& op, const Bexpress& right);
+    static Bexpress UnaryOp(const String& op, const Bexpress& right);
+
+    kind which() const { return (kind)mLayout->which; }
+
+    template <class F>
+    auto check(const F& f) {
+        if (isLeaf()) { return f(*(Bexpress_Leaf*)this); }
+        if (isBinOp()) { return f(*(Bexpress_BinOp*)this); }
+        if (isUnaryOp()) { return f(*(Bexpress_UnaryOp*)this); }
+    }
+
+    bool isLeaf() const { return which() == kind::Leaf; }
+    bool isBinOp() const { return which() == kind::BinOp; }
+    bool isUnaryOp() const { return which() == kind::UnaryOp; }
+
+    // Accessors for members
+    bool value() const;
+    Bexpress left() const;
+    String op() const;
+    Bexpress right() const;
+
+    Alternative::layout* getLayout() const { return mLayout; }
+protected:
+    explicit Bexpress(Alternative::layout* l): mLayout(l) {}
+    Alternative::layout *mLayout;
+};
+
+template <>
+class TypeDetails<Bexpress> {
+public:
+    static Type* getType() {
+        static Type* t = Bexpress::getType();
+        if (t->bytecount() != bytecount) {
+            throw std::runtime_error("Bexpress somehow we have the wrong bytecount!");
+        }
+        return t;
+    }
+    static const uint64_t bytecount = sizeof(void*);
+};
+
+class Bexpress_Leaf : public Bexpress {
+public:
+    static ConcreteAlternative* getType() {
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), static_cast<int>(kind::Leaf));
+        return t;
+    }
+    static Alternative* getAlternative() { return Bexpress::getType(); }
+
+    Bexpress_Leaf():Bexpress(kind::Leaf) {}
+    Bexpress_Leaf( const bool& value1):Bexpress(kind::Leaf) {
+        value() = value1;
+    }
+    Bexpress_Leaf(const Bexpress_Leaf& other):Bexpress(kind::Leaf) {
+        getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+    }
+    Bexpress_Leaf& operator=(const Bexpress_Leaf& other) {
+         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+         return *this;
+    }
+    ~Bexpress_Leaf() {}
+
+    bool& value() const { return *(bool*)(mLayout->data); }
+private:
+};
+
+Bexpress Bexpress::Leaf(const bool& value) {
+    return Bexpress_Leaf(value);
+}
+
+class Bexpress_BinOp : public Bexpress {
+public:
+    static ConcreteAlternative* getType() {
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), static_cast<int>(kind::BinOp));
+        return t;
+    }
+    static Alternative* getAlternative() { return Bexpress::getType(); }
+
+    Bexpress_BinOp():Bexpress(kind::BinOp) {}
+    Bexpress_BinOp( const Bexpress& left1,  const String& op1,  const Bexpress& right1):Bexpress(kind::BinOp) {
+        left() = left1;
+        op() = op1;
+        right() = right1;
+    }
+    Bexpress_BinOp(const Bexpress_BinOp& other):Bexpress(kind::BinOp) {
+        getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+    }
+    Bexpress_BinOp& operator=(const Bexpress_BinOp& other) {
+         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+         return *this;
+    }
+    ~Bexpress_BinOp() {}
+
+    Bexpress& left() const { return *(Bexpress*)(mLayout->data); }
+    String& op() const { return *(String*)(mLayout->data + size1); }
+    Bexpress& right() const { return *(Bexpress*)(mLayout->data + size1 + size2); }
+private:
+    static const int size1 = sizeof(Bexpress);
+    static const int size2 = sizeof(String);
+};
+
+Bexpress Bexpress::BinOp(const Bexpress& left, const String& op, const Bexpress& right) {
+    return Bexpress_BinOp(left, op, right);
+}
+
+class Bexpress_UnaryOp : public Bexpress {
+public:
+    static ConcreteAlternative* getType() {
+        static ConcreteAlternative* t = ConcreteAlternative::Make(Bexpress::getType(), static_cast<int>(kind::UnaryOp));
+        return t;
+    }
+    static Alternative* getAlternative() { return Bexpress::getType(); }
+
+    Bexpress_UnaryOp():Bexpress(kind::UnaryOp) {}
+    Bexpress_UnaryOp( const String& op1,  const Bexpress& right1):Bexpress(kind::UnaryOp) {
+        op() = op1;
+        right() = right1;
+    }
+    Bexpress_UnaryOp(const Bexpress_UnaryOp& other):Bexpress(kind::UnaryOp) {
+        getType()->copy_constructor((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+    }
+    Bexpress_UnaryOp& operator=(const Bexpress_UnaryOp& other) {
+         getType()->assign((instance_ptr)&mLayout, (instance_ptr)&other.mLayout);
+         return *this;
+    }
+    ~Bexpress_UnaryOp() {}
+
+    String& op() const { return *(String*)(mLayout->data); }
+    Bexpress& right() const { return *(Bexpress*)(mLayout->data + size1); }
+private:
+    static const int size1 = sizeof(String);
+};
+
+Bexpress Bexpress::UnaryOp(const String& op, const Bexpress& right) {
+    return Bexpress_UnaryOp(op, right);
+}
+
+bool Bexpress::value() const {
+    if (isLeaf())
+        return ((Bexpress_Leaf*)this)->value();
+    throw std::runtime_error("\"Bexpress\" subtype does not contain \"value\"");
+}
+
+Bexpress Bexpress::left() const {
+    if (isBinOp())
+        return ((Bexpress_BinOp*)this)->left();
+    throw std::runtime_error("\"Bexpress\" subtype does not contain \"left\"");
+}
+
+String Bexpress::op() const {
+    if (isBinOp())
+        return ((Bexpress_BinOp*)this)->op();
+    if (isUnaryOp())
+        return ((Bexpress_UnaryOp*)this)->op();
+    throw std::runtime_error("\"Bexpress\" subtype does not contain \"op\"");
+}
+
+Bexpress Bexpress::right() const {
+    if (isBinOp())
+        return ((Bexpress_BinOp*)this)->right();
+    if (isUnaryOp())
+        return ((Bexpress_UnaryOp*)this)->right();
+    throw std::runtime_error("\"Bexpress\" subtype does not contain \"right\"");
+}
+
+// END Generated Alternative Bexpress
 

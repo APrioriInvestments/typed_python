@@ -46,6 +46,8 @@ public:
             m_resolved = true;
             m_size = mTarget->bytecount();
             m_name = mTarget->name();
+            m_is_default_constructible = mTarget->is_default_constructible();
+            // TODO: anything else?
         }
     }
 

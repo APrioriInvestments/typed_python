@@ -59,9 +59,6 @@ def gen_alternative_type(full_name, d):
     ret.append('    enum class kind {{ {} }};'.format(
         ", ".join([f'{nt}={i}' for i, nt in enumerate(nts)])))
     ret.append('')
-    for nt in nts:
-        ret.append(f'    static NamedTuple* {nt}_Type;')
-    ret.append('')
     ret.append('    static Alternative* getType() {')
     ret.append('        PyObject* resolver = getOrSetTypeResolver();')
     ret.append('        if (!resolver)')
@@ -119,13 +116,6 @@ def gen_alternative_type(full_name, d):
     ret.append('    Alternative::layout *mLayout;')
     ret.append('};')
     ret.append('')
-    for nt in nts:
-        ret.append(f'NamedTuple* {name}::{nt}_Type = NamedTuple::Make(')
-        ret.append('    {' + ", ".join([f'TypeDetails<{t}>::getType()' for _, t in d[nt]]) + '},')
-        ret.append('    {' + ", ".join([f'"{a}"' for a, _ in d[nt]]) + '}')
-        ret.append(');')
-        ret.append('')
-
     ret.append('template <>')
     ret.append(f'class TypeDetails<{name}> {{')
     ret.append('public:')
