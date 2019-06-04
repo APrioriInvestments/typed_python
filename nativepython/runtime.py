@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import threading
+
 import nativepython.python_to_native_converter as python_to_native_converter
 import nativepython.llvm_compiler as llvm_compiler
 from typed_python import Function, NoneType
@@ -32,6 +34,7 @@ class Runtime:
     def __init__(self):
         self.llvm_compiler = llvm_compiler.Compiler()
         self.converter = python_to_native_converter.PythonToNativeConverter()
+        self.lock = threading.RLock()
 
     def verboselyDisplayNativeCode(self):
         self.llvm_compiler.mark_converter_verbose()
@@ -46,59 +49,60 @@ class Runtime:
         not compatible with the type argument of the existing overload, the resulting
         specialization will never be called.
         """
-        argument_types = argument_types or {}
+        with self.lock:
+            argument_types = argument_types or {}
 
-        if isinstance(f, FunctionOverload):
-            for a in f.args:
-                assert not a.isStarArg, 'dont support star args yet'
-                assert not a.isKwarg, 'dont support keyword yet'
+            if isinstance(f, FunctionOverload):
+                for a in f.args:
+                    assert not a.isStarArg, 'dont support star args yet'
+                    assert not a.isKwarg, 'dont support keyword yet'
 
-            def chooseTypeFilter(a):
-                return argument_types.pop(a.name, a.typeFilter or object)
+                def chooseTypeFilter(a):
+                    return argument_types.pop(a.name, a.typeFilter or object)
 
-            input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
+                input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
 
-            if len(argument_types):
-                raise Exception("No argument exists for type overrides %s" % argument_types)
+                if len(argument_types):
+                    raise Exception("No argument exists for type overrides %s" % argument_types)
 
-            callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
+                callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
 
-            assert callTarget is not None
+                assert callTarget is not None
 
-            wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
+                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
 
-            targets = self.converter.extract_new_function_definitions()
+                targets = self.converter.extract_new_function_definitions()
 
-            function_pointers = self.llvm_compiler.add_functions(targets)
+                function_pointers = self.llvm_compiler.add_functions(targets)
 
-            fp = function_pointers[wrappingCallTargetName]
+                fp = function_pointers[wrappingCallTargetName]
 
-            f._installNativePointer(
-                fp.fp,
-                callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                [i.typeRepresentation for i in input_wrappers]
-            )
+                f._installNativePointer(
+                    fp.fp,
+                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
+                    [i.typeRepresentation for i in input_wrappers]
+                )
 
-            return targets
+                return targets
 
-        if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
-            for o in f.overloads:
-                self.compile(o, argument_types)
-            return f
+            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+                for o in f.overloads:
+                    self.compile(o, argument_types)
+                return f
 
-        if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
-            for o in f.Function.overloads:
-                arg_types = dict(argument_types)
-                arg_types[o.args[0].name] = typeWrapper(f.Class)
-                self.compile(o, arg_types)
-            return f
+            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+                for o in f.Function.overloads:
+                    arg_types = dict(argument_types)
+                    arg_types[o.args[0].name] = typeWrapper(f.Class)
+                    self.compile(o, arg_types)
+                return f
 
-        if callable(f):
-            result = Function(f)
-            self.compile(result, argument_types)
-            return result
+            if callable(f):
+                result = Function(f)
+                self.compile(result, argument_types)
+                return result
 
-        assert False, f
+            assert False, f
 
 
 def Entrypoint(f):
