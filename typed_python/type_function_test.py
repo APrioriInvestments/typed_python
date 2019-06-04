@@ -20,18 +20,14 @@ class TypeFunctionTest(unittest.TestCase):
     def test_basic(self):
         @TypeFunction
         def List(T):
-            ListT = Forward("ListT*")
-            return ListT.define(Alternative(
+            return Alternative(
                 "List",
-                Node={"head": T, "tail": ListT},
+                Node={"head": T, "tail": List(T)},
                 Empty={}
-            ))
+            )
 
         self.assertIs(List(int), List(int))
         self.assertIsNot(List(float), List(int))
-
-        # TODO: re-enable after we fix `applyNameChangesToType`
-        # self.assertIn("List(int)", str(List(int)))
 
         l_i = List(int).Empty()
         l_f = List(float).Empty()
@@ -68,18 +64,10 @@ class TypeFunctionTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             anX.y = Y(float)()
 
-    def test_nonsensical_self_recursion_throws(self):
-        @TypeFunction
-        def crazy(T):
-            return crazy(crazy(T))
-
-        with self.assertRaisesRegex(TypeError, "has not resolved yet"):
-            crazy(int)
-
     def test_can_serialize_type_functions(self):
         @TypeFunction
         def List(T):
-            ListT = Forward("ListT*")
+            ListT = Forward("ListT")
             return ListT.define(Alternative(
                 "List",
                 Node={"head": T, "tail": ListT},

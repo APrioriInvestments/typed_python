@@ -28,9 +28,7 @@ public:
             m_alternative(m_alternative),
             m_which(which)
     {
-        m_is_simple = false;
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -38,18 +36,18 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& visitor) {
         Type* t = m_alternative;
-//        visitor(t);
+        visitor(t);
         assert(t == m_alternative);
     }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         Type* t = m_alternative;
- //       visitor(t);
+        visitor(t);
         assert(t == m_alternative);
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     int32_t hash32(instance_ptr left) {
         return m_alternative->hash32(left);

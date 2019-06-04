@@ -36,18 +36,34 @@ bool OneOfType::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
-void OneOfType::_forwardTypesMayHaveChanged() {
-    m_size = computeBytecount();
-    m_name = computeName();
+bool OneOfType::_updateAfterForwardTypesChanged() {
+    size_t size = computeBytecount();
+    std::string name = computeName();
 
-    m_is_default_constructible = false;
+    if (m_is_recursive) {
+        name = m_recursive_name;
+    }
+
+    bool is_default_constructible = false;
 
     for (auto typePtr: m_types) {
         if (typePtr->is_default_constructible()) {
-            m_is_default_constructible = true;
+            is_default_constructible = true;
             break;
         }
     }
+
+    bool anyChanged = (
+        size != m_size ||
+        name != m_name ||
+        is_default_constructible != m_is_default_constructible
+    );
+
+    m_size = size;
+    m_name = name;
+    m_is_default_constructible = is_default_constructible;
+
+    return anyChanged;
 }
 
 std::string OneOfType::computeName() const {

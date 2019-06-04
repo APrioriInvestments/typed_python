@@ -39,6 +39,8 @@ public:
         m_name = "String";
         m_is_default_constructible = true;
         m_size = sizeof(void*);
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     static int64_t bytesPerCodepointRequiredForUtf8(const uint8_t* utf8Str, int64_t length);

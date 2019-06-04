@@ -105,44 +105,6 @@ void Type::destroy(instance_ptr self) {
     this->check([&](auto& subtype) { subtype.destroy(self); } );
 }
 
-
-// common calculations
-void Type::forwardTypesMayHaveChanged() {
-    this->check([&](auto& subtype) { subtype._forwardTypesMayHaveChanged(); });
-
-    if (m_resolved)
-        return;
-    if (getTypeCategory() == catForward)
-        return;
-    m_resolved = true;
-    visitReferencedTypes([&](Type* t) { if (!t->m_resolved) m_resolved = false; });
-
-    // TODO: this doesn't need to be recalculated each time
-    visitReferencedTypes([&](Type* t) { if (t != this) {t->m_used_by.insert(this); } });
-
-    if (m_resolved) {
-        this->check([&](auto& subtype) { subtype._forwardTypesMayHaveChanged(); });
-        visitReferencedTypes(
-            [&](Type*& t) {
-                if (t->getTypeCategory() == catForward) {
-                    Type *newt = ((Forward *)t)->getTarget();
-                    if (newt) {
-                        t = newt;
-                    }
-                }
-            });
-
-        TypeCategory cat = getTypeCategory();
-        m_is_simple = (cat != catAlternative && cat != catClass && cat != catHeldClass);
-        if (m_is_simple)
-            visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) m_is_simple = false; });
-
-        if (mTypeRep) {
-            updateTypeRepForType(this, mTypeRep);
-        }
-    }
-}
-
 void Type::copy_constructor(instance_ptr self, instance_ptr other) {
     assertForwardsResolved();
 
@@ -184,6 +146,120 @@ bool Type::isBinaryCompatibleWith(Type* other) {
 
     return isCompatible;
 }
+
+void Type::endOfConstructorInitialization() {
+    visitReferencedTypes([&](Type* &t) {
+        while (t->getTypeCategory() == TypeCategory::catForward && ((Forward*)t)->getTarget()) {
+            t = ((Forward*)t)->getTarget();
+        }
+
+        if (t == this) {
+            return;
+        }
+
+        if (t->getTypeCategory() == TypeCategory::catForward) {
+            m_referenced_forwards.insert((Forward*)t);
+            ((Forward*)t)->markIndirectForwardUse(this);
+        } else {
+            for (auto referencedT: t->getReferencedForwards()) {
+                m_referenced_forwards.insert(referencedT);
+                referencedT->markIndirectForwardUse(this);
+            }
+        }
+    });
+
+    visitContainedTypes([&](Type* t) {
+        if (t->getTypeCategory() == TypeCategory::catForward) {
+            m_contained_forwards.insert((Forward*)t);
+        } else {
+            for (auto containedT: t->getContainedForwards()) {
+                m_contained_forwards.insert(containedT);
+            }
+        }
+    });
+
+    if (!m_referenced_forwards.size()) {
+        forwardTypesAreResolved();
+    } else {
+        this->check([&](auto& subtype) {
+            subtype._updateAfterForwardTypesChanged();
+        });
+    }
+}
+
+void Type::forwardTypesAreResolved() {
+    m_resolved = true;
+
+    this->check([&](auto& subtype) {
+        subtype._updateAfterForwardTypesChanged();
+    });
+
+    if (m_is_simple) {
+        bool isSimple = true;
+
+        visitReferencedTypes([&](Type* t) { if (!t->m_is_simple) isSimple = false; });
+
+        if (!isSimple) {
+            std::function<void (Type*)> markNotSimple([&](Type* t) {
+                if (t->m_is_simple) {
+                    t->m_is_simple = false;
+                    markNotSimple(t);
+                }
+            });
+
+            markNotSimple(this);
+        }
+    }
+
+    if (mTypeRep) {
+        updateTypeRepForType(this, mTypeRep);
+    }
+}
+
+void Type::forwardResolvedTo(Forward* forward, Type* resolvedTo) {
+    if (resolvedTo->getTypeCategory() == TypeCategory::catForward) {
+        throw std::runtime_error("Forwards must not resolve to other forwards.");
+    }
+
+    // make sure we reference this forward properly
+    if (m_referenced_forwards.find(forward) == m_referenced_forwards.end()) {
+        throw std::runtime_error(
+            "Internal error: we are supposed to reference forward " +
+            forward->name() + " but we don't have it marked."
+        );
+    }
+
+    // swap out the type representation. we shouldn't reference this forward any more
+    visitReferencedTypes([&](Type* &subtype) {
+        if (subtype == forward) {
+            subtype = resolvedTo;
+        }
+    });
+
+    // update the 'containment' forward graph
+    if (m_contained_forwards.find(forward) != m_contained_forwards.end()) {
+        m_contained_forwards.erase(forward);
+        for (auto contained: resolvedTo->getContainedForwards()) {
+            if (contained != forward) {
+                m_contained_forwards.insert(contained);
+            }
+        }
+    }
+
+    m_referenced_forwards.erase(forward);
+
+    for (auto referenced: resolvedTo->getReferencedForwards()) {
+        if (referenced != forward) {
+            referenced->markIndirectForwardUse(this);
+            m_referenced_forwards.insert(referenced);
+        }
+    }
+
+    if (m_referenced_forwards.size() == 0) {
+        forwardTypesAreResolved();
+    }
+}
+
 
 PyObject* getOrSetTypeResolver(PyObject* module, PyObject* args) {
     int num_args = 0;

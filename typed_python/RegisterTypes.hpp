@@ -25,6 +25,8 @@ public:
     {
         m_size = sizeof(T);
         m_is_default_constructible = true;
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
@@ -35,7 +37,7 @@ public:
         return true;
     }
 
-    void _forwardTypesMayHaveChanged() {}
+    bool _updateAfterForwardTypesChanged() { return false; }
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}

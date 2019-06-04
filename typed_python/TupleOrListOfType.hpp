@@ -40,8 +40,7 @@ public:
         m_size = sizeof(void*);
         m_is_default_constructible = true;
 
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -56,8 +55,18 @@ public:
         visitor(m_element_type);
     }
 
-    void _forwardTypesMayHaveChanged() {
-        m_name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
+    bool _updateAfterForwardTypesChanged() {
+        std::string name = (m_is_tuple ? "TupleOf(" : "ListOf(") + m_element_type->name() + ")";
+
+        if (m_is_recursive) {
+            name = m_recursive_name;
+        }
+
+        bool anyChanged = name != m_name;
+
+        m_name = name;
+
+        return anyChanged;
     }
 
     //serialize, but don't write a count

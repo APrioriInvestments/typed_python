@@ -43,47 +43,6 @@
 #include "PyForwardInstance.hpp"
 #include "PyEmbeddedMessageInstance.hpp"
 
-// static
-bool PyInstance::guaranteeForwardsResolved(Type* t) {
-    try {
-        guaranteeForwardsResolvedOrThrow(t);
-        return true;
-    } catch(PythonExceptionSet& e) {
-        return false;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return false;
-    }
-}
-
-// static
-void PyInstance::guaranteeForwardsResolvedOrThrow(Type* t) {
-    t->guaranteeForwardsResolved([&](PyObject* o) {
-        PyObjectStealer result(
-            PyObject_CallFunctionObjArgs(o, NULL)
-            );
-
-        if (!result) {
-            PyErr_Clear();
-            throw std::runtime_error("Python type callback threw an exception.");
-        }
-
-        if (!PyType_Check(result)) {
-            throw std::runtime_error("Python type callback didn't return a type: got " +
-                std::string(result->ob_type->tp_name));
-        }
-
-        Type* resType = unwrapTypeArgToTypePtr(result);
-
-        if (!resType) {
-            throw std::runtime_error("Python type callback didn't return a native type: got " +
-                std::string(result->ob_type->tp_name));
-        }
-
-        return resType;
-    });
-}
-
 Type* PyInstance::type() {
     return extractTypeFrom(((PyObject*)this)->ob_type);
 }
@@ -127,7 +86,7 @@ void PyInstance::tp_dealloc(PyObject* self) {
 
 // static
 bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool isExplicit) {
-    guaranteeForwardsResolvedOrThrow(t);
+    t->assertForwardsResolved();
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
@@ -148,7 +107,7 @@ bool PyInstance::pyValCouldBeOfType(Type* t, PyObject* pyRepresentation, bool is
 
 // static
 void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-    guaranteeForwardsResolvedOrThrow(eltType);
+    eltType->assertForwardsResolved();
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
@@ -180,7 +139,7 @@ void PyInstance::copyConstructFromPythonInstanceConcrete(Type* eltType, instance
 
 // static
 void PyInstance::constructFromPythonArguments(uint8_t* data, Type* t, PyObject* args, PyObject* kwargs) {
-    guaranteeForwardsResolvedOrThrow(t);
+    t->assertForwardsResolved();
 
     //dispatch to the appropriate PyInstance subclass
     specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
@@ -221,36 +180,31 @@ void PyInstance::constructFromPythonArgumentsConcrete(Type* t, uint8_t* data, Py
  */
 // static
 PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
-    //dispatch to the appropriate Py[]Instance type
-    PyObject* result = specializeStatic(eltType->getTypeCategory(), [&](auto* concrete_null_ptr) {
-        typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
+    return translateExceptionToPyObject([&]() {
+        //dispatch to the appropriate Py[]Instance type
+        PyObject* result = specializeStatic(eltType->getTypeCategory(), [&](auto* concrete_null_ptr) {
+            typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 
-        return py_instance_type::extractPythonObjectConcrete(
-            (typename py_instance_type::modeled_type*)eltType,
-            data
-            );
-    });
+            return py_instance_type::extractPythonObjectConcrete(
+                (typename py_instance_type::modeled_type*)eltType,
+                data
+                );
+        });
 
-    if (result) {
-        return result;
-    }
+        if (result) {
+            return result;
+        }
 
-    if (!result && PyErr_Occurred()) {
-        return NULL;
-    }
+        if (!result && PyErr_Occurred()) {
+            throw PythonExceptionSet();
+        }
 
-    try {
         Type* concreteT = eltType->pickConcreteSubclass(data);
 
         return PyInstance::initialize(concreteT, [&](instance_ptr selfData) {
             concreteT->copy_constructor(selfData, data);
         });
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
+    });
 }
 
 PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
@@ -259,16 +213,14 @@ PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr da
 
 // static
 PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds) {
-    try {
+    return translateExceptionToPyObject([&]() {
         Type* eltType = extractTypeFrom(subtype);
 
         if (!eltType) {
             throw std::runtime_error("Can't find a TypedPython type for " + std::string(subtype->tp_name));
         }
 
-        if (!guaranteeForwardsResolved(eltType)) {
-            return nullptr;
-        }
+        eltType->assertForwardsResolved();
 
         if (isSubclassOfNativeType(subtype)) {
             PyInstance* self = (PyInstance*)subtype->tp_alloc(subtype, 0);
@@ -282,46 +234,22 @@ PyObject* PyInstance::tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kw
                 }, eltType);
 
                 return (PyObject*)self;
-            } catch(PythonExceptionSet& e) {
+            } catch(...) {
                 subtype->tp_dealloc((PyObject*)self);
-                return NULL;
-            } catch(std::exception& e) {
-                subtype->tp_dealloc((PyObject*)self);
-
-                PyErr_SetString(PyExc_TypeError, e.what());
-                return NULL;
+                throw;
             }
 
             // not reachable
             assert(false);
 
         } else {
-            instance_ptr tgt = (instance_ptr)malloc(eltType->bytecount());
-
-            try {
+            Instance inst(eltType, [&](instance_ptr tgt) {
                 constructFromPythonArguments(tgt, eltType, args, kwds);
-            } catch(std::exception& e) {
-                free(tgt);
-                PyErr_SetString(PyExc_TypeError, e.what());
-                return NULL;
-            } catch(PythonExceptionSet& e) {
-                free(tgt);
-                return NULL;
-            }
+            });
 
-            PyObject* result = extractPythonObject(tgt, eltType);
-
-            eltType->destroy(tgt);
-            free(tgt);
-
-            return result;
+            return extractPythonObject(inst.data(), eltType);
         }
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
+    });
 }
 
 PyObject* PyInstance::pyUnaryOperator(PyObject* lhs, const char* op, const char* opErrRep) {
@@ -936,15 +864,17 @@ PyObject* PyInstance::tp_getattro(PyObject *o, PyObject* attrName) {
 
 // static
 Py_hash_t PyInstance::tp_hash(PyObject *o) {
-    Type* self_type = extractTypeFrom(o->ob_type);
-    PyInstance* w = (PyInstance*)o;
+    return translateExceptionToPyObjectReturningInt([&]() {
+        Type* self_type = extractTypeFrom(o->ob_type);
+        PyInstance* w = (PyInstance*)o;
 
-    int32_t h = self_type->hash32(w->dataPtr());
-    if (h == -1) {
-        h = -2;
-    }
+        int32_t h = self_type->hash32(w->dataPtr());
+        if (h == -1) {
+            h = -2;
+        }
 
-    return h;
+        return h;
+    });
 }
 
 // static
@@ -1283,10 +1213,6 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
         return NoneType::Make();
     }
 
-//    if (PyFunction_Check(arg)) {
-//        return pyFunctionToForward(arg);
-//    }
-
     return  PyInstance::tryUnwrapPyInstanceToValueType(arg);
 }
 
@@ -1347,11 +1273,6 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
         return valueType;
     }
 
-//    if (PyFunction_Check(typearg)) {
-//        return pyFunctionToForward(typearg);
-//    }
-
     PyErr_Format(PyExc_TypeError, "Cannot convert to a native type.");
-//    PyErr_Format(PyExc_TypeError, "Cannot convert %S to a native type.", typearg);
     return NULL;
 }

@@ -50,18 +50,17 @@ int64_t Alternative::refcount(instance_ptr i) const {
     return ((layout**)i)[0]->refcount;
 }
 
-void Alternative::_forwardTypesMayHaveChanged() {
-    m_size = sizeof(void*);
-
-    m_is_default_constructible = false;
-    m_all_alternatives_empty = true;
+bool Alternative::_updateAfterForwardTypesChanged() {
     m_arg_positions.clear();
-    m_default_construction_ix = 0;
     m_default_construction_type = nullptr;
+
+    bool is_default_constructible = false;
+    bool all_alternatives_empty = true;
+    int default_construction_ix = 0;
 
     for (auto& subtype_pair: m_subtypes) {
         if (subtype_pair.second->bytecount() > 0) {
-            m_all_alternatives_empty = false;
+            all_alternatives_empty = false;
         }
 
         if (m_arg_positions.find(subtype_pair.first) != m_arg_positions.end()) {
@@ -73,13 +72,27 @@ void Alternative::_forwardTypesMayHaveChanged() {
 
         m_arg_positions[subtype_pair.first] = argPosition;
 
-        if (subtype_pair.second->is_default_constructible() && !m_is_default_constructible) {
-            m_is_default_constructible = true;
-            m_default_construction_ix = m_arg_positions[subtype_pair.first];
+        if (subtype_pair.second->is_default_constructible() && !is_default_constructible) {
+            is_default_constructible = true;
+            default_construction_ix = m_arg_positions[subtype_pair.first];
         }
     }
 
-    m_size = (m_all_alternatives_empty ? 1 : sizeof(void*));
+    size_t size = (all_alternatives_empty ? 1 : sizeof(void*));
+
+    bool anyChanged = (
+        size != m_size ||
+        m_default_construction_ix != default_construction_ix ||
+        m_all_alternatives_empty != all_alternatives_empty ||
+        m_is_default_constructible != is_default_constructible
+    );
+
+    m_size = size;
+    m_default_construction_ix = default_construction_ix;
+    m_all_alternatives_empty = all_alternatives_empty;
+    m_is_default_constructible = is_default_constructible;
+
+    return anyChanged;
 }
 
 bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {

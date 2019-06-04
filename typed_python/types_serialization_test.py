@@ -421,7 +421,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertIs(ping_pong(f, ts), f)
 
     def test_serialize_alternatives_as_types(self):
-        A = Forward("A*")
+        A = Forward("A")
         A = A.define(Alternative("A", X={'a': int}, Y={'a': A}))
 
         ts = SerializationContext({'A': A})
@@ -579,7 +579,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.serializeInLoop(lambda: numpy.ones(2000))
 
     def test_serializing_anonymous_recursive_types(self):
-        NT = Forward("NT*")
+        NT = Forward("NT")
         NT = NT.define(TupleOf(NT))
 
         # right now we don't allow this. When we move to a more proper model for declarint
@@ -589,12 +589,12 @@ class TypesSerializationTest(unittest.TestCase):
             ping_pong(NT)
 
     def test_serializing_named_tuples_in_loop(self):
-        NT = Forward("NT*")
-        NT = NT.define(NamedTuple(x=OneOf(int, float), y=OneOf(int, NT)))
+        NT = Forward("NT")
+        NT = NT.define(NamedTuple(x=OneOf(int, float), y=OneOf(int, TupleOf(NT))))
 
         context = SerializationContext({'NT': NT})
 
-        self.serializeInLoop(lambda: NT(x=10, y=NT(x=20, y=2)), context=context)
+        self.serializeInLoop(lambda: NT(x=10, y=(NT(x=20, y=2),)), context=context)
 
     def test_serializing_tuple_of_in_loop(self):
         TO = TupleOf(int)
@@ -604,7 +604,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.serializeInLoop(lambda: TO((1, 2, 3, 4, 5)), context=context)
 
     def test_serializing_alternatives_in_loop(self):
-        AT = Forward("AT*")
+        AT = Forward("AT")
         AT = AT.define(Alternative("AT", X={'x': int, 'y': float}, Y={'x': int, 'y': AT}))
 
         context = SerializationContext({'AT': AT})
@@ -1104,7 +1104,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(d, d2)
 
     def test_serialize_recursive_dict_more(self):
-        D = Forward("D*")
+        D = Forward("D")
         D = D.define(Dict(str, OneOf(str, D)))
         x = SerializationContext({"D": D})
 

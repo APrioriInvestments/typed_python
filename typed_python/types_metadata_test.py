@@ -39,14 +39,12 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(ConstDict(str, int).ValueType, Int64)
 
     def test_alternatives(self):
-        X = Forward("X*")
+        X = Forward("X")
         X = X.define(Alternative(
             "X",
             Left={'x': int, 'y': str},
             Right={'x': X, 'val': int}
         ))
-
-        # _types.resolveForwards(X)
 
         self.assertEqual(len(X.__typed_python_alternatives__), 2)
 

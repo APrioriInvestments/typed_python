@@ -33,23 +33,6 @@ class UndefinedBehaviorException(BaseException):
 object = object
 
 
-# def forwardToName(fwdLambda):
-#     """Unwrap a 'forward definition' lambda to a name.
-#
-#     Maps functions like 'lambda: X' to the string 'X'.
-#     """
-#     if hasattr(fwdLambda, "__code__"):
-#         if fwdLambda.__code__.co_code == b't\x00S\x00':
-#             return fwdLambda.__code__.co_names[0]
-#         if fwdLambda.__code__.co_code == b'\x88\x00S\x00':
-#             return fwdLambda.__code__.co_freevars[0]
-#
-#     if fwdLambda.__name__ == "<lambda>":
-#         return "UnknownForward"
-#     else:
-#         return fwdLambda.__name__
-
-
 class Member:
     """A member of a Class object."""
 
@@ -61,15 +44,14 @@ class Member:
 
     @property
     def type(self):
-        if isinstance(self._type, FunctionType):
-            # resolve the function type.
-            self._type = self._type()
+        if getattr(self._type, '__typed_python_category__', None) == "Forward":
+            return self._type.get()
         return self._type
 
     def __eq__(self, other):
         if not isinstance(other, Member):
             return False
-        return self._type == other._type
+        return self.type == other.type
 
 
 class ClassMetaNamespace:
@@ -156,7 +138,7 @@ class ClassMetaclass(type):
         classMembers = []
         properties = {}
 
-        actualClass = Forward("actualClass*")
+        actualClass = Forward("actualClass")
 
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):

@@ -53,14 +53,15 @@ class Exterior(Class):
         self.i = Interior()
 
 
-C0 = Forward("C0*")
+ClassWithInit = Forward("ClassWithInit")
 
 
+@ClassWithInit.define
 class ClassWithInit(Class):
     x = Member(int)
     y = Member(float)
     z = Member(str)
-    cwi = Member(C0)
+    cwi = Member(ClassWithInit)
 
     def __init__(self):
         pass
@@ -72,9 +73,6 @@ class ClassWithInit(Class):
 
     def __init__(self, x):  # noqa: F811
         self.x = x
-
-
-C0 = C0.define(ClassWithInit)
 
 
 class ClassWithComplexDispatch(Class):

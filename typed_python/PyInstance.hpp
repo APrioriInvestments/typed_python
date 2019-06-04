@@ -251,17 +251,9 @@ public:
         }
     }
 
-    static bool guaranteeForwardsResolved(Type* t);
-
-    static void guaranteeForwardsResolvedOrThrow(Type* t);
-
     //return the standard python representation of an object of type 'eltType'
     template<class init_func>
     static PyObject* initializePythonRepresentation(Type* eltType, const init_func& f) {
-        if (!guaranteeForwardsResolved(eltType)) {
-            return nullptr;
-        }
-
         Instance instance(eltType, f);
 
         return extractPythonObject(instance.data(), instance.type());
@@ -272,9 +264,7 @@ public:
     //rather than the standard python representation.
     template<class init_func>
     static PyObject* initialize(Type* eltType, const init_func& f) {
-        if (!guaranteeForwardsResolved(eltType)) {
-            return nullptr;
-        }
+        eltType->assertForwardsResolved();
 
         PyInstance* self =
             (PyInstance*)typeObj(eltType)->tp_alloc(typeObj(eltType), 0);
@@ -292,7 +282,7 @@ public:
     template<class init_func>
     void initialize(const init_func& i, Type* typeIfKnown = nullptr) {
         Type* type = typeIfKnown ? typeIfKnown : extractTypeFrom(((PyObject*)this)->ob_type);
-        guaranteeForwardsResolvedOrThrow(type);
+        type->assertForwardsResolved();
 
         mIsInitialized = false;
         new (&mContainingInstance) Instance( type, i );
@@ -521,8 +511,6 @@ public:
     static void mirrorTypeInformationIntoPyType(Type* inType, PyTypeObject* pyType);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Type* inType, PyTypeObject* pyType);
-
-//    static Type* pyFunctionToForward(PyObject* arg);
 
     static Type* tryUnwrapPyInstanceToType(PyObject* arg);
 

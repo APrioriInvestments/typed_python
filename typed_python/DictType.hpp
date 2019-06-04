@@ -388,8 +388,7 @@ public:
             m_key(key),
             m_value(value)
     {
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     template<class visitor_type>
@@ -402,7 +401,7 @@ public:
         visitor(m_value);
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     bool isBinaryCompatibleWithConcrete(Type* other);
 

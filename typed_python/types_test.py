@@ -867,6 +867,10 @@ class NativeTypesTests(unittest.TestCase):
         print(elapsed, " to do 1mm")
         self.check_expected_performance(elapsed)
 
+    def test_mutable_dict_not_hashable(self):
+        with self.assertRaisesRegex(Exception, "not hashable"):
+            hash(Dict(int, int)())
+
     def test_const_dict_str_perf(self):
         t = ConstDict(str, str)
 
@@ -902,6 +906,17 @@ class NativeTypesTests(unittest.TestCase):
         aDict = t({str(k): str(k+1) for k in range(100)})
         for k in aDict:
             self.assertEqual(aDict[str(k)], str(int(k)+1))
+
+    def test_alternative_bytecounts(self):
+        alt = Alternative(
+            "Empty",
+            X={},
+            Y={}
+        )
+
+        self.assertEqual(_types.bytecount(alt), 1)
+        self.assertEqual(_types.bytecount(alt.X), 1)
+        self.assertEqual(_types.bytecount(alt.Y), 1)
 
     def test_alternatives_with_Bytes(self):
         alt = Alternative(
@@ -1378,7 +1393,7 @@ class NativeTypesTests(unittest.TestCase):
             a.HasOne(a.HasTwo(a='1', b='b'))
 
     def test_recursive_classes_repr(self):
-        A0 = Forward("A0*")
+        A0 = Forward("A0")
 
         class ASelfRecursiveClass(Class):
             x = Member(OneOf(None, A0))
@@ -1862,7 +1877,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertTrue(isSimple(NamedTuple(x=int)))
         self.assertFalse(isSimple(NamedTuple(x=C)))
 
-        X = Forward("X*")
+        X = Forward("X")
         X = X.define(Alternative("X", X={'x': X}, Y={'i': int}))
         self.assertFalse(isSimple(X))
         self.assertFalse(isSimple(NamedTuple(x=X)))

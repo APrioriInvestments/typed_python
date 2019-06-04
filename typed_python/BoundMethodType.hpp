@@ -29,7 +29,7 @@ public:
         m_size = inFirstArg->bytecount();
         m_is_simple = false;
 
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     template<class visitor_type>
@@ -39,19 +39,27 @@ public:
 
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
-        Type* c = m_first_arg;
+        visitor(m_first_arg);
         Type* f = m_function;
-
-        visitor(c);
         visitor(f);
-
-        assert(c == m_first_arg);
         assert(f == m_function);
     }
 
-    void _forwardTypesMayHaveChanged() {
-        m_name = "BoundMethod(" + m_first_arg->name() + "." + m_function->name() + ")";
-        m_size = m_first_arg->bytecount();
+    bool _updateAfterForwardTypesChanged() {
+        bool anyChanged = false;
+
+        std::string name = "BoundMethod(" + m_first_arg->name() + "." + m_function->name() + ")";
+        size_t size = m_first_arg->bytecount();
+
+        anyChanged = (
+            name != m_name ||
+            size != m_size
+        );
+
+        m_name = name;
+        m_size = size;
+
+        return anyChanged;
     }
 
     static BoundMethod* Make(Type* c, Function* f) {

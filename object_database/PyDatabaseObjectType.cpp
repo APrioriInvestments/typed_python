@@ -452,7 +452,7 @@ int PyDatabaseObjectType::tp_setattro(PyObject *o, PyObject* attrName, PyObject*
             });
 
             setFieldValue(obType, oid, attr, fieldType, i.data());
-            return;
+            return 0;
         }
 
         auto propIt = obType->m_properties.find(attr);
@@ -470,7 +470,7 @@ int PyDatabaseObjectType::tp_setattro(PyObject *o, PyObject* attrName, PyObject*
 
             decref(result);
 
-            return;
+            return 0;
         }
 
         throw std::runtime_error("Attribute " + attr + " is not settable.");

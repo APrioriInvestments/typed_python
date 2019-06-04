@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from types import FunctionType
+from typed_python._types import Forward
 
 _type_to_typefunction = {}
 
@@ -94,18 +95,7 @@ class ConcreteTypeFunction(object):
         if key in self._memoForKey:
             return self._memoForKey[key]
 
-        def forward():
-            if isinstance(self._memoForKey[key], Exception):
-                raise self._memoForKey[key]
-
-            if self._memoForKey[key] is forward:
-                # if this gets triggered, it means we're asking for concrete information about the type
-                # when dependent type-functions have yet to resolve.
-                raise TypeError("Forward declaration for %s has not resolved yet" % self.nameFor(args, kwargs))
-
-            return self._memoForKey[key]
-
-        forward.__name__ = self.nameFor(args, kwargs)
+        forward = Forward(self.nameFor(args, kwargs))
 
         self._memoForKey[key] = forward
         _type_to_typefunction[forward] = (self, key)
@@ -113,7 +103,7 @@ class ConcreteTypeFunction(object):
         try:
             resultType = self._concreteTypeFunction(*args, **dict(kwargs))
 
-            resultType = self.applyNameChangesToType(resultType, self.nameFor(args, kwargs))
+            forward.define(resultType)
 
             self._memoForKey[key] = resultType
 

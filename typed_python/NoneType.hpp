@@ -25,6 +25,8 @@ public:
         m_name = "NoneType";
         m_size = 0;
         m_is_default_constructible = true;
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {

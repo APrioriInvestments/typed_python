@@ -26,9 +26,8 @@ public:
         m_base = base;
         mTypeRep = (PyTypeObject*)incref((PyObject*)typePtr);
         m_name = typePtr->tp_name;
-        m_is_simple = false;
 
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -43,9 +42,19 @@ public:
         visitor(m_base);
     }
 
-    void _forwardTypesMayHaveChanged() {
-        m_size = m_base->bytecount();
-        m_is_default_constructible = m_base->is_default_constructible();
+    bool _updateAfterForwardTypesChanged() {
+        size_t size = m_base->bytecount();
+        bool is_default_constructible = m_base->is_default_constructible();
+
+        bool anyChanged = (
+            size != m_size ||
+            m_is_default_constructible != is_default_constructible
+        );
+
+        m_size = size;
+        m_is_default_constructible = is_default_constructible;
+
+        return anyChanged;
     }
 
     int32_t hash32(instance_ptr left) {

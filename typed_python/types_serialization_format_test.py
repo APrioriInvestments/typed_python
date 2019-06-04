@@ -400,7 +400,7 @@ class TypesSerializationWireFormatTest(unittest.TestCase):
         )
 
     def test_recursive_list(self):
-        L = Forward("L*")
+        L = Forward("L")
         L = L.define(ListOf(OneOf(int, L)))
 
         listInst = L()

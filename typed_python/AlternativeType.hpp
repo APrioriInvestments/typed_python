@@ -46,8 +46,11 @@ public:
             throw std::runtime_error("Can't have an alternative with more than 255 subelements");
         }
 
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+        // call this _first_, so that our core properties, (which we know) are created
+        // before we walk down to the ConcreteAlternatives
+        _updateAfterForwardTypesChanged();
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -75,7 +78,7 @@ public:
         }
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 

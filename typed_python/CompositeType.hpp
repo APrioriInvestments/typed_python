@@ -31,8 +31,7 @@ public:
             m_types(types),
             m_names(names)
     {
-        //m_resolved = false;
-        //forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -49,7 +48,7 @@ public:
         _visitContainedTypes(visitor);
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     instance_ptr eltPtr(instance_ptr self, int64_t ix) const {
         return self + m_byte_offsets[ix];
@@ -197,11 +196,11 @@ public:
             CompositeType(TypeCategory::catNamedTuple, types, names)
     {
         assert(types.size() == names.size());
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     static NamedTuple* Make(const std::vector<Type*>& types, const std::vector<std::string>& names) {
         return MakeSubtype<NamedTuple>(types, names);
@@ -213,11 +212,10 @@ public:
     Tuple(const std::vector<Type*>& types, const std::vector<std::string>& names) :
             CompositeType(TypeCategory::catTuple, types, names)
     {
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     static Tuple* Make(const std::vector<Type*>& types) {
         return MakeSubtype<Tuple>(types, std::vector<std::string>());

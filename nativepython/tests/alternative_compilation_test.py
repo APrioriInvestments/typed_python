@@ -38,7 +38,7 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(f(Simple.C()), Simple.C())
 
     def test_complex_alternative_passing(self):
-        Complex = Forward("Complex*")
+        Complex = Forward("Complex")
         Complex = Complex.define(Alternative(
             "Complex",
             A={'a': str, 'b': int},
@@ -116,7 +116,7 @@ class TestAlternativeCompilation(unittest.TestCase):
     def test_matching_recursively(self):
         @TypeFunction
         def Tree(T):
-            TreeType = Forward("TreeType*")
+            TreeType = Forward("TreeType")
             TreeType = TreeType.define(Alternative(
                 "Tree",
                 Leaf={'value': T},

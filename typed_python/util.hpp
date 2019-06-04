@@ -219,13 +219,12 @@ PyObject* translateExceptionToPyObject(func_type f) {
 Call 'f', which must return void, in a block that guards against
 exceptions returning nakedly to the python interpreter. This is meant
 to guard the barrier between Python C callbacks and our internals which
-may use exceptions. Returns -1 on failure, 0 on success.
+may use exceptions. Returns -1 on failure, the function value on success.
 ******/
 template<class func_type>
 int translateExceptionToPyObjectReturningInt(func_type f) {
     try {
-        f();
-        return 0;
+        return f();
     } catch(PythonExceptionSet& e) {
         return -1;
     } catch(std::exception& e) {

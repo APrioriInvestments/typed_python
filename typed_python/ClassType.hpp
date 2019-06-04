@@ -37,8 +37,7 @@ public:
         m_name = m_heldClass->name();
         m_is_simple = false;
 
-        m_resolved = false;
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -54,7 +53,7 @@ public:
         assert(t == m_heldClass);
     }
 
-    void _forwardTypesMayHaveChanged();
+    bool _updateAfterForwardTypesChanged();
 
     static Class* Make(
             std::string inName,

@@ -16,13 +16,24 @@
 
 #include "AllTypes.hpp"
 
-void DictType::_forwardTypesMayHaveChanged() {
-    m_name = "Dict(" + m_key->name() + "->" + m_value->name() + ")";
+bool DictType::_updateAfterForwardTypesChanged() {
     m_size = sizeof(void*);
     m_is_default_constructible = true;
     m_bytes_per_key = m_key->bytecount();
     m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
     m_key_value_pair_type = Tuple::Make({m_key, m_value});
+
+    std::string name = "Dict(" + m_key->name() + "->" + m_value->name() + ")";
+
+    if (m_is_recursive) {
+        name = m_recursive_name;
+    }
+
+    bool anyChanged = name != m_name;
+
+    m_name = name;
+
+    return anyChanged;
 }
 
 bool DictType::isBinaryCompatibleWithConcrete(Type* other) {

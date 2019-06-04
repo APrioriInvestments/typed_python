@@ -31,7 +31,7 @@ public:
         m_name = typePtr->tp_name;
         m_is_simple = false;
 
-        forwardTypesMayHaveChanged();
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other) {
@@ -46,7 +46,7 @@ public:
     void _visitReferencedTypes(const visitor_type& visitor) {
     }
 
-    void _forwardTypesMayHaveChanged() {
+    bool _updateAfterForwardTypesChanged() {
         m_size = sizeof(PyObject*);
 
         int isinst = PyObject_IsInstance(Py_None, (PyObject*)mPyTypePtr);
@@ -56,6 +56,10 @@ public:
         }
 
         m_is_default_constructible = isinst != 0;
+
+        //none of these values can ever change, so we can just return
+        //because we don't need to be updated again.
+        return false;
     }
 
     int32_t hash32(instance_ptr left) {

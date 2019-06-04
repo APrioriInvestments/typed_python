@@ -32,7 +32,7 @@ bool ConcreteAlternative::isBinaryCompatibleWithConcrete(Type* other) {
     return false;
 }
 
-void ConcreteAlternative::_forwardTypesMayHaveChanged() {
+bool ConcreteAlternative::_updateAfterForwardTypesChanged() {
     if (m_which < 0 || m_which >= m_alternative->subtypes().size()) {
       throw std::runtime_error(
         "invalid alternative index: " +
@@ -42,9 +42,22 @@ void ConcreteAlternative::_forwardTypesMayHaveChanged() {
     }
 
     m_base = m_alternative;
-    m_name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
-    m_size = m_alternative->bytecount();
-    m_is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
+
+    std::string name = m_alternative->name() + "." + m_alternative->subtypes()[m_which].first;
+    size_t size = m_alternative->bytecount();
+    bool is_default_constructible = m_alternative->subtypes()[m_which].second->is_default_constructible();
+
+    bool anyChanged = (
+      m_name != name ||
+      m_size != size ||
+      m_is_default_constructible != is_default_constructible
+    );
+
+    m_name = name;
+    m_size = size;
+    m_is_default_constructible = is_default_constructible;
+
+    return anyChanged;
 }
 
 void ConcreteAlternative::constructor(instance_ptr self) {

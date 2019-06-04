@@ -719,11 +719,9 @@ Type* PythonSerializationContext::deserializePythonObjectExpectingNativeType(Des
         throw std::runtime_error("Expected a native type but didn't get one.");
     }
 
-    // TODO: throw if not resolved
-//    if (nativeType->references_unresolved_forwards()) {
- //       PyInstance::guaranteeForwardsResolvedOrThrow(nativeType);
-  //  }
-
+    if (!nativeType->resolved()) {
+        throw std::runtime_error("Can't deserialize into an unresolved type " + nativeType->name());
+    }
     return nativeType;
 }
 

@@ -26,6 +26,15 @@ public:
         return false;
     }
 
+    static void copyConstructFromPythonInstanceConcrete(Forward* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+        throw std::logic_error("Can't construct instances of a Forward.");
+    }
+
+    static void constructFromPythonArgumentsConcrete(Forward* t, uint8_t* data, PyObject* args, PyObject* kwargs) {
+        throw std::logic_error("Can't construct instances of a Forward.");
+    }
+
+
     static PyObject* forwardDefine(PyObject *o, PyObject* args) {
         if (PyTuple_Size(args) != 1) {
             PyErr_SetString(PyExc_TypeError, "Forward.define takes one argument");
@@ -45,13 +54,60 @@ public:
             return NULL;
         }
 
-        Type* result = self_type->define(target_type);
-        return incref((PyObject*)PyInstance::typeObj(result));
+        return translateExceptionToPyObject([&]() {
+            Type* result = self_type->define(target_type);
+            return incref((PyObject*)PyInstance::typeObj(result));
+        });
+    }
+
+    static PyObject* forwardGet(PyObject* o, PyObject* args) {
+        if (PyTuple_Size(args) != 0) {
+            PyErr_SetString(PyExc_TypeError, "Forward.get takes zero arguments");
+            return NULL;
+        }
+
+        Forward* self_type = (Forward*)PyInstance::unwrapTypeArgToTypePtr(o);
+        if (!self_type) {
+            PyErr_SetString(PyExc_TypeError, "Forward.get unexpected error");
+            return NULL;
+        }
+
+        Type* result = self_type->getTarget();
+
+        if (!result) {
+            return incref(Py_None);
+        }
+
+        return incref(PyInstance::typePtrToPyTypeRepresentation(result));
+    }
+
+
+    static PyObject* forwardGetReferencing(PyObject* o, PyObject* args) {
+        if (PyTuple_Size(args) != 0) {
+            PyErr_SetString(PyExc_TypeError, "Forward.getReferencing takes zero arguments");
+            return NULL;
+        }
+
+        Forward* self_type = (Forward*)PyInstance::unwrapTypeArgToTypePtr(o);
+        if (!self_type) {
+            PyErr_SetString(PyExc_TypeError, "Forward.getReferencing unexpected error");
+            return NULL;
+        }
+
+        PyObject* res = PyList_New(0);
+
+        for (auto t: self_type->getReferencing()) {
+            PyList_Append(res, PyInstance::typePtrToPyTypeRepresentation(t));
+        }
+
+        return res;
     }
 
     static PyMethodDef* typeMethodsConcrete() {
-        return new PyMethodDef [2] {
+        return new PyMethodDef [4] {
             {"define", (PyCFunction)PyForwardInstance::forwardDefine, METH_VARARGS | METH_CLASS, NULL},
+            {"get", (PyCFunction)PyForwardInstance::forwardGet, METH_VARARGS | METH_CLASS, NULL},
+            {"getReferencing", (PyCFunction)PyForwardInstance::forwardGetReferencing, METH_VARARGS | METH_CLASS, NULL},
             {NULL, NULL}
         };
     }

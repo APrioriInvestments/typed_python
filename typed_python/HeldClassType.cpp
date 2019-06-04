@@ -37,17 +37,25 @@ bool HeldClass::isBinaryCompatibleWithConcrete(Type* other) {
     return true;
 }
 
-void HeldClass::_forwardTypesMayHaveChanged() {
-    m_is_default_constructible = true;
+bool HeldClass::_updateAfterForwardTypesChanged() {
+    bool is_default_constructible = true;
+
     m_byte_offsets.clear();
 
     //first m_members.size() bits (rounded up to nearest byte) contains the initialization flags.
-    m_size = int((m_members.size() + 7) / 8); //round up to nearest byte
+    size_t size = int((m_members.size() + 7) / 8); //round up to nearest byte
 
     for (auto t: m_members) {
-        m_byte_offsets.push_back(m_size);
-        m_size += std::get<1>(t)->bytecount();
+        m_byte_offsets.push_back(size);
+        size += std::get<1>(t)->bytecount();
     }
+
+    bool anyChanged = size != m_size || m_is_default_constructible != is_default_constructible;
+
+    m_is_default_constructible = is_default_constructible;
+    m_size = size;
+
+    return anyChanged;
 }
 
 bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {

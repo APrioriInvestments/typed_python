@@ -96,6 +96,8 @@ private:
         m_size = 0;
         m_is_default_constructible = true;
         m_name = mInstance.repr();
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     Instance mInstance;

@@ -58,8 +58,6 @@ def _typedPythonTypeToTypeWrapper(t):
         t = TypeFor(t)
         assert hasattr(t, '__typed_python_category__'), t
 
-    # resolveForwards(t)
-
     if t is Int64:
         return Int64Wrapper()
 

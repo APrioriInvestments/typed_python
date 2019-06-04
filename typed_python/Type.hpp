@@ -266,14 +266,6 @@ public:
         }
     }
 
-    // Doesn't do anything anymore.
-    // Every Type needs to be explicitly defined with resolved components before it can be used
-    template<class resolve_py_callable_to_type>
-    Type* guaranteeForwardsResolved(const resolve_py_callable_to_type& resolver) {
-        assertForwardsResolved();
-        return this;
-    }
-
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& v) {}
 
@@ -323,10 +315,16 @@ public:
     }
 
     // subtype-specific calculation
-    void _forwardTypesMayHaveChanged() {}
+    bool _updateAfterForwardTypesChanged() { return false; }
 
-    // common calculations
-    void forwardTypesMayHaveChanged();
+    // called when a downstream type has changed in some way.
+    // this may recalculate our on-disk size, our name, or some other
+    // feature of the type that depends on the forward delcarations
+    // below us.
+    void forwardTypesAreResolved();
+
+    // called after each type has initialized its internals
+    void endOfConstructorInitialization();
 
     // call subtype.copy_constructor
     void copy_constructor(instance_ptr self, instance_ptr other);
@@ -371,18 +369,19 @@ public:
         return m_is_simple;
     }
 
-    void show_used_by(int depth) {
-        std::cerr << std::string(depth, ' ') << name() << std::endl;
-        for (auto u: m_used_by) {
-            u->show_used_by(depth+1);
-        }
+    const std::set<Forward*>& getReferencedForwards() const {
+        return m_referenced_forwards;
     }
 
-    void calc_internals_and_propagate(int depth = 0) {
-        forwardTypesMayHaveChanged();
-        for (auto u: m_used_by) {
-            u->calc_internals_and_propagate(depth+1);
-        }
+    const std::set<Forward*>& getContainedForwards() const {
+        return m_contained_forwards;
+    }
+
+    void forwardResolvedTo(Forward* forward, Type* resolvedTo);
+
+    void setNameForRecursiveType(std::string nameOverride) {
+        m_recursive_name = nameOverride;
+        m_is_recursive = true;
     }
 
 protected:
@@ -394,7 +393,8 @@ protected:
             mTypeRep(nullptr),
             m_base(nullptr),
             m_is_simple(true),
-            m_resolved(true)
+            m_resolved(false),
+            m_is_recursive(false)
         {}
 
     TypeCategory m_typeCategory;
@@ -403,6 +403,10 @@ protected:
 
     bool m_is_default_constructible;
 
+    bool m_is_recursive;
+
+    std::string m_recursive_name;
+
     std::string m_name;
 
     PyTypeObject* mTypeRep;
@@ -410,18 +414,19 @@ protected:
     Type* m_base;
 
     // 'simple' types are those that have no reference to the python interpreter
-    // and which therefore do not have a dependency on a codebase when being serialized
-    // or deserialized.
     bool m_is_simple;
 
     bool m_resolved;
-
-    bool m_failed_resolution;
 
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 
     std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
 
-    std::set<Type*> m_used_by;
+    // a set of forward types that we need to be resolved before we
+    // could be resolved
+    std::set<Forward*> m_referenced_forwards;
+
+    // a subset of m_referenced_forwards that we directly contain
+    std::set<Forward*> m_contained_forwards;
 };
 

@@ -34,6 +34,8 @@ public:
         m_name = "Bytes";
         m_is_default_constructible = true;
         m_size = sizeof(layout*);
+
+        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);

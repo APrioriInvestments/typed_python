@@ -56,7 +56,7 @@ def raising(e):
     raise e
 
 
-Type = Forward("Type***")
+Type = Forward("Type")
 Type = Type.define(Alternative(
     "Type",
     Void={},
@@ -109,7 +109,7 @@ def const_str(c):
     assert False, type(c)
 
 
-Constant = Forward("Constant*")
+Constant = Forward("Constant")
 Constant = Constant.define(Alternative(
     "Constant",
     Void={},
@@ -162,8 +162,8 @@ BinaryOp = Alternative(
 
 
 # loads and stores - no assignments
-Expression = Forward("Expression*")
-Teardown = Forward("Teardown*")
+Expression = Forward("Expression")
+Teardown = Forward("Teardown")
 
 NamedCallTarget = NamedTuple(
     name=str,

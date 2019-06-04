@@ -262,21 +262,25 @@ class cb_resolver:
 
 A = Alternative('A', Sub1={'b': int, 'c': int}, Sub2={'d': str, 'e': str})
 Overlap = Alternative('Overlap', Sub1={'b': bool, 'c': int}, Sub2={'b': str, 'c': TupleOf(str)}, Sub3={'b': int})
-Bexpress = Forward("Bexpress*")
-Bexpress = Bexpress.define(Alternative(
-    "Bexpress",
-    Leaf={
-        "value": bool
-    },
-    BinOp={
-        "left": Bexpress,
-        "op": str,
-        "right": Bexpress,
-    },
-    UnaryOp={
-        "op": str,
-        "right": Bexpress
-    }))
+Bexpress = Forward("Bexpress")
+Bexpress = Bexpress.define(
+    Alternative(
+        "Bexpress",
+        Leaf={
+            "value": bool
+        },
+        BinOp={
+            "left": Bexpress,
+            "op": str,
+            "right": Bexpress,
+        },
+        UnaryOp={
+            "op": str,
+            "right": Bexpress
+        }
+    )
+)
+
 NamedTupleTwoStrings = NamedTuple(X=str, Y=str)
 NamedTupleBoolIntStr = NamedTuple(b=bool, i=int, s=str)
 NamedTupleIntFloatDesc = NamedTuple(a=OneOf(int, float, bool), b=float, desc=str)
