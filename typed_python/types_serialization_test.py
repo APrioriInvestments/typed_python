@@ -1131,6 +1131,18 @@ class TypesSerializationTest(unittest.TestCase):
             T2(x=10, y=0.0, z="")
         )
 
+    def test_serialize_listof(self):
+        T = ListOf(int)
+
+        aList = T()
+        aPopulatedList = T([1, 2, 3])
+
+        self.assertEqual(aList, deserialize(T, serialize(T, aList)))
+        self.assertEqual(refcount(deserialize(T, serialize(T, aList))), 1)
+
+        self.assertEqual(aPopulatedList, deserialize(T, serialize(T, aPopulatedList)))
+        self.assertEqual(refcount(deserialize(T, serialize(T, aPopulatedList))), 1)
+
     def test_serialize_classes(self):
         class AClass(Class):
             x = Member(int)

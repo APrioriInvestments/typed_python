@@ -762,3 +762,29 @@ class NativeClassTypesTests(unittest.TestCase):
                 return self._x + 1
 
         self.assertEqual(ClassWithProperty(10).x, 11)
+
+    def test_class_with_bound_methods(self):
+        class SomeClass:
+            pass
+
+        class SomeSubclass(SomeClass):
+            def __init__(self, x):
+                self.x = x
+
+        class ClassWithBoundMethod(Class):
+            x = Member(OneOf(None, SomeClass))
+
+            def __init__(self):
+                self.x = None
+
+            def increment(self, y):
+                if self.x is None:
+                    self.x = SomeSubclass(y)
+                else:
+                    self.x = SomeSubclass(self.x.x + y)
+
+        c = ClassWithBoundMethod()
+        for _ in range(1000000):
+            c.increment(2)
+
+        self.assertEqual(c.x.x, 2000000)

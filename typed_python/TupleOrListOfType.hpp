@@ -254,6 +254,7 @@ public:
 
         if (ct == 0) {
             constructor(self);
+            (*(layout**)self)->refcount++;
             buffer.addCachedPointer(id, *((layout**)self), this);
         } else {
             constructor(self, ct, [&](instance_ptr tgt, int k) {
