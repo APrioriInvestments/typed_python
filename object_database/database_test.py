@@ -106,6 +106,15 @@ class ThingWithInit:
 
 
 @schema.define
+class ThingWithThrowingInit:
+    x = int
+
+    def __init__(self):
+        self.x = 10
+        raise Exception("ThingWithThrowingInit")
+
+
+@schema.define
 class ThingWithInitHoldingOdbRef:
     x = Indexed(Root)
 
@@ -217,6 +226,18 @@ class ObjectDatabaseTests:
 
             self.assertEqual(x.z, "")
             self.assertEqual(y.z, "")
+
+    def test_construct_with_throwing_init(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            y = Counter()
+            y.delete()
+
+        with self.assertRaisesRegex(Exception, "ThingWithThrowingInit"):
+            with db.transaction():
+                ThingWithThrowingInit()
 
     def test_indices_independent(self):
         db = self.createNewDb()

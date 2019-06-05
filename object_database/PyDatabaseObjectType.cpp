@@ -263,9 +263,15 @@ void PyDatabaseObjectType::ensureAllFieldsInitialized(View* view, object_id oid)
 
 void PyDatabaseObjectType::removeAllFields(View* view, object_id oid) {
     for (auto fieldnameAndType: m_fields) {
-        if (lookupFieldValue(this, oid, fieldnameAndType.first, fieldnameAndType.second)) {
-            setFieldValue(this, oid, fieldnameAndType.first, fieldnameAndType.second, nullptr);
+        if (fieldnameAndType.first != " exists") {
+            if (lookupFieldValue(this, oid, fieldnameAndType.first, fieldnameAndType.second)) {
+                setFieldValue(this, oid, fieldnameAndType.first, fieldnameAndType.second, nullptr);
+            }
         }
+    }
+
+    if (lookupFieldValue(this, oid, " exists", ::Bool::Make())) {
+        setFieldValue(this, oid, " exists", ::Bool::Make(), nullptr);
     }
 }
 
