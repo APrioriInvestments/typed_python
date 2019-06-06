@@ -75,13 +75,15 @@ class Runtime:
 
                 function_pointers = self.llvm_compiler.add_functions(targets)
 
-                fp = function_pointers[wrappingCallTargetName]
+                if wrappingCallTargetName in function_pointers:
+                    # if the callTargetName isn't in the list, then we already compiled it and installed it.
+                    fp = function_pointers[wrappingCallTargetName]
 
-                f._installNativePointer(
-                    fp.fp,
-                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                    [i.typeRepresentation for i in input_wrappers]
-                )
+                    f._installNativePointer(
+                        fp.fp,
+                        callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
+                        [i.typeRepresentation for i in input_wrappers]
+                    )
 
                 return targets
 
