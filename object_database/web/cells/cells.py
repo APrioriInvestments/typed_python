@@ -3088,7 +3088,7 @@ class Plot(Cell):
                 plotDiv,
                 [],
                 {
-                    margin: {t : 30, l: 30, r: 30, b:30 },
+                    margin: {t : 30, l: 40, r: 30, b:30 },
                     xaxis: {rangeslider: {visible: false}}
                 },
                 { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
