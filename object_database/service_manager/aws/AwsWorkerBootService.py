@@ -222,7 +222,8 @@ class AwsApi:
         for reservations in self.ec2_client.describe_instances(Filters=filters)["Reservations"]:
             for instance in reservations["Instances"]:
                 if instance['State']['Name'] in ('running', 'pending') if includePending else ('running',):
-                    if instance['InstanceLifecycle'] == ('scheduled' if not spot else 'spot') or spot is None:
+                    if (not spot and instance.get('InstanceLifecycle') != 'spot' or
+                            spot and instance.get('InstanceLifecycle') == 'spot'):
                         res[str(instance["InstanceId"])] = instance
 
         return res
@@ -361,18 +362,7 @@ class AwsApi:
 
         nameValue = nameValueOverride or self.config.worker_name
 
-        if spotPrice:
-            InstanceMarketOptions = {
-                'MarketType': 'spot',
-                'SpotOptions': {
-                    'SpotInstanceType': 'one-time',
-                    'MaxPrice': str(spotPrice)
-                }
-            }
-        else:
-            InstanceMarketOptions = None
-
-        return str(self.ec2.create_instances(
+        ec2_args = dict(
             ImageId=ami,
             InstanceType=instanceType,
             KeyName=self.config.keypair,
@@ -385,7 +375,6 @@ class AwsApi:
             IamInstanceProfile={'Name': self.config.worker_iam_role_name},
             UserData=boot_script,  # base64.b64encode(boot_script.encode("ASCII")),
             BlockDeviceMappings=[deviceMapping],
-            InstanceMarketOptions=InstanceMarketOptions,
             TagSpecifications=[
                 {
                     'ResourceType': 'instance',
@@ -394,7 +383,18 @@ class AwsApi:
                         "Value": nameValue
                     }] + [{ "Key": k, "Value": v} for (k, v) in (extraTags or {}).items()]
                 }]
-        )[0].id)
+        )
+
+        if spotPrice:
+            ec2_args['InstanceMarketOptions'] = {
+                'MarketType': 'spot',
+                'SpotOptions': {
+                    'SpotInstanceType': 'one-time',
+                    'MaxPrice': str(spotPrice)
+                }
+            }
+
+        return str(self.ec2.create_instances(**ec2_args)[0].id)
 
 
 class AwsWorkerBootService(ServiceBase):
@@ -605,7 +605,8 @@ class AwsWorkerBootService(ServiceBase):
             for state in State.lookupAll():
                 if state.instance_type not in instancesByType:
                     state.booted = 0
-                elif state.instance_type not in spotInstancesByType:
+
+                if state.instance_type not in spotInstancesByType:
                     state.spot_booted = 0
 
             for type in valid_instance_types:
