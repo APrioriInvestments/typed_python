@@ -56,7 +56,7 @@ class RangeInstanceWrapper(Wrapper):
             return context.push(
                 _RangeIteratorWrapper,
                 lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(0) >>
+                    instance.expr.ElementPtrIntegers(0, 0).store(-1) >>
                     instance.expr.ElementPtrIntegers(0, 1).store(expr.nonref_expr)
             )
         return super().convert_method_call(context, expr, methodname, args, kwargs)
