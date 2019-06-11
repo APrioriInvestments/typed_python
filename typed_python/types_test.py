@@ -1496,6 +1496,19 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertEqual(T(arr), T(arr.tolist()))
                 self.assertEqual(T(arr).toArray().tolist(), arr.tolist())
 
+        self.assertEqual(str(ListOf(Int64)([1,2,3,4]).toArray().dtype), 'int64')
+        self.assertEqual(str(ListOf(Int32)([1,2,3,4]).toArray().dtype), 'int32')
+        self.assertEqual(str(ListOf(Int16)([1,2,3,4]).toArray().dtype), 'int16')
+        self.assertEqual(str(ListOf(Int8)([1,2,3,4]).toArray().dtype), 'int8')
+
+        self.assertEqual(str(ListOf(UInt64)([1,2,3,4]).toArray().dtype), 'uint64')
+        self.assertEqual(str(ListOf(UInt32)([1,2,3,4]).toArray().dtype), 'uint32')
+        self.assertEqual(str(ListOf(UInt16)([1,2,3,4]).toArray().dtype), 'uint16')
+        self.assertEqual(str(ListOf(UInt8)([1,2,3,4]).toArray().dtype), 'uint8')
+
+        self.assertEqual(str(ListOf(Float64)([1,2,3,4]).toArray().dtype), 'float64')
+        self.assertEqual(str(ListOf(Float32)([1,2,3,4]).toArray().dtype), 'float32')
+
     def test_list_of_equality(self):
         x = ListOf(int)([1, 2, 3, 4])
         y = ListOf(int)([1, 2, 3, 5])

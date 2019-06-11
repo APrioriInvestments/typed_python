@@ -350,9 +350,49 @@ PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {
         bytecount = sizeof(int64_t);
     }
 
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catInt32) {
+        typenum = NPY_INT32;
+        bytecount = sizeof(int32_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catInt16) {
+        typenum = NPY_INT16;
+        bytecount = sizeof(int16_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catInt8) {
+        typenum = NPY_INT8;
+        bytecount = sizeof(int8_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt64) {
+        typenum = NPY_UINT64;
+        bytecount = sizeof(uint64_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt32) {
+        typenum = NPY_UINT32;
+        bytecount = sizeof(uint32_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt16) {
+        typenum = NPY_UINT16;
+        bytecount = sizeof(uint16_t);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catUInt8) {
+        typenum = NPY_UINT8;
+        bytecount = sizeof(uint8_t);
+    }
+
     if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catFloat64) {
         typenum = NPY_FLOAT64;
         bytecount = sizeof(double);
+    }
+
+    if (self_w->type()->getEltType()->getTypeCategory() == Type::TypeCategory::catFloat32) {
+        typenum = NPY_FLOAT32;
+        bytecount = sizeof(float);
     }
 
     if (bytecount) {
