@@ -132,6 +132,9 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             out.convert_getitem_unsafe(i+left_size).convert_copy_initialize(right.convert_getitem_unsafe(i))
 
     def convert_getitem(self, context, expr, item):
+        if item is None or expr is None:
+            return None
+
         return context.pushReference(
             self.underlyingWrapperType,
             native_ast.Expression.Branch(

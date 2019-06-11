@@ -1455,6 +1455,27 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aLeakedTuple), 2)
 
+    def test_list_extend(self):
+        LI = ListOf(int)
+        LF = ListOf(float)
+
+        li = LI([1, 2, 3])
+        lf = LF([1.5, 2.5, 3.5])
+
+        li.extend(li)
+        self.assertEqual(li, [1, 2, 3, 1, 2, 3])
+
+        lf.extend(lf)
+        self.assertEqual(lf, [1.5, 2.5, 3.5, 1.5, 2.5, 3.5])
+
+        lf.extend(li)
+        self.assertEqual(lf, [1.5, 2.5, 3.5, 1.5, 2.5, 3.5, 1, 2, 3, 1, 2, 3])
+
+        li = LI()
+        li.extend(range(10))
+
+        self.assertEqual(li, list(range(10)))
+
     def test_list_copy_operation_duplicates_list(self):
         T = ListOf(int)
 

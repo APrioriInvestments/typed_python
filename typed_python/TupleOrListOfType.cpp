@@ -277,6 +277,12 @@ void ListOfType::append(instance_ptr self, instance_ptr other) {
     }
 }
 
+void ListOfType::ensureSpaceFor(instance_ptr data, size_t N) {
+    if (reserved(data) < count(data) + N) {
+        reserve(data, count(data) + N);
+    }
+}
+
 size_t ListOfType::reserved(instance_ptr self) {
     layout_ptr& self_layout = *(layout_ptr*)self;
 

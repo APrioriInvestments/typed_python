@@ -540,6 +540,54 @@ PyObject* PyListOfInstance::listAppend(PyObject* o, PyObject* args) {
 }
 
 // static
+PyObject* PyListOfInstance::listExtend(PyObject* o, PyObject* args) {
+    return translateExceptionToPyObject([&]() {
+        if (PyTuple_Size(args) != 1) {
+            throw std::runtime_error("ListOf.extend takes one argument");
+        }
+
+        PyObjectHolder value(PyTuple_GetItem(args, 0));
+
+        PyListOfInstance* self_w = (PyListOfInstance*)o;
+
+        ListOfType* self_type = (ListOfType*)self_w->type();
+
+        Type* value_type = extractTypeFrom(value->ob_type);
+
+        auto extendFromBinaryCompatiblePtr = [&](instance_ptr otherObj) {
+            // directly extend ourselves, because we are binary compatible with the other type.
+            size_t bytesPer = self_type->getEltType()->bytecount();
+
+            self_type->getEltType()->check([&](auto& concrete_subtype) {
+                self_type->extend(self_w->dataPtr(), self_type->count(otherObj),
+                    [&](instance_ptr tgt, size_t i) {
+                        concrete_subtype.copy_constructor(tgt, self_type->eltPtr(otherObj, i));
+                    }
+                );
+            });
+        };
+
+        if (value_type && (value_type->getTypeCategory() == Type::TypeCategory::catListOf ||
+                value_type->getTypeCategory() == Type::TypeCategory::catTupleOf) &&
+                ((TupleOrListOfType*)value_type)->getEltType() == self_type->getEltType()) {
+
+            extendFromBinaryCompatiblePtr(((PyInstance*)(PyObject*)value)->dataPtr());
+
+            return incref(Py_None);
+        }
+
+        // try to convert this to a list
+        Instance temp(self_type, [&](instance_ptr data) {
+            PyInstance::copyConstructFromPythonInstance(self_type, data, value, true);
+        });
+
+        extendFromBinaryCompatiblePtr(temp.data());
+
+        return incref(Py_None);
+    });
+}
+
+// static
 PyObject* PyListOfInstance::listReserved(PyObject* o, PyObject* args) {
     if (PyTuple_Size(args) != 0) {
         PyErr_SetString(PyExc_TypeError, "ListOf.reserved takes no arguments");
@@ -733,6 +781,7 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete() {
     return new PyMethodDef [12] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
         {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},
+        {"extend", (PyCFunction)PyListOfInstance::listExtend, METH_VARARGS, NULL},
         {"clear", (PyCFunction)PyListOfInstance::listClear, METH_VARARGS, NULL},
         {"reserved", (PyCFunction)PyListOfInstance::listReserved, METH_VARARGS, NULL},
         {"reserve", (PyCFunction)PyListOfInstance::listReserve, METH_VARARGS, NULL},

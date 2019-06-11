@@ -218,6 +218,31 @@ public:
 
     void copyListObject(instance_ptr target, instance_ptr src);
 
+    void ensureSpaceFor(instance_ptr self, size_t count);
+
+    template<class initializer>
+    void extend(instance_ptr self, size_t count, const initializer& initFun) {
+        layout_ptr& self_layout = *(layout_ptr*)self;
+        ensureSpaceFor(self, count);
+
+        size_t bytesPer = m_element_type->bytecount();
+        instance_ptr base = this->eltPtr(self, this->count(self));
+
+        size_t i = 0;
+
+        try {
+            for (; i < count; i++) {
+                initFun(base + bytesPer * i, i);
+            }
+
+            self_layout->count += i;
+        }
+        catch(...) {
+            self_layout->count += i;
+            throw;
+        }
+    }
+
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {
         size_t ct = count(self);

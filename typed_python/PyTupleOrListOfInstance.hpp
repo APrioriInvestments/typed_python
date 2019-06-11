@@ -53,6 +53,8 @@ public:
 
     static PyObject* listAppend(PyObject* o, PyObject* args);
 
+    static PyObject* listExtend(PyObject* o, PyObject* args);
+
     static PyObject* listResize(PyObject* o, PyObject* args);
 
     static PyObject* listReserve(PyObject* o, PyObject* args);
