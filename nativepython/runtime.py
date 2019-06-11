@@ -35,6 +35,7 @@ class Runtime:
         self.llvm_compiler = llvm_compiler.Compiler()
         self.converter = python_to_native_converter.PythonToNativeConverter()
         self.lock = threading.RLock()
+        self.timesCompiled = 0
 
     def verboselyDisplayNativeCode(self):
         self.llvm_compiler.mark_converter_verbose()
@@ -65,6 +66,8 @@ class Runtime:
                 if len(argument_types):
                     raise Exception("No argument exists for type overrides %s" % argument_types)
 
+                self.timesCompiled += 1
+
                 callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
 
                 assert callTarget is not None
@@ -73,17 +76,16 @@ class Runtime:
 
                 targets = self.converter.extract_new_function_definitions()
 
-                function_pointers = self.llvm_compiler.add_functions(targets)
+                self.llvm_compiler.add_functions(targets)
 
-                if wrappingCallTargetName in function_pointers:
-                    # if the callTargetName isn't in the list, then we already compiled it and installed it.
-                    fp = function_pointers[wrappingCallTargetName]
+                # if the callTargetName isn't in the list, then we already compiled it and installed it.
+                fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
 
-                    f._installNativePointer(
-                        fp.fp,
-                        callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
-                        [i.typeRepresentation for i in input_wrappers]
-                    )
+                f._installNativePointer(
+                    fp.fp,
+                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
+                    [i.typeRepresentation for i in input_wrappers]
+                )
 
                 return targets
 
@@ -131,3 +133,33 @@ def Entrypoint(f):
     inner.__qualname__ = str(f)
 
     return inner
+
+def SpecializedEntrypoint(f):
+    """Indicate that a function is a natural entrypoint into compiled code,
+    and that we want to specialize on the exact types of the given arguments.
+    """
+    if not hasattr(f, '__typed_python_category__'):
+        if not callable(f):
+            raise Exception("Can only compile functions.")
+        f = Function(f)
+
+    signatures = set()
+
+    def inner(*args):
+        signature = tuple(type(x) for x in args)
+
+        if signature not in signatures:
+            for o in f.overloads:
+                if o.matchesTypes(signature):
+                    argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+                    Runtime.singleton().compile(o, argTypes)
+            signatures.add(signature)
+
+        return f(*args)
+
+    inner.__qualname__ = str(f)
+
+    return inner
+
+
+

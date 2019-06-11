@@ -302,13 +302,9 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
         return;
     }
 
-    if (PyIter_Check(pyRepresentation)) {
-        PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
+    PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
 
-        if (!iterator) {
-            throw PythonExceptionSet();
-        }
-
+    if (iterator) {
         tupT->constructorUnbounded(tgt,
             [&](uint8_t* eltPtr, int64_t k) {
                 PyObjectStealer item(PyIter_Next(iterator));
@@ -327,10 +323,9 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
             });
 
         return;
+    } else {
+        throw PythonExceptionSet();
     }
-
-    throw std::logic_error("Couldn't initialize internal elt of type " + tupT->name()
-            + " with a " + pyRepresentation->ob_type->tp_name);
 }
 
 PyObject* PyTupleOrListOfInstance::toArray(PyObject* o, PyObject* args) {

@@ -198,6 +198,9 @@ class Compiler:
 
         return native_function_pointers
 
+    def function_pointer_by_name(self, name):
+        return self.functions_by_name.get(name)
+
     def add_functions(self, functions):
         if not functions:
             return {}
