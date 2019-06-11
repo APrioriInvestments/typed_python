@@ -12,8 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-# from typed_python.internals import forwardToName
-from typed_python import TupleOf, OneOf, Alternative, Class, Member, Forward, Int64, NamedTuple, Tuple, Dict
+
+from typed_python import (
+    TupleOf, OneOf, Alternative, Class, Member,
+    Forward, Int64, NamedTuple, Tuple, Dict, ListOf, ConstDict
+)
 
 
 class NativeForwardTypesTests(unittest.TestCase):
@@ -26,6 +29,23 @@ class NativeForwardTypesTests(unittest.TestCase):
         self.assertEqual(T.__name__, "TupleOf(Int64)")
 
         self.assertEqual(f.get(), Int64)
+
+    def test_class_in_forward(self):
+        class C(Class):
+            x = Member(int)
+
+        Fwd = Forward("Forward")
+        Fwd = Fwd.define(OneOf(None, C, TupleOf(Fwd), ListOf(Fwd), ConstDict(str, Fwd)))
+
+        Fwd(C())
+
+    def test_recursive_forwards(self):
+        Value = Forward("Value")
+        Value.define(OneOf(
+            None,
+            ConstDict(str, Value)
+        ))
+
 
     def test_cannot_create_cyclic_forwards(self):
         F0 = Forward("F0")

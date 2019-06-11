@@ -17,12 +17,13 @@
 #include "AllTypes.hpp"
 
 bool ConstDictType::_updateAfterForwardTypesChanged() {
+    size_t old_bytes_per_key_value_pair = m_bytes_per_key_value_pair;
+
     m_size = sizeof(void*);
     m_is_default_constructible = true;
     m_bytes_per_key = m_key->bytecount();
     m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
     m_bytes_per_key_subtree_pair = m_key->bytecount() + this->bytecount();
-    m_key_value_pair_type = Tuple::Make({m_key, m_value});
 
     std::string name = "ConstDict(" + m_key->name() + "->" + m_value->name() + ")";
 
@@ -30,7 +31,7 @@ bool ConstDictType::_updateAfterForwardTypesChanged() {
         name = m_recursive_name;
     }
 
-    bool anyChanged = name != m_name;
+    bool anyChanged = name != m_name || m_bytes_per_key_value_pair != old_bytes_per_key_value_pair;
 
     m_name = name;
 

@@ -146,14 +146,12 @@ public:
     void assign(instance_ptr self, instance_ptr other);
 
 
-    Type* keyValuePairType() const { return m_key_value_pair_type; }
     Type* keyType() const { return m_key; }
     Type* valueType() const { return m_value; }
 
 private:
     Type* m_key;
     Type* m_value;
-    Type* m_key_value_pair_type;
     size_t m_bytes_per_key;
     size_t m_bytes_per_key_value_pair;
     size_t m_bytes_per_key_subtree_pair;

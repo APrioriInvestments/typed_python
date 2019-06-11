@@ -128,7 +128,7 @@ public:
 
     void markIndirectForwardUse(Type* user) {
         if (m_resolved) {
-            throw std::runtime_error("already resolved forward type can't be used");
+            throw std::runtime_error("already resolved forward type " + name() + " can't be used like this.");
         }
         m_referencing_us_indirectly.insert(user);
     }

@@ -21,7 +21,6 @@ bool DictType::_updateAfterForwardTypesChanged() {
     m_is_default_constructible = true;
     m_bytes_per_key = m_key->bytecount();
     m_bytes_per_key_value_pair = m_key->bytecount() + m_value->bytecount();
-    m_key_value_pair_type = Tuple::Make({m_key, m_value});
 
     std::string name = "Dict(" + m_key->name() + "->" + m_value->name() + ")";
 
