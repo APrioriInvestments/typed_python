@@ -134,6 +134,7 @@ def Entrypoint(f):
 
     return inner
 
+
 def SpecializedEntrypoint(f):
     """Indicate that a function is a natural entrypoint into compiled code,
     and that we want to specialize on the exact types of the given arguments.
@@ -160,6 +161,3 @@ def SpecializedEntrypoint(f):
     inner.__qualname__ = str(f)
 
     return inner
-
-
-

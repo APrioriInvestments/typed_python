@@ -12,18 +12,15 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf, Function, TupleOf, OneOf
-import typed_python._types as _types
+from typed_python import ListOf, Function
 from nativepython.runtime import Runtime
 import unittest
-import time
-import numpy
-import psutil
 
 
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
 
 class TestRangeCompilation(unittest.TestCase):
     def test_sum_with_range(self):
@@ -56,7 +53,7 @@ class TestRangeCompilation(unittest.TestCase):
 
             return out
 
-        aList = ListOf(int)([1,2,3])
+        aList = ListOf(int)([1, 2, 3])
 
         self.assertEqual(repeat(aList, 0), type(aList)())
         self.assertEqual(repeat(aList, 1), aList)

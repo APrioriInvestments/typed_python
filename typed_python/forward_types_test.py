@@ -46,7 +46,6 @@ class NativeForwardTypesTests(unittest.TestCase):
             ConstDict(str, Value)
         ))
 
-
     def test_cannot_create_cyclic_forwards(self):
         F0 = Forward("F0")
         F1 = Forward("F1")

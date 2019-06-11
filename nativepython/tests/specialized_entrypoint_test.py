@@ -18,6 +18,7 @@ from nativepython.runtime import Runtime
 import time
 import unittest
 
+
 def add(aList, toAdd):
     res = type(aList)()
 
@@ -25,6 +26,7 @@ def add(aList, toAdd):
         res.append(aList[i] + toAdd)
 
     return res
+
 
 IntList = ListOf(int)
 FloatList = ListOf(float)
@@ -34,11 +36,11 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
     def test_specialized_entrypoint(self):
         compiledAdd = SpecializedEntrypoint(add)
 
-        self.assertEqual(type(compiledAdd(IntList([1,2,3]), 1)), IntList)
-        self.assertEqual(type(compiledAdd(FloatList([1,2,3]), 1)), FloatList)
+        self.assertEqual(type(compiledAdd(IntList([1, 2, 3]), 1)), IntList)
+        self.assertEqual(type(compiledAdd(FloatList([1, 2, 3]), 1)), FloatList)
 
-        self.assertEqual(compiledAdd(IntList([1,2,3]), 1), add(IntList([1,2,3]), 1))
-        self.assertEqual(compiledAdd(FloatList([1,2,3]), 1), add(FloatList([1,2,3]), 1))
+        self.assertEqual(compiledAdd(IntList([1, 2, 3]), 1), add(IntList([1, 2, 3]), 1))
+        self.assertEqual(compiledAdd(FloatList([1, 2, 3]), 1), add(FloatList([1, 2, 3]), 1))
 
     def test_specialized_entrypoint_doesnt_recompile(self):
         compiledAdd = SpecializedEntrypoint(add)
@@ -71,4 +73,4 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             speedup = (t1 - t0)/(t2 - t1)
             self.assertGreater(speedup, 10)
 
-            print("speedup for ", T, " is ", speedup) # I get about 70x
+            print("speedup for ", T, " is ", speedup)  # I get about 70x
