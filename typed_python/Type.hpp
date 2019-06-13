@@ -403,8 +403,6 @@ protected:
 
     bool m_is_default_constructible;
 
-    bool m_is_recursive;
-
     std::string m_recursive_name;
 
     std::string m_name;
@@ -417,6 +415,8 @@ protected:
     bool m_is_simple;
 
     bool m_resolved;
+
+    bool m_is_recursive;
 
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 

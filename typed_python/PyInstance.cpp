@@ -289,7 +289,7 @@ PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* 
         });
     }
 
-    PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to binary operator %s",
+    PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to ternary operator %s",
         lhs->ob_type,
         rhs->ob_type,
         op
@@ -885,14 +885,7 @@ bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
 
     Type* otherT = extractTypeFrom(other->ob_type);
 
-    if (otherT) {
-        if (otherT < t) {
-            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
-        }
-        if (otherT > t) {
-            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
-        }
-
+    if (otherT && otherT == t) {
         return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp);
     }
 
@@ -910,7 +903,16 @@ bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
 }
 
 bool PyInstance::compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
-    return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+    if (pyComparisonOp == Py_NE) {
+        return true;
+    }
+    if (pyComparisonOp == Py_EQ) {
+        return false;
+    }
+
+    throw std::runtime_error("Cannot compare instances of type " + t->name() + " and " + other->ob_type->tp_name);
+
+    return false;
 }
 
 int PyInstance::reversePyOpOrdering(int op) {
@@ -932,44 +934,29 @@ int PyInstance::reversePyOpOrdering(int op) {
 
 // static
 PyObject* PyInstance::tp_richcompare(PyObject *a, PyObject *b, int op) {
-    try {
+    return translateExceptionToPyObject([&]() {
         Type* own = extractTypeFrom(a->ob_type);
         Type* other = extractTypeFrom(b->ob_type);
 
         if (!own && !other) {
             PyErr_Format(PyExc_TypeError, "Can't call tp_richcompare where neither object is a typed_python object!");
-            return NULL;
+            return (PyObject*)NULL;
         }
 
-        if (!own || !other) {
-            bool cmp;
+        if (own && other && own == other) {
+            return incref(compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false, op) ? Py_True : Py_False);
+        }
 
-            if (own) {
-                cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false, op);
-            } else {
-                cmp = compare_to_python(other, ((PyInstance*)b)->dataPtr(), a, false, reversePyOpOrdering(op));
-            }
+        bool cmp;
 
-            return incref(cmp ? Py_True : Py_False);
+        if (own) {
+            cmp = compare_to_python(own, ((PyInstance*)a)->dataPtr(), b, false, op);
         } else {
-            bool result;
-
-            if (own < other) {
-                result = cmpResultToBoolForPyOrdering(op, -1);
-            } else if (own > other) {
-                result = cmpResultToBoolForPyOrdering(op, 1);
-            } else {
-                result = own->cmp(((PyInstance*)a)->dataPtr(), ((PyInstance*)b)->dataPtr(), op);
-            }
-
-            return incref(result ? Py_True : Py_False);
+            cmp = compare_to_python(other, ((PyInstance*)b)->dataPtr(), a, false, reversePyOpOrdering(op));
         }
-    } catch(PythonExceptionSet& e) {
-        return NULL;
-    } catch(std::exception& e) {
-        PyErr_SetString(PyExc_TypeError, e.what());
-        return NULL;
-    }
+
+        return incref(cmp ? Py_True : Py_False);
+    });
 }
 
 // static

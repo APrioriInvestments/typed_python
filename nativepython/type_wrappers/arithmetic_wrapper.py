@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import typed_python.python_ast as python_ast
+from typed_python.type_promotion import computeArithmeticBinaryResultType
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.wrapper import Wrapper
@@ -20,7 +21,9 @@ from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
 import nativepython
 
-from typed_python import Int64, Float64, Bool
+from typed_python import (
+    Float32, Float64, Int64, Bool
+)
 
 pyOpToNative = {
     python_ast.BinaryOp.Add(): native_ast.BinaryOp.Add(),
@@ -86,104 +89,145 @@ class ArithmeticTypeWrapper(Wrapper):
         return super().convert_unary_op(context, instance, op)
 
 
-class Int64Wrapper(ArithmeticTypeWrapper):
-    def __init__(self):
-        super().__init__(Int64)
+def toWrapper(T):
+    if T is Bool:
+        return BoolWrapper()
+    if T.IsInteger:
+        return IntWrapper(T)
+    return FloatWrapper(T)
+
+
+def toFloatType(T1):
+    """Convert an int or float type to the enclosing float type."""
+    if not T1.IsFloat:
+        if T1.Bits <= 32:
+            return Float32
+        else:
+            return Float64
+    return T1
+
+
+class IntWrapper(ArithmeticTypeWrapper):
+    def __init__(self, T):
+        super().__init__(T)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Int(bits=64, signed=True)
+        T = self.typeRepresentation
 
-    def toFloat64(self, context, e):
-        return context.pushPod(
-            float,
-            native_ast.Expression.Cast(
-                left=e.nonref_expr,
-                to_type=native_ast.Type.Float(bits=64)
-            )
-        )
+        return native_ast.Type.Int(bits=T.Bits, signed=T.IsSignedInt)
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Float64:
+        if target_type.typeRepresentation == self.typeRepresentation:
+            return e
+        elif target_type.typeRepresentation in (Float64, Float32):
             return context.pushPod(
-                float,
+                target_type.typeRepresentation,
                 native_ast.Expression.Cast(
                     left=e.nonref_expr,
-                    to_type=native_ast.Type.Float(bits=64)
+                    to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
                 )
             )
-        elif target_type.typeRepresentation == Int64:
-            return e
         elif target_type.typeRepresentation == Bool:
             return e != 0
+        elif isinstance(target_type, IntWrapper):
+            return context.pushPod(
+                target_type.typeRepresentation,
+                native_ast.Expression.Cast(
+                    left=e.nonref_expr,
+                    to_type=native_ast.Type.Int(
+                        bits=target_type.typeRepresentation.Bits,
+                        signed=target_type.typeRepresentation.IsSignedInt
+                    )
+                )
+            )
 
         return super().convert_to_type(context, e, target_type)
 
     def convert_bin_op(self, context, left, op, right):
         if op.matches.Div:
-            if right.expr_type == self:
-                return left.toFloat64().convert_bin_op(op, right)
+            T = toWrapper(
+                computeArithmeticBinaryResultType(
+                    toFloatType(left.expr_type.typeRepresentation),
+                    toFloatType(right.expr_type.typeRepresentation)
+                )
+            )
 
-        if right.expr_type == left.expr_type:
-            if op.matches.Mod:
-                return context.pushPod(
-                    self,
-                    native_ast.Expression.Branch(
-                        cond=right.nonref_expr,
-                        true=runtime_functions.mod_int64_int64.call(left.nonref_expr, right.nonref_expr),
-                        false=generateThrowException(context, ZeroDivisionError())
+            return left.convert_to_type(T).convert_bin_op(op, right.convert_to_type(T))
+
+        if right.expr_type != self:
+            if isinstance(right.expr_type, ArithmeticTypeWrapper):
+                promoteType = toWrapper(
+                    computeArithmeticBinaryResultType(
+                        self.typeRepresentation,
+                        right.expr_type.typeRepresentation
                     )
                 )
-            if op.matches.Pow:
-                return context.pushPod(
-                    self,
-                    runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr)
-                )
-            if op.matches.LShift or op.matches.RShift:
-                return context.pushPod(
-                    self,
-                    native_ast.Expression.Branch(
-                        cond=(right >= 0).nonref_expr,
-                        true=native_ast.Expression.Binop(
-                            left=left.nonref_expr,
-                            right=right.nonref_expr,
-                            op=pyOpToNative[op]
-                        ),
-                        false=generateThrowException(context, ValueError("negative shift count"))
-                    )
-                )
-            if op.matches.FloorDiv:
-                # this is a super-slow way of doing this because we convert to float, do the op, and back to int.
-                # we should be comparing the RHS against zero and throwing our own exception.
-                res = left.toFloat64()
-                if res is None:
-                    return None
-                res = res.convert_bin_op(python_ast.BinaryOp.Div(), right)
-                if res is None:
-                    return None
-                return res.toInt64()
 
-            if op in pyOpToNative:
-                return context.pushPod(
-                    self,
-                    native_ast.Expression.Binop(
+                return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
+
+            return super().convert_bin_op(context, left, op, right)
+
+        if op.matches.Mod:
+            return context.pushPod(
+                int,
+                native_ast.Expression.Branch(
+                    cond=right.nonref_expr,
+                    true=runtime_functions.mod_int64_int64.call(
+                        left.toInt64().nonref_expr,
+                        right.toInt64().nonref_expr
+                    ),
+                    false=generateThrowException(context, ZeroDivisionError())
+                )
+            ).convert_to_type(self)
+        if op.matches.Pow:
+            return context.pushPod(
+                self,
+                runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr)
+            )
+        if op.matches.LShift or op.matches.RShift:
+            return context.pushPod(
+                self,
+                native_ast.Expression.Branch(
+                    cond=(right >= 0).nonref_expr,
+                    true=native_ast.Expression.Binop(
                         left=left.nonref_expr,
                         right=right.nonref_expr,
                         op=pyOpToNative[op]
-                    )
+                    ),
+                    false=generateThrowException(context, ValueError("negative shift count"))
                 )
-            if op in pyCompOp:
-                return context.pushPod(
-                    bool,
-                    native_ast.Expression.Binop(
-                        left=left.nonref_expr,
-                        right=right.nonref_expr,
-                        op=pyCompOp[op]
-                    )
+            )
+        if op.matches.FloorDiv:
+            # this is a super-slow way of doing this because we convert to float, do the op, and back to int.
+            # we should be comparing the RHS against zero and throwing our own exception.
+            res = left.toFloat64()
+            if res is None:
+                return None
+            res = res.convert_bin_op(python_ast.BinaryOp.Div(), right)
+            if res is None:
+                return None
+            return res.toInt64()
+
+        if op in pyOpToNative:
+            return context.pushPod(
+                self,
+                native_ast.Expression.Binop(
+                    left=left.nonref_expr,
+                    right=right.nonref_expr,
+                    op=pyOpToNative[op]
                 )
+            )
+        if op in pyCompOp:
+            return context.pushPod(
+                bool,
+                native_ast.Expression.Binop(
+                    left=left.nonref_expr,
+                    right=right.nonref_expr,
+                    op=pyCompOp[op]
+                )
+            )
 
-        if isinstance(right.expr_type, Float64Wrapper):
-            return left.toFloat64().convert_bin_op(op, right)
-
+        # we must have a bad binary operator
         return super().convert_bin_op(context, left, op, right)
 
 
@@ -195,24 +239,13 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Int(bits=1, signed=False)
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Float64:
+        if target_type.typeRepresentation == self.typeRepresentation:
+            return e
+        elif isinstance(target_type, (FloatWrapper, IntWrapper)):
             return context.pushPod(
                 float,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Float(bits=64)
-                )
+                target_type.getNativeLayoutType()
             )
-        elif target_type.typeRepresentation == Int64:
-            return context.pushPod(
-                int,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Int(bits=64, signed=True)
-                )
-            )
-        elif target_type.typeRepresentation == Bool:
-            return e
 
         return super().convert_to_type(context, e, target_type)
 
@@ -237,15 +270,15 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return super().convert_bin_op(context, left, op, right)
 
 
-class Float64Wrapper(ArithmeticTypeWrapper):
-    def __init__(self):
-        super().__init__(Float64)
+class FloatWrapper(ArithmeticTypeWrapper):
+    def __init__(self, T):
+        super().__init__(T)
 
     def getNativeLayoutType(self):
-        return native_ast.Type.Float(bits=64)
+        return native_ast.Type.Float(bits=self.typeRepresentation.Bits)
 
     def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == Float64:
+        if target_type.typeRepresentation == self.typeRepresentation:
             return e
         elif target_type.typeRepresentation == Int64:
             return context.pushPod(
@@ -261,7 +294,7 @@ class Float64Wrapper(ArithmeticTypeWrapper):
         return super().convert_to_type(context, e, target_type)
 
     def convert_bin_op(self, context, left, op, right):
-        if isinstance(right.expr_type, Int64Wrapper):
+        if isinstance(right.expr_type, IntWrapper):
             right = right.toFloat64()
 
         if right.expr_type == left.expr_type:

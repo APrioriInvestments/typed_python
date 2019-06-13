@@ -192,10 +192,7 @@ extern "C" {
         }
 
         if (l < 0) {
-            double res = fmod(l, r) + r;
-            if (res - r >= 0.0)
-                res -= r;
-            return res;
+            return r - fmod(-l, r);
         }
 
         return fmod(l, r);

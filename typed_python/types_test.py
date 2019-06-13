@@ -21,7 +21,7 @@ from typed_python import (
     ConstDict, Alternative, serialize, deserialize, Class, Member,
     TypeFilter, Function, Forward
 )
-
+from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python.test_util import currentMemUsageMb
 import typed_python._types as _types
 import psutil
@@ -1605,55 +1605,96 @@ class NativeTypesTests(unittest.TestCase):
                     pass
 
     def test_other_bitness_types_operators(self):
-
         def add(x, y):
-            return x+y
+            return x + y
 
         def div(x, y):
-            return x/y
+            return x / y
+
+        def mod(x, y):
+            return x % y
 
         def mul(x, y):
-            return x*y
+            return x * y
 
         def sub(x, y):
-            return x-y
+            return x - y
+
+        def pow(x, y):
+            return x ** y
 
         def bitand(x, y):
-            return x&y
+            return x & y
 
         def bitor(x, y):
-            return x|y
+            return x | y
 
         def bitxor(x, y):
-            return x^y
+            return x ^ y
+
+        def less(x, y):
+            return x < y
+
+        def greater(x, y):
+            return x > y
+
+        def lesseq(x, y):
+            return x <= y
+
+        def greatereq(x, y):
+            return x >= y
+
+        def eq(x, y):
+            return x == y
+
+        def neq(x, y):
+            return x != y
 
         otherTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
-        for t1 in otherTypes:
-            for t2 in otherTypes:
-                for op in [add, mul, div, sub, bitand, bitor, bitxor]:
-                    if not ((t1.IsFloat or t2.IsFloat) and op in (bitand, bitor, bitxor)):
-                        res = op(t1(10), t2(10))
+
+        for T1 in otherTypes:
+            for T2 in otherTypes:
+                for op in [less, greater, lesseq, greatereq, eq, neq]:
+                    for i1 in [-1, 0, 1, 2]:
+                        for i2 in [-1, 0, 1, 2]:
+                            res = op(T1(i1), T2(i2))
+                            promotedType = computeArithmeticBinaryResultType(T1, T2)
+                            proI1 = promotedType(T1(i1))
+                            proI2 = promotedType(T2(i2))
+                            self.assertEqual(res, op(proI1, proI2))
+
+                for op in [add, mul, div, sub, mod]:
+                    for i1 in [-1, 0, 1, 2, 10]:
+                        for i2 in [-1, 0, 1, 2, 10]:
+                            validOp = True
+                            if op in (div, mod) and i2 == 0:
+                                validOp = False
+                            elif op is pow and i2 < 0 and i2 < 1:
+                                validOp = False
+
+                            if validOp:
+                                res = op(T1(i1), T2(i2))
+                                promotedType = computeArithmeticBinaryResultType(T1, T2)
+                                proI1 = promotedType(T1(i1))
+                                proI2 = promotedType(T2(i2))
+                                self.assertEqual(type(res), type(op(proI1, proI2)))
+                                self.assertEqual(res, op(proI1, proI2), (op.__name__, T1, T2, i1, i2, proI1, proI2))
+
+                if not T1.IsFloat and not T2.IsFloat:
+                    for op in [bitand, bitor, bitxor]:
+                        res = op(T1(10), T2(10))
                         resType = type(res)
                         resType = {bool: Bool, int: Int64, float: Float64}.get(resType, resType)
 
-                        if t1.IsFloat and t2.IsFloat:
-                            self.assertTrue(resType.IsFloat)
-                            self.assertEqual(resType.Bits, max(t1.Bits, t2.Bits))
-                            self.assertEqual(res, op(10, 10))
-                        elif t1.IsFloat or t2.IsFloat:
-                            self.assertTrue(resType.IsFloat)
-                            self.assertEqual(resType.Bits, t1.Bits if t1.IsFloat else t2.Bits)
-                            if t1.Bits > 1 and t2.Bits > 1:
-                                self.assertEqual(res, op(10, 10))
-                        elif t1 is Bool and t2 is Bool:
+                        if T1 is Bool and T2 is Bool:
                             self.assertEqual(resType, Bool if op in (bitor, bitand, bitxor) else Int64 if op is not div else Float64)
                         else:
-                            self.assertEqual(resType.Bits, max(t1.Bits, t2.Bits))
+                            self.assertEqual(resType.Bits, max(T1.Bits, T2.Bits))
 
                             if op is not div:
-                                self.assertEqual(resType.IsSignedInt, t1.IsSignedInt or t2.IsSignedInt)
+                                self.assertEqual(resType.IsSignedInt, T1.IsSignedInt or T2.IsSignedInt)
 
-                            if t1.Bits > 1 and t2.Bits > 1:
+                            if T1.Bits > 1 and T2.Bits > 1:
                                 self.assertEqual(res, op(10, 10))
 
     def test_comparing_arbitrary_objects(self):

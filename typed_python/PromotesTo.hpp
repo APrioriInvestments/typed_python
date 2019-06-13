@@ -16,6 +16,14 @@
 
 #pragma once
 
+/****************
+   determine what type an arithmetic operation on two different register types
+   should resolve to. We follow numpy here (which largely matches the c++ standard
+   but diverges slightly): integer and floating point types together produce a
+   floating point. We always pick the larger bitness. We are signed if either input
+   is signed.
+****************/
+
 template<class T1, class T2>
 class PromotesTo {};
 
@@ -40,11 +48,11 @@ template<> class PromotesTo<float, bool> { public: typedef float result_type; };
 template<> class PromotesTo<float, int8_t> { public: typedef float result_type; };
 template<> class PromotesTo<float, int16_t> { public: typedef float result_type; };
 template<> class PromotesTo<float, int32_t> { public: typedef float result_type; };
-template<> class PromotesTo<float, int64_t> { public: typedef float result_type; };
+template<> class PromotesTo<float, int64_t> { public: typedef double result_type; };
 template<> class PromotesTo<float, uint8_t> { public: typedef float result_type; };
 template<> class PromotesTo<float, uint16_t> { public: typedef float result_type; };
 template<> class PromotesTo<float, uint32_t> { public: typedef float result_type; };
-template<> class PromotesTo<float, uint64_t> { public: typedef float result_type; };
+template<> class PromotesTo<float, uint64_t> { public: typedef double result_type; };
 template<> class PromotesTo<double, bool> { public: typedef double result_type; };
 template<> class PromotesTo<double, int8_t> { public: typedef double result_type; };
 template<> class PromotesTo<double, int16_t> { public: typedef double result_type; };
@@ -58,11 +66,11 @@ template<> class PromotesTo<bool, float> { public: typedef float result_type; };
 template<> class PromotesTo<int8_t, float> { public: typedef float result_type; };
 template<> class PromotesTo<int16_t, float> { public: typedef float result_type; };
 template<> class PromotesTo<int32_t, float> { public: typedef float result_type; };
-template<> class PromotesTo<int64_t, float> { public: typedef float result_type; };
+template<> class PromotesTo<int64_t, float> { public: typedef double result_type; };
 template<> class PromotesTo<uint8_t, float> { public: typedef float result_type; };
 template<> class PromotesTo<uint16_t, float> { public: typedef float result_type; };
 template<> class PromotesTo<uint32_t, float> { public: typedef float result_type; };
-template<> class PromotesTo<uint64_t, float> { public: typedef float result_type; };
+template<> class PromotesTo<uint64_t, float> { public: typedef double result_type; };
 template<> class PromotesTo<bool, double> { public: typedef double result_type; };
 template<> class PromotesTo<int8_t, double> { public: typedef double result_type; };
 template<> class PromotesTo<int16_t, double> { public: typedef double result_type; };
@@ -140,8 +148,3 @@ template<> class PromotesTo<float, double> { public: typedef double result_type;
 template<> class PromotesTo<double, float> { public: typedef double result_type; };
 template<> class PromotesTo<float, float> { public: typedef float result_type; };
 template<> class PromotesTo<double, double> { public: typedef double result_type; };
-
-
-
-
-

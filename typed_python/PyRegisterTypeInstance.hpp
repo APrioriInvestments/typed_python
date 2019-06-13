@@ -41,17 +41,84 @@ static PyObject* registerValueToPyValue(T val) {
     return PyInstance::extractPythonObject((instance_ptr)&val, typeObj);
 }
 
-inline int64_t pyMod(int64_t l, int64_t r) { return l % r; }
-inline int32_t pyMod(int32_t l, int32_t r) { return l % r; }
-inline int16_t pyMod(int16_t l, int16_t r) { return l % r; }
-inline int8_t pyMod(int8_t l, int8_t r) { return l % r; }
-inline uint64_t pyMod(uint64_t l, uint64_t r) { return l % r; }
-inline uint32_t pyMod(uint32_t l, uint32_t r) { return l % r; }
-inline uint16_t pyMod(uint16_t l, uint16_t r) { return l % r; }
-inline uint8_t pyMod(uint8_t l, uint8_t r) { return l % r; }
+//implement mod the same way python does for unsigned integers.
+inline int64_t pyMod(uint64_t l, uint64_t r) {
+    if (r == 0) {
+        PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+        throw PythonExceptionSet();
+    }
+
+    return l % r;
+}
+
+//implement mod the same way python does for signed integers
+inline int64_t pyMod(int64_t l, int64_t r) {
+    if (r == 1 || r == -1 || l == 0) {
+        return 0;
+    }
+
+    if (r == 0) {
+        PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+        throw PythonExceptionSet();
+    }
+
+    if (r < 0) {
+        if (l < 0) {
+            return -((-l) % (-r));
+        }
+        return - ((-r) - ((l-1) % (-r) + 1) );
+    }
+
+    if (l < 0) {
+        return r - ((-l-1) % r + 1);
+    }
+
+    return l % r;
+}
+
+//implement mod the same way python does for floats and doubles
+template<class T>
+T pyModFloat(T l, T r) {
+    if (l == 0.0) {
+        return 0.0;
+    }
+    if (r == 0) {
+        PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+        throw PythonExceptionSet();
+    }
+    if (r == 1 || r == -1) {
+        return 0.0;
+    }
+
+    if (r < 0) {
+        if (l < 0) {
+            return -(fmod((-l), (-r)));
+        }
+        T res = fmod(l, r) + r;
+        if (res - r <= 0.0)
+            res -= r;
+        return res;
+    }
+
+    if (l <= 0) {
+        return r - fmod(-l, r);
+    }
+
+    return fmod(l, r);
+}
+
+
+inline int32_t pyMod(int32_t l, int32_t r) { return (int32_t)pyMod((int64_t)l, (int64_t)r); }
+inline int16_t pyMod(int16_t l, int16_t r) { return (int16_t)pyMod((int64_t)l, (int64_t)r); }
+inline int8_t pyMod(int8_t l, int8_t r) { return (int8_t)pyMod((int64_t)l, (int64_t)r); }
+
+inline uint32_t pyMod(uint32_t l, uint32_t r) { return (uint32_t)pyMod((uint64_t)l, (uint64_t)r); }
+inline uint16_t pyMod(uint16_t l, uint16_t r) { return (uint16_t)pyMod((uint64_t)l, (uint64_t)r); }
+inline uint8_t pyMod(uint8_t l, uint8_t r) { return (uint8_t)pyMod((uint64_t)l, (uint64_t)r); }
+
 inline bool pyMod(bool l, bool r) { return 0; }
-inline float pyMod(float l, float r) { return std::fmod(l,r); }
-inline double pyMod(double l, double r) { return std::fmod(l,r); }
+inline float pyMod(float l, float r) { return pyModFloat(l, r); }
+inline double pyMod(double l, double r) { return pyModFloat(l, r); }
 
 inline int64_t pyAnd(int8_t l, int8_t r) { return l & r; }
 inline int64_t pyAnd(uint8_t l, uint8_t r) { return l & r; }
@@ -104,6 +171,18 @@ inline int64_t pyXor(double l, double r) {
     throw PythonExceptionSet();
 }
 
+inline double pyFloatDiv(bool l, bool r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(uint8_t l, uint8_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(uint16_t l, uint16_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(uint32_t l, uint32_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(uint64_t l, uint64_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(int8_t l, int8_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(int16_t l, int16_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(int32_t l, int32_t r) { return ((double)l) / (double)r; }
+inline double pyFloatDiv(int64_t l, int64_t r) { return ((double)l) / (double)r; }
+inline float pyFloatDiv(float l, float r) { return l / r; }
+inline double pyFloatDiv(double l, double r) { return l / r; }
+
 template<class T>
 static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const char* op, const char* opErr) {
     if (strcmp(op, "__add__") == 0) {
@@ -136,7 +215,7 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
             throw PythonExceptionSet();
         }
 
-        return registerValueToPyValue(T(self/other));
+        return registerValueToPyValue(pyFloatDiv(self, other));
     }
 
     if (strcmp(op, "__floordiv__") == 0) {
@@ -154,7 +233,6 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
             throw PythonExceptionSet();
         }
 
-        //for mod, bool has to go to int
         return registerValueToPyValue(T(pyMod(self, other)));
     }
 
@@ -421,7 +499,7 @@ public:
             return pyOperatorConcreteForRegister<T, int64_t>(*(T*)dataPtr(), PyLong_AsLong(rhs), op, opErr);
         }
         if (PyBool_Check(rhs)) {
-            return pyOperatorConcreteForRegister<T, bool>(*(T*)dataPtr(), PyLong_AsLong(rhs), op, opErr);
+            return pyOperatorConcreteForRegister<T, bool>(*(T*)dataPtr(), rhs == Py_True ? true : false, op, opErr);
         }
         if (PyFloat_CheckExact(rhs)) {
             return pyOperatorConcreteForRegister<T, double>(*(T*)dataPtr(), PyFloat_AsDouble(rhs), op, opErr);
@@ -451,7 +529,7 @@ public:
             return pyOperatorConcreteForRegister<int64_t, T>(PyLong_AsLong(rhs), *(T*)dataPtr(), op, opErr);
         }
         if (PyBool_Check(rhs)) {
-            return pyOperatorConcreteForRegister<bool, T>(PyLong_AsLong(rhs), *(T*)dataPtr(), op, opErr);
+            return pyOperatorConcreteForRegister<bool, T>(rhs == Py_True ? true : false, *(T*)dataPtr(), op, opErr);
         }
         if (PyFloat_CheckExact(rhs)) {
             return pyOperatorConcreteForRegister<double, T>(PyFloat_AsDouble(rhs), *(T*)dataPtr(), op, opErr);
@@ -477,47 +555,54 @@ public:
     }
 
 
+    //compare two register types directly given the python
+    //comparison operator 'pyComparisonOp'. We follow numpy's comparisons here,
+    //where we use a signed compare anytime _either_ value is signed, which
+    //is different than c++.
+    template<class other_t>
+    static bool pyCompare(T lhs, other_t rhs, int pyComparisonOp) {
+        typedef typename PromotesTo<T, other_t>::result_type PT;
+
+        if (pyComparisonOp == Py_EQ) { return ((PT)lhs) == ((PT)rhs); }
+        if (pyComparisonOp == Py_NE) { return ((PT)lhs) != ((PT)rhs); }
+        if (pyComparisonOp == Py_LT) { return ((PT)lhs) < ((PT)rhs); }
+        if (pyComparisonOp == Py_GT) { return ((PT)lhs) > ((PT)rhs); }
+        if (pyComparisonOp == Py_LE) { return ((PT)lhs) <= ((PT)rhs); }
+        if (pyComparisonOp == Py_GE) { return ((PT)lhs) >= ((PT)rhs); }
+        return false;
+    }
+
     static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
-        if (PyBool_Check(other) && (!exact || t->getTypeCategory() == Type::TypeCategory::catBool)) {
-            bool value = (other == Py_True ? 1 : 0);
+        if (PyBool_Check(other)) { return pyCompare(*(T*)self, other == Py_True ? true : false, pyComparisonOp); }
+        if (PyLong_Check(other)) { return pyCompare(*(T*)self, PyLong_AsLong(other), pyComparisonOp); }
+        if (PyFloat_Check(other)) { return pyCompare(*(T*)self, PyFloat_AsDouble(other), pyComparisonOp); }
 
-            return cmpResultToBoolForPyOrdering(
-                pyComparisonOp,
-                value < *(T*)self ? -1 :
-                value > *(T*)self ? 1 :
-                    0
-                );
+        Type* rhsType = extractTypeFrom(other->ob_type);
+
+        if (rhsType) {
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catBool) { return pyCompare(*(T*)self, *(bool*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt8) { return pyCompare(*(T*)self, *(int8_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt16) { return pyCompare(*(T*)self, *(int16_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt32) { return pyCompare(*(T*)self, *(int32_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt64) { return pyCompare(*(T*)self, *(int64_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt8) { return pyCompare(*(T*)self, *(uint8_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt16) { return pyCompare(*(T*)self, *(uint16_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt32) { return pyCompare(*(T*)self, *(uint32_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt64) { return pyCompare(*(T*)self, *(uint64_t*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat32) { return pyCompare(*(T*)self, *(float*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat64) { return pyCompare(*(T*)self, *(double*)((PyInstance*)other)->dataPtr(), pyComparisonOp); }
         }
 
-        if (PyLong_CheckExact(other) && (!exact || t->getTypeCategory() == Type::TypeCategory::catInt64)) {
-            int64_t value = PyLong_AsLong(other);
-
-            return cmpResultToBoolForPyOrdering(
-                pyComparisonOp,
-                value < *(T*)self ? -1 :
-                value > *(T*)self ? 1 :
-                    0
-                );
-        }
-
-        if (PyFloat_Check(other) && (!exact || t->getTypeCategory() == Type::TypeCategory::catFloat64)) {
-            float value = PyFloat_AsDouble(other);
-
-            return cmpResultToBoolForPyOrdering(
-                pyComparisonOp,
-                value < *(T*)self ? -1 :
-                value > *(T*)self ? 1 :
-                    0
-                );
-        }
-
-        return cmpResultToBoolForPyOrdering(pyComparisonOp,-1);
+        return PyInstance::compare_to_python_concrete(t, self, other, exact, pyComparisonOp);
     }
 
     static void mirrorTypeInformationIntoPyTypeConcrete(RegisterType<T>* type, PyTypeObject* pyType) {
         //expose 'ElementType' as a member of the type object
         PyDict_SetItemString(pyType->tp_dict, "IsFloat",
             isFloat(type->getTypeCategory()) ? Py_True : Py_False
+            );
+        PyDict_SetItemString(pyType->tp_dict, "IsInteger",
+            isInteger(type->getTypeCategory()) ? Py_True : Py_False
             );
         PyDict_SetItemString(pyType->tp_dict, "IsSignedInt",
             isInteger(type->getTypeCategory()) && !isUnsigned(type->getTypeCategory()) ? Py_True : Py_False

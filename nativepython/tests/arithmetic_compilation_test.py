@@ -12,7 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf
+from typed_python import (
+    Function, OneOf,
+    Int8, Int16, Int32, Int64,
+    UInt8, UInt16, UInt32, UInt64,
+    Float32, Float64
+)
+
 from nativepython.runtime import Runtime
 import unittest
 
@@ -94,6 +100,13 @@ def neq(x: In, y: In) -> Out:
     return x != y
 
 
+ALL_OPERATIONS = [
+    add, sub, mul, div, mod, lshift, rshift,
+    pow, bitxor, bitand, bitor, less,
+    greater, lessEq, greaterEq, eq, neq
+]
+
+
 class TestArithmeticCompilation(unittest.TestCase):
     def test_runtime_singleton(self):
         self.assertTrue(Runtime.singleton() is Runtime.singleton())
@@ -125,9 +138,7 @@ class TestArithmeticCompilation(unittest.TestCase):
         failures = 0
         successes = 0
 
-        for f in [add, sub, mul, div, mod, lshift, rshift,
-                  pow, bitxor, bitand, bitor, less,
-                  greater, lessEq, greaterEq, eq, neq]:
+        for f in ALL_OPERATIONS:
             if f in [pow]:
                 lvals = range(-5, 5)
                 rvals = range(5)
@@ -224,3 +235,74 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.assertEqual(negate_int(10), -10)
         self.assertEqual(negate_float(20.5), -20.5)
+
+    def test_can_compile_all_register_types(self):
+        registerTypes = [bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+
+        for T in registerTypes:
+            if T is not bool:
+                self.assertEqual(T(1) + T(2), T(3))
+
+        for T1 in registerTypes:
+            for T2 in registerTypes:
+                def add(x: T1, y: T2):
+                    return x + y
+
+                def sub(x: T1, y: T2):
+                    return x - y
+
+                def mul(x: T1, y: T2):
+                    return x * y
+
+                def div(x: T1, y: T2):
+                    return x / y
+
+                def mod(x: T1, y: T2):
+                    return x % y
+
+                def less(x: T1, y: T2):
+                    return x < y
+
+                def greater(x: T1, y: T2):
+                    return x > y
+
+                def lessEq(x: T1, y: T2):
+                    return x <= y
+
+                def greaterEq(x: T1, y: T2):
+                    return x >= y
+
+                def bitand(x: T1, y: T2):
+                    return x & y
+
+                def bitor(x: T1, y: T2):
+                    return x | y
+
+                def bitxor(x: T1, y: T2):
+                    return x ^ y
+
+                def neq(x: T1, y: T2):
+                    return x != y
+
+                def rshift(x: T1, y: T2):
+                    return x >> y
+
+                def lshift(x: T1, y: T2):
+                    return x << y
+
+                def pow(x: T1, y: T2):
+                    return x ** y
+
+                for op in [add, sub, mul, div,
+                           mod, less, greater, lessEq, greaterEq,
+                           bitand, bitor, bitxor, neq, lshift, rshift, pow
+                           ]:
+                    compiledOp = Compiled(op)
+
+                    self.assertEqual(
+                        type(op(T1(1), T2(2))),
+                        type(compiledOp(T1(1), T2(2))),
+                        (T1, T2, type(op(T1(1), T2(2))), type(compiledOp(T1(1), T2(2))), op.__name__)
+                    )
+
+                    self.assertEqual(op(T1(1), T2(2)), compiledOp(T(1), T(2)), (T1, T2, op.__name__))
