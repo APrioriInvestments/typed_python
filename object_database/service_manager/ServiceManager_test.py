@@ -707,9 +707,9 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         for i in range(2):
             with self.database.transaction():
-                ServiceManager.startService("TestService", 20)
+                ServiceManager.startService("TestService", 10)
 
-            self.waitForCount(20)
+            self.waitForCount(10)
 
             fullThroughputs.append(self.measureThroughput(1.0))
 
