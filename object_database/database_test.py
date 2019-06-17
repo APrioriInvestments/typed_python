@@ -945,6 +945,38 @@ class ObjectDatabaseTests:
                 with t2:
                     root.obj.k = expr.Constant(value=root.obj.k.value + 1)
 
+    def test_conflicts_write_then_read(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            c = Counter()
+
+        t1 = db.transaction()
+        t2 = db.transaction()
+
+        # these don't conflict because they didn't read from the prior
+        # value.
+        with t1:
+            c.x = 1
+
+        with t2:
+            c.x = 2
+
+        # these do conflict because they update indices and we need to
+        # know the prior values to compute the index updates correctly
+        t1 = db.transaction()
+        t2 = db.transaction()
+
+        # these don't conflict because they didn't read from the prior
+        # value.
+        with t1:
+            c.k = 1
+
+        with self.assertRaises(RevisionConflictException):
+            with t2:
+                c.k = 2
+
     def test_conflicts_dont_cause_view_leaks(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
@@ -1078,43 +1110,6 @@ class ObjectDatabaseTests:
         with view:
             for c in counters:
                 self.assertTrue(c.exists())
-
-    def test_read_write_conflict(self):
-        db = self.createNewDb()
-
-        schema = Schema("test_schema")
-
-        @schema.define
-        class Counter:
-            k = int
-
-        db.subscribeToSchema(schema)
-
-        with db.transaction():
-            o1 = Counter()
-            o2 = Counter()
-
-        for consistency in [True, False]:
-            if consistency:
-                t1 = db.transaction().consistency(reads=True)
-                t2 = db.transaction().consistency(reads=True)
-            else:
-                t1 = db.transaction().consistency(none=True)
-                t2 = db.transaction().consistency(none=True)
-
-            with t1.nocommit():
-                o1.k = o2.k + 1
-
-            with t2.nocommit():
-                o2.k = o1.k + 1
-
-            t1.commit()
-
-            if consistency:
-                with self.assertRaises(RevisionConflictException):
-                    t2.commit()
-            else:
-                t2.commit()
 
     def test_indices_lookup_any(self):
         db = self.createNewDb()
@@ -1298,10 +1293,6 @@ class ObjectDatabaseTests:
         with self.assertRaises(RevisionConflictException):
             t2.commit()
 
-        with self.assertRaises(Exception):
-            with db.transaction().consistency(writes=True):
-                o.y = 2
-
     def test_indices_of_algebraics(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
@@ -1438,8 +1429,8 @@ class ObjectDatabaseTests:
             o2 = Object(k=20)
             Object(k=30)
 
-        t1 = db.transaction().consistency(full=True)
-        t2 = db.transaction().consistency(full=True)
+        t1 = db.transaction()
+        t2 = db.transaction()
 
         with t1.nocommit():
             o2.k = len(Object.lookupAll(k=10))

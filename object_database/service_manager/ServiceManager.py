@@ -214,6 +214,8 @@ class ServiceManager(object):
                 for i in bad_instances:
                     i.markFailedToStart(bad_instances[i])
 
+        self.cleanup()
+
     def updateServiceHostStats(self):
         if time.time() - self._lastMetricUpdateTimestamp > self.metricUpdateInterval:
             self._lastMetricUpdateTimestamp = time.time()

@@ -87,10 +87,6 @@ class View(object):
         self._transaction_num = transaction_id
         self.serializationContext = db.serializationContext
         self._view = _types.View(db._connection_state, transaction_id, self._writeable)
-
-        self._insistReadsConsistent = True
-        self._insistWritesConsistent = True
-        self._insistIndexReadsConsistent = False
         self._confirmCommitCallback = None
         self._logger = logging.getLogger(__name__)
 
@@ -127,9 +123,6 @@ class View(object):
         if writes:
             tid = self._transaction_num
 
-            if (setAdds or setRemoves) and not self._insistReadsConsistent:
-                raise Exception("You can't update an indexed value without read and write consistency.")
-
             if self._confirmCommitCallback is None:
                 result_queue = queue.Queue()
 
@@ -141,12 +134,8 @@ class View(object):
                 writes,
                 {k: v for k, v in setAdds.items() if v},
                 {k: v for k, v in setRemoves.items() if v},
-                (
-                    set(reads).union(set(writes)) if self._insistReadsConsistent else
-                    set(writes) if self._insistWritesConsistent else
-                    set()
-                ),
-                indexReads if self._insistIndexReadsConsistent else set(),
+                reads,
+                indexReads,
                 tid,
                 confirmCallback
             )
@@ -229,31 +218,6 @@ class ViewWatcher:
 
 class Transaction(View):
     _writeable = True
-
-    def consistency(self, writes=False, reads=False, full=False, none=False):
-        """Set the consistency model for the Transaction.
-
-        if 'none', then the transaction always succeeds
-        if 'writes', then we insist that any key you write to has not been updated, but
-            allow read keys to have been updated.
-        if 'reads', then we insist that any key you read or write is not updated, but allow
-            index updates
-        if 'full' is True, then we insist that any index you read from is not updated.
-            (this is very stringent)
-
-        This function modifies the view, and the semantics are only in place at
-        commit time.
-        """
-        assert sum(int(i) for i in (reads, writes, full, none)) == 1, "Please set exactly one option"
-
-        self._insistReadsConsistent = bool(reads or full)
-        self._insistWritesConsistent = bool(writes or reads or full)
-        self._insistIndexReadsConsistent = bool(full)
-
-        return self
-
-    def hasFullConsistency(self):
-        return self._insistIndexReadsConsistent
 
     def onConfirmed(self, callback):
         """Set a callback function to be called on the main event thread with a boolean indicating

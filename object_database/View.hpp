@@ -100,7 +100,7 @@ public:
    // lookup the current value of an object. if we have written to it, use that value.
    // otherwise use the value in the view. If the value does not exist, returns a null pointer.
    // we also record what values were read
-   instance_ptr getField(field_id field, object_id oid, Type* t) {
+   instance_ptr getField(field_id field, object_id oid, Type* t, bool recordAccess=true) {
       auto delete_it = m_delete_cache.find(std::make_pair(field, oid));
       if (delete_it != m_delete_cache.end()) {
          return nullptr;
@@ -113,7 +113,9 @@ public:
 
       instance_ptr i = m_versioned_objects.bestObjectVersion(t, *m_serialization_context, field, oid, m_tid).first;
 
-      m_read_values.insert(std::make_pair(field, oid));
+      if (recordAccess) {
+         m_read_values.insert(std::make_pair(field, oid));
+      }
 
       return i;
    }
@@ -132,7 +134,7 @@ public:
       if (data) {
          //if we're writing a new value, record whether this is a new object
          //that we're populating into 'm_new_writes'
-         bool existsAlready = getField(field, oid, t) != nullptr;
+         bool existsAlready = getField(field, oid, t, false) != nullptr;
          if (!existsAlready) {
             m_new_writes.insert(std::make_pair(field, oid));
          }
@@ -153,8 +155,6 @@ public:
    void indexAdd(field_id fid, index_value i, object_id o) {
       IndexKey key(fid, i);
 
-      m_set_reads.insert(key);
-
       //check if we are adding something back to an index it was removed from already
       auto remove_it = m_set_removes.find(key);
       if (remove_it != m_set_removes.end()) {
@@ -174,8 +174,6 @@ public:
 
    void indexRemove(field_id fid, index_value i, object_id o) {
       IndexKey key(fid, i);
-
-      m_set_reads.insert(key);
 
       //check if we are adding something back to an index it was removed from already
       auto add_it = m_set_adds.find(key);
