@@ -47,6 +47,7 @@ class SubprocessServiceManager(ServiceManager):
                  shutdownTimeout=None, logLevelName="INFO",
                  metricUpdateInterval=2.0
                  ):
+        self.cleanupLock = threading.Lock()
         self.host = host
         self.port = port
         self.storageDir = storageDir
@@ -149,25 +150,36 @@ class SubprocessServiceManager(ServiceManager):
         self.serviceProcesses = {}
 
     def cleanup(self):
-        for identity, workerProcess in list(self.serviceProcesses.items()):
-            if workerProcess.poll() is not None:
-                workerProcess.wait()
-                del self.serviceProcesses[identity]
+        with self.cleanupLock:
+            with self.lock:
+                toCheck = list(self.serviceProcesses.items())
 
-        with self.db.view():
-            for identity in list(self.serviceProcesses):
-                serviceInstance = service_schema.ServiceInstance.fromIdentity(identity)
+            for identity, workerProcess in toCheck:
+                if workerProcess.poll() is not None:
+                    workerProcess.wait()
+                    with self.lock:
+                        if identity in self.serviceProcesses:
+                            del self.serviceProcesses[identity]
 
-                if (not serviceInstance.exists()
-                        or (serviceInstance.shouldShutdown and
-                            time.time() - serviceInstance.shutdownTimestamp > self.shutdownTimeout)):
-                    workerProcess = self.serviceProcesses.get(identity)
-                    if workerProcess:
-                        workerProcess.terminate()
-                        workerProcess.wait()
-                        del self.serviceProcesses[identity]
+            with self.lock:
+                toCheck = list(self.serviceProcesses.items())
 
-        self.cleanupOldLogfiles()
+            with self.db.view():
+                for identity, workerProcess in toCheck:
+                    serviceInstance = service_schema.ServiceInstance.fromIdentity(identity)
+
+                    if (not serviceInstance.exists()
+                            or (serviceInstance.shouldShutdown and
+                                time.time() - serviceInstance.shutdownTimestamp > self.shutdownTimeout)):
+                        if workerProcess:
+                            workerProcess.terminate()
+                            workerProcess.wait()
+
+                            with self.lock:
+                                if identity in self.serviceProcesses:
+                                    del self.serviceProcesses[identity]
+
+            self.cleanupOldLogfiles()
 
     def extractLogData(self, targetInstanceId, maxBytes):
         assert isinstance(targetInstanceId, int)
