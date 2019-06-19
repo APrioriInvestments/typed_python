@@ -21,7 +21,7 @@ class Popover extends Component {
     render(){
         return h('div',
             {
-                class: "cell popover",
+                class: "cell",
                 style: this.props.extraData.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
