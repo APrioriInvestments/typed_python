@@ -50,6 +50,7 @@ import {_PlotUpdater} from './components/_PlotUpdater';
 import {Timestamp} from './components/Timestamp';
 import {SplitView} from './components/SplitView';
 import {PageView} from './components/PageView';
+import {DateTimePicker} from './components/DateTimePicker';
 
 const ComponentRegistry = {
     AsyncDropdown,
@@ -96,8 +97,8 @@ const ComponentRegistry = {
     Sheet,
     Plot,
     _PlotUpdater,
-    Timestamp,
-    SplitView
+    SplitView,
+    DateTimePicker
 };
 
 export {ComponentRegistry, ComponentRegistry as default};

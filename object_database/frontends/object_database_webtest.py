@@ -94,6 +94,11 @@ def main(argv=None):
 
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
+                    UninitializableService, "UninitializableService",
+                    target_count=1
+                )
+            with database.transaction():
+                service = ServiceManager.createOrUpdateService(
                     CellsTestService, "CellsTestService",
                     target_count=1
                 )

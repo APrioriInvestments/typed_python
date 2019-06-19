@@ -2650,3 +2650,38 @@ class Timestamp(Cell):
 
     def recalculate(self):
         self.exportData['timestamp'] = self.timestamp
+
+
+class DateTimePicker(Cell):
+    """Date time and date time range picker."""
+    def __init__(self, start, end=None, divStyle=None):
+        """
+        Parameters:
+        ----------
+        start: float or int
+            time from epoch
+        end : float or int
+            time from epoch. If end is provided the component effectively
+            becomes a datetime range picker.
+        divStyle: str
+        """
+        super().__init__()
+        assert isinstance(start, (float, int)), ("expected time since "
+                                                 "epoch float or int for"
+                                                 " 'start' argument.")
+        if end is not None:
+            assert isinstance(end, (float, int)), ("expected time since "
+                                                   "epoch float or int for"
+                                                   " 'end' argument.")
+        self.start = start
+        self.end = end
+        if divStyle is None:
+            self.divStyle = ""
+        else:
+            self.divStyle = divStyle
+
+    def recalculate(self):
+        self.contents = ""
+        self.exportData['start'] = self.start
+        self.exportData['end'] = self.end
+        self.exportData['divStyle'] = self.divStyle
