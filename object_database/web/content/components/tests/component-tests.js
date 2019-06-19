@@ -1,6 +1,7 @@
 /**
  * Mocha Tests for Base Component Class
  */
+require('jsdom-global')();
 var Component = require('../Component.js').Component;
 var chai = require('chai');
 var h = require('maquette').h;
