@@ -21,6 +21,7 @@ import textwrap
 import time
 
 from object_database.service_manager.ServiceManager import ServiceManager
+
 from object_database.service_manager.ServiceManager_test import (
     GraphDisplayService,
     TextEditorService,
@@ -29,6 +30,9 @@ from object_database.service_manager.ServiceManager_test import (
     DropdownTestService,
     BigGridTestService
 )
+
+from object_database.web.CellsTestService import CellsTestService
+
 from object_database.web.ActiveWebServiceSchema import (
     active_webservice_schema,
 )
@@ -90,9 +94,10 @@ def main(argv=None):
 
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
-                    UninitializableService, "UninitializableService",
+                    CellsTestService, "CellsTestService",
                     target_count=1
                 )
+
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
                     HappyService, "HappyService", target_count=1
