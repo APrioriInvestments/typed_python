@@ -1,0 +1,75 @@
+/**
+ * Application Wide Stylesheet for ActiveWebService
+ **/
+
+/* ResizablePanel and Friends
+ * =====================================================*/
+.resizable-panel {
+    display: flex;
+    width: 100%;
+    height: 100%;
+}
+
+.resizable-panel.vertical-panel {
+    flex-direction: column
+}
+
+.resizable-panel-item {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    flex: 1 1 auto;
+}
+
+.resizable-panel-handle {
+    padding: 0;
+    flex: 0 0 auto;
+}
+
+.horizontal-panel > .resizable-panel-handle::before {
+    height: 100%;
+    width: 4px;
+}
+
+.vertical-panel > .resizable-panel-handle::before {
+    width: 100%;
+    height: 4px;
+}
+
+.resizable-panel-handle::before {
+    content: "";
+    display: block;
+    margin: 0 auto;
+    background: black;
+}
+
+.vertical-panel > .resizable-panel-handle {
+    cursor: ns-resize;
+    height: 20px;
+}
+
+.horizontal-panel > .resizable-panel-handle {
+    cursor: ew-resize;
+    width: 20px;
+}
+
+/* In the Split.js implementation, we can
+ * style the created 'gutters' (resizers)
+ */
+.resizable-panel .gutter {
+    background-color: transparent;
+    transition: background-color 150ms linear;
+}
+
+.resizable-panel .gutter:hover {
+    background-color: rgba(200, 200, 200, 0.5);
+    transition background-color 150ms linear;
+}
+
+.vertical-panel > .gutter:hover {
+    cursor: ns-resize;
+}
+
+.horizontal-panel > .gutter:hover {
+    cursor: ew-resize;
+}

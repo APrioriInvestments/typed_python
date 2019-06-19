@@ -13,10 +13,13 @@
   "dependencies": {
     "chai": "^4.2.0",
     "esm": "^3.2.25",
+    "jsdom": "^15.1.1",
+    "jsdom-global": "^3.0.2",
     "maquette": "^3.3.4",
     "mocha": "^6.1.4",
     "moment": "^2.24.0",
     "moment-timezone": "^0.5.25",
+    "split.js": "^1.5.11",
     "webpack": "^4.32.2"
   },
   "devDependencies": {

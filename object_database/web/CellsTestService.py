@@ -26,7 +26,6 @@ import object_database as object_database
 from object_database.web.CellsTestPage import CellsTestPage
 from object_database import Schema
 
-
 schema = Schema("core.web.CellsTestService")
 
 
@@ -50,7 +49,6 @@ def getPages():
            value is not CellsTestPage:
             try:
                 instance = value()
-
                 _pagesCache.setdefault(instance.category(), {})[
                     value.__name__] = instance
             except Exception:

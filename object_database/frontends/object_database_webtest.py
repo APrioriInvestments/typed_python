@@ -26,7 +26,7 @@ from object_database.service_manager.ServiceManager_test import (
     GraphDisplayService,
     TextEditorService,
     HappyService,
-    UninitializableService,
+    # UninitializableService,
     DropdownTestService,
     BigGridTestService
 )
@@ -94,7 +94,7 @@ def main(argv=None):
 
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
-                    UninitializableService, "UninitializableService",
+                    CellsTestService, "CellsTestService",
                     target_count=1
                 )
 
