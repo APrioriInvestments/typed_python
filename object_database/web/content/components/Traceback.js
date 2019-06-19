@@ -24,7 +24,9 @@ class  Traceback extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Traceback",
                 class: "alert alert-primary"
-            }, [this.getReplacementElementFor('child')])
+            }, [
+                h('pre', {}, [this.getReplacementElementFor('child')])
+            ])
         );
     }
 }
