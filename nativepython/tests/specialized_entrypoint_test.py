@@ -13,8 +13,11 @@
 #   limitations under the License.
 
 from typed_python import ListOf
+from typed_python._types import touchCompiledSpecializations
 from nativepython import SpecializedEntrypoint
 from nativepython.runtime import Runtime
+import traceback
+import threading
 import time
 import unittest
 
@@ -74,3 +77,41 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             self.assertGreater(speedup, 10)
 
             print("speedup for ", T, " is ", speedup)  # I get about 70x
+
+    def test_many_threads_compiling_same_specialization(self):
+        @SpecializedEntrypoint
+        def sumFun(a, b):
+            """Create a new instance of type 'A' and filter where the flags are True in 'flags'"""
+            res = 0
+            while a < b:
+                res = res + a
+                a = a + 1
+
+            return res
+
+        failed = []
+        done = [False]
+
+        def threadloop():
+            try:
+                while not done[0]:
+                    sumFun(0.0, 10**4)
+            except Exception:
+                traceback.print_exc()
+                failed.append(True)
+
+        threads = [threading.Thread(target=threadloop) for x in range(10)]
+        for t in threads:
+            t.daemon = True
+            t.start()
+
+        t0 = time.time()
+        while time.time() - t0 < 10.0:
+            touchCompiledSpecializations(sumFun.__typed_python_function__.overloads[0].functionTypeObject, 0)
+
+        done[0] = True
+
+        for t in threads:
+            t.join()
+
+        assert not failed

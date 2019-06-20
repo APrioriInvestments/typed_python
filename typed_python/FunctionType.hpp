@@ -147,6 +147,12 @@ public:
             mCompiledSpecializations.push_back(CompiledSpecialization(e,returnType,argTypes));
         }
 
+        void touchCompiledSpecializations() {
+            //force the memory for the compiled specializations to move.
+            std::vector<CompiledSpecialization> other = mCompiledSpecializations;
+            std::swap(mCompiledSpecializations, other);
+        }
+
     private:
         PyFunctionObject* mFunctionObj;
         Type* mReturnType;
@@ -326,6 +332,16 @@ public:
         }
 
         mOverloads[whichOverload].addCompiledSpecialization(entrypoint, returnType, argTypes);
+    }
+
+    // a test function to force the compiled specialization table to change memory
+    // position
+    void touchCompiledSpecializations(long whichOverload) {
+        if (whichOverload < 0 || whichOverload >= mOverloads.size()) {
+            throw std::runtime_error("Invalid overload index.");
+        }
+
+        mOverloads[whichOverload].touchCompiledSpecializations();
     }
 
 private:

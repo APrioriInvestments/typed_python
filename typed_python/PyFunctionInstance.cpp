@@ -257,9 +257,11 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
                 args.push_back(i.data());
             }
 
+            auto functionPtr = specialization.getFuncPtr();
+
             PyEnsureGilReleased releaseTheGIL;
 
-            specialization.getFuncPtr()(returnData, &args[0]);
+            functionPtr(returnData, &args[0]);
         });
 
         return std::pair<bool, PyObject*>(true, (PyObject*)extractPythonObject(result.data(), result.type()));

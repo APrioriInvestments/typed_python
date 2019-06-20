@@ -1295,6 +1295,40 @@ PyObject *installNativeFunctionPointer(PyObject* nullValue, PyObject* args) {
     return incref(Py_None);
 }
 
+PyObject *touchCompiledSpecializations(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "touchCompiledSpecializations takes 2 positional arguments");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'touchCompiledSpecializations' must be a Function");
+        return NULL;
+    }
+
+    if (!PyLong_Check(a2)) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'touchCompiledSpecializations' must be an integer 'index'");
+        return NULL;
+    }
+
+    Function* f = (Function*)t1;
+
+    int index = PyLong_AsLong(a2);
+
+    if (index < 0 || index >= f->getOverloads().size()) {
+        PyErr_SetString(PyExc_TypeError, "index is out of bounds");
+        return NULL;
+    }
+
+    f->touchCompiledSpecializations(index);
+
+    return incref(Py_None);
+}
+
 PyObject *isBinaryCompatible(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
         PyErr_SetString(PyExc_TypeError, "isBinaryCompatible takes 2 positional arguments");
@@ -1443,6 +1477,7 @@ static PyMethodDef module_methods[] = {
     {"wantsToDefaultConstruct", (PyCFunction)wantsToDefaultConstruct, METH_VARARGS, NULL},
     {"all_alternatives_empty", (PyCFunction)all_alternatives_empty, METH_VARARGS, NULL},
     {"installNativeFunctionPointer", (PyCFunction)installNativeFunctionPointer, METH_VARARGS, NULL},
+    {"touchCompiledSpecializations", (PyCFunction)touchCompiledSpecializations, METH_VARARGS, NULL},
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},

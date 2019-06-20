@@ -159,5 +159,6 @@ def SpecializedEntrypoint(f):
         return f(*args)
 
     inner.__qualname__ = str(f)
+    inner.__typed_python_function__ = f
 
     return inner
