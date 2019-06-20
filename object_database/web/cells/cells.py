@@ -433,11 +433,10 @@ class Cells:
                 except Exception:
                     self._logger.error(
                         "Node %s had exception during recalculation:\n%s", n, traceback.format_exc())
-                    self._logger.error(
-                        "Subscribed cell threw an exception:\n%s", traceback.format_exc())
                     n.children = {'____contents__': Traceback(
                         traceback.format_exc())}
                     n.contents = "____contents__"
+                    time.sleep(0.1)
                 finally:
                     _cur_cell.cell = None
                     _cur_cell.isProcessingMessage = False
@@ -482,9 +481,6 @@ class Cells:
             'replacement_keys': [k for k in cell.children.keys()],
             'extra_data': cell.exportData
         }
-        # print()
-        # print(str(res))
-        # print()
 
         if cell.postscript:
             res['postscript'] = cell.postscript
@@ -2191,11 +2187,12 @@ class SortWrapper:
 
 
 class SingleLineTextBox(Cell):
-    def __init__(self, slot, pattern=None):
+    def __init__(self, slot, size=35, pattern=None):
         super().__init__()
         self.children = {}
         self.pattern = None
         self.slot = slot
+        self.size = size
 
     def recalculate(self):
         inlineScript = """
@@ -2215,6 +2212,7 @@ class SingleLineTextBox(Cell):
             .set_attribute('id', 'text_%s' % self.identity)
             .set_attribute('onchange', inlineScript)
             .set_attribute('value', inputValue)
+            .set_attribute('size', str(self.size))
         )
         if self.pattern:
             element.set_attribute('pattern', self.pattern)
