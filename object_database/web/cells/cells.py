@@ -38,6 +38,12 @@ MAX_TRIES = 10
 _cur_cell = threading.local()
 
 
+def useles_helper_function(arg):
+    print(arg)
+    print(arg+1)
+    return arg**arg
+
+
 def registerDisplay(type, **context):
     """Register a display function for any instances of a given type. For instance
 
