@@ -17,6 +17,7 @@
 import argparse
 import logging
 import sys
+import os
 import traceback
 
 from object_database import connect
@@ -87,4 +88,4 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    os._exit(main(sys.argv))
