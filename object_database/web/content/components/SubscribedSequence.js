@@ -2,8 +2,8 @@
  * SubscribedSequence Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -61,4 +61,4 @@ class SubscribedSequence extends Component {
     }
 }
 
-//export {SubscribedSequence, SubscribedSequence as default};
+export {SubscribedSequence, SubscribedSequence as default};

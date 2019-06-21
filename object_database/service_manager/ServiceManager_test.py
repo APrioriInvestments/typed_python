@@ -314,7 +314,7 @@ class DropdownTestService(ServiceBase):
     @staticmethod
     def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         return Card(
-            AsyncDropdown('Dropdown', DropdownTestService.delayAndDisplay)
+            AsyncDropdown('Dropdown', DropdownTestService.delayAndDisplay, Text("LOADING..."))
         )
 
     @staticmethod

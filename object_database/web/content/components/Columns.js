@@ -2,8 +2,8 @@
  * Columns Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -46,4 +46,4 @@ class Columns extends Component {
 }
 
 
-//export {Columns, Columns as default};
+export {Columns, Columns as default};

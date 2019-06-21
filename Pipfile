@@ -29,6 +29,7 @@ pyyaml = "*"
 redis = "*"
 requests = "*"
 websockets = "*"
+nodeenv = "*"
 nativepython = {editable = true,path = "."}
 
 [requires]

@@ -3,8 +3,8 @@
  * NOTE: This is in part a wrapper
  * for handsontables.
  */
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 /**
@@ -22,6 +22,14 @@ class Sheet extends Component {
         // Bind context to methods
         this.initializeTable = this.initializeTable.bind(this);
         this.initializeHooks = this.initializeHooks.bind(this);
+
+        /**
+         * WARINING: The Cell version of Sheet is still using
+         * certian postscripts because we have not yet refactored
+         * the socket protocol.
+         * Remove this warning about it once that happens!
+         **/
+        console.warn(`[TODO] Sheet still uses certain postscripts in its interaction. See component constructor comment`);
     }
 
     componentDidLoad(){
@@ -158,7 +166,7 @@ const SyntheticIntegerArray = function(size, emptyRow = [], callback){
         let res = Array(high - low);
         let initLow = low;
         while(low < high){
-            out = this.cache[low];
+            let out = this.cache[low];
             if(out === undefined){
                 if(callback){
                     callback({
@@ -175,4 +183,4 @@ const SyntheticIntegerArray = function(size, emptyRow = [], callback){
     };
 };
 
-//export {Sheet, Sheet as default};
+export {Sheet, Sheet as default};

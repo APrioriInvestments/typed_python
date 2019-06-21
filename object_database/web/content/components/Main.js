@@ -2,8 +2,8 @@
  * Main Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -33,4 +33,4 @@ class Main extends Component {
     }
 }
 
-//export {Main, Main as default};
+export {Main, Main as default};

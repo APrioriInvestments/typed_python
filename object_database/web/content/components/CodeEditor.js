@@ -2,15 +2,15 @@
  * CodeEditor Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class CodeEditor extends Component {
     constructor(props, ...args){
         super(props, ...args);
         this.editor = null;
         // used to schedule regular server updates
-        this.SERVER_UPDATE_DELAY_MS = 200;
+        this.SERVER_UPDATE_DELAY_MS = 1;
         this.editorStyle = 'width:100%;height:100%;margin:auto;border:1px solid lightgray;';
 
         this.setupEditor = this.setupEditor.bind(this);
@@ -69,7 +69,7 @@ class CodeEditor extends Component {
             [h('div', { id: "editor" + this.props.id, style: this.editorStyle }, [])
         ]);
     }
-    
+
     setupEditor(){
         let editorId = "editor" + this.props.id;
         // TODO These are global var defined in page.html
@@ -153,4 +153,4 @@ class CodeEditor extends Component {
     }
 }
 
-//export {CodeEditor, CodeEditor as default};
+export {CodeEditor, CodeEditor as default};

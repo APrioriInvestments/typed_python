@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "165517571c63734b573432061f0b8b16e01f13fbca10e330292d6b8ef828fd23"
+            "sha256": "f5ab52b63a1fbb27241636f9cb67e4b351cc1fe1dbc1807ff0d0e529973d1bd9"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -26,25 +26,25 @@
         },
         "boto3": {
             "hashes": [
-                "sha256:31849bbfa859d35eef2aa88c65fa497ce697254367822ba84ea6e332c584638c",
-                "sha256:36d695fac1ad08278b14e2d1a60f3a15f46e83226d0e5075479af8fa3b210b9a"
+                "sha256:1a0cc76f91f1c46804da4c6486ab4b806a765eaa3470a2d6c1cc6c1a0f466057",
+                "sha256:1cd2f629a1340d217e8cc746e9241fe8d51cb4e654050921b2cdb22498978b4c"
             ],
             "index": "pypi",
-            "version": "==1.9.166"
+            "version": "==1.9.173"
         },
         "botocore": {
             "hashes": [
-                "sha256:594ab91e7f06857476cee6139cb97c88df40c6adc7867976cb17669929da70e1",
-                "sha256:603cb288468f6b4212ee31aca39e313106c45df31349b269b15426fed3f8e787"
+                "sha256:18903b5dabfc081ed7d00aac5365b46878f39ca4f4f5c91537510583697e4ae2",
+                "sha256:1b7adcd080fcb010831cbbbaa2e6de26b79401a021ad5462678a36711bf442ae"
             ],
-            "version": "==1.12.166"
+            "version": "==1.12.173"
         },
         "certifi": {
             "hashes": [
-                "sha256:59b7658e26ca9c7339e00f8f4636cdfe59d34fa37b9b04f6f9e9926b3cece1a5",
-                "sha256:b26104d6835d1f5e49452a26eb2ff87fe7090b89dfcaee5ea2212697e1e1d7ae"
+                "sha256:046832c04d4e752f37383b628bc601a7ea7211496b4638f6514d0e5b9acc4939",
+                "sha256:945e3ba63a0b9f577b1395204e13c3a231f9bc0223888be653286534e5873695"
             ],
-            "version": "==2019.3.9"
+            "version": "==2019.6.16"
         },
         "chardet": {
             "hashes": [
@@ -301,6 +301,13 @@
         "nativepython": {
             "editable": true,
             "path": "."
+        },
+        "nodeenv": {
+            "hashes": [
+                "sha256:ad8259494cf1c9034539f6cced78a1da4840a4b157e23640bc4a0c0546b0cb7a"
+            ],
+            "index": "pypi",
+            "version": "==1.3.3"
         },
         "nose": {
             "hashes": [

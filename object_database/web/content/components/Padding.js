@@ -2,8 +2,8 @@
  * Padding Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class Padding extends Component {
     constructor(props, ...args){
@@ -22,4 +22,4 @@ class Padding extends Component {
     }
 }
 
-//export {Padding, Padding as default};
+export {Padding, Padding as default};

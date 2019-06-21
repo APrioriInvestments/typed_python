@@ -1,5 +1,6 @@
 include object_database/web/content/*.css
 include object_database/web/content/*.html
+include object_database/web/content/dist/main.bundle.js
 include object_database/web/templates/*.html
 include object_database/service_manager/aws/*.sh
 include object_database/logging.yaml

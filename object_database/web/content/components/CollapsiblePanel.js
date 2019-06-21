@@ -1,8 +1,8 @@
 /**
  * CollapsiblePanel Cell Component
  */
-//import {Component} from './Component.js';
-//import {h} from 'maquette';
+import {Component} from './Component.js';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -57,4 +57,4 @@ class CollapsiblePanel extends Component {
 }
 
 
-//export {CollapsiblePanel, CollapsiblePanel as default}
+export {CollapsiblePanel, CollapsiblePanel as default}

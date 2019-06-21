@@ -2,8 +2,8 @@
  * ContextualDisplay Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -29,4 +29,4 @@ class ContextualDisplay extends Component {
     }
 }
 
-//export {ContextualDisplay, ContextualDisplay as default};
+export {ContextualDisplay, ContextualDisplay as default};

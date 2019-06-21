@@ -2,8 +2,8 @@
  * LoadContentsFromUrl Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class LoadContentsFromUrl extends Component {
     constructor(props, ...args){
@@ -23,4 +23,4 @@ class LoadContentsFromUrl extends Component {
 
 }
 
-//export {LoadContentsFromUrl, LoadContentsFromUrl as default};
+export {LoadContentsFromUrl, LoadContentsFromUrl as default};

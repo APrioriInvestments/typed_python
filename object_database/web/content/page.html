@@ -29,156 +29,20 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js" integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q" crossorigin="anonymous"></script>
 <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
 
-<!-- Cell Handling Infrastructure -->
-<script src="/content/CellSocket.js"></script>
-<script src="/content/CellHandler.js"></script>
+<!-- Webpack Bundle of Application and Dependencies -->
+<script src="/content/dist/main.bundle.js"></script>
 
-<!-- Debugging Scripts -->
-<script src="/content/cellReporter.js"></script>
-
-<!-- Component Utilities -->
-<script src="/content/components/util/ReplacementsHandler.js"></script>
-
-<!-- Cell Components -->
-<script src="/content/components/Component.js"></script>
-<script src="/content/components/Card.js"></script>
-<script src="/content/components/CardTitle.js"></script>
-<script src="/content/components/Modal.js"></script>
-<script src="/content/components/Octicon.js"></script>
-<script src="/content/components/Badge.js"></script>
-<script src="/content/components/Expands.js"></script>
-<script src="/content/components/LoadContentsFromUrl.js"></script>
-<script src="/content/components/Button.js"></script>
-<script src="/content/components/ButtonGroup.js"></script>
-<script src="/content/components/Clickable.js"></script>
-<script src="/content/components/CollapsiblePanel.js"></script>
-<script src="/content/components/Text.js"></script>
-<script src="/content/components/Padding.js"></script>
-<script src="/content/components/Span.js"></script>
-<script src="/content/components/Sequence.js"></script>
-<script src="/content/components/Columns.js"></script>
-<script src="/content/components/HeaderBar.js"></script>
-<script src="/content/components/LargePendingDownloadDisplay.js"></script>
-<script src="/content/components/_NavTab.js"></script>
-<script src="/content/components/Tabs.js"></script>
-<script src="/content/components/Dropdown.js"></script>
-<script src="/content/components/CircleLoader.js"></script>
-<script src="/content/components/AsyncDropdown.js"></script>
-<script src="/content/components/Container.js"></script>
-<script src="/content/components/Traceback.js"></script>
-<script src="/content/components/Popover.js"></script>
-<script src="/content/components/Code.js"></script>
-<script src="/content/components/Subscribed.js"></script>
-<script src="/content/components/SubscribedSequence.js"></script>
-<script src="/content/components/ContextualDisplay.js"></script>
-<script src="/content/components/SingleLineTextBox.js"></script>
-<script src="/content/components/CodeEditor.js"></script>
-<script src="/content/components/Table.js"></script>
-<script src="/content/components/Grid.js"></script>
-<script src="/content/components/Sheet.js"></script>
-<script src="/content/components/Plot.js"></script>
-<script src="/content/components/_PlotUpdater.js"></script>
-<script src="/content/components/Main.js"></script>
-<script src="/content/components/RootCell.js"></script>
-<script src="/content/components/Scrollable.js"></script>
+<!-- <script src="/content/components/Table2.js"></script> -->
 
 <script>
- // This is the initial render function. It is called when "DOMContentLoaded"
- // event is fired with the actual rendering handled by the maquette.projector
- // (see below under `document.addEventListener('DOMContentLoaded',...)`
- // TODO: potentially this should all be moved to CellHandler
- function render() {
-     return h("div", {}, [
-	 h("div", {id: "page_root"}, [
-	     h("div.container-fluid", {}, [
-		 h("div.card", {class: "mt-5"}, [
-		     h("div.card-body", {}, ["Loading..."])
-		 ])
-	     ])
-	 ]),
-	 h("div", {id: "holding_pen", style: "display:none"}, [])
-     ]);
- }
-</script>
-
-<script>
- // maquette vdom setup
- // maquette.h is the maquette virtual hyperscript func for vdom interaction
- var h = maquette.h;
- var projector = maquette.createProjector();
-
- var langTools = ace.require("ace/ext/language_tools");
- var aceEditors = {};
- var handsOnTables = {}; // Not sure what this is or where it's used
-
- const availableComponents = {
-     AsyncDropdown,
-     AsyncDropdownContent,
-     Badge,
-     Button,
-     ButtonGroup,
-     Card,
-     CardTitle,
-     CircleLoader,
-     Clickable,
-     Code,
-     CodeEditor,
-     CollapsiblePanel,
-     Columns,
-     Container,
-     ContextualDisplay,
-     Dropdown,
-     Expands,
-     HeaderBar,
-     LoadContentsFromUrl,
-     LargePendingDownloadDisplay,
-		 Main,
-     Modal,
-     Octicon,
-     Padding,
-     Popover,
-		 RootCell,
-     Sequence,
-     Scrollable,
-     SingleLineTextBox,
-     Span,
-     Subscribed,
-     SubscribedSequence,
-     Table,
-     Tabs,
-     Text,
-     Traceback,
-     _NavTab,
-     Grid,
-     Sheet,
-     Plot,
-     _PlotUpdater
- };
-
- const cellSocket = new CellSocket();
- const cellHandler = new CellHandler(h, projector, availableComponents);
- cellSocket.onPostscripts(cellHandler.handlePostscript);
- cellSocket.onMessage(cellHandler.handleMessage);
- cellSocket.onClose(cellHandler.showConnectionClosed);
- cellSocket.onError(err => {
-     console.error("SOCKET ERROR: ", err);
- });
- document.addEventListener('DOMContentLoaded', () => {
-	   projector.append(document.body, render);
-     cellSocket.connect();
- });
+// Now empty in process of implementing Webpack
 
 </script>
 
 <!-- Helper functions; TODO: should likely be moved or integrated elsewhere -->
 
 <script>
- /**
-  * NOTE: Due to the current structure of Cells on
-  * the Python side, we *still* need to maintain these
-  * functions in the global space -- for Plot and _PlotUpdater
-  */
-function mapPlotlyData(d) {
+ function mapPlotlyData(d) {
      if (d.timestamp !== undefined) {
          d.timestamp = unpackHexFloats(d.timestamp)
          d.x = Array.from(d.timestamp).map(ts => new Date(ts * 1000))

@@ -2,15 +2,14 @@
  * ButtonGroup Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
-
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
  * ------------------
- * This component has a single
- * enumerable replacement:
+ * This component has a single enumerated
+ * replacement:
  * * `button`
  */
 class ButtonGroup extends Component {
@@ -26,10 +25,11 @@ class ButtonGroup extends Component {
                 "data-cell-type": "ButtonGroup",
                 class: "btn-group",
                 "role": "group"
-            }, [this.getReplacementElementsFor('button')])
+            }, this.getReplacementElementsFor('button')
+             )
         );
     }
 
 }
 
-//export {ButtonGroup, ButtonGroup as default};
+export {ButtonGroup, ButtonGroup as default};

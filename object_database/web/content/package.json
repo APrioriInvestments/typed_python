@@ -1,0 +1,25 @@
+{
+  "name": "content",
+  "version": "1.0.0",
+  "description": "",
+  "main": "CellHandler.js",
+  "scripts": {
+    "test": "./node_modules/mocha/bin/mocha --require esm ./components/tests/",
+    "build": "webpack",
+    "build:frontend": "webpack"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chai": "^4.2.0",
+    "esm": "^3.2.25",
+    "maquette": "^3.3.4",
+    "mocha": "^6.1.4",
+    "webpack": "^4.32.2"
+  },
+  "devDependencies": {
+    "css-loader": "^2.1.1",
+    "style-loader": "^0.23.1",
+    "webpack-cli": "^3.3.2"
+  }
+}

@@ -2,8 +2,8 @@
  * Tabs Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 /**
@@ -43,4 +43,4 @@ class Tabs extends Component {
 }
 
 
-//export {Tabs, Tabs as default};
+export {Tabs, Tabs as default};

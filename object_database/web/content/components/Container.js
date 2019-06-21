@@ -2,8 +2,8 @@
  * Container Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -35,4 +35,4 @@ class Container extends Component {
     }
 }
 
-//export {Container, Container as default};
+export {Container, Container as default};

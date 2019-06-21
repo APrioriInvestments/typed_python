@@ -2,14 +2,14 @@
  * Card Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
  * ------------------
  * This component contains two
- * regular replacement:
+ * regular replacements:
  * * `contents`
  * * `header`
  */
@@ -18,13 +18,22 @@ class Card extends Component {
         super(props, ...args);
 
         // Bind component methods
+        this.makeBody = this.makeBody.bind(this);
         this.makeHeader = this.makeHeader.bind(this);
     }
 
     render(){
-        let bodyClass = "card-body";
+        let bodyClass = 'card-body';
         if(this.props.extraData.padding){
-            bodyClass += ` p-${this.props.extraData.padding}`;
+            bodyClass = `card-body p-${this.props.extraData.padding}`;
+        }
+        let bodyArea = h('div', {
+            class: bodyClass
+        }, [this.makeBody()]);
+        let header = this.makeHeader();
+        let headerArea = null;
+        if(header){
+            headerArea = h('div', {class: "card-header"}, [header]);
         }
         return h('div',
             {
@@ -33,23 +42,28 @@ class Card extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Card"
-            },
-                 [
-                     this.makeHeader(),
-                     h('div', { class: bodyClass }, [
-                         this.getReplacementElementFor('contents')
-                     ])
-        ]);
+            }, [headerArea, bodyArea]);
+    }
+
+    makeBody(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('contents');
+        } else {
+            return this.renderChildNamed('contents');
+        }
     }
 
     makeHeader(){
-        if(this.replacements.hasReplacement('header')){
-            return h('div', {class: 'card-header'}, [
-                this.getReplacementElementFor('header')
-            ]);
+        if(this.usesReplacements){
+            if(this.replacements.hasReplacement('header')){
+                return this.getReplacementElementFor('header');
+            }
+        } else {
+            return this.renderChildNamed('header');
         }
         return null;
     }
-}
+};
 
-//export {Card, Card as default};
+console.log('Card module loaded');
+export {Card, Card as default};

@@ -3,23 +3,41 @@
  * Should be extended by other
  * Cell classes on JS side.
  */
-
-// NOTE: For the moment we assume global
-// availability of the `h` hyperscript
-// constructor and the ReplacementsHandler util class.
-//import {h} from 'maquette';
-//import {ReplacementsHandler} from './util/ReplacementsHandler';
+import {ReplacementsHandler} from './util/ReplacementsHandler';
+import {PropTypes} from './util/PropertyValidator';
+import {h} from 'maquette';
 
 class Component {
-    constructor(props = {}, children = [], replacements = []){
-        this.props = props;
-        this.children = children;
+    constructor(props = {}, replacements = []){
+        this._updateProps(props);
         this.replacements = new ReplacementsHandler(replacements);
+        this.usesReplacements = (replacements.length > 0);
+
+        // Setup parent relationship, if
+        // any. In this abstract class
+        // there isn't one by default
+        this.parent = null;
+        this._setupChildRelationships();
+
+        // Ensure that we have passed in an id
+        // with the props. Should error otherwise.
+        if(!this.props.id || this.props.id == undefined){
+            throw Error('You must define an id for every component props!');
+        }
+
+        this.validateProps();
 
         // Bind context to methods
         this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
         this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
         this.componentDidLoad = this.componentDidLoad.bind(this);
+        this.childrenDo = this.childrenDo.bind(this);
+        this.namedChildrenDo = this.namedChildrenDo.bind(this);
+        this.renderChildNamed = this.renderChildNamed.bind(this);
+        this.renderChildrenNamed = this.renderChildrenNamed.bind(this);
+        this._setupChildRelationships = this._setupChildRelationships.bind(this);
+        this._updateProps = this._updateProps.bind(this);
+        this._recursivelyMapNamedChildren = this._recursivelyMapNamedChildren.bind(this);
     }
 
     render(){
@@ -50,7 +68,7 @@ class Component {
         let replacement = this.replacements.getReplacementFor(replacementName);
         if(replacement){
             let newId = `${this.props.id}_${replacement}`;
-            return h('div', {id: newId, key: newId, 'data-maq-key': newId}, []);
+            return h('div', {id: newId, key: newId}, []);
         }
         return null;
     }
@@ -69,8 +87,157 @@ class Component {
         return this.replacements.mapReplacementsFor(replacementName, replacement => {
             let newId = `${this.props.id}_${replacement}`;
             return (
-                h('div', {id: newId, key: newId, 'data-maq-key': newId})
+                h('div', {id: newId, key: newId})
             );
         });
     }
-}
+
+    /**
+     * If there is a `propTypes` object present on
+     * the constructor (ie the component class),
+     * then run the PropTypes validator on it.
+     */
+    validateProps(){
+        if(this.constructor.propTypes){
+            PropTypes.validate(
+                this.constructor.name,
+                this.props,
+                this.constructor.propTypes
+            );
+        }
+    }
+
+    /**
+     * Looks up the passed key in namedChildren and
+     * if found responds with the result of calling
+     * render on that child component. Returns null
+     * otherwise.
+     */
+    renderChildNamed(key){
+        let foundChild = this.props.namedChildren[key];
+        if(foundChild){
+            return foundChild.render();
+        }
+        return null;
+    }
+
+    /**
+     * Looks up the passed key in namedChildren
+     * and if found -- and the value is an Array
+     * or Array of Arrays, responds with an
+     * isomorphic structure that has the rendered
+     * values of each component.
+     */
+    renderChildrenNamed(key){
+        let foundChildren = this.props.namedChildren[key];
+        if(foundChildren){
+            return this._recursivelyMapNamedChildren(foundChildren, child => {
+                return child.render();
+            });
+        }
+        return [];
+    }
+
+
+
+    /**
+     * Getter that will respond with the
+     * constructor's (aka the 'class') name
+     */
+    get name(){
+        return this.constructor.name;
+    }
+
+    /**
+     * Getter that will respond with an
+     * array of rendered (ie configured
+     * hyperscript) objects that represent
+     * each child. Note that we will create keys
+     * for these based on the ID of this parent
+     * component.
+     */
+    get renderedChildren(){
+        if(this.props.children.length == 0){
+            return [];
+        }
+        return this.props.children.map(childComponent => {
+            let renderedChild = childComponent.render();
+            renderedChild.properties.key = `${this.props.id}-child-${childComponent.props.id}`;
+            return renderedChild;
+        });
+    }
+
+    /** Public Util Methods **/
+
+    /**
+     * Calls the provided callback on each
+     * array child for this component, with
+     * the child as the sole arg to the
+     * callback
+     */
+    childrenDo(callback){
+        this.props.children.forEach(child => {
+            callback(child);
+        });
+    }
+
+    /**
+     * Calls the provided callback on
+     * each named child with key, child
+     * as the two args to the callback.
+     */
+    namedChildrenDo(callback){
+        Object.keys(this.props.namedChildren).forEach(key => {
+            let child = this.props.namedChildren[key];
+            callback(key, child);
+        });
+    }
+
+    /** Private Util Methods **/
+
+    /**
+     * Sets the parent attribute of all incoming
+     * array and/or named children to this
+     * instance.
+     */
+    _setupChildRelationships(){
+        // Named children first
+        Object.keys(this.props.namedChildren).forEach(key => {
+            let child = this.props.namedChildren[key];
+            child.parent = this;
+        });
+
+        // Now array children
+        this.props.children.forEach(child => {
+            child.parent = this;
+        });
+    }
+
+    /**
+     * Updates this components props object
+     * based on an incoming object
+     */
+    _updateProps(incomingProps){
+        this.props = incomingProps;
+        this.props.children = incomingProps.children || [];
+        this.props.namedChildren = incomingProps.namedChildren || {};
+        this._setupChildRelationships();
+    }
+
+    /**
+     * Recursively maps a one or multidimensional
+     * named children value with the given mapping
+     * function.
+     */
+    _recursivelyMapNamedChildren(collection, callback){
+        return collection.map(item => {
+            if(Array.isArray(item)){
+                return this._recursivelyMapNamedChildren(item, callback);
+            } else {
+                return callback(item);
+            }
+        });
+    }
+};
+
+export {Component, Component as default};

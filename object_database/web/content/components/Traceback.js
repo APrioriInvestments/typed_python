@@ -2,8 +2,8 @@
  * Traceback Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -32,4 +32,4 @@ class  Traceback extends Component {
 }
 
 
-//export {Traceback, Traceback as default};
+export {Traceback, Traceback as default};

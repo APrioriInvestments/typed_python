@@ -1,4 +1,4 @@
-var replacements = require('./replacement');
+var replacements = require('../util/ReplacementsHandler.js');
 var ReplacementsHandler = replacements.ReplacementsHandler;
 var chai = require('chai');
 var assert = chai.assert;

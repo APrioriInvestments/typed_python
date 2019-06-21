@@ -2,8 +2,8 @@
  * Sequence Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -12,9 +12,19 @@
  * replacement:
  * * `c`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `elements` (array) - A list of Cells that are in the
+ *    sequence.
+ */
 class Sequence extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeElements = this.makeElements.bind(this);
     }
 
     render(){
@@ -25,9 +35,17 @@ class Sequence extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Sequence",
                 style: this.props.extraData.divStyle
-            }, this.getReplacementElementsFor('c'))
+            }, this.makeElements())
         );
+    }
+
+    makeElements(){
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor('c');
+        } else {
+            return this.renderChildrenNamed('elements');
+        }
     }
 }
 
-//export {Sequence, Sequence as default};
+export {Sequence, Sequence as default};

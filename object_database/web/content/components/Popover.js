@@ -2,8 +2,8 @@
  * Popover Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -54,4 +54,4 @@ class Popover extends Component {
     }
 }
 
-//export {Popover, Popover as default};
+export {Popover, Popover as default};

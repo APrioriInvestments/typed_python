@@ -2,8 +2,8 @@
  * RootCell Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -28,4 +28,4 @@ class RootCell extends Component {
     }
 }
 
-//export {RootCell, RootCell as default};
+export {RootCell, RootCell as default};

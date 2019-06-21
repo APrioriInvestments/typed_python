@@ -2,8 +2,8 @@
  * Grid Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -13,6 +13,7 @@
  * * `header`
  * * `rowlabel`
  * * `child`
+ *
  *
  * NOTE: Child is a 2-dimensional
  * enumerated replacement!
@@ -47,27 +48,31 @@ class Grid extends Component {
     }
 
     _makeRowElements(){
-        return this.getReplacementElementsFor('child').map((row, rowIdx) => {
-            let columns = row.map((column, colIdx) => {
+        if (this.replacements.hasReplacement('child')) {
+            return this.getReplacementElementsFor('child').map((row, rowIdx) => {
+                let columns = row.map((column, colIdx) => {
+                    return (
+                        h('td', {key: `${this.props.id}-grid-col-${rowIdx}-${colIdx}`}, [
+                            column
+                        ])
+                    );
+                });
+                let rowLabelEl = null;
+                if(this.replacements.hasReplacement('rowlabel')){
+                    rowLabelEl = h('th', {key: `${this.props.id}-grid-rowlbl-${rowIdx}`}, [
+                        this.getReplacementElementsFor('rowlabel')[rowIdx]
+                    ]);
+                }
                 return (
-                    h('td', {key: `${this.props.id}-grid-col-${rowIdx}-${colIdx}`}, [
-                        column
+                    h('tr', {key: `${this.props.id}-grid-row-${rowIdx}`}, [
+                        rowLabelEl,
+                        ...columns
                     ])
                 );
             });
-            let rowLabelEl = null;
-            if(this.replacements.hasReplacement('rowlabel')){
-                rowLabelEl = h('th', {key: `${this.props.id}-grid-rowlbl-${rowIdx}`}, [
-                    this.getReplacementElementsFor('rowlabel')[rowIdx]
-                ]);
-            }
-            return (
-                h('tr', {key: `${this.props.id}-grid-row-${rowIdx}`}, [
-                    rowLabelEl,
-                    ...columns
-                ])
-            );
-        });
+        } else {
+            return []
+        }
     }
 
     _makeHeaderElements(){
@@ -81,4 +86,5 @@ class Grid extends Component {
     }
 }
 
-//export {Grid, Grid as default};
+export
+{Grid, Grid as default};

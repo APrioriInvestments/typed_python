@@ -2,8 +2,8 @@
  * Modal Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -51,4 +51,4 @@ class Modal extends Component {
     }
 }
 
-//export {Modal, Modal as default}
+export {Modal, Modal as default}

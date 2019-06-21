@@ -2,8 +2,8 @@
  * Scrollable  Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -28,4 +28,4 @@ class Scrollable extends Component {
     }
 }
 
-//export {Scrollable, Scrollable as default};
+export {Scrollable, Scrollable as default};

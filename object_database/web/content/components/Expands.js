@@ -2,8 +2,8 @@
  * Expands Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 /**
@@ -48,4 +48,4 @@ class Expands extends Component {
     }
 }
 
-//export {Expands, Expands as default};
+export {Expands, Expands as default};

@@ -10,9 +10,7 @@
  * and so the API of this class will change greatly.
  */
 
-// Temporary only for testing
-// please remove
-window.replacementStrings = new Set();
+import {h} from 'maquette';
 
 class CellHandler {
     constructor(h, projector, components){
@@ -180,7 +178,6 @@ class CellHandler {
                         id: message.id,
                         extraData: message.extra_data
                     },
-                    [],
                     message.replacement_keys
                 );
                 var velement = component.render();
@@ -235,7 +232,8 @@ class CellHandler {
 			return source;
                     });
                 } else {
-                    console.log("In message ", message, " couldn't find ", replacementKey);
+                    let errorMsg = `In message ${message} couldn't find ${replacementKey}`;
+                    throw new Error(errorMsg);
                 }
             });
         }
@@ -362,3 +360,6 @@ class CellHandler {
 	return h(tagName, attrs, children);
     }
 }
+
+
+export {CellHandler, CellHandler as default};

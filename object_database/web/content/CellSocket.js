@@ -287,3 +287,6 @@ class CellSocket {
         this.errorHandler = callback;
     }
 }
+
+
+export {CellSocket, CellSocket as default}

@@ -2,8 +2,8 @@
  * Plot Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -40,7 +40,7 @@ class Plot extends Component {
     }
 
     setupPlot(){
-        console.log("Setting up a new plotly chart from component.");
+        console.log("Setting up a new plotly chart.");
         // TODO These are global var defined in page.html
         // we should do something about this.
         var plotDiv = document.getElementById('plot' + this.props.id);
@@ -48,7 +48,7 @@ class Plot extends Component {
             plotDiv,
             [],
             {
-                margin: {t : 30, l: 40, r: 30, b:30 },
+                margin: {t : 30, l: 30, r: 30, b:30 },
                 xaxis: {rangeslider: {visible: false}}
             },
             { scrollZoom: true, dragmode: 'pan', displaylogo: false, displayModeBar: 'hover',
@@ -57,7 +57,7 @@ class Plot extends Component {
         plotDiv.on('plotly_relayout',
             function(eventdata){
                 if (plotDiv.is_server_defined_move === true) {
-                    return;
+                    return
                 }
                 //if we're sending a string, then its a date object, and we want to send
                 // a timestamp
@@ -77,4 +77,4 @@ class Plot extends Component {
     }
 }
 
-//export {Plot, Plot as default};
+export {Plot, Plot as default};

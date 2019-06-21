@@ -2,8 +2,8 @@
  * AsyncDropdown Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -39,7 +39,7 @@ class AsyncDropdown extends Component {
                     id: `${this.props.id}-dropdownMenuButton`,
                     "data-toggle": "dropdown",
                     afterCreate: this.addDropdownListener,
-                    "data-firstclick": true
+                    "data-firstclick": "true"
                 }),
                 h('div', {
                     id: `${this.props.id}-dropdownContentWrapper`,
@@ -51,19 +51,20 @@ class AsyncDropdown extends Component {
 
     addDropdownListener(element){
         let parentEl = element.parentElement;
-        let firstTimeClicked = (element.dataset.firstclick == true);
+        let firstTimeClicked = (element.dataset.firstclick == "true");
+        let component = this;
         if(firstTimeClicked){
             $(parentEl).on('show.bs.dropdown', function(){
                 cellSocket.sendString(JSON.stringify({
                     event:'dropdown',
-                    target_cell: this.props.id,
+                    target_cell: component.props.id,
                     isOpen: false
                 }));
             });
             $(parentEl).on('hide.bs.dropdown', function(){
                 cellSocket.sendString(JSON.stringify({
                     event: 'dropdown',
-                    target_cell: this.props.id,
+                    target_cell: component.props.id,
                     isOpen: true
                 }));
             });
@@ -90,10 +91,14 @@ class AsyncDropdownContent extends Component {
                 id: `dropdownContent-${this.props.id}`,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "AsyncDropdownContent"
-            }, [this.getReplacementFor('contents')])
+            }, [this.getReplacementElementFor('contents')])
         );
     }
 }
 
 
-//export {AsyncDropdown, AsyncDropdown as default};
+export {
+    AsyncDropdown,
+    AsyncDropdownContent,
+    AsyncDropdown as default
+};

@@ -2,8 +2,8 @@
  * Span Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 class Span extends Component {
@@ -23,4 +23,4 @@ class Span extends Component {
     }
 }
 
-//export {Span, Span as default};
+export {Span, Span as default};

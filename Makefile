@@ -6,7 +6,7 @@ PYTHON ?= $(shell which python3)
 
 COMMIT ?= $(shell git rev-parse HEAD)
 
-# Path to virtual environment
+# Path to virtual environment(s)
 VIRTUAL_ENV ?= .venv
 
 TP_SRC_PATH ?= typed_python
@@ -49,12 +49,31 @@ TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 install: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip install pipenv==2018.11.26; \
-		pipenv install --dev --deploy
+		pipenv install --dev --deploy; \
+		. $(VIRTUAL_ENV)/bin/activate; \
+		nodeenv -p --prebuilt --node=10.15.3 .nodeenv; \
+		npm install -g webpack webpack-cli; \
+		cd object_database/web/content; \
+		npm install; \
+	 	webpack
+
+webpack: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	nodeenv -p --prebuilt --node=10.15.3 .nodeenv; \
+	cd object_database/web/content; \
+	webpack
 
 .PHONY: test
 test: testcert.cert testcert.key install
 	. $(VIRTUAL_ENV)/bin/activate; \
-		./test.py -s
+		./test.py -s; \
+		cd object_database/web/content; \
+		npm test
+
+.PHONY:
+js-test: . $(VIRTUAL_ENV)/bin/activate; \
+		cd object_database/web/content/; \
+		npm test
 
 .PHONY: lint
 lint:
@@ -113,6 +132,8 @@ clean:
 	rm -f object_database/_types.cpython-*.so
 	rm -f testcert.cert testcert.key
 	rm -rf .venv
+	rm -rf .nodeenv
+	rm object_database/web/content/dist/main.bundle.js
 
 
 ##########################################################################

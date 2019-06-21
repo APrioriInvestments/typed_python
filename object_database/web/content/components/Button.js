@@ -2,8 +2,8 @@
  * Button Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class Button extends Component {
     constructor(props, ...args){
@@ -38,4 +38,4 @@ class Button extends Component {
     }
 }
 
-//export {Button, Button as default};
+export {Button, Button as default};

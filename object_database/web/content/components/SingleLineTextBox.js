@@ -2,8 +2,8 @@
  * SingleLineTextBox Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class SingleLineTextBox extends Component {
     constructor(props, ...args){
@@ -42,4 +42,4 @@ class SingleLineTextBox extends Component {
     }
 }
 
-//export {SingleLineTextBox, SingleLineTextBox as default};
+export {SingleLineTextBox, SingleLineTextBox as default};

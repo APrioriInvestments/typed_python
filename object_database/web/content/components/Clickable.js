@@ -1,8 +1,8 @@
 /**
  * Clickable Cell Component
  */
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -39,4 +39,4 @@ class Clickable extends Component {
     }
 }
 
-//export {Clickable, Clickable as default};
+export {Clickable, Clickable as default};

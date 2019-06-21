@@ -2,8 +2,8 @@
  * LargePendingDownloadDisplay Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class LargePendingDownloadDisplay extends Component {
     constructor(props, ...args){
@@ -22,4 +22,4 @@ class LargePendingDownloadDisplay extends Component {
     }
 }
 
-//export {LargePendingDownloadDisplay, LargePendingDownloadDisplay as default};
+export {LargePendingDownloadDisplay, LargePendingDownloadDisplay as default};

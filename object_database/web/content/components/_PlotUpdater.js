@@ -4,8 +4,8 @@
  * this component becoming obsolete
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 const MAX_INTERVALS = 25;
 
@@ -35,7 +35,7 @@ class _PlotUpdater extends Component {
             {
                 class: "cell",
                 id: this.props.id,
-                style: "display:none;",
+                style: "display: none",
                 "data-cell-id": this.props.id,
                 "data-cell-type": "_PlotUpdater"
             }, []);
@@ -69,65 +69,17 @@ class _PlotUpdater extends Component {
     }
 
     runUpdate(aDOMElement){
+        console.log("Updating plotly chart.");
         // TODO These are global var defined in page.html
         // we should do something about this.
         if (this.props.extraData.exceptionOccured) {
             console.log("plot exception occured");
             Plotly.purge(aDOMElement);
         } else {
-            console.log('_PlotUpdater updating from component');
             let data = this.props.extraData.plotData.map(mapPlotlyData);
             Plotly.react(aDOMElement, data, aDOMElement.layout);
         }
     }
-};
-
-/** Helper Functions **/
-function mapPlotlyData(d) {
-    console.log('Calling mapPlotlyData helper...');
-    if (d.timestamp !== undefined) {
-        d.timestamp = unpackHexFloats(d.timestamp);
-        d.x = Array.from(d.timestamp).map(ts => new Date(ts * 1000));
-    } else {
-        d.x = unpackHexFloats(d.x);
-    }
-
-    if (d.y !== undefined) {
-        d.y = unpackHexFloats(d.y);
-    }
-    if (d.open !== undefined) {
-        d.open = unpackHexFloats(d.open);
-    }
-    if (d.close !== undefined) {
-        d.close = unpackHexFloats(d.close);
-    }
-    if (d.high !== undefined) {
-        d.high = unpackHexFloats(d.high);
-    }
-    if (d.low !== undefined) {
-        d.low = unpackHexFloats(d.low);
-    }
-    return d;
 }
 
-function hexcharToInt(x) {
-    if (x>=97) return x - 97 + 10;
-    return x - 48;
-}
-
-function unpackHexFloats(x) {
-    if (typeof x != "string") {
-        return x;
-    }
-
-    var buf = new ArrayBuffer(x.length/2);
-    var bufView = new Uint8Array(buf);
-
-    for (var i=0, strLen=x.length/2; i < strLen; i+=1) {
-        bufView[i] = hexcharToInt(x.charCodeAt(i*2)) * 16 + hexcharToInt(x.charCodeAt(i*2+1));
-    }
-
-    return new Float64Array(buf);
-}
-
-//export {_PlotUpdater, _PlotUpdater as default};
+export {_PlotUpdater, _PlotUpdater as default};

@@ -2,8 +2,8 @@
  * Dropdown Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -53,6 +53,7 @@ class Dropdown extends Component {
         }
         return this.getReplacementElementsFor('child').map((element, idx) => {
             return new DropdownItem({
+                id: `${this.props.id}-item-${idx}`,
                 index: idx,
                 childSubstitute: element,
                 targetIdentity: this.props.extraData.targetIdentity,
@@ -108,4 +109,4 @@ class DropdownItem extends Component {
     }
 }
 
-//export {Dropdown, Dropdown as default};
+export {Dropdown, Dropdown as default};

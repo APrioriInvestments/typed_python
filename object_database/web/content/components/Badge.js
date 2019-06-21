@@ -1,8 +1,8 @@
 /**
  * Badge Cell Component
  */
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -27,4 +27,4 @@ class Badge extends Component {
     }
 }
 
-//export {Badge, Badge as default};
+export {Badge, Badge as default};

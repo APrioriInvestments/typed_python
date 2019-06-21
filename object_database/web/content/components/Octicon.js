@@ -2,8 +2,8 @@
  * Octicon Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class Octicon extends Component {
     constructor(props, ...args){
@@ -35,4 +35,4 @@ class Octicon extends Component {
     }
 }
 
-//export {Octicon, Octicon as default};
+export {Octicon, Octicon as default};

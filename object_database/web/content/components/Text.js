@@ -2,8 +2,8 @@
  * Text Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 class Text extends Component {
     constructor(props, ...args){
@@ -23,4 +23,4 @@ class Text extends Component {
     }
 }
 
-//export {Text, Text as default};
+export {Text, Text as default};

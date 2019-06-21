@@ -2890,59 +2890,7 @@ class Sheet(Cell):
                 onCellDblClick)
 
     def _addHandsontableOnCellDblClick(self):
-        return """
-        Handsontable.hooks.add(
-            "beforeOnCellMouseDown",
-            function(event,data) {
-                handsOnObj = handsOnTables["__identity__"];
-                if(handsOnObj.lastCellClicked.row == data.row &
-                   handsOnObj.lastCellClicked.col == data.col){
-                   handsOnObj.dblClicked = true;
-                   setTimeout(function(){
-                        handsOnObj = handsOnTables["__identity__"];
-                        if(handsOnObj.dblClicked){
-                            cellSocket.sendString(JSON.stringify(
-                                {'event':'onCellDblClick',
-                                 'target_cell': '__identity__',
-                                 'row': data.row,
-                                 'col': data.col
-                                 }
-                            ));
-                        }
-                        handsOnObj.lastCellClicked = {row: -100, col: -100};
-                        handsOnObj.dblClicked = false;
-                    },200);
-                } else {
-                handsOnObj.lastCellClicked = {row: data.row, col: data.col};
-                setTimeout(function(){
-                    handsOnObj = handsOnTables["__identity__"];
-                    handsOnObj.lastCellClicked = {row: -100, col: -100};
-                    handsOnObj.dblClicked = false;
-                    },600);
-                }
-            },
-            currentTable
-        );
-        Handsontable.hooks.add(
-            "beforeOnCellContextMenu",
-            function(event,data) {
-                handsOnObj = handsOnTables["__identity__"];
-                handsOnObj.dblClicked = false;
-                handsOnObj.lastCellClicked = {row: -100, col: -100};
-            },
-            currentTable
-        );
-        Handsontable.hooks.add(
-            "beforeContextMenuShow",
-            function(event,data) {
-                handsOnObj = handsOnTables["__identity__"];
-                handsOnObj.dblClicked = false;
-                handsOnObj.lastCellClicked = {row: -100, col: -100};
-            },
-            currentTable
-        );
-
-        """ .replace("__identity__", self._identity)
+        pass
 
     def recalculate(self):
         self.contents = str(

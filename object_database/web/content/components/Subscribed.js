@@ -2,8 +2,8 @@
  * Subscribed Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -31,4 +31,4 @@ class Subscribed extends Component {
     }
 }
 
-//export {Subscribed, Subscribed as default};
+export {Subscribed, Subscribed as default};

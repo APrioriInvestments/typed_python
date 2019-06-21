@@ -2,8 +2,8 @@
  * CircleLoader Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 class CircleLoader extends Component {
@@ -24,4 +24,4 @@ class CircleLoader extends Component {
     }
 }
 
-//export {CircleLoader, CircleLoader as default};
+export {CircleLoader, CircleLoader as default};

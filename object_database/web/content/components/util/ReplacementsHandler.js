@@ -158,3 +158,8 @@ class ReplacementsHandler {
         };
     }
 }
+
+export {
+    ReplacementsHandler,
+    ReplacementsHandler as default
+};

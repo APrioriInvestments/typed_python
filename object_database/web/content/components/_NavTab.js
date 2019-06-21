@@ -6,8 +6,8 @@
  * subcomponent.
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -52,4 +52,4 @@ class _NavTab extends Component {
     }
 }
 
-//export {_NavTab, _NavTab as default};
+export {_NavTab, _NavTab as default};

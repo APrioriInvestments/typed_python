@@ -2,8 +2,8 @@
  * CardTitle Cell
  */
 
-// import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 /**
@@ -32,4 +32,4 @@ class CardTitle extends Component {
     }
 }
 
-//export {CardTitle, CardTitle as default};
+export {CardTitle, CardTitle as default};

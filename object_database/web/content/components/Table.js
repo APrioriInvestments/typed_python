@@ -2,8 +2,8 @@
  * Table Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 
 /**
@@ -106,4 +106,4 @@ class Table extends Component {
     }
 }
 
-//export {Table, Table as default};
+export {Table, Table as default};

@@ -2,8 +2,8 @@
  * HeaderBar Cell Component
  */
 
-//import {Component} from './Component';
-//import {h} from 'maquette';
+import {Component} from './Component';
+import {h} from 'maquette';
 
 /**
  * About Replacements
@@ -95,4 +95,4 @@ class HeaderBar extends Component {
     }
 }
 
-//export {HeaderBar, HeaderBar as default};
+export {HeaderBar, HeaderBar as default};
