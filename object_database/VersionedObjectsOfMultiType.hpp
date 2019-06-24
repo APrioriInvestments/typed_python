@@ -181,20 +181,22 @@ public:
             throw std::runtime_error("Somehow, we don't have serialized data for this object.");
         }
 
-        Bytes& serializedVal(serialized_it->second);
+        Bytes serializedVal(serialized_it->second);
 
         DeserializationBuffer buffer((uint8_t*)&serializedVal[0], serializedVal.size(), ctx);
 
-        od = dataForType.insertKey(ObjectAndVersion(objectId, bestTid));
-
-        try {
+        Instance instance(valueType, [&](instance_ptr dataPtr) {
             auto fieldAndWireType = buffer.readFieldNumberAndWireType();
-            valueType->deserialize(od->object_data, buffer, fieldAndWireType.second);
-        } catch(std::exception& e) {
-            dataForType.deleteKeyWithUninitializedValue(ObjectAndVersion(objectId, bestTid));
 
-            throw std::runtime_error("Failed deserializing a " + valueType->name() + ": " + e.what());
-        }
+            // deserializing releases the lock that protects all of our datastructures.
+            // this means other threads could move them all around.
+            valueType->deserialize(dataPtr, buffer, fieldAndWireType.second);
+        });
+
+        //re-grab 'dataCacheForType' because it could have moved.
+        od = dataCacheForType(valueType).insertKey(ObjectAndVersion(objectId, bestTid));
+
+        valueType->copy_constructor(od->object_data, instance.data());
 
         return std::pair<instance_ptr, transaction_id>(od->object_data, bestTid);
     }

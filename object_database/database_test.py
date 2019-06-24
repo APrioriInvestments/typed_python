@@ -388,6 +388,53 @@ class ObjectDatabaseTests:
         with db.transaction():
             self.assertEqual(x.holding, 10)
 
+    def test_reading_many_python_objects_from_many_threads(self):
+        # this test simply verifies that we don't segfault when we do this.
+        # we need to verify that multiple threads writing into the view background
+        # don't corrupt its state. view internals are protected by the gil, except
+        # that deserialization can release the GIL, allowing other threads (namely the
+        # pump loop) to write into the view, and also read values from it.
+
+        db = self.createNewDb()
+
+        schema = Schema("test_schema")
+
+        @schema.define
+        class HoldsObject:
+            holding = object
+
+        db.subscribeToSchema(schema)
+
+        elapsed = 1
+
+        aTup = TupleOf(int)(range(100))
+
+        t0 = time.time()
+        def reader():
+            while time.time() - t0 < elapsed:
+                with db.view():
+                    for h in HoldsObject.lookupAll():
+                        h.holding
+
+        threads = [threading.Thread(target=reader) for _ in range(10)]
+        for t in threads:
+            t.start()
+
+        while time.time() - t0 < elapsed:
+            for i in range(10):
+                with db.transaction():
+                    h = HoldsObject(holding=aTup)
+            with db.transaction():
+                for h in HoldsObject.lookupAll():
+                    h.delete()
+
+        for t in threads:
+            t.join()
+
+
+
+
+
     def test_disconnecting(self):
         db = self.createNewDb()
         db.subscribeToSchema(schema)
