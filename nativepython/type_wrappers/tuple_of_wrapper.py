@@ -23,6 +23,50 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+def min(x, y):
+    if x < y:
+        return x
+    return y
+
+def tuple_compare_eq(left, right):
+    """Compare two 'TupleOf' instances by comparing their individual elements."""
+    if len(left) != len(right):
+        return False
+
+    for i in range(min(len(left), len(right))):
+        if left[i] != right[i]:
+            return False
+
+    return True
+
+def tuple_compare_lt(left, right):
+    """Compare two 'TupleOf' instances by comparing their individual elements."""
+    for i in range(min(len(left), len(right))):
+        if left[i] > right[i]:
+            return False
+        if left[i] < right[i]:
+            return True
+
+    return len(left) < len(right)
+
+def tuple_compare_lte(left, right):
+    """Compare two 'TupleOf' instances by comparing their individual elements."""
+    for i in range(min(len(left), len(right))):
+        if left[i] > right[i]:
+            return False
+        if left[i] < right[i]:
+            return True
+
+    return len(left) <= len(right)
+
+def tuple_compare_neq(left, right):
+    return not tuple_compare_eq(left, right)
+
+def tuple_compare_gt(left, right):
+    return not tuple_compare_lte(left, right)
+
+def tuple_compare_gte(left, right):
+    return not tuple_compare_lt(left, right)
 
 class TupleOrListOfWrapper(RefcountedWrapper):
     is_pod = False
@@ -88,6 +132,20 @@ class TupleOrListOfWrapper(RefcountedWrapper):
                             self.generateConcatenateTuple
                         ).call(new_tuple, left, right)
                 )
+
+        if right.expr_type == left.expr_type:
+            if op.matches.Eq:
+                return context.call_py_function(tuple_compare_eq, (left, right), {})
+            if op.matches.NotEq:
+                return context.call_py_function(tuple_compare_neq, (left, right), {})
+            if op.matches.Lt:
+                return context.call_py_function(tuple_compare_lt, (left, right), {})
+            if op.matches.LtE:
+                return context.call_py_function(tuple_compare_lte, (left, right), {})
+            if op.matches.Gt:
+                return context.call_py_function(tuple_compare_gt, (left, right), {})
+            if op.matches.GtE:
+                return context.call_py_function(tuple_compare_gte, (left, right), {})
 
         return super().convert_bin_op(context, left, op, right)
 

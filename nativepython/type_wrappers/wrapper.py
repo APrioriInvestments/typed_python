@@ -178,6 +178,12 @@ class Wrapper(object):
         return r.expr_type.convert_bin_op_reverse(context, r, op, l)
 
     def convert_bin_op_reverse(self, context, r, op, l):
+        if op.matches.Eq and l.expr_type != r.expr_type:
+            return context.constant(False)
+
+        if op.matches.NotEq and l.expr_type != r.expr_type:
+            return context.constant(True)
+
         return context.pushTerminal(
             generateThrowException(
                 context,
