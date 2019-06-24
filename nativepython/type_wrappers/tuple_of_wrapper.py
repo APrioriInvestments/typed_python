@@ -23,10 +23,12 @@ import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
+
 def min(x, y):
     if x < y:
         return x
     return y
+
 
 def tuple_compare_eq(left, right):
     """Compare two 'TupleOf' instances by comparing their individual elements."""
@@ -39,6 +41,7 @@ def tuple_compare_eq(left, right):
 
     return True
 
+
 def tuple_compare_lt(left, right):
     """Compare two 'TupleOf' instances by comparing their individual elements."""
     for i in range(min(len(left), len(right))):
@@ -48,6 +51,7 @@ def tuple_compare_lt(left, right):
             return True
 
     return len(left) < len(right)
+
 
 def tuple_compare_lte(left, right):
     """Compare two 'TupleOf' instances by comparing their individual elements."""
@@ -59,14 +63,18 @@ def tuple_compare_lte(left, right):
 
     return len(left) <= len(right)
 
+
 def tuple_compare_neq(left, right):
     return not tuple_compare_eq(left, right)
+
 
 def tuple_compare_gt(left, right):
     return not tuple_compare_lte(left, right)
 
+
 def tuple_compare_gte(left, right):
     return not tuple_compare_lt(left, right)
+
 
 class TupleOrListOfWrapper(RefcountedWrapper):
     is_pod = False

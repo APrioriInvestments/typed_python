@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import (
-    ListOf, Function, TupleOf, OneOf, ListOf, Dict,
+    TupleOf, ListOf, Dict,
     UInt8, UInt16, UInt32, UInt64,
     Int8, Int16, Int32, Int64,
     Float32, Float64, Tuple
@@ -22,6 +22,7 @@ from nativepython import SpecializedEntrypoint
 
 import unittest
 import collections
+
 
 def pyTypeFor(T):
     """Return the python interpreter type that T is supposed to behave like"""
@@ -42,6 +43,7 @@ def pyTypeFor(T):
             return dict
 
     assert False, f"No pyType for {T}"
+
 
 # the types we will test.
 types = [
@@ -64,9 +66,10 @@ types = [
     Tuple(str, int, str)
 ]
 
+
 def instancesOf(T):
     """Produce some instances of type T"""
-    if T is type(None):
+    if T is type(None):  # noqa
         return [None]
 
     if T is bool:
@@ -106,6 +109,7 @@ def instancesOf(T):
 
     assert False, f"Can't make instances of {T}"
 
+
 def toPyForm(x):
     """Return the python form of a value 'x', which it should behave like."""
     if x is None:
@@ -113,25 +117,27 @@ def toPyForm(x):
 
     return pyTypeFor(type(x))(x)
 
+
 binary_operations = {
-    'add': lambda a,b: a + b,
-    'sub': lambda a,b: a - b,
-    'floordiv': lambda a,b: a // b,
-    'truediv': lambda a,b: a / b,
-    'mul': lambda a,b: a * b,
-    'pow': lambda a,b: a ** b,
-    'bitxor': lambda a,b: a ^ b,
-    'bitor': lambda a,b: a | b,
-    'bitand': lambda a,b: a & b,
-    'lshift': lambda a,b: a << b,
-    'rshift': lambda a,b: a >> b,
-    'eq': lambda a,b: a == b,
-    'neq': lambda a,b: a != b,
-    'lt': lambda a,b: a < b,
-    'gt': lambda a,b: a > b,
-    'lte': lambda a,b: a <= b,
-    'gte': lambda a,b: a >= b,
+    'add': lambda a, b: a + b,
+    'sub': lambda a, b: a - b,
+    'floordiv': lambda a, b: a // b,
+    'truediv': lambda a, b: a / b,
+    'mul': lambda a, b: a * b,
+    'pow': lambda a, b: a ** b,
+    'bitxor': lambda a, b: a ^ b,
+    'bitor': lambda a, b: a | b,
+    'bitand': lambda a, b: a & b,
+    'lshift': lambda a, b: a << b,
+    'rshift': lambda a, b: a >> b,
+    'eq': lambda a, b: a == b,
+    'neq': lambda a, b: a != b,
+    'lt': lambda a, b: a < b,
+    'gt': lambda a, b: a > b,
+    'lte': lambda a, b: a <= b,
+    'gte': lambda a, b: a >= b,
 }
+
 
 unary_operations = {
     'neg': lambda a: -a,
@@ -139,17 +145,22 @@ unary_operations = {
     'inv': lambda a: ~a
 }
 
+
 _specializedCache = {}
+
+
 def compiled(f):
     if f not in _specializedCache:
         _specializedCache[f] = SpecializedEntrypoint(f)
     return _specializedCache[f]
+
 
 def sanitize(x):
     x = repr(x)
     if len(x) > 50:
         return x[:50] + "..."
     return x
+
 
 class TestTypedPythonAgainstCompiler(unittest.TestCase):
     """Systematically compare typed_python, the interpreter, and the nativepython compiler.
@@ -169,7 +180,7 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
     def callOrException(self, f, *args):
         try:
             return f(*args)
-        except Exception as e:
+        except Exception:
             return 'Exception'
 
     def test_binary_operations(self):
@@ -194,7 +205,6 @@ class TestTypedPythonAgainstCompiler(unittest.TestCase):
 
                     if list(categories) != ["OK"]:
                         print(binop, T1, T2, categories)
-
 
     def categorizeResults(self, interpreter, typed_python, compiler):
         # print(sanitize(interpreter), sanitize(typed_python), sanitize(compiler))

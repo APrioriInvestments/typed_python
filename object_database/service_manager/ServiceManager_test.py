@@ -323,8 +323,8 @@ class DropdownTestService(ServiceBase):
         return Text('NOW WE HAVE LOADED')
 
 
-
 bigGrid = Schema("core.test.biggrid")
+
 
 @bigGrid.define
 class GridValue:
@@ -334,9 +334,11 @@ class GridValue:
 
     value = int
 
+
 ROW_COUNT = 100
 COL_COUNT = 10
-GRID_INTERVAL = 0.0
+GRID_INTERVAL = 0.1
+
 
 class BigGridTestService(ServiceBase):
     @staticmethod
@@ -370,6 +372,7 @@ class BigGridTestService(ServiceBase):
             for row, col in rows_and_cols:
                 with self.db.transaction():
                     GridValue.lookupAny(row_and_col=(row, col)).value = passIx
+
 
 happy = Schema("core.test.happy")
 

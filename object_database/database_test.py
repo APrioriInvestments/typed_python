@@ -410,6 +410,7 @@ class ObjectDatabaseTests:
         aTup = TupleOf(int)(range(100))
 
         t0 = time.time()
+
         def reader():
             while time.time() - t0 < elapsed:
                 with db.view():
@@ -430,10 +431,6 @@ class ObjectDatabaseTests:
 
         for t in threads:
             t.join()
-
-
-
-
 
     def test_disconnecting(self):
         db = self.createNewDb()

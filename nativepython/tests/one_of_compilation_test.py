@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, TupleOf
+from typed_python import Function, OneOf, TupleOf, Forward
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
@@ -22,31 +22,34 @@ def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
 
+
 # a simple recursive 'value' type for testing
 Value = Forward("Value")
+
+
 Value = Value.define(
     OneOf(
-        #None,
-        #bool,
+        # None,
+        # bool,
         float,
         int,
         str,
-        #bytes,
-        #ConstDict(Value, Value),
+        # bytes,
+        # ConstDict(Value, Value),
         TupleOf(Value)
     )
 )
 
 someValues = [
-    #None,
-    #False,
-    #True,
+    # None,
+    # False,
+    # True,
     0.0, 1.0,
     0, 1,
     "hi",
-    #b"bye",
-    #Value({'hi': 'bye'}),
-    Value((1,2,3))
+    # b"bye",
+    # Value({'hi': 'bye'}),
+    Value((1, 2, 3))
 ]
 
 
@@ -188,4 +191,3 @@ class TestOneOfOfCompilation(unittest.TestCase):
         for val1 in someValues:
             for val2 in someValues:
                 self.assertEqual(val1 == val2, f(val1, val2), (val1, val2))
-
