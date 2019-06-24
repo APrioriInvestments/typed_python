@@ -705,10 +705,7 @@ Type* PyInstance::extractTypeFrom(PyTypeObject* typeObj) {
 }
 
 PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
-    static std::recursive_mutex mutex;
     static std::map<Type*, NativeTypeWrapper*> types;
-
-    std::lock_guard<std::recursive_mutex> lock(mutex);
 
     auto it = types.find(inType);
     if (it != types.end()) {
