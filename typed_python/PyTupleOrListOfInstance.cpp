@@ -112,7 +112,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
                         PyObjectStealer o(PyObject_GetItem(rhs, kval));
 
                         if (!o) {
-                            throw InternalPyException();
+                            throw PythonExceptionSet();
                         }
 
                         PyInstance::copyConstructFromPythonInstance(eltType, eltPtr, o, true);

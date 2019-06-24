@@ -25,9 +25,6 @@ struct NativeTypeWrapper {
     Type* mType;
 };
 
-class InternalPyException {};
-
-//throw to indicate we set a python error already.
 class PyClassInstance;
 class PyHeldClassInstance;
 class PyListOfInstance;

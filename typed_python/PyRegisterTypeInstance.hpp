@@ -140,6 +140,11 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
     }
 
     if (strcmp(op, "__floordiv__") == 0) {
+        if (other == 0) {
+            PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
+            throw PythonExceptionSet();
+        }
+
         return registerValueToPyValue(T(std::floor(self/other)));
     }
 
@@ -424,17 +429,19 @@ public:
 
         Type* rhsType = extractTypeFrom(rhs->ob_type);
 
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catBool) { return pyOperatorConcreteForRegister<T, bool>(*(T*)dataPtr(), *(bool*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt8) { return pyOperatorConcreteForRegister<T, int8_t>(*(T*)dataPtr(), *(int8_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt16) { return pyOperatorConcreteForRegister<T, int16_t>(*(T*)dataPtr(), *(int16_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt32) { return pyOperatorConcreteForRegister<T, int32_t>(*(T*)dataPtr(), *(int32_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt64) { return pyOperatorConcreteForRegister<T, int64_t>(*(T*)dataPtr(), *(int64_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt8) { return pyOperatorConcreteForRegister<T, uint8_t>(*(T*)dataPtr(), *(uint8_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt16) { return pyOperatorConcreteForRegister<T, uint16_t>(*(T*)dataPtr(), *(uint16_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt32) { return pyOperatorConcreteForRegister<T, uint32_t>(*(T*)dataPtr(), *(uint32_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt64) { return pyOperatorConcreteForRegister<T, uint64_t>(*(T*)dataPtr(), *(uint64_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat32) { return pyOperatorConcreteForRegister<T, float>(*(T*)dataPtr(), *(float*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat64) { return pyOperatorConcreteForRegister<T, double>(*(T*)dataPtr(), *(double*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+        if (rhsType) {
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catBool) { return pyOperatorConcreteForRegister<T, bool>(*(T*)dataPtr(), *(bool*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt8) { return pyOperatorConcreteForRegister<T, int8_t>(*(T*)dataPtr(), *(int8_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt16) { return pyOperatorConcreteForRegister<T, int16_t>(*(T*)dataPtr(), *(int16_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt32) { return pyOperatorConcreteForRegister<T, int32_t>(*(T*)dataPtr(), *(int32_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt64) { return pyOperatorConcreteForRegister<T, int64_t>(*(T*)dataPtr(), *(int64_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt8) { return pyOperatorConcreteForRegister<T, uint8_t>(*(T*)dataPtr(), *(uint8_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt16) { return pyOperatorConcreteForRegister<T, uint16_t>(*(T*)dataPtr(), *(uint16_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt32) { return pyOperatorConcreteForRegister<T, uint32_t>(*(T*)dataPtr(), *(uint32_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt64) { return pyOperatorConcreteForRegister<T, uint64_t>(*(T*)dataPtr(), *(uint64_t*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat32) { return pyOperatorConcreteForRegister<T, float>(*(T*)dataPtr(), *(float*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat64) { return pyOperatorConcreteForRegister<T, double>(*(T*)dataPtr(), *(double*)((PyInstance*)rhs)->dataPtr(), op, opErr); }
+        }
 
         return PyInstance::pyOperatorConcrete(rhs, op, opErr);
     }
@@ -452,17 +459,19 @@ public:
 
         Type* rhsType = extractTypeFrom(rhs->ob_type);
 
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catBool) { return pyOperatorConcreteForRegister<bool, T>(*(bool*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt8) { return pyOperatorConcreteForRegister<int8_t, T>(*(int8_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt16) { return pyOperatorConcreteForRegister<int16_t, T>(*(int16_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt32) { return pyOperatorConcreteForRegister<int32_t, T>(*(int32_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catInt64) { return pyOperatorConcreteForRegister<int64_t, T>(*(int64_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt8) { return pyOperatorConcreteForRegister<uint8_t, T>(*(uint8_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt16) { return pyOperatorConcreteForRegister<uint16_t, T>(*(uint16_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt32) { return pyOperatorConcreteForRegister<uint32_t, T>(*(uint32_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt64) { return pyOperatorConcreteForRegister<uint64_t, T>(*(uint64_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat32) { return pyOperatorConcreteForRegister<float, T>(*(float*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
-        if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat64) { return pyOperatorConcreteForRegister<double, T>(*(double*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+        if (rhsType) {
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catBool) { return pyOperatorConcreteForRegister<bool, T>(*(bool*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt8) { return pyOperatorConcreteForRegister<int8_t, T>(*(int8_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt16) { return pyOperatorConcreteForRegister<int16_t, T>(*(int16_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt32) { return pyOperatorConcreteForRegister<int32_t, T>(*(int32_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catInt64) { return pyOperatorConcreteForRegister<int64_t, T>(*(int64_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt8) { return pyOperatorConcreteForRegister<uint8_t, T>(*(uint8_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt16) { return pyOperatorConcreteForRegister<uint16_t, T>(*(uint16_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt32) { return pyOperatorConcreteForRegister<uint32_t, T>(*(uint32_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catUInt64) { return pyOperatorConcreteForRegister<uint64_t, T>(*(uint64_t*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat32) { return pyOperatorConcreteForRegister<float, T>(*(float*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+            if (rhsType->getTypeCategory() == Type::TypeCategory::catFloat64) { return pyOperatorConcreteForRegister<double, T>(*(double*)((PyInstance*)rhs)->dataPtr(), *(T*)dataPtr(), op, opErr); }
+        }
 
         return PyInstance::pyOperatorConcrete(rhs, op, opErr);
     }

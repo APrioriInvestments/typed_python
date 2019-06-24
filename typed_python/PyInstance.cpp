@@ -259,25 +259,27 @@ PyObject* PyInstance::pyUnaryOperator(PyObject* lhs, const char* op, const char*
 }
 
 PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, const char* opErrRep) {
-    if (extractTypeFrom(lhs->ob_type)) {
-        return specializeForType(lhs, [&](auto& subtype) {
-            return subtype.pyOperatorConcrete(rhs, op, opErrRep);
-        });
-    }
+    return translateExceptionToPyObject([&]() {
+        if (extractTypeFrom(lhs->ob_type)) {
+            return specializeForType(lhs, [&](auto& subtype) {
+                return subtype.pyOperatorConcrete(rhs, op, opErrRep);
+            });
+        }
 
-    if (extractTypeFrom(rhs->ob_type)) {
-        return specializeForType(rhs, [&](auto& subtype) {
-            return subtype.pyOperatorConcreteReverse(lhs, op, opErrRep);
-        });
-    }
+        if (extractTypeFrom(rhs->ob_type)) {
+            return specializeForType(rhs, [&](auto& subtype) {
+                return subtype.pyOperatorConcreteReverse(lhs, op, opErrRep);
+            });
+        }
 
-    PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to binary operator %s",
-        lhs->ob_type,
-        rhs->ob_type,
-        op
-        );
+        PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to binary operator %s",
+            lhs->ob_type,
+            rhs->ob_type,
+            op
+            );
 
-    return NULL;
+        throw PythonExceptionSet();
+    });
 }
 
 PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* thirdArg, const char* op, const char* opErrRep) {
