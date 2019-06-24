@@ -227,7 +227,9 @@ class CellSocket {
 
         let update = JSON.parse(joinedBuffer);
 
-        if(update == 'postscripts'){
+        if(update == 'request_ack') {
+            this.sendString(JSON.stringify({'ACK': 0}))
+        } else if(update == 'postscripts'){
             // updatePopovers();
             if(this.postscriptsHandler){
                 this.postscriptsHandler(update);

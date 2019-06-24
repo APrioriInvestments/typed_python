@@ -327,6 +327,15 @@ class ActiveWebService(ServiceBase):
                 writeJsonMessage("postscripts", ws, largeMessageAck,
                                  self._logger)
 
+                # request an ACK from the browser before sending any more data
+                # otherwise it can get overloaded and crash because it can't keep
+                # up with the data volume
+                writeJsonMessage("request_ack", ws, largeMessageAck, self._logger)
+
+                ack = largeMessageAck.get()
+                if ack is StopIteration:
+                    raise Exception("Websocket closed.")
+
                 cells.wait()
 
                 timestamps.append(time.time())
@@ -346,8 +355,6 @@ class ActiveWebService(ServiceBase):
                     sessionId,
                     len(self.sessionStates[sessionId])
                 )
-
-                cells.markStopProcessingTasks()
 
                 if reader:
                     reader.join()

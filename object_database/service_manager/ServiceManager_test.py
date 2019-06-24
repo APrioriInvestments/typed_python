@@ -34,7 +34,7 @@ from object_database.web.cells import (
 )
 
 from object_database import (
-    Schema, Indexed, core_schema,
+    Schema, Indexed, core_schema, Index,
     service_schema, current_transaction
 )
 
@@ -322,6 +322,54 @@ class DropdownTestService(ServiceBase):
         time.sleep(1)
         return Text('NOW WE HAVE LOADED')
 
+
+
+bigGrid = Schema("core.test.biggrid")
+
+@bigGrid.define
+class GridValue:
+    row = int
+    col = int
+    row_and_col = Index('row', 'col')
+
+    value = int
+
+ROW_COUNT = 100
+COL_COUNT = 10
+GRID_INTERVAL = 0.0
+
+class BigGridTestService(ServiceBase):
+    @staticmethod
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
+        ensureSubscribedType(GridValue)
+
+        return Grid(
+            colFun=lambda: list(range(COL_COUNT)),
+            rowFun=lambda: list(range(ROW_COUNT)),
+            headerFun=lambda x: x,
+            rowLabelFun=None,
+            rendererFun=lambda row, col: Subscribed(lambda: GridValue.lookupAny(row_and_col=(row, col)).value)
+        )
+
+    def doWork(self, shouldStop):
+        self.db.subscribeToType(GridValue)
+
+        with self.db.transaction():
+            for row in range(ROW_COUNT):
+                for col in range(COL_COUNT):
+                    GridValue(row=row, col=col, value=0)
+
+        passIx = 0
+        while not shouldStop.is_set():
+            print("WRITNG ", passIx)
+            passIx += 1
+            time.sleep(GRID_INTERVAL)
+            rows_and_cols = [(row, col) for row in range(ROW_COUNT) for col in range(COL_COUNT)]
+            numpy.random.shuffle(rows_and_cols)
+
+            for row, col in rows_and_cols:
+                with self.db.transaction():
+                    GridValue.lookupAny(row_and_col=(row, col)).value = passIx
 
 happy = Schema("core.test.happy")
 
