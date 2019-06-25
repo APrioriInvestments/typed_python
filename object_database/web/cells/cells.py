@@ -1821,6 +1821,9 @@ class Subscribed(Cell):
         self.f = f
 
     def prepareForReuse(self):
+        if not self.garbageCollected:
+            return False
+
         self._clearSubscriptions()
         return super().prepareForReuse()
 
@@ -1870,6 +1873,9 @@ class SubscribedSequence(Cell):
         self.asColumns = asColumns
 
     def prepareForReuse(self):
+        if not self.garbageCollected:
+            return False
+
         self._clearSubscriptions()
         self.existingItems = {}
         self.spine = []
@@ -2023,6 +2029,9 @@ class Grid(Cell):
         self.cols = []
 
     def prepareForReuse(self):
+        if not self.garbageCollected:
+            return False
+
         self._clearSubscriptions()
         self.existingItems = {}
         self.rows = []
@@ -2250,6 +2259,9 @@ class Table(Cell):
         self.columnFilters = {}
 
     def prepareForReuse(self):
+        if not self.garbageCollected:
+            return False
+
         self._clearSubscriptions()
         self.existingItems = {}
         self.rows = []
