@@ -12,9 +12,18 @@ import {h} from 'maquette';
  * regular-kind replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `child` (single) - The child cell that is wrapped
+ */
 class Main extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeChild = this.makeChild.bind(this);
     }
 
     render(){
@@ -26,10 +35,18 @@ class Main extends Component {
                 "data-cell-type": "Main"
             }, [
                 h('div', {class: "container-fluid"}, [
-                    this.getReplacementElementFor('child')
+                    this.makeChild()
                 ])
             ])
         );
+    }
+
+    makeChild(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('child');
+        }
     }
 }
 

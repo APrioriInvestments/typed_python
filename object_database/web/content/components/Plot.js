@@ -13,11 +13,21 @@ import {h} from 'maquette';
  * * `chart-updater`
  * * `error`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `chartUpdater` (single) - The Updater cell
+ * `error` (single) - An error cell, if present
+ */
 class Plot extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
+        // Bind component methods
         this.setupPlot = this.setupPlot.bind(this);
+        this.makeChartUpdater = this.makeChartUpdater.bind(this);
+        this.makeError = this.makeError.bind(this);
     }
 
     componentDidLoad() {
@@ -33,10 +43,26 @@ class Plot extends Component {
                 class: "cell"
             }, [
                 h('div', {id: `plot${this.props.id}`, style: this.props.extraData.divStyle}),
-                this.getReplacementElementFor('chart-updater'),
-                this.getReplacementElementFor('error')
+                this.makeChartUpdater(),
+                this.makeError()
             ])
         );
+    }
+
+    makeChartUpdater(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('chart-updater');
+        } else {
+            return this.renderChildNamed('chartUpdater');
+        }
+    }
+
+    makeError(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('error');
+        } else {
+            return this.renderChildNamed('error');
+        }
     }
 
     setupPlot(){

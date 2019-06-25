@@ -12,10 +12,18 @@ import {h} from 'maquette';
  * regular replacement:
  * * `contents`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `content` (single) - The underlying Cell that is subscribed
+ */
 class Subscribed extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        //this.addReplacement('contents', '_____contents__');
+
+        // Bind component methods
+        this.makeContent = this.makeContent.bind(this);
     }
 
     render(){
@@ -26,8 +34,16 @@ class Subscribed extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Subscribed"
-            }, [this.getReplacementElementFor('contents')]
+            }, [this.makeContent()]
         );
+    }
+
+    makeContent(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('contents');
+        } else {
+            return this.renderChildNamed('content');
+        }
     }
 }
 

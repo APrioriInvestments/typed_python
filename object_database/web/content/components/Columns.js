@@ -12,6 +12,12 @@ import {h} from 'maquette';
  * kind of replacement:
  * * `c`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `elements` (array) - Cell column elements
+ */
 class Columns extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -35,13 +41,17 @@ class Columns extends Component {
     }
 
     makeInnerChildren(){
-        return this.getReplacementElementsFor('c').map(replElement => {
-            return (
-                h('div', {
-                    class: "col-sm"
-                }, [replElement])
-            );
-        });
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor('c').map(replElement => {
+                return (
+                    h('div', {
+                        class: "col-sm"
+                    }, [replElement])
+                );
+            });
+        } else {
+            return this.renderChildrenNamed('elements');
+        }
     }
 }
 

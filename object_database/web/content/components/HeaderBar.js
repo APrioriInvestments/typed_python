@@ -14,6 +14,14 @@ import {h} from 'maquette';
  * * `right`
  * * `center`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `leftItems` (array) - The items that will be on the left
+ * `centerItems` (array) - The items that will be in the center
+ * `rightItems` (array) - The items that will be on the right
+ */
 class HeaderBar extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -43,7 +51,7 @@ class HeaderBar extends Component {
 
     makeLeft(){
         let innerElements = [];
-        if(this.replacements.hasReplacement('left')){
+        if(this.replacements.hasReplacement('left') || this.props.namedChildren.leftItems){
             innerElements = this.makeElements('left');
         }
         return (
@@ -58,7 +66,7 @@ class HeaderBar extends Component {
 
     makeCenter(){
         let innerElements = [];
-        if(this.replacements.hasReplacement('center')){
+        if(this.replacements.hasReplacement('center') || this.props.namedChildren.centerItems){
             innerElements = this.makeElements('center');
         }
         return (
@@ -73,7 +81,7 @@ class HeaderBar extends Component {
 
     makeRight(){
         let innerElements = [];
-        if(this.replacements.hasReplacement('right')){
+        if(this.replacements.hasReplacement('right') || this.props.namedChildren.rightItems){
             innerElements = this.makeElements('right');
         }
         return (
@@ -87,11 +95,19 @@ class HeaderBar extends Component {
     }
 
     makeElements(position){
-        return this.getReplacementElementsFor(position).map(element => {
-            return (
-                h('span', {class: "flex-item px-3"}, [element])
-            );
-        });
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor(position).map(element => {
+                return (
+                    h('span', {class: "flex-item px-3"}, [element])
+                );
+            });
+        } else {
+            return this.renderChildrenNamed(`${position}Items`).map(element => {
+                return (
+                    h('span', {class: "flex-item px-3"}, [element])
+                );
+            });
+        }
     }
 }
 

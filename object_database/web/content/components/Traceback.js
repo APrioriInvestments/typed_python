@@ -12,9 +12,17 @@ import {h} from 'maquette';
  * repalcement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * `traceback` (single) - The cell containing the traceback text
+ */
 class  Traceback extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeTraceback = this.makeTraceback.bind(this);
     }
 
     render(){
@@ -24,10 +32,16 @@ class  Traceback extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Traceback",
                 class: "alert alert-primary"
-            }, [
-                h('pre', {}, [this.getReplacementElementFor('child')])
-            ])
+            }, [this.getReplacementElementFor('child')])
         );
+    }
+
+    makeTraceback(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('traceback');
+        }
     }
 }
 

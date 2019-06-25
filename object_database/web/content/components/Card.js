@@ -3,6 +3,7 @@
  */
 
 import {Component} from './Component';
+import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
 /**
@@ -12,6 +13,13 @@ import {h} from 'maquette';
  * regular replacements:
  * * `contents`
  * * `header`
+ */
+
+/**
+ * About Named Children
+ * `body` (single) - The cell to put in the body of the Card
+ * `header` (single) - An optional header cell to put above
+ *        body
  */
 class Card extends Component {
     constructor(props, ...args){
@@ -23,12 +31,8 @@ class Card extends Component {
     }
 
     render(){
-        let bodyClass = 'card-body';
-        if(this.props.extraData.padding){
-            bodyClass = `card-body p-${this.props.extraData.padding}`;
-        }
         let bodyArea = h('div', {
-            class: bodyClass
+            class: 'card-body p-${this.props.padding}'
         }, [this.makeBody()]);
         let header = this.makeHeader();
         let headerArea = null;
@@ -38,7 +42,7 @@ class Card extends Component {
         return h('div',
             {
                 class: "cell card",
-                style: this.props.extraData.divStyle,
+                style: this.props.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Card"
@@ -49,7 +53,7 @@ class Card extends Component {
         if(this.usesReplacements){
             return this.getReplacementElementFor('contents');
         } else {
-            return this.renderChildNamed('contents');
+            return this.renderChildNamed('body');
         }
     }
 
@@ -58,12 +62,22 @@ class Card extends Component {
             if(this.replacements.hasReplacement('header')){
                 return this.getReplacementElementFor('header');
             }
+            return null;
         } else {
             return this.renderChildNamed('header');
         }
-        return null;
+    }
+}
+
+Card.propTypes = {
+    padding: {
+        description: "Padding weight as defined by Boostrap css classes.",
+        type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
+    },
+    divStyle: {
+        description: "HTML style attribute string.",
+        type: PropTypes.oneOf([PropTypes.string])
     }
 };
 
-console.log('Card module loaded');
 export {Card, Card as default};

@@ -15,11 +15,21 @@ import {h} from 'maquette';
  * enumerated replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `title` (single) - A Cell that will comprise the title of
+ *      the dropdown
+ * `dropdownItems` (array) - An array of cells that are
+ *      the items in the dropdown
+ */
 class Dropdown extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
         // Bind context to methods
+        this.makeTitle = this.makeTitle.bind(this);
         this.makeItems = this.makeItems.bind(this);
     }
 
@@ -32,7 +42,7 @@ class Dropdown extends Component {
                 class: "btn-group"
             }, [
                 h('a', {class: "btn btn-xs btn-outline-secondary"}, [
-                    this.getReplacementElementFor('title')
+                    this.makeTitle()
                 ]),
                 h('button', {
                     class: "btn btn-xs btn-outline-secondary dropdown-toggle dropdown-toggle-split",
@@ -45,21 +55,45 @@ class Dropdown extends Component {
         );
     }
 
-    makeItems(){
-        // For some reason, due again to the Cell implementation,
-        // sometimes there are not these child replacements.
-        if(!this.replacements.hasReplacement('child')){
-            return [];
+    makeTitle(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('title');
+        } else {
+            return this.renderChildNamed('title');
         }
-        return this.getReplacementElementsFor('child').map((element, idx) => {
-            return new DropdownItem({
-                id: `${this.props.id}-item-${idx}`,
-                index: idx,
-                childSubstitute: element,
-                targetIdentity: this.props.extraData.targetIdentity,
-                dropdownItemInfo: this.props.extraData.dropdownItemInfo
-            }).render();
-        });
+    }
+
+    makeItems(){
+        if(this.usesReplacements){
+            // For some reason, due again to the Cell implementation,
+            // sometimes there are not these child replacements.
+            if(!this.replacements.hasReplacement('child')){
+                return [];
+            }
+            return this.getReplacementElementsFor('child').map((element, idx) => {
+                return new DropdownItem({
+                    id: `${this.props.id}-item-${idx}`,
+                    index: idx,
+                    childSubstitute: element,
+                    targetIdentity: this.props.extraData.targetIdentity,
+                    dropdownItemInfo: this.props.extraData.dropdownItemInfo
+                }).render();
+            });
+        } else {
+            if(this.props.namedChildren.dropdownItems){
+                return this.props.namedChildren.dropdownItems.map((itemComponent, idx) => {
+                    return new DropdowItem({
+                        id: `${this.propd.id}-item-${idx}`,
+                        index: idx,
+                        childSubstitute: itemComponent.render(),
+                        targetIdentity: this.props.extraData.targetIdentity,
+                        dropdownItemInfo: this.props.extraData.dropdownItemInfo
+                    });
+                });
+            } else {
+                return [];
+            }
+        }
     }
 }
 

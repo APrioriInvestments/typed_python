@@ -16,9 +16,22 @@ import {h} from 'maquette';
  * enumerated replacement:
  * * `header`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `display` (single) - The Cell that gets displayed when
+ *      the tabs are showing
+ * `headers` (array) - An array of cells that serve as
+ *     the tab headers
+ */
 class Tabs extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeHeaders = this.makeHeaders.bind(this);
+        this.makeDisplay = this.makeDisplay.bind(this);
     }
 
     render(){
@@ -29,16 +42,30 @@ class Tabs extends Component {
                 "data-cell-type": "Tabs",
                 class: "container-fluid mb-3"
             }, [
-                h('ul', {class: "nav nav-tabs", role: "tablist"}, [
-                    this.getReplacementElementsFor('header')
-                ]),
+                h('ul', {class: "nav nav-tabs", role: "tablist"}, this.makeHeaders()),
                 h('div', {class: "tab-content"}, [
                     h('div', {class: "tab-pane fade show active", role: "tabpanel"}, [
-                        this.getReplacementElementFor('display')
+                        this.makeDisplay()
                     ])
                 ])
             ])
         );
+    }
+
+    makeDisplay(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('display');
+        } else {
+            return this.renderChildNamed('display');
+        }
+    }
+
+    makeHeaders(){
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor('header');
+        } else {
+            return this.renderChildrenNamed('headers');
+        }
     }
 }
 

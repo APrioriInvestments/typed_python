@@ -16,11 +16,18 @@ import {h} from 'maquette';
  * replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `child` (single) - The cell inside of the navigation tab
+ */
 class _NavTab extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
         // Bind context to methods
+        this.makeChild = this.makeChild.bind(this);
         this.clickHandler = this.clickHandler.bind(this);
     }
 
@@ -40,9 +47,17 @@ class _NavTab extends Component {
                     class: innerClass,
                     role: "tab",
                     onclick: this.clickHandler
-                }, [this.getReplacementElementFor('child')])
+                }, [this.makeChild()])
             ])
         );
+    }
+
+    makeChild(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('child');
+        }
     }
 
     clickHandler(event){

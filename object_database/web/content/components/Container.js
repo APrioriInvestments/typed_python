@@ -12,13 +12,22 @@ import {h} from 'maquette';
  * replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `child` (single) - The Cell that this component contains
+ */
 class Container extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeChild = this.makeChild.bind(this);
     }
 
     render(){
-        let child = this.getReplacementElementFor('child');
+        let child = this.makeChild();
         let style = "";
         if(!child){
             style = "display:none;";
@@ -32,6 +41,14 @@ class Container extends Component {
                 style: style
             }, [child])
         );
+    }
+
+    makeChild(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('child');
+        }
     }
 }
 
