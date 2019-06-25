@@ -352,6 +352,32 @@ class Cells:
 
         self._nodesToBroadcast.add(node)
 
+    def getChildrenJSON(self, cellId, cellObject):
+        childrenInfo = []
+        for replacementKey, childCell in cellObject.children.items():
+            childrenInfo.append({
+                'id': childCell.identity,
+                'cellType': childCell.__class__.__name__,
+                'children': self.getChildrenJSON(childCell.identity, childCell),
+                'replacementKey': replacementKey,
+                'properties': childCell.exportData,
+                'parentId': cellId
+            })
+        return childrenInfo
+
+    def currentStructureFromCell(self, aCell, replacement_key=None):
+        """Responds with a JSON representation of
+        the current cell tree with the passed cell as
+        the root"""
+        result = {
+            'id': aCell.identity,
+            'cellType': aCell.__class__.__name__,
+            'children': self.getChildrenJSON(aCell.identity, aCell),
+            'replacementKey': replacement_key,
+            'properties': aCell.exportData
+        }
+        return result
+
     def renderMessages(self):
         self._processCallbacks()
         self._recalculateCells()
@@ -419,7 +445,7 @@ class Cells:
                             break
                         except SubscribeAndRetry as e:
                             e.callback(self.db)
-
+                    # GLORP
                     for childname, child_cell in n.children.items():
                         if not isinstance(child_cell, Cell):
                             raise Exception("Cell of type %s had a non-cell child %s of type %s != Cell." % (
@@ -630,6 +656,7 @@ class Cell:
         self.parent = None
         self.level = None
         self.children = {}  # local node def to global node def
+        self.namedChildren = {} # The explicitly named version for front-end (refactoring)
         self.contents = ""  # some contents containing a local node def
         self._identity = None
         self._tag = None
@@ -915,7 +942,9 @@ class Card(Cell):
         self.header = header
 
     def recalculate(self):
-        self.children = {"____contents__": Cell.makeCell(self.body)}
+        bodyCell = Cell.makeCell(self.body)
+        self.children = {"____contents__": bodyCell}
+        self.namedChildren['body'] = bodyCell
 
         other = ""
         if self.padding:
@@ -932,7 +961,9 @@ class Card(Cell):
                 "card-header").add_child(
                     HTMLTextContent("____header__")
             )
-            self.children['____header__'] = Cell.makeCell(self.header)
+            headerCell = Cell.makeCell(self.header)
+            self.children['____header__'] = headerCell
+            self.namedChildren['header'] = headerCell
             card.add_child(header)
 
         card.add_child(body)
@@ -951,8 +982,9 @@ class Card(Cell):
 class CardTitle(Cell):
     def __init__(self, inner):
         super().__init__()
-
-        self.children = {"____contents__": Cell.makeCell(inner)}
+        innerCell = Cell.makeCell(inner)
+        self.children = {"____contents__": innerCell}
+        self.namedChildren['inner'] = innerCell
         self.contents = str(
             HTMLElement.div()
             .add_child(HTMLTextContent('____contents__'))
@@ -1012,8 +1044,11 @@ class Modal(Cell):
             )
         )
         self.children = dict(self.buttons)
+        self.namedChildren['buttons'] = list(self.buttons.values())
         self.children["____title__"] = self.title
+        self.namedChildren['title'] = self.title
         self.children["____message__"] = self.message
+        self.namedChildren['message'] = self.message
 
 
 class Octicon(Cell):
@@ -1054,6 +1089,7 @@ class Badge(Cell):
             .add_child(HTMLTextContent('____child__'))
         )
         self.children = {'____child__': self.inner}
+        self.namedChildren['inner'] = self.inner
 
 
 class CollapsiblePanel(Cell):
@@ -1098,9 +1134,11 @@ class CollapsiblePanel(Cell):
         self.children = {
             '____content__': self.content
         }
+        self.namedChildren['content'] = self.content
 
         if expanded:
             self.children['____panel__'] = self.panel
+            self.namedChildren['panel'] = self.panel
 
 
 class Text(Cell):
@@ -1156,6 +1194,7 @@ class Sequence(Cell):
         elements = [Cell.makeCell(x) for x in elements]
 
         self.elements = elements
+        self.namedChildren['elements'] = elements
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
 
@@ -1169,6 +1208,7 @@ class Sequence(Cell):
     def recalculate(self):
         sequenceChildrenStr = '\n'.join("____c_%s__" %
                                         i for i in range(len(self.elements)))
+        self.namedChildren['elements'] = self.elements
         self.exportData['divStyle'] = self._divStyle()
         self.contents = str(
             HTMLElement.div()
@@ -1191,6 +1231,7 @@ class Columns(Cell):
         self.elements = elements
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
+        self.namedChildren['elements'] = self.elements
 
         innerChildren = [
             HTMLElement.div()
@@ -1238,6 +1279,12 @@ class HeaderBar(Cell):
         self.leftItems = leftItems
         self.centerItems = centerItems
         self.rightItems = rightItems
+
+        self.namedChildren = {
+            'leftItems': self.leftItems,
+            'centerItems': self.centerItems,
+            'rightItems': self.rightItems
+        }
 
         self.leftElements = [
             HTMLElement.span()
@@ -1321,6 +1368,7 @@ class Main(Cell):
             )
         )
         self.children = {'____child__': child}
+        self.namedChildren['child'] = child
 
 
 class _NavTab(Cell):
@@ -1359,7 +1407,9 @@ class _NavTab(Cell):
             )
         )
 
-        self.children['____child__'] = Cell.makeCell(self.child)
+        childCell = Cell.makeCell(self.child)
+        self.children['____child__'] = childCell
+        self.namedChildren['child'] = childCell
 
 
 class Tabs(Cell):
@@ -1377,12 +1427,17 @@ class Tabs(Cell):
         self.whichSlot.set(index)
 
     def recalculate(self):
-        self.children['____display__'] = Subscribed(
+        displayCell = Subscribed(
             lambda: self.headersAndChildren[self.whichSlot.get()][1])
+        self.children['____display__'] = displayCell
+        self.namedChildren['display'] = displayCell
+        self.namedChildren['headers'] = []
 
         for i in range(len(self.headersAndChildren)):
-            self.children['____header_{ix}__'.format(ix=i)] = _NavTab(
+            headerCell = _NavTab(
                 self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
+            self.children['____header_{ix}__'.format(ix=i)] = headerCell
+            self.namedChildren['headers'].append(headerCell)
 
         headerItems = "".join(
             """ ____header___ix____ """.replace('__ix__', str(i))
@@ -1447,6 +1502,8 @@ class Dropdown(Cell):
         items = []
 
         self.children['____title__'] = self.title
+        self.namedChildren['title'] = self.title
+        self.namedChildren['dropdownItems'] = []
 
         # Because the items here are not separate cells,
         # we have to perform an extra hack of a dict
@@ -1457,7 +1514,9 @@ class Dropdown(Cell):
 
         for i in range(len(self.headersAndLambdas)):
             header, onDropdown = self.headersAndLambdas[i]
-            self.children["____child_%s__" % i] = Cell.makeCell(header)
+            childCell = Cell.makeCell(header)
+            self.children["____child_%s__" % i] = childCell
+            self.namedChildren['dropdownItems'].append(childCell)
             if not isinstance(onDropdown, str):
                 inlineScript = """
                 cellSocket.sendString(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
@@ -1564,6 +1623,8 @@ class AsyncDropdown(Cell):
             loadingIndicatorCell = CircleLoader()
         self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc, loadingIndicatorCell)
         self.children = {'____contents__': self.contentCell}
+        self.namedChildren['content'] = self.contentCell
+        self.namedChildren['loadingIndicator'] = loadingIndicatorCell
 
     def recalculate(self):
         inlinescript = self.getInlineScript()
@@ -1663,6 +1724,10 @@ class AsyncDropdownContent(Cell):
         self.children = {
             '____contents__': self.contentCell
         }
+        self.namedChildren = {
+            'content': self.contentCell,
+            'loadingIndicator': self.loadingCell
+        }
 
     def changeHandler(self):
         """If the slot is true, the
@@ -1691,12 +1756,15 @@ class Container(Cell):
         if child is None:
             self.contents = ""
             self.children = {}
+            self.namedChildren['child'] = None
         else:
             self.contents = str(
                 HTMLElement.div()
                 .add_child(HTMLTextContent('____child__'))
             )
-            self.children = {"____child__": Cell.makeCell(child)}
+            childCell = Cell.makeCell(child)
+            self.children = {"____child__": childCell}
+            self.namedChildren['child'] = childCell
 
     def setChild(self, child):
         childElement = (
@@ -1709,6 +1777,7 @@ class Container(Cell):
     def setContents(self, newContents, newChildren):
         self.contents = newContents
         self.children = newChildren
+        self.namedChildren['child'] = list(newChildren.values())[0] # Hacky!
         self.markDirty()
 
 
@@ -1732,6 +1801,10 @@ class RootCell(Container):
 
 
 class Traceback(Cell):
+    # TODO: It seems like the passed-in traceback
+    # value might not need to be its own Cell, but
+    # rather just some data that is passed to this
+    # cell.
     def __init__(self, traceback):
         super().__init__()
         self.contents = str(
@@ -1743,13 +1816,18 @@ class Traceback(Cell):
             )
         )
         self.traceback = traceback
-        self.children = {"____child__": Cell.makeCell(traceback)}
+        tracebackCell = Cell.makeCell(traceback)
+        self.children = {"____child__": tracebackCell}
+        self.namedChildren['traceback'] = tracebackCell
 
     def sortsAs(self):
         return self.traceback
 
 
 class Code(Cell):
+    # TODO: It looks like codeContents might not
+    # need to be an actual Cell, but instead just
+    # some data passed to this Cell.
     def __init__(self, codeContents):
         super().__init__()
         self.contents = str(
@@ -1760,7 +1838,9 @@ class Code(Cell):
             )
         )
         self.codeContents = codeContents
-        self.children = {"____child__": Cell.makeCell(codeContents)}
+        codeContentsCell = Cell.makeCell(codeContents)
+        self.children = {"____child__": codeContentsCell}
+        self.namedChildren['code'] = codeContentsCell
 
     def sortsAs(self):
         return self.codeContents
@@ -1811,19 +1891,20 @@ class ContextualDisplay(Cell):
 
     def recalculate(self):
         with self.view():
-            self.children = {"____child__": self.getChild()}
+            childCell = self.getChild()
+            self.children = {"____child__": childCell}
+            self.namedChildren['child'] = childCell
 
 
 class Subscribed(Cell):
     def __init__(self, f):
         super().__init__()
 
-        self.f = f
+        self.f = f # What is f? A lambda?
 
     def prepareForReuse(self):
         if not self.garbageCollected:
             return False
-
         self._clearSubscriptions()
         return super().prepareForReuse()
 
@@ -1848,11 +1929,14 @@ class Subscribed(Cell):
                 if c.cells is not None:
                     c.prepareForReuse()
                 self.children = {'____contents__': c}
+                self.namedChildren['content'] = c
             except SubscribeAndRetry:
                 raise
             except Exception:
-                self.children = {'____contents__': Traceback(
-                    traceback.format_exc())}
+                tracebackCell = Traceback(
+                    traceback.format_exc())
+                self.children = {'____contents__': tracebackCell}
+                self.namedChildren['content'] = tracebackCell
                 self._logger.error(
                     "Subscribed inner function threw exception:\n%s", traceback.format_exc())
 
@@ -1863,6 +1947,11 @@ class Subscribed(Cell):
 
 
 class SubscribedSequence(Cell):
+    # TODO: Get a better idea of what is actually happening
+    # in this cell. For example, what is with all the existing
+    # items funging, and what is actually needed in terms of
+    # information to display this correctly in the new
+    # JS-component based setup?
     def __init__(self, itemsFun, rendererFun, asColumns=False):
         super().__init__()
 
@@ -1875,7 +1964,6 @@ class SubscribedSequence(Cell):
     def prepareForReuse(self):
         if not self.garbageCollected:
             return False
-
         self._clearSubscriptions()
         self.existingItems = {}
         self.spine = []
@@ -1902,21 +1990,28 @@ class SubscribedSequence(Cell):
             self._resetSubscriptionsToViewReads(v)
 
             new_children = {}
+            new_named_children = {
+                'children': []
+            }
             for ix, rowKey in enumerate(self.spine):
                 if rowKey in self.existingItems:
                     new_children["____child_%s__" %
                                  ix] = self.existingItems[rowKey]
+                    new_named_children['children'].append(self.existingItems[rowKey])
                 else:
                     try:
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = self.makeCell(
-                            rowKey[0])
+                        childCell = self.makeCell(rowKey[0])
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = childCell
+                        new_named_children[ix] = childCell
                     except SubscribeAndRetry:
                         raise
                     except Exception:
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = Traceback(
-                            traceback.format_exc())
+                        tracebackCell = Traceback(traceback.format_exc())
+                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = tracebackCell
+                        new_named_children[ix] = tracebackCell
 
         self.children = new_children
+        self.namedChildren = new_named_children
 
         spineAsSet = set(self.spine)
         for i in list(self.existingItems):
@@ -1958,14 +2053,25 @@ class SubscribedSequence(Cell):
 
 
 class Popover(Cell):
+    # TODO: Does title actually need to be a cell here? What about detail?
+    # What is the purpose of the sortAs method here and why are we using
+    # it on the title cell?
     def __init__(self, contents, title, detail, width=400):
         super().__init__()
 
         self.width = width
+        contentCell = Cell.makeCell(contents)
+        detailCell = Cell.makeCell(detail)
+        titleCell = Cell.makeCell(title)
         self.children = {
-            '____contents__': Cell.makeCell(contents),
-            '____detail__': Cell.makeCell(detail),
-            '____title__': Cell.makeCell(title)
+            '____contents__': contentCell,
+            '____detail__': detailCell,
+            '____title__': titleCell
+        }
+        self.namedChildren = {
+            'content': contentCell,
+            'detail': detailCell,
+            'title': titleCell
         }
 
     def recalculate(self):
@@ -2016,6 +2122,9 @@ class Popover(Cell):
 
 
 class Grid(Cell):
+    # TODO: Do the individual data cells (in grid terms) need to be actual Cell objects?
+    # Is there a way to let the Components on the front end handle the updating of the
+    # data that gets presented, without having to wrap each datum in a Cell object?
     def __init__(self, colFun, rowFun, headerFun, rowLabelFun, rendererFun):
         super().__init__()
         self.colFun = colFun
@@ -2031,7 +2140,6 @@ class Grid(Cell):
     def prepareForReuse(self):
         if not self.garbageCollected:
             return False
-
         self._clearSubscriptions()
         self.existingItems = {}
         self.rows = []
@@ -2060,6 +2168,11 @@ class Grid(Cell):
             self._resetSubscriptionsToViewReads(v)
 
         new_children = {}
+        new_named_children = {
+            'headers': [],
+            'rowLabels': [],
+            'dataCells': []
+        }
         seen = set()
 
         for col_ix, col in enumerate(self.cols):
@@ -2067,56 +2180,75 @@ class Grid(Cell):
             if (None, col) in self.existingItems:
                 new_children["____header_%s__" %
                              (col_ix)] = self.existingItems[(None, col)]
+                new_named_children['headers'].append(self.existingItems[(None, col)])
             else:
                 try:
+                    headerCell = Cell.makeCell(self.headerFun(col[0]))
                     self.existingItems[(None, col)] = \
                         new_children["____header_%s__" % col_ix] = \
-                        Cell.makeCell(self.headerFun(col[0]))
+                        headerCell
+                    new_named_children['headers'].append(headerCell)
                 except SubscribeAndRetry:
                     raise
                 except Exception:
+                    tracebackCell = Traceback(traceback.format_exc)()
                     self.existingItems[(None, col)] = \
                         new_children["____header_%s__" % col_ix] = \
-                        Traceback(traceback.format_exc())
+                        tracebackCell
+                    new_named_children['headers'].append(tracebackCell)
 
         if self.rowLabelFun is not None:
             for row_ix, row in enumerate(self.rows):
                 seen.add((None, row))
                 if (row, None) in self.existingItems:
+                    rowLabelCell = self.existingItems[(row, None)]
                     new_children["____rowlabel_%s__" %
-                                 (row_ix)] = self.existingItems[(row, None)]
+                                 (row_ix)] = rowLabelCell
+                    new_named_children['rowLabels'].append(rowLabelCell)
                 else:
                     try:
+                        rowLabelCell = Cell.makeCell(self.rowLabelFun(row[0]))
                         self.existingItems[(row, None)] = \
                             new_children["____rowlabel_%s__" % row_ix] = \
-                            Cell.makeCell(self.rowLabelFun(row[0]))
+                            rowLabelCell
+                        new_named_children['rowLabels'].append(rowLabelCell)
                     except SubscribeAndRetry:
                         raise
                     except Exception:
+                        tracebackCell = Traceback(traceback.format_exc())
                         self.existingItems[(row, None)] = \
                             new_children["____rowlabel_%s__" % row_ix] = \
-                            Traceback(traceback.format_exc())
+                            tracebackCell
+                        new_named_children['rowLabels'].append(tracebackCell)
 
         seen = set()
         for row_ix, row in enumerate(self.rows):
+            new_named_children_column = []
+            new_named_children['dataCells'].append(new_named_children_column)
             for col_ix, col in enumerate(self.cols):
                 seen.add((row, col))
                 if (row, col) in self.existingItems:
                     new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
                         self.existingItems[(row, col)]
+                    new_named_children_column.append(self.existingItems[(row, col)])
                 else:
                     try:
+                        dataCell = Cell.makeCell(self.rendererFun(row[0], col[0]))
                         self.existingItems[(row, col)] = \
                             new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
-                            Cell.makeCell(self.rendererFun(row[0], col[0]))
+                            dataCell
+                        new_named_children_column.append(dataCell)
                     except SubscribeAndRetry:
                         raise
                     except Exception:
+                        tracebackCell = Traceback(traceback.format_exc())
                         self.existingItems[(row, col)] = \
                             new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
-                            Traceback(traceback.format_exc())
+                            tracebackCell
+                        new_named_children_column.append(tracebackCell)
 
         self.children = new_children
+        self.namedChildren = new_named_children
 
         for i in list(self.existingItems):
             if i not in seen:
@@ -2261,7 +2393,6 @@ class Table(Cell):
     def prepareForReuse(self):
         if not self.garbageCollected:
             return False
-
         self._clearSubscriptions()
         self.existingItems = {}
         self.rows = []
@@ -2391,6 +2522,13 @@ class Table(Cell):
             self._resetSubscriptionsToViewReads(v)
 
         new_children = {}
+        new_named_children = {
+            'headers': [],
+            'dataCells': [],
+            'page': None,
+            'right': None,
+            'left': None
+        }
         seen = set()
 
         for col_ix, col in enumerate(self.cols):
@@ -2398,38 +2536,51 @@ class Table(Cell):
             if (None, col) in self.existingItems:
                 new_children["____header_%s__" %
                              (col_ix)] = self.existingItems[(None, col)]
+                new_named_children['headers'].append(self.existingItems[(None, col)])
             else:
                 try:
+                    headerCell = self.makeHeaderCell(col_ix)
                     self.existingItems[(None, col)] = \
                         new_children["____header_%s__" % col_ix] = \
-                        self.makeHeaderCell(col_ix)
+                        headerCell
+                    new_named_children['headers'].append(headerCell)
                 except SubscribeAndRetry:
                     raise
                 except Exception:
+                    tracebackCell = Traceback(traceback.format_exc())
                     self.existingItems[(None, col)] = \
                         new_children["____header_%s__" % col_ix] = \
-                        Traceback(traceback.format_exc())
+                        tracebackCell
+                    new_named_children['headers'].append(tracebackCell)
 
         seen = set()
         for row_ix, row in enumerate(self.rows):
+            new_named_children_columns = []
+            new_named_children['dataCells'].append(new_named_children_columns)
             for col_ix, col in enumerate(self.cols):
                 seen.add((row, col))
                 if (row, col) in self.existingItems:
                     new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
                         self.existingItems[(row, col)]
+                    new_named_children_columns.append(self.existingItems[(row, col)])
                 else:
                     try:
+                        dataCell = Cell.makeCell(self.rendererFun(row, col))
                         self.existingItems[(row, col)] = \
                             new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
-                            Cell.makeCell(self.rendererFun(row, col))
+                            dataCell
+                        new_named_children_columns.append(dataCell)
                     except SubscribeAndRetry:
                         raise
                     except Exception:
+                        tracebackCell = Traceback(traceback.format_exc())
                         self.existingItems[(row, col)] = \
                             new_children["____child_%s_%s__" % (row_ix, col_ix)] = \
-                            Traceback(traceback.format_exc())
+                            tracebackCell
+                        new_named_children_columns.append(tracebackCell)
 
         self.children = new_children
+        self.namedChildren = new_named_children
 
         for i in list(self.existingItems):
             if i not in seen:
@@ -2440,34 +2591,46 @@ class Table(Cell):
         rowDisplay = "____left__ ____right__ Page ____page__ of " + \
             str(totalPages)
         if totalPages <= 1:
-            self.children['____page__'] = Cell.makeCell(totalPages).nowrap()
+            pageCell = Cell.makeCell(totalPages).nowrap()
+            self.children['____page__'] = pageCell
+            self.namedChildren['page'] = pageCell
         else:
-            self.children['____page__'] = (
+            pageCell = (
                 SingleLineTextBox(self.curPage, pattern="[0-9]+")
                 .width(10 * len(str(totalPages)) + 6)
                 .height(20)
                 .nowrap()
             )
+            self.children['____page__'] = pageCell
+            self.namedChildren['page'] = pageCell
         if self.curPage.get() == "1":
-            self.children['____left__'] = Octicon(
+            leftCell = Octicon(
                 "triangle-left").nowrap().color("lightgray")
+            self.children['____left__'] = leftCell
+            self.namedChildren['left'] = leftCell
         else:
-            self.children['____left__'] = (
+            leftCell = (
                 Clickable(
                     Octicon("triangle-left"),
                     lambda: self.curPage.set(str(int(self.curPage.get())-1))
                 ).nowrap()
             )
+            self.children['____left__'] = leftCell
+            self.namedChildren['left'] = leftCell
         if self.curPage.get() == str(totalPages):
-            self.children['____right__'] = Octicon(
+            rightCell = Octicon(
                 "triangle-right").nowrap().color("lightgray")
+            self.children['____right__'] = rightCell
+            self.namedChildren['right'] = rightCell
         else:
-            self.children['____right__'] = (
+            rightCell = (
                 Clickable(
                     Octicon("triangle-right"),
                     lambda: self.curPage.set(str(int(self.curPage.get())+1))
                 ).nowrap()
             )
+            self.children['____right__'] = rightCell
+            self.namedChildren['right'] = rightCell
         # NOTE:
         # It is unclear where the following children are
         # rendered here:
@@ -2547,7 +2710,7 @@ class Table(Cell):
 class Clickable(Cell):
     def __init__(self, content, f, makeBold=False, makeUnderling=False):
         super().__init__()
-        self.f = f
+        self.f = f # What is this?
         self.content = Cell.makeCell(content)
         self.bold = makeBold
 
@@ -2562,6 +2725,7 @@ class Clickable(Cell):
 
     def recalculate(self):
         self.children = {'____contents__': self.content}
+        self.namedChildren = {'content': self.content}
         style = self._divStyle("cursor:pointer;*cursor: hand" +
                                (";font-weight:bold" if self.bold else ""))
 
@@ -2596,6 +2760,7 @@ class Button(Clickable):
 
     def recalculate(self):
         self.children = {'____contents__': self.content}
+        self.namedChildren = {'content': self.content}
 
         classList = ['btn']
         buttonStateClass = f"""btn{'-outline' if not self.active else ''}-{self.style}"""
@@ -2623,6 +2788,7 @@ class ButtonGroup(Cell):
     def recalculate(self):
         self.children = {
             f'____button_{i}__': self.buttons[i] for i in range(len(self.buttons))}
+        self.namedChildren['buttons'] = self.buttons
         innerButtonsText = " ".join(f"____button_{i}__" for i in range(len(self.buttons)))
         self.contents = str(
             HTMLElement.div()
@@ -2630,6 +2796,9 @@ class ButtonGroup(Cell):
             .set_attribute('role', 'group')
             .add_child(HTMLTextContent(innerButtonsText))
         )
+
+        # temporary js WS refactoring data
+        self.exportData['innerButtonsText'] = innerButtonsText
 
 
 class LoadContentsFromUrl(Cell):
@@ -2683,6 +2852,8 @@ def ensureSubscribedSchema(t, lazy=False):
 
 
 class Expands(Cell):
+    # TODO: Do the icons really need to be their own Cell objects? In fact, does Octicon need to be its own Cell class/object at all, considering it is a styling/visual issue that can
+    # more easily be handled by passing names to the front end?
     def __init__(self, closed, open, closedIcon=None, openedIcon=None, initialState=False):
         super().__init__()
         self.isExpanded = initialState
@@ -2717,6 +2888,10 @@ class Expands(Cell):
         self.children = {
             '____child__': self.open if self.isExpanded else self.closed,
             '____icon__': self.openedIcon if self.isExpanded else self.closedIcon
+        }
+        self.namedChildren = {
+            'content': self.open if self.isExpanded else self.closed,
+            'icon': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
         # temporary js WS refactoring data
@@ -2787,7 +2962,7 @@ class CodeEditor(Cell):
                 self.onTextChange(msgFrame['buffer'], msgFrame['selection'])
 
     def recalculate(self):
-        self.children = {}
+        self.children = {} # Is there ever any children for this Cell type?
 
         editorStyle = 'width:100%;height:100%;margin:auto;border:1px solid lightgray;'
         self.contents = str(
@@ -2811,13 +2986,18 @@ class CodeEditor(Cell):
             self.exportData['minLines'] = self.minLines
         self.exportData['keybindings'] = [k for k in self.keybindings.keys()]
 
+        print()
+        print("CODEEDITOR")
+        print()
+        print(self.postscript)
+        print()
+
     def sendCurrentStateToBrowser(self, newSlotState):
         if self.cells is not None:
             # if self.identity is None, then we have not been installed in the tree yet
             # so sending ourselves a message makes no sense.
             self.triggerPostscript(
                 """
-                console.log('Calling sendCurrentStateToBrowser in CodeEditor (python)');
                 var editor = aceEditors["editor__identity__"]
 
                 editor.last_edit_millis = Date.now()
@@ -2903,9 +3083,12 @@ class Sheet(Cell):
                 .add_child(HTMLTextContent('____error__'))
             )
         )
+        errorCell = Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         self.children = {
-            '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
+            '____error__': errorCell
         }
+        self.namedChildren['error'] = errorCell
+
 
         # Deleted the postscript that was here.
         # Should now be implemented completely
@@ -2961,6 +3144,7 @@ class Plot(Cell):
 
     def __init__(self, namedDataSubscriptions, xySlot=None):
         """Initialize a line plot.
+
         namedDataSubscriptions: a map from plot name to a lambda function
             producing either an array, or {x: array, y: array}
         """
@@ -2969,7 +3153,6 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
-        self.exportData['divStyle'] = self._divStyle()
 
     def recalculate(self):
         self.contents = str(
@@ -2984,12 +3167,20 @@ class Plot(Cell):
                 HTMLTextContent('____error__')
             ])
         )
+        chartUpdaterCell = Subscribed(lambda: _PlotUpdater(self))
+        errorCell = Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         self.children = {
-            '____chart_updater__': Subscribed(lambda: _PlotUpdater(self)),
-            '____error__': Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
+            '____chart_updater__': chartUpdaterCell,
+            '____error__': errorCell
         }
-
+        self.namedChildren = {
+            'chartUpdater': chartUpdaterCell,
+            'error': errorCell
+        }
         self.postscript = ""
+
+        # sdtemporary js WS refactoring data
+        self.exportData['divStyle'] = self._divStyle()
 
     def onMessage(self, msgFrame):
         d = msgFrame['data']
@@ -3012,6 +3203,7 @@ class Plot(Cell):
         self.triggerPostscript(f"""
             plotDiv = document.getElementById('plot__identity__');
             newLayout = plotDiv.layout
+
             if (typeof(newLayout.xaxis.range[0]) === 'string') {{
                 formatDate = function(d) {{
                     return (d.getYear() + 1900) + "-" + ("00" + (d.getMonth() + 1)).substr(-2) + "-" +
@@ -3019,6 +3211,7 @@ class Plot(Cell):
                             ("00" + d.getMinutes()).substr(-2) + ":" + ("00" + d.getSeconds()).substr(-2) + "." +
                             ("000000" + d.getMilliseconds()).substr(-3)
                     }};
+
                 newLayout.xaxis.range[0] = formatDate(new Date({low*1000}));
                 newLayout.xaxis.range[1] = formatDate(new Date({high*1000}));
                 newLayout.xaxis.autorange = false;
@@ -3027,11 +3220,15 @@ class Plot(Cell):
                 newLayout.xaxis.range[1] = {high};
                 newLayout.xaxis.autorange = false;
             }}
+
+
             plotDiv.is_server_defined_move = true;
             Plotly.react(plotDiv, plotDiv.data, newLayout);
             plotDiv.is_server_defined_move = false;
+
             console.log("cells.Plot: range for 'plot__identity__' is now " +
                 plotDiv.layout.xaxis.range[0] + " to " + plotDiv.layout.xaxis.range[1])
+
             """.replace("__identity__", self._identity))
 
 
@@ -3044,7 +3241,6 @@ class _PlotUpdater(Cell):
         self.linePlot = linePlot
         self.namedDataSubscriptions = linePlot.namedDataSubscriptions
         self.chartId = linePlot._identity
-        self.exportData['plotId'] = self.chartId
 
     def calculatedDataJson(self):
         series = self.callFun(self.namedDataSubscriptions)
@@ -3091,35 +3287,24 @@ class _PlotUpdater(Cell):
         with self.view() as v:
             # we only exist to run our postscript
             self.contents = """<div style="display:none">"""
-            self.children = {}
+            self.children = {} # Does this Cell type ever have children?
             self.postscript = ""
             self.linePlot.error.set(None)
+
+            # temporary js WS refactoring data
+            self.exportData['plotId'] = self.chartId
+            self.exportData['exceptionOccured'] = False
 
             try:
                 jsonDataToDraw = self.calculatedDataJson()
                 self.exportData['plotData'] = jsonDataToDraw
-                self.postscript = ""
             except SubscribeAndRetry:
                 raise
             except Exception:
+                # temporary js WS refactoring data
+                self.exportData['exceptionOccured'] = True
+
                 self._logger.error(traceback.format_exc())
                 self.linePlot.error.set(traceback.format_exc())
-                self.exportData['exceptionOccured'] = traceback.format_exc()
-                self.postscript = (
-                    """
-                    plotDiv = document.getElementById('plot__identity__');
-                    data = __data__.map(mapPlotlyData)
-                    console.log('Updating plot from python:');
-                    console.log(plotDiv);
-                    console.log(jsonDataToDraw);
-                    Plotly.react(
-                        plotDiv,
-                        data,
-                        plotDiv.layout,
-                        );
-                    """
-                    .replace("__identity__", self.chartId)
-                    .replace("__data__", json.dumps(jsonDataToDraw))
-                )
 
-                self._resetSubscriptionsToViewReads(v)
+            self._resetSubscriptionsToViewReads(v)
