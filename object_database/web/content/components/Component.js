@@ -85,7 +85,7 @@ class Component {
      */
     getReplacementElementsFor(replacementName){
         if(!this.replacements.hasReplacement(replacementName)){
-            return null;
+            return [];
         }
         return this.replacements.mapReplacementsFor(replacementName, replacement => {
             let newId = `${this.props.id}_${replacement}`;
