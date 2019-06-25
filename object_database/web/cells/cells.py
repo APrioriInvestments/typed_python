@@ -656,7 +656,7 @@ class Cell:
         self.parent = None
         self.level = None
         self.children = {}  # local node def to global node def
-        self.namedChildren = {} # The explicitly named version for front-end (refactoring)
+        self.namedChildren = {}  # The explicitly named version for front-end (refactoring)
         self.contents = ""  # some contents containing a local node def
         self._identity = None
         self._tag = None
@@ -1777,7 +1777,7 @@ class Container(Cell):
     def setContents(self, newContents, newChildren):
         self.contents = newContents
         self.children = newChildren
-        self.namedChildren['child'] = list(newChildren.values())[0] # Hacky!
+        self.namedChildren['child'] = list(newChildren.values())[0]  # Hacky!
         self.markDirty()
 
 
@@ -1900,7 +1900,7 @@ class Subscribed(Cell):
     def __init__(self, f):
         super().__init__()
 
-        self.f = f # What is f? A lambda?
+        self.f = f  # What is f? A lambda?
 
     def prepareForReuse(self):
         if not self.garbageCollected:
@@ -2710,7 +2710,7 @@ class Table(Cell):
 class Clickable(Cell):
     def __init__(self, content, f, makeBold=False, makeUnderling=False):
         super().__init__()
-        self.f = f # What is this?
+        self.f = f  # What is this?
         self.content = Cell.makeCell(content)
         self.bold = makeBold
 
@@ -2852,7 +2852,9 @@ def ensureSubscribedSchema(t, lazy=False):
 
 
 class Expands(Cell):
-    # TODO: Do the icons really need to be their own Cell objects? In fact, does Octicon need to be its own Cell class/object at all, considering it is a styling/visual issue that can
+    # TODO: Do the icons really need to be their own Cell objects?
+    # In fact, does Octicon need to be its own Cell class/object at all,
+    # considering it is a styling/visual issue that can
     # more easily be handled by passing names to the front end?
     def __init__(self, closed, open, closedIcon=None, openedIcon=None, initialState=False):
         super().__init__()
@@ -2962,7 +2964,7 @@ class CodeEditor(Cell):
                 self.onTextChange(msgFrame['buffer'], msgFrame['selection'])
 
     def recalculate(self):
-        self.children = {} # Is there ever any children for this Cell type?
+        self.children = {}  # Is there ever any children for this Cell type?
 
         editorStyle = 'width:100%;height:100%;margin:auto;border:1px solid lightgray;'
         self.contents = str(
@@ -3088,7 +3090,6 @@ class Sheet(Cell):
             '____error__': errorCell
         }
         self.namedChildren['error'] = errorCell
-
 
         # Deleted the postscript that was here.
         # Should now be implemented completely
@@ -3286,7 +3287,7 @@ class _PlotUpdater(Cell):
         with self.view() as v:
             # we only exist to run our postscript
             self.contents = """<div style="display:none">"""
-            self.children = {} # Does this Cell type ever have children?
+            self.children = {}  # Does this Cell type ever have children?
             self.postscript = ""
             self.linePlot.error.set(None)
 
@@ -3319,6 +3320,6 @@ class _PlotUpdater(Cell):
                     """
                     .replace("__identity__", self.chartId)
                     .replace("__data__", json.dumps(jsonDataToDraw))
-)
+                )
 
             self._resetSubscriptionsToViewReads(v)
