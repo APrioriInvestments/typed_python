@@ -9,7 +9,10 @@ import {h} from 'maquette';
 
 class Component {
     constructor(props = {}, replacements = []){
+        this.isComponent = true;
         this._updateProps(props);
+
+        // Replacements handling
         this.replacements = new ReplacementsHandler(replacements);
         this.usesReplacements = (replacements.length > 0);
 

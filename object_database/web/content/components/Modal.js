@@ -15,10 +15,24 @@ import {h} from 'maquette';
  * replacements
  * * `button`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `title` (single) - A Cell containing the title
+ * `message` (single) - A Cell contianing the body of the
+ *     modal message
+ * `buttons` (array) - An array of button cells
+ */
 class Modal extends Component {
     constructor(props, ...args){
         super(props, ...args);
         this.mainStyle = 'display:block;padding-right:15px;';
+
+        // Bind component methods
+        this.makeTitle = this.makeTitle.bind(this);
+        this.makeMessage = this.makeMessage.bind(this);
+        this.makeButtons = this.makeButtons.bind(this);
     }
 
     render(){
@@ -35,19 +49,41 @@ class Modal extends Component {
                     h('div', {class: "modal-content"}, [
                         h('div', {class: "modal-header"}, [
                             h('h5', {class: "modal-title"}, [
-                                this.getReplacementElementFor('title')
+                                this.makeTitle()
                             ])
                         ]),
                         h('div', {class: "modal-body"}, [
-                            this.getReplacementElementFor('message')
+                            this.makeMessage()
                         ]),
-                        h('div', {class: "modal-footer"}, [
-                            this.getReplacementElementsFor('button')
-                        ])
+                        h('div', {class: "modal-footer"}, this.makeButtons())
                     ])
                 ])
             ])
         );
+    }
+
+    makeButtons(){
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor('button');
+        } else {
+            return this.renderChildrenNamed('buttons')
+        }
+    }
+
+    makeMessage(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('message');
+        } else {
+            return this.renderChildNamed('message');
+        }
+    }
+
+    makeTitle(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('title');
+        } else {
+            return this.renderChildNamed('title');
+        }
     }
 }
 

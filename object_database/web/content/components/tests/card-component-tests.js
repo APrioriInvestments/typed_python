@@ -54,7 +54,7 @@ describe('Card Component Tests', () => {
                 id: 'parent-card',
                 extraData: {},
                 namedChildren: {
-                    'contents': new FakeContent({id: 'content'}),
+                    'body': new FakeContent({id: 'content'}),
                     'header': new FakeHeader({id: 'header'})
                 }
             });

@@ -21,14 +21,28 @@ import {h} from 'maquette';
  * NOTE: `child` enumerated replacements
  * are two dimensional arrays!
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `headers` (array) - An array of table header cells
+ * `dataCells` (array-of-array) - A 2-dimensional array
+ *    structures as rows by columns that contains the
+ *    table data cells
+ * `page` (single) - A cell that tells which page of the
+ *     table we are looking at
+ * `left` (single) - A cell that shows the number on the left
+ * `right` (single) - A cell that show the number on the right
+ */
 class Table extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
         // Bind context to methods
-        this._makeHeaderElements = this._makeHeaderElements.bind(this);
+        this.makeHeaders = this.makeHeaders.bind(this);
+        this.makeRows = this.makeRows.bind(this);
+        this.makeFirstRow = this.makeFirstRow.bind(this);
         this._makeRowElements = this._makeRowElements.bind(this);
-        this._makeFirstRowElement = this._makeFirstRowElement.bind(this);
         this._theadStyle = this._theadStyle.bind(this);
         this._getRowDisplayElements = this._getRowDisplayElements.bind(this);
     }
@@ -42,9 +56,9 @@ class Table extends Component {
                 class: "cell table-hscroll table-sm table-striped"
             }, [
                 h('thead', {style: this._theadStyle()},[
-                    this._makeFirstRowElement()
+                    this.makeFirstRow()
                 ]),
-                h('tbody', {}, this._makeRowElements())
+                h('tbody', {}, this.makeRows())
             ])
         );
     }
@@ -53,20 +67,39 @@ class Table extends Component {
         return "border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;";
     }
 
-    _makeHeaderElements(){
-        return this.getReplacementElementsFor('header').map((replacement, idx) => {
-            return h('th', {
-                style: "vertical-align:top;",
-                key: `${this.props.id}-table-header-${idx}`
-            }, [replacement]);
-        });
+    makeHeaderElements(){
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor('header').map((replacement, idx) => {
+                return h('th', {
+                    style: "vertical-align:top;",
+                    key: `${this.props.id}-table-header-${idx}`
+                }, [replacement]);
+            });
+        } else {
+            return this.renderChildrenNamed('headers').map((replacement, idx) => {
+                return h('th', {
+                    style: "vertical-align:top;",
+                    key: `${this.props.id}-table-header-${idx}`
+                }, [replacement]);
+            });
+        }
     }
 
-    _makeRowElements(){
+    makeRows(){
+        if(this.usesReplacements){
+            return this._makeRowElements(this.getReplacementElementsFor('child'));
+        } else {
+            return this._makeRowElements(this.renderChildrenNamed('dataCells'));
+        }
+    }
+
+
+
+    _makeRowElements(elements){
         // Note: rows are the *first* dimension
         // in the 2-dimensional array returned
         // by getting the `child` replacement elements.
-        return this.getReplacementElementsFor('child').map((row, rowIdx) => {
+        return elements.map((row, rowIdx) => {
             let columns = row.map((childElement, colIdx) => {
                 return (
                     h('td', {
@@ -81,8 +114,8 @@ class Table extends Component {
         });
     }
 
-    _makeFirstRowElement(){
-        let headerElements = this._makeHeaderElements();
+    makeFirstRow(){
+        let headerElements = this.makeHeaderElements();
         return(
             h('tr', {}, [
                 h('th', {style: "vertical-align:top;"}, [
@@ -98,11 +131,19 @@ class Table extends Component {
     }
 
     _getRowDisplayElements(){
-        return [
-            this.getReplacementElementFor('left'),
-            this.getReplacementElementFor('right'),
-            this.getReplacementElementFor('page'),
-        ];
+        if(this.usesReplacements){
+            return [
+                this.getReplacementElementFor('left'),
+                this.getReplacementElementFor('right'),
+                this.getReplacementElementFor('page'),
+            ];
+        } else {
+            return [
+                this.renderChildNamed('left'),
+                this.renderChildNamed('right'),
+                this.renderChildNamed('page')
+            ];
+        }
     }
 }
 

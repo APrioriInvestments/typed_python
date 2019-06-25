@@ -12,9 +12,18 @@ import {h} from 'maquette';
  * regular replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `child` (single) - A child cell to display in a context
+ */
 class ContextualDisplay extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeChild = this.makeChild.bind(this);
     }
 
     render(){
@@ -24,8 +33,16 @@ class ContextualDisplay extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "ContextualDisplay"
-            }, [this.getReplacementElementFor('child')]
+            }, [this.makeChild()]
         );
+    }
+
+    makeChild(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('child');
+        }
     }
 }
 

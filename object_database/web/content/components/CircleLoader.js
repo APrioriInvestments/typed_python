@@ -24,4 +24,7 @@ class CircleLoader extends Component {
     }
 }
 
+CircleLoader.propTypes = {
+};
+
 export {CircleLoader, CircleLoader as default};

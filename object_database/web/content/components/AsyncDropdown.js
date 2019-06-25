@@ -16,12 +16,20 @@ import {h} from 'maquette';
  * either a loading indicator, text, or a
  * AsyncDropdownContent cell.
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `content` (single) - Usually an AsyncDropdownContent cell
+ * `loadingIndicator` (single) - A Cell that displays that the content is loading
+ */
 class AsyncDropdown extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
         // Bind context to methods
         this.addDropdownListener = this.addDropdownListener.bind(this);
+        this.makeContent = this.makeContent.bind(this);
     }
 
     render(){
@@ -39,20 +47,20 @@ class AsyncDropdown extends Component {
                     id: `${this.props.id}-dropdownMenuButton`,
                     "data-toggle": "dropdown",
                     afterCreate: this.addDropdownListener,
-                    "data-firstclick": "true"
+                    "data-firstclick": true
                 }),
                 h('div', {
                     id: `${this.props.id}-dropdownContentWrapper`,
                     class: "dropdown-menu"
-                }, [this.getReplacementElementFor('contents')])
+                }, [this.makeContent()])
             ])
         );
     }
 
     addDropdownListener(element){
         let parentEl = element.parentElement;
-        let firstTimeClicked = (element.dataset.firstclick == "true");
         let component = this;
+        let firstTimeClicked = (element.dataset.firstclick == true);
         if(firstTimeClicked){
             $(parentEl).on('show.bs.dropdown', function(){
                 cellSocket.sendString(JSON.stringify({
@@ -71,6 +79,14 @@ class AsyncDropdown extends Component {
             element.dataset.firstclick = false;
         }
     }
+
+    makeContent(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('contents');
+        } else {
+            return this.renderChildNamed('content');
+        }
+    }
 }
 
 /**
@@ -80,9 +96,20 @@ class AsyncDropdown extends Component {
  * replacement:
  * * `contents`
  */
+
+/**
+ * About Named Children
+ * ---------------------
+ * `content` (single) - A Cell that comprises the dropdown content
+ * `loadingIndicator` (single) - A Cell that represents a visual
+ *       indicating that the content is loading
+ */
 class AsyncDropdownContent extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeContent = this.makeContent.bind(this);
     }
 
     render(){
@@ -91,8 +118,16 @@ class AsyncDropdownContent extends Component {
                 id: `dropdownContent-${this.props.id}`,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "AsyncDropdownContent"
-            }, [this.getReplacementElementFor('contents')])
+            }, [this.makeContent()])
         );
+    }
+
+    makeContent(){
+        if(this.usesReplacements){
+            return this.getReplacementFor('contents');
+        } else {
+            return this.renderChildNamed('content');
+        }
     }
 }
 

@@ -12,9 +12,18 @@ import {h} from 'maquette';
  * regular-kind replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `child` (single) - The cell/component this instance contains
+ */
 class Scrollable extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeChild = this.makeChild.bind(this);
     }
 
     render(){
@@ -23,8 +32,16 @@ class Scrollable extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Scrollable"
-            }, [this.getReplacementElementFor('child')])
+            }, [this.makeChild()])
         );
+    }
+
+    makeChild(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('child');
+        }
     }
 }
 

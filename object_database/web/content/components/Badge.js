@@ -10,9 +10,18 @@ import {h} from 'maquette';
  * Badge has a single replacement:
  * * `child`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `inner` - The concent cell of the Badge
+ */
 class Badge extends Component {
     constructor(props, ...args){
         super(...args);
+
+        // Bind component methods
+        this.makeInner = this.makeInner.bind(this);
     }
 
     render(){
@@ -22,8 +31,16 @@ class Badge extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Badge"
-            }, [this.getReplacementElementFor('child')])
+            }, [this.makeContent()])
         );
+    }
+
+    makeInner(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('child');
+        } else {
+            return this.renderChildNamed('inner');
+        }
     }
 }
 

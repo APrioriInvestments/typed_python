@@ -40,7 +40,7 @@ class Code extends Component {
 
     makeCode(){
         if(this.usesReplacements){
-            return this.getReplacementElementFor('child');
+            return this.getReplacementelementFor('child');
         } else {
             return this.renderChildNamed('code');
         }

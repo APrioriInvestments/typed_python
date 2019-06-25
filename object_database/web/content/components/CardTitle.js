@@ -13,9 +13,18 @@ import {h} from 'maquette';
  * replacement:
  * * `contents`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `inner` (single) - The inner cell of the title component
+ */
 class CardTitle extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeInner = this.makeInner.bind(this);
     }
 
     render(){
@@ -26,9 +35,17 @@ class CardTitle extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "CardTitle"
             }, [
-                this.getReplacementElementFor('contents')
+                this.makeInner()
             ])
         );
+    }
+
+    makeInner(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('contents');
+        } else {
+            return this.renderChildNamed('inner');
+        }
     }
 }
 

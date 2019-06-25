@@ -12,9 +12,18 @@ import {h} from 'maquette';
  * replacement:
  * * `button`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `buttons` (array) - The constituent button cells
+ */
 class ButtonGroup extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeButtons = this.makeButtons.bind(this);
     }
 
     render(){
@@ -25,9 +34,17 @@ class ButtonGroup extends Component {
                 "data-cell-type": "ButtonGroup",
                 class: "btn-group",
                 "role": "group"
-            }, this.getReplacementElementsFor('button')
+            }, this.makeButtons()
              )
         );
+    }
+
+    makeButtons(){
+        if(this.usesReplacements){
+            return this.getReplacementElementsFor('button');
+        } else {
+            return this.renderChildrenNamed('buttons');
+        }
     }
 
 }

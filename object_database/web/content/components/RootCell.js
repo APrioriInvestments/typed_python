@@ -10,11 +10,20 @@ import {h} from 'maquette';
  * --------------------
  * This component has a one
  * regular-kind replacement:
- * * `child`
+ * * `c`
+ */
+
+/**
+ * About Named Children
+ * --------------------
+ * `child` (single) - The child cell this container contains
  */
 class RootCell extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makeChild = this.makeChild.bind(this);
     }
 
     render(){
@@ -23,8 +32,16 @@ class RootCell extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "RootCell"
-            }, [this.getReplacementElementFor('c')])
+            }, [this.makeChild()])
         );
+    }
+
+    makeChild(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('c');
+        } else {
+            return this.renderChildNamed('child');
+        }
     }
 }
 

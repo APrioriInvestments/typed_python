@@ -13,6 +13,12 @@ import {h} from 'maquette';
  * replacement:
  * * `error`
  */
+
+/**
+ * About Named Children
+ * --------------------
+ * `error` (single) - An error cell if present
+ */
 class Sheet extends Component {
     constructor(props, ...args){
         super(props, ...args);
@@ -22,14 +28,15 @@ class Sheet extends Component {
         // Bind context to methods
         this.initializeTable = this.initializeTable.bind(this);
         this.initializeHooks = this.initializeHooks.bind(this);
+        this.makeError = this.makeError.bind(this);
 
         /**
-         * WARINING: The Cell version of Sheet is still using
-         * certian postscripts because we have not yet refactored
-         * the socket protocol.
+         * WARNING: The Cell version of Sheet is still using certain
+         * postscripts because we have not yet refactored the socket
+         * protocol.
          * Remove this warning about it once that happens!
-         **/
-        console.warn(`[TODO] Sheet still uses certain postscripts in its interaction. See component constructor comment`);
+         */
+        console.warn(`[TODO] Sheet still uses certain postsceripts in its interaction. See component constructor comment for more information`);
     }
 
     componentDidLoad(){
@@ -60,7 +67,7 @@ class Sheet extends Component {
                     id: `sheet${this.props.id}`,
                     style: this.props.extraData.divStyle,
                     class: "handsontable"
-                }, [this.getReplacementElementFor('error')])
+                }, [this.makeError()])
             ])
         );
     }
@@ -148,6 +155,14 @@ class Sheet extends Component {
             handsOnObj.dblClicked = false;
             handsOnObj.lastCellClicked = {row: -100, col: -100};
         }, this.currentTable);
+    }
+
+    makeError(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('error');
+        } else {
+            return this.renderChildNamed('error');
+        }
     }
 }
 

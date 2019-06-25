@@ -15,9 +15,19 @@ import {h} from 'maquette';
  * if the panel is expanded
  */
 
+/**
+ * About Named Children
+ * --------------------
+ * `content` (single) - The current content Cell of the panel
+ * `panel` (single) - The current (expanded) panel view
+ */
 class CollapsiblePanel extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        // Bind component methods
+        this.makePanel = this.makePanel.bind(this);
+        this.makeContent = this.makeContent.bind(this);
     }
 
     render(){
@@ -33,10 +43,10 @@ class CollapsiblePanel extends Component {
                 }, [
                     h('div', {class: "row flex-nowrap no-gutters"}, [
                         h('div', {class: "col-md-auto"},[
-                            this.getReplacementElementFor('panel')
+                            this.makePanel()
                         ]),
                         h('div', {class: "col-sm"}, [
-                            this.getReplacementElementFor('content')
+                            this.makeContent()
                         ])
                     ])
                 ])
@@ -50,8 +60,24 @@ class CollapsiblePanel extends Component {
                     "data-expanded": false,
                     id: this.props.id,
                     style: this.props.extraData.divStyle
-                }, [this.getReplacementElementFor('content')])
+                }, [this.makeContent()])
             );
+        }
+    }
+
+    makeContent(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('content');
+        } else {
+            return this.renderChildNamed('content');
+        }
+    }
+
+    makePanel(){
+        if(this.usesReplacements){
+            return this.getReplacementElementFor('panel');
+        } else {
+            return this.renderChildNamed('panel');
         }
     }
 }
