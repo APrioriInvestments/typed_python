@@ -19,6 +19,7 @@ import traceback
 import os
 import gevent.socket
 import gevent.queue
+import json
 
 from object_database.util import genToken, validateLogLevel
 from object_database import ServiceBase, service_schema
@@ -218,7 +219,35 @@ class ActiveWebService(ServiceBase):
         self.app.add_url_rule('/services/<path:path>', endpoint=None,
                               view_func=self.sendPage)
         self.app.add_url_rule('/status', view_func=self.statusPage)
+        self.app.add_url_rule('/api/<path:path>/initial-structure', view_func=self.sendInitialStructure)
         self.sockets.add_url_rule('/socket/<path:path>', None, self.mainSocket)
+
+    @login_required
+    def sendInitialStructure(self, path=None):
+        path = str(path).split("/")
+        queryArgs = dict(request.args.items())
+        sessionId = request.cookies.get("session")
+        sessionState = self._getSessionState(sessionId)
+        cells = Cells(self.db)
+        sessionState._reset(cells)
+        cells = cells.withRoot(
+            Subscribed(
+                lambda: self.displayForPathAndQueryArgs(path, queryArgs)
+            ),
+            serialization_context=self.db.serializationContext,
+            session_state=sessionState
+        )
+        cells.renderMessages()
+        initialStructure = cells.currentStructureFromCell(cells._root)
+        responseDict = {
+            'structure': initialStructure,
+            'path': path,
+            'queryArgs': queryArgs,
+            'sessionId': sessionId
+        }
+        response = make_response(json.dumps(responseDict, indent=4))
+        response.headers['Content-Type'] = 'application/json'
+        return response
 
     def statusPage(self):
         return make_response(jsonify("STATUS: service is up"))
@@ -242,7 +271,6 @@ class ActiveWebService(ServiceBase):
 
         # wait for the other socket to close if we were bounced
         sleep(.25)
-
         sessionState = self._getSessionState(sessionId)
 
         self._logger.info("entering websocket with path %s", path)
@@ -328,8 +356,8 @@ class ActiveWebService(ServiceBase):
                                  self._logger)
 
                 # request an ACK from the browser before sending any more data
-                # otherwise it can get overloaded and crash because it can't keep
-                # up with the data volume
+                # otherwise it can get overloaded and crash because it can't
+                # keep up with the data volume
                 writeJsonMessage("request_ack", ws, largeMessageAck, self._logger)
 
                 ack = largeMessageAck.get()
