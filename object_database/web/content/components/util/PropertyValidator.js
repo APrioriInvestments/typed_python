@@ -93,6 +93,7 @@ const PropTypes = {
         propNames.delete('children');
         propNames.delete('namedChildren');
         propNames.delete('id');
+        propNames.delete('extraData'); // For now
         let propsToValidate = Array.from(propNames);
 
         // Perform all the validations on each property

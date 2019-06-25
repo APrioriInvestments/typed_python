@@ -9,7 +9,6 @@
  * plans to change this structure to be more flexible
  * and so the API of this class will change greatly.
  */
-
 import {h} from 'maquette';
 
 class CellHandler {
@@ -125,10 +124,6 @@ class CellHandler {
      */
     handleMessage(message){
         let newComponents = [];
-        if(message.component_name == 'Plot' || message.component_name == '_PlotUpdater'){
-            console.log('Attempting to mount ' + message.component_name);
-        }
-        //console.dir(this.cells["holding_pen"]);
 	if(this.cells["page_root"] == undefined){
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
@@ -170,14 +165,17 @@ class CellHandler {
 	    // the component itself as opposed to building a vdom element from the raw html
 	    let componentClass = this.components[message.component_name];
 	    if (componentClass === undefined) {
-                console.info(`Could not find component for ${message.component_name}`);
+                console.warn(`Could not find component for ${message.component_name}`);
 		var velement = this.htmlToVDomEl(message.contents, message.id);
 	    } else {
+                let componentProps = Object.assign({
+                    id: message.id,
+                    namedChildren: message.namedChildren,
+                    children: message.children,
+                    extraData: message.extra_data
+                }, message.extra_data);
 		var component = new componentClass(
-                    {
-                        id: message.id,
-                        extraData: message.extra_data
-                    },
+                    componentProps,
                     message.replacement_keys
                 );
                 var velement = component.render();
@@ -217,7 +215,7 @@ class CellHandler {
 		    // This is actually a new node.
                     // We'll define it later in the
                     // event stream.
-		    source = this.h("div", {id: replacementKey, class: 'shit'}, []);
+		    source = this.h("div", {id: replacementKey}, []);
                     this.cells[replacements[replacementKey]] = source; 
 		    this.projector.append(this.cells["holding_pen"], () => {
 			return source;
@@ -234,6 +232,7 @@ class CellHandler {
                 } else {
                     let errorMsg = `In message ${message} couldn't find ${replacementKey}`;
                     throw new Error(errorMsg);
+                    //console.log("In message ", message, " couldn't find ", replacementKey);
                 }
             });
         }
@@ -251,7 +250,7 @@ class CellHandler {
 
         // Remove leftover replacement divs
         // that are still in the page_root
-        // after vdom insertion.
+        // after vdom insertion
         let pageRoot = document.getElementById('page_root');
         let found = pageRoot.querySelectorAll('[id*="_____"]');
         found.forEach(element => {
@@ -326,7 +325,7 @@ class CellHandler {
      * HTML string and returns a maquette hyperscript
      * VDOM element from it.
      * This uses the internal browser DOMparser() to generate the html
-     * structure from the raw string and then recursively build the 
+     * structure from the raw string and then recursively build the
      * VDOM element
      * @param {string} html - The markup to
      * transform into a real element.
@@ -346,20 +345,19 @@ class CellHandler {
 	    let item = domEl.attributes.item(index);
 	    attrs[item.name] = item.value.trim();
 	}
-	
+
 	if (domEl.childElementCount === 0) {
 	    return h(tagName, attrs, [domEl.textContent]);
 	}
-	
+
 	let children = [];
 	for (index = 0; index < domEl.children.length; index++){
 	    let child = domEl.children[index];
 	    children.push(this._domElToVdomEl(child));
 	}
-	
+
 	return h(tagName, attrs, children);
     }
 }
 
-
-export {CellHandler, CellHandler as default};
+export {CellHandler, CellHandler as default}
