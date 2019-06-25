@@ -11,6 +11,10 @@ nodeenv
 .nodeenv
 node_modules
 
+# Emacs
+\#*
+\.#*
+
 # leading slash means only match at repo-root level
 /.python-version
 /testcert.key
