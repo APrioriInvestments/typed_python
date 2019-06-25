@@ -2988,12 +2988,6 @@ class CodeEditor(Cell):
             self.exportData['minLines'] = self.minLines
         self.exportData['keybindings'] = [k for k in self.keybindings.keys()]
 
-        print()
-        print("CODEEDITOR")
-        print()
-        print(self.postscript)
-        print()
-
     def sendCurrentStateToBrowser(self, newSlotState):
         if self.cells is not None:
             # if self.identity is None, then we have not been installed in the tree yet
