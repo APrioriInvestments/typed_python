@@ -3153,6 +3153,7 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
+        self.exportData['divStyle'] = self._divStyle()
 
     def recalculate(self):
         self.contents = str(
@@ -3178,9 +3179,6 @@ class Plot(Cell):
             'error': errorCell
         }
         self.postscript = ""
-
-        # sdtemporary js WS refactoring data
-        self.exportData['divStyle'] = self._divStyle()
 
     def onMessage(self, msgFrame):
         d = msgFrame['data']
@@ -3241,6 +3239,7 @@ class _PlotUpdater(Cell):
         self.linePlot = linePlot
         self.namedDataSubscriptions = linePlot.namedDataSubscriptions
         self.chartId = linePlot._identity
+        self.exportData['plotId'] = self.chartId
 
     def calculatedDataJson(self):
         series = self.callFun(self.namedDataSubscriptions)
@@ -3292,7 +3291,6 @@ class _PlotUpdater(Cell):
             self.linePlot.error.set(None)
 
             # temporary js WS refactoring data
-            self.exportData['plotId'] = self.chartId
             self.exportData['exceptionOccured'] = False
 
             try:
@@ -3306,5 +3304,21 @@ class _PlotUpdater(Cell):
 
                 self._logger.error(traceback.format_exc())
                 self.linePlot.error.set(traceback.format_exc())
+                self.postscript = (
+                    """
+                    plotDiv = document.getElementById('plot__identity__');
+                    data = __data__.map(mapPlotlyData)
+                    console.log('Updating plot from python:');
+                    console.log(plotDiv);
+                    console.log(jsonDataToDraw);
+                    Plotly.react(
+                        plotDiv,
+                        data,
+                        plotDiv.layout,
+                        );
+                    """
+                    .replace("__identity__", self.chartId)
+                    .replace("__data__", json.dumps(jsonDataToDraw))
+)
 
             self._resetSubscriptionsToViewReads(v)

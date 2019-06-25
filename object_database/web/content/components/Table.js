@@ -39,7 +39,6 @@ class Table extends Component {
         super(props, ...args);
 
         // Bind context to methods
-        this.makeHeaders = this.makeHeaders.bind(this);
         this.makeRows = this.makeRows.bind(this);
         this.makeFirstRow = this.makeFirstRow.bind(this);
         this._makeRowElements = this._makeRowElements.bind(this);

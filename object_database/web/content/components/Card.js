@@ -31,8 +31,12 @@ class Card extends Component {
     }
 
     render(){
+        let bodyClass = "card-body";
+        if(this.props.extraData.padding){
+            bodyClass = `card-body p-${this.props.extraData.padding}`;
+        }
         let bodyArea = h('div', {
-            class: 'card-body p-${this.props.padding}'
+            class: bodyClass
         }, [this.makeBody()]);
         let header = this.makeHeader();
         let headerArea = null;

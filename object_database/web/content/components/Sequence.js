@@ -41,7 +41,7 @@ class Sequence extends Component {
 
     makeElements(){
         if(this.usesReplacements){
-            return this.getReplacementElementFor('c');
+            return this.getReplacementElementsFor('c');
         } else {
             return this.renderChildrenNamed('elements');
         }
