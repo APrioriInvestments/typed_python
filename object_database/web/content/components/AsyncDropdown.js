@@ -47,7 +47,7 @@ class AsyncDropdown extends Component {
                     id: `${this.props.id}-dropdownMenuButton`,
                     "data-toggle": "dropdown",
                     afterCreate: this.addDropdownListener,
-                    "data-firstclick": true
+                    "data-firstclick": "true"
                 }),
                 h('div', {
                     id: `${this.props.id}-dropdownContentWrapper`,
@@ -60,7 +60,7 @@ class AsyncDropdown extends Component {
     addDropdownListener(element){
         let parentEl = element.parentElement;
         let component = this;
-        let firstTimeClicked = (element.dataset.firstclick == true);
+        let firstTimeClicked = (element.dataset.firstclick == "true");
         if(firstTimeClicked){
             $(parentEl).on('show.bs.dropdown', function(){
                 cellSocket.sendString(JSON.stringify({
@@ -124,7 +124,7 @@ class AsyncDropdownContent extends Component {
 
     makeContent(){
         if(this.usesReplacements){
-            return this.getReplacementFor('contents');
+            return this.getReplacementElementFor('contents');
         } else {
             return this.renderChildNamed('content');
         }
