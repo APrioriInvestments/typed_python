@@ -4,6 +4,7 @@
  * Cell classes on JS side.
  */
 import {ReplacementsHandler} from './util/ReplacementsHandler';
+import {KeyListener} from './util/KeyListener';
 import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 

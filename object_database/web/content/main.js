@@ -4,6 +4,8 @@ const h = maquette.h;
 import {CellHandler} from './CellHandler';
 import {CellSocket} from './CellSocket';
 import {ComponentRegistry} from './ComponentRegistry';
+import {KeyListener} from './components/util/KeyListener';
+import {Component} from './components/Component';
 
 /**
  * Globals
@@ -49,6 +51,10 @@ window.cellHandler = cellHandler;
 document.addEventListener('DOMContentLoaded', () => {
     projector.append(document.body, initialRender);
     cellSocket.connect();
+    Component.keyListener = new KeyListener();
+    window._keyListener = Component.keyListener;
+    Component.keyListener.start(document, cellSocket);
+    window._keyListener = Component.keyListener;
 });
 
 // TESTING; REMOVE

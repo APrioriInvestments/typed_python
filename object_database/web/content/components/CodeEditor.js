@@ -16,6 +16,11 @@ class CodeEditor extends Component {
         this.setupEditor = this.setupEditor.bind(this);
         this.setupKeybindings = this.setupKeybindings.bind(this);
         this.changeHandler = this.changeHandler.bind(this);
+
+        // Used to register and deregister
+        // any global KeyListener instance
+        this._onBlur = this._onBlur.bind(this);
+        this._onFocus = this._onFocus.bind(this);
     }
 
     componentDidLoad() {
@@ -86,6 +91,8 @@ class CodeEditor extends Component {
 	var editorId = this.props.id;
 	var editor = this.editor;
 	var SERVER_UPDATE_DELAY_MS = this.SERVER_UPDATE_DELAY_MS;
+        this.editor.on('focus', this._onFocus);
+        this.editor.on('blur', this._onBlur);
         this.editor.session.on(
             "change",
             function(delta) {
@@ -150,6 +157,18 @@ class CodeEditor extends Component {
                 }
             );
         });
+    }
+
+    _onBlur(event){
+        if(this.constructor.keyListener){
+            this.constructor.keyListener.start();
+        }
+    }
+
+    _onFocus(event){
+        if(this.constructor.keyListener){
+            this.constructor.keyListener.pause();
+        }
     }
 }
 
