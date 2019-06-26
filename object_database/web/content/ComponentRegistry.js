@@ -45,6 +45,7 @@ import {Grid} from './components/Grid';
 import {Sheet} from './components/Sheet';
 import {Plot} from './components/Plot';
 import {_PlotUpdater} from './components/_PlotUpdater';
+import {Timestamp} from './components/Timestamp';
 
 const ComponentRegistry = {
     AsyncDropdown,
@@ -87,7 +88,8 @@ const ComponentRegistry = {
     Grid,
     Sheet,
     Plot,
-    _PlotUpdater
+    _PlotUpdater,
+    Timestamp
 };
 
 export {ComponentRegistry, ComponentRegistry as default};

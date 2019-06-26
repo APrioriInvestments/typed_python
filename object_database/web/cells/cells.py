@@ -3317,3 +3317,23 @@ class _PlotUpdater(Cell):
                 )
 
             self._resetSubscriptionsToViewReads(v)
+
+
+class Timestamp(Cell):
+    """Display current time zone."""
+    def __init__(self, timestamp):
+        """
+        Parameters:
+        ----------
+        timestamp: float
+            time from epoch
+        """
+        super().__init__()
+        assert isinstance(timestamp, (float, int)), ("expected time since "
+                                                     "epoch float or int for"
+                                                     " 'timestamp' argument.")
+        self.timestamp = timestamp
+
+    def recalculate(self):
+        self.contents = ""
+        self.exportData['timestamp'] = self.timestamp
