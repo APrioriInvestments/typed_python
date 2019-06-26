@@ -61,6 +61,8 @@ from object_database.web.cells.cells import (
     Timestamp,
 )
 
+from object_database.web.cells.views.split_view import SplitView
+
 from object_database.web.cells.CellsTestMixin import CellsTestMixin
 
 from object_database.web.cells.util import waitForCellsCondition
