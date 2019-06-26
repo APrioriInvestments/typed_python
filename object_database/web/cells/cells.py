@@ -462,6 +462,7 @@ class Cells:
 
         res = {
             'id': cell.identity,
+            'shouldDisplay': cell.shouldDisplay,
             'replacements': replaceDict,
             'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
             'replacement_keys': [k for k in cell.children.keys()],
@@ -614,6 +615,7 @@ class Cell:
         self.children = {}  # local node def to global node def
         self.namedChildren = {}  # The explicitly named version for front-end (refactoring)
         self.contents = ""  # some contents containing a local node def
+        self.shouldDisplay = True  # Whether or not this is a cell that will be displayed
         self._identity = None
         self._tag = None
         self._nowrap = None

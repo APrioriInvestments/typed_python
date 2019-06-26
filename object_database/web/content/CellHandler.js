@@ -128,6 +128,7 @@ class CellHandler {
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
         }
+
 	// With the exception of `page_root` and `holding_pen` id nodes, all
 	// elements in this.cells are virtual. Dependig on whether we are adding a
 	// new node, or manipulating an existing, we neeed to work with the underlying
@@ -181,6 +182,16 @@ class CellHandler {
                 var velement = component.render();
                 newComponents.push(component);
 	    }
+
+            // If the incoming message describes a Cell that
+            // is not for display, then we should return from
+            // the method here.
+            if(!message.shouldDisplay){
+                if(component){
+                    component.componentDidLoad();
+                }
+                return;
+            }
 
             // Install the element into the dom
             if(cell === undefined){

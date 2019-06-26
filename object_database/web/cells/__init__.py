@@ -62,6 +62,8 @@ from object_database.web.cells.cells import (
 
 from object_database.web.cells.views.split_view import SplitView
 
+from .non_display.key_action import KeyAction
+
 from object_database.web.cells.CellsTestMixin import CellsTestMixin
 
 from object_database.web.cells.util import waitForCellsCondition

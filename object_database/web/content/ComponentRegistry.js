@@ -22,6 +22,7 @@ import {ContextualDisplay} from './components/ContextualDisplay';
 import {Dropdown} from './components/Dropdown';
 import {Expands} from './components/Expands';
 import {HeaderBar} from './components/HeaderBar';
+import {KeyAction} from './components/KeyAction';
 import {LoadContentsFromUrl} from './components/LoadContentsFromUrl';
 import {LargePendingDownloadDisplay} from './components/LargePendingDownloadDisplay';
 import {Main} from './components/Main';
@@ -68,6 +69,7 @@ const ComponentRegistry = {
     Dropdown,
     Expands,
     HeaderBar,
+    KeyAction,
     LoadContentsFromUrl,
     LargePendingDownloadDisplay,
     Main,
