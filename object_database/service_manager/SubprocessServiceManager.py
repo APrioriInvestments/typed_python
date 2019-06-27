@@ -28,6 +28,16 @@ from object_database import connect
 
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
+_repoDir = None
+
+
+def repoDir():
+    global _repoDir
+    if _repoDir is None:
+        parentDir = os.path.abspath(os.path.join(ownDir, '..'))
+        assert parentDir.endswith('object_database'), parentDir
+        _repoDir = os.path.abspath(os.path.join(ownDir, '..', '..'))
+    return _repoDir
 
 
 def parseLogfileToInstanceid(fname):
@@ -95,7 +105,6 @@ class SubprocessServiceManager(ServiceManager):
                     output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
                 else:
                     output_file = None
-
                 process = subprocess.Popen(
                     [
                         sys.executable,
@@ -113,6 +122,9 @@ class SubprocessServiceManager(ServiceManager):
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,
                     stderr=subprocess.STDOUT
+                )
+                self._logger.info(
+                    f"Started service_entrypoint.py subprocess with PID={process.pid}"
                 )
 
                 self.serviceProcesses[instanceIdentity] = process
@@ -136,18 +148,60 @@ class SubprocessServiceManager(ServiceManager):
 
     def stop(self, gracefully=True):
         if gracefully:
-            self.stopAllServices(self.shutdownTimeout)
+            if not self.stopAllServices(self.shutdownTimeout):
+                self._logger.error(
+                    f"Failed to gracefully stop all services within {self.shutdownTimeout} seconds"
+                )
 
         ServiceManager.stop(self)
+        self.moveCoverageFiles()
 
         with self.lock:
             for instanceIdentity, workerProcess in self.serviceProcesses.items():
                 workerProcess.terminate()
 
+            t0 = time.time()
+
+            def timeRemaining():
+                return max(0.0, self.shutdownTimeout - (time.time() - t0))
+
             for instanceIdentity, workerProcess in self.serviceProcesses.items():
-                workerProcess.wait()
+                timeout = timeRemaining()
+                self._logger.info(f"Will terminate instance '{instanceIdentity}' (timeout={timeout})")
+                try:
+                    workerProcess.wait(timeout)
+                except subprocess.TimeoutExpired:
+                    self._logger.warning(
+                        f"Worker Process '{instanceIdentity}' failed to gracefully terminate"
+                        + f" within {self.shutdownTimeout} seconds. Sending KILL signal."
+                    )
+
+                    # don't update serviceProcesses because we're iterating through it
+                    self._killWorkerProcess(
+                        instanceIdentity, workerProcess,
+                        updateServiceProcesses=False
+                    )
 
         self.serviceProcesses = {}
+        self.moveCoverageFiles()
+
+    def _dropServiceProcess(self, identity):
+        with self.lock:
+            if identity in self.serviceProcesses:
+                del self.serviceProcesses[identity]
+
+    def _killWorkerProcess(self, identity, workerProcess, updateServiceProcesses=True):
+        if workerProcess:
+            workerProcess.kill()
+            try:
+                workerProcess.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                self._logger.error(
+                    f"Failed to kill Worker Process '{identity}'"
+                )
+
+        if updateServiceProcesses:
+            self._dropServiceProcess(identity)
 
     def cleanup(self):
         with self.cleanupLock:
@@ -157,9 +211,7 @@ class SubprocessServiceManager(ServiceManager):
             for identity, workerProcess in toCheck:
                 if workerProcess.poll() is not None:
                     workerProcess.wait()
-                    with self.lock:
-                        if identity in self.serviceProcesses:
-                            del self.serviceProcesses[identity]
+                    self._dropServiceProcess(identity)
 
             with self.lock:
                 toCheck = list(self.serviceProcesses.items())
@@ -172,13 +224,13 @@ class SubprocessServiceManager(ServiceManager):
                             or (serviceInstance.shouldShutdown and
                                 time.time() - serviceInstance.shutdownTimestamp > self.shutdownTimeout)):
                         if workerProcess:
-                            workerProcess.terminate()
-                            workerProcess.wait()
+                            self._logger.warning(
+                                f"Worker Process '{identity}' failed to gracefully terminate"
+                                + f" within {self.shutdownTimeout} seconds. Sending KILL signal."
+                            )
+                            self._killWorkerProcess(identity, workerProcess)
 
-                            with self.lock:
-                                if identity in self.serviceProcesses:
-                                    del self.serviceProcesses[identity]
-
+            self.moveCoverageFiles()
             self.cleanupOldLogfiles()
 
     def extractLogData(self, targetInstanceId, maxBytes):
@@ -199,6 +251,22 @@ class SubprocessServiceManager(ServiceManager):
 
         return "<logfile not found>"
 
+    def moveCoverageFiles(self):
+        if self.storageDir:
+            with self.lock:
+                if os.path.exists(self.storageDir):
+                    for stringifiedInstanceId in os.listdir(self.storageDir):
+                        path = os.path.join(self.storageDir, stringifiedInstanceId)
+                        if stringifiedInstanceId.startswith(".coverage.") and os.path.isfile(path):
+                            self._logger.debug(
+                                "Moving '%s' from %s to %s",
+                                stringifiedInstanceId, self.storageDir, repoDir()
+                            )
+                            shutil.move(
+                                path,
+                                os.path.join(repoDir(), stringifiedInstanceId)
+                            )
+
     def cleanupOldLogfiles(self):
         if self.logfileDirectory:
             with self.lock:
@@ -217,10 +285,10 @@ class SubprocessServiceManager(ServiceManager):
             with self.lock:
                 if os.path.exists(self.storageDir):
                     for stringifiedInstanceId in os.listdir(self.storageDir):
-                        if not self.isLiveService(stringifiedInstanceId):
+                        path = os.path.join(self.storageDir, stringifiedInstanceId)
+                        if os.path.isdir(path) and not self.isLiveService(stringifiedInstanceId):
                             try:
-                                path = os.path.join(self.storageDir, stringifiedInstanceId)
-                                self._logger.info("Removing storage at path %s for dead service.", path)
+                                self._logger.debug("Removing storage at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except Exception:
                                 self._logger.error(

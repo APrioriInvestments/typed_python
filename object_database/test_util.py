@@ -163,7 +163,21 @@ def autoconfigure_and_start_service_manager(port=None, auth_token=None, loglevel
 
     def cleanupFn(error=False):
         server.terminate()
-        server.wait()
+        try:
+            server.wait(timeout=15.0)
+        except subprocess.TimeoutExpired:
+            logging.getLogger(__name__).warning(
+                f"Failed to gracefully terminate service manager after 15 seconds."
+                + " Sending KILL signal"
+            )
+            server.kill()
+            try:
+                server.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                logging.getLogger(__name__).warning(
+                    f"Failed to kill service manager process."
+                )
+
         if error:
             logging.getLogger(__name__).warning(
                 "Exited with an error. Leaving temporary directory around for inspection: {}"

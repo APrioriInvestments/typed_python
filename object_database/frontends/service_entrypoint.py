@@ -16,6 +16,7 @@
 
 import argparse
 import logging
+import signal
 import sys
 import traceback
 
@@ -77,6 +78,13 @@ def main(argv):
             parsedArgs.authToken,
             ourIP
         )
+
+        def shutdownCleanly(signalNumber, frame):
+            logger.info("Received signal %s. Stopping.", signalNumber)
+            manager.stop()
+
+        signal.signal(signal.SIGINT, shutdownCleanly)
+        signal.signal(signal.SIGTERM, shutdownCleanly)
 
         manager.runAndWaitForShutdown()
 

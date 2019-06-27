@@ -70,7 +70,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
-                timeout=self.WAIT_FOR_COUNT_TIMEOUT
+                timeout=5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -94,7 +94,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
-                timeout=self.WAIT_FOR_COUNT_TIMEOUT * 2
+                timeout=10.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -123,7 +123,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: len([t for t in Task.TaskStatus.lookupAll() if t.worker is not None]) == 4,
-                timeout=4*self.WAIT_FOR_COUNT_TIMEOUT
+                timeout=20.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -135,7 +135,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: sum([t.times_failed for t in Task.TaskStatus.lookupAll()]) > 0,
-                timeout=4*self.WAIT_FOR_COUNT_TIMEOUT
+                timeout=20.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -144,7 +144,7 @@ class TaskTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.service1Conn.waitForCondition(
                 lambda: task.finished,
-                timeout=4*self.WAIT_FOR_COUNT_TIMEOUT
+                timeout=20.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 

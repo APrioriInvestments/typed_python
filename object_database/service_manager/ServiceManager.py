@@ -182,7 +182,7 @@ class ServiceManager(object):
                 return False
             return True
 
-        self.db.waitForCondition(allStopped, timeout)
+        return self.db.waitForCondition(allStopped, timeout)
 
     def doWork(self):
         self.updateServiceHostStats()
@@ -206,7 +206,10 @@ class ServiceManager(object):
                 self.startServiceWorker(service, i._identity)
 
             except Exception:
-                self._logger.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
+                self._logger.error(
+                    "Failed to start a worker for instance %s:\n%s",
+                    i, traceback.format_exc()
+                )
                 bad_instances[i] = traceback.format_exc()
 
         if bad_instances:

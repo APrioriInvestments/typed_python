@@ -545,11 +545,11 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             ServiceManager.startService("TestService", count)
         self.waitForCount(count)
 
-    def waitForCount(self, count):
+    def waitForCount(self, count, timeout=5.0):
         self.assertTrue(
             self.database.waitForCondition(
                 lambda: TestServiceLastTimestamp.aliveCount() == count,
-                timeout=self.WAIT_FOR_COUNT_TIMEOUT
+                timeout=timeout * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -585,7 +585,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.database.waitForCondition(
                 lambda: svc.timesBootedUnsuccessfully == ServiceInstance.MAX_BAD_BOOTS,
-                10
+                timeout=10 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -601,7 +601,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.assertTrue(
             self.database.waitForCondition(
                 lambda: svc.timesBootedUnsuccessfully == ServiceInstance.MAX_BAD_BOOTS,
-                10
+                timeout=10 * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
@@ -609,7 +609,9 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.database.subscribeToSchema(waiting)
         svcName = "WaitForService"
 
-        def test_once(timeout=6.0):
+        def test_once(timeout=None):
+            if timeout is None:
+                timeout = 6.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
             with self.database.transaction():
                 self.assertIsNone(Initialized.lookupAny())
                 self.assertIsNone(Stopped.lookupAny())
@@ -680,7 +682,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         self.waitForCount(0)
 
-        self.assertTrue(time.time() - t0 < 2.0)
+        self.assertLess(time.time() - t0, 2.0 * self.ENVIRONMENT_WAIT_MULTIPLIER)
 
         # make sure we don't have a bunch of zombie processes hanging underneath the service manager
         time.sleep(1.0)
@@ -715,13 +717,13 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             i12 = v1.instantiate("test_service.service")
             i22 = v2.instantiate("test_service.service")
 
-            self.assertTrue(i1.f() == 1)
-            self.assertTrue(i2.f() == 2)
-            self.assertTrue(i12.f() == 1)
-            self.assertTrue(i22.f() == 2)
+            self.assertEqual(i1.f(), 1)
+            self.assertEqual(i2.f(), 2)
+            self.assertEqual(i12.f(), 1)
+            self.assertEqual(i22.f(), 2)
 
-            self.assertTrue(i1 is i12)
-            self.assertTrue(i2 is i22)
+            self.assertIs(i1, i12)
+            self.assertIs(i2, i22)
 
     def test_redeploy_hanging_services(self):
         with self.database.transaction():
@@ -749,9 +751,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         self.database.flush()
 
-        # after 2 seconds, we should be redeployed, but give Travis a bit more time
-        if os.environ.get('TRAVIS_CI', None) is not None:
-            time.sleep(10.0)
+        time.sleep(2.0 * self.ENVIRONMENT_WAIT_MULTIPLIER)
 
         with self.database.view():
             instances_redeployed = service_schema.ServiceInstance.lookupAll()
@@ -760,7 +760,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.assertEqual(len(instances_redeployed), 10)
             self.assertEqual(len(set(instances).intersection(set(instances_redeployed))), 0)
 
-            self.assertTrue(orig_codebase != instances_redeployed[0].codebase)
+            self.assertNotEqual(orig_codebase, instances_redeployed[0].codebase)
 
         # and we never became too big!
         self.assertLess(maxProcessesEver, 11)
@@ -834,7 +834,10 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             s = TestServiceLastTimestamp.aliveServices()[0]
             s.triggerSoftKill = True
 
-        self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
+        self.database.waitForCondition(
+            lambda: not s.connection.exists(),
+            timeout=5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
+        )
 
         self.waitForCount(1)
 
@@ -848,7 +851,10 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             s = TestServiceLastTimestamp.aliveServices()[0]
             s.triggerHardKill = True
 
-        self.database.waitForCondition(lambda: not s.connection.exists(), timeout=5.0)
+        self.database.waitForCondition(
+            lambda: not s.connection.exists(),
+            timeout=5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
+        )
 
         self.waitForCount(1)
 
@@ -858,7 +864,10 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.waitForCount(1)
 
         self.assertTrue(
-            self.database.waitForCondition(lambda: len(os.listdir(self.logDir)) == 1, timeout=5.0, maxSleepTime=0.001)
+            self.database.waitForCondition(
+                lambda: len(os.listdir(self.logDir)) == 1,
+                timeout=5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER,
+                maxSleepTime=0.001)
         )
         priorFilename = os.listdir(self.logDir)[0]
 
@@ -866,7 +875,11 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.setCountAndBlock(1)
 
         self.assertTrue(
-            self.database.waitForCondition(lambda: len(os.listdir(self.logDir)) == 2, timeout=5.0, maxSleepTime=0.001)
+            self.database.waitForCondition(
+                lambda: len(os.listdir(self.logDir)) == 2,
+                timeout=5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER,
+                maxSleepTime=0.001
+            )
         )
 
         newFilename = [x for x in os.listdir(self.logDir) if x != 'old'][0]
@@ -912,7 +925,8 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             if existing_service:
                 self.assertTrue(
                     self.database.waitForCondition(
-                        lambda: not existing_service.connection.exists(), timeout=5.0
+                        lambda: not existing_service.connection.exists(),
+                        timeout=5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
                     )
                 )
 
