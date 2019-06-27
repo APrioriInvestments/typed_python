@@ -666,7 +666,7 @@ class FunctionConverter:
 
             elif lhs.native_type.matches.Int and expr.to_type.matches.Int:
                 if lhs.native_type.bits < expr.to_type.bits:
-                    if expr.to_type.signed:
+                    if lhs.native_type.signed:
                         return TypedLLVMValue(self.builder.sext(lhs.llvm_value, target_type), expr.to_type)
                     else:
                         return TypedLLVMValue(self.builder.zext(lhs.llvm_value, target_type), expr.to_type)
@@ -912,10 +912,16 @@ class FunctionConverter:
                             native_ast.Bool
                         )
                     elif lhs.native_type.matches.Int:
-                        return TypedLLVMValue(
-                            self.builder.icmp_signed(rep, lhs.llvm_value, rhs.llvm_value),
-                            native_ast.Bool
-                        )
+                        if lhs.native_type.signed:
+                            return TypedLLVMValue(
+                                self.builder.icmp_signed(rep, lhs.llvm_value, rhs.llvm_value),
+                                native_ast.Bool
+                            )
+                        else:
+                            return TypedLLVMValue(
+                                self.builder.icmp_unsigned(rep, lhs.llvm_value, rhs.llvm_value),
+                                native_ast.Bool
+                            )
 
             for py_op, floatop, intop_s, intop_u in [('Add', 'fadd', 'add', 'add'),
                                                      ('Mul', 'fmul', 'mul', 'mul'),

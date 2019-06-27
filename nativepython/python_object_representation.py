@@ -68,7 +68,7 @@ _concreteWrappers = {
     Bool: BoolWrapper(),
     NoneType: NoneWrapper(),
     String: StringWrapper(),
-    Bytes: BoolWrapper()
+    Bytes: BytesWrapper()
 }
 
 
