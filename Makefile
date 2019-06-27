@@ -134,6 +134,7 @@ clean:
 	rm -rf .venv
 	rm -rf .nodeenv
 	rm -f object_database/web/content/dist/main.bundle.js
+	rm .coverage*
 
 
 ##########################################################################

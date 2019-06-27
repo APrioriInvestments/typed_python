@@ -18,9 +18,11 @@ import argparse
 import concurrent.futures
 import logging
 import multiprocessing
+import os
 import psutil
 import resource
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -31,10 +33,63 @@ from object_database import TcpServer, RedisPersistence, InMemoryPersistence, Di
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
 
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv
+ownDir = os.path.dirname(os.path.abspath(__file__))
 
+
+def start_service_manager(tempDirectoryName, port, auth_token, *,
+                          loglevelName="INFO",
+                          timeout=1.0,
+                          verbose=True,
+                          ownHostname='localhost',
+                          dbHostname='localhost',
+                          runDb=True,
+                          logDir=True,
+                          sslPath=None
+                          ):
+    if not verbose:
+        kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        kwargs = dict()
+
+    cmd = [
+        sys.executable,
+        os.path.join(ownDir, 'service_manager.py'),
+        ownHostname, dbHostname, str(port),
+        '--service-token', auth_token,
+        '--shutdownTimeout', str(timeout),
+        '--log-level', loglevelName,
+        '--source', os.path.join(tempDirectoryName, 'source'),
+        '--storage', os.path.join(tempDirectoryName, 'storage'),
+    ]
+    if runDb:
+        cmd.append('--run_db')
+
+    if logDir:
+        cmd.extend(['--logdir', os.path.join(tempDirectoryName, 'logs')])
+    if sslPath:
+        cmd.extend(['--ssl-path', sslPath])
+
+    server = subprocess.Popen(cmd, **kwargs)
+    try:
+        # this should throw a subprocess.TimeoutExpired exception if the service did not crash
+        server.wait(timeout)
+    except subprocess.TimeoutExpired:
+        pass
+    else:
+        if server.returncode:
+            msg = f"Failed to start service_manager (retcode:{server.returncode})"
+
+            if verbose and server.stderr:
+                error = b''.join(server.stderr.readlines())
+                msg += "\n" + error.decode("utf-8")
+            server.terminate()
+            server.wait()
+            raise Exception(msg)
+
+    return server
+
+
+def main(argv):
     parser = argparse.ArgumentParser("Run the main service manager and the object_database_service.")
 
     parser.add_argument("own_hostname")
@@ -145,9 +200,11 @@ def main(argv=None):
                     else:
                         serviceManager.start()
                 else:
-                    shouldStop.wait(timeout=max(.1, serviceManager.shutdownTimeout / 10))
+                    timeout = max(.1, serviceManager.shutdownTimeout / 10)
+                    shouldStop.wait(timeout=timeout)
                     try:
                         serviceManager.cleanup()
+
                     except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
                         # try to reconnect
                         logger.error("Disconnected from object_database host. Attempting to reconnect.")
@@ -156,13 +213,14 @@ def main(argv=None):
                     except Exception:
                         logger.error("Service manager cleanup failed:\n%s", traceback.format_exc())
         except KeyboardInterrupt:
+            logger.warning("Exiting due to KeyboardInterrupt")
             return 0
 
         return 0
     finally:
         if serviceManager is not None:
             try:
-                serviceManager.stop(gracefully=False)
+                serviceManager.stop(gracefully=True)
             except Exception:
                 logger.error("Failed to stop the service manager:\n%s", traceback.format_exc())
 
@@ -174,4 +232,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(sys.argv))

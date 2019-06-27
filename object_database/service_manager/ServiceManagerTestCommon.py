@@ -15,7 +15,6 @@
 import logging
 import os
 import subprocess
-import sys
 import tempfile
 import time
 
@@ -26,6 +25,7 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database import (
     core_schema, connect, service_schema,
 )
+from object_database.frontends import service_manager
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
@@ -35,7 +35,7 @@ VERBOSE = False if os.environ.get('TRAVIS_CI', None) else VERBOSE
 
 
 class ServiceManagerTestCommon(object):
-    WAIT_FOR_COUNT_TIMEOUT = 40.0 if os.environ.get('TRAVIS_CI', None) is not None else 5.0
+    ENVIRONMENT_WAIT_MULTIPLIER = 5 if os.environ.get('TRAVIS_CI', None) is not None else 1
 
     def schemasToSubscribeTo(self):
         """Subclasses can override to extend the schema set."""
@@ -43,7 +43,11 @@ class ServiceManagerTestCommon(object):
 
     def waitRunning(self, serviceName):
         self.assertTrue(
-            ServiceManager.waitRunning(self.database, serviceName, self.WAIT_FOR_COUNT_TIMEOUT),
+            ServiceManager.waitRunning(
+                self.database,
+                serviceName,
+                5.0 * self.ENVIRONMENT_WAIT_MULTIPLIER
+            ),
             "Service " + serviceName + " never came up."
         )
 
@@ -51,6 +55,7 @@ class ServiceManagerTestCommon(object):
         return time.time() - self.test_start_time
 
     def setUp(self):
+        self.logger = logging.getLogger(__name__)
         self.test_start_time = time.time()
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
@@ -69,31 +74,18 @@ class ServiceManagerTestCommon(object):
             logging.getLogger(__name__).getEffectiveLevel()
         )
 
-        if VERBOSE:
-            kwargs = {}
-        else:
-            kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
-
-        self.server = subprocess.Popen(
-            [
-                sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8023",
-                "--run_db",
-                '--logdir', os.path.join(self.tempDirectoryName, 'logs'),
-                '--source', os.path.join(self.tempDirectoryName, 'source'),
-                '--storage', os.path.join(self.tempDirectoryName, 'storage'),
-                '--service-token', self.token,
-                '--shutdownTimeout', '1.0',
-                '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert'),
-                '--log-level', logLevelName
-            ],
-            **kwargs
+        self.server = service_manager.start_service_manager(
+            self.tempDirectoryName, 8023, self.token,
+            loglevelName=logLevelName,
+            sslPath=os.path.join(ownDir, '..', '..', 'testcert.cert'),
+            verbose=VERBOSE
         )
 
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, *self.schemasToSubscribeTo())
         except Exception:
+            self.logger.error(f"Failed to initialize for test")
             self.server.terminate()
             self.server.wait()
             self.tempDirObj.cleanup()
@@ -104,5 +96,18 @@ class ServiceManagerTestCommon(object):
 
     def tearDown(self):
         self.server.terminate()
-        self.server.wait()
-        self.tempDirObj.__exit__(None, None, None)
+        try:
+            self.server.wait(timeout=15.0)
+        except subprocess.TimeoutExpired:
+            self.logger.warning(
+                f"Failed to gracefully terminate service manager. Sending KILL signal"
+            )
+            self.server.kill()
+            try:
+                self.server.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                self.logger.error(
+                    f"Failed to kill service manager process."
+                )
+
+        self.tempDirObj.cleanup()
