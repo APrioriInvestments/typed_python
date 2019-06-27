@@ -17,9 +17,13 @@ import argparse
 import functools
 import traceback
 import os
+import sys
 import gevent.socket
 import gevent.queue
 import json
+import psutil
+import resource
+import threading
 
 from object_database.util import genToken, validateLogLevel
 from object_database import ServiceBase, service_schema
@@ -54,6 +58,9 @@ from flask import (
 from flask_sockets import Sockets
 from flask_cors import CORS
 from flask_login import LoginManager, current_user, login_required
+
+
+MAX_PROCESS_MEMORY_HARD_LIMIT = 8 * 1024 ** 3
 
 
 class ActiveWebService(ServiceBase):
@@ -168,6 +175,8 @@ class ActiveWebService(ServiceBase):
         self.login_manager.login_view = 'login'
 
     def doWork(self, shouldStop):
+        resource.setrlimit(resource.RLIMIT_AS, (MAX_PROCESS_MEMORY_HARD_LIMIT, -1))
+
         self._logger.info("Configuring ActiveWebService")
         with self.db.view() as view:
             config = Configuration.lookupAny(service=self.serviceObject)
@@ -198,6 +207,10 @@ class ActiveWebService(ServiceBase):
 
         self._logger.info("ActiveWebService listening on %s:%s", host, port)
 
+        self.memoryUsageMonitorThread = threading.Thread(target=self.monitorMemoryUsage)
+        self.memoryUsageMonitorThread.daemon = True
+        self.memoryUsageMonitorThread.start()
+
         server = pywsgi.WSGIServer(
             (host, port),
             self.app,
@@ -205,6 +218,15 @@ class ActiveWebService(ServiceBase):
         )
 
         server.serve_forever()
+
+    def monitorMemoryUsage(self):
+        while True:
+            time.sleep(1.0)
+            if psutil.Process().memory_info().rss > MAX_PROCESS_MEMORY_HARD_LIMIT:
+                logging.error("Exiting because memory usage is too high.")
+                sys.stdout.flush()
+                sys.stderr.flush()
+                os._exit(0)
 
     def configureApp(self):
         self.app.config['SECRET_KEY'] = os.environ.get(
