@@ -629,7 +629,8 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
         self.waitForCount(0)
 
-        self.assertTrue(time.time() - t0 < 2.0)
+        timeout = 4.0 if os.environ.get('TRAVIS_CI', None) is not None else 2.0
+        self.assertLess(time.time() - t0, timeout)
 
         # make sure we don't have a bunch of zombie processes hanging underneath the service manager
         time.sleep(1.0)
@@ -664,13 +665,13 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             i12 = v1.instantiate("test_service.service")
             i22 = v2.instantiate("test_service.service")
 
-            self.assertTrue(i1.f() == 1)
-            self.assertTrue(i2.f() == 2)
-            self.assertTrue(i12.f() == 1)
-            self.assertTrue(i22.f() == 2)
+            self.assertEqual(i1.f(), 1)
+            self.assertEqual(i2.f(), 2)
+            self.assertEqual(i12.f(), 1)
+            self.assertEqual(i22.f(), 2)
 
-            self.assertTrue(i1 is i12)
-            self.assertTrue(i2 is i22)
+            self.assertIs(i1, i12)
+            self.assertIs(i2, i22)
 
     def test_redeploy_hanging_services(self):
         with self.database.transaction():
@@ -709,7 +710,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.assertEqual(len(instances_redeployed), 10)
             self.assertEqual(len(set(instances).intersection(set(instances_redeployed))), 0)
 
-            self.assertTrue(orig_codebase != instances_redeployed[0].codebase)
+            self.assertNotEqual(orig_codebase, instances_redeployed[0].codebase)
 
         # and we never became too big!
         self.assertLess(maxProcessesEver, 11)
@@ -807,7 +808,10 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.waitForCount(1)
 
         self.assertTrue(
-            self.database.waitForCondition(lambda: len(os.listdir(self.logDir)) == 1, timeout=5.0, maxSleepTime=0.001)
+            self.database.waitForCondition(
+                lambda: len(os.listdir(self.logDir)) == 1,
+                timeout=5.0,
+                maxSleepTime=0.001)
         )
         priorFilename = os.listdir(self.logDir)[0]
 
@@ -815,7 +819,10 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         self.setCountAndBlock(1)
 
         self.assertTrue(
-            self.database.waitForCondition(lambda: len(os.listdir(self.logDir)) == 2, timeout=5.0, maxSleepTime=0.001)
+            self.database.waitForCondition(
+                lambda: len(os.listdir(self.logDir)) == 2,
+                timeout=5.0,
+                maxSleepTime=0.001)
         )
 
         newFilename = [x for x in os.listdir(self.logDir) if x != 'old'][0]

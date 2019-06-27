@@ -28,7 +28,7 @@ after_failure:
 script:
   - make testcert.cert
   - make lint
-  - coverage run ./test.py -s  && coverage combine
+  - export PYTHONPATH=$(pwd); export COVERAGE_PROCESS_START="$(pwd)/tox.ini"; coverage run ./test.py -s  --filter=database_test
   - pipenv check
 
 # Push the results back to codecov

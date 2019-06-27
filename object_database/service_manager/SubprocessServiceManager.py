@@ -28,6 +28,13 @@ from object_database import connect
 
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
+_repoDir = None
+
+def repoDir():
+    if _repoDir is None:
+        assert os.path.join(ownDir, '..').endswith('object_database')
+        _repoDir = os.path.join(ownDir, '..', '..')
+    return _repoDir
 
 
 def parseLogfileToInstanceid(fname):
@@ -108,6 +115,7 @@ class SubprocessServiceManager(ServiceManager):
                         self.authToken,
                         '--log-level', self.logLevelName
                     ],
+                    cwd=self.storageDir,
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,
                     stderr=subprocess.STDOUT
@@ -216,6 +224,13 @@ class SubprocessServiceManager(ServiceManager):
                 if os.path.exists(self.storageDir):
                     for stringifiedInstanceId in os.listdir(self.storageDir):
                         path = os.path.join(self.storageDir, stringifiedInstanceId)
+
+                        if stringifiedInstanceId.startswith(".coverage.") and os.path.isfile(path):
+                            shutil.move(
+                                path,
+                                os.path.join(repoDir(), stringifiedInstanceId)
+                            )
+
                         if os.path.isdir(path) and not self.isLiveService(stringifiedInstanceId):
                             try:
                                 self._logger.info("Removing storage at path %s for dead service.", path)
