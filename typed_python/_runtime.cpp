@@ -166,7 +166,7 @@ extern "C" {
             if (l < 0) {
                 return -((-l) % (-r));
             }
-            return - ((-r) - ((l-1) % (-r) + 1) );
+            return - (-r - ((l-1) % (-r) + 1) );
         }
 
         if (l < 0) {
@@ -177,22 +177,28 @@ extern "C" {
     }
 
     double nativepython_runtime_mod_float64_float64(double l, double r) {
-        if (r == 0 || l == 0) {
-            return 0;
+        if (l == 0.0) {
+            return 0.0;
+        }
+        if (r == 0.0) {
+            throw std::runtime_error("mod by 0.0");
         }
 
-        if (r < 0) {
-            if (l < 0) {
-                return -(fmod((-l), (-r)));
+        if (r < 0.0) {
+            if (l < 0.0) {
+                return -(fmod(-l, -r));
             }
-            double res = fmod(l, r) + r;
-            if (res - r <= 0.0)
-                res -= r;
+            double res = fmod(l, -r);
+            if (res != 0.0)
+                res += r;
             return res;
         }
 
-        if (l < 0) {
-            return r - fmod(-l, r);
+        if (l <= 0.0) {
+            double res = fmod(-l, r);
+            if (res > 0.0)
+                res = r - res;
+            return res;
         }
 
         return fmod(l, r);

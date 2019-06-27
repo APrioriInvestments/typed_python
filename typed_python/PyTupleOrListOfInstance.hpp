@@ -88,6 +88,8 @@ public:
             PyObjectHolder listItem(PyList_GetItem(other,k));
 
             if (!compare_to_python(listT->getEltType(), listT->eltPtr(self, k), listItem, exact, Py_EQ)) {
+                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE)
+                    return convert(1);  // for EQ, NE, don't compare further
                 if (compare_to_python(listT->getEltType(), listT->eltPtr(self, k), listItem, exact, Py_LT)) {
                     return convert(-1);
                 }
@@ -123,6 +125,8 @@ public:
             PyObjectHolder arg(PyTuple_GetItem(other,k));
 
             if (!compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), arg, exact, Py_EQ)) {
+                if (pyComparisonOp == Py_EQ || pyComparisonOp == Py_NE)
+                    return convert(1);  // for EQ, NE, don't compare further
                 if (compare_to_python(tupT->getEltType(), tupT->eltPtr(self, k), arg, exact, Py_LT)) {
                     return convert(-1);
                 }

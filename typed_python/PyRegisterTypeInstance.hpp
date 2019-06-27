@@ -66,11 +66,11 @@ inline int64_t pyMod(int64_t l, int64_t r) {
         if (l < 0) {
             return -((-l) % (-r));
         }
-        return - ((-r) - ((l-1) % (-r) + 1) );
+        return -((-r + ((-l) % -r)) % -r);
     }
 
     if (l < 0) {
-        return r - ((-l-1) % r + 1);
+        return (r + (l % r)) % r;
     }
 
     return l % r;
@@ -82,31 +82,30 @@ T pyModFloat(T l, T r) {
     if (l == 0.0) {
         return 0.0;
     }
-    if (r == 0) {
+    if (r == 0.0) {
         PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
         throw PythonExceptionSet();
     }
-    if (r == 1 || r == -1) {
-        return 0.0;
-    }
 
-    if (r < 0) {
-        if (l < 0) {
-            return -(fmod((-l), (-r)));
+    if (r < 0.0) {
+        if (l < 0.0) {
+            return -(fmod(-l, -r));
         }
-        T res = fmod(l, r) + r;
-        if (res - r <= 0.0)
-            res -= r;
+        T res = fmod(l, -r);
+        if (res != 0.0)
+            res += r;
         return res;
     }
 
-    if (l <= 0) {
-        return r - fmod(-l, r);
+    if (l <= 0.0) {
+        T res = fmod(-l, r);
+        if (res > 0.0)
+            res = r - res;
+        return res;
     }
 
     return fmod(l, r);
 }
-
 
 inline int32_t pyMod(int32_t l, int32_t r) { return (int32_t)pyMod((int64_t)l, (int64_t)r); }
 inline int16_t pyMod(int16_t l, int16_t r) { return (int16_t)pyMod((int64_t)l, (int64_t)r); }
@@ -171,17 +170,65 @@ inline int64_t pyXor(double l, double r) {
     throw PythonExceptionSet();
 }
 
-inline double pyFloatDiv(bool l, bool r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(uint8_t l, uint8_t r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(uint16_t l, uint16_t r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(uint32_t l, uint32_t r) { return ((double)l) / (double)r; }
+template<class T>
+inline void check_neg(T r) {
+    if (r < 0) {
+        PyErr_Format(PyExc_ValueError, "negative shift count");
+        throw PythonExceptionSet();
+    }
+}
+template<class T>
+inline void check_too_large(T l, T r) {
+    if (l && r > 1024) { // arbitrary, but 1<<1024 = sys.float_info.max
+        PyErr_Format(PyExc_ValueError, "shift count too large");
+        throw PythonExceptionSet();
+    }
+}
+inline int64_t pyLshift(int8_t l, int8_t r) { check_neg(r); check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(uint8_t l, uint8_t r) { check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(int16_t l, int16_t r) { check_neg(r); check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(uint16_t l, uint16_t r) { check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(int32_t l, int32_t r) { check_neg(r); check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(uint32_t l, uint32_t r) { check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(int64_t l, int64_t r) { check_neg(r); check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(uint64_t l, uint64_t r) { check_too_large(l, r); return l << r; }
+inline int64_t pyLshift(float l, float r) {
+    PyErr_Format(PyExc_TypeError, "'<<' not supported for floating-point types");
+    throw PythonExceptionSet();
+}
+inline int64_t pyLshift(double l, double r) {
+    PyErr_Format(PyExc_TypeError, "'<<' not supported for floating-point types");
+    throw PythonExceptionSet();
+}
+
+inline int64_t pyRshift(int8_t l, int8_t r) { check_neg(r); return l >> r; }
+inline int64_t pyRshift(uint8_t l, uint8_t r) { return l >> r; }
+inline int64_t pyRshift(int16_t l, int16_t r) { check_neg(r); return l >> r; }
+inline int64_t pyRshift(uint16_t l, uint16_t r) { return l >> r; }
+inline int64_t pyRshift(int32_t l, int32_t r) { check_neg(r); return l >> r; }
+inline int64_t pyRshift(uint32_t l, uint32_t r) { return l >> r; }
+inline int64_t pyRshift(int64_t l, int64_t r) { check_neg(r); return l >> r; }
+inline int64_t pyRshift(uint64_t l, uint64_t r) { return l >> r; }
+inline int64_t pyRshift(float l, float r) {
+    PyErr_Format(PyExc_TypeError, "'>>' not supported for floating-point types");
+    throw PythonExceptionSet();
+}
+inline int64_t pyRshift(double l, double r) {
+    PyErr_Format(PyExc_TypeError, "'>>' not supported for floating-point types");
+    throw PythonExceptionSet();
+}
+
+inline float pyFloatDiv(bool l, bool r)          { return ((float)l) / (float)r; }
+inline float pyFloatDiv(uint8_t l, uint8_t r)    { return ((float)l) / (float)r; }
+inline float pyFloatDiv(uint16_t l, uint16_t r)  { return ((float)l) / (float)r; }
+inline float pyFloatDiv(uint32_t l, uint32_t r)  { return ((float)l) / (float)r; }
 inline double pyFloatDiv(uint64_t l, uint64_t r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(int8_t l, int8_t r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(int16_t l, int16_t r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(int32_t l, int32_t r) { return ((double)l) / (double)r; }
-inline double pyFloatDiv(int64_t l, int64_t r) { return ((double)l) / (double)r; }
-inline float pyFloatDiv(float l, float r) { return l / r; }
-inline double pyFloatDiv(double l, double r) { return l / r; }
+inline float pyFloatDiv(int8_t l, int8_t r)      { return ((float)l) / (float)r; }
+inline float pyFloatDiv(int16_t l, int16_t r)    { return ((float)l) / (float)r; }
+inline float pyFloatDiv(int32_t l, int32_t r)    { return ((float)l) / (float)r; }
+inline double pyFloatDiv(int64_t l, int64_t r)   { return ((double)l) / (double)r; }
+inline float pyFloatDiv(float l, float r)        { return l / r; }
+inline double pyFloatDiv(double l, double r)     { return l / r; }
 
 template<class T>
 static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const char* op, const char* opErr) {
@@ -209,12 +256,19 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
         return registerValueToPyValue(T(pyXor(self,other)));
     }
 
+    if (strcmp(op, "__lshift__") == 0) {
+        return registerValueToPyValue(T(pyLshift(self,other)));
+    }
+
+    if (strcmp(op, "__rshift__") == 0) {
+        return registerValueToPyValue(T(pyRshift(self,other)));
+    }
+
     if (strcmp(op, "__div__") == 0) {
         if (other == 0) {
             PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
             throw PythonExceptionSet();
         }
-
         return registerValueToPyValue(pyFloatDiv(self, other));
     }
 
@@ -242,6 +296,10 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
 template<class T, class T2>
 static PyObject* pyOperatorConcreteForRegister(T self, T2 other, const char* op, const char* opErr) {
     typedef typename PromotesTo<T, T2>::result_type target_type;
+    if (strcmp(op, "__div__") == 0) {
+        typedef typename PromotesTo<target_type, float>::result_type div_target_type;
+        return pyOperatorConcreteForRegisterPromoted(div_target_type(self), div_target_type(other), op, opErr);
+    }
 
     return pyOperatorConcreteForRegisterPromoted(target_type(self), target_type(other), op, opErr);
 }
