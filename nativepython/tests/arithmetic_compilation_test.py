@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import operator
+# import operator
 import sys
 
 
@@ -320,35 +320,35 @@ class TestArithmeticCompilation(unittest.TestCase):
                     ]
                     # TODO: missing pow
 
-                typed_to_native_op = {
-                    add: operator.add,
-                    sub: operator.sub,
-                    mul: operator.mul,
-                    div: operator.truediv,
-                    mod: operator.mod,
-                    less: operator.lt,
-                    greater: operator.gt,
-                    lessEq: operator.le,
-                    greaterEq: operator.ge,
-                    neq: operator.ne,
-                    bitand: operator.and_,
-                    bitor: operator.or_,
-                    bitxor: operator.xor,
-                    rshift: operator.rshift,
-                    lshift: operator.lshift,
-                    pow: operator.pow
-                }
+                # typed_to_native_op = {
+                #     add: operator.add,
+                #     sub: operator.sub,
+                #     mul: operator.mul,
+                #     div: operator.truediv,
+                #     mod: operator.mod,
+                #     less: operator.lt,
+                #     greater: operator.gt,
+                #     lessEq: operator.le,
+                #     greaterEq: operator.ge,
+                #     neq: operator.ne,
+                #     bitand: operator.and_,
+                #     bitor: operator.or_,
+                #     bitxor: operator.xor,
+                #     rshift: operator.rshift,
+                #     lshift: operator.lshift,
+                #     pow: operator.pow
+                # }
 
                 for op in suitable_ops:
-                    native_op = typed_to_native_op[op]
+                    # native_op = typed_to_native_op[op]
                     compiledOp = Compiled(op)
 
                     for v1 in suitable_range(T1):
                         for v2 in suitable_range(T2):
-                            try:
-                                native_result = native_op(v1, v2)
-                            except Exception:
-                                native_result = "exception"
+                            # try:
+                            #     native_result = native_op(v1, v2)
+                            # except Exception:
+                            #     native_result = "exception"
 
                             try:
                                 typed_py_result = op(T1(v1), T2(v2))
