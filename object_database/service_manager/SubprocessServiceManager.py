@@ -95,7 +95,6 @@ class SubprocessServiceManager(ServiceManager):
                     output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
                 else:
                     output_file = None
-
                 process = subprocess.Popen(
                     [
                         sys.executable,
@@ -109,7 +108,6 @@ class SubprocessServiceManager(ServiceManager):
                         self.authToken,
                         '--log-level', self.logLevelName
                     ],
-                    cwd=self.storageDir,
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,
                     stderr=subprocess.STDOUT
@@ -217,9 +215,9 @@ class SubprocessServiceManager(ServiceManager):
             with self.lock:
                 if os.path.exists(self.storageDir):
                     for stringifiedInstanceId in os.listdir(self.storageDir):
-                        if not self.isLiveService(stringifiedInstanceId):
+                        path = os.path.join(self.storageDir, stringifiedInstanceId)
+                        if os.path.isdir(path) and not self.isLiveService(stringifiedInstanceId):
                             try:
-                                path = os.path.join(self.storageDir, stringifiedInstanceId)
                                 self._logger.info("Removing storage at path %s for dead service.", path)
                                 shutil.rmtree(path)
                             except Exception:

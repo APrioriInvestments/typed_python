@@ -206,14 +206,16 @@ class ServiceManager(object):
                 self.startServiceWorker(service, i._identity)
 
             except Exception:
-                self._logger.error("Failed to start a worker for instance %s:\n%s", i, traceback.format_exc())
+                self._logger.error(
+                    "Failed to start a worker for instance %s:\n%s",
+                    i, traceback.format_exc()
+                )
                 bad_instances[i] = traceback.format_exc()
 
         if bad_instances:
             with self.db.transaction():
                 for i in bad_instances:
                     i.markFailedToStart(bad_instances[i])
-
         self.cleanup()
 
     def updateServiceHostStats(self):

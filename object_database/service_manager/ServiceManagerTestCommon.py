@@ -26,6 +26,7 @@ from object_database.service_manager.ServiceManager import ServiceManager
 from object_database import (
     core_schema, connect, service_schema,
 )
+from object_database.frontends import service_manager
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
@@ -51,6 +52,7 @@ class ServiceManagerTestCommon(object):
         return time.time() - self.test_start_time
 
     def setUp(self):
+        self.logger = logging.getLogger(__name__)
         self.test_start_time = time.time()
         self.token = genToken()
         self.tempDirObj = tempfile.TemporaryDirectory()
@@ -74,26 +76,17 @@ class ServiceManagerTestCommon(object):
         else:
             kwargs = {'stdout': subprocess.DEVNULL, 'stderr': subprocess.DEVNULL}
 
-        self.server = subprocess.Popen(
-            [
-                sys.executable, os.path.join(ownDir, '..', 'frontends', 'service_manager.py'),
-                'localhost', 'localhost', "8023",
-                "--run_db",
-                '--logdir', os.path.join(self.tempDirectoryName, 'logs'),
-                '--source', os.path.join(self.tempDirectoryName, 'source'),
-                '--storage', os.path.join(self.tempDirectoryName, 'storage'),
-                '--service-token', self.token,
-                '--shutdownTimeout', '1.0',
-                '--ssl-path', os.path.join(ownDir, '..', '..', 'testcert.cert'),
-                '--log-level', logLevelName
-            ],
-            **kwargs
+        self.server = service_manager.start_service_manager(
+            self.tempDirectoryName, 8023, self.token,
+            loglevelName=logLevelName,
+            sslPath=os.path.join(ownDir, '..', '..', 'testcert.cert')
         )
 
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
             self.database.subscribeToSchema(core_schema, service_schema, *self.schemasToSubscribeTo())
         except Exception:
+            self.logger.error(f"Failed to initialize for test")
             self.server.terminate()
             self.server.wait()
             self.tempDirObj.cleanup()
@@ -105,4 +98,4 @@ class ServiceManagerTestCommon(object):
     def tearDown(self):
         self.server.terminate()
         self.server.wait()
-        self.tempDirObj.__exit__(None, None, None)
+        self.tempDirObj.cleanup()

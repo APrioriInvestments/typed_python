@@ -18,9 +18,11 @@ import argparse
 import concurrent.futures
 import logging
 import multiprocessing
+import os
 import psutil
 import resource
 import signal
+import subprocess
 import sys
 import threading
 import time
@@ -29,6 +31,63 @@ import traceback
 from object_database.util import configureLogging, sslContextFromCertPathOrNone, validateLogLevel
 from object_database import TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
+
+
+ownDir = os.path.dirname(os.path.abspath(__file__))
+
+
+def start_service_manager(tempDirectoryName, port, auth_token, *,
+                          loglevelName="INFO",
+                          timeout=1.0,
+                          verbose=True,
+                          ownHostname='localhost',
+                          dbHostname='localhost',
+                          runDb=True,
+                          logDir=True,
+                          sslPath=None
+                          ):
+    if not verbose:
+        kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        kwargs = dict()
+
+    cmd = [
+        sys.executable,
+        os.path.join(ownDir, 'service_manager.py'),
+        ownHostname, dbHostname, str(port),
+        '--service-token', auth_token,
+        '--shutdownTimeout', str(timeout),
+        '--log-level', loglevelName,
+        '--source', os.path.join(tempDirectoryName, 'source'),
+        '--storage', os.path.join(tempDirectoryName, 'storage'),
+    ]
+    if runDb:
+        cmd.append('--run_db')
+
+    if logDir:
+        cmd.extend(['--logdir', os.path.join(tempDirectoryName, 'logs')])
+    if sslPath:
+        cmd.extend(['--ssl-path', sslPath])
+
+
+    server = subprocess.Popen(cmd, **kwargs)
+    try:
+        # this should throw a subprocess.TimeoutExpired exception if the service did not crash
+        server.wait(timeout)
+    except subprocess.TimeoutExpired:
+        pass
+    else:
+        if server.returncode:
+            msg = f"Failed to start service_manager (retcode:{server.returncode})"
+
+            if verbose:
+                error = b''.join(server.stderr.readlines())
+                msg += "\n" + error.decode("utf-8")
+            server.terminate()
+            server.wait()
+            raise Exception(msg)
+
+    return server
 
 
 def main(argv=None):
@@ -145,7 +204,8 @@ def main(argv=None):
                     else:
                         serviceManager.start()
                 else:
-                    shouldStop.wait(timeout=max(.1, serviceManager.shutdownTimeout / 10))
+                    timeout = max(5.1, serviceManager.shutdownTimeout / 10)
+                    shouldStop.wait(timeout=timeout)
                     try:
                         serviceManager.cleanup()
                     except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):

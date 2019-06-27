@@ -28,7 +28,7 @@ after_failure:
 script:
   - make testcert.cert
   - make lint
-  - coverage run ./test.py -s
+  - coverage run ./test.py -s  && coverage combine
   - pipenv check
 
 # Push the results back to codecov

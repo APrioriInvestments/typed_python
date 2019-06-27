@@ -17,5 +17,5 @@ node_modules
 /testcert.cert
 /.venv
 /.eggs
-/.coverage
+/.coverage*
 /.tox
