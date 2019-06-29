@@ -103,7 +103,7 @@ public:
         return res;
     }
 
-    static PyMethodDef* typeMethodsConcrete() {
+    static PyMethodDef* typeMethodsConcrete(Type* t) {
         return new PyMethodDef [4] {
             {"define", (PyCFunction)PyForwardInstance::forwardDefine, METH_VARARGS | METH_CLASS, NULL},
             {"get", (PyCFunction)PyForwardInstance::forwardGet, METH_VARARGS | METH_CLASS, NULL},

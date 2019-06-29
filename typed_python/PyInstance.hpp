@@ -314,7 +314,7 @@ public:
 
     static PyMethodDef* typeMethods(Type* t);
 
-    static PyMethodDef* typeMethodsConcrete();
+    static PyMethodDef* typeMethodsConcrete(Type* t);
 
     static void tp_dealloc(PyObject* self);
 

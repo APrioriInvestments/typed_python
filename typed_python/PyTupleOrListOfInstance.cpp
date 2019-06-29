@@ -479,7 +479,7 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
     return NULL;
 }
 
-PyMethodDef* PyTupleOfInstance::typeMethodsConcrete() {
+PyMethodDef* PyTupleOfInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [3] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
         {NULL, NULL}
@@ -775,7 +775,7 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
     return ((PyInstance*)this)->mp_ass_subscript_concrete(item, value);
 }
 
-PyMethodDef* PyListOfInstance::typeMethodsConcrete() {
+PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [12] {
         {"toArray", (PyCFunction)PyTupleOrListOfInstance::toArray, METH_VARARGS, NULL},
         {"append", (PyCFunction)PyListOfInstance::listAppend, METH_VARARGS, NULL},

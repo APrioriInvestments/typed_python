@@ -107,3 +107,59 @@ class TestTupleCompilation(unittest.TestCase):
             tupToString(Tuple(int, str)((0, 'a'))),
             ["0", "a"]
         )
+
+    def test_named_tuple_replacing_error(self):
+        """We should have errors for all the field names passed to the replacing function,
+        if the fields are not in the tuple definition.
+        """
+        NT = NamedTuple(a=int, b=str)
+        n1 = NT(a=1, b='x')
+
+        @Compiled
+        def f1(x: NT) -> NT:
+            return x.replacing(c=10)
+
+        with self.assertRaisesRegex(Exception, "The arguments list contain names 'c' which are not in the tuple definition."):
+            f1(n1)
+
+        @Compiled
+        def f2(x: NT) -> NT:
+            return x.replacing(c=10, d=10, e=10)
+
+        with self.assertRaisesRegex(Exception, "The arguments list contain names 'c, d, e' which are not in the tuple definition."):
+            f2(n1)
+
+    def test_named_tuple_replacing_function(self):
+        NT = NamedTuple(a=int, b=str)
+        n1 = NT(a=1, b='x')
+
+        @Compiled
+        def f1(x: NT, a: int) -> NT:
+            return x.replacing(a=a)
+
+        n2 = f1(n1, 10)
+        self.assertIsNot(n1, n2)
+        self.assertEqual(n2.a, 10)
+        self.assertEqual(n2.b, 'x')
+
+        @Compiled
+        def f2(x: NT, a: int, b: str) -> NT:
+            return x.replacing(a=a, b=b)
+
+        n3 = f2(n2, 123, '345')
+        self.assertIsNot(n1, n2)
+        self.assertIsNot(n2, n3)
+        self.assertEqual(n3.a, 123)
+        self.assertEqual(n3.b, '345')
+
+    def test_named_tuple_replacing_refcount(self):
+        N = NamedTuple(x=ListOf(int))
+        N = NamedTuple(x=ListOf(int))
+        aList = ListOf(int)([1, 2, 3])
+
+        self.assertEqual(_types.refcount(aList), 1)
+        nt = N().replacing(x=aList)
+        self.assertEqual(nt.x, aList)
+        self.assertEqual(_types.refcount(aList), 2)
+        nt = None
+        self.assertEqual(_types.refcount(aList), 1)

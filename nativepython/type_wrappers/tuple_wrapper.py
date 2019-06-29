@@ -16,6 +16,7 @@ from nativepython.type_wrappers.wrapper import Wrapper
 
 from typed_python import _types, Int32, OneOf
 
+from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 import nativepython.native_ast as native_ast
 import nativepython
 
@@ -150,9 +151,42 @@ class NamedTupleWrapper(TupleWrapper):
         self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
     def convert_attribute(self, context, instance, attribute):
+
+        if attribute in ["replacing"]:
+            return instance.changeType(BoundCompiledMethodWrapper(self, attribute))
+
         ix = self.namesToIndices.get(attribute)
         if ix is None:
             context.pushException(AttributeError, "'%s' object has no attribute '%s'" % (str(self.typeRepresentation), attribute))
             return
 
         return self.refAs(context, instance, ix)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == 'replacing' and not args:
+            return context.push(self, lambda newInstance: self.initializeReplacing(context, newInstance, instance, kwargs))
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+    def initializeReplacing(self, context, toInitialize, existingInstance, kwargs):
+        # check if all the passed arguments are in the list of the names
+        additional_arguments = sorted(list(set(kwargs.keys()) - set(self.typeRepresentation.ElementNames)))
+        if additional_arguments:
+            context.pushException(
+                ValueError,
+                "The arguments list contain names '{}' which are not in the tuple definition."
+                .format(", ".join(additional_arguments))
+            )
+            return None
+
+        for i in range(len(self.subTypeWrappers)):
+            field_name = self.typeRepresentation.ElementNames[i]
+            field_type = self.typeRepresentation.ElementTypes[i]
+
+            if field_name not in kwargs:
+                self.refAs(context, toInitialize, i).convert_copy_initialize(self.refAs(context, existingInstance, i))
+            else:
+                converted = kwargs[field_name].convert_to_type(field_type)
+                if converted is None:
+                    return None
+                self.refAs(context, toInitialize, i).convert_copy_initialize(converted)

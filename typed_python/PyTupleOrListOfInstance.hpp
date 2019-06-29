@@ -71,7 +71,7 @@ public:
 
     int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
 
-    static PyMethodDef* typeMethodsConcrete();
+    static PyMethodDef* typeMethodsConcrete(Type* t);
 
     static void constructFromPythonArgumentsConcrete(ListOfType* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 
@@ -109,7 +109,7 @@ public:
 
     TupleOfType* type();
 
-    static PyMethodDef* typeMethodsConcrete();
+    static PyMethodDef* typeMethodsConcrete(Type* t);
 
     static bool compare_to_python_concrete(TupleOfType* tupT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
         auto convert = [&](char cmpValue) { return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpValue); };

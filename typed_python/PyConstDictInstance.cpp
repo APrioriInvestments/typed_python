@@ -292,7 +292,7 @@ PyObject* PyConstDictInstance::mp_subscript_concrete(PyObject* item) {
     return NULL;
 }
 
-PyMethodDef* PyConstDictInstance::typeMethodsConcrete() {
+PyMethodDef* PyConstDictInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [5] {
         {"get", (PyCFunction)PyConstDictInstance::constDictGet, METH_VARARGS, NULL},
         {"items", (PyCFunction)PyConstDictInstance::constDictItems, METH_NOARGS, NULL},
