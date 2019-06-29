@@ -12,12 +12,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 from nativepython.type_wrappers.util import min
 
-from typed_python import NoneType
+from typed_python import NoneType, Tuple
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -131,17 +132,24 @@ def const_dict_contains_not(constDict, key):
     return False if const_dict_contains(constDict, key) else True
 
 
-class ConstDictWrapper(RefcountedWrapper):
+class ConstDictWrapperBase(RefcountedWrapper):
+    """Common method wrappers for all ConstDicts.
+
+    We subclass this for things like 'keys', 'values', and 'items' since
+    they all basically look like a const-dict with different methods
+    """
     is_pod = False
     is_empty = False
     is_pass_by_ref = True
 
-    def __init__(self, t):
-        assert hasattr(t, '__typed_python_category__')
-        super().__init__(t)
+    def __init__(self, constDictType, behavior):
+        assert hasattr(constDictType, '__typed_python_category__')
+        super().__init__(constDictType if behavior is None else (constDictType, behavior))
 
-        self.keyType = typeWrapper(t.KeyType)
-        self.valueType = typeWrapper(t.ValueType)
+        self.constDictType = constDictType
+        self.keyType = typeWrapper(constDictType.KeyType)
+        self.valueType = typeWrapper(constDictType.ValueType)
+        self.itemType = typeWrapper(Tuple(constDictType.KeyType, constDictType.ValueType))
 
         self.kvBytecount = self.keyType.getBytecount() + self.valueType.getBytecount()
         self.keyBytecount = self.keyType.getBytecount()
@@ -152,18 +160,74 @@ class ConstDictWrapper(RefcountedWrapper):
             ('count', native_ast.Int32),
             ('subpointers', native_ast.Int32),
             ('data', native_ast.UInt8)
-        ), name='TupleOfLayout').pointer()
+        ), name='ConstDictLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
 
+    def on_refcount_zero(self, context, instance):
+        assert instance.isReference
+
+        if self.keyType.is_pod and self.valueType.is_pod:
+            return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
+        else:
+            return (
+                context.converter.defineNativeFunction(
+                    "destructor_" + str(self.constDictType),
+                    ('destructor', self),
+                    [self],
+                    typeWrapper(NoneType),
+                    self.generateNativeDestructorFunction
+                )
+                .call(instance)
+            )
+
+    def generateNativeDestructorFunction(self, context, out, inst):
+        with context.loop(inst.convert_len()) as i:
+            self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
+            self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
+
+        context.pushEffect(
+            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
+        )
+
+
+class ConstDictWrapper(ConstDictWrapperBase):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, None)
+
     def convert_attribute(self, context, instance, attr):
-        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe"):
+        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe", "keys", "values", "items"):
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == "__iter__" and not args and not kwargs:
+            res = context.push(
+                ConstDictKeysIteratorWrapper(self.constDictType),
+                lambda instance:
+                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+                    # we initialize the dict pointer below, so technically
+                    # if that were to throw, this would leak a bad value.
+            )
+
+            context.pushReference(
+                self,
+                res.expr.ElementPtrIntegers(0, 1)
+            ).convert_copy_initialize(instance)
+
+            return res
+
+        if methodname == "keys" and not args and not kwargs:
+            return instance.changeType(ConstDictKeysWrapper(self.constDictType))
+
+        if methodname == "values" and not args and not kwargs:
+            return instance.changeType(ConstDictValuesWrapper(self.constDictType))
+
+        if methodname == "items" and not args and not kwargs:
+            return instance.changeType(ConstDictItemsWrapper(self.constDictType))
+
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
@@ -185,38 +249,20 @@ class ConstDictWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-    def on_refcount_zero(self, context, instance):
-        assert instance.isReference
-
-        if self.keyType.is_pod and self.valueType.is_pod:
-            return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
-        else:
-            return (
-                context.converter.defineNativeFunction(
-                    "destructor_" + str(self.typeRepresentation),
-                    ('destructor', self),
-                    [self],
-                    typeWrapper(NoneType),
-                    self.generateNativeDestructorFunction
-                )
-                .call(instance)
-            )
-
-    def generateNativeDestructorFunction(self, context, out, inst):
-        with context.loop(inst.convert_len()) as i:
-            self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
-            self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
-
-        context.pushEffect(
-            runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
-        )
-
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
                 item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
             ).cast(self.keyType.getNativeLayoutType().pointer())
+        )
+
+    def convert_getitem_by_index_unsafe(self, context, expr, item):
+        return context.pushReference(
+            self.itemType,
+            expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
+                item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
+            ).cast(self.itemType.getNativeLayoutType().pointer())
         )
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
@@ -275,3 +321,138 @@ class ConstDictWrapper(RefcountedWrapper):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
+
+
+class ConstDictIteratorWrapper(ConstDictWrapperBase):
+    def convert_method_call(self, context, expr, methodname, args, kwargs):
+        if methodname == "__iter__" and not args and not kwargs:
+            res = context.push(
+                # self.iteratorType is inherited from our specialized children
+                # who pick whether we're an interator over keys, values, items, etc.
+                self.iteratorType,
+                lambda instance:
+                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+            )
+
+            context.pushReference(
+                self,
+                res.expr.ElementPtrIntegers(0, 1)
+            ).convert_copy_initialize(expr)
+
+            return res
+
+        return super().convert_method_call(context, expr, methodname, args, kwargs)
+
+
+class ConstDictKeysWrapper(ConstDictIteratorWrapper):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, "keys")
+        self.iteratorType = ConstDictKeysIteratorWrapper(constDictType)
+
+
+class ConstDictValuesWrapper(ConstDictIteratorWrapper):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, "values")
+        self.iteratorType = ConstDictValuesIteratorWrapper(constDictType)
+
+
+class ConstDictItemsWrapper(ConstDictIteratorWrapper):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, "items")
+        self.iteratorType = ConstDictItemsIteratorWrapper(constDictType)
+
+
+class ConstDictIteratorWrapper(Wrapper):
+    is_pod = False
+    is_empty = False
+    is_pass_by_ref = True
+
+    def __init__(self, constDictType, iteratorType):
+        self.constDictType = constDictType
+        self.iteratorType = iteratorType
+        super().__init__((constDictType, "iterator", iteratorType))
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Struct(
+            element_types=(("pos", native_ast.Int64), ("dict", ConstDictWrapper(self.constDictType).getNativeLayoutType())),
+            name="const_dict_iterator"
+        )
+
+    def convert_next(self, context, expr):
+        context.pushEffect(
+            expr.expr.ElementPtrIntegers(0, 0).store(
+                expr.expr.ElementPtrIntegers(0, 0).load().add(1)
+            )
+        )
+        self_len = self.refAs(context, expr, 1).convert_len()
+        canContinue = context.pushPod(
+            bool,
+            expr.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
+        )
+
+        nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+
+        return self.iteratedItemForReference(context, expr, nextIx), canContinue
+
+    def refAs(self, context, expr, which):
+        assert expr.expr_type == self
+
+        if which == 0:
+            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+
+        if which == 1:
+            return context.pushReference(
+                self.constDictType,
+                expr.expr
+                    .ElementPtrIntegers(0, 1)
+                    .cast(ConstDictWrapper(self.constDictType).getNativeLayoutType().pointer())
+            )
+
+    def convert_assign(self, context, expr, other):
+        assert expr.isReference
+
+        for i in range(2):
+            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
+
+    def convert_copy_initialize(self, context, expr, other):
+        for i in range(2):
+            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
+
+    def convert_destroy(self, context, expr):
+        self.refAs(context, expr, 1).convert_destroy()
+
+
+class ConstDictKeysIteratorWrapper(ConstDictIteratorWrapper):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, "keys")
+
+    def iteratedItemForReference(self, context, expr, ixExpr):
+        return ConstDictWrapper(self.constDictType).convert_getkey_by_index_unsafe(
+            context,
+            self.refAs(context, expr, 1),
+            ixExpr
+        )
+
+
+class ConstDictItemsIteratorWrapper(ConstDictIteratorWrapper):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, "items")
+
+    def iteratedItemForReference(self, context, expr, ixExpr):
+        return ConstDictWrapper(self.constDictType).convert_getitem_by_index_unsafe(
+            context,
+            self.refAs(context, expr, 1),
+            ixExpr
+        )
+
+
+class ConstDictValuesIteratorWrapper(ConstDictIteratorWrapper):
+    def __init__(self, constDictType):
+        super().__init__(constDictType, "values")
+
+    def iteratedItemForReference(self, context, expr, ixExpr):
+        return ConstDictWrapper(self.constDictType).convert_getvalue_by_index_unsafe(
+            context,
+            self.refAs(context, expr, 1),
+            ixExpr
+        )

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ConstDict, String, TupleOf
+from typed_python import Function, ConstDict, String, TupleOf, ListOf, Tuple
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 from nativepython import SpecializedEntrypoint
@@ -218,3 +218,94 @@ class TestConstDictCompilation(unittest.TestCase):
 
         self.assertFalse(eq(t1, t2))
         self.assertTrue(neq(t1, t2))
+
+    def test_const_dict_iteration(self):
+        def iterateConstDict(cd):
+            res = ListOf(type(cd).KeyType)()
+
+            for k in cd:
+                res.append(k)
+
+            return res
+
+        def iterateKeysObject(cd):
+            res = ListOf(type(cd).KeyType)()
+
+            for k in cd.keys():
+                res.append(k)
+
+            return res
+
+        def iterateValuesObject(cd):
+            res = ListOf(type(cd).ValueType)()
+
+            for k in cd.values():
+                res.append(k)
+
+            return res
+
+        def iterateItemsObject(cd):
+            res = ListOf(Tuple(type(cd).KeyType, type(cd).ValueType))()
+
+            for k in cd.items():
+                res.append(k)
+
+            return res
+
+        T = ConstDict(int, int)
+        t0 = T()
+        t1 = T({1: 2})
+        t2 = T({k * 2: k * 2 for k in range(10)})
+        t3 = T({k * 2: k * 5 for k in range(10)})
+
+        for kf in [iterateConstDict, iterateKeysObject, iterateValuesObject, iterateItemsObject]:
+            for toCheck in [t0, t1, t2, t3]:
+                if len(toCheck):
+                    self.assertEqual(_types.refcount(toCheck), 1)
+
+                self.assertEqual(kf(toCheck), SpecializedEntrypoint(kf)(toCheck), (kf, toCheck))
+
+                if len(toCheck):
+                    self.assertEqual(_types.refcount(toCheck), 1)
+
+        T2 = ConstDict(TupleOf(int), TupleOf(str))
+        atup = TupleOf(int)((1, 2, 3))
+        atup2 = TupleOf(str)(('1', '2', '3', '4'))
+
+        t0 = T2({atup: atup2})
+
+        self.assertEqual(_types.refcount(atup), 2)
+        self.assertEqual(_types.refcount(atup2), 2)
+
+        for kf in [iterateConstDict, iterateKeysObject, iterateValuesObject, iterateItemsObject]:
+            SpecializedEntrypoint(kf)(t0)
+
+            self.assertEqual(_types.refcount(atup), 2)
+            self.assertEqual(_types.refcount(atup2), 2)
+
+    def test_const_dict_iteration_perf(self):
+        def loop(x: ConstDict(int, int)):
+            res = 0
+            for k1 in x.values():
+                for k2 in x.values():
+                    res = res + k1 + k2
+            return res
+
+        compiledLoop = Compiled(loop)
+
+        aBigDict = {i: i % 20 for i in range(3000)}
+        compiledLoop(aBigDict)
+
+        t0 = time.time()
+        interpreterResult = loop(aBigDict)
+        t1 = time.time()
+        compiledResult = compiledLoop(aBigDict)
+        t2 = time.time()
+
+        speedup = (t1-t0)/(t2-t1)
+
+        self.assertEqual(interpreterResult, compiledResult)
+
+        # I get about 70x
+        print("ConstDict iteration speedup is ", speedup)
+        self.assertGreater(speedup, 2)
