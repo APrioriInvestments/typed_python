@@ -190,3 +190,86 @@ int PyNamedTupleInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attr
     );
     return -1;
 }
+
+/**
+ * Searches for the index of the element in the container.
+ * Returns the position, if the element doesn't exist, returns -1.
+ */
+int PyNamedTupleInstance::findElementIndex(const std::vector<std::string>& container, const std::string &element) {
+    auto it = std::find(container.begin(), container.end(), element);
+    int index = it == container.end() ? -1 : std::distance(container.begin(), it);
+    return index;
+}
+
+// static
+PyObject* PyNamedTupleInstance::replacing(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyNamedTupleInstance* self = (PyNamedTupleInstance*)o;
+
+    NamedTuple* tupType = self->type();
+
+    // we should not allow passing any args, only kwargs are allower
+    if (!PyArg_ParseTuple(args, "")) {
+        PyErr_Format(PyExc_ValueError, "Only keyword arguments are allowed.");
+        return NULL;
+    }
+
+    // don't allow for calling the function without any arguments
+    if (!kwargs) {
+        PyErr_Format(PyExc_ValueError, "No arguments provided.");
+        return NULL;
+    }
+
+    // fields from the tuple definition
+    const std::vector<std::string>& names = self->type()->getNames();
+
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+
+    // check if the names are fine
+    while (PyDict_Next(kwargs, &pos, &key, &value)) {
+        std::string stringKey = std::string(PyUnicode_AsUTF8(key));
+        int index = PyNamedTupleInstance::findElementIndex(names, stringKey);
+        if (index == -1) {
+            PyErr_Format(PyExc_ValueError, "Argument '%s' is not in the tuple definition.", stringKey.c_str());
+            return nullptr;
+        }
+    }
+
+    // return a copy with updated valuess
+    return PyInstance::initialize(tupType, [&](instance_ptr newInstanceData) {
+        //newInstanceData will point to the uninitialized memory we've allocated for the new tuple
+
+        tupType->constructor(newInstanceData, [&](instance_ptr item_data, int index) {
+            //item_data is a pointer to the uninitialized value in the 'index'th slot in the new tuple
+            Type *itemType = tupType->getTypes()[index];
+            std::string itemName = tupType->getNames()[index];
+
+            // value passed in kwargs
+            PyObject* value = PyDict_GetItemString(kwargs, itemName.c_str());
+
+            if (value != NULL) {
+                PyInstance::copyConstructFromPythonInstance(
+                        itemType,
+                        item_data,
+                        value
+                );
+            } else {
+                //on failure, PyDict_GetItemString doesn't actually throw an exception,
+                //so we don't have to do anything.
+
+                //we don't have a replacement, so copy the existing value over.
+                itemType->copy_constructor(item_data,  tupType->eltPtr(self->dataPtr(), index));
+            };
+        });
+    });
+
+}
+
+PyMethodDef* PyNamedTupleInstance::typeMethodsConcrete(Type* t) {
+
+    return new PyMethodDef[2] {
+        {"replacing", (PyCFunction)PyNamedTupleInstance::replacing, METH_VARARGS | METH_KEYWORDS, NULL},
+        {NULL, NULL}
+    };
+
+}

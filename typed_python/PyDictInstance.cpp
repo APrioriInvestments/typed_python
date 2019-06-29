@@ -272,7 +272,7 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
     }
 }
 
-PyMethodDef* PyDictInstance::typeMethodsConcrete() {
+PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [5] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
         {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},

@@ -42,5 +42,5 @@ public:
         return true;
     }
 
-    static PyMethodDef* typeMethodsConcrete();
+    static PyMethodDef* typeMethodsConcrete(Type* t);
 };

@@ -63,11 +63,11 @@ PyMethodDef* PyInstance::typeMethods(Type* t) {
     return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
         typedef typename std::remove_reference<decltype(*concrete_null_ptr)>::type py_instance_type;
 
-        return py_instance_type::typeMethodsConcrete();
+        return py_instance_type::typeMethodsConcrete(t);
     });
 }
 
-PyMethodDef* PyInstance::typeMethodsConcrete() {
+PyMethodDef* PyInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [2] {
         {NULL, NULL}
     };

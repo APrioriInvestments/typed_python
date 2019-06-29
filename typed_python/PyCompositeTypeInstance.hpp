@@ -118,4 +118,12 @@ public:
     static void mirrorTypeInformationIntoPyTypeConcrete(NamedTuple* tupleT, PyTypeObject* pyType);
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);
+
+    static PyMethodDef* typeMethodsConcrete(Type* t);
+
+    static PyObject* replacing(PyObject* o, PyObject* args, PyObject* kwargs);
+
+private:
+
+    static int findElementIndex(const std::vector<std::string>& container, const std::string &element);
 };

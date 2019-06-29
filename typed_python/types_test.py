@@ -170,7 +170,6 @@ class RandomValueProducer:
 
 
 class NativeTypesTests(unittest.TestCase):
-
     def test_refcount_bug_with_simple_string(self):
         with self.assertRaisesRegex(TypeError, "^first argument to refcount '111' not a permitted Type$"):
             _types.refcount(111)
@@ -2003,3 +2002,68 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(aDict[1], 100)
         self.assertEqual(aDict['hi'], 200)
+
+    def test_named_tuple_replacing_argument_errors(self):
+        N = NamedTuple(a=int, b=str)
+        n = N(a=10, b='20')
+
+        with self.assertRaises(ValueError) as context:
+            n.replacing(10)
+
+        self.assertTrue("Only keyword arguments are allowed." in str(context.exception), str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            n.replacing()
+
+        self.assertTrue("No arguments provided." in str(context.exception), str(context.exception))
+
+        with self.assertRaises(ValueError) as context:
+            n.replacing(a=1, b='xx', c=2)
+
+        self.assertTrue("Argument 'c' is not in the tuple definition." in str(context.exception), str(context.exception))
+
+    def test_named_tuple_replacing_function(self):
+        N = NamedTuple(a=int, b=str)
+
+        n1 = N(a=1, b='xx')
+        n1_copy = n1
+
+        self.assertIsInstance(n1, N)
+        self.assertIsInstance(n1.a, int)
+        self.assertIsInstance(n1.b, str)
+        self.assertEqual(n1.a, 1)
+        self.assertEqual(n1.b, 'xx')
+
+        n2 = n1.replacing(a=2)
+
+        self.assertIsInstance(n2, N)
+
+        self.assertTrue(n1 is n1_copy)
+        self.assertTrue(n1 == n1_copy)
+
+        self.assertFalse(n1 is n2)
+        self.assertIsInstance(n2.a, int)
+        self.assertIsInstance(n2.b, str)
+        self.assertEqual(n2.a, 2)
+        self.assertEqual(n2.b, 'xx')
+
+        n3 = n2.replacing(b='yy', a=3)
+
+        self.assertIsInstance(n3, N)
+
+        self.assertFalse(n2 is n3)
+        self.assertIsInstance(n3.a, int)
+        self.assertIsInstance(n3.b, str)
+        self.assertEqual(n3.a, 3)
+        self.assertEqual(n3.b, 'yy')
+
+    def test_named_tuple_replacing_refcount(self):
+        N = NamedTuple(x=ListOf(int))
+        aList = ListOf(int)([1, 2, 3])
+
+        self.assertEqual(_types.refcount(aList), 1)
+        nt = N().replacing(x=aList)
+        self.assertEqual(nt.x, aList)
+        self.assertEqual(_types.refcount(aList), 2)
+        nt = None
+        self.assertEqual(_types.refcount(aList), 1)

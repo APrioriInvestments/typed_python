@@ -44,7 +44,7 @@ public:
 
     static PyObject* constDictGet(PyObject* o, PyObject* args);
 
-    static PyMethodDef* typeMethodsConcrete();
+    static PyMethodDef* typeMethodsConcrete(Type* t);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType);
 

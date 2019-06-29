@@ -163,7 +163,7 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
     return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
 }
 
-PyMethodDef* PyPointerToInstance::typeMethodsConcrete() {
+PyMethodDef* PyPointerToInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef [5] {
         {"initialize", (PyCFunction)PyPointerToInstance::pointerInitialize, METH_VARARGS, NULL},
         {"set", (PyCFunction)PyPointerToInstance::pointerSet, METH_VARARGS, NULL},
