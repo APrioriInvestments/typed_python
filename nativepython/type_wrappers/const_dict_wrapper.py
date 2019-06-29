@@ -14,6 +14,8 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
+from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
+from nativepython.type_wrappers.util import min
 
 from typed_python import NoneType
 
@@ -21,6 +23,112 @@ import nativepython.native_ast as native_ast
 import nativepython
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+def const_dict_eq(l, r):
+    if len(l) != len(r):
+        return False
+
+    for i in range(len(l)):
+        if l.get_key_by_index_unsafe(i) != r.get_key_by_index_unsafe(i):
+            return False
+
+        if l.get_value_by_index_unsafe(i) != r.get_value_by_index_unsafe(i):
+            return False
+
+    return True
+
+
+def const_dict_neq(l, r):
+    return not const_dict_eq(l, r)
+
+
+def const_dict_lt(left, right):
+    """Compare two 'ConstDict' instances by comparing their individual elements."""
+    for i in range(min(len(left), len(right))):
+        if left.get_key_by_index_unsafe(i) > right.get_key_by_index_unsafe(i):
+            return False
+
+        if left.get_key_by_index_unsafe(i) < right.get_key_by_index_unsafe(i):
+            return True
+
+        if left.get_value_by_index_unsafe(i) > right.get_value_by_index_unsafe(i):
+            return False
+
+        if left.get_value_by_index_unsafe(i) < right.get_value_by_index_unsafe(i):
+            return True
+
+    return len(left) < len(right)
+
+
+def const_dict_lte(left, right):
+    """Compare two 'ConstDict' instances by comparing their individual elements."""
+    for i in range(min(len(left), len(right))):
+        if left.get_key_by_index_unsafe(i) > right.get_key_by_index_unsafe(i):
+            return False
+
+        if left.get_key_by_index_unsafe(i) < right.get_key_by_index_unsafe(i):
+            return True
+
+        if left.get_value_by_index_unsafe(i) > right.get_value_by_index_unsafe(i):
+            return False
+
+        if left.get_value_by_index_unsafe(i) < right.get_value_by_index_unsafe(i):
+            return True
+
+    return len(left) <= len(right)
+
+
+def const_dict_gt(left, right):
+    return not const_dict_lte(left, right)
+
+
+def const_dict_gte(left, right):
+    return not const_dict_lt(left, right)
+
+
+def const_dict_getitem(constDict, key):
+    # perform a binary search
+    lowIx = 0
+    highIx = len(constDict)
+
+    while lowIx < highIx:
+        mid = (lowIx + highIx) >> 1
+
+        keyAtVal = constDict.get_key_by_index_unsafe(mid)
+
+        if keyAtVal < key:
+            lowIx = mid + 1
+        elif key < keyAtVal:
+            highIx = mid
+        else:
+            return constDict.get_value_by_index_unsafe(mid)
+
+    raise Exception("Key doesn't exist")
+
+
+def const_dict_contains(constDict, key):
+    # perform a binary search
+    lowIx = 0
+    highIx = len(constDict)
+
+    while lowIx < highIx:
+        mid = (lowIx + highIx) >> 1
+
+        keyAtVal = constDict.get_key_by_index_unsafe(mid)
+
+        if keyAtVal < key:
+            lowIx = mid + 1
+        elif key < keyAtVal:
+            highIx = mid
+        else:
+            return True
+
+    return False
+
+
+def const_dict_contains_not(constDict, key):
+    return False if const_dict_contains(constDict, key) else True
 
 
 class ConstDictWrapper(RefcountedWrapper):
@@ -48,6 +156,34 @@ class ConstDictWrapper(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_attribute(self, context, instance, attr):
+        if attr in ("get_key_by_index_unsafe", "get_value_by_index_unsafe"):
+            return instance.changeType(BoundCompiledMethodWrapper(self, attr))
+
+        return super().convert_attribute(context, instance, attr)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if kwargs:
+            return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+        if methodname == "get_key_by_index_unsafe":
+            if len(args) == 1:
+                ix = args[0].toInt64()
+                if ix is None:
+                    return
+
+                return self.convert_getkey_by_index_unsafe(context, instance, ix)
+
+        if methodname == "get_value_by_index_unsafe":
+            if len(args) == 1:
+                ix = args[0].toInt64()
+                if ix is None:
+                    return
+
+                return self.convert_getvalue_by_index_unsafe(context, instance, ix)
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference
@@ -85,12 +221,29 @@ class ConstDictWrapper(RefcountedWrapper):
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
-            self.keyType,
+            self.valueType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).elemPtr(
                 item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
                 .add(native_ast.const_int_expr(self.keyBytecount))
             ).cast(self.valueType.getNativeLayoutType().pointer())
         )
+
+    def convert_bin_op(self, context, left, op, right):
+        if right.expr_type == left.expr_type:
+            if op.matches.Eq:
+                return context.call_py_function(const_dict_eq, (left, right), {})
+            if op.matches.NotEq:
+                return context.call_py_function(const_dict_neq, (left, right), {})
+            if op.matches.Lt:
+                return context.call_py_function(const_dict_lt, (left, right), {})
+            if op.matches.LtE:
+                return context.call_py_function(const_dict_lte, (left, right), {})
+            if op.matches.Gt:
+                return context.call_py_function(const_dict_gt, (left, right), {})
+            if op.matches.GtE:
+                return context.call_py_function(const_dict_gte, (left, right), {})
+
+        return super().convert_bin_op(context, left, op, right)
 
     def convert_bin_op_reverse(self, context, left, op, right):
         if op.matches.In or op.matches.NotIn:
@@ -98,18 +251,11 @@ class ConstDictWrapper(RefcountedWrapper):
             if right is None:
                 return None
 
-            native_contains = context.converter.defineNativeFunction(
-                "dict_contains" + str(self.typeRepresentation),
-                ('dict_contains', self),
-                [self, self.keyType],
-                bool,
-                self.generateContains()
+            return context.call_py_function(
+                const_dict_contains if op.matches.In else const_dict_contains_not,
+                (left, right),
+                {}
             )
-
-            if op.matches.In:
-                return context.pushPod(bool, native_contains.call(left, right))
-            else:
-                return context.pushPod(bool, native_contains.call(left, right).logical_not())
 
         return super().convert_bin_op(context, left, op, right)
 
@@ -118,76 +264,7 @@ class ConstDictWrapper(RefcountedWrapper):
         if item is None:
             return None
 
-        native_getitem = context.converter.defineNativeFunction(
-            "dict_getitem" + str(self.typeRepresentation),
-            ('dict_getitem', self),
-            [self, self.keyType],
-            self.valueType,
-            self.generateGetitem()
-        )
-
-        if self.valueType.is_pass_by_ref:
-            return context.push(
-                self.valueType,
-                lambda output:
-                    native_getitem.call(output, instance, item)
-            )
-        else:
-            return context.push(
-                self.valueType,
-                lambda output:
-                    output.expr.store(native_getitem.call(instance, item))
-            )
-
-    def generateGetitem(self):
-        return self.generateLookupFun(False)
-
-    def generateContains(self):
-        return self.generateLookupFun(True)
-
-    def generateLookupFun(self, containmentOnly):
-        def f(context, out, inst, key):
-            # a linear scan for now.
-            lowIx = context.push(int, lambda x: x.expr.store(native_ast.const_int_expr(0)))
-            highIx = context.push(int, lambda x: x.expr.store(self.convert_len_native(inst.nonref_expr)))
-
-            with context.whileLoop(lowIx.nonref_expr.lt(highIx.nonref_expr)):
-                mid = context.pushPod(int, lowIx.nonref_expr.add(highIx.nonref_expr).div(2))
-
-                isLt = key < self.convert_getkey_by_index_unsafe(context, inst, mid)
-                isEq = key == self.convert_getkey_by_index_unsafe(context, inst, mid)
-
-                if isLt is not None and isEq is not None:
-                    with context.ifelse(isEq.nonref_expr) as (true, false):
-                        if containmentOnly:
-                            with true:
-                                context.pushTerminal(native_ast.Expression.Return(arg=native_ast.const_bool_expr(True)))
-                        else:
-                            with true:
-                                result = self.convert_getvalue_by_index_unsafe(context, inst, mid)
-
-                                if out is not None:
-                                    context.pushEffect(
-                                        out.convert_copy_initialize(result)
-                                    )
-                                    context.pushTerminal(
-                                        native_ast.Expression.Return(arg=None)
-                                    )
-                                else:
-                                    context.pushTerminal(
-                                        native_ast.Expression.Return(arg=result.nonref_expr)
-                                    )
-
-                    with context.ifelse(isLt.nonref_expr) as (true, false):
-                        with true:
-                            context.pushEffect(highIx.expr.store(mid.nonref_expr))
-                        with false:
-                            context.pushEffect(lowIx.expr.store(mid.nonref_expr.add(1)))
-            if containmentOnly:
-                context.pushTerminal(native_ast.Expression.Return(arg=native_ast.const_bool_expr(False)))
-            else:
-                context.pushException(KeyError, "Can't find key")
-        return f
+        return context.call_py_function(const_dict_getitem, (instance, item), {})
 
     def convert_len_native(self, expr):
         return native_ast.Expression.Branch(

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward
+from typed_python import Function, OneOf, TupleOf, Forward, ConstDict
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
@@ -35,7 +35,7 @@ Value = Value.define(
         int,
         str,
         # bytes,
-        # ConstDict(Value, Value),
+        ConstDict(Value, Value),
         TupleOf(Value)
     )
 )
@@ -48,7 +48,7 @@ someValues = [
     0, 1,
     "hi",
     # b"bye",
-    # Value({'hi': 'bye'}),
+    Value({'hi': 'bye'}),
     Value((1, 2, 3))
 ]
 

@@ -12,9 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ConstDict, String
+from typed_python import Function, ConstDict, String, TupleOf
 import typed_python._types as _types
 from nativepython.runtime import Runtime
+from nativepython import SpecializedEntrypoint
 import unittest
 import time
 
@@ -106,6 +107,15 @@ class TestConstDictCompilation(unittest.TestCase):
                 self.assertEqual(key in d, compiledIn(d, key))
                 self.assertEqual(key not in d, compiledNotIn(d, key))
 
+        @Compiled
+        def compiledContains(x: ConstDict(int, int), y: int):
+            return y in x
+
+        self.assertTrue(compiledContains({k*2: k*2 for k in range(10)}, 2))
+        self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 3))
+        self.assertTrue(compiledContains({k*2: k*2 for k in range(10)}, 4))
+        self.assertFalse(compiledContains({k*2: k*2 for k in range(10)}, 5))
+
     def test_const_dict_loops(self):
         def loop(x: ConstDict(int, int)):
             res = 0
@@ -121,6 +131,7 @@ class TestConstDictCompilation(unittest.TestCase):
         compiledLoop = Compiled(loop)
 
         aBigDict = {i: i % 20 for i in range(1000)}
+        compiledLoop(aBigDict)
 
         t0 = time.time()
         interpreterResult = loop(aBigDict)
@@ -132,7 +143,78 @@ class TestConstDictCompilation(unittest.TestCase):
 
         self.assertEqual(interpreterResult, compiledResult)
 
-        # I get about 3x. This is not as big a speedup as some other thigns we do
+        # I get about 3x. This is not as big a speedup as some other things we do
         # because most of the time is spent in the dictionary lookup, and python's
         # dict lookup is quite fast.
+        print("ConstDict lookup speedup is ", speedup)
         self.assertGreater(speedup, 2)
+
+    def test_const_dict_key_error(self):
+        @Compiled
+        def lookup(x: ConstDict(int, int), y: int):
+            return x[y]
+
+        self.assertEqual(lookup({1: 2}, 1), 2)
+        with self.assertRaises(Exception):
+            lookup({1: 2}, 2)
+
+    def test_const_dict_unsafe_operations(self):
+        T = ConstDict(int, int)
+
+        t = T({1: 2, 3: 4})
+
+        @SpecializedEntrypoint
+        def getkey(d, i):
+            return d.get_key_by_index_unsafe(i)
+
+        @SpecializedEntrypoint
+        def getvalue(d, i):
+            return d.get_value_by_index_unsafe(i)
+
+        self.assertEqual(getkey(t, 0), 1)
+        self.assertEqual(getkey(t, 1), 3)
+        self.assertEqual(getvalue(t, 0), 2)
+        self.assertEqual(getvalue(t, 1), 4)
+
+        TOI = TupleOf(int)
+        T2 = ConstDict(TOI, TOI)
+
+        toi = TOI((1, 2, 3))
+        self.assertEqual(_types.refcount(toi), 1)
+
+        t2 = T2({toi: toi})
+        self.assertEqual(_types.refcount(toi), 3)
+
+        toi_copy = getkey(t2, 0)
+        self.assertEqual(_types.refcount(toi), 4)
+
+        toi_copy_2 = getvalue(t2, 0)
+        self.assertEqual(_types.refcount(toi), 5)
+
+        toi_copy = toi_copy_2 = None # noqa
+        t2 = None
+
+        self.assertEqual(_types.refcount(toi), 1)
+
+    def test_const_dict_comparison(self):
+        @SpecializedEntrypoint
+        def eq(x, y):
+            return x == y
+
+        @SpecializedEntrypoint
+        def neq(x, y):
+            return x != y
+
+        @SpecializedEntrypoint
+        def lt(x, y):
+            return x < y
+
+        T = ConstDict(str, str)
+        t1 = T({'1': '2'})
+        t2 = T({'1': '3'})
+
+        self.assertTrue(eq(t1, t1))
+        self.assertFalse(neq(t1, t1))
+
+        self.assertFalse(eq(t1, t2))
+        self.assertTrue(neq(t1, t2))

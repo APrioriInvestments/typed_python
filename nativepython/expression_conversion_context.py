@@ -669,7 +669,7 @@ class ExpressionConversionContext(object):
                 with true_block:
                     true_res = self.convert_expression_ast(ast.body)
                 with false_block:
-                    false_res = self.conversion_exception(ast.orelse)
+                    false_res = self.convert_expression_ast(ast.orelse)
 
                 if true_res.expr_type != false_res.expr_type:
                     out_type = typeWrapper(OneOf(true_res.expr_type.typeRepresentation, false_res.expr_type.typeRepresentation))

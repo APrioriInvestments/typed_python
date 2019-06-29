@@ -446,7 +446,9 @@ class FunctionConversionContext(object):
             )
 
         if ast.matches.Raise:
-            raise NotImplementedError()
+            expr_contex = ExpressionConversionContext(self)
+            expr_contex.pushException(KeyError, "Can't find key")
+            return expr_contex.finalize(None), False
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
 

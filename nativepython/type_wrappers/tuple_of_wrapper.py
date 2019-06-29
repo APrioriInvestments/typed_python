@@ -17,6 +17,7 @@ from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
 from typed_python import NoneType
+from nativepython.type_wrappers.util import min
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -24,18 +25,12 @@ import nativepython
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
-def min(x, y):
-    if x < y:
-        return x
-    return y
-
-
 def tuple_compare_eq(left, right):
     """Compare two 'TupleOf' instances by comparing their individual elements."""
     if len(left) != len(right):
         return False
 
-    for i in range(min(len(left), len(right))):
+    for i in range(len(left)):
         if left[i] != right[i]:
             return False
 

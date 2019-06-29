@@ -152,6 +152,8 @@ class Int64Wrapper(ArithmeticTypeWrapper):
                     )
                 )
             if op.matches.FloorDiv:
+                # this is a super-slow way of doing this because we convert to float, do the op, and back to int.
+                # we should be comparing the RHS against zero and throwing our own exception.
                 res = left.toFloat64()
                 if res is None:
                     return None
@@ -213,6 +215,12 @@ class BoolWrapper(ArithmeticTypeWrapper):
             return e
 
         return super().convert_to_type(context, e, target_type)
+
+    def convert_unary_op(self, context, left, op):
+        if op.matches.Not:
+            return context.pushPod(self, left.nonref_expr.logical_not())
+
+        return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
