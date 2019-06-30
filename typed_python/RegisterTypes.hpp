@@ -56,8 +56,8 @@ public:
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
-    int32_t hash32(instance_ptr left) {
-        Hash32Accumulator acc((int)getTypeCategory());
+    typed_python_hash_type hash64(instance_ptr left) {
+        HashAccumulator acc(0);
 
         acc.addRegister(*(T*)left);
 

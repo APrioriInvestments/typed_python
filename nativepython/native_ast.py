@@ -530,6 +530,7 @@ Int64 = Type.Int(bits=64, signed=True)
 UInt64 = Type.Int(bits=64, signed=False)
 Int32 = Type.Int(bits=32, signed=True)
 Int32Ptr = Int32.pointer()
+Int64Ptr = Int64.pointer()
 
 
 def var(name):

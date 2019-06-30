@@ -85,8 +85,8 @@ public:
         stream << "(" << m_element_type->name() << "*)" << *(void**)self;
     }
 
-    int32_t hash32(instance_ptr left) {
-        Hash32Accumulator acc((int)getTypeCategory());
+    typed_python_hash_type hash64(instance_ptr left) {
+        HashAccumulator acc((int)getTypeCategory());
 
         acc.addRegister((uint64_t)*(void**)left);
 

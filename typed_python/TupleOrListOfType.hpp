@@ -23,7 +23,7 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        int32_t hash_cache;
+        typed_python_hash_type hash_cache;
         int32_t count;
         int32_t reserved;
         uint8_t* data;
@@ -82,7 +82,7 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    int32_t hash32(instance_ptr left);
+    typed_python_hash_type hash64(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 

@@ -135,11 +135,11 @@ void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
     m_subtypes[which(self)].second->repr(eltPtr(self), stream);
 }
 
-int32_t Alternative::hash32(instance_ptr left) {
-    Hash32Accumulator acc((int)TypeCategory::catAlternative);
+typed_python_hash_type Alternative::hash64(instance_ptr left) {
+    HashAccumulator acc((int)TypeCategory::catAlternative);
 
     acc.add(which(left));
-    acc.add(m_subtypes[which(left)].second->hash32(eltPtr(left)));
+    acc.add(m_subtypes[which(left)].second->hash64(eltPtr(left)));
 
     return acc.get();
 }

@@ -132,6 +132,12 @@ class StringWrapper(RefcountedWrapper):
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
+    def convert_to_self(self, context, expr):
+        if expr.expr_type == self:
+            return expr
+
+        context.pushException(TypeError, f"Can't convert object of type {expr.expr_type} to 'str'")
+
     def constant(self, context, s):
         return context.push(
             str,
@@ -143,26 +149,23 @@ class StringWrapper(RefcountedWrapper):
             )
         )
 
-    def _d(s):
-        return (s, eval("runtime_functions.string_" + s))
+    _bool_methods = dict(
+        isalpha=runtime_functions.string_isalpha,
+        isalnum=runtime_functions.string_isalnum,
+        isdecimal=runtime_functions.string_isdecimal,
+        isdigit=runtime_functions.string_isdigit,
+        islower=runtime_functions.string_islower,
+        isnumeric=runtime_functions.string_isnumeric,
+        isprintable=runtime_functions.string_isprintable,
+        isspace=runtime_functions.string_isspace,
+        istitle=runtime_functions.string_istitle,
+        isupper=runtime_functions.string_isupper
+    )
 
-    _bool_methods = dict([
-        _d("isalpha"),
-        _d("isalnum"),
-        _d("isdecimal"),
-        _d("isdigit"),
-        _d("islower"),
-        _d("isnumeric"),
-        _d("isprintable"),
-        _d("isspace"),
-        _d("istitle"),
-        _d("isupper")
-    ])
-
-    _str_methods = dict([
-        _d("lower"),
-        _d("upper")
-    ])
+    _str_methods = dict(
+        lower=runtime_functions.string_lower,
+        upper=runtime_functions.string_upper
+    )
 
     def convert_attribute(self, context, instance, attr):
         if attr in ("find", "split") or attr in self._str_methods or attr in self._bool_methods:

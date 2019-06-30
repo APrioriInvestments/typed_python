@@ -22,7 +22,7 @@ import nativepython.native_ast as native_ast
 import nativepython
 
 from typed_python import (
-    Float32, Float64, Int64, UInt64, Bool
+    Float32, Float64, Int64, Bool, String, Int8, UInt8, Int16, UInt16, Int32, UInt32, UInt64
 )
 
 pyOpToNative = {
@@ -87,8 +87,10 @@ class ArithmeticTypeWrapper(Wrapper):
         if op.matches.USub:
             return context.pushPod(self, instance.nonref_expr.negate())
 
-        return super().convert_unary_op(context, instance, op)
+        if op.matches.Not:
+            return context.pushPod(bool, instance.nonref_expr.cast(native_ast.Bool).logical_not())
 
+        return super().convert_unary_op(context, instance, op)
 
 def toWrapper(T):
     if T is Bool:
@@ -107,6 +109,8 @@ def toFloatType(T1):
             return Float64
     return T1
 
+def hash_int64(x):
+    return ((x >> 32) * 1000003) ^ (x & 0xFFFFFFFF)
 
 class IntWrapper(ArithmeticTypeWrapper):
     def __init__(self, T):
@@ -116,6 +120,11 @@ class IntWrapper(ArithmeticTypeWrapper):
         T = self.typeRepresentation
 
         return native_ast.Type.Int(bits=T.Bits, signed=T.IsSignedInt)
+
+    def convert_hash(self, context, expr):
+        if self.typeRepresentation in (Int64, UInt64):
+            return context.call_py_function(hash_int64, (expr,), {})
+        return expr.convert_to_type(Int32)
 
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == self.typeRepresentation:
@@ -141,6 +150,26 @@ class IntWrapper(ArithmeticTypeWrapper):
                     )
                 )
             )
+        elif target_type.typeRepresentation == String:
+            if self.typeRepresentation == Int64:
+                return context.push(
+                    str,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.int64_to_string.call(e.nonref_expr).cast(strRef.expr_type.layoutType)
+                    )
+                )
+
+            suffix = {
+                UInt64: 'u64',
+                Int32: 'i32',
+                UInt32: 'u32',
+                Int16: 'i16',
+                UInt16: 'u16',
+                Int8: 'i8',
+                UInt8: 'u8'
+            }[self.typeRepresentation]
+
+            return e.convert_to_type(int).convert_to_type(str) + context.constant(suffix)
 
         return super().convert_to_type(context, e, target_type)
 
@@ -275,6 +304,9 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Int(bits=1, signed=False)
+
+    def convert_hash(self, context, expr):
+        return expr.convert_to_type(Int32)
 
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == self.typeRepresentation:

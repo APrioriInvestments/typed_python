@@ -24,7 +24,7 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        int32_t hash_cache;
+        typed_python_hash_type hash_cache;
         int32_t bytecount;
         uint8_t data[];
     };
@@ -79,7 +79,7 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
 
-    int32_t hash32(instance_ptr left);
+    typed_python_hash_type hash64(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
     static char cmpStatic(layout* left, layout* right);

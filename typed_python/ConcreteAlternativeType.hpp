@@ -49,8 +49,8 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
-    int32_t hash32(instance_ptr left) {
-        return m_alternative->hash32(left);
+    typed_python_hash_type hash64(instance_ptr left) {
+        return m_alternative->hash64(left);
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream) {

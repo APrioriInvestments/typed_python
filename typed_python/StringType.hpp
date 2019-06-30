@@ -24,7 +24,7 @@ public:
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        int32_t hash_cache;
+        typed_python_hash_type hash_cache;
         int32_t pointcount;
         int32_t bytes_per_codepoint; //1 implies
         uint8_t data[];
@@ -129,6 +129,34 @@ public:
         }
     }
 
+    std::string toUtf8String(instance_ptr self) {
+        std::vector<uint8_t> data;
+
+        if (bytes_per_codepoint(self) == 1) {
+            size_t bytecount = countUtf8BytesRequiredFor((uint8_t*)eltPtr(self, 0), count(self));
+
+            data.resize(bytecount);
+
+            encodeUtf8((uint8_t*)eltPtr(self, 0), count(self), &data[0]);
+        } else if (bytes_per_codepoint(self) == 2) {
+            size_t bytecount = countUtf8BytesRequiredFor((uint16_t*)eltPtr(self, 0), count(self));
+
+            data.resize(bytecount);
+
+            encodeUtf8((uint16_t*)eltPtr(self, 0), count(self), &data[0]);
+        } else if (bytes_per_codepoint(self) == 4) {
+            size_t bytecount = countUtf8BytesRequiredFor((uint32_t*)eltPtr(self, 0), count(self));
+
+            data.resize(bytecount);
+
+            encodeUtf8((uint32_t*)eltPtr(self, 0), count(self), &data[0]);
+        } else {
+            throw std::runtime_error("corrupt bytes-per-codepoint");
+        }
+
+        return std::string(data.begin(), data.end());
+    }
+
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
         assertWireTypesEqual(wireType, WireType::BYTES);
@@ -141,7 +169,7 @@ public:
         });
     }
 
-    int32_t hash32(instance_ptr left);
+    typed_python_hash_type hash64(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 

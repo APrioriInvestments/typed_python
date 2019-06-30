@@ -110,6 +110,9 @@ class TypedExpression(object):
     def convert_len(self):
         return self.expr_type.convert_len(self.context, self)
 
+    def convert_hash(self):
+        return self.expr_type.convert_hash(self.context, self)
+
     def convert_reserved(self):
         return self.expr_type.convert_reserved(self.context, self)
 
@@ -126,6 +129,8 @@ class TypedExpression(object):
         return self.expr_type.convert_method_call(self.context, self, methodname, args, kwargs)
 
     def convert_to_type(self, target_type):
+        target_type = typeWrapper(target_type)
+
         return self.expr_type.convert_to_type(self.context, self, target_type)
 
     def convert_next(self):

@@ -16,14 +16,18 @@
 
 #pragma once
 
-class Hash32Accumulator {
+
+typedef int32_t typed_python_hash_type;
+
+
+class HashAccumulator {
 public:
-    Hash32Accumulator(int32_t init) :
+    HashAccumulator(typed_python_hash_type init) :
         m_state(init)
     {
     }
 
-    void add(int32_t i) {
+    void add(int64_t i) {
         m_state = (m_state * 1000003) ^ i;
     }
 
@@ -40,7 +44,7 @@ public:
         }
     }
 
-    int32_t get() const {
+    typed_python_hash_type get() const {
         return m_state;
     }
 
@@ -48,16 +52,31 @@ public:
     void addRegister(uint8_t i) { add(i); }
     void addRegister(uint16_t i) { add(i); }
     void addRegister(uint32_t i) { add(i); }
-    void addRegister(uint64_t i) { addBytes((uint8_t*)&i, sizeof(i)); }
+    void addRegister(uint64_t i) {
+        add(i >> 32);
+        add(i & 0xFFFFFFFF);
+    }
 
     void addRegister(int8_t i) { add(i); }
     void addRegister(int16_t i) { add(i); }
     void addRegister(int32_t i) { add(i); }
-    void addRegister(int64_t i) { addBytes((uint8_t*)&i, sizeof(i)); }
+    void addRegister(int64_t i) {
+        add(i >> 32);
+        add(i & 0xFFFFFFFF);
+    }
 
-    void addRegister(float i) { addBytes((uint8_t*)&i, sizeof(i)); }
-    void addRegister(double i) { addBytes((uint8_t*)&i, sizeof(i)); }
+    void addRegister(float i) {
+      addRegister((double)i);
+    }
+
+    void addRegister(double i) {
+      if (i == int32_t(i)) {
+        add((int32_t)i);
+      } else {
+        addBytes((uint8_t*)&i, sizeof(i));
+      }
+    }
 
 private:
-    int32_t m_state;
+    typed_python_hash_type m_state;
 };

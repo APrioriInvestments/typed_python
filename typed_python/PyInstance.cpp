@@ -867,7 +867,7 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
         Type* self_type = extractTypeFrom(o->ob_type);
         PyInstance* w = (PyInstance*)o;
 
-        int32_t h = self_type->hash32(w->dataPtr());
+        int64_t h = self_type->hash64(w->dataPtr());
         if (h == -1) {
             h = -2;
         }

@@ -16,15 +16,15 @@
 
 #include "AllTypes.hpp"
 
-int32_t BytesType::hash32(instance_ptr left) {
-    Hash32Accumulator acc((int)getTypeCategory());
+typed_python_hash_type BytesType::hash64(instance_ptr left) {
+    HashAccumulator acc((int)getTypeCategory());
 
     if (!(*(layout**)left)) {
         return 0x1234;
     }
 
     if ((*(layout**)left)->hash_cache == -1) {
-        Hash32Accumulator acc((int)getTypeCategory());
+        HashAccumulator acc((int)getTypeCategory());
 
         acc.addBytes(eltPtr(left, 0), count(left));
 

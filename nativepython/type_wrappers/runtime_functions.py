@@ -318,3 +318,15 @@ bytes_from_ptr_and_len = externalCallTarget(
     Void.pointer(),
     UInt8Ptr, Int64
 )
+
+print_string = externalCallTarget(
+    "nativepython_print_string",
+    Void,
+    Void.pointer()
+)
+
+int64_to_string = externalCallTarget(
+    "nativepython_int64_to_string",
+    Void.pointer(),
+    Int64
+)

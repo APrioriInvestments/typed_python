@@ -181,7 +181,7 @@ class OneOfWrapper(Wrapper):
                     context.markUninitializedSlotInitialized(result)
                 with false:
                     context.pushEffect(
-                        generateThrowException(context, Exception("Can't convert"))
+                        generateThrowException(context, Exception("Can't convert."))
                     )
 
             return result

@@ -15,14 +15,56 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.typed_expression import TypedExpression
 import nativepython.type_wrappers.runtime_functions as runtime_functions
+from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 
-from typed_python import NoneType
+from typed_python import NoneType, Tuple, PointerTo, Int32, Int64
 
 import nativepython.native_ast as native_ast
 import nativepython
 
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+EMPTY = -1
+DELETED = -2
+
+
+def dict_slot_for_key(instance, item):
+    slots = instance._hash_table_slots
+
+    if not slots:
+        return -1
+
+    itemHash = hash(item)
+
+    offset = itemHash % instance._hash_table_size
+
+    while True:
+        slotIndex = int((slots + offset).get())
+
+        if slotIndex == EMPTY:
+            return -1
+
+        if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
+            if instance.getKeyByIndexUnsafe(slotIndex) == item:
+                return slotIndex
+
+        slotIndex += 1
+        if slotIndex >= instance._hash_table_size:
+            slotIndex = 0
+
+    # not necessary, but currently we don't currently realize that the while loop
+    # never exits, and so we think there's a possibility we return None
+    return 0
+
+
+def dict_getitem(instance, item):
+    slot = dict_slot_for_key(instance, item)
+
+    if slot == -1:
+        raise Exception("Key doesn't exist.")
+
+    return instance.getValueByIndexUnsafe(slot)
 
 
 class DictWrapper(RefcountedWrapper):
@@ -36,6 +78,7 @@ class DictWrapper(RefcountedWrapper):
 
         self.keyType = typeWrapper(t.KeyType)
         self.valueType = typeWrapper(t.ValueType)
+        self.itemType = typeWrapper(Tuple(t.KeyType, t.ValueType))
 
         self.kvBytecount = self.keyType.getBytecount() + self.valueType.getBytecount()
         self.keyBytecount = self.keyType.getBytecount()
@@ -52,6 +95,73 @@ class DictWrapper(RefcountedWrapper):
             ('hash_table_count', native_ast.Int64),
             ('hash_table_empty_slots', native_ast.Int64)
         ), name="DictWrapper").pointer()
+
+    def convert_attribute(self, context, expr, attr):
+        if attr in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe"):
+            return expr.changeType(BoundCompiledMethodWrapper(self, attr))
+
+        if attr == '_hash_table_slots':
+            return context.pushPod(
+                PointerTo(Int32),
+                expr.nonref_expr.ElementPtrIntegers(0, 5).load()
+            )
+
+        if attr == '_hash_table_hashes':
+            return context.pushPod(
+                PointerTo(Int32),
+                expr.nonref_expr.ElementPtrIntegers(0, 6).load()
+            )
+
+        if attr == '_hash_table_size':
+            return context.pushPod(
+                int,
+                expr.nonref_expr.ElementPtrIntegers(0, 7).load()
+            )
+
+        if attr == '_hash_table_count':
+            return context.pushPod(
+                int,
+                expr.nonref_expr.ElementPtrIntegers(0, 8).load()
+            )
+
+        return super().convert_attribute(context, expr, attr)
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if kwargs:
+            return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+        if len(args) == 1:
+            item = args[0]
+
+            if item.expr_type.typeRepresentation is Int64:
+                if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe"):
+                    item = context.pushReference(
+                        self.itemType,
+                        instance.nonref_expr.ElementPtrIntegers(0, 1).load().cast(
+                            self.itemType.getNativeLayoutType().pointer()
+                        ).elemPtr(item.toInt64().nonref_expr)
+                    )
+
+                    if methodname == "getItemByIndexUnsafe":
+                        return item
+                    elif methodname == "getKeyByIndexUnsafe":
+                        # take the first item in the tuple
+                        return item.expr_type.refAs(context, item, 0)
+                    else:
+                        # take the second item in the tuple
+                        return item.expr_type.refAs(context, item, 1)
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+    def convert_getitem(self, context, expr, item):
+        if item is None or expr is None:
+            return None
+
+        item = item.convert_to_type(self.keyType)
+        if item is None:
+            return None
+
+        return context.call_py_function(dict_getitem, (expr, item), {})
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -73,6 +183,9 @@ class DictWrapper(RefcountedWrapper):
         if isinstance(expr, TypedExpression):
             expr = expr.nonref_expr
         return expr.ElementPtrIntegers(0, 2).load().elemPtr(slotIx.nonref_expr).load()
+
+    def convert_len(self, context, expr):
+        return context.pushPod(int, self.convert_len_native(expr))
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference

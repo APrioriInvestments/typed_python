@@ -59,7 +59,20 @@ class ExpressionConversionContext(object):
     def inputArg(self, type, name):
         return TypedExpression(self, native_ast.Expression.Variable(name), type, type.is_pass_by_ref)
 
+    def zero(self, T):
+        """Return a TypedExpression matching the Zero form of the native layout of type T.
+
+        Args:
+            T - a wrapper, or a type that will get turned into a wrapper.
+        """
+
+        T = typeWrapper(T)
+
+        return TypedExpression(self, T.getNativeLayoutType().zero(), T, False)
+
     def constant(self, x):
+        if isinstance(x, str):
+            return nativepython.type_wrappers.string_wrapper.StringWrapper().constant(self, x)
         if isinstance(x, bool):
             return TypedExpression(self, native_ast.const_bool_expr(x), bool, False)
         if isinstance(x, int):
@@ -455,6 +468,9 @@ class ExpressionConversionContext(object):
             assert len(call_target.named_call_target.arg_types) == len(native_args)
 
             self.pushTerminal(call_target.call(*native_args))
+
+            # if you get this spuriously, perhaps one of your code-conversion functions
+            # returned None when it meant to return context.pushVoid(), which actually returns Void.
             self.pushException(TypeError, "Unreachable code.")
             return
 

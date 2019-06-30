@@ -82,8 +82,8 @@ public:
         return getType()->count((instance_ptr)&mLayout);
     }
 
-    int32_t hashValue() const {
-        return getType()->hash32((instance_ptr)&mLayout);
+    typed_python_hash_type hashValue() const {
+        return getType()->hash64((instance_ptr)&mLayout);
     }
 
     static inline char cmp(const Bytes& left, const Bytes& right) {

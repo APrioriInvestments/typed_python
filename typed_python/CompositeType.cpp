@@ -119,11 +119,11 @@ void CompositeType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << ")";
 }
 
-int32_t CompositeType::hash32(instance_ptr left) {
-    Hash32Accumulator acc((int)getTypeCategory());
+typed_python_hash_type CompositeType::hash64(instance_ptr left) {
+    HashAccumulator acc((int)getTypeCategory());
 
     for (long k = 0; k < getTypes().size();k++) {
-        acc.add(getTypes()[k]->hash32(eltPtr(left,k)));
+        acc.add(getTypes()[k]->hash64(eltPtr(left,k)));
     }
 
     acc.add(getTypes().size());

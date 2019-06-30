@@ -76,5 +76,5 @@ public:
 private:
   field_id m_fieldId;
   index_value m_index;
-  int32_t m_hash_val;
+  typed_python_hash_type m_hash_val;
 };

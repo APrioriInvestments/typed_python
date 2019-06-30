@@ -367,7 +367,7 @@ class FunctionConversionContext(object):
 
                 branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
 
-                return cond.expr + branch, flow_returns
+                return cond.expr >> branch, flow_returns
 
             true, true_returns = self.convert_statement_list_ast(ast.body)
             false, false_returns = self.convert_statement_list_ast(ast.orelse)
@@ -447,7 +447,13 @@ class FunctionConversionContext(object):
 
         if ast.matches.Raise:
             expr_contex = ExpressionConversionContext(self)
-            expr_contex.pushException(KeyError, "Can't find key")
+            strVal = "Unknown Exception"
+            if ast.exc.matches.Call:
+                if ast.exc.func.matches.Name and ast.exc.func.id == "Exception":
+                    if len(ast.exc.args) == 1 and ast.exc.args[0].matches.Str:
+                        strVal = ast.exc.args[0].s
+
+            expr_contex.pushException(KeyError, strVal)
             return expr_contex.finalize(None), False
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast._which)

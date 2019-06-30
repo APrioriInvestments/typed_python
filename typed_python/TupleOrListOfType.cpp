@@ -54,19 +54,19 @@ void TupleOrListOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << (m_is_tuple ? ")" : "]");
 }
 
-int32_t TupleOrListOfType::hash32(instance_ptr left) {
+typed_python_hash_type TupleOrListOfType::hash64(instance_ptr left) {
     if (!(*(layout**)left)) {
         return 0x123;
     }
 
     if ((*(layout**)left)->hash_cache == -1) {
-        Hash32Accumulator acc((int)getTypeCategory());
+        HashAccumulator acc((int)getTypeCategory());
 
         int32_t ct = count(left);
         acc.add(ct);
 
         for (long k = 0; k < ct;k++) {
-            acc.add(m_element_type->hash32(eltPtr(left, k)));
+            acc.add(m_element_type->hash64(eltPtr(left, k)));
         }
 
         (*(layout**)left)->hash_cache = acc.get();

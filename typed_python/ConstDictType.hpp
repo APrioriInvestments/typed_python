@@ -23,7 +23,7 @@ class ConstDictType : public Type {
     class layout {
     public:
         std::atomic<int64_t> refcount;
-        int32_t hash_cache;
+        typed_python_hash_type hash_cache;
         int32_t count; //the actual number of items in the tree (in total)
         int32_t subpointers; //if 0, then all values are inline as pairs of (key,value)
                              //otherwise, its an array of '(key, ConstDict(key,value))'
@@ -101,7 +101,7 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    int32_t hash32(instance_ptr left);
+    typed_python_hash_type hash64(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 

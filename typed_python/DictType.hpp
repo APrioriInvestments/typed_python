@@ -44,7 +44,7 @@ public:
 
         //return the index of the object indexed by 'hash', or -1
         template<class eq_func>
-        int32_t find(int32_t kv_pair_size, int32_t hash, const eq_func& compare) {
+        int32_t find(int32_t kv_pair_size, typed_python_hash_type hash, const eq_func& compare) {
             if (!hash_table_slots) {
                 return -1;
             }
@@ -77,7 +77,7 @@ public:
         }
 
         //add an item to the hash table
-        void add(int32_t hash, int32_t slot) {
+        void add(typed_python_hash_type hash, int32_t slot) {
             if (hash_table_count * 2 + 1 > hash_table_size || hash_table_empty_slots < hash_table_size / 4 + 1) {
                 resizeTable();
             }
@@ -103,7 +103,7 @@ public:
         //remove an item with the given hash. returning the item slot where it lived.
         //-1 if not found
         template<class eq_func>
-        int32_t remove(int32_t kv_pair_size, int32_t hash, const eq_func& compare) {
+        int32_t remove(int32_t kv_pair_size, typed_python_hash_type hash, const eq_func& compare) {
             if (!hash_table_slots) {
                 return -1;
             }
@@ -253,7 +253,7 @@ public:
         void resizeTable() {
             if (!hash_table_slots) {
                 hash_table_slots = (int32_t*)malloc(7 * sizeof(int32_t));
-                hash_table_hashes = (int32_t*)malloc(7 * sizeof(int32_t));
+                hash_table_hashes = (typed_python_hash_type*)malloc(7 * sizeof(typed_python_hash_type));
                 hash_table_size = 7;
                 hash_table_count = 0;
                 hash_table_empty_slots = hash_table_size;
@@ -265,13 +265,13 @@ public:
             } else {
                 int32_t oldSize = hash_table_size;
                 int32_t* oldSlots = hash_table_slots;
-                int32_t* oldHashes = hash_table_hashes;
+                typed_python_hash_type* oldHashes = hash_table_hashes;
 
                 //make sure the table's not too small
                 hash_table_size = computeNextPrime(hash_table_count * 4 + 7);
 
                 hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
-                hash_table_hashes = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+                hash_table_hashes = (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
 
                 for (long k = 0; k < hash_table_size; k++) {
                     hash_table_slots[k] = EMPTY;
@@ -312,7 +312,7 @@ public:
         void buildHashTableAfterDeserialization(size_t kv_pair_size, const hash_fun_type& hash_fun) {
             hash_table_size = computeNextPrime(items_reserved * 2.5 + 7);
             hash_table_slots = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
-            hash_table_hashes = (int32_t*)malloc(hash_table_size * sizeof(int32_t));
+            hash_table_hashes = (typed_python_hash_type*)malloc(hash_table_size * sizeof(typed_python_hash_type));
             hash_table_count = 0;
             hash_table_empty_slots = hash_table_size;
 
@@ -375,11 +375,11 @@ public:
         size_t items_reserved; //count of items reserved
         size_t top_item_slot; //index of the next item slot to use
 
-        int32_t* hash_table_slots; //a hashtable. each actual object hash to the slot it holds. -1 if not populated.
-        int32_t* hash_table_hashes; //a hashtable. each actual object hash to the slot it holds. -1 if not populated.
+        int32_t* hash_table_slots; //a hashtable. each actual object hash to the slot index it holds. -1 if not populated.
+        typed_python_hash_type* hash_table_hashes; //a hashtable. each actual object hash to the hash in that part of the table. -1 if not populated.
         size_t hash_table_size; //size of the table
         size_t hash_table_count; //populated count of the table
-        size_t hash_table_empty_slots; //slots that are not empty in the table
+        size_t hash_table_empty_slots; //slots that are not empty in the table. Recall that some slots are 'deleted'
     };
 
 public:
@@ -492,14 +492,14 @@ public:
             layout& l = **((layout**)self);
             l.buildHashTableAfterDeserialization(
                 m_bytes_per_key_value_pair,
-                [&](instance_ptr ptr) { return m_key->hash32(ptr); }
+                [&](instance_ptr ptr) { return m_key->hash64(ptr); }
                 );
         }
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    int32_t hash32(instance_ptr left);
+    typed_python_hash_type hash64(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 

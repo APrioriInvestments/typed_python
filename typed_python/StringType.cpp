@@ -625,13 +625,13 @@ StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int
     return new_layout;
 }
 
-int32_t StringType::hash32(instance_ptr left) {
+typed_python_hash_type StringType::hash64(instance_ptr left) {
     if (!(*(layout**)left)) {
         return 0x12345;
     }
 
     if ((*(layout**)left)->hash_cache == -1) {
-        Hash32Accumulator acc((int)getTypeCategory());
+        HashAccumulator acc((int)getTypeCategory());
         acc.addBytes(eltPtr(left, 0), bytes_per_codepoint(left) * count(left));
         (*(layout**)left)->hash_cache = acc.get();
         if ((*(layout**)left)->hash_cache == -1) {

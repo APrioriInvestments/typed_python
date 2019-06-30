@@ -136,7 +136,7 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    int32_t hash32(instance_ptr left);
+    typed_python_hash_type hash64(instance_ptr left);
 
     template<class sub_constructor>
     void constructor(instance_ptr self, const sub_constructor& initializer) const {

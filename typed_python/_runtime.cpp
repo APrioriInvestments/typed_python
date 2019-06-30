@@ -311,4 +311,16 @@ extern "C" {
 
         throw std::runtime_error("Couldn't convert to an int64.");
     }
+
+    void nativepython_print_string(StringType::layout* layout) {
+        std::cout << StringType::Make()->toUtf8String((instance_ptr)&layout) << std::flush;
+    }
+
+    StringType::layout* nativepython_int64_to_string(int64_t i) {
+        char data[20];
+
+        int64_t count = sprintf((char*)data, "%ld", i);
+
+        return StringType::createFromUtf8(data, count);
+    }
 }

@@ -22,6 +22,7 @@ from typed_python import (
     Float32, Float64
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
+from nativepython import SpecializedEntrypoint
 from nativepython.runtime import Runtime
 import unittest
 
@@ -237,6 +238,16 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         self.assertEqual(negate_int(10), -10)
         self.assertEqual(negate_float(20.5), -20.5)
+
+    def test_can_stringify_unsigned(self):
+        @SpecializedEntrypoint
+        def toString(x):
+            return str(x)
+
+        self.assertEqual(toString(UInt64(10)), "10u64")
+        self.assertEqual(toString(UInt32(10)), "10u32")
+        self.assertEqual(toString(UInt16(10)), "10u16")
+        self.assertEqual(toString(UInt8(10)), "10u8")
 
     def test_can_compile_all_register_types(self):
         registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]

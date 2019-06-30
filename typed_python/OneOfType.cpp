@@ -88,11 +88,11 @@ void OneOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     m_types[*((uint8_t*)self)]->repr(self+1, stream);
 }
 
-int32_t OneOfType::hash32(instance_ptr left) {
-    Hash32Accumulator acc((int)getTypeCategory());
+typed_python_hash_type OneOfType::hash64(instance_ptr left) {
+    HashAccumulator acc((int)getTypeCategory());
 
     acc.add(*(uint8_t*)left);
-    acc.add(m_types[*((uint8_t*)left)]->hash32(left+1));
+    acc.add(m_types[*((uint8_t*)left)]->hash64(left+1));
 
     return acc.get();
 }

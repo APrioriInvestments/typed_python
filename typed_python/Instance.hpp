@@ -88,7 +88,7 @@ public:
 
     std::string repr() const;
 
-    int32_t hash32() const;
+    typed_python_hash_type hash64() const;
 
     Type* type() const {
         return mLayout->type;

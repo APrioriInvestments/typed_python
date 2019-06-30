@@ -51,3 +51,33 @@ class TestDictCompilation(unittest.TestCase):
             refcounts2 = [_types.refcount(x) for x in aList]
 
             self.assertEqual(refcounts, refcounts2)
+
+    def test_dict_length(self):
+        @SpecializedEntrypoint
+        def dict_len(x):
+            return len(x)
+
+        x = Dict(int, int)({1: 2})
+
+        self.assertEqual(dict_len(x), 1)
+        x[2] = 3
+
+        self.assertEqual(dict_len(x), 2)
+
+        del x[1]
+
+        self.assertEqual(dict_len(x), 1)
+
+    def test_dict_getitem(self):
+        @SpecializedEntrypoint
+        def dict_getitem(x, y):
+            return x[y]
+
+        x = Dict(int, int)()
+
+        x[1] = 2
+
+        self.assertEqual(dict_getitem(x, 1), 2)
+
+        with self.assertRaisesRegex(Exception, "Key doesn't exist"):
+            dict_getitem(x, 2)
