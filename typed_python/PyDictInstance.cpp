@@ -330,3 +330,62 @@ void PyDictInstance::copyConstructFromPythonInstanceConcrete(DictType* dictType,
     PyInstance::copyConstructFromPythonInstanceConcrete(dictType, dictTgt, pyRepresentation, isExplicit);
 }
 
+bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    if (pyComparisonOp != Py_EQ && pyComparisonOp != Py_NE) {
+        return PyInstance::compare_to_python_concrete(dictType, self, other, exact, pyComparisonOp);
+    }
+
+    if (pyComparisonOp == Py_NE) {
+        return !compare_to_python_concrete(dictType, self, other, exact, Py_EQ);
+    }
+
+    //only Py_EQ at this point in the function
+    if (pyComparisonOp != Py_EQ) {
+        throw std::runtime_error("Somehow pyComparisonOp is not Py_EQ");
+    }
+
+    if (!PyDict_Check(other)) {
+        return false;
+    }
+
+    int lenO = PyDict_Size(other);
+    int lenS = dictType->size(self);
+
+    if (lenO != lenS) {
+        return false;
+    }
+
+    // iterate the python dictionary and check if each item in it matches
+    // our values. if 'exact', then don't try to coerce the key types.
+
+    PyObject *key, *value;
+    Py_ssize_t pos = 0;
+
+    while (PyDict_Next(other, &pos, &key, &value)) {
+        Instance keyInst;
+
+        try {
+            keyInst = Instance(dictType->keyType(), [&](instance_ptr data) {
+                copyConstructFromPythonInstance(dictType->keyType(), data, key, !exact /* explicit */);
+            });
+        } catch(PythonExceptionSet&) {
+            PyErr_Clear();
+        } catch(...) {
+            //if we can't convert to KeyType, we're not equal
+            return false;
+        }
+
+        instance_ptr valueTgt = dictType->lookupValueByKey(self, keyInst.data());
+
+        if (!valueTgt) {
+            //if we don't have the value, we're not equal
+            return false;
+        }
+
+        if (!compare_to_python(dictType->valueType(), valueTgt, value, exact, Py_EQ)) {
+            return false;
+        }
+    }
+
+    return true;
+}

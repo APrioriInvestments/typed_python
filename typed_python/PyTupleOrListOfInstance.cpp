@@ -556,8 +556,6 @@ PyObject* PyListOfInstance::listExtend(PyObject* o, PyObject* args) {
 
         auto extendFromBinaryCompatiblePtr = [&](instance_ptr otherObj) {
             // directly extend ourselves, because we are binary compatible with the other type.
-            size_t bytesPer = self_type->getEltType()->bytecount();
-
             self_type->getEltType()->check([&](auto& concrete_subtype) {
                 self_type->extend(self_w->dataPtr(), self_type->count(otherObj),
                     [&](instance_ptr tgt, size_t i) {

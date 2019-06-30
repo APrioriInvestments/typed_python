@@ -1925,3 +1925,16 @@ class NativeTypesTests(unittest.TestCase):
         self.assertIsInstance(T(1.5), float)
         self.assertIsInstance(T(1), int)
         self.assertIsInstance(T(True), bool)
+
+    def test_dict_equality(self):
+        for d in [{1: 2}, {1: 2, 3: 4}]:
+            self.assertEqual(Dict(int, int)(d), d)
+
+        self.assertNotEqual(Dict(int, int)({1: 2}), {'1': 2})
+        self.assertNotEqual(Dict(int, int)({1: 2}), {1: '2'})
+        self.assertNotEqual(Dict(int, int)({1: 2}), {2: 3})
+
+        self.assertNotEqual(Dict(int, int)({1: 2}), {1: 2.5})
+
+        T = Dict(OneOf(int, float), OneOf(int, float))
+        self.assertEqual(T({1: 2.5}), {1: 2.5})
