@@ -23,6 +23,7 @@ node_modules
 /.eggs
 /.coverage*
 /.tox
+/.env
 
 # don't need the package lock for this sub-pipenv.
 object_database/web/content/package-lock.json
