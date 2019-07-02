@@ -74,7 +74,7 @@ class ServiceManagerTestCommon(object):
             logging.getLogger(__name__).getEffectiveLevel()
         )
 
-        self.server = service_manager.start_service_manager(
+        self.server = service_manager.startServiceManagerProcess(
             self.tempDirectoryName, 8023, self.token,
             loglevelName=logLevelName,
             sslPath=os.path.join(ownDir, '..', '..', 'testcert.cert'),
@@ -83,7 +83,9 @@ class ServiceManagerTestCommon(object):
 
         try:
             self.database = connect("localhost", 8023, self.token, retry=True)
-            self.database.subscribeToSchema(core_schema, service_schema, *self.schemasToSubscribeTo())
+            self.database.subscribeToSchema(
+                core_schema, service_schema, *self.schemasToSubscribeTo()
+            )
         except Exception:
             self.logger.error(f"Failed to initialize for test")
             self.server.terminate()

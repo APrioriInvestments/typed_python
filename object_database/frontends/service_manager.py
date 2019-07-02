@@ -24,11 +24,17 @@ import resource
 import signal
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import traceback
 
-from object_database.util import configureLogging, sslContextFromCertPathOrNone, validateLogLevel
+from object_database.util import (
+    configureLogging,
+    genToken,
+    sslContextFromCertPathOrNone,
+    validateLogLevel
+)
 from object_database import TcpServer, RedisPersistence, InMemoryPersistence, DisconnectedException
 from object_database.service_manager.SubprocessServiceManager import SubprocessServiceManager
 
@@ -36,16 +42,15 @@ from object_database.service_manager.SubprocessServiceManager import SubprocessS
 ownDir = os.path.dirname(os.path.abspath(__file__))
 
 
-def start_service_manager(tempDirectoryName, port, auth_token, *,
-                          loglevelName="INFO",
-                          timeout=1.0,
-                          verbose=True,
-                          ownHostname='localhost',
-                          dbHostname='localhost',
-                          runDb=True,
-                          logDir=True,
-                          sslPath=None
-                          ):
+def startServiceManagerProcess(tempDirectoryName, port, authToken, *,
+                               loglevelName="INFO",
+                               timeout=1.0,
+                               verbose=True,
+                               ownHostname='localhost',
+                               dbHostname='localhost',
+                               runDb=True,
+                               logDir=True,
+                               sslPath=None):
     if not verbose:
         kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
@@ -55,7 +60,7 @@ def start_service_manager(tempDirectoryName, port, auth_token, *,
         sys.executable,
         os.path.join(ownDir, 'service_manager.py'),
         ownHostname, dbHostname, str(port),
-        '--service-token', auth_token,
+        '--service-token', authToken,
         '--shutdownTimeout', str(timeout),
         '--log-level', loglevelName,
         '--source', os.path.join(tempDirectoryName, 'source'),
@@ -87,6 +92,56 @@ def start_service_manager(tempDirectoryName, port, auth_token, *,
             raise Exception(msg)
 
     return server
+
+
+def autoconfigureAndStartServiceManagerProcess(
+        port=None, authToken=None, loglevelName=None, **kwargs):
+
+    port = port or 8020
+    authToken = authToken or genToken()
+
+    if loglevelName is None:
+        loglevelName = logging.getLevelName(
+            logging.getLogger(__name__).getEffectiveLevel()
+        )
+
+    tempDirObj = tempfile.TemporaryDirectory()
+    tempDirectoryName = tempDirObj.name
+
+    server = startServiceManagerProcess(
+        tempDirectoryName,
+        port,
+        authToken,
+        loglevelName=loglevelName,
+        **kwargs
+    )
+
+    def cleanupFn(error=False):
+        server.terminate()
+        try:
+            server.wait(timeout=15.0)
+        except subprocess.TimeoutExpired:
+            logging.getLogger(__name__).warning(
+                f"Failed to gracefully terminate service manager after 15 seconds."
+                + " Sending KILL signal"
+            )
+            server.kill()
+            try:
+                server.wait(timeout=5.0)
+            except subprocess.TimeoutExpired:
+                logging.getLogger(__name__).warning(
+                    f"Failed to kill service manager process."
+                )
+
+        if error or server.returncode:
+            logging.getLogger(__name__).warning(
+                "Exited with an error. Leaving temporary directory around for inspection: {}"
+                .format(tempDirectoryName)
+            )
+        else:
+            tempDirObj.cleanup()
+
+    return server, cleanupFn
 
 
 def main(argv):
