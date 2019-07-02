@@ -29,9 +29,9 @@ from object_database.web.cells import (
 
 from object_database import InMemServer, Schema, Indexed, connect
 from object_database.util import genToken, configureLogging
+from object_database.frontends.service_manager import autoconfigureAndStartServiceManagerProcess
 from object_database.test_util import (
     currentMemUsageMb,
-    autoconfigure_and_start_service_manager,
     log_cells_stats
 )
 
@@ -226,9 +226,9 @@ class CellsTests(unittest.TestCase):
 
     def helper_memory_leak(self, cell, initFn, workFn, thresholdMB):
         port = 8021
-        server, cleanupFn = autoconfigure_and_start_service_manager(
+        server, cleanupFn = autoconfigureAndStartServiceManagerProcess(
             port=port,
-            auth_token=self.token,
+            authToken=self.token,
         )
         try:
             db = connect("localhost", port, self.token, retry=True)

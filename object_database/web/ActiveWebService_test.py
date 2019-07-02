@@ -27,7 +27,7 @@ from object_database.web.ActiveWebService import ActiveWebService
 
 from object_database import core_schema, connect, service_schema
 from object_database.util import configureLogging, genToken
-from object_database.test_util import autoconfigure_and_start_service_manager
+from object_database.frontends.service_manager import autoconfigureAndStartServiceManagerProcess
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
@@ -62,12 +62,12 @@ class ActiveWebServiceTest(unittest.TestCase):
         log_level = self._logger.getEffectiveLevel()
         loglevel_name = logging.getLevelName(log_level)
 
-        self.server, self.cleanupFn = autoconfigure_and_start_service_manager(
+        self.server, self.cleanupFn = autoconfigureAndStartServiceManagerProcess(
             port=DATABASE_SERVER_PORT,
-            auth_token=self.token,
-            loglevel_name=loglevel_name,
-            own_hostname=hostname,
-            db_hostname=hostname
+            authToken=self.token,
+            loglevelName=loglevel_name,
+            ownHostname=hostname,
+            dbHostname=hostname
         )
 
         try:

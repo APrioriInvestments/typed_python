@@ -15,14 +15,8 @@
 from collections import defaultdict
 
 import gc
-import logging
 import os
 import psutil
-import subprocess
-import sys
-import tempfile
-
-from object_database.util import genToken
 
 
 def currentMemUsageMb(residentOnly=True):
@@ -103,87 +97,3 @@ def log_cells_stats(cells, logger, indentation=0):
 
 
 ownDir = os.path.dirname(os.path.abspath(__file__))
-
-
-def start_service_manager(tempDirectoryName, port, auth_token, loglevel_name="INFO", timeout=1.0,
-                          verbose=True, own_hostname='localhost', db_hostname='localhost'):
-    if not verbose:
-        kwargs = dict(stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    else:
-        kwargs = dict()
-
-    server = subprocess.Popen(
-        [
-            sys.executable, os.path.join(ownDir, 'frontends', 'service_manager.py'),
-            own_hostname, db_hostname, str(port), '--run_db',
-            '--source', os.path.join(tempDirectoryName, 'source'),
-            '--storage', os.path.join(tempDirectoryName, 'storage'),
-            '--service-token', auth_token,
-            '--shutdownTimeout', str(timeout / 2.0),
-            '--log-level', loglevel_name
-        ],
-        **kwargs
-    )
-    try:
-        # this should throw a subprocess.TimeoutExpired exception if the service did not crash
-        server.wait(timeout)
-    except subprocess.TimeoutExpired:
-        pass
-    else:
-        msg = f"Failed to start service_manager (retcode:{server.returncode})"
-
-        if verbose:
-            error = b''.join(server.stderr.readlines())
-            msg += "\n" + error.decode("utf-8")
-
-        raise Exception(msg)
-
-    return server
-
-
-def autoconfigure_and_start_service_manager(port=None, auth_token=None, loglevel_name=None, **kwargs):
-    port = port or 8020
-    auth_token = auth_token or genToken()
-
-    if loglevel_name is None:
-        loglevel_name = logging.getLevelName(
-            logging.getLogger(__name__).getEffectiveLevel()
-        )
-
-    tempDirObj = tempfile.TemporaryDirectory()
-    tempDirectoryName = tempDirObj.name
-
-    server = start_service_manager(
-        tempDirectoryName,
-        port,
-        auth_token,
-        loglevel_name,
-        **kwargs
-    )
-
-    def cleanupFn(error=False):
-        server.terminate()
-        try:
-            server.wait(timeout=15.0)
-        except subprocess.TimeoutExpired:
-            logging.getLogger(__name__).warning(
-                f"Failed to gracefully terminate service manager after 15 seconds."
-                + " Sending KILL signal"
-            )
-            server.kill()
-            try:
-                server.wait(timeout=5.0)
-            except subprocess.TimeoutExpired:
-                logging.getLogger(__name__).warning(
-                    f"Failed to kill service manager process."
-                )
-
-        if error:
-            logging.getLogger(__name__).warning(
-                "Exited with an error. Leaving temporary directory around for inspection: {}"
-                .format(tempDirectoryName)
-            )
-        else:
-            tempDirObj.cleanup()
-
-    return server, cleanupFn

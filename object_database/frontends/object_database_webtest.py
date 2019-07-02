@@ -43,9 +43,8 @@ from object_database import (
     connect,
     core_schema,
     service_schema,
-
 )
-from object_database.test_util import start_service_manager
+from object_database.frontends.service_manager import startServiceManagerProcess
 from object_database.util import genToken
 from object_database.web.LoginPlugin import LoginIpPlugin
 
@@ -63,8 +62,9 @@ def main(argv=None):
 
     with tempfile.TemporaryDirectory() as tmpDirName:
         try:
-            server = start_service_manager(tmpDirName, port, token,
-                                           loglevel_name=loglevel_name)
+            server = startServiceManagerProcess(
+                tmpDirName, port, token, loglevelName=loglevel_name
+            )
 
             database = connect("localhost", port, token, retry=True)
             database.subscribeToSchema(core_schema, service_schema,
