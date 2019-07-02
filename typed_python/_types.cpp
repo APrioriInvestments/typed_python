@@ -656,8 +656,8 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
             )) {
         PyErr_Format(
             PyExc_TypeError,
-            "first argument to refcount %S not a permitted Type",
-            a1
+            "first argument to refcount '%S' not a permitted Type",
+            (PyObject*)a1
             );
         return NULL;
     }
