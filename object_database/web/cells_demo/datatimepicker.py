@@ -22,11 +22,11 @@ from object_database.web.CellsTestPage import CellsTestPage
 class BasicDateTimePicker(CellsTestPage):
     def cell(self):
         # year, month, day, hour, minute, second
-        start = datetime.datetime(2011, 10, 21, 12, 20, 15)
-        start = time.mktime(start.timetuple())
+        dt = datetime.datetime(2011, 10, 21, 12, 20, 15)
+        dt = time.mktime(dt.timetuple())
 
         divStyle = "background-color: blue"
-        return cells.DateTimePicker(start=start, divStyle=divStyle)
+        return cells.DateTimePicker(datetime=dt, divStyle=divStyle)
 
     def text(self):
         return "You should see a datetime picker."

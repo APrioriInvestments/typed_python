@@ -31,7 +31,7 @@ class DateTimePicker extends Component {
     constructor(props, ...args){
         super(props, ...args);
         this.timeformat = 'YYYY-MM-DTh:mm:ss'
-        this.start = moment.unix(this.props.start).format(this.timeformat)
+        this.datetime = moment.unix(this.props.datetime).format(this.timeformat)
 
         // Bind component methods
     }
@@ -49,7 +49,7 @@ class DateTimePicker extends Component {
                     {
                         type: "datetime-local",
                         id: "datetimepicker-" + this.props.id,
-                        value: this.start
+                        value: this.datetime
                     },
                     []
                 )
@@ -59,11 +59,7 @@ class DateTimePicker extends Component {
 }
 
 DateTimePicker.propTypes = {
-    start: {
-        description: "Start datetime in (unix) seconds from epoch.",
-        type: PropTypes.oneOf([PropTypes.number])
-    },
-    end: {
+    datetime: {
         description: "Start datetime in (unix) seconds from epoch.",
         type: PropTypes.oneOf([PropTypes.number])
     },
