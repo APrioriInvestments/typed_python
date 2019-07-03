@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Bool, Float64, Int64
+from typed_python import Bool, Float64, Int64, UInt64
 from typed_python.python_ast import BinaryOp, ComparisonOp, BooleanOp
 import nativepython.native_ast as native_ast
 import nativepython
@@ -136,6 +136,9 @@ class TypedExpression(object):
 
     def toInt64(self):
         return self.expr_type.convert_to_type(self.context, self, typeWrapper(Int64))
+
+    def toUInt64(self):
+        return self.expr_type.convert_to_type(self.context, self, typeWrapper(UInt64))
 
     def toBool(self):
         return self.expr_type.convert_to_type(self.context, self, typeWrapper(Bool))

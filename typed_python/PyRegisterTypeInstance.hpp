@@ -170,28 +170,30 @@ inline int64_t pyXor(double l, double r) {
     throw PythonExceptionSet();
 }
 
-template<class T>
-inline void check_neg(T r) {
+inline int64_t pyLshift(int64_t l, int64_t r) {
     if (r < 0) {
         PyErr_Format(PyExc_ValueError, "negative shift count");
         throw PythonExceptionSet();
     }
-}
-template<class T>
-inline void check_too_large(T l, T r) {
-    if (l && r > 1024) { // arbitrary, but 1<<1024 = sys.float_info.max
+    if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
         PyErr_Format(PyExc_ValueError, "shift count too large");
         throw PythonExceptionSet();
     }
+    return (l >= 0) ? l << r : -((-l) << r);
 }
-inline int64_t pyLshift(int8_t l, int8_t r) { check_neg(r); check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(uint8_t l, uint8_t r) { check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(int16_t l, int16_t r) { check_neg(r); check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(uint16_t l, uint16_t r) { check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(int32_t l, int32_t r) { check_neg(r); check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(uint32_t l, uint32_t r) { check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(int64_t l, int64_t r) { check_neg(r); check_too_large(l, r); return l << r; }
-inline int64_t pyLshift(uint64_t l, uint64_t r) { check_too_large(l, r); return l << r; }
+inline uint64_t pyLshift(uint64_t l, uint64_t r) {
+    if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+        PyErr_Format(PyExc_ValueError, "shift count too large");
+        throw PythonExceptionSet();
+    }
+    return l << r;
+}
+inline int64_t pyLshift(int32_t l, int32_t r) { return pyLshift((int64_t)l, (int64_t)r); }
+inline int64_t pyLshift(int16_t l, int16_t r) { return pyLshift((int64_t)l, (int64_t)r); }
+inline int64_t pyLshift(int8_t l, int8_t r) { return pyLshift((int64_t)l, (int64_t)r); }
+inline uint64_t pyLshift(uint32_t l, uint32_t r) { return pyLshift((uint64_t)l, (uint64_t)r); }
+inline uint64_t pyLshift(uint16_t l, uint16_t r) { return pyLshift((uint64_t)l, (uint64_t)r); }
+inline uint64_t pyLshift(uint8_t l, uint8_t r) { return pyLshift((uint64_t)l, (uint64_t)r); }
 inline int64_t pyLshift(float l, float r) {
     PyErr_Format(PyExc_TypeError, "'<<' not supported for floating-point types");
     throw PythonExceptionSet();
@@ -201,14 +203,43 @@ inline int64_t pyLshift(double l, double r) {
     throw PythonExceptionSet();
 }
 
-inline int64_t pyRshift(int8_t l, int8_t r) { check_neg(r); return l >> r; }
-inline int64_t pyRshift(uint8_t l, uint8_t r) { return l >> r; }
-inline int64_t pyRshift(int16_t l, int16_t r) { check_neg(r); return l >> r; }
-inline int64_t pyRshift(uint16_t l, uint16_t r) { return l >> r; }
-inline int64_t pyRshift(int32_t l, int32_t r) { check_neg(r); return l >> r; }
-inline int64_t pyRshift(uint32_t l, uint32_t r) { return l >> r; }
-inline int64_t pyRshift(int64_t l, int64_t r) { check_neg(r); return l >> r; }
-inline int64_t pyRshift(uint64_t l, uint64_t r) { return l >> r; }
+inline uint64_t pyRshift(uint64_t l, uint64_t r) {
+    if (r > SSIZE_MAX) {
+        PyErr_Format(PyExc_ValueError, "shift count too large");
+        throw PythonExceptionSet();
+    }
+    if (r == 0)
+        return l;
+    if (r >= 64)
+        return 0;
+    return l >> r;
+}
+inline int64_t pyRshift(int64_t l, int64_t r) {
+    if (r < 0) {
+        PyErr_Format(PyExc_ValueError, "negative shift count");
+        throw PythonExceptionSet();
+    }
+    if (r > SSIZE_MAX) {
+        PyErr_Format(PyExc_ValueError, "shift count too large");
+        throw PythonExceptionSet();
+    }
+    if (r == 0)
+        return l;
+    if (l >= 0)
+        return l >> r;
+    int64_t ret = (-l) >> r;
+    if (ret == 0)
+        return -1;
+    if (l == -l)  // int64_min case
+        return ret;
+    return -ret;
+}
+inline int64_t pyRshift(int8_t l, int8_t r) { return pyRshift((int64_t)l, (int64_t)r); }
+inline int64_t pyRshift(int16_t l, int16_t r) { return pyRshift((int64_t)l, (int64_t)r); }
+inline int64_t pyRshift(int32_t l, int32_t r) { return pyRshift((int64_t)l, (int64_t)r); }
+inline int64_t pyRshift(uint8_t l, uint8_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
+inline int64_t pyRshift(uint16_t l, uint16_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
+inline int64_t pyRshift(uint32_t l, uint32_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
 inline int64_t pyRshift(float l, float r) {
     PyErr_Format(PyExc_TypeError, "'>>' not supported for floating-point types");
     throw PythonExceptionSet();
@@ -229,6 +260,17 @@ inline float pyFloatDiv(int32_t l, int32_t r)    { return ((float)l) / (float)r;
 inline double pyFloatDiv(int64_t l, int64_t r)   { return ((double)l) / (double)r; }
 inline float pyFloatDiv(float l, float r)        { return l / r; }
 inline double pyFloatDiv(double l, double r)     { return l / r; }
+
+inline double pyPow(int8_t l, int8_t r) { return std::pow(l,r); }
+inline double pyPow(int16_t l, int16_t r) { return std::pow(l,r); }
+inline double pyPow(int32_t l, int32_t r) { return std::pow(l,r); }
+inline double pyPow(int64_t l, int64_t r) { return std::pow(l,r); }
+inline double pyPow(uint8_t l, uint8_t r) { return std::pow(l,r); }
+inline double pyPow(uint16_t l, uint16_t r) { return std::pow(l,r); }
+inline double pyPow(uint32_t l, uint32_t r) { return std::pow(l,r); }
+inline double pyPow(uint64_t l, uint64_t r) { return std::pow(l,r); }
+inline double pyPow(float l, float r) { return std::pow(l,r); }
+inline double pyPow(double l, double r) { return std::pow(l,r); }
 
 template<class T>
 static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const char* op, const char* opErr) {
@@ -264,6 +306,10 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
         return registerValueToPyValue(T(pyRshift(self,other)));
     }
 
+    if (strcmp(op, "__pow__") == 0) {
+        return registerValueToPyValue(T(pyPow(self,other)));
+    }
+
     if (strcmp(op, "__div__") == 0) {
         if (other == 0) {
             PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
@@ -277,7 +323,6 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
             PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
             throw PythonExceptionSet();
         }
-
         return registerValueToPyValue(T(std::floor(self/other)));
     }
 
@@ -381,6 +426,14 @@ public:
             if (isInteger(cat)) {
                 long l = PyLong_AsLong(pyRepresentation);
                 if (l == -1 && PyErr_Occurred()) {
+                    if (cat == Type::TypeCategory::catUInt64) {
+                        PyErr_Clear();
+                        unsigned long u = PyLong_AsUnsignedLong(pyRepresentation);
+                        if (u == (unsigned long)(-1) && PyErr_Occurred())
+                            throw PythonExceptionSet();
+                        ((T*)tgt)[0] = u;
+                        return;
+                    }
                     throw PythonExceptionSet();
                 }
 
@@ -632,7 +685,17 @@ public:
 
     static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
         if (PyBool_Check(other)) { return pyCompare(*(T*)self, other == Py_True ? true : false, pyComparisonOp); }
-        if (PyLong_Check(other)) { return pyCompare(*(T*)self, PyLong_AsLong(other), pyComparisonOp); }
+        if (PyLong_Check(other)) {
+            long l = PyLong_AsLong(other);
+            if (l == -1 && PyErr_Occurred()) {
+                PyErr_Clear();
+                unsigned long u = PyLong_AsUnsignedLong(other);
+                if (u == (unsigned long)(-1) && PyErr_Occurred())
+                    throw PythonExceptionSet();
+                return pyCompare(*(T*)self, u, pyComparisonOp);
+            }
+            return pyCompare(*(T*)self, l, pyComparisonOp);
+        }
         if (PyFloat_Check(other)) { return pyCompare(*(T*)self, PyFloat_AsDouble(other), pyComparisonOp); }
 
         Type* rhsType = extractTypeFrom(other->ob_type);

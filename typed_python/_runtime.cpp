@@ -150,10 +150,18 @@ extern "C" {
     }
 
     double nativepython_runtime_pow_float64_float64(double l, double r) {
+        if (l == 0.0 && r < 0.0)
+            throw std::runtime_error("0^-1 err");
         return std::pow(l,r);
     }
 
-    int64_t nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
+    double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
+        if (l == 0 && r < 0)
+            throw std::runtime_error("0^-1 err");
+        return std::pow(l,r);
+    }
+
+    double nativepython_runtime_pow_uint64_uint64(uint64_t l, uint64_t r) {
         return std::pow(l,r);
     }
 
@@ -171,6 +179,14 @@ extern "C" {
 
         if (l < 0) {
             return r - ((-l-1) % r + 1);
+        }
+
+        return l % r;
+    }
+
+    int64_t nativepython_runtime_mod_uint64_uint64(uint64_t l, uint64_t r) {
+        if (r == 1 || r == 0 || l == 0) {
+            return 0;
         }
 
         return l % r;
@@ -202,6 +218,49 @@ extern "C" {
         }
 
         return fmod(l, r);
+    }
+
+    // should match corresponding function in PyRegisterTypeInstance.hpp
+    int64_t nativepython_runtime_lshift_int64_int64(int64_t l, int64_t r) {
+        if (r < 0) {
+            throw std::runtime_error("negative shift count");
+        }
+        if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+            throw std::runtime_error("shift count too large");
+        }
+        return (l >= 0) ? l << r : -((-l) << r);
+    }
+
+    // should match corresponding function in PyRegisterTypeInstance.hpp
+    uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
+        if (r > SSIZE_MAX) {
+            throw std::runtime_error("shift count too large");
+        }
+        if (r == 0)
+            return l;
+        if (r >= 64)
+            return 0;
+        return l >> r;
+    }
+
+    // should match corresponding function in PyRegisterTypeInstance.hpp
+    int64_t nativepython_runtime_rshift_int64_int64(int64_t l, int64_t r) {
+        if (r < 0) {
+            throw std::runtime_error("negative shift count");
+        }
+        if (r > SSIZE_MAX) {
+            throw std::runtime_error("shift count too large");
+        }
+        if (r == 0)
+            return l;
+        if (l >= 0)
+            return l >> r;
+        int64_t ret = (-l) >> r;
+        if (ret == 0)
+            return -1;
+        if (l == -l)  // int64_min case
+            return ret;
+        return -ret;
     }
 
     PyObject* nativepython_runtime_int_to_pyobj(int64_t i) {

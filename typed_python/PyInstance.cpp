@@ -1103,7 +1103,12 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
         return Instance::create(inst == Py_True);
     }
     if (PyLong_Check(inst)) {
-        return Instance::create(PyLong_AsLong(inst));
+        try {
+            return Instance::create(PyLong_AsLong(inst));
+        }
+        catch(...) {
+            return Instance::create(PyLong_AsUnsignedLong(inst));
+        }
     }
     if (PyFloat_Check(inst)) {
         return Instance::create(PyFloat_AsDouble(inst));

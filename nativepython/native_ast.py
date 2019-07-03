@@ -137,7 +137,7 @@ UnaryOp = Alternative(
 
 BinaryOp = Alternative(
     "BinaryOp",
-    Add={}, Sub={}, Mul={}, Div={}, Eq={},
+    Add={}, Sub={}, Mul={}, Div={}, FloorDiv={}, Eq={},
     NotEq={}, Lt={}, LtE={}, Gt={}, GtE={},
     Mod={}, LShift={}, RShift={},
     BitOr={}, BitAnd={}, BitXor={},
@@ -146,6 +146,7 @@ BinaryOp = Alternative(
         "-" if o.matches.Sub else
         "*" if o.matches.Mul else
         "/" if o.matches.Div else
+        "//" if o.matches.FloorDiv else
         "==" if o.matches.Eq else
         "!=" if o.matches.NotEq else
         "<" if o.matches.Lt else
@@ -526,6 +527,7 @@ UInt8Ptr = UInt8.pointer()
 Int8Ptr = Type.Pointer(value_type=Type.Int(bits=8, signed=True))
 Float64 = Type.Float(bits=64)
 Int64 = Type.Int(bits=64, signed=True)
+UInt64 = Type.Int(bits=64, signed=False)
 Int32 = Type.Int(bits=32, signed=True)
 Int32Ptr = Int32.pointer()
 

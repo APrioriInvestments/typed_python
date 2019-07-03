@@ -17,6 +17,7 @@ import nativepython.native_ast as native_ast
 Bool = native_ast.Bool
 UInt8Ptr = native_ast.UInt8Ptr
 Int64 = native_ast.Int64
+UInt64 = native_ast.UInt64
 Float64 = native_ast.Float64
 Void = native_ast.Void
 
@@ -53,6 +54,12 @@ mod_int64_int64 = externalCallTarget(
     Int64, Int64
 )
 
+mod_uint64_uint64 = externalCallTarget(
+    "nativepython_runtime_mod_uint64_uint64",
+    UInt64,
+    UInt64, UInt64
+)
+
 mod_float64_float64 = externalCallTarget(
     "nativepython_runtime_mod_float64_float64",
     Float64,
@@ -61,8 +68,14 @@ mod_float64_float64 = externalCallTarget(
 
 pow_int64_int64 = externalCallTarget(
     "nativepython_runtime_pow_int64_int64",
-    Int64,
+    Float64,
     Int64, Int64
+)
+
+pow_uint64_uint64 = externalCallTarget(
+    "nativepython_runtime_pow_uint64_uint64",
+    Float64,
+    UInt64, UInt64
 )
 
 pow_float64_float64 = externalCallTarget(
@@ -70,6 +83,25 @@ pow_float64_float64 = externalCallTarget(
     Float64,
     Float64, Float64
 )
+
+lshift_int64_int64 = externalCallTarget(
+    "nativepython_runtime_lshift_int64_int64",
+    Int64,
+    Int64, Int64
+)
+
+rshift_int64_int64 = externalCallTarget(
+    "nativepython_runtime_rshift_int64_int64",
+    Int64,
+    Int64, Int64
+)
+
+rshift_uint64_uint64 = externalCallTarget(
+    "nativepython_runtime_rshift_uint64_uint64",
+    UInt64,
+    UInt64, UInt64
+)
+
 
 get_pyobj_None = externalCallTarget(
     "nativepython_runtime_get_pyobj_None",

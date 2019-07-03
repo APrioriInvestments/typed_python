@@ -12,18 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-# import operator
+import operator
 import sys
-
-
 from typed_python import (
     Function, OneOf,
     Bool,
-    Int8, Int16, Int32,
+    Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64
 )
-
+from typed_python.type_promotion import computeArithmeticBinaryResultType
 from nativepython.runtime import Runtime
 import unittest
 
@@ -241,19 +239,32 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(negate_float(20.5), -20.5)
 
     def test_can_compile_all_register_types(self):
-        registerTypes = [Int8, Int16, Int32, Bool, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
-        # TODO: missing Int64
+        registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+
+        def equal_result(a, b):
+            epsilon = float(1e-6)
+            if hasattr(a, "IsFloat") and a.IsFloat and a != 0.0:
+                return (b - a) / a < epsilon
+            return a == b
+
+        def signed_overflow(T, v):
+            return T.IsUnsignedInt and (v >= 2**(T.Bits - 1) or v < -2**(T.Bits - 1))
 
         def suitable_range(t):
             if t in [Bool]:
                 return [0, 1]
             elif t.IsUnsignedInt:
-                return [0, 1, 2, (1 << t.Bits) - 1]
+                return [0, 1, 2, (1 << (t.Bits // 4)) - 1, (1 << (t.Bits // 2)) - 1, (1 << t.Bits) - 1]
             elif t.IsSignedInt:
-                return [0, 1, 2, (1 << (t.Bits - 1)) - 1, -1, -2, -(1 << (t.Bits - 1))]
+                return [0, 1, 2, (1 << (t.Bits // 2 - 1)) - 1, (1 << (t.Bits - 1)) - 1,
+                        -1, -2, -(1 << (t.Bits // 2 - 1)), -(1 << (t.Bits - 1))]
             elif t in [Float32]:
+                # testing with 1/3 exposes some problems with mod
+                # return [0.0, 1.0/3.0, 1.0, 2.0, (2 - 1 / (2**23)) * 2**127, -1.0/3.0, -1.0, -2.0, -(2 - 1 / (2**23)) * 2**127]
                 return [0.0, 1.0, 2.0, (2 - 1 / (2**23)) * 2**127, -1.0, -2.0, -(2 - 1 / (2**23)) * 2**127]
             elif t in [Float64]:
+                # testing with 1/3 exposes some problems with mod
+                # return [0.0, 1.0/3.0, 1.0, 2.0, sys.float_info.max, -1.0/3.0, -1.0, -2.0, -sys.float_info.max]
                 return [0.0, 1.0, 2.0, sys.float_info.max, -1.0, -2.0, -sys.float_info.max]
 
         for T in registerTypes:
@@ -273,6 +284,9 @@ class TestArithmeticCompilation(unittest.TestCase):
 
                 def div(x: T1, y: T2):
                     return x / y
+
+                def floordiv(x: T1, y: T2):
+                    return x // y
 
                 def mod(x: T1, y: T2):
                     return x % y
@@ -316,44 +330,62 @@ class TestArithmeticCompilation(unittest.TestCase):
                     suitable_ops = [
                         add, sub, mul, div, mod,
                         less, greater, lessEq, greaterEq, neq,
-                        bitand, bitor, bitxor, lshift, rshift,
+                        bitand, bitor, bitxor, lshift, rshift
                     ]
-                    # TODO: missing pow
+                    # TODO: missing pow, floordiv
 
-                # typed_to_native_op = {
-                #     add: operator.add,
-                #     sub: operator.sub,
-                #     mul: operator.mul,
-                #     div: operator.truediv,
-                #     mod: operator.mod,
-                #     less: operator.lt,
-                #     greater: operator.gt,
-                #     lessEq: operator.le,
-                #     greaterEq: operator.ge,
-                #     neq: operator.ne,
-                #     bitand: operator.and_,
-                #     bitor: operator.or_,
-                #     bitxor: operator.xor,
-                #     rshift: operator.rshift,
-                #     lshift: operator.lshift,
-                #     pow: operator.pow
-                # }
+                typed_to_native_op = {
+                    sub: operator.sub,
+                    add: operator.add,
+                    mul: operator.mul,
+                    div: operator.truediv,
+                    floordiv: operator.floordiv,
+                    mod: operator.mod,
+                    less: operator.lt,
+                    greater: operator.gt,
+                    lessEq: operator.le,
+                    greaterEq: operator.ge,
+                    neq: operator.ne,
+                    bitand: operator.and_,
+                    bitor: operator.or_,
+                    bitxor: operator.xor,
+                    rshift: operator.rshift,
+                    lshift: operator.lshift,
+                    pow: operator.pow
+                }
 
                 for op in suitable_ops:
-                    # native_op = typed_to_native_op[op]
+                    native_op = typed_to_native_op[op]
                     compiledOp = Compiled(op)
 
                     for v1 in suitable_range(T1):
                         for v2 in suitable_range(T2):
-                            # try:
-                            #     native_result = native_op(v1, v2)
-                            # except Exception:
-                            #     native_result = "exception"
+                            comparable = True
+                            try:
+                                if op in [lshift, pow] and v1 != 0 and v2 > 1024:
+                                    raise Exception("overflow")  # rather than trying to calculate and possibly running out of memory
+                                native_result = native_op(v1, v2)
+                                T_result = computeArithmeticBinaryResultType(T1, T2)
+                                if T_result.IsSignedInt:
+                                    if signed_overflow(T1, v1) or signed_overflow(T2, v2):
+                                        comparable = False
+                                    if native_result >= 2**(T_result.Bits - 1) or native_result < -2**(T_result.Bits - 1):
+                                        comparable = False
+                                elif T_result.IsUnsignedInt:
+                                    if native_result >= 2**T_result.Bits or native_result < 0:
+                                        comparable = False
+                                elif T_result.IsFloat:
+                                    if native_result >= 2**128 or native_result <= -2**128:
+                                        comparable = False
+                            except Exception:
+                                native_result = "exception"
 
                             try:
-                                typed_py_result = op(T1(v1), T2(v2))
+                                if T1 is Int64 and T2 is Int64 and op in [lshift, pow] and v1 != 0 and v2 > 1024:
+                                    raise Exception("overflow")
+                                typed_result = op(T1(v1), T2(v2))
                             except Exception:
-                                typed_py_result = "exception"
+                                typed_result = "exception"
 
                             try:
                                 compiled_result = compiledOp(T1(v1), T2(v2))
@@ -361,16 +393,19 @@ class TestArithmeticCompilation(unittest.TestCase):
                                 compiled_result = "exception"
 
                             # for debugging
-                            # if type(typed_py_result) != type(compiled_result):
-                            #     print("type mismatch", type(typed_py_result).__name__, type(compiled_result).__name__)
-                            # if type(typed_py_result) == type(compiled_result):
-                            #     if typed_py_result != compiled_result:
+                            # if type(typed_result) != type(compiled_result):
+                            #     print("type mismatch", type(typed_result).__name__, type(compiled_result).__name__)
+                            # if type(typed_result) == type(compiled_result):
+                            #     if comparable and typed_result != compiled_result:
                             #         print("result mismatch")
-                            # if native_result != compiled_result:
+                            # if comparable and not equal_result(type(compiled_result)(native_result), compiled_result):
                             #     print("mismatch")
 
                             self.assertEqual(
-                                type(typed_py_result), type(compiled_result),
-                                (T1, T2, type(typed_py_result), type(compiled_result), op.__name__)
+                                type(typed_result), type(compiled_result),
+                                (T1, T2, type(typed_result), type(compiled_result), op.__name__)
                             )
-                            self.assertEqual(typed_py_result, compiled_result, (T1, T2, op.__name__))
+                            if comparable:
+                                self.assertEqual(typed_result, compiled_result, (T1, T2, op.__name__))
+                                self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
+                                                (T1, T2, op.__name__, native_result, compiled_result))

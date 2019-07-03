@@ -40,6 +40,10 @@ Instance Instance::create(long val) {
     return create(Int64::Make(), (instance_ptr)&val);
 }
 
+Instance Instance::create(unsigned long val) {
+    return create(UInt64::Make(), (instance_ptr)&val);
+}
+
 Instance Instance::create(double val) {
     return create(Float64::Make(), (instance_ptr)&val);
 }

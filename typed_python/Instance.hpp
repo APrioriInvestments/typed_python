@@ -42,6 +42,8 @@ public:
 
     static Instance create(long val);
 
+    static Instance create(unsigned long val);
+
     static Instance create(double val);
 
     static Instance create(Type*t, instance_ptr data);
