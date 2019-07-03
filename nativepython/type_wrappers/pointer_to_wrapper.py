@@ -137,13 +137,23 @@ class PointerToWrapper(Wrapper):
 
         return super().convert_attribute(context, instance, attr)
 
+    def convert_getitem(self, context, instance, key):
+        return (instance+key).convert_method_call("get", (), {})
+
+    def convert_setitem(self, context, instance, key, val):
+        return (instance+key).convert_method_call("set", (val,), {})
+
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
         if methodname == "set":
             if len(args) == 1:
-                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_assign(args[0])
+                val = args[0].convert_to_type(self.typeRepresentation.ElementType)
+                if val is None:
+                    return None
+
+                context.pushReference(self.typeRepresentation.ElementType, instance.nonref_expr).convert_assign(val)
                 return context.pushVoid()
 
         if methodname == "destroy":

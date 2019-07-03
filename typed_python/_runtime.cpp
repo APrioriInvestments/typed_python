@@ -323,4 +323,16 @@ extern "C" {
 
         return StringType::createFromUtf8(data, count);
     }
+
+    int32_t nativepython_dict_allocateNewSlot(DictType::layout* layout, size_t kvPairSize) {
+        return layout->allocateNewSlot(kvPairSize);
+    }
+
+    void nativepython_dict_resizeTable(DictType::layout* layout) {
+        layout->resizeTable();
+    }
+
+    void nativepython_dict_compressItemTable(DictType::layout* layout, size_t kvPairSize) {
+        layout->compressItemTable(kvPairSize);
+    }
 }

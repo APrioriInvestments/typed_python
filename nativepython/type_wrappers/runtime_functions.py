@@ -18,6 +18,7 @@ Bool = native_ast.Bool
 UInt8Ptr = native_ast.UInt8Ptr
 Int64 = native_ast.Int64
 UInt64 = native_ast.UInt64
+Int32 = native_ast.Int32
 Float64 = native_ast.Float64
 Void = native_ast.Void
 
@@ -329,4 +330,22 @@ int64_to_string = externalCallTarget(
     "nativepython_int64_to_string",
     Void.pointer(),
     Int64
+)
+
+dict_allocateNewSlot = externalCallTarget(
+    "nativepython_dict_allocateNewSlot",
+    Int32,
+    Void.pointer(), Int64
+)
+
+dict_resizeTable = externalCallTarget(
+    "nativepython_dict_resizeTable",
+    Void,
+    Void.pointer()
+)
+
+dict_compressItemTable = externalCallTarget(
+    "nativepython_dict_compressItemTable",
+    Void,
+    Void.pointer(), Int64
 )

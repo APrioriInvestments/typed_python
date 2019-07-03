@@ -81,3 +81,29 @@ class TestDictCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "Key doesn't exist"):
             dict_getitem(x, 2)
+
+    def test_dict_setitem(self):
+        @SpecializedEntrypoint
+        def dict_setitem(d, k, v):
+            d[k] = v
+
+        x = Dict(int, int)()
+
+        x[1] = 2
+
+        dict_setitem(x, 1, 3)
+
+        self.assertEqual(x, {1: 3})
+
+        dict_setitem(x, 2, 300)
+
+        self.assertEqual(x, {1: 3, 2: 300})
+
+        @SpecializedEntrypoint
+        def dict_setmany(d, count):
+            for i in range(count):
+                d[i] = i * i
+
+        dict_setmany(x, 1000)
+
+        self.assertEqual(x, {i: i*i for i in range(1000)})
