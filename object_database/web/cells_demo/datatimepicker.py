@@ -22,11 +22,14 @@ from object_database.web.CellsTestPage import CellsTestPage
 class BasicDateTimePicker(CellsTestPage):
     def cell(self):
         # year, month, day, hour, minute, second
-        dt = datetime.datetime(2011, 10, 21, 12, 20, 15)
-        dt = time.mktime(dt.timetuple())
+        aSlot = cells.Slot(datetime.datetime(2011, 10, 21, 12, 20, 15).timestamp())
 
-        divStyle = "background-color: blue"
-        return cells.DateTimePicker(datetime=dt, divStyle=divStyle)
+        return cells.Card(
+            cells.DateTimePicker(slot=aSlot) +
+            cells.Subscribed(lambda: f"You picked {aSlot.get()} seconds") +
+            cells.Subscribed(lambda: cells.Timestamp(aSlot.get())),
+            padding=4
+        )
 
     def text(self):
         return "You should see a datetime picker."

@@ -10,22 +10,14 @@ import * as moment from 'moment';
 /**
  * About Replacements
  * ------------------
- * This component contains two
- * regular replacements:
- * * `contents`
- * * `header`
+ * This component contains no
+ * regular replacements
  */
 
 /**
  * About Named Children
- * `body` (single) - The cell to put in the body of the DateTimePicker
- * `header` (single) - An optional header cell to put above
- *        body
- *        <label for="meeting-time">Choose a time for your appointment:</label>
-
-<input type="datetime-local" id="meeting-time"
-       name="meeting-time" value="2018-06-12T19:30"
-       min="2018-06-07T00:00" max="2018-06-14T00:00">
+ * --------------------
+ *  This component has no children
  */
 class DateTimePicker extends Component {
     constructor(props, ...args){
@@ -34,6 +26,7 @@ class DateTimePicker extends Component {
         this.datetime = moment.unix(this.props.datetime).format(this.timeformat)
 
         // Bind component methods
+        this.changeHandler = this.changeHandler.bind(this);
     }
 
     render(){
@@ -49,13 +42,25 @@ class DateTimePicker extends Component {
                     {
                         type: "datetime-local",
                         id: "datetimepicker-" + this.props.id,
-                        value: this.datetime
+                        value: this.datetime,
+                        onchange: (event) => {this.changeHandler(event.target.value)}
                     },
                     []
                 )
             ]);
     }
 
+    changeHandler(val) {
+        cellSocket.sendString(
+            JSON.stringify(
+                {
+                    "event": "change",
+                    "target_cell": this.props.id,
+                    "value": moment(val).unix()  //TODO check this!
+                }
+            )
+        );
+    }
 }
 
 DateTimePicker.propTypes = {
