@@ -53,9 +53,17 @@ class Button extends Component {
     }
 
     _getHTMLClasses(){
-        let classString = this.props.extraData.classes.join(" ");
-        // remember to trim the class string due to a maquette bug
-        return classString.trim();
+        let classes = ['btn'];
+        if(this.props.extraData.active){
+            classes.push('btn-outline');
+        }
+        if(this.props.extraData.style){
+            classes.push(`btn-${this.props.extraData.style}`);
+        }
+        if(this.props.extraData.small){
+            classes.push('btn-xs');
+        }
+        return classes.join(" ").trim();
     }
 }
 

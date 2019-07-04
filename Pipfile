@@ -8,7 +8,6 @@ autopep8 = "*"
 beautifulsoup4 = "*"
 flake8 = "*"
 nose = "*"
-py_w3c = "*"
 coverage = "*"
 
 [packages]
