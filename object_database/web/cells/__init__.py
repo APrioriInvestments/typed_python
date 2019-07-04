@@ -3,7 +3,6 @@ from object_database.web.cells.cells import (
     registerDisplay,
     context,
     quoteForJs,
-    multiReplace,
     augmentToBeUnique,
     sessionState,
     ensureSubscribedType,

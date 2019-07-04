@@ -24,7 +24,8 @@ class Clickable extends Component {
 
         // Bind context to methods
         this.makeContent = this.makeContent.bind(this);
-        this._getEvents = this._getEvent.bind(this);
+        this.getStyle = this.getStyle.bind(this);
+        this._getEvent = this._getEvent.bind(this);
     }
 
     render(){
@@ -34,12 +35,20 @@ class Clickable extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Clickable",
                 onclick: this._getEvent('onclick'),
-                style: this.props.extraData.divStyle
+                style: this.getStyle()
             }, [
                 h('div', {}, [this.makeContent()])
             ]
             )
         );
+    }
+
+    getStyle(){
+        if(this.props.extraData.bold){
+            return "cursor:pointer;*cursor:hand;font-weight:bold;display:inline-block;";
+        } else {
+            return "display:inline-block;";
+        }
     }
 
     makeContent(){

@@ -29,7 +29,6 @@ from inspect import signature
 from object_database.view import RevisionConflictException
 from object_database.view import current_transaction
 from object_database.util import Timer
-from object_database.web.html.html_gen import HTMLElement, HTMLTextContent
 from typed_python.Codebase import Codebase as TypedPythonCodebase
 
 MAX_TIMEOUT = 1.0
@@ -79,30 +78,6 @@ def quoteForJs(string, quoteType):
         return string.replace("\\", "\\\\").replace("'", "\\'").replace("\n", "\\n")
     else:
         return string.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
-
-
-def multiReplace(msg, replacements):
-    for k, v in replacements.items():
-        assert k[:4] == "____", k
-
-    chunks = msg.split("____")
-    outChunks = []
-    for chunk in chunks:
-        subchunk = chunk.split("__", 1)
-        if len(subchunk) == 2:
-            lookup = "____" + subchunk[0] + "__"
-            if lookup in replacements:
-                outChunks.append(replacements.pop(lookup))
-                outChunks.append(subchunk[1])
-            else:
-                outChunks.append("____" + chunk)
-        else:
-            outChunks.append("____" + chunk)
-
-    assert not replacements, "Didn't use up replacement %s in %s" % (
-        replacements.keys(), msg)
-
-    return "".join(outChunks)
 
 
 def wrapCallback(callback):
@@ -480,37 +455,18 @@ class Cells:
                 self._cellsKnownChildren[n.identity] = newChildren
 
     def updateMessageFor(self, cell):
-        contents = cell.contents
-        assert isinstance(
-            contents, str), "Cell %s produced %s for its contents which is not a string" % (cell, contents)
-
-        formatArgs = {}
-
         replaceDict = {}
 
         for childName, childNode in cell.children.items():
-            formatArgs[childName] = "<div id='%s'></div>" % (
-                cell.identity + "_" + childName)
             replaceDict[cell.identity + "_" + childName] = childNode.identity
-
-        try:
-            contents = multiReplace(contents, formatArgs)
-        except Exception:
-            raise Exception(
-                "Failed to format these contents with args %s:\n\n%s", formatArgs, contents)
 
         res = {
             'id': cell.identity,
-            'contents': contents,
             'replacements': replaceDict,
             'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
-            'component_contents': cell.contents,  # TODO: TEMP replace when ready
             'replacement_keys': [k for k in cell.children.keys()],
             'extra_data': cell.exportData
         }
-        # print()
-        # print(str(res))
-        # print()
 
         if cell.postscript:
             res['postscript'] = cell.postscript
@@ -946,32 +902,11 @@ class Card(Cell):
         self.children = {"____contents__": bodyCell}
         self.namedChildren['body'] = bodyCell
 
-        other = ""
-        if self.padding:
-            other += " p-" + str(self.padding)
-
-        body = HTMLElement.div().add_class(
-            "card-body").add_class(
-                other).add_child(
-                    HTMLTextContent(" ____contents__"))
-        card = HTMLElement.div().add_class("card")
-
         if self.header is not None:
-            header = HTMLElement.div().add_class(
-                "card-header").add_child(
-                    HTMLTextContent("____header__")
-            )
             headerCell = Cell.makeCell(self.header)
             self.children['____header__'] = headerCell
             self.namedChildren['header'] = headerCell
-            card.add_child(header)
 
-        card.add_child(body)
-        card.attributes["style"] = self._divStyle()
-
-        self.contents = str(card)
-
-        # temporary js WS refactoring data
         self.exportData['divStyle'] = self._divStyle()
         self.exportData['padding'] = self.padding
 
@@ -985,10 +920,6 @@ class CardTitle(Cell):
         innerCell = Cell.makeCell(inner)
         self.children = {"____contents__": innerCell}
         self.namedChildren['inner'] = innerCell
-        self.contents = str(
-            HTMLElement.div()
-            .add_child(HTMLTextContent('____contents__'))
-        )
 
     def sortsAs(self):
         return self.inner.sortsAs()
@@ -1011,38 +942,6 @@ class Modal(Cell):
         }
 
     def recalculate(self):
-        mainStyle = 'display: block; padding-right: 15px;'
-        self.contents = str(
-            HTMLElement.div()
-            .add_classes(['modal', 'fade', 'show'])
-            .set_attribute('role', 'dialog')
-            .set_attribute('style', mainStyle)
-            .add_child(
-                HTMLElement.div()
-                .add_class('modal-dialog')
-                .set_attribute('role', 'document')
-                .add_child(
-                    HTMLElement.div()
-                    .add_class('modal-content')
-                    .with_children(
-                        HTMLElement.div()
-                        .add_class('modal-header')
-                        .add_child(
-                            HTMLElement.h5()
-                            .add_class('modal-title')
-                            .add_child(HTMLTextContent('____title__'))
-                        ),
-                        HTMLElement.div()
-                        .add_class('modal-body')
-                        .add_child(HTMLTextContent('____message__')),
-                        HTMLElement.div()
-                        .add_class('modal-footer')
-                        .add_child(HTMLTextContent(" ".join(self.buttons)))
-
-                    )
-                )
-            )
-        )
         self.children = dict(self.buttons)
         self.namedChildren['buttons'] = list(self.buttons.values())
         self.children["____title__"] = self.title
@@ -1063,12 +962,6 @@ class Octicon(Cell):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
         self.exportData['octiconClasses'] = octiconClasses
         self.exportData['divStyle'] = self._divStyle()
-        self.contents = str(
-            HTMLElement.span()
-            .add_classes(octiconClasses)
-            .set_attribute('aria-hidden', 'true')
-            .set_attribute('style', self._divStyle())
-        )
 
 
 class Badge(Cell):
@@ -1082,12 +975,6 @@ class Badge(Cell):
         return self.inner.sortsAs()
 
     def recalculate(self):
-        self.contents = str(
-            HTMLElement.span()
-            .add_class('badge')
-            .add_class('badge-{}'.format(self.style))
-            .add_child(HTMLTextContent('____child__'))
-        )
         self.children = {'____child__': self.inner}
         self.namedChildren['inner'] = self.inner
 
@@ -1106,36 +993,10 @@ class CollapsiblePanel(Cell):
         expanded = self.evaluateWithDependencies(self.isExpanded)
         self.exportData['isExpanded'] = expanded
         self.exportData['divStyle'] = self._divStyle()
-        if expanded:
-            self.contents = str(
-                HTMLElement.div()
-                .add_class('container-fluid')
-                .set_attribute('style', self._divStyle())
-                .add_child(
-                    HTMLElement.div()
-                    .add_classes(['row', 'flex-nowrap', 'no-gutters'])
-                    .with_children(
-                        HTMLElement.div()
-                        .add_class('col-md-auto')
-                        .add_child(HTMLTextContent('____panel__')),
-                        HTMLElement.div()
-                        .add_class('col-sm')
-                        .add_child(HTMLTextContent('____content__'))
-                    )
-                )
-            )
-        else:
-            self.contents = str(
-                HTMLElement.div()
-                .add_child(HTMLTextContent('____content__'))
-                .set_attribute('style', self._divStyle())
-            )
-
         self.children = {
             '____content__': self.content
         }
         self.namedChildren['content'] = self.content
-
         if expanded:
             self.children['____panel__'] = self.panel
             self.namedChildren['panel'] = self.panel
@@ -1155,21 +1016,11 @@ class Text(Cell):
         self.exportData['escapedText'] = escapedText
         self.exportData['rawText'] = self.text
         self.exportData['divStyle'] = self._divStyle()
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', self._divStyle())
-            .add_child(HTMLTextContent(escapedText))
-        )
 
 
 class Padding(Cell):
     def __init__(self):
         super().__init__()
-        self.contents = str(
-            HTMLElement.span()
-            .add_class('px-2')
-            .add_child(HTMLTextContent('&nbsp'))
-        )
 
     def sortsAs(self):
         return " "
@@ -1179,10 +1030,6 @@ class Span(Cell):
     def __init__(self, text):
         super().__init__()
         self.exportData['text'] = text
-        self.contents = str(
-            HTMLElement.span()
-            .add_child(HTMLTextContent(cgi.escape(str(text))))
-        )
 
     def sortsAs(self):
         return self.contents
@@ -1206,15 +1053,8 @@ class Sequence(Cell):
             return Sequence(self.elements + [other])
 
     def recalculate(self):
-        sequenceChildrenStr = '\n'.join("____c_%s__" %
-                                        i for i in range(len(self.elements)))
         self.namedChildren['elements'] = self.elements
         self.exportData['divStyle'] = self._divStyle()
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', self._divStyle())
-            .add_child(HTMLTextContent(sequenceChildrenStr))
-        )
 
     def sortsAs(self):
         if self.elements:
@@ -1233,23 +1073,6 @@ class Columns(Cell):
                          i: elements[i] for i in range(len(elements))}
         self.namedChildren['elements'] = self.elements
 
-        innerChildren = [
-            HTMLElement.div()
-            .add_class('col-sm')
-            .add_child(HTMLTextContent('____c_%s__' % i))
-            for i in range(len(elements))
-        ]
-        self.contents = str(
-            HTMLElement.div()
-            .add_class('container-fluid')
-            .set_attribute('style', self._divStyle())
-            .add_child(
-                HTMLElement.div()
-                .add_classes(['row', 'flex-nowrap'])
-                .add_children(innerChildren)
-            )
-        )
-
     def __add__(self, other):
         other = Cell.makeCell(other)
         if isinstance(other, Columns):
@@ -1267,11 +1090,6 @@ class LargePendingDownloadDisplay(Cell):
     def __init__(self):
         super().__init__()
 
-        self.contents = str(
-            HTMLElement.span()
-            .set_attribute('id', 'object_database_large_pending_download_text')
-        )
-
 
 class HeaderBar(Cell):
     def __init__(self, leftItems, centerItems=(), rightItems=()):
@@ -1286,66 +1104,6 @@ class HeaderBar(Cell):
             'rightItems': self.rightItems
         }
 
-        self.leftElements = [
-            HTMLElement.span()
-            .add_classes(['flex-item', 'px-3'])
-            .add_child(HTMLTextContent('____left_%s__' % i))
-            for i in range(len(self.leftItems))
-        ]
-        self.centerElements = [
-            HTMLElement.span()
-            .add_classes(['flex-item', 'px-3'])
-            .add_child(HTMLTextContent('____center_%s__' % i))
-            for i in range(len(self.centerItems))
-        ]
-        self.rightElements = [
-            HTMLElement.span()
-            .add_classes(['flex-item', 'px-3'])
-            .add_child(HTMLTextContent('____right_%s__' % i))
-            for i in range(len(self.rightItems))
-        ]
-
-        self.contents = str(
-            HTMLElement.div()
-            .add_classes(['p-2', 'bg-light', 'flex-container'])
-            .set_attribute('style', 'display:flex;align-items:baseline;')
-            .with_children(
-                # Left Elements
-                HTMLElement.div()
-                .add_class('flex-item')
-                .set_attribute('style', 'flex-grow:0;')
-                .add_child(
-                    HTMLElement.div()
-                    .add_class('flex-container')
-                    .set_attribute('style',
-                                   'display:flex;justify-content:center;align-items:baseline;')
-                    .add_children(self.leftElements)
-                ),
-                # Center Elements
-                HTMLElement.div()
-                .add_class('flex-item')
-                .set_attribute('style', 'flex-grow:1;')
-                .add_child(
-                    HTMLElement.div()
-                    .add_class('flex-container')
-                    .set_attribute('style',
-                                   'display:flex;justify-content:center;align-items:baseline;')
-                    .add_children(self.centerElements)
-                ),
-                # Right Elements
-                HTMLElement.div()
-                .add_class('flex-item')
-                .set_attribute('style', 'flex-grow:0;')
-                .add_child(
-                    HTMLElement.div()
-                    .add_class('flex-container')
-                    .set_attribute('style',
-                                   'display:flex;justify-content:center;align-items:baseline;')
-                    .add_children(self.rightElements)
-                )
-            )
-        )
-
         self.children = {'____left_%s__' %
                          i: self.leftItems[i] for i in range(len(self.leftItems))}
         self.children.update(
@@ -1357,16 +1115,6 @@ class HeaderBar(Cell):
 class Main(Cell):
     def __init__(self, child):
         super().__init__()
-
-        self.contents = str(
-            HTMLElement.main()
-            .add_class('py-md-2')
-            .add_child(
-                HTMLElement.div()
-                .add_class('container-fluid')
-                .add_child(HTMLTextContent('____child__'))
-            )
-        )
         self.children = {'____child__': child}
         self.namedChildren['child'] = child
 
@@ -1381,31 +1129,16 @@ class _NavTab(Cell):
         self.child = child
 
     def recalculate(self):
-        inlineScript = """
-        cellSocket.sendString(JSON.stringify({'event': 'click', 'ix': __ix__, 'target_cell': '__identity__'}))
-        """.replace('__identity__', self.target).replace('__ix__', str(self.index))
         self.exportData['clickData'] = {
             'event': 'click',
             'ix': str(self.index),
             'target_cell': self.target
         }
-        navLinkClasses = ['nav-link']
+
         if self.index == self.slot.get():
-            navLinkClasses.append('active')
             self.exportData['isActive'] = True
         else:
             self.exportData['isActive'] = False
-        self.contents = str(
-            HTMLElement.li()
-            .add_class('nav-item')
-            .add_child(
-                HTMLElement.a()
-                .add_classes(navLinkClasses)
-                .set_attribute('role', 'tab')
-                .set_attribute('onclick', inlineScript)
-                .add_child(HTMLTextContent('____child__'))
-            )
-        )
 
         childCell = Cell.makeCell(self.child)
         self.children['____child__'] = childCell
@@ -1438,29 +1171,6 @@ class Tabs(Cell):
                 self.whichSlot, i, self._identity, self.headersAndChildren[i][0])
             self.children['____header_{ix}__'.format(ix=i)] = headerCell
             self.namedChildren['headers'].append(headerCell)
-
-        headerItems = "".join(
-            """ ____header___ix____ """.replace('__ix__', str(i))
-            for i in range(len(self.headersAndChildren)))
-        self.contents = str(
-            HTMLElement.div()
-            .add_classes(['container-fluid', 'mb-3'])
-            .with_children(
-                HTMLElement.ul()
-                .add_classes(['nav', 'nav-tabs'])
-                .set_attribute('role', 'tablist')
-                .add_child(HTMLTextContent(headerItems)),
-
-                HTMLElement.div()
-                .add_class("tab-content")
-                .add_child(
-                    HTMLElement.div()
-                    .add_classes(['tab-pane', 'fade', 'show', 'active'])
-                    .set_attribute('role', 'tabpanel')
-                    .add_child(HTMLTextContent('____display__'))
-                )
-            )
-        )
 
     def onMessage(self, msgFrame):
         self.whichSlot.set(int(msgFrame['ix']))
@@ -1499,8 +1209,6 @@ class Dropdown(Cell):
         return self.title.sortsAs()
 
     def recalculate(self):
-        items = []
-
         self.children['____title__'] = self.title
         self.namedChildren['title'] = self.title
         self.namedChildren['dropdownItems'] = []
@@ -1518,43 +1226,9 @@ class Dropdown(Cell):
             self.children["____child_%s__" % i] = childCell
             self.namedChildren['dropdownItems'].append(childCell)
             if not isinstance(onDropdown, str):
-                inlineScript = """
-                cellSocket.sendString(JSON.stringify({'event':'menu', 'ix': __ix__, 'target_cell': '__identity__'}))
-                """.replace('__ix__', str(i)).replace('__identity__', self.identity)
                 self.exportData['dropdownItemInfo'][i] = 'callback'
             else:
-                inlineScript = quoteForJs("window.location.href = '%s'"
-                                          % (quoteForJs(onDropdown, "'")), '"')
                 self.exportData['dropdownItemInfo'][i] = onDropdown
-            childSubstitute = '____child_%s__' % str(i)
-            items.append(
-                HTMLElement.a()
-                .add_class('dropdown-item')
-                .set_attribute('onclick', inlineScript)
-                .add_child(HTMLTextContent(childSubstitute))
-            )
-        self.contents = str(
-            HTMLElement.div()
-            .add_class('btn-group')
-            .with_children(
-                HTMLElement.a()
-                .add_classes(['btn', 'btn-xs', 'btn-outline-secondary'])
-                .add_child(HTMLTextContent('____title__')),
-
-                HTMLElement.button()
-                .add_classes(['btn', 'btn-xs',
-                              'btn-outline-secondary',
-                              'dropdown-toggle',
-                              'dropdown-toggle-split'])
-                .set_attribute('type', 'button')
-                .set_attribute('id', '%s-dropdownMenuButton' % self.identity)
-                .set_attribute('data-toggle', 'dropdown'),
-
-                HTMLElement.div()
-                .add_class('dropdown-menu')
-                .add_children(items)
-            )
-        )
 
     def onMessage(self, msgFrame):
         self._logger.info(msgFrame)
@@ -1567,13 +1241,6 @@ class CircleLoader(Cell):
     """
     def __init__(self):
         super().__init__()
-
-    def recalculate(self):
-        self.contents = str(
-            HTMLElement.div()
-            .add_class('spinner-grow')
-            .set_attribute('role', 'status')
-        )
 
 
 class AsyncDropdown(Cell):
@@ -1625,48 +1292,6 @@ class AsyncDropdown(Cell):
         self.children = {'____contents__': self.contentCell}
         self.namedChildren['content'] = self.contentCell
         self.namedChildren['loadingIndicator'] = loadingIndicatorCell
-
-    def recalculate(self):
-        inlinescript = self.getInlineScript()
-        self.contents = str(
-            HTMLElement.div()
-            .add_class('btn-group')
-            .with_children(
-                HTMLElement.a()
-                .add_classes(['btn', 'btn-xs', 'btn-outline-secondary'])
-                .add_child(HTMLTextContent(self.labelText)),
-
-                HTMLElement.button()
-                .add_classes(['btn', 'btn-xs',
-                              'btn-outline-secondary',
-                              'dropdown-toggle',
-                              'dropdown-toggle-split'])
-                .set_attribute('type', 'button')
-                .set_attribute('id', '%s-dropdownMenuButton' % self.identity)
-                .set_attribute('data-toggle', 'dropdown')
-                .set_attribute('onclick', inlinescript)
-                .set_attribute('data-firstclick', 'true'),
-
-                HTMLElement.div()
-                .set_attribute('id', '%s-dropdownContentWrapper' % self.identity)
-                .add_classes(['dropdown-menu'])
-                .add_child(HTMLTextContent('____contents__'))
-            )
-        )
-
-    def getInlineScript(self):
-        """Binds a specific call to the JS
-        side `cellHandler` who now has a
-        special method for dealing with initial
-        dropdown events. We dynamically pass the
-        Cell identity as the arg and add this as
-        an `onclick` inline method to the
-        Dropdown's `button` element
-        """
-        template = """
-        cellHandler.dropdownInitialBindFor('__target__')
-        """.replace('__target__', self.identity)
-        return template
 
     def onMessage(self, messageFrame):
         """On `dropdown` events sent to this
@@ -1742,40 +1367,27 @@ class AsyncDropdownContent(Cell):
         else:
             return self.loadingCell
 
-    def recalculate(self):
-        elementId = ('dropdownContent-%s' % self.identity)
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('id', elementId)
-            .add_child(HTMLTextContent('____contents__')))
-
 
 class Container(Cell):
+    # TODO: Figure out what this Cell
+    # actually needs to do, ie why
+    # we need this setContents method
+    # now that we are not using contents strings
     def __init__(self, child=None):
         super().__init__()
         if child is None:
-            self.contents = ""
             self.children = {}
             self.namedChildren['child'] = None
         else:
-            self.contents = str(
-                HTMLElement.div()
-                .add_child(HTMLTextContent('____child__'))
-            )
             childCell = Cell.makeCell(child)
             self.children = {"____child__": childCell}
             self.namedChildren['child'] = childCell
 
     def setChild(self, child):
-        childElement = (
-            HTMLElement.div()
-            .add_child(HTMLTextContent('____child__'))
-        )
-        self.setContents(str(childElement),
+        self.setContents("",
                          {"____child__": Cell.makeCell(child)})
 
     def setContents(self, newContents, newChildren):
-        self.contents = newContents
         self.children = newChildren
         self.namedChildren['child'] = list(newChildren.values())[0]  # Hacky!
         self.markDirty()
@@ -1793,11 +1405,7 @@ class RootCell(Container):
         return "page_root"
 
     def setChild(self, child):
-        childElement = (
-            HTMLElement.div()
-            .add_child(HTMLTextContent('____c__'))
-        )
-        self.setContents(str(childElement), {"____c__": child})
+        self.setContents("", {"____c__": child})
 
 
 class Traceback(Cell):
@@ -1807,14 +1415,6 @@ class Traceback(Cell):
     # cell.
     def __init__(self, traceback):
         super().__init__()
-        self.contents = str(
-            HTMLElement.div()
-            .add_classes(['alert', 'alert-primary'])
-            .add_child(
-                HTMLElement.pre()
-                .add_child(HTMLTextContent('____child__'))
-            )
-        )
         self.traceback = traceback
         tracebackCell = Cell.makeCell(traceback)
         self.children = {"____child__": tracebackCell}
@@ -1830,13 +1430,6 @@ class Code(Cell):
     # some data passed to this Cell.
     def __init__(self, codeContents):
         super().__init__()
-        self.contents = str(
-            HTMLElement.pre()
-            .add_child(
-                HTMLElement.code()
-                .add_child(HTMLTextContent('____child__'))
-            )
-        )
         self.codeContents = codeContents
         codeContentsCell = Cell.makeCell(codeContents)
         self.children = {"____child__": codeContentsCell}
@@ -1873,10 +1466,6 @@ class ContextualDisplay(Cell):
     def __init__(self, obj):
         super().__init__()
         self.obj = obj
-        self.contents = str(
-            HTMLElement.div()
-            .add_child(HTMLTextContent('____child__'))
-        )
 
     def getChild(self):
         if type(self.obj) in ContextualDisplay._typeToDisplay:
@@ -1919,11 +1508,6 @@ class Subscribed(Cell):
 
     def recalculate(self):
         with self.view() as v:
-            self.contents = str(
-                HTMLElement.div()
-                .set_attribute('style', self._divStyle())
-                .add_child(HTMLTextContent('____contents__'))
-            )
             try:
                 c = Cell.makeCell(self.f())
                 if c.cells is not None:
@@ -2018,34 +1602,6 @@ class SubscribedSequence(Cell):
             if i not in spineAsSet:
                 del self.existingItems[i]
 
-        if self.asColumns:
-            spineChildren = []
-            for i in range(len(self.spine)):
-                spineChildren.append(
-                    HTMLElement.div()
-                    .add_class('col-sm')
-                    .add_child(HTMLTextContent('____child_%s__' % str(i)))
-                )
-            self.contents = str(
-                HTMLElement.div()
-                .add_class('container-fluid')
-                .set_attribute('style', self._divStyle())
-                .add_child(
-                    HTMLElement.div()
-                    .add_classes(['row', 'flex-nowrap'])
-                    .add_children(spineChildren)
-                )
-            )
-        else:
-            spineChildren = []
-            for i in range(len(self.spine)):
-                spineChildren.append('____child_%s__' % i)
-            self.contents = str(
-                HTMLElement.div()
-                .set_attribute('style', self._divStyle())
-                .add_child(HTMLTextContent("\n".join(spineChildren)))
-            )
-
         # temporary js WS refactoring data
         self.exportData['divStyle'] = self._divStyle()
         self.exportData['asColumns'] = self.asColumns
@@ -2075,44 +1631,6 @@ class Popover(Cell):
         }
 
     def recalculate(self):
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', self._divStyle())
-            .with_children(
-                HTMLElement.a()
-                .set_attribute('href', '#popmain_%s' % self.identity)
-                .set_attribute('data-toggle', 'popover')
-                .set_attribute('data-trigger', 'focus')
-                .set_attribute('data-bind', '#pop_%s' % self.identity)
-                .set_attribute('data-placement', 'bottom')
-                .set_attribute('role', 'button')
-                .add_classes(['btn', 'btn-xs'])
-                .add_child(HTMLTextContent('____contents__')),
-
-                HTMLElement.div()
-                .set_attribute('style', 'display:none;')
-                .add_child(
-                    HTMLElement.div()
-                    .set_attribute('id', 'pop_%s' % self.identity)
-                    .with_children(
-
-                        HTMLElement.div()
-                        .add_class('data-title')
-                        .add_child(HTMLTextContent('____title__')),
-
-                        HTMLElement.div()
-                        .add_class('data-content')
-                        .add_child(
-                            HTMLElement.div()
-                            .set_attribute('style', 'width: %spx' % str(self.width))
-                            .add_child(HTMLTextContent('____detail__'))
-                        )
-                    )
-                )
-            )
-        )
-
-        # temporary js WS refactoring data
         self.exportData['divStyle'] = self._divStyle()
         self.exportData['width'] = self.width
 
@@ -2254,49 +1772,6 @@ class Grid(Cell):
             if i not in seen:
                 del self.existingItems[i]
 
-        tableHeaders = []
-        for colIndex in range(len(self.cols)):
-            tableHeaders.append(
-                HTMLElement.th()
-                .add_child(HTMLTextContent('____header_%s__' % colIndex))
-            )
-        tableRows = []
-        for rowIndex in range(len(self.rows)):
-            rowLabel = HTMLTextContent("")
-            if self.rowLabelFun:
-                rowLabel = (
-                    HTMLElement.td()
-                    .add_child(HTMLTextContent('____rowlabel_%s__' % rowIndex))
-                )
-            tableColumns = []
-            for colIndex in range(len(self.cols)):
-                tableColumns.append(
-                    HTMLElement.td()
-                    .add_child(HTMLTextContent('____child_%s_%s__' % (rowIndex, colIndex)))
-                )
-            tableRows.append(
-                HTMLElement.tr()
-                .add_child(rowLabel)
-                .add_children(tableColumns)
-            )
-        topTableHeader = HTMLTextContent("")
-        if self.rowLabelFun is not None:
-            topTableHeader = HTMLElement.th()
-        self.contents = str(
-            HTMLElement.table()
-            .add_classes(['table-hscroll', 'table-sm', 'table-striped'])
-            .with_children(
-                HTMLElement.thead()
-                .add_child(
-                    HTMLElement.tr()
-                    .add_child(topTableHeader)
-                    .add_children(tableHeaders)
-                ),
-                HTMLElement.tbody()
-                .add_children(tableRows)
-            )
-        )
-
         self.exportData['rowNum'] = len(self.rows)
         self.exportData['colNum'] = len(self.cols)
         self.exportData['hasTopHeader'] = (self.rowLabelFun is not None)
@@ -2339,29 +1814,6 @@ class SingleLineTextBox(Cell):
         self.slot = slot
 
     def recalculate(self):
-        inlineScript = """
-        cellSocket.sendString(
-            JSON.stringify({
-                'event':'click',
-                'target_cell': '__identity__',
-                'text': this.value
-            })
-        )
-        """
-        inlineScript = inlineScript.replace('__identity__', self.identity)
-        inputValue = quoteForJs(self.slot.get(), '"')
-        element = (
-            HTMLElement.input()
-            .set_attribute('type', 'text')
-            .set_attribute('id', 'text_%s' % self.identity)
-            .set_attribute('onchange', inlineScript)
-            .set_attribute('value', inputValue)
-        )
-        if self.pattern:
-            element.set_attribute('pattern', self.pattern)
-        self.contents = str(element)
-
-        # temporary js WS refactoring data
         if self.pattern:
             self.exportData['pattern'] = self.pattern
 
@@ -2588,8 +2040,6 @@ class Table(Cell):
 
         totalPages = ((len(self.filteredRows) - 1) // self.maxRowsPerPage + 1)
 
-        rowDisplay = "____left__ ____right__ Page ____page__ of " + \
-            str(totalPages)
         if totalPages <= 1:
             pageCell = Cell.makeCell(totalPages).nowrap()
             self.children['____page__'] = pageCell
@@ -2631,75 +2081,6 @@ class Table(Cell):
             )
             self.children['____right__'] = rightCell
             self.namedChildren['right'] = rightCell
-        # NOTE:
-        # It is unclear where the following children are
-        # rendered here:
-        # ____right__
-        # ____left__
-        # ____page__
-
-        headerElements = []
-        for colIndex in range(len(self.cols)):
-            headerElements.append(
-                HTMLElement.th()
-                .set_attribute('style', 'vertical-align:top;')
-                .add_child(HTMLTextContent('____header_%s__' % str(colIndex)))
-            )
-
-        rowElements = []
-        for rowIndex in range(len(self.rows)):
-            colElements = []
-            colElements.append(
-                HTMLElement.td()
-                .add_child(HTMLTextContent(str(rowIndex+1)))
-            )
-            for colIndex in range(len(self.cols)):
-                colElements.append(
-                    HTMLElement.td()
-                    .add_child(HTMLTextContent('____child_%s_%s__' % (rowIndex, colIndex)))
-                )
-            rowElements.append(
-                HTMLElement.tr()
-                .add_children(colElements)
-            )
-
-        firstRowElement = (
-            HTMLElement.tr()
-            .add_child(
-                HTMLElement.th()
-                .set_attribute('style', 'vertical-align:top;')
-                .add_child(
-                    HTMLElement.div()
-                    .add_class('card')
-                    .add_child(
-                        HTMLElement.div()
-                        .add_classes(['card-body', 'p-1'])
-                        .add_child(HTMLTextContent(rowDisplay))
-                    )
-                )
-            )
-        )
-        firstRowElement.add_children(headerElements)
-
-        self.contents = str(
-            HTMLElement.table()
-            .add_classes(['table-hscroll', 'table-sm', 'table-striped'])
-            .with_children(
-                HTMLElement.thead()
-                .set_attribute('style', 'border-bottom: black;border-bottom-style:solid;border-bottom-width:thin;')
-                .add_child(firstRowElement),
-
-                HTMLElement.tbody()
-                .add_children(rowElements)
-            )
-        )
-
-        # print("THIS IS INSANE TABLE DATA")
-        # print("first row")
-        # print(str(firstRowElement))
-        # print("rows")
-        # [print(r) for r in rowElements]
-        # print()
 
         # temporary js WS refactoring data
         self.exportData['totalPages'] = totalPages
@@ -2726,18 +2107,8 @@ class Clickable(Cell):
     def recalculate(self):
         self.children = {'____contents__': self.content}
         self.namedChildren = {'content': self.content}
-        style = self._divStyle("cursor:pointer;*cursor: hand" +
-                               (";font-weight:bold" if self.bold else ""))
+        self.exportData['bold'] = self.bold
 
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', style)
-            .set_attribute('onclick', self.calculatedOnClick())
-            .add_child(HTMLTextContent('____contents__'))
-        )
-
-        # temporary js WS refactoring data
-        self.exportData['divStyle'] = style
         # TODO: this event handling situation must be refactored
         self.exportData['events'] = {"onclick": self.calculatedOnClick()}
 
@@ -2762,20 +2133,15 @@ class Button(Clickable):
         self.children = {'____contents__': self.content}
         self.namedChildren = {'content': self.content}
 
-        classList = ['btn']
-        buttonStateClass = f"""btn{'-outline' if not self.active else ''}-{self.style}"""
-        classList.append(buttonStateClass)
-        buttonSize = ("" if not self.small else "btn-xs")
-        classList.append(buttonSize)
-        self.contents = str(
-            HTMLElement.button()
-            .add_classes(classList)
-            .set_attribute('onclick', self.calculatedOnClick())
-            .add_child(HTMLTextContent('____contents__'))
-        )
+        isActive = False
+        if self.active:
+            isActive = True
 
         # temporary js WS refactoring data
-        self.exportData['classes'] = classList
+        self.exportData['small'] = self.small
+        self.exportData['active'] = isActive
+        self.exportData['style'] = self.style
+
         # TODO: this event handling situation must be refactored
         self.exportData['events'] = {"onclick": self.calculatedOnClick()}
 
@@ -2789,35 +2155,20 @@ class ButtonGroup(Cell):
         self.children = {
             f'____button_{i}__': self.buttons[i] for i in range(len(self.buttons))}
         self.namedChildren['buttons'] = self.buttons
-        innerButtonsText = " ".join(f"____button_{i}__" for i in range(len(self.buttons)))
-        self.contents = str(
-            HTMLElement.div()
-            .add_class('btn-group')
-            .set_attribute('role', 'group')
-            .add_child(HTMLTextContent(innerButtonsText))
-        )
-
-        # temporary js WS refactoring data
-        self.exportData['innerButtonsText'] = innerButtonsText
 
 
 class LoadContentsFromUrl(Cell):
+    # TODO: Determine the real need / purpose of
+    # this cell. In the future WS system, we can
+    # simply send this as a message and it can be
+    # at the most a non-display kind of Cell that
+    # sends a WS command when it first gets created
     def __init__(self, targetUrl):
         Cell.__init__(self)
         self.targetUrl = targetUrl
 
     def recalculate(self):
         self.children = {}
-
-        self.contents = str(
-            HTMLElement.div()
-            .add_child(
-                HTMLElement.div()
-                .set_attribute('id', 'loadtarget%s' % self._identity)
-            )
-        )
-
-        # temporary js WS refactoring data
         self.exportData['loadTargetId'] = 'loadtarget%s' % self._identity
 
         self.postscript = (
@@ -2871,21 +2222,6 @@ class Expands(Cell):
 
     def recalculate(self):
         inlineScript = "cellSocket.sendString(JSON.stringify({'event':'click', 'target_cell': '%s'}))" % self.identity
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', self._divStyle())
-            .with_children(
-                HTMLElement.div()
-                .set_attribute('style', 'display:inline-block;vertical-align:top')
-                .set_attribute('onclick', inlineScript)
-                .add_child(HTMLTextContent('____icon__')),
-
-                HTMLElement.div()
-                .set_attribute('style', 'display:inline-block')
-                .add_child(HTMLTextContent('____child__'))
-
-            )
-        )
 
         self.children = {
             '____child__': self.open if self.isExpanded else self.closed,
@@ -2896,8 +2232,10 @@ class Expands(Cell):
             'icon': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
-        # temporary js WS refactoring data
         self.exportData['divStyle'] = self._divStyle()
+
+        # TODO: Refactor this. We shouldn't need to send
+        # an inline script!
         self.exportData['events'] = {"onclick": inlineScript}
 
         for c in self.children.values():
@@ -2965,17 +2303,6 @@ class CodeEditor(Cell):
 
     def recalculate(self):
         self.children = {}  # Is there ever any children for this Cell type?
-
-        editorStyle = 'width:100%;height:100%;margin:auto;border:1px solid lightgray;'
-        self.contents = str(
-            HTMLElement.div()
-            .set_attribute('style', self._divStyle())
-            .add_child(
-                HTMLElement.div()
-                .set_attribute('id', 'editor%s' % self.identity)
-                .set_attribute('style', editorStyle)
-            )
-        )
 
         # temporary js WS refactoring data
         self.exportData['divStyle'] = self._divStyle()
@@ -3069,16 +2396,6 @@ class Sheet(Cell):
         pass
 
     def recalculate(self):
-        self.contents = str(
-            HTMLElement.div()
-            .add_child(
-                HTMLElement.div()
-                .set_attribute('id', 'sheet%s' % self.identity)
-                .set_attribute('style', self._divStyle())
-                .add_class('handsontable')
-                .add_child(HTMLTextContent('____error__'))
-            )
-        )
         errorCell = Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         self.children = {
             '____error__': errorCell
@@ -3151,18 +2468,6 @@ class Plot(Cell):
         self.exportData['divStyle'] = self._divStyle()
 
     def recalculate(self):
-        self.contents = str(
-            HTMLElement.div()
-            .add_child(
-                HTMLElement.div()
-                .set_attribute('id', 'plot%s' % self.identity)
-                .set_attribute('style', self._divStyle())
-            )
-            .add_children([
-                HTMLTextContent('____chart_updater__'),
-                HTMLTextContent('____error__')
-            ])
-        )
         chartUpdaterCell = Subscribed(lambda: _PlotUpdater(self))
         errorCell = Subscribed(lambda: Traceback(self.error.get()) if self.error.get() is not None else Text(""))
         self.children = {
@@ -3280,7 +2585,6 @@ class _PlotUpdater(Cell):
     def recalculate(self):
         with self.view() as v:
             # we only exist to run our postscript
-            self.contents = """<div style="display:none">"""
             self.children = {}  # Does this Cell type ever have children?
             self.postscript = ""
             self.linePlot.error.set(None)
@@ -3335,5 +2639,4 @@ class Timestamp(Cell):
         self.timestamp = timestamp
 
     def recalculate(self):
-        self.contents = ""
         self.exportData['timestamp'] = self.timestamp
