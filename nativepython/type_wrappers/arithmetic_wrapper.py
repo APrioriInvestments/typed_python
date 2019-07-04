@@ -92,6 +92,7 @@ class ArithmeticTypeWrapper(Wrapper):
 
         return super().convert_unary_op(context, instance, op)
 
+
 def toWrapper(T):
     if T is Bool:
         return BoolWrapper()
@@ -109,8 +110,10 @@ def toFloatType(T1):
             return Float64
     return T1
 
+
 def hash_int64(x):
     return ((x >> 32) * 1000003) ^ (x & 0xFFFFFFFF)
+
 
 class IntWrapper(ArithmeticTypeWrapper):
     def __init__(self, T):

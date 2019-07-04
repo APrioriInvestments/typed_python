@@ -106,6 +106,11 @@ class Wrapper(object):
             generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
         )
 
+    def convert_delitem(self, context, instance, item):
+        return context.pushTerminal(
+            generateThrowException(context, AttributeError("%s is not subscriptable" % str(self)))
+        )
+
     def convert_getitem(self, context, instance, item):
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s is not subscriptable" % str(self)))

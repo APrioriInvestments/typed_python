@@ -16,6 +16,7 @@ from typed_python import Dict, ListOf
 import typed_python._types as _types
 from nativepython import SpecializedEntrypoint
 import unittest
+import time
 
 
 class TestDictCompilation(unittest.TestCase):
@@ -107,3 +108,49 @@ class TestDictCompilation(unittest.TestCase):
         dict_setmany(x, 1000)
 
         self.assertEqual(x, {i: i*i for i in range(1000)})
+
+    def test_dict_del(self):
+        @SpecializedEntrypoint
+        def dict_delitem(d, k):
+            del d[k]
+
+        x = Dict(int, int)()
+        x[1] = 2
+        x[2] = 3
+
+        dict_delitem(x, 1)
+
+        self.assertEqual(x, {2: 3})
+
+    def test_dict_read_write_perf(self):
+        def dict_setmany(d, count, passes):
+            for _ in range(passes):
+                for i in range(count):
+                    if i in d:
+                        d[i] += i
+                    else:
+                        d[i] = i
+
+        compiled_setmany = SpecializedEntrypoint(dict_setmany)
+
+        t0 = time.time()
+        aDict = Dict(int, int)()
+        dict_setmany(aDict, 10000, 100)
+        t1 = time.time()
+
+        aDict2 = Dict(int, int)()
+        compiled_setmany(aDict2, 1, 1)
+
+        t2 = time.time()
+        aDict2 = Dict(int, int)()
+        compiled_setmany(aDict2, 10000, 100)
+        t3 = time.time()
+
+        self.assertEqual(aDict2, aDict2)
+
+        ratio = (t1 - t0) / (t3 - t2)
+
+        # I get about 6.5
+        self.assertGreater(ratio, 3)
+
+        print("Speedup was ", ratio)

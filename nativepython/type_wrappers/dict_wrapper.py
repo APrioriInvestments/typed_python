@@ -30,10 +30,12 @@ DELETED = -2
 
 
 def dict_add_slot(instance, itemHash, slot):
-    if instance._hash_table_count * 2 + 1 > instance._hash_table_size or instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1:
+    if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or
+            instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1):
         instance._resizeTableUnsafe()
 
-    offset = itemHash % instance._hash_table_size;
+    offset = itemHash % instance._hash_table_size
+
     while True:
         if instance._hash_table_slots[offset] == EMPTY or instance._hash_table_slots[offset] == DELETED:
             if instance._hash_table_slots[offset] == EMPTY:
@@ -69,13 +71,58 @@ def dict_slot_for_key(instance, item, itemHash):
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
                 return slotIndex
 
-        slotIndex += 1
-        if slotIndex >= instance._hash_table_size:
-            slotIndex = 0
+        offset += 1
+        if offset >= instance._hash_table_size:
+            offset = 0
 
     # not necessary, but currently we don't currently realize that the while loop
     # never exits, and so we think there's a possibility we return None
     return 0
+
+
+def dict_remove_key(instance, item, itemHash):
+    slots = instance._hash_table_slots
+
+    if not slots:
+        raise Exception("Key doesn't exist")
+
+    if instance._items_reserved > (instance._hash_table_count + 2) * 4:
+        instance._compressItemTableUnsafe()
+
+    if instance._hash_table_count < instance._hash_table_size >> 3:
+        instance._resizeTableUnsafe()
+
+    offset = itemHash % instance._hash_table_size
+
+    while True:
+        slotIndex = int((slots + offset).get())
+
+        if slotIndex == EMPTY:
+            raise Exception("Key doesn't exist")
+
+        if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
+            if instance.getKeyByIndexUnsafe(slotIndex) == item:
+                instance._hash_table_hashes[offset] = -1
+                instance._hash_table_slots[offset] = DELETED
+                instance._hash_table_count -= 1
+                instance._items_populated[slotIndex] = 0
+
+                instance.deleteItemByIndexUnsafe(slotIndex)
+                return
+
+        offset += 1
+        if offset >= instance._hash_table_size:
+            offset = 0
+
+    # not necessary, but currently we don't currently realize that the while loop
+    # never exits, and so we think there's a possibility we return None
+    return 0
+
+
+def dict_delitem(instance, item):
+    itemHash = hash(item)
+
+    dict_remove_key(instance, itemHash, item)
 
 
 def dict_getitem(instance, item):
@@ -87,6 +134,22 @@ def dict_getitem(instance, item):
         raise Exception("Key doesn't exist.")
 
     return instance.getValueByIndexUnsafe(slot)
+
+
+def dict_contains(instance, item):
+    itemHash = hash(item)
+
+    slot = dict_slot_for_key(instance, itemHash, item)
+
+    return slot != -1
+
+
+def dict_contains_not(instance, item):
+    itemHash = hash(item)
+
+    slot = dict_slot_for_key(instance, itemHash, item)
+
+    return slot == -1
 
 
 def dict_setitem(instance, key, value):
@@ -133,8 +196,10 @@ class DictWrapper(RefcountedWrapper):
         ), name="DictWrapper").pointer()
 
     def convert_attribute(self, context, expr, attr):
-        if attr in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe",
-                "setValueByIndexUnsafe", "setKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe"):
+        if attr in (
+                "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
+                "setValueByIndexUnsafe", "setKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
+                "_compressItemTableUnsafe"):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
         if attr == '_items_populated':
@@ -205,6 +270,15 @@ class DictWrapper(RefcountedWrapper):
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
         if len(args) == 0:
+            if methodname == "_compressItemTableUnsafe":
+                context.pushEffect(
+                    runtime_functions.dict_compressItemTable.call(
+                        instance.nonref_expr.cast(native_ast.VoidPtr),
+                        context.constant(self.kvBytecount)
+                    )
+                )
+                return context.pushVoid()
+
             if methodname == "_resizeTableUnsafe":
                 context.pushEffect(
                     runtime_functions.dict_resizeTable.call(
@@ -223,7 +297,7 @@ class DictWrapper(RefcountedWrapper):
                 )
 
         if len(args) == 1:
-            if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe"):
+            if methodname in ("getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe"):
                 index = args[0].convert_to_type(int)
                 if index is None:
                     return None
@@ -237,6 +311,9 @@ class DictWrapper(RefcountedWrapper):
 
                 if methodname == "getItemByIndexUnsafe":
                     return item
+                elif methodname == "deleteItemByIndexUnsafe":
+                    item.convert_destroy()
+                    return context.pushVoid()
                 elif methodname == "getKeyByIndexUnsafe":
                     # take the first item in the tuple
                     return item.expr_type.refAs(context, item, 0)
@@ -287,6 +364,16 @@ class DictWrapper(RefcountedWrapper):
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
 
+    def convert_delitem(self, context, expr, item):
+        if item is None or expr is None:
+            return None
+
+        item = item.convert_to_type(self.keyType)
+        if item is None:
+            return None
+
+        return context.call_py_function(dict_delitem, (expr, item), {})
+
     def convert_getitem(self, context, expr, item):
         if item is None or expr is None:
             return None
@@ -334,6 +421,20 @@ class DictWrapper(RefcountedWrapper):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr))
+
+    def convert_bin_op_reverse(self, context, left, op, right):
+        if op.matches.In or op.matches.NotIn:
+            right = right.convert_to_type(self.keyType)
+            if right is None:
+                return None
+
+            return context.call_py_function(
+                dict_contains if op.matches.In else dict_contains_not,
+                (left, right),
+                {}
+            )
+
+        return super().convert_bin_op(context, left, op, right)
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference

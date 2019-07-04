@@ -258,9 +258,11 @@ class FunctionConversionContext(object):
                 if slicing is None:
                     return subcontext.finalize(None), False
 
+                # we are assuming this is an index. We ought to be checking this
+                # and doing something else if it's a Slice or an Ellipsis or whatnot
                 index = subcontext.convert_expression_ast(target.slice.value)
 
-                if slicing is None:
+                if index is None:
                     return subcontext.finalize(None), False
 
                 val_to_store = subcontext.convert_expression_ast(ast.value)
@@ -456,7 +458,51 @@ class FunctionConversionContext(object):
             expr_contex.pushException(KeyError, strVal)
             return expr_contex.finalize(None), False
 
-        raise ConversionException("Can't handle python ast Statement.%s" % ast._which)
+        if ast.matches.Delete:
+            exprs = None
+            for target in ast.targets:
+                subExprs, flowReturns = self.convert_delete(target)
+                if exprs is None:
+                    exprs = subExprs
+                else:
+                    exprs = exprs >> subExprs
+
+                if not flowReturns:
+                    return exprs, flowReturns
+            return exprs, True
+
+        raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
+
+    def convert_delete(self, expression):
+        """Convert the target of a 'del' statement.
+
+        Args:
+            expression - a python_ast Expression
+
+        Returns:
+            a pair of native_ast.Expression and a bool indicating whether control flow
+            returns to the caller.
+        """
+        expr_contex = ExpressionConversionContext(self)
+
+        if expression.matches.Subscript:
+            slicing = expr_contex.convert_expression_ast(expression.value)
+            if slicing is None:
+                return expr_contex.finalize(None), False
+
+            # we are assuming this is an index. We ought to be checking this
+            # and doing something else if it's a Slice or an Ellipsis or whatnot
+            index = expr_contex.convert_expression_ast(expression.slice.value)
+
+            if slicing is None:
+                return expr_contex.finalize(None), False
+
+            res = slicing.convert_delitem(index)
+
+            return expr_contex.finalize(None), res is not None
+        else:
+            expr_contex.pushException(Exception, "Can't delete this")
+            return expr_contex.finalize(None), False
 
     def convert_function_body(self, statements):
         return self.convert_statement_list_ast(statements, toplevel=True)
