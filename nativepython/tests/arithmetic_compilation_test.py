@@ -328,11 +328,11 @@ class TestArithmeticCompilation(unittest.TestCase):
                     suitable_ops = [bitand, bitor, bitxor]
                 else:
                     suitable_ops = [
-                        add, sub, mul, div, mod,
+                        add, sub, mul, div, mod, floordiv,
                         less, greater, lessEq, greaterEq, neq,
                         bitand, bitor, bitxor, lshift, rshift
                     ]
-                    # TODO: missing pow, floordiv
+                    # TODO: missing pow
 
                 typed_to_native_op = {
                     sub: operator.sub,

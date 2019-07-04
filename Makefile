@@ -133,7 +133,7 @@ clean:
 	rm -f testcert.cert testcert.key
 	rm -rf .venv
 	rm -rf .nodeenv
-	rm object_database/web/content/dist/main.bundle.js
+	rm -f object_database/web/content/dist/main.bundle.js
 
 
 ##########################################################################

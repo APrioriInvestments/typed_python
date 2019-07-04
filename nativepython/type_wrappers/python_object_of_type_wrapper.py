@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import Int64
+from typed_python import Int64, UInt64
 from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast
@@ -91,6 +91,11 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 target_type,
                 runtime_functions.pyobj_to_int.call(expr.nonref_expr)
             )
+        if target_type.typeRepresentation == UInt64:
+            return context.pushPod(
+                target_type,
+                runtime_functions.pyobj_to_uint.call(expr.nonref_expr)
+            )
 
         return super().convert_to_type(context, expr, target_type)
 
@@ -102,6 +107,14 @@ class PythonObjectOfTypeWrapper(Wrapper):
                     targetSlot.expr.store(
                         runtime_functions.int_to_pyobj.call(expr.nonref_expr)
                     )
+            )
+        if expr.expr_type.typeRepresentation == UInt64:
+            return context.push(
+                self,
+                lambda targetSlot:
+                targetSlot.expr.store(
+                    runtime_functions.uint_to_pyobj.call(expr.nonref_expr)
+                )
             )
 
         return super().convert_to_self(context, expr)

@@ -261,6 +261,35 @@ inline double pyFloatDiv(int64_t l, int64_t r)   { return ((double)l) / (double)
 inline float pyFloatDiv(float l, float r)        { return l / r; }
 inline double pyFloatDiv(double l, double r)     { return l / r; }
 
+inline int64_t pyFloorDiv(int64_t l, int64_t r)   {
+    if (r == 0) {
+        PyErr_Format(PyExc_TypeError, "pyFloorDiv by 0");
+        throw PythonExceptionSet();
+    }
+    if (l < 0 && l == -l && r == -1) {
+        // overflow because int64_min / -1 > int64_max
+        return l;
+    }
+
+    if ((l>0 && r>0) || (l<0 && r<0)) { //same signs
+        return l / r;
+    }
+    // opposite signs
+    return (l % r) ? l / r - 1 : l / r;
+}
+inline int32_t pyFloorDiv(int32_t l, int32_t r)    { return pyFloorDiv((int64_t)l, (int64_t)r); }
+inline int16_t pyFloorDiv(int16_t l, int16_t r)    { return pyFloorDiv((int64_t)l, (int64_t)r); }
+inline int8_t pyFloorDiv(int8_t l, int8_t r)       { return pyFloorDiv((int64_t)l, (int64_t)r); }
+inline uint64_t pyFloorDiv(uint64_t l, uint64_t r) { return l / r; }
+inline uint32_t pyFloorDiv(uint32_t l, uint32_t r) { return l / r; }
+inline uint16_t pyFloorDiv(uint16_t l, uint16_t r) { return l / r; }
+inline uint8_t pyFloorDiv(uint8_t l, uint8_t r)    { return l / r; }
+inline bool pyFloorDiv(bool l, bool r)             { return l / r; }
+
+
+inline float pyFloorDiv(float l, float r)        { return std::floor(l / r); }
+inline double pyFloorDiv(double l, double r)     { return std::floor(l / r); }
+
 inline double pyPow(int8_t l, int8_t r) { return std::pow(l,r); }
 inline double pyPow(int16_t l, int16_t r) { return std::pow(l,r); }
 inline double pyPow(int32_t l, int32_t r) { return std::pow(l,r); }
@@ -323,7 +352,7 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
             PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
             throw PythonExceptionSet();
         }
-        return registerValueToPyValue(T(std::floor(self/other)));
+        return registerValueToPyValue(T(pyFloorDiv(self,other)));
     }
 
     if (strcmp(op, "__mod__") == 0) {
@@ -461,6 +490,13 @@ public:
                     }
 
                     ((T*)tgt)[0] = (result == 1);
+                    return;
+                }
+            }
+
+            if (cat == Type::TypeCategory::catUInt64) {
+                if (PyLong_CheckExact(pyRepresentation)) {
+                    ((T*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
                     return;
                 }
             }
@@ -607,7 +643,15 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
         if (PyLong_CheckExact(rhs)) {
-            return pyOperatorConcreteForRegister<T, int64_t>(*(T*)dataPtr(), PyLong_AsLong(rhs), op, opErr);
+            long l = PyLong_AsLong(rhs);
+            if (l == -1 && PyErr_Occurred()) {
+                PyErr_Clear();
+                unsigned long u = PyLong_AsUnsignedLong(rhs);
+                if (u == (unsigned long)(-1) && PyErr_Occurred())
+                    throw PythonExceptionSet();
+                return pyOperatorConcreteForRegister<T, uint64_t>(*(T*)dataPtr(), u, op, opErr);
+            }
+            return pyOperatorConcreteForRegister<T, int64_t>(*(T*)dataPtr(), l, op, opErr);
         }
         if (PyBool_Check(rhs)) {
             return pyOperatorConcreteForRegister<T, bool>(*(T*)dataPtr(), rhs == Py_True ? true : false, op, opErr);
@@ -637,7 +681,15 @@ public:
 
     PyObject* pyOperatorConcreteReverse(PyObject* rhs, const char* op, const char* opErr) {
         if (PyLong_CheckExact(rhs)) {
-            return pyOperatorConcreteForRegister<int64_t, T>(PyLong_AsLong(rhs), *(T*)dataPtr(), op, opErr);
+            long l = PyLong_AsLong(rhs);
+            if (l == -1 && PyErr_Occurred()) {
+                PyErr_Clear();
+                unsigned long u = PyLong_AsUnsignedLong(rhs);
+                if (u == (unsigned long)(-1) && PyErr_Occurred())
+                    throw PythonExceptionSet();
+                return pyOperatorConcreteForRegister<uint64_t, T>(u, *(T*)dataPtr(), op, opErr);
+            }
+            return pyOperatorConcreteForRegister<int64_t, T>(l, *(T*)dataPtr(), op, opErr);
         }
         if (PyBool_Check(rhs)) {
             return pyOperatorConcreteForRegister<bool, T>(rhs == Py_True ? true : false, *(T*)dataPtr(), op, opErr);

@@ -90,6 +90,12 @@ lshift_int64_int64 = externalCallTarget(
     Int64, Int64
 )
 
+lshift_uint64_uint64 = externalCallTarget(
+    "nativepython_runtime_lshift_int64_int64",
+    UInt64,
+    UInt64, UInt64
+)
+
 rshift_int64_int64 = externalCallTarget(
     "nativepython_runtime_rshift_int64_int64",
     Int64,
@@ -102,6 +108,17 @@ rshift_uint64_uint64 = externalCallTarget(
     UInt64, UInt64
 )
 
+floordiv_int64_int64 = externalCallTarget(
+    "nativepython_runtime_floordiv_int64_int64",
+    Int64,
+    Int64, Int64
+)
+
+floordiv_float64_float64 = externalCallTarget(
+    "nativepython_runtime_floordiv_float64_float64",
+    Float64,
+    Float64, Float64
+)
 
 get_pyobj_None = externalCallTarget(
     "nativepython_runtime_get_pyobj_None",
@@ -134,9 +151,21 @@ int_to_pyobj = externalCallTarget(
     Int64
 )
 
+uint_to_pyobj = externalCallTarget(
+    "nativepython_runtime_uint_to_pyobj",
+    Void.pointer(),
+    UInt64
+)
+
 pyobj_to_int = externalCallTarget(
     "nativepython_runtime_pyobj_to_int",
     Int64,
+    Void.pointer()
+)
+
+pyobj_to_uint = externalCallTarget(
+    "nativepython_runtime_pyobj_to_uint",
+    UInt64,
     Void.pointer()
 )
 

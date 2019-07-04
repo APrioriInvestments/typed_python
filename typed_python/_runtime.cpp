@@ -232,6 +232,14 @@ extern "C" {
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
+    uint64_t nativepython_runtime_lshift_uint64_uint64(uint64_t l, uint64_t r) {
+        if ((l == 0 && r > SSIZE_MAX) || (l != 0 && r >= 1024)) { // 1024 is arbitrary
+            throw std::runtime_error("shift count too large");
+        }
+        return l << r;
+    }
+
+    // should match corresponding function in PyRegisterTypeInstance.hpp
     uint64_t nativepython_runtime_rshift_uint64_uint64(uint64_t l, uint64_t r) {
         if (r > SSIZE_MAX) {
             throw std::runtime_error("shift count too large");
@@ -263,8 +271,37 @@ extern "C" {
         return -ret;
     }
 
+    // should match corresponding function in PyRegisterTypeInstance.hpp
+    int64_t nativepython_runtime_floordiv_int64_int64(int64_t l, int64_t r) {
+        if (r == 0) {
+            throw std::runtime_error("floordiv by 0");
+        }
+        if (l < 0 && l == -l && r == -1) {
+            // overflow because int64_min / -1 > int64_max
+            return 1;
+        }
+
+        if ((l>0 && r>0) || (l<0 && r<0)) { //same signs
+            return l / r;
+        }
+        // opposite signs
+        return (l % r) ? l / r - 1 : l / r;
+    }
+
+    // should match corresponding function in PyRegisterTypeInstance.hpp
+    double nativepython_runtime_floordiv_float64_float64(double l, double r) {
+        if (r == 0.0) {
+            throw std::runtime_error("floordiv by 0.0");
+        }
+        return std::floor(l / r);
+    }
+
     PyObject* nativepython_runtime_int_to_pyobj(int64_t i) {
         return PyLong_FromLong(i);
+    }
+
+    PyObject* nativepython_runtime_uint_to_pyobj(uint64_t u) {
+        return PyLong_FromUnsignedLong(u);
     }
 
     int64_t nativepython_runtime_pyobj_to_int(PyObject* i) {
@@ -274,5 +311,4 @@ extern "C" {
 
         throw std::runtime_error("Couldn't convert to an int64.");
     }
-
 }

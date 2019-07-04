@@ -170,95 +170,82 @@ class IntWrapper(ArithmeticTypeWrapper):
             return super().convert_bin_op(context, left, op, right)
 
         if op.matches.Mod:
-            if left.expr_type.typeRepresentation.IsUnsignedInt:
+            if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
                     native_ast.Expression.Branch(
                         cond=right.nonref_expr,
-                        true=runtime_functions.mod_uint64_uint64.call(
-                            left.toUInt64().nonref_expr,
-                            right.toUInt64().nonref_expr
+                        true=runtime_functions.mod_int64_int64.call(
+                            left.toInt64().nonref_expr,
+                            right.toInt64().nonref_expr
                         ),
                         false=generateThrowException(context, ZeroDivisionError())
                     )
                 ).convert_to_type(self)
+            # unsigned int
             return context.pushPod(
                 int,
                 native_ast.Expression.Branch(
                     cond=right.nonref_expr,
-                    true=runtime_functions.mod_int64_int64.call(
-                        left.toInt64().nonref_expr,
-                        right.toInt64().nonref_expr
+                    true=runtime_functions.mod_uint64_uint64.call(
+                        left.toUInt64().nonref_expr,
+                        right.toUInt64().nonref_expr
                     ),
                     false=generateThrowException(context, ZeroDivisionError())
                 )
             ).convert_to_type(self)
         if op.matches.Pow:
-            if left.expr_type.typeRepresentation == Int64:
-                return context.pushPod(
-                    float,
-                    runtime_functions.pow_int64_int64.call(left.nonref_expr, right.nonref_expr)
-                ).toFloat64()
-            elif left.expr_type.typeRepresentation == UInt64:
-                return context.pushPod(
-                    float,
-                    runtime_functions.pow_uint64_uint64.call(left.nonref_expr, right.nonref_expr)
-                ).toFloat64()
-            elif left.expr_type.typeRepresentation.IsSignedInt:
+            if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     float,
                     runtime_functions.pow_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
                 ).toFloat64()
-            else:  # unsigned int
-                return context.pushPod(
-                    float,
-                    runtime_functions.pow_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
-                ).toFloat64()
+            # unsigned int
+            return context.pushPod(
+                float,
+                runtime_functions.pow_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+            ).toFloat64()
         if op.matches.LShift:
-            if left.expr_type.typeRepresentation == Int64:
-                return context.pushPod(
-                    self,
-                    runtime_functions.lshift_int64_int64.call(left.nonref_expr, right.nonref_expr)
-                )
-            else:
+            if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
                     runtime_functions.lshift_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
                 ).convert_to_type(self)
+            # unsigned int
+            return context.pushPod(
+                int,
+                runtime_functions.lshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+            ).convert_to_type(self)
         if op.matches.RShift:
-            if left.expr_type.typeRepresentation == Int64:
-                return context.pushPod(
-                    self,
-                    runtime_functions.rshift_int64_int64.call(left.nonref_expr, right.nonref_expr)
-                )
-            elif left.expr_type.typeRepresentation == UInt64:
-                return context.pushPod(
-                    self,
-                    runtime_functions.rshift_uint64_uint64.call(left.nonref_expr, right.nonref_expr)
-                )
-            elif left.expr_type.typeRepresentation.IsSignedInt:
+            if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
                     runtime_functions.rshift_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
                 ).convert_to_type(self)
-            else:  # unsigned int
+            # unsigned int
+            return context.pushPod(
+                int,
+                runtime_functions.rshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+            ).convert_to_type(self)
+        if op.matches.FloorDiv:
+            if right.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
-                    runtime_functions.rshift_uint64_uint64.call(left.toUInt64().nonref_expr, right.toUInt64().nonref_expr)
+                    runtime_functions.floordiv_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
                 ).convert_to_type(self)
-        if op.matches.FloorDiv:
+            # unsigned int
             return context.pushPod(
-                float,
+                self,
                 native_ast.Expression.Branch(
                     cond=right.nonref_expr,
                     true=native_ast.Expression.Binop(
                         left=left.nonref_expr,
                         right=right.nonref_expr,
-                        op=pyOpToNative[python_ast.BinaryOp.Div()]
+                        op=native_ast.BinaryOp.Div()
                     ),
                     false=generateThrowException(context, ZeroDivisionError())
                 )
-            ).convert_to_type(self)
+            )
         if op in pyOpToNative:
             return context.pushPod(
                 self,
@@ -438,6 +425,11 @@ class FloatWrapper(ArithmeticTypeWrapper):
                     left.nonref_expr, right.nonref_expr
                 )
             )
+        if op.matches.FloorDiv:
+            return context.pushPod(
+                float,
+                runtime_functions.floordiv_float64_float64.call(left.toFloat64().nonref_expr, right.toFloat64().nonref_expr)
+            ).convert_to_type(self)
 
         if op in pyOpToNative and op not in pyOpNotForFloat:
             return context.pushPod(
