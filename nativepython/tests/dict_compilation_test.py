@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf
+from typed_python import Dict, ListOf, Tuple
 import typed_python._types as _types
 from nativepython import SpecializedEntrypoint
 import unittest
@@ -154,3 +154,51 @@ class TestDictCompilation(unittest.TestCase):
         self.assertGreater(ratio, 3)
 
         print("Speedup was ", ratio)
+
+    def test_iteration(self):
+        def iterateDirect(d):
+            res = ListOf(type(d).KeyType)()
+
+            for elt in d:
+                res.append(elt)
+
+            return res
+
+        def iterateKeys(d):
+            res = ListOf(type(d).KeyType)()
+
+            for elt in d.keys():
+                res.append(elt)
+
+            return res
+
+        def iterateValues(d):
+            res = ListOf(type(d).ValueType)()
+
+            for elt in d.values():
+                res.append(elt)
+
+            return res
+
+        def iterateItems(d):
+            res = ListOf(Tuple(type(d).KeyType, type(d).ValueType))()
+
+            for elt in d.items():
+                res.append(elt)
+
+            return res
+
+        for iterate in [iterateDirect, iterateKeys, iterateValues, iterateItems]:
+            iterateCompiled = SpecializedEntrypoint(iterate)
+
+            d = Dict(int, int)()
+
+            for i in range(100):
+                self.assertEqual(iterateCompiled(d), iterate(d))
+                d[i] = i
+
+            for i in range(50):
+                self.assertEqual(iterateCompiled(d), iterate(d))
+                del d[i * 2]
+
+            self.assertEqual(iterateCompiled(d), iterate(d))

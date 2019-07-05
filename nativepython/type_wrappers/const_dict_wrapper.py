@@ -323,7 +323,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
 
-class ConstDictIteratorWrapper(ConstDictWrapperBase):
+class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):
     def convert_method_call(self, context, expr, methodname, args, kwargs):
         if methodname == "__iter__" and not args and not kwargs:
             res = context.push(
@@ -344,19 +344,19 @@ class ConstDictIteratorWrapper(ConstDictWrapperBase):
         return super().convert_method_call(context, expr, methodname, args, kwargs)
 
 
-class ConstDictKeysWrapper(ConstDictIteratorWrapper):
+class ConstDictKeysWrapper(ConstDictMakeIteratorWrapper):
     def __init__(self, constDictType):
         super().__init__(constDictType, "keys")
         self.iteratorType = ConstDictKeysIteratorWrapper(constDictType)
 
 
-class ConstDictValuesWrapper(ConstDictIteratorWrapper):
+class ConstDictValuesWrapper(ConstDictMakeIteratorWrapper):
     def __init__(self, constDictType):
         super().__init__(constDictType, "values")
         self.iteratorType = ConstDictValuesIteratorWrapper(constDictType)
 
 
-class ConstDictItemsWrapper(ConstDictIteratorWrapper):
+class ConstDictItemsWrapper(ConstDictMakeIteratorWrapper):
     def __init__(self, constDictType):
         super().__init__(constDictType, "items")
         self.iteratorType = ConstDictItemsIteratorWrapper(constDictType)

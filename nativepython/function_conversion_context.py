@@ -431,6 +431,9 @@ class FunctionConversionContext(object):
             iter_obj = cond_context.named_var_expr(iter_varname)
             next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
 
+            if next_ptr is None:
+                return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
+
             with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
                 with if_true:
                     self.generateAssignmentExpr(target_var_name, next_ptr)
