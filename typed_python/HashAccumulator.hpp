@@ -22,13 +22,13 @@ typedef int32_t typed_python_hash_type;
 
 class HashAccumulator {
 public:
-    HashAccumulator(typed_python_hash_type init) :
+    HashAccumulator(typed_python_hash_type init = 0) :
         m_state(init)
     {
     }
 
-    void add(int64_t i) {
-        m_state = (m_state * 1000003) ^ i;
+    void add(int32_t i) {
+        m_state = int32_t(m_state * 1000003) ^ i;
     }
 
     void addBytes(uint8_t* bytes, int64_t count) {

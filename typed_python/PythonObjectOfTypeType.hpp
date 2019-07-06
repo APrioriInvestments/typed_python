@@ -62,7 +62,7 @@ public:
         return false;
     }
 
-    typed_python_hash_type hash64(instance_ptr left) {
+    typed_python_hash_type hash(instance_ptr left) {
         PyObject* p = *(PyObject**)left;
 
         return PyObject_Hash(p);

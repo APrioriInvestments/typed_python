@@ -166,7 +166,7 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream) {
     m_heldClass->repr(l.data, stream);
 }
 
-typed_python_hash_type Class::hash64(instance_ptr left) {
+typed_python_hash_type Class::hash(instance_ptr left) {
     auto it = m_heldClass->getMemberFunctions().find("__hash__");
 
     if (it != m_heldClass->getMemberFunctions().end()) {
@@ -200,7 +200,7 @@ typed_python_hash_type Class::hash64(instance_ptr left) {
     }
 
     layout& l = **(layout**)left;
-    return m_heldClass->hash64(l.data);
+    return m_heldClass->hash(l.data);
 }
 
 void Class::emptyConstructor(instance_ptr self) {

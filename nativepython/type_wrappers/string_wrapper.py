@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from typed_python import Int64, Bool, String, NoneType
+from typed_python import Int64, Bool, String, NoneType, Int32
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
@@ -38,6 +38,9 @@ class StringWrapper(RefcountedWrapper):
             ('refcount', native_ast.Int64),
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
+
+    def convert_hash(self, context, expr):
+        return context.pushPod(Int32, runtime_functions.hash_string.call(expr.nonref_expr.cast(VoidPtr)))
 
     def getNativeLayoutType(self):
         return self.layoutType

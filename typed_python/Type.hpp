@@ -154,7 +154,7 @@ public:
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
-    typed_python_hash_type hash64(instance_ptr left);
+    typed_python_hash_type hash(instance_ptr left);
 
     template<class buf_t>
     void serialize(instance_ptr left, buf_t& buffer, size_t fieldNumber) {

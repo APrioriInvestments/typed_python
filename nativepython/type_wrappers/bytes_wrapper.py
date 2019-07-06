@@ -15,7 +15,7 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import Bytes
+from typed_python import Bytes, Int32
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -40,6 +40,9 @@ class BytesWrapper(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_hash(self, context, expr):
+        return context.pushPod(Int32, runtime_functions.hash_bytes.call(expr.nonref_expr.cast(VoidPtr)))
 
     def on_refcount_zero(self, context, instance):
         assert instance.isReference

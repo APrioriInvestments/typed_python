@@ -293,7 +293,7 @@ public:
         stream << "<function " << m_name << ">";
     }
 
-    typed_python_hash_type hash64(instance_ptr left) {
+    typed_python_hash_type hash(instance_ptr left) {
         HashAccumulator acc((int)getTypeCategory());
 
         acc.addRegister((uint64_t)mPyFunc);

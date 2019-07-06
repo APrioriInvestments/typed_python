@@ -61,7 +61,7 @@ void PythonSerializationContext::serializePythonObject(PyObject* o, Serializatio
         } else
         if (PyLong_CheckExact(o)) {
             //this will fail for very large integers. We should fix this
-            b.writeSignedVarintObject(FieldNumbers::LONG, PyLong_AsLong(o));
+            b.writeSignedVarintObject(FieldNumbers::LONG, PyLong_AsLongLong(o));
         } else
         if (PyFloat_CheckExact(o)) {
             b.writeRegisterType(FieldNumbers::FLOAT, PyFloat_AsDouble(o));

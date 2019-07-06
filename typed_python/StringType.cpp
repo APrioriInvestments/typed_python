@@ -625,7 +625,7 @@ StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int
     return new_layout;
 }
 
-typed_python_hash_type StringType::hash64(instance_ptr left) {
+typed_python_hash_type StringType::hash(instance_ptr left) {
     if (!(*(layout**)left)) {
         return 0x12345;
     }

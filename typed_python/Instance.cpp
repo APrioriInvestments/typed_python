@@ -129,6 +129,6 @@ std::string Instance::repr() const {
     return s.str();
 }
 
-typed_python_hash_type Instance::hash64() const {
-    return mLayout->type->hash64(mLayout->data);
+typed_python_hash_type Instance::hash() const {
+    return mLayout->type->hash(mLayout->data);
 }

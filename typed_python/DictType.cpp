@@ -94,7 +94,7 @@ void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "}";
 }
 
-typed_python_hash_type DictType::hash64(instance_ptr left) {
+typed_python_hash_type DictType::hash(instance_ptr left) {
     throw std::logic_error(name() + " is not hashable");
 }
 
@@ -174,7 +174,7 @@ int64_t DictType::size(instance_ptr self) const {
 instance_ptr DictType::lookupValueByKey(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
-    typed_python_hash_type keyHash = m_key->hash64(key);
+    typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t index = record.find(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
         return m_key->cmp(key, ptr, Py_EQ);
@@ -190,7 +190,7 @@ instance_ptr DictType::lookupValueByKey(instance_ptr self, instance_ptr key) con
 bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
-    typed_python_hash_type keyHash = m_key->hash64(key);
+    typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t index = record.remove(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
         return m_key->cmp(key, ptr, Py_EQ);
@@ -208,7 +208,7 @@ bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
 bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
-    typed_python_hash_type keyHash = m_key->hash64(key);
+    typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t index = record.remove(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
         return m_key->cmp(key, ptr, Py_EQ);
@@ -224,7 +224,7 @@ bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr k
 instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
     layout& record = **(layout**)self;
 
-    typed_python_hash_type keyHash = m_key->hash64(key);
+    typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t slot = record.allocateNewSlot(m_bytes_per_key_value_pair);
 

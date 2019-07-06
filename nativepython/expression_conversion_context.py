@@ -20,7 +20,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
-from typed_python import NoneType, Alternative, OneOf
+from typed_python import NoneType, Alternative, OneOf, Int32
 
 
 NoneExprType = NoneWrapper()
@@ -77,6 +77,8 @@ class ExpressionConversionContext(object):
             return TypedExpression(self, native_ast.const_bool_expr(x), bool, False)
         if isinstance(x, int):
             return TypedExpression(self, native_ast.const_int_expr(x), int, False)
+        if isinstance(x, Int32):
+            return TypedExpression(self, native_ast.const_int32_expr(int(x)), Int32, False)
         if isinstance(x, float):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False)
         assert False

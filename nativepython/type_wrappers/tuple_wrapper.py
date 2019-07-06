@@ -14,7 +14,7 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types
+from typed_python import _types, Int32
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -41,6 +41,15 @@ class TupleWrapper(Wrapper):
 
         self._is_pod = all(typeWrapper(possibility).is_pod for possibility in self.subTypeWrappers)
         self.is_default_constructible = _types.is_default_constructible(t)
+
+    def convert_hash(self, context, expr):
+        val = context.constant(Int32(0))
+        for i in range(len(self.subTypeWrappers)):
+            subHash = self.refAs(context, expr, i).convert_hash()
+            if subHash is None:
+                return None
+            val = (val * context.constant(Int32(1000003))) ^ subHash
+        return val
 
     @property
     def is_pod(self):

@@ -102,7 +102,7 @@ void HeldClass::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << ")";
 }
 
-typed_python_hash_type HeldClass::hash64(instance_ptr left) {
+typed_python_hash_type HeldClass::hash(instance_ptr left) {
     HashAccumulator acc((int)getTypeCategory());
 
     //hash the class pointer, since the values within the class can change.

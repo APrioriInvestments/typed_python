@@ -492,14 +492,14 @@ public:
             layout& l = **((layout**)self);
             l.buildHashTableAfterDeserialization(
                 m_bytes_per_key_value_pair,
-                [&](instance_ptr ptr) { return m_key->hash64(ptr); }
+                [&](instance_ptr ptr) { return m_key->hash(ptr); }
                 );
         }
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    typed_python_hash_type hash64(instance_ptr left);
+    typed_python_hash_type hash(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 

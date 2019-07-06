@@ -83,7 +83,7 @@ public:
     }
 
     typed_python_hash_type hashValue() const {
-        return getType()->hash64((instance_ptr)&mLayout);
+        return getType()->hash((instance_ptr)&mLayout);
     }
 
     static inline char cmp(const Bytes& left, const Bytes& right) {

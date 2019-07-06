@@ -111,10 +111,6 @@ def toFloatType(T1):
     return T1
 
 
-def hash_int64(x):
-    return ((x >> 32) * 1000003) ^ (x & 0xFFFFFFFF)
-
-
 class IntWrapper(ArithmeticTypeWrapper):
     def __init__(self, T):
         super().__init__(T)
@@ -125,8 +121,12 @@ class IntWrapper(ArithmeticTypeWrapper):
         return native_ast.Type.Int(bits=T.Bits, signed=T.IsSignedInt)
 
     def convert_hash(self, context, expr):
-        if self.typeRepresentation in (Int64, UInt64):
-            return context.call_py_function(hash_int64, (expr,), {})
+        if self.typeRepresentation == Int64:
+            return context.pushPod(Int32, runtime_functions.hash_int64.call(expr.nonref_expr))
+
+        if self.typeRepresentation == UInt64:
+            return context.pushPod(Int32, runtime_functions.hash_uint64.call(expr.nonref_expr))
+
         return expr.convert_to_type(Int32)
 
     def convert_to_type(self, context, e, target_type):
@@ -388,6 +388,14 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
     def getNativeLayoutType(self):
         return native_ast.Type.Float(bits=self.typeRepresentation.Bits)
+
+    def convert_hash(self, context, expr):
+        if self.typeRepresentation == Float32:
+            return context.pushPod(Int32, runtime_functions.hash_float32.call(expr.nonref_expr))
+        if self.typeRepresentation == Float64:
+            return context.pushPod(Int32, runtime_functions.hash_float64.call(expr.nonref_expr))
+
+        assert False
 
     def convert_to_type(self, context, e, target_type):
         if target_type.typeRepresentation == self.typeRepresentation:

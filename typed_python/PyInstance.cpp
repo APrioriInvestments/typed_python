@@ -867,7 +867,7 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
         Type* self_type = extractTypeFrom(o->ob_type);
         PyInstance* w = (PyInstance*)o;
 
-        int64_t h = self_type->hash64(w->dataPtr());
+        int64_t h = self_type->hash(w->dataPtr());
         if (h == -1) {
             h = -2;
         }
@@ -1104,10 +1104,10 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
     }
     if (PyLong_Check(inst)) {
         try {
-            return Instance::create(PyLong_AsLong(inst));
+            return Instance::create((int64_t)PyLong_AsLongLong(inst));
         }
         catch(...) {
-            return Instance::create(PyLong_AsUnsignedLong(inst));
+            return Instance::create((uint64_t)PyLong_AsUnsignedLongLong(inst));
         }
     }
     if (PyFloat_Check(inst)) {

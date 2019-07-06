@@ -14,6 +14,20 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 import nativepython.native_ast as native_ast
+from typed_python import Int32
+
+
+def tp_hash_to_py_hash(hVal):
+    """Convert a typed-python hash to a regular python hash.
+
+    Python insists that its hash values are never -1, because it uses -1 as an
+    indicator that the exception flag is set. TypedPython doesn't have this behavior
+    because it uses c++ exception propagation internally. As a result, it's the
+    'hash' wrapper that's responsible for mapping -1 to -2.
+    """
+    if hVal == -1:
+        return Int32(-2)
+    return hVal
 
 
 class HashWrapper(Wrapper):
@@ -29,6 +43,6 @@ class HashWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and not kwargs:
-            return args[0].convert_hash()
+            return context.call_py_function(tp_hash_to_py_hash, (args[0].convert_hash(),), {})
 
         return super().convert_call(context, expr, args, kwargs)

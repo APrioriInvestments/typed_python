@@ -306,7 +306,7 @@ extern "C" {
 
     int64_t nativepython_runtime_pyobj_to_int(PyObject* i) {
         if (PyLong_Check(i)) {
-            return PyLong_AsLong(i);
+            return PyLong_AsLongLong(i);
         }
 
         throw std::runtime_error("Couldn't convert to an int64.");
@@ -334,5 +334,45 @@ extern "C" {
 
     void nativepython_dict_compressItemTable(DictType::layout* layout, size_t kvPairSize) {
         layout->compressItemTable(kvPairSize);
+    }
+
+    int32_t nativepython_hash_float32(float val) {
+        HashAccumulator acc;
+
+        acc.addRegister(val);
+
+        return acc.get();
+    }
+
+    int32_t nativepython_hash_float64(double val) {
+        HashAccumulator acc;
+
+        acc.addRegister(val);
+
+        return acc.get();
+    }
+
+    int32_t nativepython_hash_int64(int64_t val) {
+        HashAccumulator acc;
+
+        acc.addRegister(val);
+
+        return acc.get();
+    }
+
+    int32_t nativepython_hash_uint64(uint64_t val) {
+        HashAccumulator acc;
+
+        acc.addRegister(val);
+
+        return acc.get();
+    }
+
+    int32_t nativepython_hash_string(StringType::layout* s) {
+        return StringType::Make()->hash((instance_ptr)&s);
+    }
+
+    int32_t nativepython_hash_bytes(BytesType::layout* s) {
+        return BytesType::Make()->hash((instance_ptr)&s);
     }
 }

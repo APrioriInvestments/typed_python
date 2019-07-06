@@ -32,11 +32,11 @@ bool Type::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     });
 }
 
-typed_python_hash_type Type::hash64(instance_ptr left) {
+typed_python_hash_type Type::hash(instance_ptr left) {
     assertForwardsResolved();
 
     return this->check([&](auto& subtype) {
-        return subtype.hash64(left);
+        return subtype.hash(left);
     });
 }
 

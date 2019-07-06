@@ -140,7 +140,7 @@ PyObject* PyListOfInstance::listSetSizeUnsafe(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+    int64_t ix = PyLong_AsLongLong(PyTuple_GetItem(args,0));
 
     if (ix < 0) {
         PyErr_SetString(undefinedBehaviorException(), "setSizeUnsafe passed negative index");
@@ -457,7 +457,7 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
     }
 
     if (PyLong_Check(item)) {
-        return sq_item((PyObject*)this, PyLong_AsLong(item));
+        return sq_item((PyObject*)this, PyLong_AsLongLong(item));
     }
 
     if (PyIndex_Check(item)) {
@@ -472,7 +472,7 @@ PyObject* PyTupleOrListOfInstance::mp_subscript_concrete(PyObject* item) {
             return NULL;
         }
 
-        return sq_item((PyObject*)this, PyLong_AsLong(res));
+        return sq_item((PyObject*)this, PyLong_AsLongLong(res));
     }
 
     PyErr_SetObject(PyExc_KeyError, item);
@@ -495,7 +495,7 @@ PyObject* PyListOfInstance::listPointerUnsafe(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    int64_t ix = PyLong_AsLong(PyTuple_GetItem(args,0));
+    int64_t ix = PyLong_AsLongLong(PyTuple_GetItem(args,0));
 
     void* ptr = (void*)self_w->type()->eltPtr(self_w->dataPtr(), ix);
 
@@ -610,7 +610,7 @@ PyObject* PyListOfInstance::listReserve(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    int size = PyLong_AsLong(pyReserveSize);
+    int size = PyLong_AsLongLong(pyReserveSize);
 
     PyListOfInstance* self_w = (PyListOfInstance*)o;
 
@@ -646,7 +646,7 @@ PyObject* PyListOfInstance::listResize(PyObject* o, PyObject* args) {
             return NULL;
         }
 
-        int size = PyLong_AsLong(pySize);
+        int64_t size = PyLong_AsLongLong(pySize);
 
         PyListOfInstance* self_w = (PyListOfInstance*)o;
         Type* eltType = self_w->type()->getEltType();
@@ -686,7 +686,7 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
         return NULL;
     }
 
-    int which = -1;
+    int64_t which = -1;
 
     if (PyTuple_Size(args)) {
         PyObject* pySize = PyTuple_GetItem(args, 0);
@@ -696,12 +696,12 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
             return NULL;
         }
 
-        which = PyLong_AsLong(pySize);
+        which = PyLong_AsLongLong(pySize);
     }
 
     PyListOfInstance* self_w = (PyListOfInstance*)o;
 
-    int listSize = self_w->type()->count(self_w->dataPtr());
+    int64_t listSize = self_w->type()->count(self_w->dataPtr());
 
     if (listSize == 0) {
         PyErr_SetString(PyExc_TypeError, "pop from empty list");
@@ -739,7 +739,7 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
     Type* eltType = type()->getEltType();
 
     if (PyLong_Check(item)) {
-        int64_t ix = PyLong_AsLong(item);
+        int64_t ix = PyLong_AsLongLong(item);
         int64_t count = type()->count(dataPtr());
 
         if (ix < 0) {

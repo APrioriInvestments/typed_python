@@ -48,7 +48,7 @@ public:
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
-    typed_python_hash_type hash64(instance_ptr left) {
+    typed_python_hash_type hash(instance_ptr left) {
         return (int)getTypeCategory();
     }
 

@@ -20,6 +20,7 @@ Int64 = native_ast.Int64
 UInt64 = native_ast.UInt64
 Int32 = native_ast.Int32
 Float64 = native_ast.Float64
+Float32 = native_ast.Float32
 Void = native_ast.Void
 
 
@@ -348,4 +349,40 @@ dict_compressItemTable = externalCallTarget(
     "nativepython_dict_compressItemTable",
     Void,
     Void.pointer(), Int64
+)
+
+hash_float32 = externalCallTarget(
+    "nativepython_hash_float32",
+    Int32,
+    Float32
+)
+
+hash_float64 = externalCallTarget(
+    "nativepython_hash_float64",
+    Int32,
+    Float64
+)
+
+hash_int64 = externalCallTarget(
+    "nativepython_hash_int64",
+    Int32,
+    Int64
+)
+
+hash_uint64 = externalCallTarget(
+    "nativepython_hash_uint64",
+    Int32,
+    UInt64
+)
+
+hash_string = externalCallTarget(
+    "nativepython_hash_string",
+    Int32,
+    Void.pointer()
+)
+
+hash_bytes = externalCallTarget(
+    "nativepython_hash_bytes",
+    Int32,
+    Void.pointer()
 )

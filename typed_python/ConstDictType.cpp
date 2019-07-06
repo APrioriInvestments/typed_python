@@ -92,7 +92,7 @@ void ConstDictType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << "}";
 }
 
-typed_python_hash_type ConstDictType::hash64(instance_ptr left) {
+typed_python_hash_type ConstDictType::hash(instance_ptr left) {
     if (size(left) == 0) {
         return 0x123456;
     }
@@ -103,8 +103,8 @@ typed_python_hash_type ConstDictType::hash64(instance_ptr left) {
         int32_t count = size(left);
         acc.add(count);
         for (long k = 0; k < count;k++) {
-            acc.add(m_key->hash64(kvPairPtrKey(left,k)));
-            acc.add(m_value->hash64(kvPairPtrValue(left,k)));
+            acc.add(m_key->hash(kvPairPtrKey(left,k)));
+            acc.add(m_value->hash(kvPairPtrValue(left,k)));
         }
 
         (*(layout**)left)->hash_cache = acc.get();

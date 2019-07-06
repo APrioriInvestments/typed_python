@@ -86,8 +86,8 @@ public:
         stream << m_name;
     }
 
-    typed_python_hash_type hash64(instance_ptr left) {
-        return m_first_arg->hash64(left);
+    typed_python_hash_type hash(instance_ptr left) {
+        return m_first_arg->hash(left);
     }
 
     template<class buf_t>

@@ -36,8 +36,8 @@ public:
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 
-    typed_python_hash_type hash64(instance_ptr left) {
-        return mInstance.hash64();
+    typed_python_hash_type hash(instance_ptr left) {
+        return mInstance.hash();
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream) {

@@ -16,7 +16,7 @@
 
 #include "AllTypes.hpp"
 
-typed_python_hash_type BytesType::hash64(instance_ptr left) {
+typed_python_hash_type BytesType::hash(instance_ptr left) {
     HashAccumulator acc((int)getTypeCategory());
 
     if (!(*(layout**)left)) {

@@ -452,18 +452,18 @@ public:
                 ((T*)tgt)[0] = (result == 1);
                 return;
             }
+
             if (isInteger(cat)) {
-                long l = PyLong_AsLong(pyRepresentation);
+                int64_t l = PyLong_AsLongLong(pyRepresentation);
                 if (l == -1 && PyErr_Occurred()) {
-                    if (cat == Type::TypeCategory::catUInt64) {
-                        PyErr_Clear();
-                        unsigned long u = PyLong_AsUnsignedLong(pyRepresentation);
-                        if (u == (unsigned long)(-1) && PyErr_Occurred())
-                            throw PythonExceptionSet();
-                        ((T*)tgt)[0] = u;
-                        return;
+                    PyErr_Clear();
+                    // we always want to be able to cast, even if we throw information away.
+                    uint64_t u = PyLong_AsUnsignedLongLongMask(pyRepresentation);
+                    if (u == (uint64_t)(-1) && PyErr_Occurred()) {
+                        throw PythonExceptionSet();
                     }
-                    throw PythonExceptionSet();
+                    ((T*)tgt)[0] = u;
+                    return;
                 }
 
                 ((T*)tgt)[0] = l;
@@ -496,14 +496,14 @@ public:
 
             if (cat == Type::TypeCategory::catUInt64) {
                 if (PyLong_CheckExact(pyRepresentation)) {
-                    ((T*)tgt)[0] = PyLong_AsUnsignedLong(pyRepresentation);
+                    ((T*)tgt)[0] = PyLong_AsUnsignedLongLongMask(pyRepresentation);
                     return;
                 }
             }
 
             if (isInteger(cat)) {
                 if (PyLong_CheckExact(pyRepresentation)) {
-                    ((T*)tgt)[0] = PyLong_AsLong(pyRepresentation);
+                    ((T*)tgt)[0] = PyLong_AsLongLong(pyRepresentation);
                     return;
                 }
             }
@@ -600,7 +600,7 @@ public:
 
     static PyObject* extractPythonObjectConcrete(RegisterType<T>* t, instance_ptr data) {
         if (t->getTypeCategory() == Type::TypeCategory::catInt64) {
-            return PyLong_FromLong(*(int64_t*)data);
+            return PyLong_FromLongLong(*(int64_t*)data);
         }
         if (t->getTypeCategory() == Type::TypeCategory::catFloat64) {
             return PyFloat_FromDouble(*(double*)data);
@@ -643,11 +643,11 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
         if (PyLong_CheckExact(rhs)) {
-            long l = PyLong_AsLong(rhs);
+            int64_t l = PyLong_AsLongLong(rhs);
             if (l == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
-                unsigned long u = PyLong_AsUnsignedLong(rhs);
-                if (u == (unsigned long)(-1) && PyErr_Occurred())
+                uint64_t u = PyLong_AsUnsignedLongLongMask(rhs);
+                if (u == (uint64_t)(-1) && PyErr_Occurred())
                     throw PythonExceptionSet();
                 return pyOperatorConcreteForRegister<T, uint64_t>(*(T*)dataPtr(), u, op, opErr);
             }
@@ -681,11 +681,11 @@ public:
 
     PyObject* pyOperatorConcreteReverse(PyObject* rhs, const char* op, const char* opErr) {
         if (PyLong_CheckExact(rhs)) {
-            long l = PyLong_AsLong(rhs);
+            int64_t l = PyLong_AsLongLong(rhs);
             if (l == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
-                unsigned long u = PyLong_AsUnsignedLong(rhs);
-                if (u == (unsigned long)(-1) && PyErr_Occurred())
+                uint64_t u = PyLong_AsUnsignedLongLongMask(rhs);
+                if (u == (uint64_t)(-1) && PyErr_Occurred())
                     throw PythonExceptionSet();
                 return pyOperatorConcreteForRegister<uint64_t, T>(u, *(T*)dataPtr(), op, opErr);
             }
@@ -738,12 +738,13 @@ public:
     static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
         if (PyBool_Check(other)) { return pyCompare(*(T*)self, other == Py_True ? true : false, pyComparisonOp); }
         if (PyLong_Check(other)) {
-            long l = PyLong_AsLong(other);
+            int64_t l = PyLong_AsLongLong(other);
             if (l == -1 && PyErr_Occurred()) {
                 PyErr_Clear();
-                unsigned long u = PyLong_AsUnsignedLong(other);
-                if (u == (unsigned long)(-1) && PyErr_Occurred())
+                uint64_t u = PyLong_AsUnsignedLongLongMask(other);
+                if (u == (uint64_t)(-1) && PyErr_Occurred()) {
                     throw PythonExceptionSet();
+                }
                 return pyCompare(*(T*)self, u, pyComparisonOp);
             }
             return pyCompare(*(T*)self, l, pyComparisonOp);

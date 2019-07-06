@@ -169,7 +169,7 @@ public:
         });
     }
 
-    typed_python_hash_type hash64(instance_ptr left);
+    typed_python_hash_type hash(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
 
