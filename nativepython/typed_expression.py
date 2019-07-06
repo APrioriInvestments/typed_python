@@ -136,6 +136,9 @@ class TypedExpression(object):
 
         return self.expr_type.convert_to_type(self.context, self, target_type)
 
+    def get_iteration_expressions(self):
+        return self.expr_type.get_iteration_expressions(self.context, self)
+
     def convert_next(self):
         return self.expr_type.convert_next(self.context, self)
 

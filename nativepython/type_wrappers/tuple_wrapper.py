@@ -14,7 +14,7 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types, Int32
+from typed_python import _types, Int32, OneOf
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -32,6 +32,7 @@ class TupleWrapper(Wrapper):
         bytecount = _types.bytecount(t)
 
         self.subTypeWrappers = tuple(typeWrapper(sub_t) for sub_t in t.ElementTypes)
+        self.unionType = OneOf(*tuple(t.ElementTypes))
         self.byteOffsets = [0]
 
         for i in range(len(self.subTypeWrappers)-1):
@@ -80,6 +81,48 @@ class TupleWrapper(Wrapper):
                 .cast(self.subTypeWrappers[which].getNativeLayoutType().pointer())
         )
 
+    def convert_len(self, context):
+        return context.constant(len(self.subTypeWrappers))
+
+    def convert_getitem(self, context, expr, index):
+        index = index.convert_to_type(int)
+        if index is None:
+            return None
+
+        # if the argument is a constant, we can be very precise about what type
+        # we're going to get out of the indexing operation
+        if index.expr.matches.Constant:
+            if index.expr.val.matches.Int:
+                indexVal = index.expr.val.val
+
+                if indexVal >= - len(self.subTypeWrappers) and indexVal < len(self.subTypeWrappers):
+                    if indexVal < 0:
+                        indexVal += len(self.subTypeWrappers)
+
+                    return self.refAs(context, expr, indexVal)
+
+        index = index.convert_to_type(int)
+        if index is None:
+            return None
+
+        result = context.allocateUninitializedSlot(self.unionType)
+        with context.switch(
+            index.nonref_expr,
+            range(len(self.subTypeWrappers)),
+            True
+        ) as indicesAndContexts:
+            for i, subcontext in indicesAndContexts:
+                with subcontext:
+                    if i is not None:
+                        converted = self.refAs(context, expr, i).convert_to_type(self.unionType)
+                        if converted is not None:
+                            result.convert_copy_initialize(converted)
+                            context.markUninitializedSlotInitialized(result)
+                    else:
+                        context.pushException(IndexError, f"{i} not in [0, {len(self.subTypeWrappers)})")
+
+        return result
+
     def convert_assign(self, context, expr, other):
         assert expr.isReference
 
@@ -94,6 +137,9 @@ class TupleWrapper(Wrapper):
         if not self.is_pod:
             for i in range(len(self.subTypeWrappers)):
                 self.refAs(context, expr, i).convert_destroy()
+
+    def get_iteration_expressions(self, context, expr):
+        return [self.refAs(context, expr, i) for i in range(len(self.subTypeWrappers))]
 
 
 class NamedTupleWrapper(TupleWrapper):

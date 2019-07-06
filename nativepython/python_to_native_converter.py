@@ -35,6 +35,10 @@ class NativeFunctionConversionContext:
         self._output_type = output_type
         self._generatingFunction = generatingFunction
 
+    @property
+    def identity(self):
+        return ("native", self._generatingFunction, self._input_types, self._output_type)
+
     def let_varname(self):
         self.varnames += 1
         return ".var_%s" % self.varnames

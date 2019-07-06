@@ -137,6 +137,7 @@ class OneOfWrapper(Wrapper):
 
     def convert_copy_initialize(self, context, expr, other):
         assert expr.isReference
+        assert other.expr_type == self
 
         if self.is_pod:
             context.pushEffect(

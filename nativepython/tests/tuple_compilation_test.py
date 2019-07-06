@@ -12,10 +12,11 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Tuple, NamedTuple, Class, Member
+from typed_python import Function, Tuple, NamedTuple, Class, Member, ListOf
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
+from nativepython import SpecializedEntrypoint
 
 
 def Compiled(f):
@@ -72,3 +73,37 @@ class TestTupleCompilation(unittest.TestCase):
 
         self.assertEqual(res.x, 20)
         self.assertEqual(_types.refcount(res), 2)
+
+    def test_indexing(self):
+        T = Tuple(int, str)
+
+        @SpecializedEntrypoint
+        def getFirst(t):
+            return t[0]
+
+        @SpecializedEntrypoint
+        def getSecond(t):
+            return t[1]
+
+        @SpecializedEntrypoint
+        def getIx(t, i):
+            return t[i]
+
+        self.assertEqual(getFirst(T((1, '2'))), 1)
+        self.assertEqual(getSecond(T((1, '2'))), '2')
+
+        self.assertEqual(getIx(T((1, '2')), 0), 1)
+        self.assertEqual(getIx(T((1, '2')), 1), '2')
+
+    def test_iterating(self):
+        @SpecializedEntrypoint
+        def tupToString(x):
+            res = ListOf(str)()
+            for elt in x:
+                res.append(str(elt))
+            return res
+
+        self.assertEqual(
+            tupToString(Tuple(int, str)((0, 'a'))),
+            ["0", "a"]
+        )

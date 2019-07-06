@@ -15,6 +15,7 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 import nativepython.native_ast as native_ast
 import nativepython
+from typed_python import String
 
 
 class PythonFreeObjectWrapper(Wrapper):
@@ -58,3 +59,9 @@ class PythonFreeObjectWrapper(Wrapper):
         except Exception as e:
             context.pushException(type(e), str(e))
             return
+
+    def convert_to_type(self, context, expr, target_type):
+        if target_type.typeRepresentation == String:
+            return context.constant(str(self.typeRepresentation))
+
+        return super().convert_to_type(context, expr, target_type)

@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import nativepython
+from typed_python import String, Int64, Bool, Float64
 from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -37,9 +38,23 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     type
                 )
             else:
+                typeRep = argtype.typeRepresentation
+
+                # internally, we track int, bool, float, and str as Int64, Bool, Float64, etc.
+                # but that's now how python programs would see them. So, we have to convert
+                # to the python object representation of those objects.
+                if typeRep == Int64:
+                    typeRep = int
+                if typeRep == Float64:
+                    typeRep = float
+                elif typeRep == Bool:
+                    typeRep = bool
+                elif typeRep == String:
+                    typeRep = str
+
                 res = nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
-                    argtype.typeRepresentation
+                    typeRep
                 )
             return res
 

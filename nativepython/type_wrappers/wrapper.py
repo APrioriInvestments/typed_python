@@ -226,3 +226,20 @@ class Wrapper(object):
                 )
             )
         )
+
+    def get_iteration_expressions(self, context, expr):
+        """Return a fixed list of TypedExpressions iterating the object.
+
+        In cases where iteration produces a fixed set of values of possibly
+        different types, this lets us 'iterate' the object without having to jam
+        all the values down into a single OneOf
+
+        Args:
+            context - an ExpressionConversionContext
+            expr - a TypedExpression representing the current instance.
+
+        Returns:
+            None if we can't do this, or a list of TypedExpressions representing
+            the values of the expression.
+        """
+        return None

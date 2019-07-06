@@ -547,19 +547,21 @@ class ExpressionConversionContext(object):
 
         if ast.matches.Name:
             assert ast.ctx.matches.Load
-            if ast.id in self.functionContext._varname_to_type:
-                with self.ifelse(self.isInitializedVarExpr(ast.id)) as (true, false):
+            properName = self.functionContext.mapVarname(ast.id)
+
+            if properName in self.functionContext._varname_to_type:
+                with self.ifelse(self.isInitializedVarExpr(properName)) as (true, false):
                     with false:
                         self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % ast.id)
-                return self.named_var_expr(ast.id)
+                return self.named_var_expr(properName)
 
-            if ast.id in self.functionContext._free_variable_lookup:
-                return pythonObjectRepresentation(self, self.functionContext._free_variable_lookup[ast.id])
+            if properName in self.functionContext._free_variable_lookup:
+                return pythonObjectRepresentation(self, self.functionContext._free_variable_lookup[properName])
 
-            elif ast.id in __builtins__:
-                return pythonObjectRepresentation(self, __builtins__[ast.id])
+            elif properName in __builtins__:
+                return pythonObjectRepresentation(self, __builtins__[properName])
 
-            if ast.id not in self.functionContext._varname_to_type:
+            if properName not in self.functionContext._varname_to_type:
                 self.pushException(NameError, "name '%s' is not defined" % ast.id)
                 return None
 

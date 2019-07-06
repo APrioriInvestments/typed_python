@@ -43,6 +43,8 @@ class FunctionConversionContext(object):
         self._input_types = input_types
         self._output_type = output_type
         self._varname_to_type = {}
+        self._varname_map = {}
+        self._varname_map_count = {}
         self._free_variable_lookup = free_variable_lookup
         self._temp_let_var = 0
         self._temp_stack_var = 0
@@ -149,6 +151,8 @@ class FunctionConversionContext(object):
         return self._typesAreUnstable
 
     def resetTypeInstabilityFlag(self):
+        self._varname_map_count = {}
+        self._varname_map = {}
         self._typesAreUnstable = False
 
     def markTypesAreUnstable(self):
@@ -163,6 +167,8 @@ class FunctionConversionContext(object):
         return "stackvar.%s" % (self._temp_stack_var-1)
 
     def upsizeVariableType(self, varname, new_type):
+        varname = self.mapVarname(varname)
+
         if self._varname_to_type.get(varname) is None:
             if new_type is None:
                 return
@@ -187,8 +193,33 @@ class FunctionConversionContext(object):
 
         self._varname_to_type[varname] = typeWrapper(final_type)
 
+    def maskVarnameWithFreshInstantiation(self, name):
+        """Map all references to 'name' to a freshly named variable."""
+        if name not in self._varname_map:
+            self._varname_map[name] = [name]
+
+        self._varname_map_count[name] = self._varname_map_count.get(name, 0) + 1
+
+        self._varname_map[name].append(name + "." + str(self._varname_map_count[name]))
+
+    def mapVarname(self, name):
+        """Look up the 'real' varname for 'name'.
+
+        During codegen, we may have different stack-variables that map to the same
+        python variable. This happens mostly when we have different versions of the same
+        variable that have different types. We give them different names on the stack
+        """
+        return self._varname_map.get(name, [name])[-1]
+
+    def popMaskedVarname(self, name):
+        self._varname_map[name].pop()
+        if not self._varname_map[name]:
+            del self._varname_map[name]
+
     def generateAssignmentExpr(self, varname, val_to_store):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
+        varname = self.mapVarname(varname)
+
         subcontext = val_to_store.context
 
         self.upsizeVariableType(varname, val_to_store.expr_type)
@@ -426,36 +457,62 @@ class FunctionConversionContext(object):
             iter_varname = target_var_name + ".iter." + str(ast.line_number)
 
             iterator_setup_context = ExpressionConversionContext(self)
+
             to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
             if to_iterate is None:
                 return iterator_setup_context.finalize(to_iterate), False
-            iterator_object = to_iterate.convert_method_call("__iter__", (), {})
-            if iterator_object is None:
-                return iterator_setup_context.finalize(iterator_object), False
-            self.generateAssignmentExpr(iter_varname, iterator_object)
 
-            cond_context = ExpressionConversionContext(self)
-            iter_obj = cond_context.named_var_expr(iter_varname)
-            next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+            iteration_expressions = to_iterate.get_iteration_expressions()
 
-            if next_ptr is None:
-                return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
+            if iteration_expressions is not None:
+                for subexpr in iteration_expressions:
+                    self.maskVarnameWithFreshInstantiation(target_var_name)
 
-            with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
-                with if_true:
-                    self.generateAssignmentExpr(target_var_name, next_ptr)
+                    self.generateAssignmentExpr(target_var_name, subexpr)
 
-            true, true_returns = self.convert_statement_list_ast(ast.body)
+                    thisOne, thisOneReturns = self.convert_statement_list_ast(ast.body)
 
-            false, false_returns = self.convert_statement_list_ast(ast.orelse)
+                    iterator_setup_context.pushEffect(thisOne)
 
-            return (
-                iterator_setup_context.finalize(None) >>
-                native_ast.Expression.While(
-                    cond=cond_context.finalize(is_populated), while_true=true, orelse=false
-                ),
-                true_returns or false_returns
-            )
+                    self.popMaskedVarname(target_var_name)
+
+                    if not thisOneReturns:
+                        return iterator_setup_context.finalize(None), False
+
+                thisOne, thisOneReturns = self.convert_statement_list_ast(ast.orelse)
+
+                iterator_setup_context.pushEffect(thisOne)
+
+                return iterator_setup_context.finalize(None), thisOneReturns
+            else:
+                iterator_object = to_iterate.convert_method_call("__iter__", (), {})
+                if iterator_object is None:
+                    return iterator_setup_context.finalize(iterator_object), False
+
+                self.generateAssignmentExpr(iter_varname, iterator_object)
+
+                cond_context = ExpressionConversionContext(self)
+                iter_obj = cond_context.named_var_expr(iter_varname)
+                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+
+                if next_ptr is None:
+                    return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
+
+                with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                    with if_true:
+                        self.generateAssignmentExpr(target_var_name, next_ptr)
+
+                true, true_returns = self.convert_statement_list_ast(ast.body)
+
+                false, false_returns = self.convert_statement_list_ast(ast.orelse)
+
+                return (
+                    iterator_setup_context.finalize(None) >>
+                    native_ast.Expression.While(
+                        cond=cond_context.finalize(is_populated), while_true=true, orelse=false
+                    ),
+                    true_returns or false_returns
+                )
 
         if ast.matches.Raise:
             expr_contex = ExpressionConversionContext(self)
