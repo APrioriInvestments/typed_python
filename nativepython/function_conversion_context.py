@@ -213,6 +213,9 @@ class FunctionConversionContext(object):
                     )
 
     def convert_statement_ast(self, ast):
+        if ast.matches.Expr and ast.value.matches.Str:
+            return native_ast.Expression(), True
+
         if ast.matches.Assign or ast.matches.AugAssign:
             if ast.matches.Assign:
                 assert len(ast.targets) == 1

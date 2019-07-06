@@ -19,6 +19,7 @@ import unittest
 import time
 import threading
 
+
 class TestDictCompilation(unittest.TestCase):
     def test_can_copy_dict(self):
         @SpecializedEntrypoint

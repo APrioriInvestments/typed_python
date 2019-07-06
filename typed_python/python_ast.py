@@ -63,7 +63,6 @@ Statement = Statement.define(Alternative(
         'col_offset': int,
         'filename': str
     },
-
     ClassDef={
         "name": str,
         "bases": TupleOf(Expr),
@@ -74,7 +73,6 @@ Statement = Statement.define(Alternative(
         'col_offset': int,
         'filename': str
     },
-
     Return={
         "value": OneOf(Expr, None),
         'line_number': int,
