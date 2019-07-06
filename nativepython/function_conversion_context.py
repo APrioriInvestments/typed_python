@@ -271,7 +271,11 @@ class FunctionConversionContext(object):
                     return subcontext.finalize(None), False
 
                 if op is not None:
-                    val_to_store = slicing.convert_getitem(index).convert_bin_op(op, val_to_store)
+                    getItem = slicing.convert_getitem(index)
+                    if getItem is None:
+                        return subcontext.finalize(None), False
+
+                    val_to_store = getItem.convert_bin_op(op, val_to_store)
                     if val_to_store is None:
                         return subcontext.finalize(None), False
 

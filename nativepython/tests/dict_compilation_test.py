@@ -17,7 +17,7 @@ import typed_python._types as _types
 from nativepython import SpecializedEntrypoint
 import unittest
 import time
-
+import threading
 
 class TestDictCompilation(unittest.TestCase):
     def test_can_copy_dict(self):
@@ -146,7 +146,7 @@ class TestDictCompilation(unittest.TestCase):
         compiled_setmany(aDict2, 10000, 100)
         t3 = time.time()
 
-        self.assertEqual(aDict2, aDict2)
+        self.assertEqual(aDict, aDict2)
 
         ratio = (t1 - t0) / (t3 - t2)
 
@@ -154,6 +154,43 @@ class TestDictCompilation(unittest.TestCase):
         self.assertGreater(ratio, 3)
 
         print("Speedup was ", ratio)
+
+    def test_dict_read_write_perf_releases_gil(self):
+        def dict_setmany(d, count, passes):
+            for _ in range(passes):
+                for i in range(count):
+                    if i in d:
+                        d[i] += i
+                    else:
+                        d[i] = i
+
+        compiled_setmany = SpecializedEntrypoint(dict_setmany)
+
+        # make sure we compile this immediately
+        aDictToForceCompilation = Dict(int, int)()
+        compiled_setmany(aDictToForceCompilation, 1, 1)
+
+        # test it with one core
+        t0 = time.time()
+        aDict = Dict(int, int)()
+        compiled_setmany(aDict, 10000, 100)
+        t1 = time.time()
+
+        # test it with 2 cores
+        threads = [threading.Thread(target=compiled_setmany, args=(Dict(int, int)(), 10000, 100)) for _ in range(2)]
+        t2 = time.time()
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        t3 = time.time()
+
+        slowdownRatio = (t3 - t2) / (t1 - t0)
+
+        self.assertGreater(slowdownRatio, .9)
+        self.assertLess(slowdownRatio, 1.5)
+
+        print("Multicore slowdown factor was ", slowdownRatio)
 
     def test_iteration(self):
         def iterateDirect(d):
