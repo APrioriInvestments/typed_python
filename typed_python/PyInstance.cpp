@@ -288,19 +288,28 @@ PyObject* PyInstance::pyOperator(PyObject* lhs, PyObject* rhs, const char* op, c
 }
 
 PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* thirdArg, const char* op, const char* opErrRep) {
-    if (extractTypeFrom(lhs->ob_type)) {
-        return specializeForType(lhs, [&](auto& subtype) {
-            return subtype.pyTernaryOperatorConcrete(rhs, thirdArg, op, opErrRep);
-        });
-    }
+    return translateExceptionToPyObject([&]() {
+        if (extractTypeFrom(lhs->ob_type)) {
+            return specializeForType(lhs, [&](auto& subtype) {
+                return subtype.pyTernaryOperatorConcrete(rhs, thirdArg, op, opErrRep);
+            });
+        }
 
-    PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to ternary operator %s",
-        lhs->ob_type,
-        rhs->ob_type,
-        op
-        );
+        // only supporting binary version of ternary __pow__
+        if (extractTypeFrom(rhs->ob_type)) {
+            return specializeForType(rhs, [&](auto& subtype) {
+                return subtype.pyOperatorConcreteReverse(lhs, op, opErrRep);
+            });
+        }
 
-    return NULL;
+        PyErr_Format(PyExc_TypeError, "Invalid type arguments of type '%S' and '%S' to ternary operator %s",
+            lhs->ob_type,
+            rhs->ob_type,
+            op
+            );
+
+        throw PythonExceptionSet();
+    });
 }
 
 PyObject* PyInstance::pyUnaryOperatorConcrete(const char* op, const char* opErrRep) {
@@ -391,7 +400,7 @@ PyObject* PyInstance::nb_positive(PyObject* lhs) {
 
 // static
 PyObject* PyInstance::nb_absolute(PyObject* lhs) {
-    return pyUnaryOperator(lhs, "__abs__", "+");
+    return pyUnaryOperator(lhs, "__abs__", "abs");
 }
 
 // static
@@ -401,17 +410,17 @@ PyObject* PyInstance::nb_invert(PyObject* lhs) {
 
 // static
 PyObject* PyInstance::nb_int(PyObject* lhs) {
-    return pyUnaryOperator(lhs, "__int__", "+");
+    return pyUnaryOperator(lhs, "__int__", "int");
 }
 
 // static
 PyObject* PyInstance::nb_float(PyObject* lhs) {
-    return pyUnaryOperator(lhs, "__float__", "+");
+    return pyUnaryOperator(lhs, "__float__", "float");
 }
 
 // static
 PyObject* PyInstance::nb_index(PyObject* lhs) {
-    return pyUnaryOperator(lhs, "__index__", "+");
+    return pyUnaryOperator(lhs, "__index__", "index");
 }
 
 // static
