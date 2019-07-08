@@ -34,6 +34,9 @@ def dict_add_slot(instance, itemHash, slot):
             instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1):
         instance._resizeTableUnsafe()
 
+    if itemHash < 0:
+        itemHash = -itemHash
+
     offset = itemHash % instance._hash_table_size
 
     while True:
@@ -53,11 +56,14 @@ def dict_add_slot(instance, itemHash, slot):
             offset = 0
 
 
-def dict_slot_for_key(instance, item, itemHash):
+def dict_slot_for_key(instance, itemHash, item):
     slots = instance._hash_table_slots
 
     if not slots:
         return -1
+
+    if itemHash < 0:
+        itemHash = - itemHash
 
     offset = itemHash % instance._hash_table_size
 
@@ -102,6 +108,9 @@ def dict_remove_key(instance, item, itemHash):
 
     if instance._hash_table_count < instance._hash_table_size >> 3:
         instance._resizeTableUnsafe()
+
+    if itemHash < 0:
+        itemHash = - itemHash
 
     offset = itemHash % instance._hash_table_size
 
@@ -284,17 +293,21 @@ class DictWrapper(DictWrapperBase):
             val = expr.convert_to_type(int)
             if val is None:
                 return None
-            return context.pushEffect(
+            context.pushEffect(
                 instance.nonref_expr.ElementPtrIntegers(0, 8).store(val.nonref_expr)
             )
+
+            return context.pushVoid()
 
         if attr == '_hash_table_empty_slots':
             val = expr.convert_to_type(int)
             if val is None:
                 return None
-            return context.pushEffect(
+            context.pushEffect(
                 instance.nonref_expr.ElementPtrIntegers(0, 9).store(val.nonref_expr)
             )
+
+            return context.pushVoid()
 
         return super().convert_set_attribute(context, instance, attr, expr)
 
@@ -504,7 +517,7 @@ class DictWrapper(DictWrapperBase):
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
-            self.keyType,
+            self.valueType,
             expr.nonref_expr.ElementPtrIntegers(0, 1)
             .elemPtr(
                 item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
@@ -515,8 +528,9 @@ class DictWrapper(DictWrapperBase):
     def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(self.convert_items_reserved(context, inst)) as i:
             with context.ifelse(self.convert_slot_populated_native(inst, i)) as (then, otherwise):
-                self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
-                self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
+                with then:
+                    self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
+                    self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()
 
         context.pushEffect(
             runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 1).load().cast(native_ast.UInt8Ptr)) >>

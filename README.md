@@ -59,7 +59,7 @@ strings. Later, if you accidentally try to insert `None`, you'll get an
 exception at insertion time, not later when you walk the list and find an
 unexpected value inside of it.
 
-Crucially, we allow you to model the natural variation of types present in
+We can also model the natural variation of types present in
 real python programs: for instance, you can say something like
 
     ListOf(OneOf(None, str, TupleOf(int)))

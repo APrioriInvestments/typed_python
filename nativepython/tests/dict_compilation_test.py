@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple
+from typed_python import Dict, ListOf, Tuple, TupleOf
 import typed_python._types as _types
 from nativepython import SpecializedEntrypoint
 import unittest
@@ -240,3 +240,29 @@ class TestDictCompilation(unittest.TestCase):
                 del d[i * 2]
 
             self.assertEqual(iterateCompiled(d), iterate(d))
+
+    def test_refcounting(self):
+        TOI = TupleOf(int)
+        x = Dict(TOI, TOI)()
+        aTup = TOI((1, 2, 3))
+        aTup2 = TOI((1, 2, 3, 4))
+        aTup3 = TOI((1, 2, 3, 4, 5))
+
+        x[aTup] = aTup2
+
+        @SpecializedEntrypoint
+        def setItem(d, k, v):
+            d[k] = v
+
+        @SpecializedEntrypoint
+        def getItem(d, k):
+            return d[k]
+
+        self.assertEqual(getItem(x, aTup), aTup2)
+
+        setItem(x, aTup, aTup3)
+
+        self.assertEqual(getItem(x, aTup), aTup3)
+
+        self.assertEqual(_types.refcount(aTup), 2)
+        self.assertEqual(_types.refcount(aTup3), 2)

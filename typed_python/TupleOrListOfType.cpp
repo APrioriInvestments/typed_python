@@ -60,10 +60,9 @@ typed_python_hash_type TupleOrListOfType::hash(instance_ptr left) {
     }
 
     if ((*(layout**)left)->hash_cache == -1) {
-        HashAccumulator acc((int)getTypeCategory());
+        HashAccumulator acc(0);
 
         int32_t ct = count(left);
-        acc.add(ct);
 
         for (long k = 0; k < ct;k++) {
             acc.add(m_element_type->hash(eltPtr(left, k)));

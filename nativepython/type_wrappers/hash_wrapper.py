@@ -43,6 +43,10 @@ class HashWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and not kwargs:
-            return context.call_py_function(tp_hash_to_py_hash, (args[0].convert_hash(),), {})
+            hashVal = args[0].convert_hash()
+            if hashVal is None:
+                return None
+
+            return context.call_py_function(tp_hash_to_py_hash, (hashVal,), {})
 
         return super().convert_call(context, expr, args, kwargs)

@@ -13,10 +13,11 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType
+from typed_python import NoneType, Int32
 from nativepython.type_wrappers.util import min
 
 import nativepython.native_ast as native_ast
@@ -69,6 +70,21 @@ def tuple_compare_gt(left, right):
 
 def tuple_compare_gte(left, right):
     return not tuple_compare_lt(left, right)
+
+
+def tuple_of_hash(instance):
+    val = instance._hash_cache
+    if val != -1:
+        return val
+    val = Int32(0)
+    for item in instance:
+        val = (val * Int32(1000003)) ^ hash(item)
+    if val == Int32(-1):
+        val = Int32(-2)
+
+    instance._hash_cache = val
+
+    return val
 
 
 class TupleOrListOfWrapper(RefcountedWrapper):
@@ -152,6 +168,30 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
         return super().convert_bin_op(context, left, op, right)
 
+    def convert_attribute(self, context, expr, attr):
+        if attr == '_hash_cache':
+            return context.pushPod(
+                Int32,
+                expr.nonref_expr.ElementPtrIntegers(0, 1).load()
+            )
+
+        return super().convert_attribute(context, expr, attr)
+
+    def convert_set_attribute(self, context, expr, attr, val):
+        if attr == '_hash_cache':
+            val = val.convert_to_type(Int32)
+            if val is None:
+                return None
+
+            return context.pushEffect(
+                expr.nonref_expr.ElementPtrIntegers(0, 1).store(val.nonref_expr)
+            )
+
+        return super().convert_set_attribute(context, expr, attr, val)
+
+    def convert_hash(self, context, expr):
+        return context.call_py_function(tuple_of_hash, (expr,), {})
+
     def generateConcatenateTuple(self, context, out, left, right):
         def elt_ref(tupPtrExpr, iExpr):
             return context.pushReference(
@@ -224,6 +264,89 @@ class TupleOrListOfWrapper(RefcountedWrapper):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
+
+    def convert_method_call(self, context, instance, methodname, args, kwargs):
+        if methodname == "__iter__" and not args and not kwargs:
+            res = context.push(
+                TupleOrListOfIteratorWrapper(self.typeRepresentation),
+                lambda instance:
+                    instance.expr.ElementPtrIntegers(0, 0).store(-1)
+            )
+
+            context.pushReference(
+                self,
+                res.expr.ElementPtrIntegers(0, 1)
+            ).convert_copy_initialize(instance)
+
+            return res
+
+        return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+
+class TupleOrListOfIteratorWrapper(Wrapper):
+    is_pod = False
+    is_empty = False
+    is_pass_by_ref = True
+
+    def __init__(self, tupType):
+        self.tupType = tupType
+        super().__init__((tupType, "iterator"))
+
+    def getNativeLayoutType(self):
+        return native_ast.Type.Struct(
+            element_types=(("pos", native_ast.Int64), ("tup", typeWrapper(self.tupType).getNativeLayoutType())),
+            name="tuple_or_list_iterator"
+        )
+
+    def convert_next(self, context, expr):
+        context.pushEffect(
+            expr.expr.ElementPtrIntegers(0, 0).store(
+                expr.expr.ElementPtrIntegers(0, 0).load().add(1)
+            )
+        )
+        self_len = self.refAs(context, expr, 1).convert_len()
+        canContinue = context.pushPod(
+            bool,
+            expr.expr.ElementPtrIntegers(0, 0).load().lt(self_len.nonref_expr)
+        )
+
+        nextIx = context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+
+        return self.iteratedItemForReference(context, expr, nextIx), canContinue
+
+    def refAs(self, context, expr, which):
+        assert expr.expr_type == self
+
+        if which == 0:
+            return context.pushReference(int, expr.expr.ElementPtrIntegers(0, 0))
+
+        if which == 1:
+            return context.pushReference(
+                self.tupType,
+                expr.expr
+                    .ElementPtrIntegers(0, 1)
+                    .cast(typeWrapper(self.tupType).getNativeLayoutType().pointer())
+            )
+
+    def iteratedItemForReference(self, context, expr, ixExpr):
+        return typeWrapper(self.tupType).convert_getitem_unsafe(
+            context,
+            self.refAs(context, expr, 1),
+            ixExpr
+        )
+
+    def convert_assign(self, context, expr, other):
+        assert expr.isReference
+
+        for i in range(2):
+            self.refAs(context, expr, i).convert_assign(self.refAs(context, other, i))
+
+    def convert_copy_initialize(self, context, expr, other):
+        for i in range(2):
+            self.refAs(context, expr, i).convert_copy_initialize(self.refAs(context, other, i))
+
+    def convert_destroy(self, context, expr):
+        self.refAs(context, expr, 1).convert_destroy()
 
 
 class TupleOfWrapper(TupleOrListOfWrapper):

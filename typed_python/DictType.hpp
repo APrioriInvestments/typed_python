@@ -49,6 +49,13 @@ public:
                 return -1;
             }
 
+            //because typed_python has to use python's mod, which is different than
+            //c++'s mod for negative numbers, we just map negatives to positives.
+            if (hash < 0) {
+                hash = -hash;
+            }
+
+
             int32_t offset = hash % hash_table_size;
 
             while (true) {
@@ -80,6 +87,12 @@ public:
         void add(typed_python_hash_type hash, int32_t slot) {
             if (hash_table_count * 2 + 1 > hash_table_size || hash_table_empty_slots < hash_table_size / 4 + 1) {
                 resizeTable();
+            }
+
+            //because typed_python has to use python's mod, which is different than
+            //c++'s mod for negative numbers, we just map negatives to positives.
+            if (hash < 0) {
+                hash = -hash;
             }
 
             int32_t offset = hash % hash_table_size;
@@ -115,6 +128,12 @@ public:
             //compress the hashtable if it's really empty
             if (hash_table_count < hash_table_size / 8) {
                 resizeTable();
+            }
+
+            //because typed_python has to use python's mod, which is different than
+            //c++'s mod for negative numbers, we just map negatives to positives.
+            if (hash < 0) {
+                hash = -hash;
             }
 
             int32_t offset = hash % hash_table_size;
