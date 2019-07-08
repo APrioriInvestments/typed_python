@@ -135,12 +135,6 @@ class StringWrapper(RefcountedWrapper):
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
 
-    def convert_to_self(self, context, expr):
-        if expr.expr_type == self:
-            return expr
-
-        context.pushException(TypeError, f"Can't convert object of type {expr.expr_type} to 'str'")
-
     def constant(self, context, s):
         return context.push(
             str,

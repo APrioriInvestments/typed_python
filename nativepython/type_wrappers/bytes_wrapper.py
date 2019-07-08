@@ -50,6 +50,45 @@ class BytesWrapper(RefcountedWrapper):
 
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
+            if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
+                cmp_res = context.pushPod(
+                    int,
+                    runtime_functions.bytes_cmp.call(
+                        left.nonref_expr.cast(VoidPtr),
+                        right.nonref_expr.cast(VoidPtr)
+                    )
+                )
+                if op.matches.Eq:
+                    return context.pushPod(
+                        bool,
+                        cmp_res.nonref_expr.eq(0)
+                    )
+                if op.matches.NotEq:
+                    return context.pushPod(
+                        bool,
+                        cmp_res.nonref_expr.neq(0)
+                    )
+                if op.matches.Lt:
+                    return context.pushPod(
+                        bool,
+                        cmp_res.nonref_expr.lt(0)
+                    )
+                if op.matches.LtE:
+                    return context.pushPod(
+                        bool,
+                        cmp_res.nonref_expr.lte(0)
+                    )
+                if op.matches.Gt:
+                    return context.pushPod(
+                        bool,
+                        cmp_res.nonref_expr.gt(0)
+                    )
+                if op.matches.GtE:
+                    return context.pushPod(
+                        bool,
+                        cmp_res.nonref_expr.gte(0)
+                    )
+
             if op.matches.Add:
                 return context.push(
                     bytes,

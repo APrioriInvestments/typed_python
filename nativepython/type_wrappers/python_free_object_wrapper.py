@@ -60,8 +60,14 @@ class PythonFreeObjectWrapper(Wrapper):
             context.pushException(type(e), str(e))
             return
 
-    def convert_to_type(self, context, expr, target_type):
-        if target_type.typeRepresentation == String:
-            return context.constant(str(self.typeRepresentation))
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        target_type = targetVal.expr_type
 
-        return super().convert_to_type(context, expr, target_type)
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        if target_type.typeRepresentation == String:
+            targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation)))
+            return context.cosntant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)

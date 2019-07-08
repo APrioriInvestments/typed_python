@@ -259,8 +259,17 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(callOrExceptType(c_find_5, s, s, 0, 1, 2), callOrExceptType(s.find, s, 0, 1, 2))
             self.assertEqual(callOrExceptType(c_find_1, s), callOrExceptType(s.find))
 
-    def test_string_is_something(self):
+    def test_string_from_float(self):
+        @Compiled
+        def toString(f: float):
+            return str(f)
 
+        self.assertEqual(toString(1.2), "1.2")
+
+        # this is not actually correct, but it's our current behavior
+        self.assertEqual(toString(1), "1")
+
+    def test_string_is_something(self):
         @Compiled
         def c_isalpha(s: str):
             return s.isalpha()

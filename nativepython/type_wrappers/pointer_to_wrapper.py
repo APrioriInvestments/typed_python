@@ -59,7 +59,12 @@ class PointerToWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
-    def convert_to_type(self, context, e, target_type):
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        target_type = targetVal.expr_type
+
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
         if target_type.typeRepresentation == String:
             asInt = e.convert_to_type(int)
             if asInt is None:
@@ -69,15 +74,19 @@ class PointerToWrapper(Wrapper):
             if asStr is None:
                 return None
 
-            return context.constant("0x") + asStr
+            resStr = context.constant("0x") + asStr
+            targetVal.convert_copy_initialize(resStr)
+            return context.constant(True)
 
         if target_type.typeRepresentation == Int64:
-            return context.pushPod(int, e.nonref_expr.cast(native_ast.Int64))
+            context.pushEffect(targetVal.expr.store(e.nonref_expr.cast(native_ast.Int64)))
+            return context.constant(True)
 
         if target_type.typeRepresentation == Bool:
-            return e != context.zero(self)
+            targetVal.convert_copy_initialize(e != context.zero(self))
+            return context.constant(True)
 
-        return super().convert_to_type(context, e, target_type)
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_bin_op(self, context, left, op, right):
         if op.matches.Add:

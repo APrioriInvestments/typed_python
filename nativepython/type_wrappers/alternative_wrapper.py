@@ -207,11 +207,16 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
             instance.nonref_expr.ElementPtrIntegers(0, 2).cast(self.underlyingLayout.getNativeLayoutType().pointer())
         )
 
-    def convert_to_type(self, context, instance, otherType):
-        if otherType == typeWrapper(self.alternativeType):
-            return instance.changeType(otherType)
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        assert targetVal.isReference
 
-        return super().convert_to_type(context, instance, otherType)
+        target_type = targetVal.expr_type
+
+        if target_type == typeWrapper(self.alternativeType):
+            targetVal.convert_copy_initialize(e.changeType(target_type))
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         tupletype = self.typeRepresentation.ElementType

@@ -129,52 +129,68 @@ class IntWrapper(ArithmeticTypeWrapper):
 
         return expr.convert_to_type(Int32)
 
-    def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == self.typeRepresentation:
-            return e
-        elif target_type.typeRepresentation in (Float64, Float32):
-            return context.pushPod(
-                target_type.typeRepresentation,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
-                )
-            )
-        elif target_type.typeRepresentation == Bool:
-            return e != 0
-        elif isinstance(target_type, IntWrapper):
-            return context.pushPod(
-                target_type.typeRepresentation,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Int(
-                        bits=target_type.typeRepresentation.Bits,
-                        signed=target_type.typeRepresentation.IsSignedInt
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        assert targetVal.isReference
+
+        target_type = targetVal.expr_type
+
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        if target_type.typeRepresentation in (Float64, Float32):
+            context.pushEffect(
+                targetVal.expr.store(
+                    native_ast.Expression.Cast(
+                        left=e.nonref_expr,
+                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
                     )
                 )
             )
-        elif target_type.typeRepresentation == String:
+            return context.constant(True)
+
+        if target_type.typeRepresentation == Bool and explicit:
+            targetVal.convert_copy_initialize(e != 0)
+            return context.constant(True)
+
+        if isinstance(target_type, IntWrapper):
+            context.pushEffect(
+                targetVal.expr.store(
+                    native_ast.Expression.Cast(
+                        left=e.nonref_expr,
+                        to_type=native_ast.Type.Int(
+                            bits=target_type.typeRepresentation.Bits,
+                            signed=target_type.typeRepresentation.IsSignedInt
+                        )
+                    )
+                )
+            )
+            return context.constant(True)
+
+        if target_type.typeRepresentation == String:
             if self.typeRepresentation == Int64:
-                return context.push(
+                strForm = context.push(
                     str,
                     lambda strRef: strRef.expr.store(
                         runtime_functions.int64_to_string.call(e.nonref_expr).cast(strRef.expr_type.layoutType)
                     )
                 )
+            else:
+                suffix = {
+                    UInt64: 'u64',
+                    Int32: 'i32',
+                    UInt32: 'u32',
+                    Int16: 'i16',
+                    UInt16: 'u16',
+                    Int8: 'i8',
+                    UInt8: 'u8'
+                }[self.typeRepresentation]
 
-            suffix = {
-                UInt64: 'u64',
-                Int32: 'i32',
-                UInt32: 'u32',
-                Int16: 'i16',
-                UInt16: 'u16',
-                Int8: 'i8',
-                UInt8: 'u8'
-            }[self.typeRepresentation]
+                strForm = e.convert_to_type(int).convert_to_type(str) + context.constant(suffix)
 
-            return e.convert_to_type(int).convert_to_type(str) + context.constant(suffix)
+            targetVal.convert_copy_initialize(strForm)
+            return context.constant(True)
 
-        return super().convert_to_type(context, e, target_type)
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_bin_op(self, context, left, op, right):
         if op.matches.Div:
@@ -311,30 +327,38 @@ class BoolWrapper(ArithmeticTypeWrapper):
     def convert_hash(self, context, expr):
         return expr.convert_to_type(Int32)
 
-    def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == self.typeRepresentation:
-            return e
-        elif target_type.typeRepresentation in (Float64, Float32):
-            return context.pushPod(
-                target_type.typeRepresentation,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
-                )
-            )
-        elif isinstance(target_type, IntWrapper):
-            return context.pushPod(
-                target_type.typeRepresentation,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Int(
-                        bits=target_type.typeRepresentation.Bits,
-                        signed=target_type.typeRepresentation.IsSignedInt
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        target_type = targetVal.expr_type
+
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        if target_type.typeRepresentation in (Float64, Float32):
+            context.pushEffect(
+                targetVal.expr.store(
+                    native_ast.Expression.Cast(
+                        left=e.nonref_expr,
+                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
                     )
                 )
             )
+            return context.constant(True)
 
-        return super().convert_to_type(context, e, target_type)
+        elif isinstance(target_type, IntWrapper):
+            context.pushEffect(
+                targetVal.expr.store(
+                    native_ast.Expression.Cast(
+                        left=e.nonref_expr,
+                        to_type=native_ast.Type.Int(
+                            bits=target_type.typeRepresentation.Bits,
+                            signed=target_type.typeRepresentation.IsSignedInt
+                        )
+                    )
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
@@ -397,29 +421,50 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
         assert False
 
-    def convert_to_type(self, context, e, target_type):
-        if target_type.typeRepresentation == self.typeRepresentation:
-            return e
-        elif target_type.typeRepresentation in [Float32, Float64]:
-            return context.pushPod(
-                target_type.typeRepresentation,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
-                )
-            )
-        elif target_type.typeRepresentation == Int64:
-            return context.pushPod(
-                int,
-                native_ast.Expression.Cast(
-                    left=e.nonref_expr,
-                    to_type=native_ast.Type.Int(bits=64, signed=True)
-                )
-            )
-        elif target_type.typeRepresentation == Bool:
-            return e != 0.0
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        target_type = targetVal.expr_type
 
-        return super().convert_to_type(context, e, target_type)
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        if target_type.typeRepresentation in (Float32, Float64):
+            context.pushEffect(
+                targetVal.expr.store(
+                    native_ast.Expression.Cast(
+                        left=e.nonref_expr,
+                        to_type=native_ast.Type.Float(bits=target_type.typeRepresentation.Bits)
+                    )
+                )
+            )
+            return context.constant(True)
+
+        if target_type.typeRepresentation == String:
+            if self.typeRepresentation == Float64:
+                func = runtime_functions.float64_to_string
+            else:
+                func = runtime_functions.float32_to_string
+
+            context.pushEffect(
+                targetVal.expr.store(func.call(e.nonref_expr).cast(target_type.layoutType))
+            )
+            return context.constant(True)
+
+        if target_type.typeRepresentation == Int64:
+            context.pushEffect(
+                targetVal.expr.store(
+                    native_ast.Expression.Cast(
+                        left=e.nonref_expr,
+                        to_type=native_ast.Type.Int(bits=64, signed=True)
+                    )
+                )
+            )
+            return context.constant(True)
+
+        if target_type.typeRepresentation == Bool:
+            targetVal.convert_copy_initialize(e != 0.0)
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type != self:

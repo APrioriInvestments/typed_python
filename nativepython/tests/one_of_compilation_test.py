@@ -34,7 +34,7 @@ Value = Value.define(
         float,
         int,
         str,
-        # bytes,
+        bytes,
         ConstDict(Value, Value),
         TupleOf(Value)
     )
@@ -47,7 +47,7 @@ someValues = [
     0.0, 1.0,
     0, 1,
     "hi",
-    # b"bye",
+    b"bye",
     Value({'hi': 'bye'}),
     Value((1, 2, 3))
 ]
@@ -152,8 +152,7 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return x
 
         self.assertEqual(f(10), 10)
-        with self.assertRaises(Exception):
-            f(10.5)
+        self.assertEqual(f(10.5), 10)
 
     def test_one_of_downcast_to_oneof(self):
         @Compiled
@@ -162,8 +161,7 @@ class TestOneOfOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(10), 10)
         self.assertIs(f(None), None)
-        with self.assertRaises(Exception):
-            f(10.5)
+        self.assertEqual(f(10.5), 10)
 
     def test_one_of_upcast(self):
         @Compiled
@@ -191,3 +189,33 @@ class TestOneOfOfCompilation(unittest.TestCase):
         for val1 in someValues:
             for val2 in someValues:
                 self.assertEqual(val1 == val2, f(val1, val2), (val1, val2))
+
+    def test_convert_ordering(self):
+        # we should always pick the int if we can
+        @Compiled
+        def f(x: int) -> OneOf(int, float):
+            return x
+
+        self.assertEqual(f(1), 1)
+        self.assertIs(type(f(1)), int)
+
+        @Compiled
+        def f2(x: int) -> OneOf(float, int):
+            return x
+
+        self.assertEqual(f2(1), 1)
+        self.assertIs(type(f2(1)), int)
+
+        # but if there's no exact conversion form,
+        # we will prefer whichever one comes first
+        @Compiled
+        def f3(x: float) -> OneOf(int, str):
+            return x
+
+        self.assertIs(type(f3(1.5)), int)
+
+        @Compiled
+        def f4(x: float) -> OneOf(str, int):
+            return x
+
+        self.assertEqual(f4(1.5), "1.5")

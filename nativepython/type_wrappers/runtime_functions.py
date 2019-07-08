@@ -309,6 +309,12 @@ string_isupper = externalCallTarget(
     Void.pointer()
 )
 
+bytes_cmp = externalCallTarget(
+    "nativepython_runtime_bytes_cmp",
+    Int64,
+    Void.pointer(), Void.pointer()
+)
+
 bytes_concat = externalCallTarget(
     "nativepython_runtime_bytes_concat",
     Void.pointer(),
@@ -331,6 +337,18 @@ int64_to_string = externalCallTarget(
     "nativepython_int64_to_string",
     Void.pointer(),
     Int64
+)
+
+float64_to_string = externalCallTarget(
+    "nativepython_float64_to_string",
+    Void.pointer(),
+    Float64
+)
+
+float32_to_string = externalCallTarget(
+    "nativepython_float32_to_string",
+    Void.pointer(),
+    Float32
 )
 
 dict_allocateNewSlot = externalCallTarget(

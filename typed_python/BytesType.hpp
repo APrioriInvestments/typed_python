@@ -82,6 +82,7 @@ public:
     typed_python_hash_type hash(instance_ptr left);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+
     static char cmpStatic(layout* left, layout* right);
 
     static BytesType* Make() { static BytesType res; return &res; }

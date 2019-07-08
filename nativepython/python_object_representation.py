@@ -51,6 +51,9 @@ _type_to_type_wrapper_cache = {}
 
 
 def typedPythonTypeToTypeWrapper(t):
+    if isinstance(t, Wrapper):
+        return t
+
     if t not in _type_to_type_wrapper_cache:
         _type_to_type_wrapper_cache[t] = _typedPythonTypeToTypeWrapper(t)
     return _type_to_type_wrapper_cache[t]
@@ -98,6 +101,7 @@ def _typedPythonTypeToTypeWrapper(t):
         return DictWrapper(t)
 
     if t.__typed_python_category__ == "ConcreteAlternative":
+        print(t, type(t))
         return makeAlternativeWrapper(t)
 
     if t.__typed_python_category__ == "NamedTuple":

@@ -13,9 +13,9 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.type_wrappers.exceptions import generateThrowException
 
-from typed_python import _types, OneOf
+from typed_python import _types, OneOf, PointerTo
+from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -163,63 +163,103 @@ class OneOfWrapper(Wrapper):
                     with subcontext:
                         self.refAs(context, expr, ix).convert_destroy()
 
-    def convert_to_type(self, context, expr, otherType):
-        if otherType == self:
-            return expr
+    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
+        assert expr.isReference
 
-        if otherType.typeRepresentation in self.typeRepresentation.Types:
-            # this is wrong - we need to be unpacking each of the alternatives
-            # and attempting to convert them. Which should probably be a function...
-            assert expr.isReference
+        isInitialized = context.push(bool, lambda tgt: tgt.expr.store(native_ast.const_bool_expr(False)))
 
-            which = tuple(self.typeRepresentation.Types).index(otherType.typeRepresentation)
+        with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
+                            range(len(self.typeRepresentation.Types)),
+                            False) as indicesAndContexts:
+            for ix, subcontext in indicesAndContexts:
+                with subcontext:
+                    concreteChild = self.refAs(context, expr, ix)
 
-            result = context.allocateUninitializedSlot(otherType)
-
-            with context.ifelse(expr.expr.ElementPtrIntegers(0, 0).load().eq(native_ast.const_uint8_expr(which))) as (true, false):
-                with true:
-                    result.convert_copy_initialize(self.refAs(context, expr, which))
-                    context.markUninitializedSlotInitialized(result)
-                with false:
+                    converted = concreteChild.expr_type.convert_to_type_with_target(context, concreteChild, targetVal, explicit)
                     context.pushEffect(
-                        generateThrowException(context, Exception("Can't convert."))
+                        isInitialized.expr.store(converted.nonref_expr)
                     )
 
-            return result
-        else:
-            return super().convert_to_type(context, expr, otherType)
+        return isInitialized
 
-    def convert_to_self(self, context, otherExpr):
-        if otherExpr.expr_type == self:
-            return otherExpr
+    def convert_to_self_with_target(self, context, targetVal, otherExpr, explicit):
+        assert targetVal.isReference
 
-        return context.push(
-            self,
-            lambda result: self.convert_to_self_with_target(context, result, otherExpr)
+        native = context.converter.defineNativeFunction(
+            f'convert({otherExpr.expr_type}, {targetVal.expr_type}, explicit={explicit})',
+            ('convert', otherExpr.expr_type, targetVal.expr_type, explicit),
+            [PointerTo(self.typeRepresentation), otherExpr.expr_type],
+            bool,
+            lambda *args: self.generateConvertToSelf(*args, explicit=explicit)
         )
 
-    def convert_to_self_with_target(self, context, result, otherExpr):
-        if otherExpr.expr_type == self:
-            result.convert_copy_initialize(otherExpr)
-        elif isinstance(otherExpr.expr_type, OneOfWrapper):
-            with context.switch(
-                    otherExpr.expr.ElementPtrIntegers(0, 0).load(),
-                    range(len(otherExpr.expr_type.typeRepresentation.Types)),
-                    False
-            ) as indicesAndContexts:
-                for i, subcontext in indicesAndContexts:
-                    with subcontext:
-                        self.convert_to_self_with_target(
-                            context,
-                            result,
-                            otherExpr.expr_type.refAs(context, otherExpr, i)
-                        )
-        elif otherExpr.expr_type.typeRepresentation in self.typeRepresentation.Types:
-            which = tuple(self.typeRepresentation.Types).index(otherExpr.expr_type.typeRepresentation)
-
-            context.pushEffect(
-                result.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(which))
+        didConvert = context.pushPod(
+            bool,
+            native.call(
+                targetVal.changeType(PointerTo(self.typeRepresentation), False),
+                otherExpr
             )
-            self.refAs(context, result, which).convert_copy_initialize(otherExpr)
-        else:
-            return super().convert_to_self(context, otherExpr)
+        )
+
+        return didConvert
+
+    def generateConvertToSelf(self, context, _, convertIntoPtr, convertFrom, explicit):
+        """Store a conversion of 'convertFrom' into the pointed-to-value at convertIntoPointer."""
+        assert not isinstance(convertFrom.expr_type, OneOfWrapper), "This should already have been expanded away"
+
+        # 'convertIntoPtr' is a PointerTo(self.typeRepresentation), and the nonref_expr of that has exactly
+        # the same layout as the 'expr' for a reference to 'self'.
+        targetVal = TypedExpression(context, convertIntoPtr.nonref_expr, self, True)
+
+        explicitnessPasses = [False, True] if explicit else [False]
+
+        for explicitThisTime in explicitnessPasses:
+            # first, try converting without explicit turned on. If that works, that's our preferred
+            # conversion.
+            for ix, type in enumerate(self.typeRepresentation.Types):
+                # get a pointer to the uninitialized target as if it were the 'ix'th type
+                typedTarget = self.refAs(context, targetVal, ix)
+
+                if typedTarget.expr_type == convertFrom.expr_type:
+                    typedTarget.convert_copy_initialize(convertFrom)
+
+                    context.pushEffect(
+                        targetVal.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
+                    )
+                    context.pushEffect(
+                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
+                    )
+                    return
+
+                converted = convertFrom.expr_type.convert_to_type_with_target(
+                    context,
+                    convertFrom,
+                    typedTarget,
+                    explicitThisTime
+                )
+
+                if converted.expr.matches.Constant and converted.expr.val.matches.Int and converted.expr.val.val:
+                    # we _definitely_ match
+                    context.pushEffect(
+                        targetVal.expr.ElementPtrIntegers(0, 0).store(native_ast.const_uint8_expr(ix))
+                    )
+                    context.pushEffect(
+                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
+                    )
+                    return
+
+                if converted.expr.matches.Constant and converted.expr.val.matches.Int and not converted.expr.val.val:
+                    # we definitely didn't match
+                    pass
+                else:
+                    # maybe we matched.
+                    with context.ifelse(converted.nonref_expr) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            context.pushEffect(
+                                native_ast.Expression.Return(arg=native_ast.const_bool_expr(True))
+                            )
+
+        # at the end, we didn't convert
+        context.pushEffect(
+            native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+        )

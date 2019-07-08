@@ -85,36 +85,48 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
         )
 
-    def convert_to_type(self, context, expr, target_type):
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        target_type = targetVal.expr_type
+
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
         if target_type.typeRepresentation == Int64:
-            return context.pushPod(
-                target_type,
-                runtime_functions.pyobj_to_int.call(expr.nonref_expr)
-            )
-        if target_type.typeRepresentation == UInt64:
-            return context.pushPod(
-                target_type,
-                runtime_functions.pyobj_to_uint.call(expr.nonref_expr)
-            )
-
-        return super().convert_to_type(context, expr, target_type)
-
-    def convert_to_self(self, context, expr):
-        if expr.expr_type.typeRepresentation == Int64:
-            return context.push(
-                self,
-                lambda targetSlot:
-                    targetSlot.expr.store(
-                        runtime_functions.int_to_pyobj.call(expr.nonref_expr)
-                    )
-            )
-        if expr.expr_type.typeRepresentation == UInt64:
-            return context.push(
-                self,
-                lambda targetSlot:
-                targetSlot.expr.store(
-                    runtime_functions.uint_to_pyobj.call(expr.nonref_expr)
+            context.pushEffect(
+                targetVal.expr.store(
+                    runtime_functions.pyobj_to_int.call(e.nonref_expr)
                 )
             )
+            return context.constant(True)
 
-        return super().convert_to_self(context, expr)
+        if target_type.typeRepresentation == UInt64:
+            context.pushEffect(
+                targetVal.expr.store(
+                    runtime_functions.pyobj_to_uint.call(e.nonref_expr)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        if not explicit:
+            return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
+
+        if sourceVal.expr_type.typeRepresentation == Int64:
+            context.pushEffect(
+                targetVal.expr.store(
+                    runtime_functions.int_to_pyobj.call(sourceVal.nonref_expr)
+                )
+            )
+            return context.constant(True)
+
+        if sourceVal.expr_type.typeRepresentation == UInt64:
+            context.pushEffect(
+                targetVal.expr.store(
+                    runtime_functions.uint_to_pyobj.call(sourceVal.nonref_expr)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)

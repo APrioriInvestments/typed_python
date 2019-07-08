@@ -106,6 +106,10 @@ extern "C" {
         return StringType::createFromUtf8(utf8_str, len);
     }
 
+    int64_t nativepython_runtime_bytes_cmp(BytesType::layout* lhs, BytesType::layout* rhs) {
+        return BytesType::cmpStatic(lhs, rhs);
+    }
+
     BytesType::layout* nativepython_runtime_bytes_concat(BytesType::layout* lhs, BytesType::layout* rhs) {
         return BytesType::concatenate(lhs, rhs);
     }
@@ -322,6 +326,25 @@ extern "C" {
         int64_t count = sprintf((char*)data, "%ld", i);
 
         return StringType::createFromUtf8(data, count);
+    }
+
+    StringType::layout* nativepython_float64_to_string(double i) {
+        std::ostringstream s;
+        ReprAccumulator acc(s);
+        acc << i;
+
+        std::string rep = s.str();
+        return StringType::createFromUtf8(&rep[0], rep.size());
+    }
+
+    StringType::layout* nativepython_float32_to_string(float i) {
+        std::ostringstream s;
+
+        s << i << "f32";
+
+        std::string rep = s.str();
+
+        return StringType::createFromUtf8(&rep[0], rep.size());
     }
 
     int32_t nativepython_dict_allocateNewSlot(DictType::layout* layout, size_t kvPairSize) {

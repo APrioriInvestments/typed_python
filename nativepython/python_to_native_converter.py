@@ -56,38 +56,43 @@ class NativeFunctionConversionContext:
         return self.getFunction(), self._output_type
 
     def getFunction(self):
-        subcontext = ExpressionConversionContext(self)
-        output_type = self._output_type
-        input_types = self._input_types
-        generatingFunction = self._generatingFunction
+        try:
+            subcontext = ExpressionConversionContext(self)
+            output_type = self._output_type
+            input_types = self._input_types
+            generatingFunction = self._generatingFunction
 
-        if output_type.is_pass_by_ref:
-            outputArg = subcontext.inputArg(output_type, '.return')
-        else:
-            outputArg = None
+            if output_type.is_pass_by_ref:
+                outputArg = subcontext.inputArg(output_type, '.return')
+            else:
+                outputArg = None
 
-        inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
-                     else subcontext.pushPod(native_ast.nullExpr, input_types[i])
-                     for i in range(len(input_types))]
+            inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
+                         else subcontext.pushPod(input_types[i], native_ast.nullExpr)
+                         for i in range(len(input_types))]
 
-        generatingFunction(subcontext, outputArg, *inputArgs)
+            generatingFunction(subcontext, outputArg, *inputArgs)
 
-        native_args = [
-            ('a_%s' % i, input_types[i].getNativePassingType())
-            for i in range(len(input_types)) if not input_types[i].is_empty
-        ]
-        if output_type.is_pass_by_ref:
-            # the first argument is actually the output
-            native_output_type = native_ast.Void
-            native_args = [('.return', output_type.getNativePassingType())] + native_args
-        else:
-            native_output_type = output_type.getNativeLayoutType()
+            native_args = [
+                ('a_%s' % i, input_types[i].getNativePassingType())
+                for i in range(len(input_types)) if not input_types[i].is_empty
+            ]
 
-        return native_ast.Function(
-            args=native_args,
-            output_type=native_output_type,
-            body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
-        )
+            if output_type.is_pass_by_ref:
+                # the first argument is actually the output
+                native_output_type = native_ast.Void
+                native_args = [('.return', output_type.getNativePassingType())] + native_args
+            else:
+                native_output_type = output_type.getNativeLayoutType()
+
+            return native_ast.Function(
+                args=native_args,
+                output_type=native_output_type,
+                body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
+            )
+        except Exception:
+            print("Failing function is ", self.identity)
+            raise
 
 
 class TypedCallTarget(object):

@@ -47,8 +47,14 @@ class TypedExpression(object):
         self.expr_type = t
         self.isReference = isReference
 
-    def changeType(self, newType):
-        return TypedExpression(self.context, self.expr, newType, self.isReference)
+    def changeType(self, newType, isReferenceOverride=None):
+        """Return a TypedExpression with the same native_ast content but a different type-wrapper."""
+        return TypedExpression(
+            self.context,
+            self.expr,
+            typeWrapper(newType),
+            self.isReference if isReferenceOverride is None else isReferenceOverride
+        )
 
     def as_native_call_arg(self):
         """Convert this expression to a call-argument form."""

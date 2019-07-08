@@ -59,6 +59,7 @@ class Wrapper(object):
         super().__init__()
 
         self.typeRepresentation = typeRepresentation
+        self._conversionCache = {}
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -169,20 +170,58 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))
         )
 
-    def convert_to_type(self, context, expr, target_type):
-        return target_type.convert_to_self(context, expr)
+    def convert_to_type(self, context, expr, target_type, explicit=True):
+        """Convert to 'target_type' and return a handle on the resulting expression.
 
-    def convert_to_self(self, context, expr):
-        if expr.expr_type == self:
+        If 'explicit', then we're requesting an agressive conversion that may lose information.
+
+        If non-explicit, then we only allow conversion that's an obvious upcast (say, from float
+        to OneOf(None, float))
+
+        We return a TypedExpression, or None if the operation always throws an exception.
+
+        Subclasses are not generally expected to override this function.
+
+        Args:
+            context - an ExpressionConversionContext
+            expr - a TypedExpression for the instance we're converting
+            target_type - a Wrapper for the target type we're converting to
+            explicit (bool) - should we allow conversion or not?
+        """
+
+        # check if there's nothing to do
+        if target_type == self:
             return expr
-        return context.pushTerminal(
-            generateThrowException(
-                context,
-                TypeError("Can't convert from type %s to type %s" % (
-                          expr.expr_type.typeRepresentation.__name__,
-                          self.typeRepresentation.__name__))
-            )
-        )
+
+        # put conversion into its own function
+        targetVal = context.allocateUninitializedSlot(target_type)
+        succeeded = expr.expr_type.convert_to_type_with_target(context, expr, targetVal, explicit)
+        if succeeded is None:
+            return
+        succeeded = succeeded.convert_to_type(bool)
+        if succeeded is None:
+            return
+
+        with context.ifelse(succeeded.nonref_expr) as (ifTrue, ifFalse):
+            with ifTrue:
+                context.markUninitializedSlotInitialized(targetVal)
+
+            with ifFalse:
+                context.pushException(TypeError, "Can't convert from type %s to type %s" % (self, target_type))
+
+        return targetVal
+
+    def convert_to_type_with_target(self, context, expr, targetVal, explicit):
+        """Convert 'expr' into the slot contained by 'targetVal', returning True if initialized.
+
+        This is the method child classes are expected to override in order to control how they convert.
+        If no conversion to the target type is available, we're expected to call the super implementation
+        which defers to 'convert_to_self_with_target'
+        """
+        return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, explicit)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        return context.constant(False)
 
     def convert_bin_op(self, context, l, op, r):
         return r.expr_type.convert_bin_op_reverse(context, r, op, l)

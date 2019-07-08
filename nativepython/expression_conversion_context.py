@@ -585,16 +585,16 @@ class ExpressionConversionContext(object):
                     value = TypedExpression.asBool(value)
                     if value is not None:
                         if depth == len(ast.values) - 1:
-                            sc.expr = value.expr
+                            sc.expr = value.nonref_expr
                         else:
                             tail_expr = convertBoolOp(depth + 1)
 
                             if ast.op.matches.And:
                                 sc.expr = native_ast.Expression.Branch(
-                                    cond=value.expr, true=tail_expr, false=native_ast.falseExpr)
+                                    cond=value.nonref_expr, true=tail_expr, false=native_ast.falseExpr)
                             elif ast.op.matches.Or:
                                 sc.expr = native_ast.Expression.Branch(
-                                    cond=value.expr, true=native_ast.trueExpr, false=tail_expr)
+                                    cond=value.nonref_expr, true=native_ast.trueExpr, false=tail_expr)
                             else:
                                 raise Exception(f"Unknown kind of Boolean operator: {ast.op.Name}")
 
