@@ -19,6 +19,14 @@
 #include "PyInstance.hpp"
 #include "PromotesTo.hpp"
 #include <cmath>
+
+template<class T>
+static PyObject* registerValueToPyValue(T val) {
+    static Type* typeObj = GetRegisterType<T>()();
+
+    return PyInstance::extractPythonObject((instance_ptr)&val, typeObj);
+}
+
 inline int64_t bitInvert(int64_t in) { return ~in; }
 inline int32_t bitInvert(int32_t in) { return ~in; }
 inline int16_t bitInvert(int16_t in) { return ~in; }
@@ -28,21 +36,12 @@ inline uint32_t bitInvert(uint32_t in) { return ~in; }
 inline uint16_t bitInvert(uint16_t in) { return ~in; }
 inline uint8_t bitInvert(uint8_t in) { return ~in; }
 inline bool bitInvert(bool in) { return !in; }
-
 //this never gets called, but we need it for the compiler to be happy
-inline float bitInvert(float in) { return 0.0; }
 inline double bitInvert(double in) { return 0.0; }
-
-
-template<class T>
-static PyObject* registerValueToPyValue(T val) {
-    static Type* typeObj = GetRegisterType<T>()();
-
-    return PyInstance::extractPythonObject((instance_ptr)&val, typeObj);
-}
+inline float bitInvert(float in) { return 0.0; }
 
 //implement mod the same way python does for unsigned integers.
-inline int64_t pyMod(uint64_t l, uint64_t r) {
+inline uint64_t pyMod(uint64_t l, uint64_t r) {
     if (r == 0) {
         PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
         throw PythonExceptionSet();
@@ -87,68 +86,54 @@ T pyModFloat(T l, T r) {
         throw PythonExceptionSet();
     }
 
-    if (r < 0.0) {
-        if (l < 0.0) {
-            return -(fmod(-l, -r));
-        }
-        T res = fmod(l, -r);
-        if (res != 0.0)
-            res += r;
-        return res;
+    double mod = fmod(l, r);
+    if (mod) {
+        if ((r < 0) != (mod < 0))
+            mod += r;
     }
-
-    if (l <= 0.0) {
-        T res = fmod(-l, r);
-        if (res > 0.0)
-            res = r - res;
-        return res;
-    }
-
-    return fmod(l, r);
+    return mod;
 }
 
 inline int32_t pyMod(int32_t l, int32_t r) { return (int32_t)pyMod((int64_t)l, (int64_t)r); }
 inline int16_t pyMod(int16_t l, int16_t r) { return (int16_t)pyMod((int64_t)l, (int64_t)r); }
 inline int8_t pyMod(int8_t l, int8_t r) { return (int8_t)pyMod((int64_t)l, (int64_t)r); }
-
 inline uint32_t pyMod(uint32_t l, uint32_t r) { return (uint32_t)pyMod((uint64_t)l, (uint64_t)r); }
 inline uint16_t pyMod(uint16_t l, uint16_t r) { return (uint16_t)pyMod((uint64_t)l, (uint64_t)r); }
 inline uint8_t pyMod(uint8_t l, uint8_t r) { return (uint8_t)pyMod((uint64_t)l, (uint64_t)r); }
-
-inline bool pyMod(bool l, bool r) { return 0; }
-inline float pyMod(float l, float r) { return pyModFloat(l, r); }
+//inline bool pyMod(bool l, bool r) { return 0; }
 inline double pyMod(double l, double r) { return pyModFloat(l, r); }
+inline float pyMod(float l, float r) { return pyModFloat(l, r); }
 
-inline int64_t pyAnd(int8_t l, int8_t r) { return l & r; }
-inline int64_t pyAnd(uint8_t l, uint8_t r) { return l & r; }
-inline int64_t pyAnd(int16_t l, int16_t r) { return l & r; }
-inline int64_t pyAnd(uint16_t l, uint16_t r) { return l & r; }
-inline int64_t pyAnd(int32_t l, int32_t r) { return l & r; }
-inline int64_t pyAnd(uint32_t l, uint32_t r) { return l & r; }
 inline int64_t pyAnd(int64_t l, int64_t r) { return l & r; }
+inline int64_t pyAnd(int32_t l, int32_t r) { return l & r; }
+inline int64_t pyAnd(int16_t l, int16_t r) { return l & r; }
+inline int64_t pyAnd(int8_t l, int8_t r) { return l & r; }
 inline int64_t pyAnd(uint64_t l, uint64_t r) { return l & r; }
-inline int64_t pyAnd(float l, float r) {
-    PyErr_Format(PyExc_TypeError, "'&' not supported for floating-point types");
-    throw PythonExceptionSet();
-}
+inline int64_t pyAnd(uint32_t l, uint32_t r) { return l & r; }
+inline int64_t pyAnd(uint16_t l, uint16_t r) { return l & r; }
+inline int64_t pyAnd(uint8_t l, uint8_t r) { return l & r; }
 inline int64_t pyAnd(double l, double r) {
     PyErr_Format(PyExc_TypeError, "'&' not supported for floating-point types");
     throw PythonExceptionSet();
 }
+inline int64_t pyAnd(float l, float r) {
+    PyErr_Format(PyExc_TypeError, "'&' not supported for floating-point types");
+    throw PythonExceptionSet();
+}
 
-inline int64_t pyOr(int8_t l, int8_t r) { return l | r; }
-inline int64_t pyOr(uint8_t l, uint8_t r) { return l | r; }
-inline int64_t pyOr(int16_t l, int16_t r) { return l | r; }
-inline int64_t pyOr(uint16_t l, uint16_t r) { return l | r; }
-inline int64_t pyOr(int32_t l, int32_t r) { return l | r; }
-inline int64_t pyOr(uint32_t l, uint32_t r) { return l | r; }
 inline int64_t pyOr(int64_t l, int64_t r) { return l | r; }
+inline int64_t pyOr(int32_t l, int32_t r) { return l | r; }
+inline int64_t pyOr(int16_t l, int16_t r) { return l | r; }
+inline int64_t pyOr(int8_t l, int8_t r) { return l | r; }
 inline int64_t pyOr(uint64_t l, uint64_t r) { return l | r; }
-inline int64_t pyOr(float l, float r) {
+inline int64_t pyOr(uint32_t l, uint32_t r) { return l | r; }
+inline int64_t pyOr(uint16_t l, uint16_t r) { return l | r; }
+inline int64_t pyOr(uint8_t l, uint8_t r) { return l | r; }
+inline int64_t pyOr(double l, double r) {
     PyErr_Format(PyExc_TypeError, "'|' not supported for floating-point types");
     throw PythonExceptionSet();
 }
-inline int64_t pyOr(double l, double r) {
+inline int64_t pyOr(float l, float r) {
     PyErr_Format(PyExc_TypeError, "'|' not supported for floating-point types");
     throw PythonExceptionSet();
 }
@@ -161,11 +146,11 @@ inline int64_t pyXor(int32_t l, int32_t r) { return l ^ r; }
 inline int64_t pyXor(uint32_t l, uint32_t r) { return l ^ r; }
 inline int64_t pyXor(int64_t l, int64_t r) { return l ^ r; }
 inline int64_t pyXor(uint64_t l, uint64_t r) { return l ^ r; }
-inline int64_t pyXor(float l, float r) {
+inline int64_t pyXor(double l, double r) {
     PyErr_Format(PyExc_TypeError, "'^' not supported for floating-point types");
     throw PythonExceptionSet();
 }
-inline int64_t pyXor(double l, double r) {
+inline int64_t pyXor(float l, float r) {
     PyErr_Format(PyExc_TypeError, "'^' not supported for floating-point types");
     throw PythonExceptionSet();
 }
@@ -234,32 +219,32 @@ inline int64_t pyRshift(int64_t l, int64_t r) {
         return ret;
     return -ret;
 }
-inline int64_t pyRshift(int8_t l, int8_t r) { return pyRshift((int64_t)l, (int64_t)r); }
-inline int64_t pyRshift(int16_t l, int16_t r) { return pyRshift((int64_t)l, (int64_t)r); }
 inline int64_t pyRshift(int32_t l, int32_t r) { return pyRshift((int64_t)l, (int64_t)r); }
-inline int64_t pyRshift(uint8_t l, uint8_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
-inline int64_t pyRshift(uint16_t l, uint16_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
+inline int64_t pyRshift(int16_t l, int16_t r) { return pyRshift((int64_t)l, (int64_t)r); }
+inline int64_t pyRshift(int8_t l, int8_t r) { return pyRshift((int64_t)l, (int64_t)r); }
 inline int64_t pyRshift(uint32_t l, uint32_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
-inline int64_t pyRshift(float l, float r) {
-    PyErr_Format(PyExc_TypeError, "'>>' not supported for floating-point types");
-    throw PythonExceptionSet();
-}
+inline int64_t pyRshift(uint16_t l, uint16_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
+inline int64_t pyRshift(uint8_t l, uint8_t r) { return pyRshift((uint64_t)l, (uint64_t)r); }
 inline int64_t pyRshift(double l, double r) {
     PyErr_Format(PyExc_TypeError, "'>>' not supported for floating-point types");
     throw PythonExceptionSet();
 }
+inline int64_t pyRshift(float l, float r) {
+    PyErr_Format(PyExc_TypeError, "'>>' not supported for floating-point types");
+    throw PythonExceptionSet();
+}
 
-inline float pyFloatDiv(bool l, bool r)          { return ((float)l) / (float)r; }
-inline float pyFloatDiv(uint8_t l, uint8_t r)    { return ((float)l) / (float)r; }
-inline float pyFloatDiv(uint16_t l, uint16_t r)  { return ((float)l) / (float)r; }
-inline float pyFloatDiv(uint32_t l, uint32_t r)  { return ((float)l) / (float)r; }
+//inline float pyFloatDiv(bool l, bool r)          { return ((float)l) / (float)r; }
 inline double pyFloatDiv(uint64_t l, uint64_t r) { return ((double)l) / (double)r; }
-inline float pyFloatDiv(int8_t l, int8_t r)      { return ((float)l) / (float)r; }
-inline float pyFloatDiv(int16_t l, int16_t r)    { return ((float)l) / (float)r; }
-inline float pyFloatDiv(int32_t l, int32_t r)    { return ((float)l) / (float)r; }
+inline float pyFloatDiv(uint32_t l, uint32_t r)  { return ((float)l) / (float)r; }
+inline float pyFloatDiv(uint16_t l, uint16_t r)  { return ((float)l) / (float)r; }
+inline float pyFloatDiv(uint8_t l, uint8_t r)    { return ((float)l) / (float)r; }
 inline double pyFloatDiv(int64_t l, int64_t r)   { return ((double)l) / (double)r; }
-inline float pyFloatDiv(float l, float r)        { return l / r; }
+inline float pyFloatDiv(int32_t l, int32_t r)    { return ((float)l) / (float)r; }
+inline float pyFloatDiv(int16_t l, int16_t r)    { return ((float)l) / (float)r; }
+inline float pyFloatDiv(int8_t l, int8_t r)      { return ((float)l) / (float)r; }
 inline double pyFloatDiv(double l, double r)     { return l / r; }
+inline float pyFloatDiv(float l, float r)        { return l / r; }
 
 inline int64_t pyFloorDiv(int64_t l, int64_t r)   {
     if (r == 0) {
@@ -285,21 +270,37 @@ inline uint32_t pyFloorDiv(uint32_t l, uint32_t r) { return l / r; }
 inline uint16_t pyFloorDiv(uint16_t l, uint16_t r) { return l / r; }
 inline uint8_t pyFloorDiv(uint8_t l, uint8_t r)    { return l / r; }
 inline bool pyFloorDiv(bool l, bool r)             { return l / r; }
+inline double pyFloorDiv(double l, double r) {
+    if (r == 0.0) {
+        PyErr_Format(PyExc_TypeError, "pyFloorDiv by 0");
+        throw PythonExceptionSet();
+    }
+    double result = (l - pyMod(l, r))/r;
+    double floorresult = std::floor(result);
+    if (result - floorresult > 0.5)
+        floorresult += 1.0;
+    return floorresult;
+}
+inline float pyFloorDiv(float l, float r) { return pyFloorDiv((double)l, (double)r); }
 
-
-inline float pyFloorDiv(float l, float r)        { return std::floor(l / r); }
-inline double pyFloorDiv(double l, double r)     { return std::floor(l / r); }
-
-inline double pyPow(int8_t l, int8_t r) { return std::pow(l,r); }
-inline double pyPow(int16_t l, int16_t r) { return std::pow(l,r); }
-inline double pyPow(int32_t l, int32_t r) { return std::pow(l,r); }
-inline double pyPow(int64_t l, int64_t r) { return std::pow(l,r); }
+// template for signed pow
+template <class T>
+inline double pyPow(T l, T r) {
+    if (l == 0 && r < 0) {
+        PyErr_Format(PyExc_TypeError, "pyPow div by 0");
+        throw PythonExceptionSet();
+    }
+    double result = std::pow(l, r);
+    if (std::is_integral<T>::value && l < 0 && r > 0 && pyMod(r, (T)2) && result > 0)
+        return -result;
+    return result;
+}
+// specific for unsigned pow
+//inline double pyPow(bool l, bool r) { return 1.0; }
 inline double pyPow(uint8_t l, uint8_t r) { return std::pow(l,r); }
 inline double pyPow(uint16_t l, uint16_t r) { return std::pow(l,r); }
 inline double pyPow(uint32_t l, uint32_t r) { return std::pow(l,r); }
 inline double pyPow(uint64_t l, uint64_t r) { return std::pow(l,r); }
-inline double pyPow(float l, float r) { return std::pow(l,r); }
-inline double pyPow(double l, double r) { return std::pow(l,r); }
 
 template<class T>
 static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const char* op, const char* opErr) {
@@ -336,7 +337,7 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
     }
 
     if (strcmp(op, "__pow__") == 0) {
-        return registerValueToPyValue(T(pyPow(self,other)));
+        return registerValueToPyValue(pyPow(self,other));
     }
 
     if (strcmp(op, "__div__") == 0) {
@@ -373,6 +374,10 @@ static PyObject* pyOperatorConcreteForRegister(T self, T2 other, const char* op,
     if (strcmp(op, "__div__") == 0) {
         typedef typename PromotesTo<target_type, float>::result_type div_target_type;
         return pyOperatorConcreteForRegisterPromoted(div_target_type(self), div_target_type(other), op, opErr);
+    }
+    else if (strcmp(op, "__pow__") == 0) {
+        typedef typename PromotesTo<target_type, uint64_t>::result_type pow_target_type;
+        return pyOperatorConcreteForRegisterPromoted(pow_target_type(self), pow_target_type(other), op, opErr);
     }
 
     return pyOperatorConcreteForRegisterPromoted(target_type(self), target_type(other), op, opErr);
@@ -612,12 +617,11 @@ public:
     }
 
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr) {
-        Type::TypeCategory cat = type()->getTypeCategory();
-
         if (strcmp(op, "__float__") == 0) {
             return PyFloat_FromDouble(*(T*)dataPtr());
         }
         if (strcmp(op, "__int__") == 0) {
+            Type::TypeCategory cat = type()->getTypeCategory();
             if (cat == Type::TypeCategory::catUInt64) {
                 return PyLong_FromUnsignedLong(*(T*)dataPtr());
             }
@@ -628,7 +632,11 @@ public:
             val = -val;
             return extractPythonObject((instance_ptr)&val, type());
         }
-        if (strcmp(op, "__inv__") == 0 && isInteger(type()->getTypeCategory())) {
+        if (strcmp(op, "__pos__") == 0) {
+            T val = *(T*)dataPtr();
+            return extractPythonObject((instance_ptr)&val, type());
+        }
+        if (strcmp(op, "__invert__") == 0 && isInteger(type()->getTypeCategory())) {
             T val = *(T*)dataPtr();
             val = bitInvert(val);
             return extractPythonObject((instance_ptr)&val, type());
@@ -637,8 +645,21 @@ public:
             int64_t val = *(T*)dataPtr();
             return PyLong_FromLong(val);
         }
+        if (strcmp(op, "__abs__") == 0) {
+            T val = *(T*)dataPtr();
+            if (val < 0)
+                val = -val;
+            return extractPythonObject((instance_ptr)&val, type());
+        }
 
         return PyInstance::pyUnaryOperatorConcrete(op, opErr);
+    }
+
+    PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErr) {
+        // support binary operator __pow__ but not ternary
+        if (strcmp(op, "__pow__") == 0 && third == Py_None)
+            return pyOperatorConcrete(rhs, op, opErr);
+        return PyInstance::pyOperatorConcrete(rhs, op, opErr);
     }
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
@@ -716,7 +737,6 @@ public:
 
         return PyInstance::pyOperatorConcrete(rhs, op, opErr);
     }
-
 
     //compare two register types directly given the python
     //comparison operator 'pyComparisonOp'. We follow numpy's comparisons here,

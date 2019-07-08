@@ -888,10 +888,16 @@ class FunctionConverter:
                     if operand.native_type.matches.Int:
                         return TypedLLVMValue(self.builder.neg(operand.llvm_value), operand.native_type)
                     if operand.native_type.matches.Float:
-                        return TypedLLVMValue(
-                            self.builder.fmul(operand.llvm_value, llvmlite.ir.DoubleType()(-1.0)),
-                            operand.native_type
-                        )
+                        if operand.native_type.bits == 32:
+                            return TypedLLVMValue(
+                                self.builder.fmul(operand.llvm_value, llvmlite.ir.FloatType()(-1.0)),
+                                operand.native_type
+                            )
+                        else:
+                            return TypedLLVMValue(
+                                self.builder.fmul(operand.llvm_value, llvmlite.ir.DoubleType()(-1.0)),
+                                operand.native_type
+                            )
 
             assert False, "can't apply unary operand %s to %s" % (expr.op, str(operand.native_type))
 

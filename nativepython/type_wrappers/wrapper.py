@@ -185,6 +185,11 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't hash instance of type '%s'" % (str(self),)))
         )
 
+    def convert_abs(self, context, expr):
+        return context.pushTerminal(
+            generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
+        )
+
     def convert_unary_op(self, context, expr, op):
         return context.pushTerminal(
             generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))

@@ -14,6 +14,7 @@
 
 import operator
 import sys
+from math import isfinite
 from typed_python import (
     Function, OneOf,
     Bool,
@@ -252,10 +253,21 @@ class TestArithmeticCompilation(unittest.TestCase):
     def test_can_compile_all_register_types(self):
         registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
 
+        def result_or_exception(f, *p):
+            try:
+                return f(*p)
+            except Exception:
+                return "exception"
+
         def equal_result(a, b):
-            epsilon = float(1e-6)
-            if hasattr(a, "IsFloat") and a.IsFloat and a != 0.0:
-                return (b - a) / a < epsilon
+            if (type(a) is float or (hasattr(a, "IsFloat") and a.IsFloat)):
+                epsilon = float(1e-6)
+                if a < 1e-32:  # these results happen to be from calculations that magnify errors
+                    epsilon = float(1e-5)
+                if a != 0.0:
+                    return abs(float(b - a) / a) < epsilon
+                else:
+                    return abs(float(b - a)) < epsilon
             return a == b
 
         def signed_overflow(T, v):
@@ -270,17 +282,68 @@ class TestArithmeticCompilation(unittest.TestCase):
                 return [0, 1, 2, (1 << (t.Bits // 2 - 1)) - 1, (1 << (t.Bits - 1)) - 1,
                         -1, -2, -(1 << (t.Bits // 2 - 1)), -(1 << (t.Bits - 1))]
             elif t in [Float32]:
-                # testing with 1/3 exposes some problems with mod
-                # return [0.0, 1.0/3.0, 1.0, 2.0, (2 - 1 / (2**23)) * 2**127, -1.0/3.0, -1.0, -2.0, -(2 - 1 / (2**23)) * 2**127]
-                return [0.0, 1.0, 2.0, (2 - 1 / (2**23)) * 2**127, -1.0, -2.0, -(2 - 1 / (2**23)) * 2**127]
+                return [0.0, 1.0/3.0, 1.0, 2.0, (2 - 1 / (2**23)) * 2**127, -1.0/3.0, -1.0, -2.0, -(2 - 1 / (2**23)) * 2**127]
             elif t in [Float64]:
-                # testing with 1/3 exposes some problems with mod
-                # return [0.0, 1.0/3.0, 1.0, 2.0, sys.float_info.max, -1.0/3.0, -1.0, -2.0, -sys.float_info.max]
-                return [0.0, 1.0, 2.0, sys.float_info.max, -1.0, -2.0, -sys.float_info.max]
+                return [0.0, 1e-16, 9.876e-16, 1.0/3.0, 1.0, 10.0/7.0, 2.0, 3.0, 10.0/3.0, 100.0/3.0, sys.float_info.max,
+                        -1e-16, -9.876e-16, -1.0/3.0, -1.0, -10.0/7.0, -2.0, -3.0, -10.0/3.0, -100.0/3.0, -sys.float_info.max]
 
         for T in registerTypes:
+            def not_(x: T):
+                return not x
+
+            def invert(x: T):
+                return ~x
+
+            def neg(x: T):
+                return -x
+
+            def pos(x: T):
+                return +x
+
+            def abs_(x: T):
+                return abs(x)
+
             if T is not Bool:
                 self.assertEqual(T(1) + T(2), T(3))
+            if T in [Bool]:
+                suitable_ops = [not_]
+            else:
+                suitable_ops = [invert, neg, pos, abs_]
+
+            typed_to_native_op = {
+                invert: operator.__inv__,
+                not_: operator.__not__,
+                neg: operator.__neg__,
+                pos: operator.__pos__,
+                abs_: operator.__abs__,
+            }
+            for op in suitable_ops:
+                native_op = typed_to_native_op[op]
+                compiled_op = Compiled(op)
+
+                for v in suitable_range(T):
+                    comparable = True
+                    native_result = result_or_exception(native_op, v)
+                    if T.IsSignedInt:
+                        if native_result >= 2**(T.Bits - 1) or native_result < -2**(T.Bits - 1):
+                            comparable = False
+                    elif T.IsUnsignedInt:
+                        if native_result >= 2**T.Bits or native_result < 0:
+                            comparable = False
+                    typed_result = result_or_exception(op, T(v))
+                    if typed_result == NotImplemented:
+                        typed_result = "exception"
+                    compiled_result = result_or_exception(compiled_op, T(v))
+
+                    self.assertEqual(
+                        type(typed_result), type(compiled_result),
+                        (T, type(typed_result), type(compiled_result), op.__name__)
+                    )
+                    if comparable:
+                        self.assertTrue(equal_result(type(compiled_result)(typed_result), compiled_result),
+                                        (T, op.__name__, typed_result, compiled_result))
+                        self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
+                                        (T, op.__name__, native_result, compiled_result))
 
         for T1 in registerTypes:
             for T2 in registerTypes:
@@ -341,9 +404,8 @@ class TestArithmeticCompilation(unittest.TestCase):
                     suitable_ops = [
                         add, sub, mul, div, mod, floordiv,
                         less, greater, lessEq, greaterEq, neq,
-                        bitand, bitor, bitxor, lshift, rshift
+                        bitand, bitor, bitxor, lshift, rshift, pow
                     ]
-                    # TODO: missing pow
 
                 typed_to_native_op = {
                     sub: operator.sub,
@@ -367,19 +429,26 @@ class TestArithmeticCompilation(unittest.TestCase):
 
                 for op in suitable_ops:
                     native_op = typed_to_native_op[op]
-                    compiledOp = Compiled(op)
+                    compiled_op = Compiled(op)
 
                     for v1 in suitable_range(T1):
                         for v2 in suitable_range(T2):
                             comparable = True
-                            try:
-                                if op in [lshift, pow] and v1 != 0 and v2 > 1024:
-                                    raise Exception("overflow")  # rather than trying to calculate and possibly running out of memory
-                                native_result = native_op(v1, v2)
+                            T_result = computeArithmeticBinaryResultType(T1, T2)
+                            if T_result.IsSignedInt:
+                                if signed_overflow(T1, v1) or signed_overflow(T2, v2):
+                                    comparable = False
+                            if (op is lshift and v1 != 0 and v2 > 1024) \
+                                    or (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024):
+                                native_result = "exception"
+                            else:
+                                native_result = result_or_exception(native_op, v1, v2)
                                 T_result = computeArithmeticBinaryResultType(T1, T2)
-                                if T_result.IsSignedInt:
-                                    if signed_overflow(T1, v1) or signed_overflow(T2, v2):
-                                        comparable = False
+                                if native_result == "exception":
+                                    pass
+                                elif type(native_result) is complex:
+                                    native_result = "exception"
+                                elif T_result.IsSignedInt:
                                     if native_result >= 2**(T_result.Bits - 1) or native_result < -2**(T_result.Bits - 1):
                                         comparable = False
                                 elif T_result.IsUnsignedInt:
@@ -388,35 +457,53 @@ class TestArithmeticCompilation(unittest.TestCase):
                                 elif T_result.IsFloat:
                                     if native_result >= 2**128 or native_result <= -2**128:
                                         comparable = False
-                            except Exception:
-                                native_result = "exception"
 
-                            try:
-                                if T1 is Int64 and T2 is Int64 and op in [lshift, pow] and v1 != 0 and v2 > 1024:
-                                    raise Exception("overflow")
-                                typed_result = op(T1(v1), T2(v2))
-                            except Exception:
+                            native_comparable = comparable
+                            if (T1 is Float32 or T2 is Float32) and op in [mod, floordiv]:
+                                # can't expect Float32 mod and floordiv to match native calculations
+                                # typed should still match compiled
+                                native_comparable = False
+                            if ((T1 is Float32 and T2 is Float64) or (T1 is Float64 and T2 is Float32)) \
+                                    and op in [less, greater, lessEq, greaterEq, neq]:
+                                native_comparable = False
+
+                            if T1 is Int64 and T2 is Int64 and \
+                                    ((op is lshift and v1 != 0 and v2 > 1024) or
+                                     (op is pow and (v1 > 1 or v1 < -1) and v2 > 1024)):
                                 typed_result = "exception"
+                            else:
+                                typed_result = result_or_exception(op, T1(v1), T2(v2))
+                                if type(typed_result) in [float, Float32, Float64] and not isfinite(typed_result):
+                                    typed_result = "exception"
+                                if type(typed_result) is complex:
+                                    typed_result = "exception"
+                                if op is pow and type(typed_result) is int:
+                                    typed_result = float(typed_result)
 
-                            try:
-                                compiled_result = compiledOp(T1(v1), T2(v2))
-                            except Exception:
+                            compiled_result = result_or_exception(compiled_op, T1(v1), T2(v2))
+                            if type(compiled_result) in [float, Float32, Float64] and not isfinite(compiled_result):
                                 compiled_result = "exception"
 
                             # for debugging
                             # if type(typed_result) != type(compiled_result):
                             #     print("type mismatch", type(typed_result).__name__, type(compiled_result).__name__)
                             # if type(typed_result) == type(compiled_result):
-                            #     if comparable and typed_result != compiled_result:
+                            #     if comparable and not equal_result(typed_result, compiled_result):
                             #         print("result mismatch")
-                            # if comparable and not equal_result(type(compiled_result)(native_result), compiled_result):
-                            #     print("mismatch")
+                            # try:
+                            #     if native_comparable and not equal_result(type(compiled_result)(native_result), compiled_result):
+                            #         print("mismatch")
+                            # except Exception:
+                            #     print("mismatch exception")
 
                             self.assertEqual(
                                 type(typed_result), type(compiled_result),
                                 (T1, T2, type(typed_result), type(compiled_result), op.__name__)
                             )
+
                             if comparable:
-                                self.assertEqual(typed_result, compiled_result, (T1, T2, op.__name__))
+                                self.assertTrue(equal_result(type(compiled_result)(typed_result), compiled_result),
+                                                (T1, T2, op.__name__, typed_result, compiled_result))
+                            if native_comparable:
                                 self.assertTrue(equal_result(type(compiled_result)(native_result), compiled_result),
                                                 (T1, T2, op.__name__, native_result, compiled_result))

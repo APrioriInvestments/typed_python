@@ -153,22 +153,6 @@ extern "C" {
         decref(p);
     }
 
-    double nativepython_runtime_pow_float64_float64(double l, double r) {
-        if (l == 0.0 && r < 0.0)
-            throw std::runtime_error("0^-1 err");
-        return std::pow(l,r);
-    }
-
-    double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
-        if (l == 0 && r < 0)
-            throw std::runtime_error("0^-1 err");
-        return std::pow(l,r);
-    }
-
-    double nativepython_runtime_pow_uint64_uint64(uint64_t l, uint64_t r) {
-        return std::pow(l,r);
-    }
-
     int64_t nativepython_runtime_mod_int64_int64(int64_t l, int64_t r) {
         if (r == 1 || r == -1 || r == 0 || l == 0) {
             return 0;
@@ -204,24 +188,34 @@ extern "C" {
             throw std::runtime_error("mod by 0.0");
         }
 
-        if (r < 0.0) {
-            if (l < 0.0) {
-                return -(fmod(-l, -r));
-            }
-            double res = fmod(l, -r);
-            if (res != 0.0)
-                res += r;
-            return res;
+        double mod = fmod(l, r);
+        if (mod) {
+            if ((r < 0) != (mod < 0))
+                mod += r;
         }
+        return mod;
+    }
 
-        if (l <= 0.0) {
-            double res = fmod(-l, r);
-            if (res > 0.0)
-                res = r - res;
-            return res;
-        }
+    double nativepython_runtime_pow_float64_float64(double l, double r) {
+        if (l == 0.0 && r < 0.0)
+            throw std::runtime_error("0**-x err");
+        double result = std::pow(l, r);
+        if (l < 0.0 && r > 0.0 && nativepython_runtime_mod_float64_float64(r, 2.0) == 1.0 && result > 0.0)
+            return -result;
+        return result;
+    }
 
-        return fmod(l, r);
+    double nativepython_runtime_pow_int64_int64(int64_t l, int64_t r) {
+        if (l == 0 && r < 0)
+            throw std::runtime_error("0**-x err");
+        double result = std::pow(l, r);
+        if (l < 0 && r > 0 && r % 2 && result > 0)
+            return -result;
+        return result;
+    }
+
+    double nativepython_runtime_pow_uint64_uint64(uint64_t l, uint64_t r) {
+        return std::pow(l,r);
     }
 
     // should match corresponding function in PyRegisterTypeInstance.hpp
@@ -297,7 +291,11 @@ extern "C" {
         if (r == 0.0) {
             throw std::runtime_error("floordiv by 0.0");
         }
-        return std::floor(l / r);
+        double result = (l - nativepython_runtime_mod_float64_float64(l, r))/r;
+        double floorresult = std::floor(result);
+        if (result - floorresult > 0.5)
+            floorresult += 1.0;
+        return floorresult;
     }
 
     PyObject* nativepython_runtime_int_to_pyobj(int64_t i) {
