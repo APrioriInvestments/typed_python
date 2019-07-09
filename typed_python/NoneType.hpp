@@ -44,7 +44,7 @@ public:
     void _visitContainedTypes(const visitor_type& v) {}
 
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }
 

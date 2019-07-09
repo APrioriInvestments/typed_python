@@ -93,7 +93,7 @@ public:
         return acc.get();
     }
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
         if (*(void**)left < *(void**)right) {
             return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
         }

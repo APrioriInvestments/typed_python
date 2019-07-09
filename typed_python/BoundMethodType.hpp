@@ -100,8 +100,8 @@ public:
         m_first_arg->serialize(self, buffer, fieldNumber);
     }
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
-        return m_first_arg->cmp(left,right,pyComparisonOp);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
+        return m_first_arg->cmp(left,right,pyComparisonOp, suppressExceptions);
     }
 
     void constructor(instance_ptr self) {

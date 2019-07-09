@@ -37,7 +37,7 @@ typed_python_hash_type BytesType::hash(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
-bool BytesType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool BytesType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if ( !(*(layout**)left) && !(*(layout**)right) ) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
     }

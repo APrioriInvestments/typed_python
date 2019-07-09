@@ -117,9 +117,9 @@ typed_python_hash_type ConstDictType::hash(instance_ptr left) {
 }
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
-bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (pyComparisonOp == Py_NE) {
-        return !cmp(left, right, Py_EQ);
+        return !cmp(left, right, Py_EQ, suppressExceptions);
     }
 
 
@@ -138,8 +138,8 @@ bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
 
     if (pyComparisonOp == Py_EQ) {
         for (long k = 0; k < ct; k++) {
-            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE) ||
-                    m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
+            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE, true) ||
+                    m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE, true)) {
                 return false;
             }
         }
@@ -147,8 +147,8 @@ bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
         return true;
     } else {
         for (long k = 0; k < ct; k++) {
-            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE)) {
-                if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_LT)) {
+            if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_NE, true)) {
+                if (m_key->cmp(kvPairPtrKey(left,k), kvPairPtrKey(right,k), Py_LT, true)) {
                     return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
                 }
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
@@ -156,8 +156,8 @@ bool ConstDictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
         }
 
         for (long k = 0; k < ct; k++) {
-            if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE)) {
-                if (m_value->cmp( kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT)) {
+            if (m_value->cmp(kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_NE, true)) {
+                if (m_value->cmp(kvPairPtrValue(left,k), kvPairPtrValue(right,k), Py_LT, true)) {
                     return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
                 }
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
@@ -269,7 +269,7 @@ void ConstDictType::sortKvPairs(instance_ptr self) const {
         return;
     }
     else if (record.count == 2) {
-        if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1), Py_GT)) {
+        if (m_key->cmp(kvPairPtrKey(self, 0), kvPairPtrKey(self,1), Py_GT, true)) {
             m_key->swap(kvPairPtrKey(self,0), kvPairPtrKey(self,1));
             m_value->swap(kvPairPtrValue(self,0), kvPairPtrValue(self,1));
         }
@@ -281,7 +281,7 @@ void ConstDictType::sortKvPairs(instance_ptr self) const {
         }
 
         std::sort(indices.begin(), indices.end(), [&](int l, int r) {
-            return m_key->cmp(kvPairPtrKey(self,l),kvPairPtrKey(self,r), Py_LT);
+            return m_key->cmp(kvPairPtrKey(self,l),kvPairPtrKey(self,r), Py_LT, true);
             });
 
         //create a temporary buffer
@@ -369,9 +369,9 @@ int64_t ConstDictType::lookupIndexByKey(instance_ptr self, instance_ptr key) con
     while (low < high) {
         long mid = (low+high)/2;
 
-        if (m_key->cmp(kvPairPtrKey(self, mid), key, Py_EQ)) {
+        if (m_key->cmp(kvPairPtrKey(self, mid), key, Py_EQ, true)) {
             return mid;
-        } else if (m_key->cmp(kvPairPtrKey(self, mid), key, Py_LT)) {
+        } else if (m_key->cmp(kvPairPtrKey(self, mid), key, Py_LT, true)) {
             low = mid+1;
         } else {
             high = mid;

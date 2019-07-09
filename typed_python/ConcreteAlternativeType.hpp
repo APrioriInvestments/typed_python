@@ -67,8 +67,8 @@ public:
         m_alternative->serialize(self, buffer, fieldNumber);
     }
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
-        return m_alternative->cmp(left,right, pyComparisonOp);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
+        return m_alternative->cmp(left,right, pyComparisonOp, suppressExceptions);
     }
 
     void constructor(instance_ptr self);

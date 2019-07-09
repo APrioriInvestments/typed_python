@@ -890,7 +890,7 @@ bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
     Type* otherT = extractTypeFrom(other->ob_type);
 
     if (otherT && otherT == t) {
-        return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp);
+        return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
     }
 
     return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {

@@ -99,7 +99,7 @@ typed_python_hash_type DictType::hash(instance_ptr left) {
 }
 
 //to make this fast(er), we do dict size comparison first, then keys, then values
-bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (pyComparisonOp != Py_NE && pyComparisonOp != Py_EQ) {
         throw std::runtime_error("Ordered comparison not supported between objects of type " + name());
     }
@@ -126,7 +126,7 @@ bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
             }
 
-            if (m_value->cmp(value, otherValue, Py_NE)) {
+            if (m_value->cmp(value, otherValue, Py_NE, suppressExceptions)) {
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
             }
         }
@@ -177,7 +177,7 @@ instance_ptr DictType::lookupValueByKey(instance_ptr self, instance_ptr key) con
     typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t index = record.find(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
-        return m_key->cmp(key, ptr, Py_EQ);
+        return m_key->cmp(key, ptr, Py_EQ, false);
     });
 
     if (index >= 0) {
@@ -193,7 +193,7 @@ bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
     typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t index = record.remove(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
-        return m_key->cmp(key, ptr, Py_EQ);
+        return m_key->cmp(key, ptr, Py_EQ, false);
     });
 
     if (index >= 0) {
@@ -211,7 +211,7 @@ bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr k
     typed_python_hash_type keyHash = m_key->hash(key);
 
     int32_t index = record.remove(m_bytes_per_key_value_pair, keyHash, [&](instance_ptr ptr) {
-        return m_key->cmp(key, ptr, Py_EQ);
+        return m_key->cmp(key, ptr, Py_EQ, false);
     });
 
     if (index >= 0) {

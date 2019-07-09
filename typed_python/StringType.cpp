@@ -657,7 +657,7 @@ char typedArrayCompare(T1* l, T2* r, size_t count) {
     return 0;
 }
 
-bool StringType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool StringType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpStatic(*(layout**)left, *(layout**)right));
 }
 

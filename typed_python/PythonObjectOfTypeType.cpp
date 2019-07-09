@@ -37,7 +37,7 @@ void PythonObjectOfType::repr(instance_ptr self, ReprAccumulator& stream) {
     stream << PyUnicode_AsUTF8(o);
 }
 
-bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     PyEnsureGilAcquired acquireTheGil;
 
     PyObject* l = *(PyObject**)left;
@@ -46,6 +46,11 @@ bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyCompar
     int res = PyObject_RichCompareBool(l, r, pyComparisonOp);
 
     if (res == -1) {
+        if (suppressExceptions) {
+          PyErr_Clear();
+          return cmpResultToBoolForPyOrdering(pyComparisonOp, ::strcmp(l->ob_type->tp_name, r->ob_type->tp_name));
+        }
+
         throw PythonExceptionSet();
     }
 

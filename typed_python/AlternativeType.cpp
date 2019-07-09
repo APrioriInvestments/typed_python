@@ -95,7 +95,7 @@ bool Alternative::_updateAfterForwardTypesChanged() {
     return anyChanged;
 }
 
-bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (m_all_alternatives_empty) {
         if (*(uint8_t*)left < *(uint8_t*)right) {
             return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
@@ -120,7 +120,7 @@ bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp)
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
-    return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data, pyComparisonOp);
+    return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data, pyComparisonOp, suppressExceptions);
 }
 
 void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {

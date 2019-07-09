@@ -97,7 +97,7 @@ typed_python_hash_type OneOfType::hash(instance_ptr left) {
     return acc.get();
 }
 
-bool OneOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool OneOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (((uint8_t*)left)[0] < ((uint8_t*)right)[0]) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
@@ -105,7 +105,7 @@ bool OneOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
     }
 
-    return m_types[*((uint8_t*)left)]->cmp(left+1,right+1, pyComparisonOp);
+    return m_types[*((uint8_t*)left)]->cmp(left+1,right+1, pyComparisonOp, suppressExceptions);
 }
 
 size_t OneOfType::computeBytecount() const {

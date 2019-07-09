@@ -84,7 +84,7 @@ public:
 
     typed_python_hash_type hash(instance_ptr left);
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     Type* getEltType() const {
         return m_element_type;

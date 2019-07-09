@@ -71,14 +71,14 @@ bool CompositeType::_updateAfterForwardTypesChanged() {
     return anyChanged;
 }
 
-bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (pyComparisonOp == Py_NE) {
-        return !cmp(left, right, Py_EQ);
+        return !cmp(left, right, Py_EQ, suppressExceptions);
     }
 
     if (pyComparisonOp == Py_EQ) {
         for (long k = 0; k < m_types.size(); k++) {
-            if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE)) {
+            if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE, suppressExceptions)) {
                 return false;
             }
         }
@@ -87,8 +87,8 @@ bool CompositeType::cmp(instance_ptr left, instance_ptr right, int pyComparisonO
     }
 
     for (long k = 0; k < m_types.size(); k++) {
-        if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE)) {
-            if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_LT)) {
+        if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_NE, suppressExceptions)) {
+            if (m_types[k]->cmp(left + m_byte_offsets[k], right + m_byte_offsets[k], Py_LT, suppressExceptions)) {
                 return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
             }
             return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);

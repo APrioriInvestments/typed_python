@@ -520,7 +520,7 @@ public:
 
     typed_python_hash_type hash(instance_ptr left);
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     int64_t refcount(instance_ptr self) const;
 

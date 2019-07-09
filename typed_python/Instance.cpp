@@ -117,7 +117,7 @@ bool Instance::operator<(const Instance& other) const {
     if (mLayout->type > other.mLayout->type) {
         return false;
     }
-    return mLayout->type->cmp(mLayout->data, other.mLayout->data, Py_LT);
+    return mLayout->type->cmp(mLayout->data, other.mLayout->data, Py_LT, true);
 }
 
 std::string Instance::repr() const {

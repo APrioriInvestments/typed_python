@@ -1980,3 +1980,19 @@ class NativeTypesTests(unittest.TestCase):
 
         T = Dict(OneOf(int, float), OneOf(int, float))
         self.assertEqual(T({1: 2.5}), {1: 2.5})
+
+    def test_const_dict_with_noncomparable_things(self):
+        DictType = ConstDict(OneOf(int, str), int)
+
+        aDict = DictType({1: 100, 'hi': 200, 'bye': 300})
+
+        self.assertEqual(aDict[1], 100)
+        self.assertEqual(aDict['hi'], 200)
+
+    def test_const_dict_with_noncomparable_things_as_object(self):
+        DictType = ConstDict(object, int)
+
+        aDict = DictType({1: 100, 'hi': 200, 'bye': 300})
+
+        self.assertEqual(aDict[1], 100)
+        self.assertEqual(aDict['hi'], 200)

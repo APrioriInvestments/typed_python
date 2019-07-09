@@ -58,7 +58,7 @@ bool HeldClass::_updateAfterForwardTypesChanged() {
     return anyChanged;
 }
 
-bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool HeldClass::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     uint64_t leftPtr = *(uint64_t*)left;
     uint64_t rightPtr = *(uint64_t*)right;
 

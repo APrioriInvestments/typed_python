@@ -45,7 +45,7 @@ public:
     template<class visitor_type>
     void _visitContainedTypes(const visitor_type& v) {}
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
         if ( (*(T*)left) < (*(T*)right) ) {
             return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
         }

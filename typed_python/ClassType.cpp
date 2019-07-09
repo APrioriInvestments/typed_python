@@ -53,7 +53,7 @@ bool Class::checkInitializationFlag(instance_ptr self, int64_t ix) const {
     return m_heldClass->checkInitializationFlag(l.data, ix);
 }
 
-bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     const char* method = nullptr;
     switch (pyComparisonOp) {
         case Py_EQ:
@@ -99,7 +99,7 @@ bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
     }
 
     if (pyComparisonOp == Py_NE) {
-        return !cmp(left, right, Py_EQ);
+        return !cmp(left, right, Py_EQ, suppressExceptions);
     }
 
     if (pyComparisonOp == Py_EQ) {

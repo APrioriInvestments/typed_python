@@ -152,7 +152,12 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& out);
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+    /* compare two types as closely as possible to how python would.
+
+    If 'suppressExceptions', then don't generate exceptions when comparing objects of unlike type. Sort their
+    type names instead.
+    */
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     typed_python_hash_type hash(instance_ptr left);
 

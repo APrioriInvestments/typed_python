@@ -77,7 +77,7 @@ typed_python_hash_type TupleOrListOfType::hash(instance_ptr left) {
     return (*(layout**)left)->hash_cache;
 }
 
-bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp) {
+bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     if (!(*(layout**)left) && (*(layout**)right)) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
     }
@@ -96,7 +96,7 @@ bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyCompari
     }
 
     if (pyComparisonOp == Py_NE) {
-        return !cmp(left, right, Py_EQ);
+        return !cmp(left, right, Py_EQ, suppressExceptions);
     }
 
     size_t bytesPer = m_element_type->bytecount();
@@ -108,7 +108,7 @@ bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyCompari
 
         for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
             if (m_element_type->cmp(left_layout.data + bytesPer * k,
-                                           right_layout.data + bytesPer * k, Py_NE)) {
+                                           right_layout.data + bytesPer * k, Py_NE, suppressExceptions)) {
                 return false;
             }
         }
@@ -118,10 +118,10 @@ bool TupleOrListOfType::cmp(instance_ptr left, instance_ptr right, int pyCompari
 
     for (long k = 0; k < left_layout.count && k < right_layout.count; k++) {
         if (m_element_type->cmp(left_layout.data + bytesPer * k,
-                                       right_layout.data + bytesPer * k, Py_NE)) {
+                                       right_layout.data + bytesPer * k, Py_NE, suppressExceptions)) {
             return cmpResultToBoolForPyOrdering(pyComparisonOp,
                 m_element_type->cmp(left_layout.data + bytesPer * k,
-                                       right_layout.data + bytesPer * k, Py_LT)
+                                       right_layout.data + bytesPer * k, Py_LT, suppressExceptions)
                     ? -1 : 1
                 );
         }

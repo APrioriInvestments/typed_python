@@ -81,7 +81,7 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream);
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     void constructor(instance_ptr self) {
         *(PyObject**)self = incref(Py_None);

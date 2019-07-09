@@ -103,7 +103,7 @@ public:
         return self + m_byte_offsets[ix];
     }
 
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {
