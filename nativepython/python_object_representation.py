@@ -25,6 +25,7 @@ from nativepython.type_wrappers.value_wrapper import ValueWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from nativepython.type_wrappers.pointer_to_wrapper import PointerToWrapper
 from nativepython.type_wrappers.list_of_wrapper import ListOfWrapper
+from nativepython.type_wrappers.isinstance_wrapper import IsinstanceWrapper
 from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
 from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.type_wrappers.const_dict_wrapper import ConstDictWrapper
@@ -147,6 +148,9 @@ def pythonObjectRepresentation(context, f):
 
     if f is range:
         return TypedExpression(context, native_ast.nullExpr, _RangeWrapper, False)
+
+    if f is isinstance:
+        return TypedExpression(context, native_ast.nullExpr, IsinstanceWrapper(), False)
 
     if f is bytecount:
         return TypedExpression(context, native_ast.nullExpr, BytecountWrapper(), False)

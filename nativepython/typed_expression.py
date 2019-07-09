@@ -64,6 +64,17 @@ class TypedExpression(object):
         else:
             return self.nonref_expr
 
+    def canUnwrap(self):
+        return self.expr_type.can_unwrap
+
+    def unwrap(self, generator):
+        """If we 'canUnwrap', call generator back with 'self' in the lowered form.
+
+        In the case of a OneOf, this may produce a compound expression that merges the operation
+        over the possible subtypes.
+        """
+        return self.expr_type.unwrap(self.context, self, generator)
+
     @property
     def nonref_expr(self):
         """Get our expression (deferenced if necessary) so that it definitely represents the real object, not its location"""

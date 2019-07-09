@@ -12,9 +12,21 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import nativepython
+
 from typed_python import _types
 
 from nativepython.type_wrappers.exceptions import generateThrowException
+
+
+def replaceTupElt(tup, index, newValue):
+    return tuple(tup[:index]) + (newValue,) + tuple(tup[index+1:])
+
+
+def replaceDictElt(dct, key, newValue):
+    res = dict(dct)
+    res[key] = newValue
+    return res
 
 
 class Wrapper(object):
@@ -42,6 +54,10 @@ class Wrapper(object):
     # to the output location as the first argument (and return void) rather
     # than returning registers.
     is_pass_by_ref = True
+
+    # are we a Value or OneOf, where we need to be lowered to a different representation
+    # for most operations to succeed?
+    can_unwrap = False
 
     def __repr__(self):
         return "Wrapper(%s)" % str(self)
@@ -282,3 +298,42 @@ class Wrapper(object):
             the values of the expression.
         """
         return None
+
+    @staticmethod
+    def unwrapOneOfAndValue(f):
+        """Decorator for 'f' to unwrap value and oneof arguments to their composite forms.
+
+        We loop over each argument to 'f' and check if its a TypedExpression. if so, and if its
+        'unwrappable', we call 'f' with the unwrapped form. For OneOf and Value, this means we
+        never see actual instances of those objects, just their lowered forms.
+
+        We also loop over lists, tuples, and dicts (at the first level of the argument tree)
+        and break those apart.
+        """
+        def inner(self, context, *args):
+            TypedExpression = nativepython.typed_expression.TypedExpression
+
+            for i in range(len(args)):
+                if isinstance(args[i], TypedExpression) and args[i].canUnwrap():
+                    return args[i].unwrap(
+                        lambda newArgI: inner(self, context, *replaceTupElt(args, i, newArgI))
+                    )
+
+                if isinstance(args[i], (tuple, list)):
+                    for j in range(len(args[i])):
+                        if isinstance(args[i][j], TypedExpression) and args[i][j].canUnwrap():
+                            return args[i][j].unwrap(
+                                lambda newArgIJ: inner(self, context, *replaceTupElt(args, i, replaceTupElt(args[i], j, newArgIJ)))
+                            )
+
+                if isinstance(args[i], dict):
+                    for key, val in args[i].items():
+                        if isinstance(val, TypedExpression) and val.canUnwrap():
+                            return val.unwrap(
+                                lambda newVal: inner(self, context, *replaceTupElt(args, i, replaceDictElt(args[i], key, newVal)))
+                            )
+
+            return f(self, context, *args)
+
+        inner.__name__ = f.__name__
+        return inner

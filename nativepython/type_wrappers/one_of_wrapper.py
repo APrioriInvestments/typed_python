@@ -26,6 +26,7 @@ typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTyp
 class OneOfWrapper(Wrapper):
     is_empty = False
     is_pass_by_ref = True
+    can_unwrap = True
 
     def __init__(self, t):
         assert hasattr(t, '__typed_python_category__')
@@ -52,20 +53,17 @@ class OneOfWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def convert_bin_op(self, context, left, op, right, isReversed=False):
+    def unwrap(self, context, expr, generator):
         types = []
         exprs = []
         typesSeen = set()
 
-        with context.switch(left.expr.ElementPtrIntegers(0, 0).load(),
+        with context.switch(expr.expr.ElementPtrIntegers(0, 0).load(),
                             range(len(self.typeRepresentation.Types)),
                             False) as indicesAndContexts:
             for i, subcontext in indicesAndContexts:
                 with subcontext:
-                    if isReversed:
-                        exprs.append(right.convert_bin_op(op, self.refAs(context, left, i)))
-                    else:
-                        exprs.append(self.refAs(context, left, i).convert_bin_op(op, right))
+                    exprs.append(generator(self.refAs(context, expr, i)))
 
                 if exprs[-1] is not None:
                     t = exprs[-1].expr_type
@@ -97,6 +95,15 @@ class OneOfWrapper(Wrapper):
                             context.markUninitializedSlotInitialized(out_slot)
 
         return out_slot
+
+    def convert_bin_op(self, context, left, op, right, isReversed=False):
+        def generator(leftUnwrapped):
+            if isReversed:
+                return right.convert_bin_op(op, leftUnwrapped)
+            else:
+                return leftUnwrapped.convert_bin_op(op, right)
+
+        return self.unwrap(context, left, generator)
 
     def convert_bin_op_reverse(self, context, r, op, l):
         assert r.expr_type == self

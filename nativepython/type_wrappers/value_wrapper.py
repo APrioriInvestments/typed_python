@@ -30,6 +30,7 @@ class ValueWrapper(Wrapper):
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
+    can_unwrap = True
 
     def __init__(self, valueType):
         super().__init__(valueType)
@@ -40,6 +41,9 @@ class ValueWrapper(Wrapper):
 
     def __repr__(self):
         return f"Value({self.typeRepresentation})"
+
+    def unwrap(self, context, expr, generator):
+        return generator(context.constant(self.typeRepresentation.Value))
 
     def convert_default_initialize(self, context, target):
         pass
