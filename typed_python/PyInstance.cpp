@@ -207,6 +207,10 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
     });
 }
 
+PyObject* PyInstance::extractPythonObject(const Instance& instance) {
+    return extractPythonObject(instance.data(), instance.type());
+}
+
 PyObject* PyInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
     return NULL;
 }

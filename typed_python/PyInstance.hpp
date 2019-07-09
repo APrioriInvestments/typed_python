@@ -338,6 +338,8 @@ public:
     //we return a pointer to a PyInstance representing the object.
     static PyObject* extractPythonObject(instance_ptr data, Type* eltType);
 
+    static PyObject* extractPythonObject(const Instance& instance);
+
     //if we have a python representation that we want to use for this object, override and return not-NULL.
     //otherwise, this version takes over and returns a PyInstance wrapper for the object
     static PyObject* extractPythonObjectConcrete(Type* eltType, instance_ptr data);

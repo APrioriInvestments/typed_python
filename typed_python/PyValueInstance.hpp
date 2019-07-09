@@ -41,5 +41,13 @@ public:
     static PyObject* extractPythonObjectConcrete(Value* valueType, instance_ptr data) {
         return extractPythonObject(valueType->value().data(), valueType->value().type());
     }
-};
 
+    static void mirrorTypeInformationIntoPyTypeConcrete(Value* v, PyTypeObject* pyType) {
+        //expose the actual Instance we represent as a member of the type object
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            "Value",
+            PyInstance::extractPythonObject(v->value())
+        );
+    }
+};

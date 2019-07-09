@@ -49,7 +49,7 @@ public:
     }
 
     typed_python_hash_type hash(instance_ptr left) {
-        return (int)getTypeCategory();
+        return 0;
     }
 
     void constructor(instance_ptr self) {}

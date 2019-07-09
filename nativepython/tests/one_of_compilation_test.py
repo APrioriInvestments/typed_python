@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 from typed_python import Function, OneOf, TupleOf, Forward, ConstDict
+from typed_python import Value as ValueType
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
@@ -29,8 +30,9 @@ Value = Forward("Value")
 
 Value = Value.define(
     OneOf(
-        # None,
-        # bool,
+        None,
+        False,
+        True,
         float,
         int,
         str,
@@ -41,9 +43,9 @@ Value = Value.define(
 )
 
 someValues = [
-    # None,
-    # False,
-    # True,
+    None,
+    False,
+    True,
     0.0, 1.0,
     0, 1,
     "hi",
@@ -189,6 +191,21 @@ class TestOneOfOfCompilation(unittest.TestCase):
         for val1 in someValues:
             for val2 in someValues:
                 self.assertEqual(val1 == val2, f(val1, val2), (val1, val2))
+
+    def test_value_types(self):
+        @Compiled
+        def f(x: ValueType(1), y: ValueType(2)):
+            return x + y
+
+        self.assertEqual(f(1, 2), 3)
+
+    def test_convert_bool_to_value(self):
+        @Compiled
+        def f(x: bool) -> Value:
+            return x
+
+        self.assertEqual(f(False), False)
+        self.assertEqual(f(True), True)
 
     def test_convert_ordering(self):
         # we should always pick the int if we can

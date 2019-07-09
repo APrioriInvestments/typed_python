@@ -403,6 +403,16 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     )
                 )
 
+        if op in pyCompOp:
+            return context.pushPod(
+                bool,
+                native_ast.Expression.Binop(
+                    left=left.nonref_expr,
+                    right=right.nonref_expr,
+                    op=pyCompOp[op]
+                )
+            )
+
         return super().convert_bin_op(context, left, op, right)
 
 

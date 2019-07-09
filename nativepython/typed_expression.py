@@ -131,6 +131,9 @@ class TypedExpression(object):
     def convert_bin_op(self, op, rhs):
         return self.expr_type.convert_bin_op(self.context, self, op, rhs)
 
+    def convert_bin_op_reverse(self, op, rhs):
+        return self.expr_type.convert_bin_op_reverse(self.context, self, op, rhs)
+
     def convert_call(self, args, kwargs):
         return self.expr_type.convert_call(self.context, self, args, kwargs)
 

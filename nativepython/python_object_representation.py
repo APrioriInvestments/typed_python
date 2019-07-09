@@ -21,6 +21,7 @@ from nativepython.type_wrappers.module_wrapper import ModuleWrapper
 from nativepython.type_wrappers.python_free_function_wrapper import PythonFreeFunctionWrapper
 from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+from nativepython.type_wrappers.value_wrapper import ValueWrapper
 from nativepython.type_wrappers.tuple_of_wrapper import TupleOfWrapper
 from nativepython.type_wrappers.pointer_to_wrapper import PointerToWrapper
 from nativepython.type_wrappers.list_of_wrapper import ListOfWrapper
@@ -130,6 +131,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "PythonObjectOfType":
         return PythonObjectOfTypeWrapper(t)
+
+    if t.__typed_python_category__ == "Value":
+        return ValueWrapper(t)
 
     assert False, t
 

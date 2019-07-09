@@ -13,17 +13,33 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import NoneType, Int32
 import nativepython.native_ast as native_ast
 
 
-class NoneWrapper(Wrapper):
+class ValueWrapper(Wrapper):
+    """A type wrapper for all 'Value' typed_python types.
+
+    We use Value types to model constants: if you write `OneOf(1, 2, 3)`, you
+    have three Value types modeling the three integers. When you actually interact
+    with such values at the interpreter level, you always deal with them as
+    real python objects because typed_python unboxes them.
+
+    This type wrapper is responsible for implementing these same semantics
+    at the compiler level.
+    """
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
 
-    def __init__(self):
-        super().__init__(NoneType)
+    def __init__(self, valueType):
+        super().__init__(valueType)
+        assert getattr(valueType, '__typed_python_category__', '') == 'Value'
+
+    def __str__(self):
+        return f"Value({self.typeRepresentation})"
+
+    def __repr__(self):
+        return f"Value({self.typeRepresentation})"
 
     def convert_default_initialize(self, context, target):
         pass
@@ -40,14 +56,9 @@ class NoneWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
-    def convert_hash(self, context, expr):
-        return context.constant(Int32(0))
-
     def convert_bin_op(self, context, left, op, right):
-        if right.expr_type == self:
-            if op.matches.Eq:
-                return context.constant(True)
-            if op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.Gt or op.matches.GtE:
-                return context.constant(False)
+        """Apply a binary operator to a Value and something else."""
+        return context.constant(self.typeRepresentation.Value).convert_bin_op(op, right)
 
-        return super().convert_bin_op(context, left, op, right)
+    def convert_bin_op_reverse(self, context, left, op, right):
+        return right.convert_bin_op(op, context.constant(self.typeRepresentation.Value))

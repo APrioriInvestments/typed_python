@@ -57,3 +57,12 @@ class TypesMetadataTest(unittest.TestCase):
         self.assertEqual(Left.ElementType.ElementTypes, (Int64, String))
         self.assertEqual(Right.ElementType.ElementNames, ('x', 'val'))
         self.assertEqual(Right.ElementType.ElementTypes, (X, Int64))
+
+    def test_oneof(self):
+        someInts = TupleOf(int)((1, 2))
+
+        T = OneOf(1, "2", someInts)
+
+        self.assertEqual(T.Types[0].Value, 1)
+        self.assertEqual(T.Types[1].Value, "2")
+        self.assertEqual(T.Types[2].Value, someInts)
