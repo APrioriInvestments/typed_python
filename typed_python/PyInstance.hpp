@@ -48,6 +48,7 @@ class PyPythonObjectOfTypeInstance;
 class PyOneOfInstance;
 class PyForwardInstance;
 class PyEmbeddedMessageInstance;
+class PySetInstance;
 
 template<class T>
 class PyRegisterTypeInstance;
@@ -104,6 +105,8 @@ public:
                 return f(*(PyConstDictInstance*)obj);
             case Type::TypeCategory::catDict:
                 return f(*(PyDictInstance*)obj);
+            case Type::TypeCategory::catSet:
+                return f(*(PySetInstance*)obj);
             case Type::TypeCategory::catAlternative:
                 return f(*(PyAlternativeInstance*)obj);
             case Type::TypeCategory::catConcreteAlternative:
@@ -177,6 +180,8 @@ public:
                 return f((PyConstDictInstance*)nullptr);
             case Type::TypeCategory::catDict:
                 return f((PyDictInstance*)nullptr);
+            case Type::TypeCategory::catSet:
+                return f((PySetInstance*)nullptr);
             case Type::TypeCategory::catAlternative:
                 return f((PyAlternativeInstance*)nullptr);
             case Type::TypeCategory::catConcreteAlternative:

@@ -39,7 +39,9 @@ compile the entire group all at once.
 #include "PyFunctionInstance.cpp"
 #include "PyBoundMethodInstance.cpp"
 #include "PyGilState.cpp"
+#include "PySetInstance.cpp"
 
+#include "SetType.cpp"
 #include "AlternativeType.cpp"
 #include "BytesType.cpp"
 #include "ClassType.cpp"

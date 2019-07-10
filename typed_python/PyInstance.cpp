@@ -42,6 +42,7 @@
 #include "PyOneOfInstance.hpp"
 #include "PyForwardInstance.hpp"
 #include "PyEmbeddedMessageInstance.hpp"
+#include "PySetInstance.hpp"
 
 Type* PyInstance::type() {
     return extractTypeFrom(((PyObject*)this)->ob_type);
@@ -502,12 +503,13 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
             t->getTypeCategory() == Type::TypeCategory::catNamedTuple ||
             t->getTypeCategory() == Type::TypeCategory::catString ||
             t->getTypeCategory() == Type::TypeCategory::catBytes ||
+            t->getTypeCategory() == Type::TypeCategory::catSet ||
             t->getTypeCategory() == Type::TypeCategory::catDict ||
             t->getTypeCategory() == Type::TypeCategory::catConstDict) {
         PySequenceMethods* res =
             new PySequenceMethods {0,0,0,0,0,0,0,0};
 
-        if (t->getTypeCategory() == Type::TypeCategory::catConstDict || t->getTypeCategory() == Type::TypeCategory::catDict) {
+        if (t->getTypeCategory() == Type::TypeCategory::catConstDict || t->getTypeCategory() == Type::TypeCategory::catDict || t->getTypeCategory() == Type::TypeCategory::catSet) {
             res->sq_contains = (objobjproc)PyInstance::sq_contains;
         } else {
             res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
@@ -633,6 +635,7 @@ PyMappingMethods* PyInstance::mappingMethods(Type* t) {
 
     if (t->getTypeCategory() == Type::TypeCategory::catConstDict ||
         t->getTypeCategory() == Type::TypeCategory::catDict ||
+        t->getTypeCategory() == Type::TypeCategory::catSet ||
         t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
         t->getTypeCategory() == Type::TypeCategory::catListOf ||
         t->getTypeCategory() == Type::TypeCategory::catClass) {
@@ -752,7 +755,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_richcompare = tp_richcompare,           // richcmpfunc
             .tp_weaklistoffset = 0,                     // Py_ssize_t
             .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ||
-                        inType->getTypeCategory() == Type::TypeCategory::catDict
+                        inType->getTypeCategory() == Type::TypeCategory::catDict || 
+                        inType->getTypeCategory() == Type::TypeCategory::catSet 
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
@@ -1082,6 +1086,8 @@ PyObject* PyInstance::categoryToPyString(Type::TypeCategory cat) {
     if (cat == Type::TypeCategory::catListOf) { static PyObject* res = PyUnicode_FromString("ListOf"); return res; }
     if (cat == Type::TypeCategory::catNamedTuple) { static PyObject* res = PyUnicode_FromString("NamedTuple"); return res; }
     if (cat == Type::TypeCategory::catTuple) { static PyObject* res = PyUnicode_FromString("Tuple"); return res; }
+    if (cat == Type::TypeCategory::catSet) { static PyObject* res = PyUnicode_FromString("Set"); return res; }
+    if (cat == Type::TypeCategory::catConstDict) { static PyObject* res = PyUnicode_FromString("ConstDict"); return res; }
     if (cat == Type::TypeCategory::catDict) { static PyObject* res = PyUnicode_FromString("Dict"); return res; }
     if (cat == Type::TypeCategory::catConstDict) { static PyObject* res = PyUnicode_FromString("ConstDict"); return res; }
     if (cat == Type::TypeCategory::catAlternative) { static PyObject* res = PyUnicode_FromString("Alternative"); return res; }

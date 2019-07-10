@@ -70,6 +70,7 @@ class Function;
 class BoundMethod;
 class Forward;
 class EmbeddedMessageType;
+class SetType;
 
 typedef uint8_t* instance_ptr;
 
@@ -116,7 +117,8 @@ public:
         catHeldClass = 29,
         catFunction = 30,
         catForward = 31,
-        catEmbeddedMessage = 32
+        catEmbeddedMessage = 32,
+        catSet = 33
     };
 
     virtual ~Type() {
@@ -161,7 +163,7 @@ public:
     If 'suppressExceptions', then don't generate exceptions when comparing objects of unlike type. Sort their
     type names instead.
     */
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions = false);
 
     typed_python_hash_type hash(instance_ptr left);
 
@@ -236,6 +238,8 @@ public:
                 return f(*(NamedTuple*)this);
             case catTuple:
                 return f(*(Tuple*)this);
+            case catSet:
+                return f(*(SetType*)this);
             case catDict:
                 return f(*(DictType*)this);
             case catConstDict:
