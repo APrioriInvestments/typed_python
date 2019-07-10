@@ -1908,6 +1908,57 @@ class NativeTypesTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             self.assertEqual(d.get("1000"), None)
 
+    def test_mutable_dict_setdefault_bad_arguments(self):
+        d = Dict(int, str)()
+
+        with self.assertRaises(TypeError):
+            d.setdefault()
+
+        with self.assertRaises(TypeError):
+            d.setdefault(1, 2, 3)
+
+    def test_mutable_dict_setdefault(self):
+        d = Dict(int, str)()
+        d[1] = "a"
+
+        # check if this call doesn't change the dict
+        # and returns already existing value
+        v1 = d.setdefault(1, "b")
+        self.assertEqual(v1, "a")
+        self.assertEqual(d[1], "a")
+
+        # check if this call sets the d[2]="b"
+        # # and returns "b"
+        v2 = d.setdefault(2, "b")
+        self.assertEqual(v2, "b")
+        self.assertEqual(d[2], "b")
+
+        # it's not possible to convert None to String,
+        # so this should throw an exception
+        with self.assertRaisesRegex(TypeError, "Can't initialize a StringType from an instance of NoneType"):
+            v3 = d.setdefault(3)
+
+        with self.assertRaisesRegex(TypeError, "Can't initialize a StringType from an instance of NoneType"):
+            v3 = d.setdefault(3, None)
+
+    def test_mutable_dict_setdefault_refcount(self):
+        d = Dict(int, ListOf(int))()
+        aList = ListOf(int)([1, 2, 3])
+
+        self.assertEquals(_types.refcount(aList), 1)
+        d[1] = aList
+        self.assertEquals(_types.refcount(aList), 2)
+        d.setdefault(2, aList)
+        self.assertEquals(_types.refcount(aList), 3)
+        a = d.setdefault(2, aList)
+        self.assertEquals(_types.refcount(aList), 4)
+        a = None
+        self.assertEquals(_types.refcount(aList), 3)
+        d.setdefault(3, ListOf(int)([1]))
+        self.assertEquals(_types.refcount(aList), 3)
+        d.setdefault(3, aList)
+        self.assertEquals(_types.refcount(aList), 3)
+
     def test_mutable_dict_iteration_order(self):
         d = Dict(int, int)()
 
