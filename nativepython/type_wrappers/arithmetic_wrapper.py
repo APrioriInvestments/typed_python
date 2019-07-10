@@ -367,6 +367,12 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return super().convert_unary_op(context, left, op)
 
     def convert_bin_op(self, context, left, op, right):
+        if op.matches.Is and right.expr_type == self:
+            op = python_ast.ComparisonOp.Eq()
+
+        if op.matches.IsNot and right.expr_type == self:
+            op = python_ast.ComparisonOp.NotEq()
+
         if op.matches.Div:
             T = toWrapper(
                 computeArithmeticBinaryResultType(

@@ -96,19 +96,20 @@ class OneOfWrapper(Wrapper):
 
         return out_slot
 
-    def convert_bin_op(self, context, left, op, right, isReversed=False):
+    def convert_bin_op(self, context, left, op, right):
         def generator(leftUnwrapped):
-            if isReversed:
-                return right.convert_bin_op(op, leftUnwrapped)
-            else:
-                return leftUnwrapped.convert_bin_op(op, right)
+            return leftUnwrapped.convert_bin_op(op, right)
 
         return self.unwrap(context, left, generator)
 
     def convert_bin_op_reverse(self, context, r, op, l):
         assert r.expr_type == self
         assert r.isReference
-        return self.convert_bin_op(context, r, op, l, True)
+
+        def generator(rightUnwrapped):
+            return l.convert_bin_op(op, rightUnwrapped)
+
+        return self.unwrap(context, r, generator)
 
     def convert_default_initialize(self, context, target):
         for i, t in enumerate(self.typeRepresentation.Types):

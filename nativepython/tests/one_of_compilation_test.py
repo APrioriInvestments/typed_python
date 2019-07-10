@@ -108,11 +108,11 @@ class TestOneOfOfCompilation(unittest.TestCase):
     def test_one_of_binop_rhs(self):
         @Compiled
         def f(x: int, y: OneOf(int, float)) -> OneOf(int, float):
-            return x + y
+            return x - y
 
         def check(x, y):
-            self.assertIs(type(f(x, y)), type(x+y))
-            self.assertEqual(f(x, y), x+y)
+            self.assertIs(type(f(x, y)), type(x + y))
+            self.assertEqual(f(x, y), x - y)
 
         things = [0, 1, 2, 0.0, 1.0, 2.0]
 

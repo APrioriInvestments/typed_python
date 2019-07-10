@@ -49,5 +49,9 @@ class NoneWrapper(Wrapper):
                 return context.constant(True)
             if op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.Gt or op.matches.GtE:
                 return context.constant(False)
+            if op.matches.Is:
+                return context.constant(True)
+            if op.matches.IsNot:
+                return context.constant(False)
 
         return super().convert_bin_op(context, left, op, right)

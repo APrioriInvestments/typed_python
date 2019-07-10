@@ -491,6 +491,14 @@ class ExpressionConversionContext(object):
             )
 
     def isInitializedVarExpr(self, name):
+        if self.functionContext._varname_to_type[name] is None:
+            raise ConversionException(
+                "variable %s is not in scope here" % name
+            )
+
+        if self.functionContext._varname_to_type[name].is_empty:
+            return self.constant(True)
+
         return TypedExpression(
             self,
             native_ast.Expression.StackSlot(
@@ -534,6 +542,24 @@ class ExpressionConversionContext(object):
                 )
             )
         )
+
+    def markVariableInitialized(self, varname):
+        if self.functionContext._varname_to_type[varname].is_empty:
+            raise Exception(
+                f"Can't mark {varname} initialized because its variables are of type"
+                f" {self.functionContext._varname_to_type[varname]} and have no content."
+            )
+
+        self.pushEffect(self.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+
+    def markVariableNotInitialized(self, varname):
+        if self.functionContext._varname_to_type[varname].is_empty:
+            raise Exception(
+                f"Can't mark {varname} not initialized because its variables are of type"
+                f" {self.functionContext._varname_to_type[varname]} and have no content."
+            )
+
+        self.pushEffect(self.isInitializedVarExpr(varname).expr.store(native_ast.falseExpr))
 
     def convert_expression_ast(self, ast):
         if ast.matches.Attribute:

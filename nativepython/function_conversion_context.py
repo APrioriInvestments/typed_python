@@ -230,18 +230,18 @@ class FunctionConversionContext(object):
 
         assert val_to_store is not None, "We should always be able to upsize"
 
-        if slot_ref.expr_type.is_pod:
+        if slot_ref.expr_type.is_empty:
+            pass
+        elif slot_ref.expr_type.is_pod:
             slot_ref.convert_copy_initialize(val_to_store)
-            subcontext.pushEffect(subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
+            subcontext.markVariableInitialized(varname)
         else:
             with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
                 with true_block:
                     slot_ref.convert_assign(val_to_store)
                 with false_block:
                     slot_ref.convert_copy_initialize(val_to_store)
-                    subcontext.pushEffect(
-                        subcontext.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr)
-                    )
+                    subcontext.markVariableInitialized(varname)
 
     def convert_statement_ast(self, ast):
         if ast.matches.Expr and ast.value.matches.Str:
@@ -628,7 +628,9 @@ class FunctionConversionContext(object):
                 elif slot_type is not None:
                     context = ExpressionConversionContext(self)
 
-                    if slot_type.is_pod:
+                    if slot_type.is_empty:
+                        pass
+                    elif slot_type.is_pod:
                         # we can just copy this into the stackslot directly. no destructor needed
                         context.pushEffect(
                             native_ast.Expression.Store(
@@ -642,9 +644,7 @@ class FunctionConversionContext(object):
                                 )
                             )
                         )
-                        context.pushEffect(
-                            context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
-                        )
+                        context.markVariableInitialized(name)
                     else:
                         # need to make a stackslot for this variable
                         # the argument will be a pointer because it's POD
@@ -654,9 +654,7 @@ class FunctionConversionContext(object):
 
                         slot_type.convert_copy_initialize(context, slot_expr, var_expr)
 
-                        context.pushEffect(
-                            context.isInitializedVarExpr(name).expr.store(native_ast.trueExpr)
-                        )
+                        context.markVariableInitialized(name)
 
                     to_add.append(context.finalize(None))
 
@@ -664,7 +662,7 @@ class FunctionConversionContext(object):
             if name is not FunctionOutput and name != stararg_name:
                 context = ExpressionConversionContext(self)
 
-                if self._varname_to_type[name] is not None:
+                if self._varname_to_type[name] is not None and not self._varname_to_type[name].is_empty:
                     slot_expr = context.named_var_expr(name)
 
                     with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
@@ -681,7 +679,7 @@ class FunctionConversionContext(object):
                         # this is a variable in the function that we assigned to. we need to ensure that
                         # the initializer flag is zero
                         context = ExpressionConversionContext(self)
-                        context.pushEffect(context.isInitializedVarExpr(name).expr.store(native_ast.falseExpr))
+                        context.markVariableNotInitialized(name)
                         to_add.append(context.finalize(None))
 
         if to_add:
