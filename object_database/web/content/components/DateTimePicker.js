@@ -22,7 +22,7 @@ import * as moment from 'moment';
 class DateTimePicker extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        this.timeformat = 'YYYY-MM-DTh:mm:ss'
+        this.timeformat = 'YYYY-MM-DThh:mm:ss'
         this.datetime = moment.unix(this.props.datetime).format(this.timeformat)
 
         // Bind component methods
@@ -33,7 +33,6 @@ class DateTimePicker extends Component {
         return h('div',
             {
                 class: "cell",
-                style: this.props.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "DateTimePicker"
@@ -51,15 +50,19 @@ class DateTimePicker extends Component {
     }
 
     changeHandler(val) {
-        cellSocket.sendString(
-            JSON.stringify(
-                {
-                    "event": "change",
-                    "target_cell": this.props.id,
-                    "value": moment(val).unix()  //TODO check this!
-                }
-            )
-        );
+        // don't send back NaN
+        let unix_val = moment(val).unix()
+        if (unix_val !== NaN) {
+            cellSocket.sendString(
+                JSON.stringify(
+                    {
+                        "event": "change",
+                        "target_cell": this.props.id,
+                        "value": unix_val
+                    }
+                )
+            );
+        }
     }
 }
 
@@ -67,10 +70,6 @@ DateTimePicker.propTypes = {
     datetime: {
         description: "Start datetime in (unix) seconds from epoch.",
         type: PropTypes.oneOf([PropTypes.number])
-    },
-    divStyle: {
-        description: "HTML style attribute string.",
-        type: PropTypes.oneOf([PropTypes.string])
     }
 };
 

@@ -11,6 +11,9 @@ nodeenv
 .nodeenv
 node_modules
 
+# ignore the main bundle
+content/dist/main.bundle.js
+
 # Emacs
 \#*
 \.#*

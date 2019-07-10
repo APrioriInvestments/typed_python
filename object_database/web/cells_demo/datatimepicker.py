@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import time
 import datetime
 
 from object_database.web import cells as cells

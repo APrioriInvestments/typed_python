@@ -2654,7 +2654,7 @@ class Timestamp(Cell):
 
 class DateTimePicker(Cell):
     """Date time and date time range picker."""
-    def __init__(self, slot, divStyle=None):
+    def __init__(self, slot):
         """
         Parameters:
         ----------
@@ -2662,7 +2662,6 @@ class DateTimePicker(Cell):
             Must be initialized with a float or int (time from epoch) value.
             Alternatively you can pass in a float or int and DateTimePicker
             will create it's own internal slot.
-        divStyle: str
         """
         super().__init__()
         if isinstance(slot, Slot):
@@ -2672,15 +2671,11 @@ class DateTimePicker(Cell):
         assert isinstance(self.slot.getWithoutRegisteringDependency(), (float, int)), (
             "expected time since epoch float or int")
 
-        if divStyle is None:
-            self.divStyle = ""
-        else:
-            self.divStyle = divStyle
-
     def recalculate(self):
         self.contents = ""
         self.exportData['datetime'] = self.slot.get()
         self.exportData['divStyle'] = self.divStyle
+        self.exportData['initial'] = self.initial
 
     def onMessage(self, msgFrame):
         self.slot.set(msgFrame['value'])

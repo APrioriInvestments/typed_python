@@ -98,6 +98,7 @@ const ComponentRegistry = {
     Plot,
     _PlotUpdater,
     SplitView,
+    Timestamp,
     DateTimePicker
 };
 
