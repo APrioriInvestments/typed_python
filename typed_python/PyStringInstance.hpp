@@ -30,7 +30,7 @@ public:
                 kind == PyUnicode_2BYTE_KIND ||
                 kind == PyUnicode_4BYTE_KIND
                 );
-            StringType().constructor(
+            StringType::Make()->constructor(
                 tgt,
                 kind == PyUnicode_1BYTE_KIND ? 1 :
                 kind == PyUnicode_2BYTE_KIND ? 2 :
@@ -51,14 +51,14 @@ public:
     }
 
     static PyObject* extractPythonObjectConcrete(StringType* t, instance_ptr data) {
-        int bytes_per_codepoint = StringType().bytes_per_codepoint(data);
+        int bytes_per_codepoint = StringType::Make()->bytes_per_codepoint(data);
 
         return PyUnicode_FromKindAndData(
             bytes_per_codepoint == 1 ? PyUnicode_1BYTE_KIND :
             bytes_per_codepoint == 2 ? PyUnicode_2BYTE_KIND :
                                        PyUnicode_4BYTE_KIND,
-            StringType().eltPtr(data, 0),
-            StringType().count(data)
+            StringType::Make()->eltPtr(data, 0),
+            StringType::Make()->count(data)
             );
     }
 

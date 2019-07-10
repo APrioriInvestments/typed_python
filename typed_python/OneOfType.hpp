@@ -20,7 +20,7 @@
 
 class OneOfType : public Type {
 public:
-    OneOfType(const std::vector<Type*>& types) :
+    OneOfType(const std::vector<Type*>& types) noexcept :
                     Type(TypeCategory::catOneOf),
                     m_types(types)
     {

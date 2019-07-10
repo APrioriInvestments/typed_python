@@ -119,6 +119,10 @@ public:
         catEmbeddedMessage = 32
     };
 
+    virtual ~Type() {
+        throw std::runtime_error("Types should never get deleted.");
+    }
+
     TypeCategory getTypeCategory() const {
         return m_typeCategory;
     }

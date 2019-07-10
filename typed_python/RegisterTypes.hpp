@@ -100,7 +100,10 @@ public:
         stream << (*(bool*)self ? "True":"False");
     }
 
-    static Bool* Make() { static Bool res; return &res; }
+    static Bool* Make() {
+        static Bool* res = new Bool();
+        return res;
+    }
 };
 
 class UInt8 : public RegisterType<uint8_t> {
@@ -114,7 +117,10 @@ public:
         stream << (uint64_t)*(uint8_t*)self << "u8";
     }
 
-    static UInt8* Make() { static UInt8 res; return &res; }
+    static UInt8* Make() {
+        static UInt8* res = new UInt8();
+        return res;
+    }
 };
 
 class UInt16 : public RegisterType<uint16_t> {
@@ -128,7 +134,7 @@ public:
         stream << (uint64_t)*(uint16_t*)self << "u16";
     }
 
-    static UInt16* Make() { static UInt16 res; return &res; }
+    static UInt16* Make() { static UInt16* res = new UInt16(); return res; }
 };
 
 class UInt32 : public RegisterType<uint32_t> {
@@ -142,7 +148,7 @@ public:
         stream << (uint64_t)*(uint32_t*)self << "u32";
     }
 
-    static UInt32* Make() { static UInt32 res; return &res; }
+    static UInt32* Make() { static UInt32* res = new UInt32(); return res; }
 };
 
 class UInt64 : public RegisterType<uint64_t> {
@@ -156,7 +162,7 @@ public:
         stream << *(uint64_t*)self << "u64";
     }
 
-    static UInt64* Make() { static UInt64 res; return &res; }
+    static UInt64* Make() { static UInt64* res = new UInt64(); return res; }
 };
 
 class Int8 : public RegisterType<int8_t> {
@@ -171,7 +177,7 @@ public:
         stream << (int64_t)*(int8_t*)self << "i8";
     }
 
-    static Int8* Make() { static Int8 res; return &res; }
+    static Int8* Make() { static Int8* res = new Int8(); return res; }
 };
 
 class Int16 : public RegisterType<int16_t> {
@@ -185,7 +191,7 @@ public:
         stream << (int64_t)*(int16_t*)self << "i16";
     }
 
-    static Int16* Make() { static Int16 res; return &res; }
+    static Int16* Make() { static Int16* res = new Int16(); return res; }
 };
 
 class Int32 : public RegisterType<int32_t> {
@@ -199,7 +205,7 @@ public:
         stream << (int64_t)*(int32_t*)self << "i32";
     }
 
-    static Int32* Make() { static Int32 res; return &res; }
+    static Int32* Make() { static Int32* res = new Int32(); return res; }
 };
 
 class Int64 : public RegisterType<int64_t> {
@@ -213,7 +219,7 @@ public:
         stream << *(int64_t*)self;
     }
 
-    static Int64* Make() { static Int64 res; return &res; }
+    static Int64* Make() { static Int64* res = new Int64(); return res; }
 };
 
 class Float32 : public RegisterType<float> {
@@ -227,7 +233,7 @@ public:
         stream << *(float*)self << "f32";
     }
 
-    static Float32* Make() { static Float32 res; return &res; }
+    static Float32* Make() { static Float32* res = new Float32(); return res; }
 };
 
 class Float64 : public RegisterType<double> {
@@ -241,7 +247,7 @@ public:
         stream << *(double*)self;
     }
 
-    static Float64* Make() { static Float64 res; return &res; }
+    static Float64* Make() { static Float64* res = new Float64(); return res; }
 };
 
 template<class T>

@@ -24,7 +24,7 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(EmbeddedMessageType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyBytes_Check(pyRepresentation)) {
-            EmbeddedMessageType().constructor(
+            EmbeddedMessageType::Make()->constructor(
                 tgt,
                 PyBytes_GET_SIZE(pyRepresentation),
                 PyBytes_AsString(pyRepresentation)
@@ -41,8 +41,8 @@ public:
 
     static PyObject* extractPythonObjectConcrete(modeled_type* bytesType, instance_ptr data) {
         return PyBytes_FromStringAndSize(
-            (const char*)EmbeddedMessageType().eltPtr(data, 0),
-            EmbeddedMessageType().count(data)
+            (const char*)EmbeddedMessageType::Make()->eltPtr(data, 0),
+            EmbeddedMessageType::Make()->count(data)
         );
     }
 

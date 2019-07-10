@@ -216,7 +216,7 @@ int64_t StringType::find(layout *l, layout *sub, int64_t start, int64_t stop) {
 void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
-    static auto listofstring = ListOfType::Make(StringType::Make());
+    static ListOfType* listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
     if (!l || !l->pointcount)
@@ -270,7 +270,7 @@ void StringType::split_3(ListOfType::layout* outList, layout* l, int64_t max) {
 void StringType::split(ListOfType::layout* outList, layout* l, layout* sep, int64_t max) {
     if (!outList)
         throw std::invalid_argument("missing return argument");
-    static auto listofstring = ListOfType::Make(StringType::Make());
+    static ListOfType* listofstring = ListOfType::Make(StringType::Make());
     listofstring->resize((instance_ptr)&outList, 0, 0);
 
     if (!sep || !sep->pointcount)

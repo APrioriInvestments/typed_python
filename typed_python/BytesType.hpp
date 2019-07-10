@@ -85,7 +85,10 @@ public:
 
     static char cmpStatic(layout* left, layout* right);
 
-    static BytesType* Make() { static BytesType res; return &res; }
+    static BytesType* Make() {
+        static BytesType* res = new BytesType();
+        return res;
+    }
 
     void constructor(instance_ptr self, int64_t count, const char* data) const;
 

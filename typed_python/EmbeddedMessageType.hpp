@@ -30,7 +30,10 @@ public:
         m_typeCategory = TypeCategory::catEmbeddedMessage;
     }
 
-    static EmbeddedMessageType* Make() { static EmbeddedMessageType res; return &res; }
+    static EmbeddedMessageType* Make() {
+        static EmbeddedMessageType* res = new EmbeddedMessageType();
+        return res;
+    }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {

@@ -102,7 +102,7 @@ public:
     void _visitContainedTypes(const visitor_type& v) {}
 
 
-    static StringType* Make() { static StringType res; return &res; }
+    static StringType* Make() { static StringType* res = new StringType(); return res; }
 
     template<class buf_t>
     void serialize(instance_ptr self, buf_t& buffer, size_t fieldNumber) {

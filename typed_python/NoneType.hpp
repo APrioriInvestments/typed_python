@@ -60,7 +60,10 @@ public:
 
     void assign(instance_ptr self, instance_ptr other) {}
 
-    static NoneType* Make() { static NoneType res; return &res; }
+    static NoneType* Make() {
+        static NoneType* res = new NoneType();
+        return res;
+    }
 
     template<class buf_t>
     void deserialize(instance_ptr self, buf_t& buffer, size_t wireType) {

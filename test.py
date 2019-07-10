@@ -482,7 +482,7 @@ def runPythonUnitTests(args, filterActions, modules):
         for test in testCasesToRun:
             print(test.id())
 
-        os._exit(0)
+        sys.exit(0)
 
     return runPyTestSuite(config, None, testCasesToRun, testArgs)
 

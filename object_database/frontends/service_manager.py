@@ -22,7 +22,6 @@ import psutil
 import resource
 import signal
 import sys
-import os
 import threading
 import time
 import traceback
@@ -175,4 +174,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    os._exit(main())
+    sys.exit(main())

@@ -24,7 +24,7 @@ public:
 
     static void copyConstructFromPythonInstanceConcrete(BytesType* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyBytes_Check(pyRepresentation)) {
-            BytesType().constructor(
+            BytesType::Make()->constructor(
                 tgt,
                 PyBytes_GET_SIZE(pyRepresentation),
                 PyBytes_AsString(pyRepresentation)
@@ -41,8 +41,8 @@ public:
 
     static PyObject* extractPythonObjectConcrete(BytesType* bytesType, instance_ptr data) {
         return PyBytes_FromStringAndSize(
-            (const char*)BytesType().eltPtr(data, 0),
-            BytesType().count(data)
+            (const char*)BytesType::Make()->eltPtr(data, 0),
+            BytesType::Make()->count(data)
             );
     }
 
