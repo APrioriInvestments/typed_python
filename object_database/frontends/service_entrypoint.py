@@ -15,7 +15,9 @@
 #   limitations under the License.
 
 import argparse
+import coverage
 import logging
+import os
 import signal
 import sys
 import traceback
@@ -95,4 +97,8 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    errno = main(sys.argv)
+    # Hack to avoid calling sys.exit(errno) because it could segfault
+    # during clean-up and return a non-zero result.
+    coverage.control.process_startup.coverage._atexit()
+    os._exit(errno)
