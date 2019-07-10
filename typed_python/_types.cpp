@@ -113,6 +113,21 @@ PyObject *MakeConstDictType(PyObject* nullValue, PyObject* args) {
     return incref(typeObj);
 }
 
+PyObject* MakeSetType(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args)!=1) {
+        PyErr_SetString(PyExc_TypeError, "Set takes 1 positional arguments");
+        return NULL;
+    }
+    PyObjectHolder tupleItem(PyTuple_GetItem(args, 0));
+    Type* t = PyInstance::unwrapTypeArgToTypePtr(tupleItem);
+    if (!t) {
+        PyErr_SetString(PyExc_TypeError, "Set needs a type.");
+        return NULL;
+    }
+    SetType* setT = SetType::Make(t);
+    return incref((PyObject*)PyInstance::typeObj(setT));
+}
+
 PyObject *MakeDictType(PyObject* nullValue, PyObject* args) {
     std::vector<Type*> types;
     for (long k = 0; k < PyTuple_Size(args); k++) {
@@ -651,6 +666,7 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
             actualType->getTypeCategory() != Type::TypeCategory::catClass &&
             actualType->getTypeCategory() != Type::TypeCategory::catConstDict &&
             actualType->getTypeCategory() != Type::TypeCategory::catDict &&
+            actualType->getTypeCategory() != Type::TypeCategory::catSet &&
             actualType->getTypeCategory() != Type::TypeCategory::catAlternative &&
             actualType->getTypeCategory() != Type::TypeCategory::catConcreteAlternative
             )) {
@@ -683,6 +699,11 @@ PyObject *refcount(PyObject* nullValue, PyObject* args) {
     if (actualType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         return PyLong_FromLong(
             ((::ConstDictType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
+            );
+    }
+    if (actualType->getTypeCategory() == Type::TypeCategory::catSet) {
+        return PyLong_FromLong(
+            ((::SetType*)actualType)->refcount(((PyInstance*)(PyObject*)a1)->dataPtr())
             );
     }
     if (actualType->getTypeCategory() == Type::TypeCategory::catDict) {
@@ -1452,6 +1473,7 @@ static PyMethodDef module_methods[] = {
     {"Tuple", (PyCFunction)MakeTupleType, METH_VARARGS, NULL},
     {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},
     {"OneOf", (PyCFunction)MakeOneOfType, METH_VARARGS, NULL},
+    {"Set", (PyCFunction)MakeSetType, METH_VARARGS, NULL},
     {"Dict", (PyCFunction)MakeDictType, METH_VARARGS, NULL},
     {"ConstDict", (PyCFunction)MakeConstDictType, METH_VARARGS, NULL},
     {"Alternative", (PyCFunction)MakeAlternativeType, METH_VARARGS | METH_KEYWORDS, NULL},

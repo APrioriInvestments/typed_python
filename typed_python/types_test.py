@@ -19,7 +19,7 @@ from typed_python import (
     Float32, Float64,
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Dict,
     ConstDict, Alternative, serialize, deserialize, Class, Member,
-    TypeFilter, Function, Forward
+    TypeFilter, Function, Forward, Set
 )
 from typed_python.type_promotion import computeArithmeticBinaryResultType
 from typed_python.test_util import currentMemUsageMb
@@ -2067,3 +2067,141 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(_types.refcount(aList), 2)
         nt = None
         self.assertEqual(_types.refcount(aList), 1)
+
+    def test_set_constructor_identity(self):
+        s = Set(int)
+        self.assertEqual(s.__qualname__, "Set(Int64)")
+        s = Set(float)
+        self.assertEqual(s.__qualname__, "Set(Float64)")
+        s = Set(str)
+        self.assertEqual(s.__qualname__, "Set(String)")
+
+        s1 = Set(int)(1)
+        s2 = Set(int)(1)
+        self.assertNotEqual(id(s2), id(s1))
+
+    def test_set_len(self):
+        s1 = Set(int)([1, 2, 3])
+        s2 = Set(int)([1, 2, 3])
+        self.assertEqual(len(s1), len(s2))
+
+    def test_set_discard(self):
+        s = Set(int)([1, 2, 3])
+        s.discard(2)
+        self.assertNotIn(2, s)
+        self.assertRaises(TypeError, s.discard, [])
+
+        s = Set(str)()
+        s.add("hello")
+        s.discard("hello")
+        self.assertEqual(len(s), 0)
+
+        # discard on empty or when key not found should not throw
+        s = Set(int)()
+        s.discard(1)
+
+    def test_set_clear(self):
+        s = Set(int)([1, 2, 3])
+        s.clear()
+        self.assertEqual(set(s), set())
+        self.assertEqual(len(s), 0)
+
+    def test_set_contains(self):
+        letters = ['a', 'b', 'c']
+        s1 = Set(str)()
+        s2 = Set(str)()
+        for c in letters:
+            s1.add(c)
+            s2.add(c)
+        for c in letters:
+            self.assertEqual(c in s1, c in s2)
+        self.assertRaises(TypeError, s1.__contains__, [[]])
+
+    def test_set_remove(self):
+        s = Set(str)()
+        s.add("a")
+        s.add("b")
+        s.remove("a")
+        self.assertNotIn("a", s)
+        self.assertRaises(KeyError, s.remove, "Q")
+        self.assertRaises(TypeError, s.remove, [])
+
+    def test_set_add(self):
+        s = Set(int)()
+        self.assertEqual(len(s), 0)
+        s.add(1)
+        self.assertIn(1, s)
+        self.assertEqual(len(s), 1)
+        s.add(2)
+        self.assertEqual(len(s), 2)
+        s.add(2)
+        self.assertEqual(len(s), 2)
+        self.assertRaises(TypeError, s.add, [])
+        self.assertRaises(TypeError, s.add, 1.0)
+        self.assertRaises(TypeError, s.add, "hello")
+
+        for i in ([1, 2, 3], (1, 2, 3), {1, 2, 3}):
+            s = Set(int)(i)
+            self.assertEqual(len(s), 3)
+
+    def test_set_refcounts(self):
+        native_d = Dict(str, Set(int))()
+        i = Set(int)()
+        native_d["a"] = i
+        self.assertEqual(_types.refcount(i), 2)
+        native_d["b"] = i
+        self.assertEqual(_types.refcount(i), 3)
+        del native_d["a"]
+        self.assertEqual(_types.refcount(i), 2)
+        native_d = None
+        self.assertEqual(_types.refcount(i), 1)
+
+    def test_set_equality(self):
+        s = Set(str)()
+        s.add('hello')
+        other_s = Set(str)()
+        other_s.add('world')
+        another_s = Set(str)()
+        another_s.add('hello')
+        self.assertEqual(set(s), set(['hello']))
+        self.assertEqual(s == 'hello', False)
+        self.assertNotEqual(set(s), set(other_s))
+        self.assertEqual(s != 'hello', True)
+        self.assertEqual(s == other_s, False)
+        self.assertEqual(s != other_s, True)
+        self.assertEqual(s == another_s, True)
+
+    def test_set_self_equality(self):
+        s = Set(int)()
+        self.assertEqual(s, s)
+
+    def test_set_repr(self):
+        repr_s = '{1, 2, 3}'
+        s = Set(int)([1, 2, 3])
+        self.assertEqual(repr(s), repr_s)
+
+    def test_set_literal(self):
+        s = Set(int)([1, 2, 3])
+        t = {1, 2, 3}
+        self.assertEqual(t, set(s))
+
+        s = Set(str)(["a", "b", "c"])
+        t = {"a", "b", "c"}
+        self.assertEqual(t, set(s))
+
+    def test_set_iterating(self):
+        s = Set(int)()
+        it = iter(s)
+        self.assertRaises(StopIteration, next, it)
+
+        s = Set(str)(["a", "b", "c"])
+        it = iter(s)
+        count = 0
+        while True:
+            try:
+                next(it)
+                count += 1
+            except StopIteration:
+                break
+        self.assertEqual(count, len(s))
+ 

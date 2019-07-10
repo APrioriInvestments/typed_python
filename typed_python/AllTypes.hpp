@@ -43,6 +43,7 @@
 #include "ClassType.hpp"
 #include "BoundMethodType.hpp"
 #include "EmbeddedMessageType.hpp"
+#include "SetType.hpp"
 
 #include "direct_types/all.hpp"
 #include "direct_types/GeneratedTypes.hpp"

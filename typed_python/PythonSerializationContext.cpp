@@ -664,6 +664,8 @@ void PythonSerializationContext::serializeNativeType(
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
         serializeNativeTypeInCompound(nativeType->getBaseType(), b, 1);
         b.writeUnsignedVarintObject(2, ((ConcreteAlternative*)nativeType)->which());
+    } else if (nativeType->getTypeCategory() == Type::TypeCategory::catSet) {
+        serializeNativeTypeInCompound(((SetType*)nativeType)->keyType(), b, 1);
     } else if (nativeType->getTypeCategory() == Type::TypeCategory::catConstDict) {
         serializeNativeTypeInCompound(((ConstDictType*)nativeType)->keyType(), b, 1);
         serializeNativeTypeInCompound(((ConstDictType*)nativeType)->valueType(), b, 2);
@@ -773,6 +775,7 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
             if (category == Type::TypeCategory::catOneOf ||
                 category == Type::TypeCategory::catTupleOf ||
                 category == Type::TypeCategory::catListOf ||
+                category == Type::TypeCategory::catSet ||
                 category == Type::TypeCategory::catDict ||
                 category == Type::TypeCategory::catConstDict ||
                 category == Type::TypeCategory::catPointerTo ||
@@ -874,6 +877,12 @@ Type* PythonSerializationContext::deserializeNativeType(DeserializationBuffer& b
     else if (category == Type::TypeCategory::catTuple) {
         resultType = ::Tuple::Make(types);
     }
+    else if (category == Type::TypeCategory::catSet) {
+        if (types.size() != 1) {
+            throw std::runtime_error("Invalid native type: Set needs exactly 1 type.");
+        }
+        resultType = ::SetType::Make(types[0]);
+    }    
     else if (category == Type::TypeCategory::catDict) {
         if (types.size() != 2) {
             throw std::runtime_error("Invalid native type: Dict needs exactly 2 types.");
