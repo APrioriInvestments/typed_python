@@ -61,6 +61,18 @@ public:
     static void copyConstructFromPythonInstanceConcrete(DictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     static bool compare_to_python_concrete(DictType* listT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
+
+    /**
+     * Function implementing python's dict::setdefault.
+     * 
+     * https://docs.python.org/3/library/stdtypes.html#dict.setdefault
+     * 
+     * setdefault(key[, default])
+     *      If key is in the dictionary, return its value. 
+     *      If not, insert key with a value of default and return default. default defaults to None.
+     * 
+     */
+    static PyObject* setDefault(PyObject* o, PyObject* args);
 };
 
 

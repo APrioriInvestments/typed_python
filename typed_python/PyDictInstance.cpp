@@ -273,11 +273,12 @@ int PyDictInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
 }
 
 PyMethodDef* PyDictInstance::typeMethodsConcrete(Type* t) {
-    return new PyMethodDef [5] {
+    return new PyMethodDef [6] {
         {"get", (PyCFunction)PyDictInstance::dictGet, METH_VARARGS, NULL},
         {"items", (PyCFunction)PyDictInstance::dictItems, METH_NOARGS, NULL},
         {"keys", (PyCFunction)PyDictInstance::dictKeys, METH_NOARGS, NULL},
         {"values", (PyCFunction)PyDictInstance::dictValues, METH_NOARGS, NULL},
+        {"setdefault", (PyCFunction)PyDictInstance::setDefault, METH_VARARGS, NULL},
         {NULL, NULL}
     };
 }
@@ -388,4 +389,71 @@ bool PyDictInstance::compare_to_python_concrete(DictType* dictType, instance_ptr
     }
 
     return true;
+}
+
+//static 
+PyObject* PyDictInstance::setDefault(PyObject* o, PyObject* args) {
+    return translateExceptionToPyObject([&]() {
+        const int argsNumber = PyTuple_Size(args);
+
+        if (argsNumber < 1 || argsNumber > 2) {
+            throw std::runtime_error("Dict.setdefault takes one or two arguments.");
+        }
+
+        PyDictInstance *self = (PyDictInstance *) o;
+
+        /*
+         * The function is called with setdefault(tem, ifNotFound=None)
+         */
+        PyObjectHolder item(PyTuple_GetItem(args, 0));
+        PyObjectHolder ifNotFound(argsNumber == 2 ? PyTuple_GetItem(args, 1) : Py_None);
+
+        Type *selfType = extractTypeFrom(o->ob_type);
+        Type *itemType = extractTypeFrom(item->ob_type);
+
+        Type *keyType = self->type()->keyType();
+        Type *valueType = self->type()->valueType();
+
+        if (selfType->getTypeCategory() != Type::TypeCategory::catDict) {
+            throw std::runtime_error("Wrong type!");
+        }
+
+        instance_ptr i;
+        instance_ptr lookupKey;
+        Instance key;
+
+        if (itemType == keyType) {
+            PyInstance *item_w = (PyInstance *) (PyObject *) item;
+            lookupKey = item_w->dataPtr();
+            i = self->type()->lookupValueByKey(self->dataPtr(), item_w->dataPtr());
+        } else {
+            key = Instance(keyType, [&](instance_ptr data) {
+                copyConstructFromPythonInstance(keyType, data, item);
+            });
+            lookupKey = key.data();
+            i = self->type()->lookupValueByKey(self->dataPtr(), key.data());
+        }
+
+        // there is no value, we need to insert this to the dictionary
+        if (!i) {
+            if (extractTypeFrom(ifNotFound->ob_type) == self->type()->valueType()) {
+                instance_ptr ifNotFoundValue = ((PyInstance *) (PyObject *) ifNotFound)->dataPtr();
+                instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
+                self->type()->valueType()->copy_constructor(valueTgt, ifNotFoundValue);
+                return extractPythonObject(valueTgt, self->type()->valueType());
+            } else {
+                Instance i(valueType, [&](instance_ptr data) {
+                    copyConstructFromPythonInstance(valueType, data, ifNotFound);
+                });
+                instance_ptr ifNotFoundValue = i.data();
+                instance_ptr valueTgt = self->type()->insertKey(self->dataPtr(), lookupKey);
+                self->type()->valueType()->copy_constructor(valueTgt, ifNotFoundValue);
+                return extractPythonObject(valueTgt, self->type()->valueType());
+
+            }
+        }
+        // there is this value, we should return the one which is stored
+        return extractPythonObject(i, self->type()->valueType());
+
+    });
 }
