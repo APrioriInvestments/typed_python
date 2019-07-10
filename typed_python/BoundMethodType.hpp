@@ -48,7 +48,11 @@ public:
     bool _updateAfterForwardTypesChanged() {
         bool anyChanged = false;
 
-        std::string name = "BoundMethod(" + m_first_arg->name() + "." + m_function->name() + ")";
+        // note that you can't have '.' in the name of a type, so we use '::'.
+        // otherwise, the __name__ attribute of the type gets cut off at the last '.' and
+        // looks like a memory corruption issue. It also prevents you from knowing what
+        // type you're looking at.
+        std::string name = "BoundMethod(" + m_first_arg->name() + "::" + m_function->name() + ")";
         size_t size = m_first_arg->bytecount();
 
         anyChanged = (

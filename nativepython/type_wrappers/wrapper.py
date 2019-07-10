@@ -114,6 +114,7 @@ class Wrapper(object):
         )
 
     def convert_attribute(self, context, instance, attribute):
+        """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""
         return context.pushTerminal(
             generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
         )

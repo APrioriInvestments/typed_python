@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward, ConstDict
+from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Member
 from typed_python import Value as ValueType
 import typed_python._types as _types
 from nativepython.runtime import Runtime
@@ -53,6 +53,20 @@ someValues = [
     Value({'hi': 'bye'}),
     Value((1, 2, 3))
 ]
+
+
+class ClassA(Class):
+    x = Member(int)
+
+    def f(self, y):
+        return self.x + y
+
+
+class ClassB(Class):
+    x = Member(float)
+
+    def f(self, y):
+        return self.x - y
 
 
 class TestOneOfOfCompilation(unittest.TestCase):
@@ -236,3 +250,27 @@ class TestOneOfOfCompilation(unittest.TestCase):
             return x
 
         self.assertEqual(f4(1.5), "1.5")
+
+    def test_oneof_method_dispatch(self):
+        @Compiled
+        def f(c: OneOf(ClassA, ClassB), y: OneOf(int, float)):
+            return c.f(y)
+
+        anA = ClassA(x=10)
+        aB = ClassB(x=10.5)
+
+        self.assertEqual(f(anA, 0.5), anA.f(0.5))
+        self.assertEqual(f(anA, 1), anA.f(1))
+        self.assertEqual(f(aB, 0.5), aB.f(0.5))
+        self.assertEqual(f(aB, 1), aB.f(1))
+
+    def test_oneof_attribute_dispatch(self):
+        @Compiled
+        def f(c: OneOf(ClassA, ClassB)):
+            return c.x
+
+        anA = ClassA(x=10)
+        aB = ClassB(x=10.5)
+
+        self.assertEqual(f(anA), anA.x)
+        self.assertEqual(f(aB), aB.x)

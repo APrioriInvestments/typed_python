@@ -26,6 +26,9 @@ class BoundMethodWrapper(Wrapper):
 
         self.firstArgType = typeWrapper(self.typeRepresentation.FirstArgType)
 
+    def getNativeLayoutType(self):
+        return self.firstArgType.getNativeLayoutType()
+
     def convert_assign(self, context, target, toStore):
         return self.firstArgType.convert_assign(
             context,

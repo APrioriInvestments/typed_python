@@ -68,7 +68,9 @@ bool OneOfType::_updateAfterForwardTypesChanged() {
 
 std::string OneOfType::computeName() const {
     std::string res = "OneOf(";
+
     bool first = true;
+
     for (auto t: m_types) {
         if (first) {
             first = false;

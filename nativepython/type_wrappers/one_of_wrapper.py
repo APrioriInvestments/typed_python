@@ -96,6 +96,14 @@ class OneOfWrapper(Wrapper):
 
         return out_slot
 
+    def convert_attribute(self, context, instance, attribute):
+        # just unwrap us
+        return self.unwrap(context, instance, lambda realInstance: realInstance.convert_attribute(attribute))
+
+    def convert_call(self, context, left, args, kwargs):
+        # just unwrap us
+        return self.unwrap(context, left, lambda realInstance: realInstance.convert_call(args, kwargs))
+
     def convert_bin_op(self, context, left, op, right):
         def generator(leftUnwrapped):
             return leftUnwrapped.convert_bin_op(op, right)
