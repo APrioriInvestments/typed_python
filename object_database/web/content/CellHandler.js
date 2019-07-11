@@ -183,7 +183,7 @@ class CellHandler {
         // Instead of removing the node we replace with the a
 	// `display:none` style node which effectively removes it
 	// from the DOM
-	if (foundCell.parentNode !== null) {
+	if (foundCell && foundCell.parentNode !== null) {
 	    this.projector.replace(foundCell, () => {
 		return h("div", {style: "display:none"}, []);
 	    });
@@ -295,7 +295,6 @@ class CellHandler {
             // the node with this incoming
             // copy.
 	    if(cell.parentNode === null){
->>>>>>> Adding structured lifecycle WS messages and appropriate refactored handlers on the UI side
 		this.projector.append(this.cells["holding_pen"], () => {
 		    return velement;
 		});
