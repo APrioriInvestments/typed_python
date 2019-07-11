@@ -24,7 +24,7 @@ def cellUpdated(cell, replaceDict={}):
     A JSON parsable dictionary that can
     be sent over a websocket
     """
-    res =  {
+    res = {
         'channel': '#main',
         'type': '#cellUpdated',
         'id': cell.identity,
@@ -60,6 +60,7 @@ def cellDiscarded(cell):
         'type': '#cellDiscarded',
         'id': cell.identity
     }
+
 
 def appendPostscript(jsString):
     """A lifecycle message formatter
