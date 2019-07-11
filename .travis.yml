@@ -23,18 +23,16 @@ install:
 
 jobs:
   include:
-    - stage: "Checks"
+    - stage: "Tests"
       name: "Lint"
       script:
         - pipenv lock --dev --requirements > dev-reqs.txt
-        - cat dev-reqs.txt
         - pip install -r dev-reqs.txt
         - make lint
     - name: "pipenv check"
       script:
         - pipenv check || (sleep 60; pipenv check) || (sleep 60; pipenv check)
-    - stage: "Tests"
-      name: "Unit Tests"
+    - name: "Unit Tests"
       before_script:
         - ulimit -c unlimited -S       # enable core dumps
       script:
@@ -54,7 +52,3 @@ jobs:
         - if [[ -f "$COREFILE" ]]; then
               gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch;
           fi
-
-stages:
-  - check
-  - test
