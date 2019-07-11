@@ -13,30 +13,48 @@ env:
     - PYTHONPATH=$(pwd)
     - COVERAGE_PROCESS_START="$(pwd)/tox.ini"
 
+cache:
+  directories:
+    - $HOME/.cache/pip
+
 install:
   - pip install pipenv codecov
-  - pipenv install --dev --deploy
-  - sudo apt-get install -y gdb  # install gdb
-  - make testcert.cert
 
-before_script:
-  - ulimit -c unlimited -S       # enable core dumps
 
-after_failure:
-  - PYTHON_EXECUTABLE=$(python3 -c "import sys; print(sys.executable)")
-  - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1) # find core file
-  - if [[ -f "$COREFILE" ]]; then
-        gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch;
-    fi
+jobs:
+  include:
+    - stage: "Checks"
+      name: "Lint"
+      script:
+        - pipenv lock --dev --requirements > dev-reqs.txt
+        - cat dev-reqs.txt
+        - pip install -r dev-reqs.txt
+        - make lint
+    - name: "pipenv check"
+      script:
+        - pipenv check || (sleep 60; pipenv check) || (sleep 60; pipenv check)
+    - stage: "Tests"
+      name: "Unit Tests"
+      before_script:
+        - ulimit -c unlimited -S       # enable core dumps
+      script:
+        - pipenv lock --requirements > reqs.txt
+        - pip install -r reqs.txt
+        - sudo apt-get install -y gdb  # install gdb
+        - make testcert.cert
+        - coverage erase
+        - ./test.py -s
+        - ls -la
+        - coverage combine
+      after_success:
+        - codecov
+      after_failure:
+        - PYTHON_EXECUTABLE=$(python3 -c "import sys; print(sys.executable)")
+        - COREFILE=$(find . -maxdepth 1 -name "core*" | head -n 1) # find core file
+        - if [[ -f "$COREFILE" ]]; then
+              gdb -c "$COREFILE" $PYTHON_EXECUTABLE -ex "thread apply all bt" -ex "set pagination 0" -batch;
+          fi
 
-script:
-  - make lint
-  - pipenv check
-  - coverage erase
-  - coverage run ./test.py -s
-  - ls -la  # Allows us to visually inspect we produced a bunch of .coverage files
-  - coverage combine
-
-# Push the results back to codecov
-after_success:
-  - codecov
+stages:
+  - check
+  - test
