@@ -37,7 +37,7 @@ let projector = maquette.createProjector();
 const cellSocket = new CellSocket();
 const cellHandler = new CellHandler(h, projector, ComponentRegistry);
 cellSocket.onPostscripts(cellHandler.handlePostscript);
-cellSocket.onMessage(cellHandler.handleMessage);
+cellSocket.onMessage(cellHandler.receive);
 cellSocket.onClose(cellHandler.showConnectionClosed);
 cellSocket.onError(err => {
     console.error("SOCKET ERROR: ", err);

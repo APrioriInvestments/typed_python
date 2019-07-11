@@ -17,6 +17,7 @@ class CellHandler {
 	this.h = h;
 	this.projector = projector;
 	this.components = components;
+        this.activeComponents = {};
 
 	// Instance Props
         this.postscripts = [];
@@ -27,7 +28,11 @@ class CellHandler {
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
 	this.connectionClosedView = this.connectionClosedView.bind(this);
         this.handlePostscript = this.handlePostscript.bind(this);
-        this.handleMessage = this.handleMessage.bind(this);
+        this.cellUpdated = this.cellUpdated.bind(this);
+        this.cellDiscarded = this.cellDiscarded.bind(this);
+        this.receive = this.receive.bind(this);
+        this.invalidMessageFormat = this.invalidMessageFormat.bind(this);
+        this.doesNotUnderstand = this.doesNotUnderstand.bind(this);
 
     }
 
@@ -41,6 +46,26 @@ class CellHandler {
 	    document.getElementById("page_root"),
 	    this.connectionClosedView
 	);
+    }
+
+    /**
+     * Primary entrypoint to handling
+     * normal messages.
+     */
+    receive(aMessage){
+        if(!aMessage.type || aMessage.type == undefined){
+            return this.invalidMessageFormat(aMessage);
+        }
+        switch(aMessage.type){
+        case '#cellUpdated':
+            return this.cellUpdated(aMessage);
+        case '#cellDiscarded':
+            return this.cellDiscarded(aMessage);
+        case '#appendPostscript':
+            return this.appendPostscript(aMessage);
+        default:
+            return this.doesNotUnderstand(aMessage);
+        }
     }
 
     /**
@@ -111,6 +136,61 @@ class CellHandler {
     }
 
     /**
+     * Message that tells the handler to append
+     * a specific and immediate script to
+     * the postscripts list.
+     */
+    appendPostscript(message){
+        this.postscripts.push(message.script);
+    }
+
+    /**
+     * Message that tells us a Cell has been
+     * discarded and is no longer needed.
+     * We remove both it's DOM representation
+     * and any registered components for it.
+     */
+    cellDiscarded(message){
+        let foundCell = this.cells[message.id];
+        let foundComponent = this.activeComponents[message.id];
+
+        if(foundCell == undefined){
+            console.warn(`Received discard message for non-existing Cell ${message.id}`);
+        }
+
+        if(foundComponent == undefined){
+            console.warn(`Received discard message for non-existing Component ${message.id}`);
+        }
+
+        // If the cell has a domNode property,
+        // it means it's a hyperscript element
+        // and this is what we should deal with.
+        if(foundCell && foundCell.domNode !== undefined){
+            foundCell = foundCell.domNode;
+        }
+
+        if(foundComponent){
+            // Unload lifecycle function
+            foundComponent.componentWillUnload();
+            delete this.activeComponents[message.id];
+        }
+
+        // NOTE: The following was copied from the original
+        // large handler function. Not sure we need to
+        // replace rather than remove.
+        // TODO: Refactor this when removing reliance
+        // on replacements.
+        // Instead of removing the node we replace with the a
+	// `display:none` style node which effectively removes it
+	// from the DOM
+	if (foundCell.parentNode !== null) {
+	    this.projector.replace(foundCell, () => {
+		return h("div", {style: "display:none"}, []);
+	    });
+	}
+    }
+
+    /**
      * Primary method for handling 'normal'
      * (ie non-postscripts) messages that have
      * been deserialized from JSON.
@@ -122,7 +202,7 @@ class CellHandler {
      * information about elements that need to
      * be updated.
      */
-    handleMessage(message){
+    cellUpdated(message){
         let newComponents = [];
 	if(this.cells["page_root"] == undefined){
             this.cells["page_root"] = document.getElementById("page_root");
@@ -140,113 +220,119 @@ class CellHandler {
 	    cell = cell.domNode;
 	}
 
-        if(message.discard !== undefined){
-            // In the case where we have received a 'discard' message,
-            // but the cell requested is not available in our
-            // cells collection, we simply display a warning:
-            if(cell == undefined){
-                console.warn(`Received discard message for non-existing cell id ${message.id}`);
-                return;
-            }
-	    // Instead of removing the node we replace with the a
-	    // `display:none` style node which effectively removes it
-	    // from the DOM
-	    if (cell.parentNode !== null) {
-		this.projector.replace(cell, () => {
-		    return h("div", {style: "display:none"}, []);
-		});
-	    }
-	} else if(message.id !== undefined){
-	    // A dictionary of ids within the object to replace.
-	    // Targets are real ids of other objects.
-	    let replacements = message.replacements;
 
-	    // TODO: this is a temporary branching, to be removed with a more logical setup. As
-	    // of writing if the message coming across is sending a "known" component then we use
-	    // the component itself as opposed to building a vdom element from the raw html
-	    let componentClass = this.components[message.component_name];
+	// A dictionary of ids within the object to replace.
+	// Targets are real ids of other objects.
+	let replacements = message.replacements;
+        var component = this.activeComponents[message.id];
+        if(component){
+            // In this case, this component has already been
+            // created and stored, so we just need to pass in
+            // updated props and re-render.
+            let nextProps = Object.assign({}, component.props, {
+                namedChildren: message.namedChildren,
+                children: message.children,
+                extraData: message.extraData
+            }, message.extraData);
+            let nextPropsToPass = component.componentWillReceiveProps(
+                component.props,
+                nextProps
+            );
+            component._updateReplacements(message.replacementKeys);
+            component._updateProps(nextPropsToPass);
+            //let cClass = this.components[message.componentName];
+            //var component = new cClass(nextProps, message.replacementKeys);
+            var velement = component.render();
+        } else {
+            // In this case, we are creating this cell for the first
+            // time (we have never seen its ID, and will create
+            // and store a whole new Component for it)
+	    let componentClass = this.components[message.componentName];
 	    if (componentClass === undefined) {
-                console.warn(`Could not find component for ${message.component_name}`);
+                console.warn(`Could not find component for ${message.componentName}`);
 		var velement = this.htmlToVDomEl(message.contents, message.id);
 	    } else {
                 let componentProps = Object.assign({
                     id: message.id,
                     namedChildren: message.namedChildren,
                     children: message.children,
-                    extraData: message.extra_data
+                    extraData: message.extraData
                 }, message.extra_data);
 		var component = new componentClass(
                     componentProps,
-                    message.replacement_keys
+                    message.replacementKeys
                 );
                 var velement = component.render();
+
+                // Add the new component to the comp/cell
+                // stored dict.
+                this.activeComponents[message.id] = component;
                 newComponents.push(component);
 	    }
+        }
 
-            // If the incoming message describes a Cell that
-            // is not for display, then we should return from
-            // the method here.
-            if(!message.shouldDisplay){
-                if(component){
-                    component.componentDidLoad();
-                }
-                return;
+        // If the incoming message describes a Cell that
+        // is not for display, then we should return from
+        // the method here.
+        if(!message.shouldDisplay){
+            if(component){
+                component.componentDidLoad();
+            }
+            return;
+        }
+
+        // Install the element into the dom
+        if(cell === undefined){
+	    // This is a totally new node.
+            // For the moment, add it to the
+            // holding pen.
+	    this.projector.append(this.cells["holding_pen"], () => {
+                return velement;
+            });
+	    this.cells[message.id] = velement;
+        } else {
+            // Replace the existing copy of
+            // the node with this incoming
+            // copy.
+	    if(cell.parentNode === null){
+>>>>>>> Adding structured lifecycle WS messages and appropriate refactored handlers on the UI side
+		this.projector.append(this.cells["holding_pen"], () => {
+		    return velement;
+		});
+	    } else {
+		this.projector.replace(cell, () => {return velement;});
+	    }
+	}
+
+        this.cells[message.id] = velement;
+
+        // Now wire in replacements
+        Object.keys(replacements).forEach((replacementKey, idx) => {
+            let target = document.getElementById(replacementKey);
+            let source = null;
+            if(this.cells[replacements[replacementKey]] === undefined){
+		// This is actually a new node.
+                // We'll define it later in the
+                // event stream.
+		source = this.h("div", {id: replacementKey}, []);
+                this.cells[replacements[replacementKey]] = source; 
+		this.projector.append(this.cells["holding_pen"], () => {
+		    return source;
+                });
+	    } else {
+                // Not a new node
+                source = this.cells[replacements[replacementKey]];
             }
 
-            // Install the element into the dom
-            if(cell === undefined){
-		// This is a totally new node.
-                // For the moment, add it to the
-                // holding pen.
-		this.projector.append(this.cells["holding_pen"], () => {
-                    return velement;
+            if(target != null){
+		this.projector.replace(target, () => {
+		    return source;
                 });
-
-		this.cells[message.id] = velement;
             } else {
-                // Replace the existing copy of
-                // the node with this incoming
-                // copy.
-		if(cell.parentNode === null){
-		    this.projector.append(this.cells["holding_pen"], () => {
-			return velement;
-		    });
-		} else {
-		    this.projector.replace(cell, () => {return velement;});
-		}
-	    }
-
-            this.cells[message.id] = velement;
-
-            // Now wire in replacements
-            Object.keys(replacements).forEach((replacementKey, idx) => {
-                let target = document.getElementById(replacementKey);
-                let source = null;
-                if(this.cells[replacements[replacementKey]] === undefined){
-		    // This is actually a new node.
-                    // We'll define it later in the
-                    // event stream.
-		    source = this.h("div", {id: replacementKey}, []);
-                    this.cells[replacements[replacementKey]] = source; 
-		    this.projector.append(this.cells["holding_pen"], () => {
-			return source;
-                    });
-		} else {
-                    // Not a new node
-                    source = this.cells[replacements[replacementKey]];
-                }
-
-                if(target != null){
-		    this.projector.replace(target, () => {
-			return source;
-                    });
-                } else {
-                    let errorMsg = `In message ${message} couldn't find ${replacementKey}`;
-                    throw new Error(errorMsg);
-                    //console.log("In message ", message, " couldn't find ", replacementKey);
-                }
-            });
-        }
+                let errorMsg = `In message ${message} couldn't find ${replacementKey}`;
+                throw new Error(errorMsg);
+            }
+        });
 
         if(message.postscript !== undefined){
             this.postscripts.push(message.postscript);
@@ -276,11 +362,11 @@ class CellHandler {
     connectionClosedView(){
 	return this.h("main.container", {role: "main"}, [
 	    this.h("div", {class: "alert alert-primary center-block mt-5"},
-		["Disconnected"])
+		   ["Disconnected"])
 	]);
     }
 
-        /**
+     /**
      * This is a (hopefully temporary) hack
      * that will intercept the first time a
      * dropdown carat is clicked and bind
@@ -320,6 +406,23 @@ class CellHandler {
             // Now expire the first time clicked
             element.dataset.firstclick = 'false';
         }
+    }
+
+    /**
+     * A catch-all default response for messages
+     * whose `type` property contains a value
+     * that the system doesn't understand.
+     */
+    doesNotUnderstand(aMessage){
+        console.error(`CellHandler does not understand the message:`, aMessage);
+    }
+
+    /**
+     * An error reporting for badly-formatted
+     * socket messages.
+     */
+    invalidMessageFormat(aMessage){
+        console.error(`CellHandler received a malformatted message:`, aMessage);
     }
 
     /**
