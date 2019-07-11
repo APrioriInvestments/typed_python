@@ -1954,6 +1954,9 @@ class NativeTypesTests(unittest.TestCase):
         self.assertFalse(isSimple(Dict(C, int)))
         self.assertFalse(isSimple(Dict(int, C)))
 
+        self.assertTrue(isSimple(Set(int)))
+        self.assertFalse(isSimple(Set(C)))
+
         self.assertFalse(isSimple(Alternative("Alternative")))
 
         self.assertTrue(isSimple(NamedTuple(x=int)))
@@ -2156,6 +2159,70 @@ class NativeTypesTests(unittest.TestCase):
         native_d = None
         self.assertEqual(_types.refcount(i), 1)
 
+        d = Dict(str, Set(TupleOf(int)))()
+        s = Set(TupleOf(int))()
+        i = TupleOf(int)((1,))
+        self.assertEqual(_types.refcount(i), 1)
+        s.add(i)
+        self.assertEqual(_types.refcount(i), 2)
+        s.add(i)
+        self.assertEqual(_types.refcount(i), 2)
+        s.discard(i)
+        self.assertEqual(_types.refcount(i), 1)
+        d['a'] = d['b'] = i
+        self.assertEqual(_types.refcount(i), 3)
+        d = None
+        self.assertEqual(_types.refcount(i), 1)
+        s.add(i)
+        self.assertEqual(_types.refcount(i), 2)
+        d = Dict(str, Set(TupleOf(int)))()
+        d['a'] = d['b'] = i
+        self.assertEqual(_types.refcount(i), 4)
+        s.clear()
+        self.assertEqual(_types.refcount(i), 3)
+        del d['a']
+        self.assertEqual(_types.refcount(i), 2)
+        d = None
+
+        # test several tuple adds into same set
+        s.clear()
+        self.assertEqual(len(s), 0)
+        self.assertEqual(_types.refcount(i), 1)
+
+        i = TupleOf(int)((1,))
+        i2 = TupleOf(int)((2,))
+        i3 = TupleOf(int)((3,))
+        s.add(i)
+        s.add(i2)
+        s.add(i3)
+        self.assertEqual(len(s), 3)
+        self.assertEqual(_types.refcount(i), 2)
+        self.assertEqual(_types.refcount(i2), 2)
+        self.assertEqual(_types.refcount(i3), 2)
+        s.remove(i2)
+        self.assertEqual(_types.refcount(i), 2)
+        self.assertEqual(_types.refcount(i2), 1)
+        self.assertEqual(_types.refcount(i3), 2)
+        s.remove(i3)
+        self.assertEqual(_types.refcount(i), 2)
+        self.assertEqual(_types.refcount(i2), 1)
+        self.assertEqual(_types.refcount(i3), 1)
+        s = None
+        self.assertEqual(_types.refcount(i), 1)
+        self.assertEqual(_types.refcount(i2), 1)
+        self.assertEqual(_types.refcount(i3), 1)
+
+        # test from constructor
+        s = Set(TupleOf(int))((i, i2, i3))
+        self.assertEqual(len(s), 3)
+        self.assertEqual(_types.refcount(i), 2)
+        self.assertEqual(_types.refcount(i2), 2)
+        self.assertEqual(_types.refcount(i3), 2)
+        s.clear()
+        self.assertEqual(_types.refcount(i), 1)
+        self.assertEqual(_types.refcount(i2), 1)
+        self.assertEqual(_types.refcount(i3), 1)
+
     def test_set_equality(self):
         s = Set(str)()
         s.add('hello')
@@ -2204,4 +2271,3 @@ class NativeTypesTests(unittest.TestCase):
             except StopIteration:
                 break
         self.assertEqual(count, len(s))
- 

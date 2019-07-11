@@ -382,6 +382,11 @@ class SetType : public Type {
         endOfConstructorInitialization();
     }
 
+    template<class visitor_type>
+    void _visitReferencedTypes(const visitor_type& visitor) {
+        visitor(m_key_type);
+    }
+
     instance_ptr insertKey(instance_ptr self, instance_ptr key);
     instance_ptr lookupKey(instance_ptr self, instance_ptr key) const;
     bool discard(instance_ptr self, instance_ptr key);
@@ -393,7 +398,8 @@ class SetType : public Type {
     int64_t refcount(instance_ptr self) const;
     bool _updateAfterForwardTypesChanged();
     int64_t size(instance_ptr self) const;
-    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions = false);
+    bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
+             bool suppressExceptions = false);
     Type* keyType() const { return m_key_type; }
 
     // layout accessors
