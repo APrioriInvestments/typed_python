@@ -24,6 +24,8 @@ import gevent.fileobject
 import threading
 import numpy
 
+from object_database.web.cells import Messenger
+
 from inspect import signature
 
 from object_database.view import RevisionConflictException
@@ -373,15 +375,18 @@ class Cells:
         for n in self._nodesToDiscard:
             if n.cells is not None:
                 assert n.cells == self
-                res.append({'id': n.identity, 'discard': True})
+                res.append(Messenger.cellDiscarded(n))
 
         # the client reverses the order of postscripts because it wants
         # to do parent nodes before child nodes. We want our postscripts
         # here to happen in order, because they're triggered by messages,
         # so we have to reverse the order in which we append them, and
         # put them on the front.
-        res = [{'postscript': js}
-               for js in reversed(self._pendingPostscripts)] + res
+        postScriptMsgs = []
+        for js in reversed(self._pendingPostscripts):
+            msg = Messenger.appendPostscript(js)
+            postScriptMsgs.append(msg)
+        res = postScriptMsgs + res
 
         self._pendingPostscripts.clear()
 
@@ -460,18 +465,7 @@ class Cells:
         for childName, childNode in cell.children.items():
             replaceDict[cell.identity + "_" + childName] = childNode.identity
 
-        res = {
-            'id': cell.identity,
-            'shouldDisplay': cell.shouldDisplay,
-            'replacements': replaceDict,
-            'component_name': cell.__class__.__name__,  # TODO: TEMP replace when ready
-            'replacement_keys': [k for k in cell.children.keys()],
-            'extra_data': cell.exportData
-        }
-
-        if cell.postscript:
-            res['postscript'] = cell.postscript
-        return res
+        return Messenger.cellUpdated(cell, replaceDict)
 
     def childrenWithExceptions(self):
         return self._root.findChildrenMatching(lambda cell: isinstance(cell, Traceback))

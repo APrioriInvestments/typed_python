@@ -60,6 +60,27 @@ class Component {
     componentDidLoad() {
         return null;
     }
+
+    /**
+     * Lifecycle function that will be called just before
+     * the component is removed from the global handler's
+     * dict of components and also from the DOM.
+     */
+    componentWillUnload(){
+        return null;
+    }
+
+    /**
+     * Will be called on subsequent changes to the props
+     * for the component. Needs to return a new props
+     * object.
+     * By default we simply return the passed-in
+     * nextProps
+     */
+    componentWillReceiveProps(oldProps, nextProps){
+        return nextProps;
+    }
+
     /**
      * Responds with a hyperscript object
      * that represents a div that is formatted
@@ -226,6 +247,18 @@ class Component {
         this.props.children = incomingProps.children || [];
         this.props.namedChildren = incomingProps.namedChildren || {};
         this._setupChildRelationships();
+    }
+
+    /**
+     * Updates the mapped replacement keys internal
+     * object for the component.
+     * TODO: Remove this internal lifecycle method
+     * when refactoring away from the replacement
+     * structure
+     */
+    _updateReplacements(replacementKeys){
+        this.replacements = new ReplacementsHandler(replacementKeys);
+        this.usesReplacements = (replacementKeys.length > 0);
     }
 
     /**
