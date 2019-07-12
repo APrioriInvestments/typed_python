@@ -18,8 +18,6 @@ class CellHandler {
 	this.projector = projector;
 	this.components = components;
         this.activeComponents = {};
-
-	// Instance Props
         this.postscripts = [];
         this.cells = {};
 	this.DOMParser = new DOMParser();
@@ -230,7 +228,8 @@ class CellHandler {
             // In this case, this component has already been
             // created and stored, so we just need to pass in
             // updated props and re-render.
-            let nextProps = Object.assign({}, component.props, {
+            let nextProps = Object.assign({}, {
+                id: component.props.id,
                 namedChildren: message.namedChildren,
                 children: message.children,
                 extraData: message.extraData
