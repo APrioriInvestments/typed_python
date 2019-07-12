@@ -404,3 +404,15 @@ hash_bytes = externalCallTarget(
     Int32,
     Void.pointer()
 )
+
+isinf_float32 = externalCallTarget("nativepython_isinf_float32", Bool, Float32)
+
+isnan_float32 = externalCallTarget("nativepython_isnan_float32", Bool, Float32)
+
+isfinite_float32 = externalCallTarget("nativepython_isfinite_float32", Bool, Float32)
+
+isinf_float64 = externalCallTarget("nativepython_isinf_float64", Bool, Float64)
+
+isnan_float64 = externalCallTarget("nativepython_isnan_float64", Bool, Float64)
+
+isfinite_float64 = externalCallTarget("nativepython_isfinite_float64", Bool, Float64)

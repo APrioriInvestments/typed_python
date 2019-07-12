@@ -60,6 +60,7 @@ pyCompOp = {
 class ArithmeticTypeWrapper(Wrapper):
     is_pod = True
     is_pass_by_ref = False
+    is_arithmetic = True
 
     def convert_default_initialize(self, context, target):
         self.convert_copy_initialize(

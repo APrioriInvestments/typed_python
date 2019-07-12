@@ -59,6 +59,9 @@ class Wrapper(object):
     # for most operations to succeed?
     can_unwrap = False
 
+    # are we a simple arithmetic type
+    is_arithmetic = False
+
     def __repr__(self):
         return "Wrapper(%s)" % str(self)
 

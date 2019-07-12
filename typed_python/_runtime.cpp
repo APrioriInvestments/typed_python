@@ -398,4 +398,17 @@ extern "C" {
     int32_t nativepython_hash_bytes(BytesType::layout* s) {
         return BytesType::Make()->hash((instance_ptr)&s);
     }
+
+    bool nativepython_isinf_float32(float f) { return std::isinf(f); }
+
+    bool nativepython_isnan_float32(float f) { return std::isnan(f); }
+
+    bool nativepython_isfinite_float32(float f) { return std::isfinite(f); }
+
+    bool nativepython_isinf_float64(double f) { return std::isinf(f); }
+
+    bool nativepython_isnan_float64(double f) { return std::isnan(f); }
+
+    bool nativepython_isfinite_float64(double f) { return std::isfinite(f); }
 }
+
