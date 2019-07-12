@@ -2271,3 +2271,14 @@ class NativeTypesTests(unittest.TestCase):
             except StopIteration:
                 break
         self.assertEqual(count, len(s))
+
+    def test_list_of_tuples_transpose(self):
+        listOfTuples = ListOf(NamedTuple(x=int, y=str, z=bool))()
+        listOfTuples.append(dict(x=1, y="hi", z=False))
+        listOfTuples.append(dict(x=2, y="hihi", z=True))
+
+        tupleOfLists = listOfTuples.transpose()
+
+        self.assertEqual(tupleOfLists.x, [1, 2])
+        self.assertEqual(tupleOfLists.y, ['hi', 'hihi'])
+        self.assertEqual(tupleOfLists.z, [False, True])

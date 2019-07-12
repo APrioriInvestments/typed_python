@@ -69,6 +69,8 @@ public:
 
     static PyObject* listPointerUnsafe(PyObject* o, PyObject* args);
 
+    static PyObject* listTranspose(PyObject* o, PyObject* args);
+
     int mp_ass_subscript_concrete(PyObject* item, PyObject* value);
 
     static PyMethodDef* typeMethodsConcrete(Type* t);

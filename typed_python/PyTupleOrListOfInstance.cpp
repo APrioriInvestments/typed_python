@@ -727,6 +727,73 @@ PyObject* PyListOfInstance::listPop(PyObject* o, PyObject* args) {
     return result;
 }
 
+PyObject* PyListOfInstance::listTranspose(PyObject* o, PyObject* args) {
+    if (PyTuple_Size(args) != 0) {
+        PyErr_SetString(PyExc_TypeError, "ListOf.trasnpose takes zero arguments");
+        return NULL;
+    }
+
+    PyListOfInstance* self_w = (PyListOfInstance*)o;
+
+    ListOfType* ourListType = (ListOfType*)self_w->type();
+
+    int64_t listSize = self_w->type()->count(self_w->dataPtr());
+    instance_ptr ourListPtr = self_w->dataPtr();
+
+    if (ourListType->getEltType()->getTypeCategory() != Type::TypeCategory::catNamedTuple &&
+            ourListType->getEltType()->getTypeCategory() != Type::TypeCategory::catTuple) {
+        PyErr_Format(
+            PyExc_TypeError,
+            "Can't transpose %s because it's not a List of NamedTuple or Tuple objects.",
+            self_w->type()->name().c_str()
+        );
+
+        return NULL;
+    }
+
+    CompositeType* ourListEltType = (CompositeType*)ourListType->getEltType();
+
+    std::vector<Type*> childListTypes;
+    for (auto t: ourListEltType->getTypes()) {
+        childListTypes.push_back(ListOfType::Make(t));
+    }
+
+    CompositeType* newListType;
+
+    if (ourListEltType->getTypeCategory() == Type::TypeCategory::catNamedTuple) {
+        newListType = NamedTuple::Make(childListTypes, ourListEltType->getNames());
+    } else {
+        newListType = Tuple::Make(childListTypes);
+    }
+
+    //create each list
+    std::vector<Instance> listInstances;
+
+    for (long k = 0; k < ourListEltType->getOffsets().size(); k++) {
+        size_t offset = ourListEltType->getOffsets()[k];
+        Type* eltType = ourListEltType->getTypes()[k];
+        ListOfType* tgtList = (ListOfType*)childListTypes[k];
+
+        listInstances.push_back(Instance(tgtList, [&](instance_ptr listBody) {
+            eltType->check([&](auto& eltTypeConcrete) {
+                tgtList->constructor(listBody, listSize, [&](instance_ptr toCopy, size_t index) {
+                    eltTypeConcrete.copy_constructor(
+                        toCopy,
+                        ourListType->eltPtr(ourListPtr, index) + offset
+                    );
+                });
+            });
+        }));
+    }
+
+    Instance outTuple(newListType, [&](instance_ptr outComposite) {
+        newListType->constructor(outComposite, [&](instance_ptr outSublist, size_t outSublistIx) {
+            ((ListOfType*)childListTypes[outSublistIx])->copy_constructor(outSublist, listInstances[outSublistIx].data());
+        });
+    });
+
+    return PyInstance::fromInstance(outTuple);
+}
 
 int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value) {
     if (!value) {
@@ -787,6 +854,7 @@ PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {
         {"pop", (PyCFunction)PyListOfInstance::listPop, METH_VARARGS, NULL},
         {"setSizeUnsafe", (PyCFunction)PyListOfInstance::listSetSizeUnsafe, METH_VARARGS, NULL},
         {"pointerUnsafe", (PyCFunction)PyListOfInstance::listPointerUnsafe, METH_VARARGS, NULL},
+        {"transpose", (PyCFunction)PyListOfInstance::listTranspose, METH_VARARGS, NULL},
         {NULL, NULL}
     };
 }
