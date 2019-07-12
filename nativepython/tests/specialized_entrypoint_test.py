@@ -31,6 +31,12 @@ def add(aList, toAdd):
     return res
 
 
+class AClass:
+    @staticmethod
+    def aMethod(x):
+        return x + 1
+
+
 IntList = ListOf(int)
 FloatList = ListOf(float)
 
@@ -44,6 +50,10 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(compiledAdd(IntList([1, 2, 3]), 1), add(IntList([1, 2, 3]), 1))
         self.assertEqual(compiledAdd(FloatList([1, 2, 3]), 1), add(FloatList([1, 2, 3]), 1))
+
+    def test_specialized_entrypoint_on_staticmethod(self):
+        compiled = SpecializedEntrypoint(AClass.aMethod)
+        self.assertEqual(compiled(10), 11)
 
     def test_specialized_entrypoint_doesnt_recompile(self):
         compiledAdd = SpecializedEntrypoint(add)

@@ -140,8 +140,10 @@ def SpecializedEntrypoint(f):
     and that we want to specialize on the exact types of the given arguments.
     """
     if not hasattr(f, '__typed_python_category__'):
+        if isinstance(f, staticmethod):
+            f = f.__func__
         if not callable(f):
-            raise Exception("Can only compile functions.")
+            raise Exception(f"Can only compile functions, not {f}")
         f = Function(f)
 
     signatures = set()
