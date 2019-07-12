@@ -23,7 +23,7 @@ class Timestamp extends Component {
 
         this.timeformat = 'YYYY-MM-D h:mm:ss'
         this.timezone = this.getCurrentTimeZone()
-        this.timestamp = moment.unix(this.props.extraData.timestamp)
+        this.timestamp = moment.unix(this.props.timestamp)
         // make sure user knows to hover over
         this.style = "cursor: default"
 
