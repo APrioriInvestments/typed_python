@@ -41,17 +41,17 @@ class DateTimePicker extends Component {
                     {
                         type: "datetime-local",
                         id: "datetimepicker-" + this.props.id,
-                        value: this.datetime,
-                        onchange: (event) => {this.changeHandler(event.target.value)}
+                        value: moment.unix(this.props.datetime).format(this.timeformat),
+                        onchange: this.changeHandler
                     },
                     []
                 )
             ]);
     }
 
-    changeHandler(val) {
+    changeHandler(event) {
         // don't send back NaN
-        let unix_val = moment(val).unix()
+        let unix_val = moment(event.target.value).unix()
         if (unix_val !== NaN) {
             cellSocket.sendString(
                 JSON.stringify(
@@ -63,6 +63,7 @@ class DateTimePicker extends Component {
                 )
             );
         }
+        event.preventDefault();
     }
 }
 
