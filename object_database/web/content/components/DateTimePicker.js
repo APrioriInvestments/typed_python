@@ -23,7 +23,7 @@ class DateTimePicker extends Component {
     constructor(props, ...args){
         super(props, ...args);
         this.timeformat = 'YYYY-MM-DThh:mm:ss'
-        this.datetime = moment.unix(this.props.datetime).format(this.timeformat)
+        this.datetime = moment.unix(this.props.extraData.datetime).format(this.timeformat)
 
         // Bind component methods
         this.changeHandler = this.changeHandler.bind(this);
