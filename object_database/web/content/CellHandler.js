@@ -13,23 +13,26 @@ import {h} from 'maquette';
 
 class CellHandler {
     constructor(h, projector, components){
-	// props
-	this.h = h;
-	this.projector = projector;
-	this.components = components;
+        // props
+        this.h = h;
+        this.projector = projector;
+        this.components = components;
         this.activeComponents = {};
-
-	// Instance Props
         this.postscripts = [];
         this.cells = {};
-	this.DOMParser = new DOMParser();
+        this.DOMParser = new DOMParser();
 
         // Bind Instance Methods
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
-	this.connectionClosedView = this.connectionClosedView.bind(this);
+        this.connectionClosedView = this.connectionClosedView.bind(this);
         this.handlePostscript = this.handlePostscript.bind(this);
         this.cellUpdated = this.cellUpdated.bind(this);
         this.cellDiscarded = this.cellDiscarded.bind(this);
+        this.componentCreated = this.componentCreated.bind(this);
+        this.componentUpdated = this.componentUpdated.bind(this);
+        this._DOMcleanup = this._DOMcleanup.bind(this);
+        this._installElement = this._installElement.bind(this);
+        this._installReplacements = this._installReplacements.bind(this);
         this.receive = this.receive.bind(this);
         this.invalidMessageFormat = this.invalidMessageFormat.bind(this);
         this.doesNotUnderstand = this.doesNotUnderstand.bind(this);
@@ -173,6 +176,7 @@ class CellHandler {
             // Unload lifecycle function
             foundComponent.componentWillUnload();
             delete this.activeComponents[message.id];
+            delete this.cells[message.id];
         }
 
         // NOTE: The following was copied from the original
@@ -181,13 +185,13 @@ class CellHandler {
         // TODO: Refactor this when removing reliance
         // on replacements.
         // Instead of removing the node we replace with the a
-	// `display:none` style node which effectively removes it
-	// from the DOM
-	if (foundCell && foundCell.parentNode !== null) {
-	    this.projector.replace(foundCell, () => {
-		return h("div", {style: "display:none"}, []);
-	    });
-	}
+        // `display:none` style node which effectively removes it
+        // from the DOM
+        if (foundCell && foundCell.parentNode !== null) {
+            this.projector.replace(foundCell, () => {
+                return h("div", {style: "display:none"}, []);
+            });
+        }
     }
 
     /**
@@ -204,71 +208,39 @@ class CellHandler {
      */
     cellUpdated(message){
         let newComponents = [];
-	if(this.cells["page_root"] == undefined){
+        if(this.cells["page_root"] == undefined){
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
         }
 
-	// With the exception of `page_root` and `holding_pen` id nodes, all
-	// elements in this.cells are virtual. Dependig on whether we are adding a
-	// new node, or manipulating an existing, we neeed to work with the underlying
-	// DOM node. Hence if this.cell[message.id] is a vdom element we use its
-	// underlying domNode element when in operations like this.projector.replace()
-	let cell = this.cells[message.id];
+        // With the exception of `page_root` and `holding_pen` id nodes, all
+        // elements in this.cells are virtual. Dependig on whether we are adding a
+        // new node, or manipulating an existing, we neeed to work with the underlying
+        // DOM node. Hence if this.cell[message.id] is a vdom element we use its
+        // underlying domNode element when in operations like this.projector.replace()
+        let cell = this.cells[message.id];
+        if (cell !== undefined && cell.domNode !== undefined) {
+            cell = cell.domNode;
+        }
 
-	if (cell !== undefined && cell.domNode !== undefined) {
-	    cell = cell.domNode;
-	}
+        // A dictionary of ids within the object to replace.
+        // Targets are real ids of other objects.
+        let replacements = message.replacements;
 
-
-	// A dictionary of ids within the object to replace.
-	// Targets are real ids of other objects.
-	let replacements = message.replacements;
         var component = this.activeComponents[message.id];
         if(component){
             // In this case, this component has already been
             // created and stored, so we just need to pass in
             // updated props and re-render.
-            let nextProps = Object.assign({}, component.props, {
-                namedChildren: message.namedChildren,
-                children: message.children,
-                extraData: message.extraData
-            }, message.extraData);
-            let nextPropsToPass = component.componentWillReceiveProps(
-                component.props,
-                nextProps
-            );
-            component._updateReplacements(message.replacementKeys);
-            component._updateProps(nextPropsToPass);
-            //let cClass = this.components[message.componentName];
-            //var component = new cClass(nextProps, message.replacementKeys);
+            component = this.componentUpdated(component, message);
             var velement = component.render();
         } else {
-            // In this case, we are creating this cell for the first
-            // time (we have never seen its ID, and will create
-            // and store a whole new Component for it)
-	    let componentClass = this.components[message.componentName];
-	    if (componentClass === undefined) {
-                console.warn(`Could not find component for ${message.componentName}`);
-		var velement = this.htmlToVDomEl(message.contents, message.id);
-	    } else {
-                let componentProps = Object.assign({
-                    id: message.id,
-                    namedChildren: message.namedChildren,
-                    children: message.children,
-                    extraData: message.extraData
-                }, message.extra_data);
-		var component = new componentClass(
-                    componentProps,
-                    message.replacementKeys
-                );
-                var velement = component.render();
-
-                // Add the new component to the comp/cell
-                // stored dict.
-                this.activeComponents[message.id] = component;
-                newComponents.push(component);
-	    }
+            let component = this.componentCreated(message);
+            newComponents.push(component);
+            var velement = component.render();
+            // Add the new component to the comp/cell
+            // stored dict.
+            this.activeComponents[message.id] = component;
         }
 
         // If the incoming message describes a Cell that
@@ -281,57 +253,14 @@ class CellHandler {
             return;
         }
 
+
         // Install the element into the dom
-        if(cell === undefined){
-	    // This is a totally new node.
-            // For the moment, add it to the
-            // holding pen.
-	    this.projector.append(this.cells["holding_pen"], () => {
-                return velement;
-            });
-	    this.cells[message.id] = velement;
-        } else {
-            // Replace the existing copy of
-            // the node with this incoming
-            // copy.
-	    if(cell.parentNode === null){
-		this.projector.append(this.cells["holding_pen"], () => {
-		    return velement;
-		});
-	    } else {
-		this.projector.replace(cell, () => {return velement;});
-	    }
-	}
+        this._installElement(cell, velement);
 
         this.cells[message.id] = velement;
 
         // Now wire in replacements
-        Object.keys(replacements).forEach((replacementKey, idx) => {
-            let target = document.getElementById(replacementKey);
-            let source = null;
-            if(this.cells[replacements[replacementKey]] === undefined){
-		// This is actually a new node.
-                // We'll define it later in the
-                // event stream.
-		source = this.h("div", {id: replacementKey}, []);
-                this.cells[replacements[replacementKey]] = source; 
-		this.projector.append(this.cells["holding_pen"], () => {
-		    return source;
-                });
-	    } else {
-                // Not a new node
-                source = this.cells[replacements[replacementKey]];
-            }
-
-            if(target != null){
-		this.projector.replace(target, () => {
-		    return source;
-                });
-            } else {
-                let errorMsg = `In message ${message} couldn't find ${replacementKey}`;
-                throw new Error(errorMsg);
-            }
-        });
+        this._installReplacements(replacements);
 
         if(message.postscript !== undefined){
             this.postscripts.push(message.postscript);
@@ -344,14 +273,120 @@ class CellHandler {
             component.componentDidLoad();
         });
 
-        // Remove leftover replacement divs
-        // that are still in the page_root
-        // after vdom insertion
+        this._DOMcleanup()
+
+    }
+
+    /**
+     * Helper function that install all the replacements into the DOM
+     */
+    _installReplacements(replacements) {
+        Object.keys(replacements).forEach((replacementKey, idx) => {
+            let target = document.getElementById(replacementKey);
+            let source = null;
+            if(this.cells[replacements[replacementKey]] === undefined){
+                // This is actually a new node.
+                // We'll define it later in the
+                // event stream.
+                source = this.h("div", {id: replacementKey}, []);
+                this.cells[replacements[replacementKey]] = source;
+                this.projector.append(this.cells["holding_pen"], () => {
+                    return source;
+                });
+            } else {
+                // Not a new node
+                source = this.cells[replacements[replacementKey]];
+            }
+
+            if(target != null){
+                this.projector.replace(target, () => {
+                    return source;
+                });
+            } else {
+                let errorMsg = `In message ${message} couldn't find ${replacementKey}`;
+                throw new Error(errorMsg);
+            }
+        });
+    }
+
+    /**
+     * Helper function that installs a velement into the DOM,
+     * either replacing or creating a new cell as necessary
+     */
+    _installElement(cell, velement) {
+
+        if(cell === undefined){
+            // This is a totally new node.
+            // For the moment, add it to the
+            // holding pen.
+            this.projector.append(this.cells["holding_pen"], () => {
+                return velement;
+            });
+        } else {
+            // Replace the existing copy of
+            // the node with this incoming
+            // copy.
+            if(cell.parentNode === null){
+                this.projector.append(this.cells["holding_pen"], () => {
+                    return velement;
+                });
+            } else {
+                this.projector.replace(cell, () => {return velement;});
+            }
+        }
+    }
+    /**
+     * Helper function to cleanup the DOM after cellUpdate
+     * Removes leftover replacement divs that are still in the page_root
+     * after vdom insertion
+     */
+    _DOMcleanup() {
         let pageRoot = document.getElementById('page_root');
         let found = pageRoot.querySelectorAll('[id*="_____"]');
         found.forEach(element => {
             element.remove();
         });
+    }
+
+    /**
+     * Helper function that creates a new component from the message data
+     */
+    componentCreated(message) {
+
+        // In this case, we are creating this cell for the first
+        // time (we have never seen its ID, and will create
+        // and store a whole new Component for it)
+        let componentClass = this.components[message.componentName];
+        let componentProps = Object.assign({
+            id: message.id,
+            namedChildren: message.namedChildren,
+            children: message.children,
+            extraData: message.extraData
+        }, message.extraData);
+        var component = new componentClass(
+            componentProps,
+            message.replacementKeys
+        );
+        return component;
+    }
+
+    /**
+     * Helper function that updates an existing component from the message data
+     */
+    componentUpdated(component, message) {
+        let nextProps = Object.assign({}, {
+            id: component.props.id,
+            namedChildren: message.namedChildren,
+            children: message.children,
+            extraData: message.extraData
+        }, message.extraData);
+        let nextPropsToPass = component.componentWillReceiveProps(
+            component.props,
+            nextProps
+        );
+        component._updateReplacements(message.replacementKeys);
+        component._updateProps(nextPropsToPass);
+        return component;
     }
 
     /**
@@ -363,48 +398,6 @@ class CellHandler {
 	    this.h("div", {class: "alert alert-primary center-block mt-5"},
 		   ["Disconnected"])
 	]);
-    }
-
-     /**
-     * This is a (hopefully temporary) hack
-     * that will intercept the first time a
-     * dropdown carat is clicked and bind
-     * Bootstrap Dropdown event handlers
-     * to it that should be bound to the
-     * identified cell. We are forced to do this
-     * because the current Cells infrastructure
-     * does not have flexible event binding/handling.
-     * @param {string} cellId - The ID of the cell
-     * to identify in the socket callback we will
-     * bind to open and close events on dropdown
-     */
-    dropdownInitialBindFor(cellId){
-        let elementId = cellId + '-dropdownMenuButton';
-        let element = document.getElementById(elementId);
-        if(!element){
-            throw Error('Element of id ' + elementId + ' doesnt exist!');
-        }
-        let dropdownMenu = element.parentElement;
-        let firstTimeClicked = element.dataset.firstclick == 'true';
-        if(firstTimeClicked){
-            $(dropdownMenu).on('show.bs.dropdown', function(){
-                cellSocket.sendString(JSON.stringify({
-                    event: 'dropdown',
-                    target_cell: cellId,
-                    isOpen: false
-                }));
-            });
-            $(dropdownMenu).on('hide.bs.dropdown', function(){
-                cellSocket.sendString(JSON.stringify({
-                    event: 'dropdown',
-                    target_cell: cellId,
-                    isOpen: true
-                }));
-            });
-
-            // Now expire the first time clicked
-            element.dataset.firstclick = 'false';
-        }
     }
 
     /**
@@ -431,45 +424,6 @@ class CellHandler {
      */
     static unsafelyExecute(aString){
         window.exec(aString);
-    }
-
-    /**
-     * Helper function that takes some incoming
-     * HTML string and returns a maquette hyperscript
-     * VDOM element from it.
-     * This uses the internal browser DOMparser() to generate the html
-     * structure from the raw string and then recursively build the
-     * VDOM element
-     * @param {string} html - The markup to
-     * transform into a real element.
-     */
-    htmlToVDomEl(html, id){
-	let dom = this.DOMParser.parseFromString(html, "text/html");
-        let element = dom.body.children[0];
-        return this._domElToVdomEl(element, id);
-    }
-
-    _domElToVdomEl(domEl, id) {
-	let tagName = domEl.tagName.toLocaleLowerCase();
-	let attrs = {id: id};
-	let index;
-
-	for (index = 0; index < domEl.attributes.length; index++){
-	    let item = domEl.attributes.item(index);
-	    attrs[item.name] = item.value.trim();
-	}
-
-	if (domEl.childElementCount === 0) {
-	    return h(tagName, attrs, [domEl.textContent]);
-	}
-
-	let children = [];
-	for (index = 0; index < domEl.children.length; index++){
-	    let child = domEl.children[index];
-	    children.push(this._domElToVdomEl(child));
-	}
-
-	return h(tagName, attrs, children);
     }
 }
 
