@@ -26,7 +26,7 @@ from object_database.service_manager.ServiceManager_test import (
     GraphDisplayService,
     TextEditorService,
     HappyService,
-    # UninitializableService,
+    UninitializableService,
     DropdownTestService,
     BigGridTestService
 )
