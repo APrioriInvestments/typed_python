@@ -173,6 +173,7 @@ class CellHandler {
             // Unload lifecycle function
             foundComponent.componentWillUnload();
             delete this.activeComponents[message.id];
+            delete this.cells[message.id];
         }
 
         // NOTE: The following was copied from the original
@@ -257,7 +258,7 @@ class CellHandler {
                     namedChildren: message.namedChildren,
                     children: message.children,
                     extraData: message.extraData
-                }, message.extra_data);
+                }, message.extraData);
 		var component = new componentClass(
                     componentProps,
                     message.replacementKeys
