@@ -186,6 +186,13 @@ def dict_setitem(instance, key, value):
         instance.setValueByIndexUnsafe(slot, value)
 
 
+def dict_setdefault(dict, item, defaultValue=None):
+    if item not in dict:
+        # TypeError: Can't convert from type String to type Int64
+        dict[item] = defaultValue
+    return dict[item]
+
+
 class DictWrapperBase(RefcountedWrapper):
     is_pod = False
     is_empty = False
@@ -213,7 +220,8 @@ class DictWrapperBase(RefcountedWrapper):
             ('hash_table_hashes', native_ast.Int32Ptr),
             ('hash_table_size', native_ast.Int64),
             ('hash_table_count', native_ast.Int64),
-            ('hash_table_empty_slots', native_ast.Int64)
+            ('hash_table_empty_slots', native_ast.Int64),
+            ('setdefault', native_ast.Int64)
         ), name="DictWrapper").pointer()
 
     def on_refcount_zero(self, context, instance):
@@ -241,7 +249,7 @@ class DictWrapper(DictWrapperBase):
         if attr in (
                 "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
                 "setValueByIndexUnsafe", "setKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
-                "_compressItemTableUnsafe", "get", "items", "keys", "values"):
+                "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault"):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
         if attr == '_items_populated':
@@ -367,6 +375,12 @@ class DictWrapper(DictWrapperBase):
                     )
                 )
 
+        if methodname == "setdefault":
+            if len(args) == 1:
+                return context.call_py_function(dict_setdefault, (instance, args[0]), {})
+            else:
+                return context.call_py_function(dict_setdefault, (instance, args[0], args[1]), {})
+
         if len(args) == 1:
             if methodname == "get":
                 return self.convert_getitem(context, instance, args[0])
@@ -466,7 +480,7 @@ class DictWrapper(DictWrapperBase):
         if key is None:
             return None
 
-        value = value.convert_to_type(self.keyType)
+        value = value.convert_to_type(self.valueType)
         if value is None:
             return None
 
