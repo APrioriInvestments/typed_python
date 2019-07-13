@@ -1936,10 +1936,10 @@ class NativeTypesTests(unittest.TestCase):
         # it's not possible to convert None to String,
         # so this should throw an exception
         with self.assertRaisesRegex(TypeError, "Can't initialize a StringType from an instance of NoneType"):
-            v3 = d.setdefault(3)
+            d.setdefault(3)
 
         with self.assertRaisesRegex(TypeError, "Can't initialize a StringType from an instance of NoneType"):
-            v3 = d.setdefault(3, None)
+            d.setdefault(3, None)
 
     def test_mutable_dict_setdefault_refcount(self):
         d = Dict(int, ListOf(int))()
@@ -1952,6 +1952,7 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEquals(_types.refcount(aList), 3)
         a = d.setdefault(2, aList)
         self.assertEquals(_types.refcount(aList), 4)
+        self.assertEquals(a, aList)
         a = None
         self.assertEquals(_types.refcount(aList), 3)
         d.setdefault(3, ListOf(int)([1]))

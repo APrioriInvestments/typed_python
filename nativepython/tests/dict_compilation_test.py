@@ -110,6 +110,40 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(x, {i: i*i for i in range(1000)})
 
+    def test_dict_setdefault(self):
+        @SpecializedEntrypoint
+        def dict_setdefault(d, k, v):
+            return d.setdefault(k, v)
+
+        x = Dict(int, str)()
+        x[1] = "a"
+
+        # This should not change the dictionary, and return "a"
+        v1 = dict_setdefault(x, 1, "b")
+        self.assertEqual(v1, "a")
+        self.assertEqual(x, {1: "a"})
+
+        # This should set x[2]="b" and return "b"
+        v2 = dict_setdefault(x, 2, "b")
+        self.assertEqual(v2, "b")
+        self.assertEqual(x, {1: "a", 2: "b"})
+
+    def test_dict_with_different_types(self):
+        """Check if the dictionary with different types
+        supports proper key and type conversion.
+        """
+        @SpecializedEntrypoint
+        def dict_setvalue(d, k, v):
+            d[k] = v
+
+        x = Dict(int, str)()
+        x[1] = "a"
+        self.assertEqual(x, {1: "a"})
+
+        x = Dict(str, int)()
+        x["a"] = 1
+        self.assertEqual(x, {"a": 1})
+
     def test_dict_del(self):
         @SpecializedEntrypoint
         def dict_delitem(d, k):
