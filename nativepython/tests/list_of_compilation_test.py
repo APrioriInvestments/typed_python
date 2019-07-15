@@ -76,6 +76,24 @@ class TestListOfCompilation(unittest.TestCase):
 
         print(t_py / t_fast, " speedup")
 
+    def test_list_negative_indexing(self):
+        @Compiled
+        def getitem(x: ListOf(int), y: int):
+            return x[y]
+
+        for listToCheck in [[], [1], [1, 2], [1, 2, 3]]:
+            for ix in [-2, -1, 0, 1, 2]:
+                try:
+                    val = listToCheck[ix]
+                except IndexError:
+                    val = None
+
+                if val is not None:
+                    self.assertEqual(val, getitem(listToCheck, ix))
+                else:
+                    with self.assertRaises(Exception):
+                        getitem(listToCheck, ix)
+
     def test_list_passing(self):
         @Compiled
         def f(x: ListOf(int)) -> int:

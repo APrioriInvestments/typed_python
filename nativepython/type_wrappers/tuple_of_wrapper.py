@@ -236,13 +236,26 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         if item is None or expr is None:
             return None
 
+        item = item.toInt64()
+        if item is None:
+            return None
+
+        actualItem = context.pushPod(
+            int,
+            native_ast.Expression.Branch(
+                cond=item.nonref_expr.lt(0),
+                true=item.nonref_expr.add(self.convert_len_native(expr.nonref_expr)),
+                false=item.nonref_expr
+            )
+        )
+
         return context.pushReference(
             self.underlyingWrapperType,
             native_ast.Expression.Branch(
-                cond=((item >= 0) & (item < self.convert_len(context, expr))).nonref_expr,
+                cond=((actualItem >= 0) & (actualItem < self.convert_len(context, expr))).nonref_expr,
                 true=expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
-                ).elemPtr(item.toInt64().nonref_expr),
+                ).elemPtr(actualItem.toInt64().nonref_expr),
                 false=generateThrowException(context, IndexError(("tuple" if self.is_tuple else "list") + " index out of range"))
             )
         )
