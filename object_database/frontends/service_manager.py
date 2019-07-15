@@ -144,7 +144,11 @@ def autoconfigureAndStartServiceManagerProcess(
     return server, cleanupFn
 
 
-def main(argv):
+def main(argv=None):
+    if argv is None:
+        # this is a needed pathway for the 'console_scripts' in setup.py
+        argv = sys.argv
+
     parser = argparse.ArgumentParser("Run the main service manager and the object_database_service.")
 
     parser.add_argument("own_hostname")
