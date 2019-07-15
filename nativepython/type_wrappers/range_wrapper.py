@@ -32,11 +32,28 @@ class RangeWrapper(Wrapper):
             arg = args[0].toInt64()
             if not arg:
                 return None
-            return context.pushPod(
+            return context.push(
                 _RangeInstanceWrapper,
-                arg.nonref_expr
+                lambda newInstance:
+                    newInstance.expr.ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(-1))
+                    >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg.nonref_expr)
             )
 
+        if len(args) == 2 and not kwargs:
+            arg0 = args[0].toInt64()
+            if not arg0:
+                return None
+
+            arg1 = args[1].toInt64()
+            if not arg1:
+                return None
+
+            return context.push(
+                _RangeInstanceWrapper,
+                lambda newInstance:
+                    newInstance.expr.ElementPtrIntegers(0, 0).store(arg0.nonref_expr.sub(1))
+                    >> newInstance.expr.ElementPtrIntegers(0, 1).store(arg1.nonref_expr)
+            )
         return super().convert_call(context, expr, args, kwargs)
 
 
@@ -49,15 +66,14 @@ class RangeInstanceWrapper(Wrapper):
         super().__init__((range, "instance"))
 
     def getNativeLayoutType(self):
-        return native_ast.Int64
+        return native_ast.Type.Struct(element_types=(('start', native_ast.Int64), ('stop', native_ast.Int64)))
 
     def convert_method_call(self, context, expr, methodname, args, kwargs):
         if methodname == "__iter__" and not args and not kwargs:
             return context.push(
                 _RangeIteratorWrapper,
                 lambda instance:
-                    instance.expr.ElementPtrIntegers(0, 0).store(-1) >>
-                    instance.expr.ElementPtrIntegers(0, 1).store(expr.nonref_expr)
+                    instance.expr.store(expr.nonref_expr)
             )
         return super().convert_method_call(context, expr, methodname, args, kwargs)
 

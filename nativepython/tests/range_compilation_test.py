@@ -34,6 +34,18 @@ class TestRangeCompilation(unittest.TestCase):
         for i in range(10):
             self.assertEqual(sumWithRange(i), sum(range(i+1)))
 
+    def test_range_with_two_values(self):
+        @Compiled
+        def sumWithRangePair(x, y):
+            res = 0
+            for i in range(x, y):
+                res += i
+            return res
+
+        for i in range(30):
+            for i2 in range(30):
+                self.assertEqual(sumWithRangePair(i, i2), sum(range(i, i2)))
+
     def test_range_repeat(self):
         @Compiled
         def repeat(array: ListOf(int), times: int):
