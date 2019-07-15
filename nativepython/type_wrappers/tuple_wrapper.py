@@ -151,7 +151,6 @@ class NamedTupleWrapper(TupleWrapper):
         self.namesToTypes = {n: t.ElementTypes[i] for i, n in enumerate(t.ElementNames)}
 
     def convert_attribute(self, context, instance, attribute):
-
         if attribute in ["replacing"]:
             return instance.changeType(BoundCompiledMethodWrapper(self, attribute))
 
@@ -161,6 +160,43 @@ class NamedTupleWrapper(TupleWrapper):
             return
 
         return self.refAs(context, instance, ix)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0:
+            for name in kwargs:
+                if name not in self.namesToTypes:
+                    context.pushException(TypeError, f"Couldn't initialize type of {self} with an argument named {name}")
+                    return
+
+            needsDefaultInitializer = set()
+
+            for name, argType in self.namesToTypes.items():
+                if name not in kwargs:
+                    if _types.is_default_constructible(name):
+                        needsDefaultInitializer.add(name)
+                    else:
+                        context.pushException(TypeError, f"Can't default initialize member {name} of {self}")
+                        return
+
+            uninitializedNamedTuple = context.allocateUninitializedSlot(self)
+
+            for name, expr in kwargs.items():
+                actualExpr = expr.convert_to_type(self.namesToTypes[name])
+                if actualExpr is None:
+                    return None
+
+                uninitializedChildElement = self.refAs(context, uninitializedNamedTuple, self.namesToIndices[name])
+                uninitializedChildElement.convert_copy_initialize(actualExpr)
+
+            for name in needsDefaultInitializer:
+                self.refAs(context, uninitializedNamedTuple, self.namesToIndices[name]).convert_default_initialize()
+
+            context.markUninitializedSlotInitialized(uninitializedNamedTuple)
+
+            # the tuple is now initialized
+            return uninitializedNamedTuple
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         if methodname == 'replacing' and not args:

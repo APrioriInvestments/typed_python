@@ -163,3 +163,30 @@ class TestTupleCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(aList), 2)
         nt = None
         self.assertEqual(_types.refcount(aList), 1)
+
+    def test_named_tuple_construction(self):
+        NT = NamedTuple(x=ListOf(int), y=float)
+
+        @SpecializedEntrypoint
+        def makeNt():
+            return NT()
+
+        @SpecializedEntrypoint
+        def makeNtX(x):
+            return NT(x=x)
+
+        @SpecializedEntrypoint
+        def makeNtY(y):
+            return NT(y=y)
+
+        @SpecializedEntrypoint
+        def makeNtXY(x, y):
+            return NT(x=x, y=y)
+
+        self.assertEqual(makeNt(), NT())
+        self.assertEqual(makeNtX(ListOf(int)([1, 2, 3])), NT(x=[1, 2, 3]))
+        self.assertEqual(makeNtXY(ListOf(int)([1, 2, 3]), 2.0), NT(x=[1, 2, 3], y=2.0))
+        self.assertEqual(makeNtY(2.0), NT(y=2.0))
+
+        with self.assertRaisesRegex(TypeError, "convert from type Float64 to type List"):
+            makeNtX(1.2)
