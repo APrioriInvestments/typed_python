@@ -756,7 +756,42 @@ public:
     }
 
     static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
-        if (PyBool_Check(other)) { return pyCompare(*(T*)self, other == Py_True ? true : false, pyComparisonOp); }
+        //we need to ensure that we don't compare ourselves to any other
+        if (exact) {
+            if (pyComparisonOp == Py_NE) {
+                return !compare_to_python_concrete(t, self, other, exact, Py_EQ);
+            }
+
+            if (pyComparisonOp != Py_EQ) {
+                throw std::runtime_error("Exact must be used with Eq or Neq only");
+            }
+
+            if (t->getTypeCategory() == Type::TypeCategory::catBool) {
+                if (!PyBool_Check(other)) {
+                    return false;
+                }
+            } else
+            if (t->getTypeCategory() == Type::TypeCategory::catInt64) {
+                if (!PyLong_Check(other)) {
+                    return false;
+                }
+            } else
+            if (t->getTypeCategory() == Type::TypeCategory::catFloat64) {
+                if (!PyFloat_Check(other)) {
+                    return false;
+                }
+            } else {
+                Type* rhsType = extractTypeFrom(other->ob_type);
+                if (rhsType != t) {
+                    return false;
+                }
+            }
+        }
+
+        if (PyBool_Check(other)) {
+            return pyCompare(*(T*)self, other == Py_True ? true : false, pyComparisonOp);
+        }
+
         if (PyLong_Check(other)) {
             int64_t l = PyLong_AsLongLong(other);
             if (l == -1 && PyErr_Occurred()) {
@@ -769,7 +804,10 @@ public:
             }
             return pyCompare(*(T*)self, l, pyComparisonOp);
         }
-        if (PyFloat_Check(other)) { return pyCompare(*(T*)self, PyFloat_AsDouble(other), pyComparisonOp); }
+
+        if (PyFloat_Check(other)) {
+            return pyCompare(*(T*)self, PyFloat_AsDouble(other), pyComparisonOp);
+        }
 
         Type* rhsType = extractTypeFrom(other->ob_type);
 

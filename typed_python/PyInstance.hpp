@@ -485,6 +485,10 @@ public:
 
     static Py_hash_t tp_hash(PyObject *o);
 
+    /***
+     compare this value to a python value using the comparison op pyComparisonOp (Py_EQ, Py_LT, etc.)
+     if 'exact', then the types must be equivalent as well.
+    ***/
     static bool compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static bool compare_to_python_concrete(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);

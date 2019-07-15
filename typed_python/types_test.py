@@ -2058,6 +2058,17 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(aDict[1], 100)
         self.assertEqual(aDict['hi'], 200)
 
+    def test_oneof_conversion(self):
+        BrokenOutBool = OneOf(False, True, int)
+
+        self.assertIs(type(BrokenOutBool(0)), int)
+        self.assertIs(type(BrokenOutBool(False)), bool)
+
+        BrokenOutBoolReordered = OneOf(int, False, True)
+
+        self.assertIs(type(BrokenOutBoolReordered(0)), int)
+        self.assertIs(type(BrokenOutBoolReordered(False)), bool)
+
     def test_named_tuple_replacing_argument_errors(self):
         N = NamedTuple(a=int, b=str)
         n = N(a=10, b='20')

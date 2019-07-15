@@ -764,8 +764,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_richcompare = tp_richcompare,           // richcmpfunc
             .tp_weaklistoffset = 0,                     // Py_ssize_t
             .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ||
-                        inType->getTypeCategory() == Type::TypeCategory::catDict || 
-                        inType->getTypeCategory() == Type::TypeCategory::catSet 
+                        inType->getTypeCategory() == Type::TypeCategory::catDict ||
+                        inType->getTypeCategory() == Type::TypeCategory::catSet
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
@@ -895,6 +895,10 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
 
 // static
 bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    if (exact && pyComparisonOp != Py_EQ && pyComparisonOp != Py_NE) {
+        throw std::runtime_error("Exact must be used with Py_EQ or Py_NE only");
+    }
+
     if (t->getTypeCategory() == Type::TypeCategory::catValue) {
         Value* valType = (Value*)t;
         return compare_to_python(valType->value().type(), valType->value().data(), other, exact, pyComparisonOp);
