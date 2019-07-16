@@ -63,6 +63,16 @@ Statement = Statement.define(Alternative(
         'col_offset': int,
         'filename': str
     },
+    AsyncFunctionDef={
+        "name": str,
+        "args": Arguments,
+        "body": TupleOf(Statement),
+        "decorator_list": TupleOf(Expr),
+        "returns": OneOf(Expr, None),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
     ClassDef={
         "name": str,
         "bases": TupleOf(Expr),
@@ -96,6 +106,16 @@ Statement = Statement.define(Alternative(
         "target": Expr,
         "op": BinaryOp,
         "value": Expr,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    AnnAssign={
+        "target": Expr,
+        "annotation": Expr,
+        'simple': int,
+        "value": OneOf(Expr, None),
+        "op": BinaryOp,
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -140,6 +160,22 @@ Statement = Statement.define(Alternative(
         'col_offset': int,
         'filename': str
     },
+    AsyncWith={
+        "items": TupleOf(WithItem),
+        "body": TupleOf(Statement),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    AsyncFor={
+        'target': Expr,
+        'iter': Expr,
+        'body': TupleOf(Statement),
+        'orelse': TupleOf(Statement),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
     Raise={
         "exc": OneOf(Expr, None),
         "cause": OneOf(Expr, None),
@@ -178,6 +214,12 @@ Statement = Statement.define(Alternative(
         'filename': str
     },
     Global={
+        "names": TupleOf(str),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    NonLocal={
         "names": TupleOf(str),
         'line_number': int,
         'col_offset': int,
@@ -293,6 +335,18 @@ Expr = Expr.define(Alternative(
         'col_offset': int,
         'filename': str
     },
+    YieldFrom={
+        "value": Expr,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    Await={
+        "value": Expr,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
     Compare={
         "left": Expr,
         "ops": TupleOf(ComparisonOp),
@@ -305,6 +359,32 @@ Expr = Expr.define(Alternative(
         "func": Expr,
         "args": TupleOf(Expr),
         "keywords": TupleOf(Keyword),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    JoinedStr={
+        "values": TupleOf(Expr),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    Bytes={
+        's': bytes,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    Constant={
+        'value': OneOf(object, None),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    FormattedValue={
+        "value": Expr,
+        "conversion": OneOf(int, None),
+        "format_spec": OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -410,6 +490,7 @@ BinaryOp = BinaryOp.define(Alternative(
     Add={},
     Sub={},
     Mult={},
+    MatMult={},
     Div={},
     Mod={},
     Pow={},
@@ -558,6 +639,7 @@ converters = {
     ast.Delete: Statement.Delete,
     ast.Assign: Statement.Assign,
     ast.AugAssign: Statement.AugAssign,
+    ast.AnnAssign: Statement.AnnAssign,
     ast.For: Statement.For,
     ast.While: Statement.While,
     ast.If: Statement.If,
@@ -568,6 +650,7 @@ converters = {
     ast.Import: Statement.Import,
     ast.ImportFrom: Statement.ImportFrom,
     ast.Global: Statement.Global,
+    ast.Nonlocal: Statement.NonLocal,
     ast.Expr: Statement.Expr,
     ast.Pass: Statement.Pass,
     ast.Break: Statement.Break,
@@ -579,11 +662,20 @@ converters = {
     ast.IfExp: Expr.IfExp,
     ast.Dict: Expr.Dict,
     ast.Set: Expr.Set,
+    ast.JoinedStr: Expr.JoinedStr,
+    ast.Bytes: Expr.Bytes,
+    ast.Constant: Expr.Constant,
+    ast.FormattedValue: Expr.FormattedValue,
     ast.ListComp: Expr.ListComp,
+    ast.AsyncFunctionDef: Statement.AsyncFunctionDef,
+    ast.AsyncWith: Statement.AsyncWith,
+    ast.AsyncFor: Statement.AsyncFor,
+    ast.Await: Expr.Await,
     ast.SetComp: Expr.SetComp,
     ast.DictComp: Expr.DictComp,
     ast.GeneratorExp: Expr.GeneratorExp,
     ast.Yield: Expr.Yield,
+    ast.YieldFrom: Expr.YieldFrom,
     ast.Compare: Expr.Compare,
     ast.Call: Expr.Call,
     ast.Num: createPythonAstConstant,
@@ -610,6 +702,7 @@ converters = {
     ast.Add: BinaryOp.Add,
     ast.Sub: BinaryOp.Sub,
     ast.Mult: BinaryOp.Mult,
+    ast.MatMult: BinaryOp.MatMult,
     ast.Div: BinaryOp.Div,
     ast.Mod: BinaryOp.Mod,
     ast.Pow: BinaryOp.Pow,
@@ -669,7 +762,7 @@ def convertAlgebraicToPyAst_(pyAst):
     if pyAst is None:
         return None
 
-    if isinstance(pyAst, (str, int, float, bool)):
+    if isinstance(pyAst, (str, int, float, bool, bytes)):
         return pyAst
 
     if hasattr(pyAst, "__typed_python_category__") and pyAst.__typed_python_category__ == "TupleOf":
