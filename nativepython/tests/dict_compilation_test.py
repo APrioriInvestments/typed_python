@@ -89,26 +89,26 @@ class TestDictCompilation(unittest.TestCase):
         def dict_setitem(d, k, v):
             d[k] = v
 
-        x = Dict(int, int)()
+        x = Dict(int, str)()
 
-        x[1] = 2
+        x[1] = '2'
 
-        dict_setitem(x, 1, 3)
+        dict_setitem(x, 1, '3')
 
-        self.assertEqual(x, {1: 3})
+        self.assertEqual(x, {1: '3'})
 
-        dict_setitem(x, 2, 300)
+        dict_setitem(x, 2, '300')
 
-        self.assertEqual(x, {1: 3, 2: 300})
+        self.assertEqual(x, {1: '3', 2: '300'})
 
         @SpecializedEntrypoint
         def dict_setmany(d, count):
             for i in range(count):
-                d[i] = i * i
+                d[i] = str(i * i)
 
         dict_setmany(x, 1000)
 
-        self.assertEqual(x, {i: i*i for i in range(1000)})
+        self.assertEqual(x, {i: str(i*i) for i in range(1000)})
 
     def test_dict_setdefault(self):
         @SpecializedEntrypoint

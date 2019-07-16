@@ -180,10 +180,10 @@ def dict_setitem(instance, key, value):
     if slot == -1:
         newSlot = instance._allocateNewSlotUnsafe()
         dict_add_slot(instance, itemHash, newSlot)
-        instance.setKeyByIndexUnsafe(newSlot, key)
-        instance.setValueByIndexUnsafe(newSlot, value)
+        instance.initializeKeyByIndexUnsafe(newSlot, key)
+        instance.initializeValueByIndexUnsafe(newSlot, value)
     else:
-        instance.setValueByIndexUnsafe(slot, value)
+        instance.initializeValueByIndexUnsafe(slot, value)
 
 
 def dict_setdefault(dict, item, defaultValue=None):
@@ -248,7 +248,7 @@ class DictWrapper(DictWrapperBase):
     def convert_attribute(self, context, expr, attr):
         if attr in (
                 "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
-                "setValueByIndexUnsafe", "setKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
+                "initializeValueByIndexUnsafe", "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault"):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
@@ -410,7 +410,7 @@ class DictWrapper(DictWrapperBase):
                     return item.expr_type.refAs(context, item, 1)
 
         if len(args) == 2:
-            if methodname == "setValueByIndexUnsafe":
+            if methodname == "initializeValueByIndexUnsafe":
                 index = args[0].convert_to_type(int)
                 if index is None:
                     return None
@@ -426,11 +426,11 @@ class DictWrapper(DictWrapperBase):
                     ).elemPtr(index.toInt64().nonref_expr)
                 )
 
-                item.expr_type.refAs(context, item, 1).convert_assign(value)
+                item.expr_type.refAs(context, item, 1).convert_copy_initialize(value)
 
                 return context.pushVoid()
 
-            if methodname == "setKeyByIndexUnsafe":
+            if methodname == "initializeKeyByIndexUnsafe":
                 index = args[0].convert_to_type(int)
                 if index is None:
                     return None
@@ -446,7 +446,7 @@ class DictWrapper(DictWrapperBase):
                     ).elemPtr(index.toInt64().nonref_expr)
                 )
 
-                item.expr_type.refAs(context, item, 0).convert_assign(key)
+                item.expr_type.refAs(context, item, 0).convert_copy_initialize(key)
 
                 return context.pushVoid()
 
