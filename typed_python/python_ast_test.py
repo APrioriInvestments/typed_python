@@ -122,3 +122,79 @@ class TestPythonAst(unittest.TestCase):
             from numpy import float64
             return float(float64(x))
         self.reverseParseAndEvalCheck(f, 10)
+
+    def test_parsing_fstring(self):
+        """
+        This code generates:
+            - ast.JoinedStr
+            - ast.FormattedValue
+        """
+        self.reverseParseCheck(lambda x: f" - {x} - ")
+
+    def test_parsing_assert(self):
+        """This code generates ast.Assert node."""
+        def f(x):
+            assert x == 1
+        self.reverseParseCheck(f)
+
+    def test_parsing_yield_from(self):
+        """This code generates ast.YieldFrom."""
+        def f(x):
+            yield from x
+        self.reverseParseCheck(f)
+
+    def test_parsing_async(self):
+        """This code generates:
+            - ast.AsyncFunctionDef
+            - ast.Await
+            - ast.AsyncWith
+        """
+        import asyncio
+
+        async def f(x, y):
+            print("Compute %s + %s ..." % (x, y))
+            await asyncio.sleep(1.0)
+            async for i in x:
+                print(i)
+            async with y:
+                pass
+            return x + y
+
+        self.reverseParseCheck(f)
+
+    def test_parsing_nonlocal(self):
+        """This code generates: ast.Nonlocal."""
+        def f():
+            x = "local"
+
+            def inner():
+                nonlocal x
+                x = "nonlocal"
+                print("inner:", x)
+
+            inner()
+            print("outer:", x)
+
+        self.reverseParseCheck(f)
+
+    def test_parsing_matmul(self):
+        """This code generates: ast.MatMult."""
+        def f(a, b):
+            a @ b
+            a @= b
+
+        self.reverseParseCheck(f)
+
+    def test_parsing_annotated_assignment(self):
+        """This code generates: ast.AddAssign."""
+        def f():
+            a: int = 2
+            return a
+
+        self.reverseParseCheck(f)
+
+    def test_parsing_bytes(self):
+        def f():
+            return b"aaa"
+
+        self.reverseParseCheck(f)
