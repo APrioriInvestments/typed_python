@@ -38,6 +38,8 @@ public:
         m_is_simple = false;
 
         endOfConstructorInitialization(); // finish initializing the type object.
+
+        inClass->setClassType(this);
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -53,10 +55,22 @@ public:
         assert(t == m_heldClass);
     }
 
+    /*****
+    //we should have this, except that natively generated code doesn't know how to write
+    //this field yet, so the vtable will be null in those cases.
+
+    Type* pickConcreteSubclassConcrete(instance_ptr self) {
+        layout& l = **(layout**)self;
+
+        return m_heldClass->vtableFor(l.data)->mType->getClassType();
+    }
+    ******/
+
     bool _updateAfterForwardTypesChanged();
 
     static Class* Make(
             std::string inName,
+            const std::vector<Class*>& bases,
             const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
@@ -64,7 +78,23 @@ public:
             const std::map<std::string, PyObject*>& classMembers
             )
     {
-        return new Class(HeldClass::Make(inName, members, memberFunctions, staticFunctions, propertyFunctions, classMembers));
+        std::vector<HeldClass*> heldClassBases;
+
+        for (auto c: bases) {
+            heldClassBases.push_back(c->getHeldClass());
+        }
+
+        return new Class(
+            HeldClass::Make(
+                inName,
+                heldClassBases,
+                members,
+                memberFunctions,
+                staticFunctions,
+                propertyFunctions,
+                classMembers
+            )
+        );
     }
 
     Class* renamed(std::string newName) {
@@ -198,8 +228,6 @@ public:
     HeldClass* getHeldClass() const {
         return m_heldClass;
     }
-
-
 
 private:
     HeldClass* m_heldClass;

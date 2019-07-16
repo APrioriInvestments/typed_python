@@ -526,7 +526,7 @@ Function* convertPythonObjectToFunction(PyObject* name, PyObject *funcObj) {
 }
 
 PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
-    int expected_args = 6;
+    int expected_args = 7;
     if (PyTuple_Size(args) != expected_args) {
         PyErr_Format(PyExc_TypeError, "Class takes %S arguments", expected_args);
         return NULL;
@@ -541,19 +541,20 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
 
     std::string name = PyUnicode_AsUTF8(nameArg);
 
-    PyObjectHolder memberTuple(PyTuple_GetItem(args,1));
-    PyObjectHolder memberFunctionTuple(PyTuple_GetItem(args,2));
-    PyObjectHolder staticFunctionTuple(PyTuple_GetItem(args,3));
-    PyObjectHolder propertyFunctionTuple(PyTuple_GetItem(args,4));
-    PyObjectHolder classMemberTuple(PyTuple_GetItem(args,5));
+    PyObjectHolder basesTuple(PyTuple_GetItem(args, 1));
+    PyObjectHolder memberTuple(PyTuple_GetItem(args, 2));
+    PyObjectHolder memberFunctionTuple(PyTuple_GetItem(args, 3));
+    PyObjectHolder staticFunctionTuple(PyTuple_GetItem(args, 4));
+    PyObjectHolder propertyFunctionTuple(PyTuple_GetItem(args, 5));
+    PyObjectHolder classMemberTuple(PyTuple_GetItem(args, 6));
 
-    if (!PyTuple_Check(memberTuple)) {
-        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, member_type) in the second argument");
+    if (!PyTuple_Check(basesTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of Class type objects in the second argument");
         return NULL;
     }
 
-    if (!PyTuple_Check(memberFunctionTuple)) {
-        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, Function) in the third argument");
+    if (!PyTuple_Check(memberTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, member_type) in the third argument");
         return NULL;
     }
 
@@ -562,21 +563,40 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         return NULL;
     }
 
-    if (!PyTuple_Check(propertyFunctionTuple)) {
-        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the fifth argument");
+    if (!PyTuple_Check(memberFunctionTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, Function) in the fifth argument");
         return NULL;
     }
 
-    if (!PyTuple_Check(classMemberTuple)) {
+    if (!PyTuple_Check(propertyFunctionTuple)) {
         PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the sixth argument");
         return NULL;
     }
 
+    if (!PyTuple_Check(classMemberTuple)) {
+        PyErr_SetString(PyExc_TypeError, "Class needs a tuple of (str, object) in the seventh argument");
+        return NULL;
+    }
+
+    std::vector<Type*> bases;
     std::vector<std::tuple<std::string, Type*, Instance> > members;
     std::vector<std::pair<std::string, Type*> > memberFunctions;
     std::vector<std::pair<std::string, Type*> > staticFunctions;
     std::vector<std::pair<std::string, Type*> > propertyFunctions;
     std::vector<std::pair<std::string, PyObject*> > classMembers;
+
+    if (!unpackTupleToTypes(basesTuple, bases)) {
+        return NULL;
+    }
+    std::vector<Class*> baseClasses;
+
+    for (auto t: bases) {
+        if (t->getTypeCategory() != Type::TypeCategory::catClass) {
+            PyErr_SetString(PyExc_TypeError, "Classes must descend from other Class types");
+            return NULL;
+        }
+        baseClasses.push_back((Class*)t);
+    }
 
     if (!unpackTupleToStringTypesAndValues(memberTuple, members)) {
         return NULL;
@@ -644,9 +664,17 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
 
     return incref(
         (PyObject*)PyInstance::typeObj(
-            Class::Make(name, members, memberFuncs, staticFuncs, propertyFuncs, clsMembers)
+            Class::Make(
+                name,
+                baseClasses,
+                members,
+                memberFuncs,
+                staticFuncs,
+                propertyFuncs,
+                clsMembers
             )
-        );
+        )
+    );
 }
 
 PyObject *refcount(PyObject* nullValue, PyObject* args) {

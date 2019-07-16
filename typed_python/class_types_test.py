@@ -792,3 +792,26 @@ class NativeClassTypesTests(unittest.TestCase):
             c.increment(2)
 
         self.assertEqual(c.x.x, 2000000)
+
+    def test_class_inheritance_basic(self):
+        class BaseClass(Class):
+            x = Member(int)
+
+            def f(self, add):
+                return self.x + add
+
+        class ChildClass(BaseClass):
+            y = Member(int)
+
+            def f(self, add):
+                return self.x + self.y + add
+
+        b = BaseClass(x=10)
+        c = ChildClass(x=10, y=20)
+
+        self.assertEqual(b.x, 10)
+        self.assertEqual(b.f(100), 110)
+
+        self.assertEqual(c.x, 10)
+        self.assertEqual(c.y, 20)
+        self.assertEqual(c.f(100), 130)

@@ -42,8 +42,9 @@ bool HeldClass::_updateAfterForwardTypesChanged() {
 
     m_byte_offsets.clear();
 
-    //first m_members.size() bits (rounded up to nearest byte) contains the initialization flags.
-    size_t size = int((m_members.size() + 7) / 8); //round up to nearest byte
+    //first 8 bytes are the vtable pointer.
+    //the next m_members.size() bits (rounded up to nearest byte) contain the initialization flags.
+    size_t size = sizeof(vtable_ptr) + int((m_members.size() + 7) / 8); //round up to nearest byte
 
     for (auto t: m_members) {
         m_byte_offsets.push_back(size);
@@ -128,6 +129,8 @@ void HeldClass::setAttribute(instance_ptr self, int memberIndex, instance_ptr ot
 }
 
 void HeldClass::emptyConstructor(instance_ptr self) {
+    vtableFor(self) = m_vtable;
+
     //more efficient would be to just write over the bytes directly.
     for (size_t k = 0; k < m_members.size(); k++) {
         clearInitializationFlag(self, k);
@@ -135,6 +138,8 @@ void HeldClass::emptyConstructor(instance_ptr self) {
 }
 
 void HeldClass::constructor(instance_ptr self) {
+    vtableFor(self) = m_vtable;
+
     for (size_t k = 0; k < m_members.size(); k++) {
         Type* member_t = std::get<1>(m_members[k]);
 
@@ -161,6 +166,8 @@ void HeldClass::destroy(instance_ptr self) {
 }
 
 void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
+    vtableFor(self) = vtableFor(other);
+
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         Type* member_t = std::get<1>(m_members[k]);
         if (checkInitializationFlag(other, k)) {
@@ -171,6 +178,8 @@ void HeldClass::copy_constructor(instance_ptr self, instance_ptr other) {
 }
 
 void HeldClass::assign(instance_ptr self, instance_ptr other) {
+    vtableFor(self) = vtableFor(other);
+
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         bool selfInit = checkInitializationFlag(self,k);
         bool otherInit = checkInitializationFlag(other,k);
@@ -189,14 +198,14 @@ void HeldClass::assign(instance_ptr self, instance_ptr other) {
 }
 
 void HeldClass::setInitializationFlag(instance_ptr self, int memberIndex) const {
-    int byte = memberIndex / 8;
+    int byte = memberIndex / 8 + sizeof(vtable_ptr);
     int bit = memberIndex % 8;
     uint8_t mask = (1 << bit);
     ((uint8_t*)self)[byte] |= mask;
 }
 
 void HeldClass::clearInitializationFlag(instance_ptr self, int memberIndex) const {
-    int byte = memberIndex / 8;
+    int byte = memberIndex / 8 + sizeof(vtable_ptr);
     int bit = memberIndex % 8;
     uint8_t mask = (1 << bit);
     ((uint8_t*)self)[byte] &= ~mask;
