@@ -30,6 +30,15 @@ class _PlotUpdater extends Component {
         }
     }
 
+    componentDidUpdate(){
+        // Because _PlotUpdater is a separate
+        // component for now, we need to call
+        // the update method each time the
+        // #cellUpdated message comes through for
+        // this specific component instance.
+        this.componentDidLoad();
+    }
+
     render(){
         return h('div',
             {

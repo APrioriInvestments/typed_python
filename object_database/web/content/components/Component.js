@@ -35,6 +35,8 @@ class Component {
         this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
         this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
         this.componentDidLoad = this.componentDidLoad.bind(this);
+        this.componentDidUpdate = this.componentDidUpdate.bind(this);
+        this.componentWillReceiveProps = this.componentWillReceiveProps.bind(this);
         this.childrenDo = this.childrenDo.bind(this);
         this.namedChildrenDo = this.namedChildrenDo.bind(this);
         this.renderChildNamed = this.renderChildNamed.bind(this);
@@ -79,6 +81,17 @@ class Component {
      */
     componentWillReceiveProps(oldProps, nextProps){
         return nextProps;
+    }
+
+    /**
+     * Lifecycle function that will be called
+     * each time an exsting component is matched
+     * in the CellHandler's #cellUpdated message.
+     * Will only be triggered *after* the initial
+     * load and will happen with each update.
+     */
+    componentDidUpdate(){
+        return null;
     }
 
     /**

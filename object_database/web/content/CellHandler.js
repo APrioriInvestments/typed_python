@@ -273,7 +273,16 @@ class CellHandler {
             component.componentDidLoad();
         });
 
-        this._DOMcleanup()
+        // Otherwise, we likely have an existing
+        // component that has been updated.
+        // We need to call the
+        // componentDidUpdate lifecycle
+        // method on that component in that case.
+        if(component){
+            component.componentDidUpdate();
+        }
+
+        this._DOMcleanup();
 
     }
 
