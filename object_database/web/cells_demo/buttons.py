@@ -18,8 +18,12 @@ from object_database.web.CellsTestPage import CellsTestPage
 
 class SingleButton(CellsTestPage):
     def cell(self):
-        return cells.Button(cells.Octicon("Click"), lambda: None,
-                            small=True, active=True, style="primary")
+        return (
+            cells.Button("Small Active", lambda: None, small=True, active=True, style="primary")
+            + cells.Button("Small Inactive", lambda: None, small=True, active=False, style="primary")
+            + cells.Button("Large Active", lambda: None, small=False, active=True, style="primary")
+            + cells.Button("Large Inactive", lambda: None, small=False, active=False, style="primary")
+        )
 
     def text(self):
         return "You should see some buttons."
