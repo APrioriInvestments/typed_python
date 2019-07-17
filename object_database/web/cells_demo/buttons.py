@@ -16,7 +16,7 @@ from object_database.web import cells as cells
 from object_database.web.CellsTestPage import CellsTestPage
 
 
-class SingleButton(CellsTestPage):
+class SomeButtons(CellsTestPage):
     def cell(self):
         return (
             cells.Button("Small Active", lambda: None, small=True, active=True, style="primary")
@@ -26,4 +26,4 @@ class SingleButton(CellsTestPage):
         )
 
     def text(self):
-        return "You should see some buttons."
+        return "You should see some buttons in various styles."
