@@ -49,18 +49,18 @@ class Button extends Component {
     }
 
     _getEvent(eventName) {
-        return this.props.extraData.events[eventName];
+        return this.props.events[eventName];
     }
 
     _getHTMLClasses(){
         let classes = ['btn'];
-        if(this.props.extraData.active){
-            classes.push('btn-outline');
+        if(this.props.active){
+            classes.push(`btn-outline-${this.props.style}`);
         }
-        if(this.props.extraData.style){
-            classes.push(`btn-${this.props.extraData.style}`);
+        if(this.props.style){
+            classes.push(`btn-${this.props.style}`);
         }
-        if(this.props.extraData.small){
+        if(this.props.small){
             classes.push('btn-xs');
         }
         return classes.join(" ").trim();
