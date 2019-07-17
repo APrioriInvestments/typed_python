@@ -1688,6 +1688,44 @@ class ObjectDatabaseTests:
             r1.stop()
             r1.teardown()
 
+    def test_reactor_with_exception(self):
+        db = self.createNewDb()
+        db.subscribeToSchema(schema)
+
+        with db.transaction():
+            c = Counter(k=0, x=0)
+
+        executed = [0]
+        thrown = [0]
+
+        def incrementor():
+            shouldThrow = False
+
+            with db.transaction():
+                executed[0] += 1
+                if c.x:
+                    thrown[0] += 1
+                    c.x = 0
+                    shouldThrow = True
+
+            assert not shouldThrow
+
+        r1 = Reactor(db, incrementor)
+        r1.start()
+
+        try:
+            for _ in range(10):
+                with db.transaction():
+                    c.x = 1
+
+                self.assertTrue(db.waitForCondition(lambda: c.x == 0, timeout=1.0))
+        finally:
+            r1.stop()
+            r1.teardown()
+
+        self.assertEqual(thrown[0], 10)
+        self.assertGreater(executed[0], thrown[0])
+
     def test_reactor_with_timestamp_lookup(self):
         # check the semantics of 'curTimestampIsAfter'
         t0 = time.time()

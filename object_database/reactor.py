@@ -193,9 +193,22 @@ class Reactor:
     def updateLoop(self):
         try:
             """Update as quickly as possible."""
+            exceptionsInARow = 0
+
             while self._isStarted:
                 self._drainTransactionQueue()
-                _, readKeys, nextWakeup = self._calculate(catchRevisionConflicts=True)
+                try:
+                    _, readKeys, nextWakeup = self._calculate(catchRevisionConflicts=True)
+                    exceptionsInARow = 0
+                except Exception:
+                    exceptionsInARow += 1
+                    logging.error(
+                        "Unexpected exception in Reactor user code (%s occurrences in a row):\n%s",
+                        exceptionsInARow,
+                        traceback.format_exc()
+                    )
+                    time.sleep(0.001 * exceptionsInARow)
+
                 if readKeys is not None:
                     self._blockUntilRecalculate(readKeys, nextWakeup, self.maxSleepTime)
 
