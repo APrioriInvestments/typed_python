@@ -922,20 +922,31 @@ class CardTitle(Cell):
 
 
 class Modal(Cell):
-    def __init__(self, title, message, **buttonActions):
+    def __init__(self, title, message, show=None, **buttonActions):
         """Initialize a modal dialog.
 
         title - string for the title
         message - string for the message body
+        show - A Slot whose value is True if the cell
+               should currently be showing and false if
+               otherwise.
         buttonActions - a dict from string to a button action function.
         """
         super().__init__()
         self.title = Cell.makeCell(title).tagged("title")
         self.message = Cell.makeCell(message).tagged("message")
-        self.buttons = {
-            f"____button_{k}__": Button(k, v).tagged(k)
-            for k, v in buttonActions.items()
-        }
+        if not show:
+            self.show = Slot(False)
+        else:
+            self.show = show
+        self.initButtons(buttonActions)
+
+    def initButtons(self, buttonActions):
+        buttons = [Button(k, v).tagged(k) for k, v in buttonActions.items()]
+        self.buttons = {}
+        for i in range(len(buttons)):
+            button = buttons[i]
+            self.buttons['____button_{}__'.format(i)] = button
 
     def recalculate(self):
         self.children = dict(self.buttons)
@@ -944,6 +955,7 @@ class Modal(Cell):
         self.namedChildren['title'] = self.title
         self.children["____message__"] = self.message
         self.namedChildren['message'] = self.message
+        self.exportData['show'] = self.show.get()
 
 
 class Octicon(Cell):

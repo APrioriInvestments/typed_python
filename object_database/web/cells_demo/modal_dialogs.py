@@ -16,13 +16,33 @@ from object_database.web import cells as cells
 from object_database.web.CellsTestPage import CellsTestPage
 
 
+class BasicModal(CellsTestPage):
+    def cell(self):
+        isShowing = cells.Slot(False)
+
+        def buttonCallback():
+            isShowing.set(not isShowing.get())
+
+        button = cells.Button("Toggle Modal", buttonCallback)
+        modal = cells.Modal(
+            "Basic Modal",
+            cells.Text("Modal Body"),
+            isShowing,
+            Close=buttonCallback
+        )
+        return cells.Card(button + modal)
+
+    def text(self):
+        return "When you click Toggle, you should see a basic modal appear and it should be closable"
+
+
 class ModalDialogBox(CellsTestPage):
     def cell(self):
         slot = cells.Slot("Some Text")
         isEditing = cells.Slot(False)
 
         def makeModal():
-            editSlot = Slot(slot.get())
+            editSlot = cells.Slot(slot.get())
             def onCancel():
                 isEditing.set(False)
             def onOk():
@@ -41,7 +61,7 @@ class ModalDialogBox(CellsTestPage):
                 cells.Subscribed(lambda: slot.get()) +
                 cells.Button("Edit", lambda: isEditing.set(True))
             ) +
-            cells.Subscribed(makeModal()) if isEditing.get() else None
+            (cells.Subscribed(makeModal) if isEditing.get() else None)
         )
 
     def text(self):
