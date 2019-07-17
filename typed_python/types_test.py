@@ -2345,3 +2345,14 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(tupleOfLists.x, [1, 2])
         self.assertEqual(tupleOfLists.y, ['hi', 'hihi'])
         self.assertEqual(tupleOfLists.z, [False, True])
+
+    def test_const_dict_equality_with_python(self):
+        CD = ConstDict(OneOf(int, str), OneOf(int, str))
+
+        someDicts = [{}, {1: 2}, {1: 2, 3: 4}, {"a": 10, "b": "c"}]
+
+        for d1 in someDicts:
+            for d2 in someDicts:
+                self.assertEqual(CD(d1) == CD(d2), d1 == d2)
+                self.assertEqual(CD(d1) == d2, d1 == d2)
+                self.assertEqual(d1 == CD(d2), d1 == d2)

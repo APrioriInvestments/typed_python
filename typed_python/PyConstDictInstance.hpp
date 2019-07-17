@@ -60,6 +60,8 @@ public:
         return true;
     }
 
+    static bool compare_to_python_concrete(ConstDictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
+
     static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
         if (PyDict_Check(pyRepresentation)) {
             dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
