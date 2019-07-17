@@ -903,7 +903,6 @@ class Card(Cell):
             self.children['____header__'] = headerCell
             self.namedChildren['header'] = headerCell
 
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['padding'] = self.padding
 
     def sortsAs(self):
