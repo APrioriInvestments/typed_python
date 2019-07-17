@@ -9,7 +9,10 @@ import {h} from 'maquette';
 class Octicon extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        this.style = "color:" + this.props.color
+        this.style = ""
+        if (this.props.color !== null) {
+            this.style = "color:" + this.props.color
+        }
 
         // Bind context to methods
         this._getHTMLClasses = this._getHTMLClasses.bind(this);

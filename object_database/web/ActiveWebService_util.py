@@ -56,13 +56,13 @@ def view():
     buttons = Sequence([
         Padding(),
         Button(
-            Sequence([Octicon('shield').color('green'), Span('Lock ALL')]),
+            Sequence([Octicon('shield', color='green'), Span('Lock ALL')]),
             lambda: [s.lock() for s in service_schema.Service.lookupAll()]),
         Button(
-            Sequence([Octicon('shield').color('orange'), Span('Prepare ALL')]),
+            Sequence([Octicon('shield', color='orange'), Span('Prepare ALL')]),
             lambda: [s.prepare() for s in service_schema.Service.lookupAll()]),
         Button(
-            Sequence([Octicon('stop').color('red'), Span('Unlock ALL')]),
+            Sequence([Octicon('stop', color='red'), Span('Unlock ALL')]),
             lambda: [s.unlock() for s in service_schema.Service.lookupAll()]),
     ])
     tabs = Tabs(
@@ -163,19 +163,19 @@ def servicesTableDataPrep(s, field, serviceCounts):
         data = (
             Clickable(
                 Sequence(
-                    [Octicon('stop').color('red'), Span('Unlocked')]
+                    [Octicon('stop', color='red'), Span('Unlocked')]
                 ),
                 lambda: s.lock()
             ) if s.isUnlocked else
             Clickable(
                 Sequence(
-                    [Octicon('shield').color('green'), Span('Locked')]
+                    [Octicon('shield', color='green'), Span('Locked')]
                 ),
                 lambda: s.prepare()
             ) if s.isLocked else
             Clickable(
                 Sequence(
-                    [Octicon('shield').color('orange'), Span('Prepared')]
+                    [Octicon('shield', color='orange'), Span('Prepared')]
                 ), lambda: s.unlock()
             )
         )
