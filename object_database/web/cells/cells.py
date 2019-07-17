@@ -958,9 +958,10 @@ class Modal(Cell):
 
 
 class Octicon(Cell):
-    def __init__(self, which):
+    def __init__(self, which, color='black'):
         super().__init__()
         self.whichOcticon = which
+        self.color = color
 
     def sortsAs(self):
         return self.whichOcticon
@@ -968,7 +969,7 @@ class Octicon(Cell):
     def recalculate(self):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
         self.exportData['octiconClasses'] = octiconClasses
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['color'] = self.color
 
 
 class Badge(Cell):
@@ -2062,7 +2063,7 @@ class Table(Cell):
             self.namedChildren['page'] = pageCell
         if self.curPage.get() == "1":
             leftCell = Octicon(
-                "triangle-left").nowrap().color("lightgray")
+                "triangle-left", color="lightgray").nowrap()
             self.children['____left__'] = leftCell
             self.namedChildren['left'] = leftCell
         else:
@@ -2076,7 +2077,7 @@ class Table(Cell):
             self.namedChildren['left'] = leftCell
         if self.curPage.get() == str(totalPages):
             rightCell = Octicon(
-                "triangle-right").nowrap().color("lightgray")
+                "triangle-right", color="lightgray").nowrap()
             self.children['____right__'] = rightCell
             self.namedChildren['right'] = rightCell
         else:
