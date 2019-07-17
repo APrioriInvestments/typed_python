@@ -3,11 +3,13 @@
  */
 
 import {Component} from './Component';
+import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
 class Octicon extends Component {
     constructor(props, ...args){
         super(props, ...args);
+        this.style = "color:" + this.props.color
 
         // Bind context to methods
         this._getHTMLClasses = this._getHTMLClasses.bind(this);
@@ -21,18 +23,30 @@ class Octicon extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Octicon",
                 "aria-hidden": true,
-                style: this.props.extraData.divStyle
+                style: this.style
             })
         );
     }
 
     _getHTMLClasses(){
         let classes = ["cell", "octicon"];
-        this.props.extraData.octiconClasses.forEach(name => {
+        this.props.octiconClasses.forEach(name => {
             classes.push(name);
         });
         return classes.join(" ");
     }
 }
+
+Octicon.propTypes = {
+    octiconClasses: {
+        description: "Octicon css classes, such as 'shield,' 'alert' etc.",
+        type: PropTypes.oneOf([PropTypes.object])
+    },
+    color: {
+        description: "Color of the Octicon",
+        type: PropTypes.oneOf([PropTypes.string])
+    }
+};
+
 
 export {Octicon, Octicon as default};

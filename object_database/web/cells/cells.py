@@ -958,9 +958,10 @@ class Modal(Cell):
 
 
 class Octicon(Cell):
-    def __init__(self, which):
+    def __init__(self, which, color=None):
         super().__init__()
         self.whichOcticon = which
+        self.color = color
 
     def sortsAs(self):
         return self.whichOcticon
@@ -968,7 +969,8 @@ class Octicon(Cell):
     def recalculate(self):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
         self.exportData['octiconClasses'] = octiconClasses
-        self.exportData['divStyle'] = self._divStyle()
+        if self.color is not None:
+            self.exportData['color'] = self.color
 
 
 class Badge(Cell):
