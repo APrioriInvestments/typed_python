@@ -33,17 +33,19 @@ class Modal extends Component {
         this.makeTitle = this.makeTitle.bind(this);
         this.makeMessage = this.makeMessage.bind(this);
         this.makeButtons = this.makeButtons.bind(this);
+        this.makeClasses = this.makeClasses.bind(this);
+        this.makeStyle = this.makeStyle.bind(this);
     }
 
     render(){
         return (
             h('div', {
-                class: "cell modal fade show",
+                class: this.makeClasses(),
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Modal",
                 role: "dialog",
-                style: mainStyle
+                style: this.makeStyle()
             }, [
                 h('div', {role: "document", class: "modal-dialog"}, [
                     h('div', {class: "modal-content"}, [
@@ -62,11 +64,30 @@ class Modal extends Component {
         );
     }
 
+    makeStyle(){
+        // TODO: Move this into some
+        // CSS classes and condition
+        // using makeClasses()
+        if(this.props.extraData.show == true){
+            return this.mainStyle;
+        } else {
+            return "";
+        }
+    }
+
+    makeClasses(){
+        let classes = ["cell", "modal", "fade"];
+        if(this.props.extraData.show == true){
+            classes.push("show");
+        }
+        return classes.join(" ");
+    }
+
     makeButtons(){
         if(this.usesReplacements){
             return this.getReplacementElementsFor('button');
         } else {
-            return this.renderChildrenNamed('buttons')
+            return this.renderChildrenNamed('buttons');
         }
     }
 
