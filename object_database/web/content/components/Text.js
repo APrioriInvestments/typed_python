@@ -3,11 +3,14 @@
  */
 
 import {Component} from './Component';
+import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
 class Text extends Component {
     constructor(props, ...args){
         super(props, ...args);
+
+        this.style = "color:" + this.props.text_color
     }
 
     render(){
@@ -15,12 +18,27 @@ class Text extends Component {
             h('div', {
                 class: "cell",
                 id: this.props.id,
-                style: this.props.extraData.divStyle,
+                style: this.style,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Text"
-            }, [this.props.extraData.rawText])
+            }, [this.props.rawText])
         );
     }
 }
+
+Text.propTypes = {
+    text_color: {
+        description: "Text color.",
+        type: PropTypes.oneOf([PropTypes.string])
+    },
+    rawText: {
+        description: "Basic display text.",
+        type: PropTypes.oneOf([PropTypes.string])
+    },
+    escapedText: {
+        description: "Escaped Text.", //TODO!
+        type: PropTypes.oneOf([PropTypes.string])
+    },
+};
 
 export {Text, Text as default};

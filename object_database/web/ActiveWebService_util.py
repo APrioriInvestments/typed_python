@@ -56,20 +56,20 @@ def view():
     buttons = Sequence([
         Padding(),
         Button(
-            Sequence([Octicon('shield').color('green'), Span('Lock ALL')]),
+            Sequence([Octicon('shield', color='green'), Span('Lock ALL')]),
             lambda: [s.lock() for s in service_schema.Service.lookupAll()]),
         Button(
-            Sequence([Octicon('shield').color('orange'), Span('Prepare ALL')]),
+            Sequence([Octicon('shield', color='orange'), Span('Prepare ALL')]),
             lambda: [s.prepare() for s in service_schema.Service.lookupAll()]),
         Button(
-            Sequence([Octicon('stop').color('red'), Span('Unlock ALL')]),
+            Sequence([Octicon('stop', color='red'), Span('Unlock ALL')]),
             lambda: [s.unlock() for s in service_schema.Service.lookupAll()]),
-    ])
+    ], split="vertical")
     tabs = Tabs(
         Services=servicesTable(),
         Hosts=hostsTable()
     )
-    return Sequence([buttons, tabs])
+    return Sequence([buttons, tabs], split="horizontal")
 
 
 def hostsTable():
@@ -163,19 +163,22 @@ def servicesTableDataPrep(s, field, serviceCounts):
         data = (
             Clickable(
                 Sequence(
-                    [Octicon('stop').color('red'), Span('Unlocked')]
+                    [Octicon('stop', color='red'), Span('Unlocked')],
+                    split="vertical"
                 ),
                 lambda: s.lock()
             ) if s.isUnlocked else
             Clickable(
                 Sequence(
-                    [Octicon('shield').color('green'), Span('Locked')]
+                    [Octicon('shield', color='green'), Span('Locked')],
+                    split="vertical"
                 ),
                 lambda: s.prepare()
             ) if s.isLocked else
             Clickable(
                 Sequence(
-                    [Octicon('shield').color('orange'), Span('Prepared')]
+                    [Octicon('shield', color='orange'), Span('Prepared')],
+                    split="vertical"
                 ), lambda: s.unlock()
             )
         )
