@@ -103,7 +103,7 @@ class CellsTestService(ServiceBase):
         else:
             page = None
             description = ""
-            ed = cells.Card("pick something").height(inputAreaHeight)
+            ed = cells.Card("pick something").height("100%")
 
             def actualDisplay():
                 return cells.Text("nothing to display")
@@ -118,7 +118,7 @@ class CellsTestService(ServiceBase):
 
         inputArea = cells.Card(
             cells.SplitView(
-                [(selectionPanel(page, inputAreaHeight), 1), (ed, 6)]
+                [(selectionPanel(page, inputAreaHeight), 1), (ed, 8)]
             ), padding=2
         ).height(inputAreaHeight)
 
@@ -147,7 +147,8 @@ def selectionPanel(page, height):
                 dict(category=x.category(), name=x.name())),
             makeBold=x is page)
             for perCategory in getPages().values()
-            for x in perCategory.values()]
+            for x in perCategory.values()],
+        split="horizontal"
     )
     return cells.Card(
         cells.SplitView([

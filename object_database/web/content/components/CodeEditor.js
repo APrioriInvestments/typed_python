@@ -11,7 +11,7 @@ class CodeEditor extends Component {
         this.editor = null;
         // used to schedule regular server updates
         this.SERVER_UPDATE_DELAY_MS = 1;
-        this.editorStyle = 'width:100%;height:100%;margin:auto;border:1px solid lightgray;';
+        this.editorStyle = 'width:100%;min-height:100%;margin:auto;border:1px solid lightgray;';
 
         this.setupEditor = this.setupEditor.bind(this);
         this.setupKeybindings = this.setupKeybindings.bind(this);

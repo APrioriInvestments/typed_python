@@ -958,9 +958,10 @@ class Modal(Cell):
 
 
 class Octicon(Cell):
-    def __init__(self, which):
+    def __init__(self, which, color='black'):
         super().__init__()
         self.whichOcticon = which
+        self.color = color
 
     def sortsAs(self):
         return self.whichOcticon
@@ -968,7 +969,7 @@ class Octicon(Cell):
     def recalculate(self):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
         self.exportData['octiconClasses'] = octiconClasses
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['color'] = self.color
 
 
 class Badge(Cell):
@@ -999,7 +1000,6 @@ class CollapsiblePanel(Cell):
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
         self.exportData['isExpanded'] = expanded
-        self.exportData['divStyle'] = self._divStyle()
         self.children = {
             '____content__': self.content
         }
@@ -1010,10 +1010,11 @@ class CollapsiblePanel(Cell):
 
 
 class Text(Cell):
-    def __init__(self, text, sortAs=None):
+    def __init__(self, text, text_color='black', sortAs=None):
         super().__init__()
         self.text = text
         self._sortAs = sortAs if sortAs is not None else text
+        self.text_color = text_color
 
     def sortsAs(self):
         return self._sortAs
@@ -1022,7 +1023,7 @@ class Text(Cell):
         escapedText = html.escape(str(self.text)) if self.text else " "
         self.exportData['escapedText'] = escapedText
         self.exportData['rawText'] = self.text
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['text_color'] = self.text_color
 
 
 class Padding(Cell):
@@ -1043,7 +1044,19 @@ class Span(Cell):
 
 
 class Sequence(Cell):
-    def __init__(self, elements):
+    def __init__(self, elements, split="horizontal", overflow=True):
+        """
+        Parameters:
+        -----------
+        elements: list of cells
+        split: str
+            The split axis of the  view. Can
+            be either 'horizontal' or 'vertical'. Defaults
+            to 'vertical'.
+        overflow: bool
+            Sets overflow-auto on the div.
+
+        """
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
 
@@ -1051,6 +1064,8 @@ class Sequence(Cell):
         self.namedChildren['elements'] = elements
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
+        self.split = split
+        self.overflow = overflow
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1061,7 +1076,8 @@ class Sequence(Cell):
 
     def recalculate(self):
         self.namedChildren['elements'] = self.elements
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['split'] = self.split
+        self.exportData['overflow'] = self.overflow
 
     def sortsAs(self):
         if self.elements:
@@ -2062,7 +2078,7 @@ class Table(Cell):
             self.namedChildren['page'] = pageCell
         if self.curPage.get() == "1":
             leftCell = Octicon(
-                "triangle-left").nowrap().color("lightgray")
+                "triangle-left", color="lightgray").nowrap()
             self.children['____left__'] = leftCell
             self.namedChildren['left'] = leftCell
         else:
@@ -2076,7 +2092,7 @@ class Table(Cell):
             self.namedChildren['left'] = leftCell
         if self.curPage.get() == str(totalPages):
             rightCell = Octicon(
-                "triangle-right").nowrap().color("lightgray")
+                "triangle-right", color="lightgray").nowrap()
             self.children['____right__'] = rightCell
             self.namedChildren['right'] = rightCell
         else:
