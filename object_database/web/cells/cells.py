@@ -1011,10 +1011,11 @@ class CollapsiblePanel(Cell):
 
 
 class Text(Cell):
-    def __init__(self, text, sortAs=None):
+    def __init__(self, text, text_color='black', sortAs=None):
         super().__init__()
         self.text = text
         self._sortAs = sortAs if sortAs is not None else text
+        self.text_color = text_color
 
     def sortsAs(self):
         return self._sortAs
@@ -1023,7 +1024,7 @@ class Text(Cell):
         escapedText = cgi.escape(str(self.text)) if self.text else " "
         self.exportData['escapedText'] = escapedText
         self.exportData['rawText'] = self.text
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['text_color'] = self.text_color
 
 
 class Padding(Cell):
