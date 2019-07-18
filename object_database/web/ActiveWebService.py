@@ -30,7 +30,8 @@ from object_database import ServiceBase, service_schema
 from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin
 from object_database.web.ActiveWebService_util import (
-    Configuration, LoginPlugin, mainBar,
+    Configuration, LoginPlugin,
+    makeMainView,
     displayAndHeadersForPathAndQueryArgs,
     writeJsonMessage,
     readThread
@@ -281,8 +282,8 @@ class ActiveWebService(ServiceBase):
 
     def displayForPathAndQueryArgs(self, path, queryArgs):
         display, toggles = displayAndHeadersForPathAndQueryArgs(path, queryArgs)
-        return mainBar(display, toggles, current_user.username,
-                       self.authorized_groups_text)
+        return makeMainView(display, toggles, current_user.username,
+                            self.authorized_groups_text)
 
     @login_required
     def mainSocket(self, ws, path):

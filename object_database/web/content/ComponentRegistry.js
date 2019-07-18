@@ -49,6 +49,7 @@ import {Plot} from './components/Plot';
 import {_PlotUpdater} from './components/_PlotUpdater';
 import {Timestamp} from './components/Timestamp';
 import {SplitView} from './components/SplitView';
+import {PageView} from './components/PageView';
 
 const ComponentRegistry = {
     AsyncDropdown,
@@ -76,6 +77,7 @@ const ComponentRegistry = {
     Modal,
     Octicon,
     Padding,
+    PageView,
     Popover,
     ResizablePanel,
     RootCell,
