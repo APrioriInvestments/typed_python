@@ -75,33 +75,26 @@
 }
 
 
-* Modals (addition to Bootstrap)
+/* Modals (bypasses Bootstrap implementation)
 * =============================================================*/
-.cell.modal.show {
-    display: block;
-    padding-right: 15px;
-}
 
-[data-cell-type="Modal"] {
-    display: none;
+.modal-cell {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     background-color: rgba(0, 0, 0, 0.0);
-    transition: background-color 0.2s linear;
+    transition: background-color 0.1s linear;
+    z-index: -1;
+    opacity: 0.0;
 }
 
-[data-cell-type="Modal"].show {
+.modal-cell-show {
     display: block;
+    opacity: 1.0;
     background-color: rgba(50, 50, 50, 0.5);
     transition: background-color 0.2s linear;
-}
-
-[data-cell-type="Modal"] .modal-dialog {
-    opacity: 0.01;
-    transform: translateY(-40px);
-    transition: transform 0.2s linear, opacity 0.2s linear;
-}
-
-[data-cell-type="Modal"].show .modal-dialog {
-    opacity: 1.0;
-    transform: translateY(0px);
-    transition: transform: 0.2s linear; opacity 0.2s linear;
+    z-index: 1050;
 }
