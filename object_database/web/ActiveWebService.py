@@ -31,6 +31,7 @@ from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin
 from object_database.web.ActiveWebService_util import (
     Configuration, LoginPlugin, mainBar,
+    makeMainView,
     displayAndHeadersForPathAndQueryArgs,
     writeJsonMessage,
     readThread
@@ -281,7 +282,7 @@ class ActiveWebService(ServiceBase):
 
     def displayForPathAndQueryArgs(self, path, queryArgs):
         display, toggles = displayAndHeadersForPathAndQueryArgs(path, queryArgs)
-        return mainBar(display, toggles, current_user.username,
+        return makeMainView(display, toggles, current_user.username,
                        self.authorized_groups_text)
 
     @login_required

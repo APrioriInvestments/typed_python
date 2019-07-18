@@ -261,7 +261,7 @@ class CellHandler {
         this.cells[message.id] = velement;
 
         // Now wire in replacements
-        this._installReplacements(replacements);
+        this._installReplacements(replacements, message);
 
         if(message.postscript !== undefined){
             this.postscripts.push(message.postscript);
@@ -290,7 +290,7 @@ class CellHandler {
     /**
      * Helper function that install all the replacements into the DOM
      */
-    _installReplacements(replacements) {
+    _installReplacements(replacements, message) {
         Object.keys(replacements).forEach((replacementKey, idx) => {
             let target = document.getElementById(replacementKey);
             let source = null;
