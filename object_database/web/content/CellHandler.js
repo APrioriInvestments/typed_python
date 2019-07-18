@@ -211,6 +211,7 @@ class CellHandler {
         if(this.cells["page_root"] == undefined){
             this.cells["page_root"] = document.getElementById("page_root");
             this.cells["holding_pen"] = document.getElementById("holding_pen");
+            this.cells["modal-area"] = document.getElementById("modal-area");
         }
 
         // With the exception of `page_root` and `holding_pen` id nodes, all
@@ -305,6 +306,16 @@ class CellHandler {
             } else {
                 // Not a new node
                 source = this.cells[replacements[replacementKey]];
+            }
+
+            // If the source is a Modal,
+            // we need to move it to the modal area
+            // and project there.
+            if(source.properties['data-cell-type'] == "Modal"){
+                this.projector.append(this.cells['modal-area'], () => {
+                    return source;
+                });
+                return;
             }
 
             if(target != null){

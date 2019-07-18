@@ -26,7 +26,7 @@ const initialRender = function(){
                  ])
              ])
          ]),
-         h("div", {id: "holding_pen", style: "display:none"}, [])
+        h("div", {id: "holding_pen", style: "display:none"}, [])
      ]);
 };
 
@@ -50,6 +50,9 @@ window.cellHandler = cellHandler;
 /** Render top level component once DOM is ready **/
 document.addEventListener('DOMContentLoaded', () => {
     projector.append(document.body, initialRender);
+    projector.append(document.body, () => {
+        return h('div', {id: 'modal-area'}, []);
+    });
     cellSocket.connect();
     Component.keyListener = new KeyListener();
     window._keyListener = Component.keyListener;
