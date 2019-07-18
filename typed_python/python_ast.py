@@ -63,16 +63,6 @@ Statement = Statement.define(Alternative(
         'col_offset': int,
         'filename': str
     },
-    AsyncFunctionDef={
-        "name": str,
-        "args": Arguments,
-        "body": TupleOf(Statement),
-        "decorator_list": TupleOf(Expr),
-        "returns": OneOf(Expr, None),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
     ClassDef={
         "name": str,
         "bases": TupleOf(Expr),
@@ -106,16 +96,6 @@ Statement = Statement.define(Alternative(
         "target": Expr,
         "op": BinaryOp,
         "value": Expr,
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    AnnAssign={
-        "target": Expr,
-        "annotation": Expr,
-        'simple': int,
-        "value": OneOf(Expr, None),
-        "op": BinaryOp,
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -156,22 +136,6 @@ Statement = Statement.define(Alternative(
     With={
         "items": TupleOf(WithItem),
         "body": TupleOf(Statement),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    AsyncWith={
-        "items": TupleOf(WithItem),
-        "body": TupleOf(Statement),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    AsyncFor={
-        'target': Expr,
-        'iter': Expr,
-        'body': TupleOf(Statement),
-        'orelse': TupleOf(Statement),
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -219,12 +183,6 @@ Statement = Statement.define(Alternative(
         'col_offset': int,
         'filename': str
     },
-    NonLocal={
-        "names": TupleOf(str),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
     Expr={
         "value": Expr,
         'line_number': int,
@@ -242,6 +200,48 @@ Statement = Statement.define(Alternative(
         'filename': str
     },
     Continue={
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    AsyncFunctionDef={
+        "name": str,
+        "args": Arguments,
+        "body": TupleOf(Statement),
+        "decorator_list": TupleOf(Expr),
+        "returns": OneOf(Expr, None),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    AnnAssign={
+        "target": Expr,
+        "annotation": Expr,
+        'simple': int,
+        "value": OneOf(Expr, None),
+        "op": BinaryOp,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    AsyncWith={
+        "items": TupleOf(WithItem),
+        "body": TupleOf(Statement),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    AsyncFor={
+        'target': Expr,
+        'iter': Expr,
+        'body': TupleOf(Statement),
+        'orelse': TupleOf(Statement),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    NonLocal={
+        "names": TupleOf(str),
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -335,18 +335,6 @@ Expr = Expr.define(Alternative(
         'col_offset': int,
         'filename': str
     },
-    YieldFrom={
-        "value": Expr,
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    Await={
-        "value": Expr,
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
     Compare={
         "left": Expr,
         "ops": TupleOf(ComparisonOp),
@@ -359,32 +347,6 @@ Expr = Expr.define(Alternative(
         "func": Expr,
         "args": TupleOf(Expr),
         "keywords": TupleOf(Keyword),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    JoinedStr={
-        "values": TupleOf(Expr),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    Bytes={
-        's': bytes,
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    Constant={
-        'value': OneOf(object, None),
-        'line_number': int,
-        'col_offset': int,
-        'filename': str
-    },
-    FormattedValue={
-        "value": Expr,
-        "conversion": OneOf(int, None),
-        "format_spec": OneOf(Expr, None),
         'line_number': int,
         'col_offset': int,
         'filename': str
@@ -444,6 +406,44 @@ Expr = Expr.define(Alternative(
         'line_number': int,
         'col_offset': int,
         'filename': str
+    },
+    YieldFrom={
+        "value": Expr,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    Await={
+        "value": Expr,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    JoinedStr={
+        "values": TupleOf(Expr),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    Bytes={
+        's': bytes,
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    Constant={
+        'value': OneOf(object, None),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
+    },
+    FormattedValue={
+        "value": Expr,
+        "conversion": OneOf(int, None),
+        "format_spec": OneOf(Expr, None),
+        'line_number': int,
+        'col_offset': int,
+        'filename': str
     }
 ))
 
@@ -490,7 +490,6 @@ BinaryOp = BinaryOp.define(Alternative(
     Add={},
     Sub={},
     Mult={},
-    MatMult={},
     Div={},
     Mod={},
     Pow={},
@@ -499,7 +498,8 @@ BinaryOp = BinaryOp.define(Alternative(
     BitOr={},
     BitXor={},
     BitAnd={},
-    FloorDiv={}
+    FloorDiv={},
+    MatMult={}
 ))
 
 UnaryOp = UnaryOp.define(Alternative(
