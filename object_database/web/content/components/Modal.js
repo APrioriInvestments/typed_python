@@ -27,76 +27,45 @@ import {h} from 'maquette';
 class Modal extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        this.mainStyle = 'display:block;padding-right:15px;';
-        this.modal = null;
 
         // Bind component methods
-        this.makeTitle = this.makeTitle.bind(this);
-        this.makeMessage = this.makeMessage.bind(this);
-        this.makeButtons = this.makeButtons.bind(this);
+        this.makeHeader = this.makeHeader.bind(this);
+        this.makeBody = this.makeBody.bind(this);
+        this.makeFooter = this.makeFooter.bind(this);
         this.makeClasses = this.makeClasses.bind(this);
-        this.makeStyle = this.makeStyle.bind(this);
-    }
-
-    componentDidLoad(){
-        console.log(`Modal component ${this.props.id} loaded`);
-    }
-
-    componentDidUpdate(){
-        console.log(`Modal component ${this.props.id} updated`);
     }
 
     render(){
-        console.log('Modal render with show:');
-        console.log(this.props.extraData.show.toString());
+        console.log(`Rendered modal ${this.props.id} as ${this.props.extraData.show}`);
         return (
             h('div', {
-                class: this.makeClasses(),
                 id: this.props.id,
-                "data-cell-id": this.props.id,
-                "data-cell-type": "Modal",
-                role: "dialog",
-                //tabindex: "-1",
-                style: this.makeStyle()
+                'data-cell-id': this.props.id,
+                'data-cell-type': "Modal",
+                class: this.makeClasses(),
+                tabindex: "-1",
+                role: "dialog"
             }, [
-                h('div', {role: "document", class: "modal-dialog"}, [
+                h('div', {class: "modal-dialog", role: "document"}, [
                     h('div', {class: "modal-content"}, [
-                        h('div', {class: "modal-header"}, [
-                            h('h5', {class: "modal-title"}, [
-                                this.makeTitle()
-                            ])
-                        ]),
-                        h('div', {class: "modal-body"}, [
-                            this.makeMessage()
-                        ]),
-                        h('div', {class: "modal-footer"}, this.makeButtons())
+                        h('div', {class: "modal-header"}, [this.makeHeader()]),
+                        h('div', {class: "modal-body"}, [this.makeBody()]),
+                        h('div', {class: "modal-footer"}, this.makeFooter())
                     ])
                 ])
             ])
         );
     }
 
-    makeStyle(){
-        // TODO: Move this into some
-        // CSS classes and condition
-        // using makeClasses()
-        if(this.props.extraData.show == true){
-            //return this.mainStyle;
-            return "";
-        } else {
-            return "";
-        }
-    }
-
     makeClasses(){
-        let classes = ["cell", "modal"];
-        if(this.props.extraData.show == true){
-            classes.push("show");
+        let classes = ["cell", "modal-cell"];
+        if(this.props.extraData.show){
+            classes.push("modal-cell-show");
         }
         return classes.join(" ");
     }
 
-    makeButtons(){
+    makeFooter(){
         if(this.usesReplacements){
             return this.getReplacementElementsFor('button');
         } else {
@@ -104,7 +73,7 @@ class Modal extends Component {
         }
     }
 
-    makeMessage(){
+    makeBody(){
         if(this.usesReplacements){
             return this.getReplacementElementFor('message');
         } else {
@@ -112,12 +81,24 @@ class Modal extends Component {
         }
     }
 
-    makeTitle(){
+    makeHeader(){
+        var title = null;
         if(this.usesReplacements){
-            return this.getReplacementElementFor('title');
+            title = this.getReplacementElementFor('title');
+            if(title){
+                return h('h5', {class: "modal-title", id: `${this.props.id}-modalTitle`}, [
+                    title
+                ]);
+            }
         } else {
-            return this.renderChildNamed('title');
+            title = this.renderChildNamed('title');
+            if(title){
+                return h('h5', {class: "modal-title", id: `${this.props.id}-modalTitle`}, [
+                    title
+                ]);
+            }
         }
+        return null;
     }
 }
 
