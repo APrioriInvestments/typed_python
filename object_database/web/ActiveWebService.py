@@ -30,7 +30,7 @@ from object_database import ServiceBase, service_schema
 from object_database.web.AuthPlugin import AuthPluginBase, LdapAuthPlugin
 from object_database.web.LoginPlugin import LoginIpPlugin
 from object_database.web.ActiveWebService_util import (
-    Configuration, LoginPlugin, mainBar,
+    Configuration, LoginPlugin,
     makeMainView,
     displayAndHeadersForPathAndQueryArgs,
     writeJsonMessage,
