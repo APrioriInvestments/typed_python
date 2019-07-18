@@ -33,7 +33,6 @@ class Columns extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Columns",
-                style: this.props.extraData.divStyle
             }, [
                 h('div', {class: "row flex-nowrap"}, this.makeInnerChildren())
             ])

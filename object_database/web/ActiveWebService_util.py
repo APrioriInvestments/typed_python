@@ -20,7 +20,7 @@ from object_database.web.ActiveWebServiceSchema import active_webservice_schema
 from object_database.web.cells import (
     Main, Subscribed, Sequence, Traceback, Span, Button, Octicon,
     Padding, Tabs, Table, Clickable, Dropdown, Popover, HeaderBar,
-    LargePendingDownloadDisplay
+    LargePendingDownloadDisplay, PageView
 )
 
 from object_database.web.AuthPlugin import AuthPluginBase
@@ -56,20 +56,20 @@ def view():
     buttons = Sequence([
         Padding(),
         Button(
-            Sequence([Octicon('shield').color('green'), Span('Lock ALL')]),
+            Sequence([Octicon('shield', color='green'), Span('Lock ALL')]),
             lambda: [s.lock() for s in service_schema.Service.lookupAll()]),
         Button(
-            Sequence([Octicon('shield').color('orange'), Span('Prepare ALL')]),
+            Sequence([Octicon('shield', color='orange'), Span('Prepare ALL')]),
             lambda: [s.prepare() for s in service_schema.Service.lookupAll()]),
         Button(
-            Sequence([Octicon('stop').color('red'), Span('Unlock ALL')]),
+            Sequence([Octicon('stop', color='red'), Span('Unlock ALL')]),
             lambda: [s.unlock() for s in service_schema.Service.lookupAll()]),
-    ])
+    ], split="vertical")
     tabs = Tabs(
         Services=servicesTable(),
         Hosts=hostsTable()
     )
-    return Sequence([buttons, tabs])
+    return Sequence([buttons, tabs], split="horizontal")
 
 
 def hostsTable():
@@ -163,19 +163,22 @@ def servicesTableDataPrep(s, field, serviceCounts):
         data = (
             Clickable(
                 Sequence(
-                    [Octicon('stop').color('red'), Span('Unlocked')]
+                    [Octicon('stop', color='red'), Span('Unlocked')],
+                    split="vertical"
                 ),
                 lambda: s.lock()
             ) if s.isUnlocked else
             Clickable(
                 Sequence(
-                    [Octicon('shield').color('green'), Span('Locked')]
+                    [Octicon('shield', color='green'), Span('Locked')],
+                    split="vertical"
                 ),
                 lambda: s.prepare()
             ) if s.isLocked else
             Clickable(
                 Sequence(
-                    [Octicon('shield').color('orange'), Span('Prepared')]
+                    [Octicon('shield', color='orange'), Span('Prepared')],
+                    split="vertical"
                 ), lambda: s.unlock()
             )
         )
@@ -215,38 +218,81 @@ def servicesTableDataPrep(s, field, serviceCounts):
     return data
 
 
-def mainBar(display, toggles, current_username, authorized_groups_text):
-    """Main header bar.
+def makeServiceDropdown(services):
+    """Creates a dropdown menu of available
+    services.
 
-    Parameters:
-    -----------
-    display: serviceDisplay object
-    togges: list of servicesToggles
-    current_username : text
-    authorized_groups_text: text
+    Parameters
+    ----------
+    services ServiceSchema - A collection of services
+
+    Returns
+    -------
+    A Subscribed Cell whose lambda returns
+    a dropdown of service items
     """
+    return [
+        Subscribed(
+            lambda: Dropdown(
+                "Service",
+                [("All", "/services")] +
+                [(s.name, "/services/" + s.name)
+                 for s in sorted(services.Service.lookupAll(),
+                                 key=lambda s:s.name)]
+            ),
+        )
+    ]
 
-    return (
-        HeaderBar(
-            [
-                Subscribed(
-                    lambda: Dropdown(
-                        "Service",
-                        [("All", "/services")] +
-                        [(s.name, "/services/" + s.name)
-                         for s in sorted(service_schema.Service.lookupAll(),
-                                         key=lambda s:s.name)]
-                    ),
-                )
-            ],
-            toggles,
-            [
-                LargePendingDownloadDisplay(),
-                Octicon('person') + Span(current_username),
-                Span('Authorized Groups: {}'.format(authorized_groups_text)),
-                Button(Octicon('sign-out'), '/logout')
-            ]) +
-        Main(display)
+
+def makeMainHeader(toggles, current_username, authorized_groups_text):
+    """Creates the main view's header
+
+    Parameters
+    ----------
+    toggles - A list of serviceToggles
+    current_username str - The name of the current
+              user for display
+    authorized_groups_text str - Text to display
+              about the user's authorized groups
+
+    Returns
+    -------
+    A HeaderBar Cell configured as the main view's header
+    """
+    serviceDropdown = makeServiceDropdown(service_schema)
+    return HeaderBar(
+        serviceDropdown,
+        toggles,
+        [
+            LargePendingDownloadDisplay(),
+            Octicon('person') + Span(current_username),
+            Span('Authorized Groups: {}'.format(authorized_groups_text)),
+            Button(Octicon('sign-out'), '/logout')
+        ]
+    )
+
+
+def makeMainView(display, toggles, current_username, authorized_groups_text):
+    """Creates a PageView configured as the
+    application's primary view with header etc.
+
+    Parameters
+    ----------
+    display Cell - The content Cell that will be displayed in the
+            Main display area of the view
+    toggles list - A list of serviceToggles
+    current_username str - The current user's name
+    authorized_groups_text str - Text about auth groups for user
+
+    Returns
+    -------
+    A configured PageView Cell for use as the application's
+    primary view container, with configured header
+    """
+    header = makeMainHeader(toggles, current_username, authorized_groups_text)
+    return PageView(
+        Main(display),
+        header=header
     )
 
 

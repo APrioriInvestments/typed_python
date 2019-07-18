@@ -903,7 +903,6 @@ class Card(Cell):
             self.children['____header__'] = headerCell
             self.namedChildren['header'] = headerCell
 
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['padding'] = self.padding
 
     def sortsAs(self):
@@ -959,9 +958,10 @@ class Modal(Cell):
 
 
 class Octicon(Cell):
-    def __init__(self, which):
+    def __init__(self, which, color='black'):
         super().__init__()
         self.whichOcticon = which
+        self.color = color
 
     def sortsAs(self):
         return self.whichOcticon
@@ -969,7 +969,7 @@ class Octicon(Cell):
     def recalculate(self):
         octiconClasses = ['octicon', ('octicon-%s' % self.whichOcticon)]
         self.exportData['octiconClasses'] = octiconClasses
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['color'] = self.color
 
 
 class Badge(Cell):
@@ -1000,7 +1000,6 @@ class CollapsiblePanel(Cell):
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
         self.exportData['isExpanded'] = expanded
-        self.exportData['divStyle'] = self._divStyle()
         self.children = {
             '____content__': self.content
         }
@@ -1011,10 +1010,11 @@ class CollapsiblePanel(Cell):
 
 
 class Text(Cell):
-    def __init__(self, text, sortAs=None):
+    def __init__(self, text, text_color='black', sortAs=None):
         super().__init__()
         self.text = text
         self._sortAs = sortAs if sortAs is not None else text
+        self.text_color = text_color
 
     def sortsAs(self):
         return self._sortAs
@@ -1023,7 +1023,7 @@ class Text(Cell):
         escapedText = cgi.escape(str(self.text)) if self.text else " "
         self.exportData['escapedText'] = escapedText
         self.exportData['rawText'] = self.text
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['text_color'] = self.text_color
 
 
 class Padding(Cell):
@@ -1044,7 +1044,19 @@ class Span(Cell):
 
 
 class Sequence(Cell):
-    def __init__(self, elements):
+    def __init__(self, elements, split="horizontal", overflow=True):
+        """
+        Parameters:
+        -----------
+        elements: list of cells
+        split: str
+            The split axis of the  view. Can
+            be either 'horizontal' or 'vertical'. Defaults
+            to 'vertical'.
+        overflow: bool
+            Sets overflow-auto on the div.
+
+        """
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
 
@@ -1052,6 +1064,8 @@ class Sequence(Cell):
         self.namedChildren['elements'] = elements
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
+        self.split = split
+        self.overflow = overflow
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1062,7 +1076,8 @@ class Sequence(Cell):
 
     def recalculate(self):
         self.namedChildren['elements'] = self.elements
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['split'] = self.split
+        self.exportData['overflow'] = self.overflow
 
     def sortsAs(self):
         if self.elements:
@@ -1074,7 +1089,6 @@ class Columns(Cell):
     def __init__(self, *elements):
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
-        self.exportData['divStyle'] = self._divStyle()
 
         self.elements = elements
         self.children = {"____c_%s__" %
@@ -1534,9 +1548,6 @@ class Subscribed(Cell):
 
             self._resetSubscriptionsToViewReads(v)
 
-            # temporary js WS refactoring data
-            self.exportData['divStyle'] = self._divStyle()
-
 
 class SubscribedSequence(Cell):
     # TODO: Get a better idea of what is actually happening
@@ -1609,9 +1620,6 @@ class SubscribedSequence(Cell):
         for i in list(self.existingItems):
             if i not in spineAsSet:
                 del self.existingItems[i]
-
-        # temporary js WS refactoring data
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['asColumns'] = self.asColumns
         self.exportData['numSpineChildren'] = len(self.spine)
 
@@ -1639,7 +1647,6 @@ class Popover(Cell):
         }
 
     def recalculate(self):
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['width'] = self.width
 
     def sortsAs(self):
@@ -2063,7 +2070,7 @@ class Table(Cell):
             self.namedChildren['page'] = pageCell
         if self.curPage.get() == "1":
             leftCell = Octicon(
-                "triangle-left").nowrap().color("lightgray")
+                "triangle-left", color="lightgray").nowrap()
             self.children['____left__'] = leftCell
             self.namedChildren['left'] = leftCell
         else:
@@ -2077,7 +2084,7 @@ class Table(Cell):
             self.namedChildren['left'] = leftCell
         if self.curPage.get() == str(totalPages):
             rightCell = Octicon(
-                "triangle-right").nowrap().color("lightgray")
+                "triangle-right", color="lightgray").nowrap()
             self.children['____right__'] = rightCell
             self.namedChildren['right'] = rightCell
         else:
@@ -2240,8 +2247,6 @@ class Expands(Cell):
             'icon': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
-        self.exportData['divStyle'] = self._divStyle()
-
         # TODO: Refactor this. We shouldn't need to send
         # an inline script!
         self.exportData['events'] = {"onclick": inlineScript}
@@ -2313,7 +2318,6 @@ class CodeEditor(Cell):
         self.children = {}  # Is there ever any children for this Cell type?
 
         # temporary js WS refactoring data
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['initialText'] = self.initialText
         self.exportData['autocomplete'] = self.autocomplete
         self.exportData['noScroll'] = self.noScroll
@@ -2414,7 +2418,6 @@ class Sheet(Cell):
         # Should now be implemented completely
         # in the JS side component.
 
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['columnNames'] = [x for x in self.columnNames]
         self.exportData['rowCount'] = self.rowCount
         self.exportData['columnWidth'] = self.colWidth
@@ -2473,7 +2476,6 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
-        self.exportData['divStyle'] = self._divStyle()
 
     def recalculate(self):
         chartUpdaterCell = Subscribed(lambda: _PlotUpdater(self))

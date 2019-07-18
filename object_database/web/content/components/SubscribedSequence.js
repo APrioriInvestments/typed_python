@@ -33,7 +33,6 @@ class SubscribedSequence extends Component {
         return h('div',
             {
                 class: this.makeClass(),
-                style: this.props.extraData.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "SubscribedSequence"

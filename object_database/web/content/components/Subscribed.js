@@ -30,7 +30,6 @@ class Subscribed extends Component {
         return h('div',
             {
                 class: "cell subscribed",
-                style: this.props.extraData.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Subscribed"
