@@ -69,7 +69,7 @@ def view():
         Services=servicesTable(),
         Hosts=hostsTable()
     )
-    return Sequence([buttons, tabs])
+    return Sequence([buttons, tabs], split="horizontal")
 
 
 def hostsTable():

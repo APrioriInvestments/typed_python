@@ -1045,7 +1045,16 @@ class Span(Cell):
 
 
 class Sequence(Cell):
-    def __init__(self, elements):
+    def __init__(self, elements, split="vertical"):
+        """
+        Parameters:
+        -----------
+        elements: list of cells
+        split: str
+            The split axis of the  view. Can
+            be either 'horizontal' or 'vertical'. Defaults
+            to 'vertical'.
+        """
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
 
@@ -1053,6 +1062,7 @@ class Sequence(Cell):
         self.namedChildren['elements'] = elements
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
+        self.split = split
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1063,7 +1073,7 @@ class Sequence(Cell):
 
     def recalculate(self):
         self.namedChildren['elements'] = self.elements
-        self.exportData['divStyle'] = self._divStyle()
+        self.exportData['split'] = self.split
 
     def sortsAs(self):
         if self.elements:
