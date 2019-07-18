@@ -18,10 +18,17 @@ from object_database.web.CellsTestPage import CellsTestPage
 
 class BasicCollapsiblePanel(CellsTestPage):
     def cell(self):
-        return cells.CollapsiblePanel(
+        isExpanded = cells.Slot(False)
+
+        return cells.Subscribed(
+            lambda: cells.Button(
+                "Close" if isExpanded.get() else "Open",
+                lambda: isExpanded.set(not isExpanded.get())
+            )
+        ) + cells.CollapsiblePanel(
             panel=cells.Card("I am a panel", padding=2),
             content=cells.Card("I am some content"),
-            isExpanded=False
+            isExpanded=lambda: isExpanded.get()
         )
 
     def text(self):
