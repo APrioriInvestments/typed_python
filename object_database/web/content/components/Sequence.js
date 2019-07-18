@@ -52,10 +52,14 @@ class Sequence extends Component {
     makeStyle(){
         // Note: the server side uses "split" (axis) to denote the direction
         let direction = "row";
-        if(this.props.split == "horizontal"){
+        if (this.props.split == "horizontal"){
             direction = "column";
         }
-        return `width:100%;height:100%;display:flex;flex-direction:${direction};`;
+        let overflow = ""
+        if (this.props.overflow) {
+            overflow = "overflow:auto"
+        }
+        return `width:100%;height:100%;display:flex;flex-direction:${direction};${overflow}`;
     }
 }
 
@@ -63,6 +67,10 @@ Sequence.propTypes = {
     split: {
         description: "Horizontal/vertical layout of the children.",
         type: PropTypes.oneOf([PropTypes.string])
+    },
+    overflow: {
+        description: "Overflow-auto.",
+        type: PropTypes.oneOf([PropTypes.boolean])
     }
 };
 

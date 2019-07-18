@@ -1045,7 +1045,7 @@ class Span(Cell):
 
 
 class Sequence(Cell):
-    def __init__(self, elements, split="horizontal"):
+    def __init__(self, elements, split="horizontal", overflow=True):
         """
         Parameters:
         -----------
@@ -1054,6 +1054,9 @@ class Sequence(Cell):
             The split axis of the  view. Can
             be either 'horizontal' or 'vertical'. Defaults
             to 'vertical'.
+        overflow: bool
+            Sets overflow-auto on the div.
+
         """
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
@@ -1063,6 +1066,7 @@ class Sequence(Cell):
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
         self.split = split
+        self.overflow = overflow
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1074,6 +1078,7 @@ class Sequence(Cell):
     def recalculate(self):
         self.namedChildren['elements'] = self.elements
         self.exportData['split'] = self.split
+        self.exportData['overflow'] = self.overflow
 
     def sortsAs(self):
         if self.elements:
