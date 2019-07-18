@@ -214,6 +214,7 @@ def servicesTableDataPrep(s, field, serviceCounts):
         data = ""
     return data
 
+
 def makeServiceDropdown(services):
     """Creates a dropdown menu of available
     services.
@@ -238,6 +239,7 @@ def makeServiceDropdown(services):
             ),
         )
     ]
+
 
 def makeMainHeader(toggles, current_username, authorized_groups_text):
     """Creates the main view's header
@@ -266,6 +268,7 @@ def makeMainHeader(toggles, current_username, authorized_groups_text):
         ]
     )
 
+
 def makeMainView(display, toggles, current_username, authorized_groups_text):
     """Creates a PageView configured as the
     application's primary view with header etc.
@@ -288,7 +291,6 @@ def makeMainView(display, toggles, current_username, authorized_groups_text):
         Main(display),
         header=header
     )
-
 
 
 def displayAndHeadersForPathAndQueryArgs(path, queryArgs):
