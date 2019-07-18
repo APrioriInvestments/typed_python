@@ -73,3 +73,35 @@
 .horizontal-panel > .gutter:hover {
     cursor: ew-resize;
 }
+
+
+* Modals (addition to Bootstrap)
+* =============================================================*/
+.cell.modal.show {
+    display: block;
+    padding-right: 15px;
+}
+
+[data-cell-type="Modal"] {
+    display: none;
+    background-color: rgba(0, 0, 0, 0.0);
+    transition: background-color 0.2s linear;
+}
+
+[data-cell-type="Modal"].show {
+    display: block;
+    background-color: rgba(50, 50, 50, 0.5);
+    transition: background-color 0.2s linear;
+}
+
+[data-cell-type="Modal"] .modal-dialog {
+    opacity: 0.01;
+    transform: translateY(-40px);
+    transition: transform 0.2s linear, opacity 0.2s linear;
+}
+
+[data-cell-type="Modal"].show .modal-dialog {
+    opacity: 1.0;
+    transform: translateY(0px);
+    transition: transform: 0.2s linear; opacity 0.2s linear;
+}

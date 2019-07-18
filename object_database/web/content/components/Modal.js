@@ -28,6 +28,7 @@ class Modal extends Component {
     constructor(props, ...args){
         super(props, ...args);
         this.mainStyle = 'display:block;padding-right:15px;';
+        this.modal = null;
 
         // Bind component methods
         this.makeTitle = this.makeTitle.bind(this);
@@ -37,7 +38,17 @@ class Modal extends Component {
         this.makeStyle = this.makeStyle.bind(this);
     }
 
+    componentDidLoad(){
+        console.log(`Modal component ${this.props.id} loaded`);
+    }
+
+    componentDidUpdate(){
+        console.log(`Modal component ${this.props.id} updated`);
+    }
+
     render(){
+        console.log('Modal render with show:');
+        console.log(this.props.extraData.show.toString());
         return (
             h('div', {
                 class: this.makeClasses(),
@@ -45,6 +56,7 @@ class Modal extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Modal",
                 role: "dialog",
+                //tabindex: "-1",
                 style: this.makeStyle()
             }, [
                 h('div', {role: "document", class: "modal-dialog"}, [
@@ -69,14 +81,15 @@ class Modal extends Component {
         // CSS classes and condition
         // using makeClasses()
         if(this.props.extraData.show == true){
-            return this.mainStyle;
+            //return this.mainStyle;
+            return "";
         } else {
             return "";
         }
     }
 
     makeClasses(){
-        let classes = ["cell", "modal", "fade"];
+        let classes = ["cell", "modal"];
         if(this.props.extraData.show == true){
             classes.push("show");
         }
