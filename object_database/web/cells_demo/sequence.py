@@ -16,21 +16,24 @@ from object_database.web import cells as cells
 from object_database.web.CellsTestPage import CellsTestPage
 
 
-class BasicOcticon(CellsTestPage):
+class VerticalSplitSequence(CellsTestPage):
     def cell(self):
-        return cells.Octicon('shield', color='green')
+        return cells.Sequence(
+            [cells.Text("item 1", text_color="red"),
+             cells.Text("item 2", text_color="blue")]
+        )
 
     def text(self):
-        return "You should see a single octicon."
+        return "You should see a vertically split sequence of text."
 
 
-class MultiOcticon(CellsTestPage):
+class HorizontalSplitSequence(CellsTestPage):
     def cell(self):
-        return cells.Sequence([
-            cells.Octicon('shield', color='green'),
-            cells.Octicon('stop', color='red'),
-            cells.Octicon('alert', color='yellow')
-        ], split="vertical")
+        return cells.Sequence(
+            [cells.Text("item 1", text_color="red"),
+             cells.Text("item 2", text_color="blue")],
+            split="horizontal"
+        )
 
     def text(self):
-        return "You should see a single octicon."
+        return "You should see a horizontally split sequence of text."
