@@ -30,7 +30,7 @@ class MultiOcticon(CellsTestPage):
             cells.Octicon('shield', color='green'),
             cells.Octicon('stop', color='red'),
             cells.Octicon('alert', color='yellow')
-        ])
+        ], split="vertical")
 
     def text(self):
         return "You should see a single octicon."

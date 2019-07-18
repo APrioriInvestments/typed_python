@@ -1045,7 +1045,7 @@ class Span(Cell):
 
 
 class Sequence(Cell):
-    def __init__(self, elements, split="vertical"):
+    def __init__(self, elements, split="horizontal"):
         """
         Parameters:
         -----------
