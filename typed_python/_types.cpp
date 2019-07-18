@@ -31,7 +31,7 @@
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
 #include "direct_types/DirectTypesTest.hpp"
-
+#include "_types.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
     std::vector<Type*> types;
@@ -1491,36 +1491,7 @@ PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
 }
 
 static PyMethodDef module_methods[] = {
-    {"NoneType", (PyCFunction)MakeNoneType, METH_VARARGS, NULL},
-    {"Bool", (PyCFunction)MakeBoolType, METH_VARARGS, NULL},
-    {"Int8", (PyCFunction)MakeInt8Type, METH_VARARGS, NULL},
-    {"Int16", (PyCFunction)MakeInt16Type, METH_VARARGS, NULL},
-    {"Int32", (PyCFunction)MakeInt32Type, METH_VARARGS, NULL},
-    {"Int64", (PyCFunction)MakeInt64Type, METH_VARARGS, NULL},
-    {"UInt8", (PyCFunction)MakeUInt8Type, METH_VARARGS, NULL},
-    {"UInt16", (PyCFunction)MakeUInt16Type, METH_VARARGS, NULL},
-    {"UInt32", (PyCFunction)MakeUInt32Type, METH_VARARGS, NULL},
-    {"UInt64", (PyCFunction)MakeUInt64Type, METH_VARARGS, NULL},
-    {"Float32", (PyCFunction)MakeFloat32Type, METH_VARARGS, NULL},
-    {"Float64", (PyCFunction)MakeFloat64Type, METH_VARARGS, NULL},
-    {"String", (PyCFunction)MakeStringType, METH_VARARGS, NULL},
-    {"Bytes", (PyCFunction)MakeBytesType, METH_VARARGS, NULL},
-    {"TupleOf", (PyCFunction)MakeTupleOfType, METH_VARARGS, NULL},
-    {"PointerTo", (PyCFunction)MakePointerToType, METH_VARARGS, NULL},
-    {"ListOf", (PyCFunction)MakeListOfType, METH_VARARGS, NULL},
-    {"Tuple", (PyCFunction)MakeTupleType, METH_VARARGS, NULL},
-    {"NamedTuple", (PyCFunction)MakeNamedTupleType, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"OneOf", (PyCFunction)MakeOneOfType, METH_VARARGS, NULL},
-    {"Set", (PyCFunction)MakeSetType, METH_VARARGS, NULL},
-    {"Dict", (PyCFunction)MakeDictType, METH_VARARGS, NULL},
-    {"ConstDict", (PyCFunction)MakeConstDictType, METH_VARARGS, NULL},
-    {"Alternative", (PyCFunction)MakeAlternativeType, METH_VARARGS | METH_KEYWORDS, NULL},
-    {"Value", (PyCFunction)MakeValueType, METH_VARARGS, NULL},
-    {"Class", (PyCFunction)MakeClassType, METH_VARARGS, NULL},
-    {"Function", (PyCFunction)MakeFunctionType, METH_VARARGS, NULL},
-    {"BoundMethod", (PyCFunction)MakeBoundMethodType, METH_VARARGS, NULL},
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
-    {"EmbeddedMessage", (PyCFunction)MakeEmbeddedMessageType, METH_VARARGS, NULL},
     {"RenameType", (PyCFunction)RenameType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
@@ -1578,6 +1549,38 @@ PyInit__types(void)
     import_array();
 
     PyObject *module = PyModule_Create(&moduledef);
+
+    PyModule_AddObject(module, "Type", (PyObject*)incref(PyInstance::allTypesBaseType()));
+    PyModule_AddObject(module, "ListOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catListOf)));
+    PyModule_AddObject(module, "NoneType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catNone)));
+    PyModule_AddObject(module, "Bool", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBool)));
+    PyModule_AddObject(module, "Int8", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt8)));
+    PyModule_AddObject(module, "Int16", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt16)));
+    PyModule_AddObject(module, "Int32", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt32)));
+    PyModule_AddObject(module, "Int64", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catInt64)));
+    PyModule_AddObject(module, "UInt8", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt8)));
+    PyModule_AddObject(module, "UInt16", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt16)));
+    PyModule_AddObject(module, "UInt32", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt32)));
+    PyModule_AddObject(module, "UInt64", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catUInt64)));
+    PyModule_AddObject(module, "Float32", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFloat32)));
+    PyModule_AddObject(module, "Float64", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFloat64)));
+    PyModule_AddObject(module, "String", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catString)));
+    PyModule_AddObject(module, "Bytes", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBytes)));
+    PyModule_AddObject(module, "TupleOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTupleOf)));
+    PyModule_AddObject(module, "PointerTo", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPointerTo)));
+    PyModule_AddObject(module, "Tuple", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catTuple)));
+    PyModule_AddObject(module, "NamedTuple", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catNamedTuple)));
+    PyModule_AddObject(module, "OneOf", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catOneOf)));
+    PyModule_AddObject(module, "Set", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catSet)));
+    PyModule_AddObject(module, "Dict", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catDict)));
+    PyModule_AddObject(module, "ConstDict", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catConstDict)));
+    PyModule_AddObject(module, "Alternative", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catAlternative)));
+    PyModule_AddObject(module, "Value", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catValue)));
+    PyModule_AddObject(module, "Class", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catClass)));
+    PyModule_AddObject(module, "Function", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFunction)));
+    PyModule_AddObject(module, "BoundMethod", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBoundMethod)));
+    PyModule_AddObject(module, "EmbeddedMessage", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
+
 
     if (module == NULL)
         return NULL;

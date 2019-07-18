@@ -14,11 +14,8 @@
 
 from types import FunctionType
 
-import typed_python._types as _types
+import typed_python
 import typed_python.inspect_override as inspect
-
-from typed_python._types import NamedTuple, Forward
-
 
 class UndefinedBehaviorException(BaseException):
     """An unsafe operation with known undefined behavior was performed.
@@ -121,7 +118,7 @@ def makeFunction(name, f, firstArgType=None):
     if spec.varkw is not None:
         arg_types.append((spec.varkw, getAnn(spec.varkw), None, False, True))
 
-    return _types.Function(name, return_type, f, tuple(arg_types))
+    return typed_python._types.Function(name, return_type, f, tuple(arg_types))
 
 
 class ClassMetaclass(type):
@@ -134,13 +131,13 @@ class ClassMetaclass(type):
             return type.__new__(cls, name, bases, namespace.ns, **kwds)
 
         members = []
-        bases = [x for x in bases if x is not Class]
+        bases = [x for x in bases if x is not typed_python._types.Class]
         memberFunctions = {}
         staticFunctions = {}
         classMembers = []
         properties = {}
 
-        actualClass = Forward("actualClass")
+        actualClass = typed_python._types.Forward(name)
 
         for eltName, elt in namespace.order:
             if isinstance(elt, Member):
@@ -152,16 +149,16 @@ class ClassMetaclass(type):
                 if eltName not in staticFunctions:
                     staticFunctions[eltName] = makeFunction(eltName, elt.__func__)
                 else:
-                    staticFunctions[eltName] = _types.Function(staticFunctions[eltName], makeFunction(eltName, elt.__func__))
+                    staticFunctions[eltName] = typed_python._types.Function(staticFunctions[eltName], makeFunction(eltName, elt.__func__))
             elif isinstance(elt, FunctionType):
                 if eltName not in memberFunctions:
                     memberFunctions[eltName] = makeFunction(eltName, elt, actualClass)
                 else:
-                    memberFunctions[eltName] = _types.Function(memberFunctions[eltName], makeFunction(eltName, elt, actualClass))
+                    memberFunctions[eltName] = typed_python._types.Function(memberFunctions[eltName], makeFunction(eltName, elt, actualClass))
             else:
                 classMembers.append((eltName, elt))
 
-        actualClass = actualClass.define(_types.Class(
+        actualClass = actualClass.define(typed_python._types.Class(
             name,
             tuple(bases),
             tuple(members),
@@ -172,11 +169,6 @@ class ClassMetaclass(type):
         ))
 
         return actualClass
-
-
-class Class(metaclass=ClassMetaclass):
-    """Base class for all typed python Class objects."""
-    pass
 
 
 def Function(f):
@@ -209,7 +201,7 @@ class FunctionOverload:
         """Do the types in 'argTypes' match our argument typeFilters at a binary level"""
         if len(argTypes) == len(self.args) and not any(x.isStarArg or x.isKwarg for x in self.args):
             for i in range(len(argTypes)):
-                if self.args[i].typeFilter is not None and not _types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i]):
+                if self.args[i].typeFilter is not None and not typed_python._types.isBinaryCompatible(self.args[i].typeFilter, argTypes[i]):
                     return False
 
             return True
@@ -220,7 +212,7 @@ class FunctionOverload:
         return "FunctionOverload(%s->%s, %s)" % (self.functionTypeObject, self.returnType, self.args)
 
     def _installNativePointer(self, fp, returnType, argumentTypes):
-        _types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
+        typed_python._types.installNativeFunctionPointer(self.functionTypeObject, self.index, fp, returnType, tuple(argumentTypes))
 
 
 class DisableCompiledCode:
@@ -228,11 +220,11 @@ class DisableCompiledCode:
         pass
 
     def __enter__(self):
-        _types.disableNativeDispatch()
+        typed_python._types.disableNativeDispatch()
 
     def __exit__(self, *args):
-        _types.enableNativeDispatch()
+        typed_python._types.enableNativeDispatch()
 
 
 def makeNamedTuple(**kwargs):
-    return NamedTuple(**{k: type(v) for k, v in kwargs.items()})(kwargs)
+    return typed_python._types.NamedTuple(**{k: type(v) for k, v in kwargs.items()})(kwargs)

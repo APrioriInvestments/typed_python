@@ -627,7 +627,7 @@ def makeNameConstant(value, **kwds):
     return Expr.Num(n=numericConverters[type(value)](value), **kwds)
 
 
-# map Python AST types to our syntax-tree types (defined above)
+# map Python AST types to our syntax-tree types (defined `ove)
 converters = {
     ast.Module: Module.Module,
     ast.Expression: Module.Expression,

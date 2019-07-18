@@ -12,11 +12,32 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 import unittest
-from typed_python import TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String, \
-    ConstDict, Alternative, Forward
+from typed_python import (
+    ListOf, Set, Dict, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String,
+    ConstDict, Alternative, Forward, Class, PointerTo, Member, Type
+)
 
 
 class TypesMetadataTest(unittest.TestCase):
+    def test_type_relationships(self):
+        assert issubclass(ListOf, Type)
+
+        assert issubclass(ListOf(int), ListOf)
+        assert issubclass(TupleOf(int), TupleOf)
+        assert issubclass(Set(int), Set)
+        assert issubclass(OneOf(int, float), OneOf)
+        assert issubclass(NamedTuple(x=int), NamedTuple)
+        assert issubclass(Tuple(int), Tuple)
+        assert issubclass(Alternative("A", X={}), Alternative)
+        assert issubclass(Dict(int, int), Dict)
+        assert issubclass(ConstDict(int, int), ConstDict)
+        assert issubclass(PointerTo(int), PointerTo)
+
+        class A(Class):
+            pass
+
+        assert issubclass(A, Class)
+
     def test_tupleOf(self):
         self.assertEqual(TupleOf(int), TupleOf(Int64))
         self.assertEqual(TupleOf(int).ElementType, Int64)

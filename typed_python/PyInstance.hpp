@@ -25,6 +25,12 @@ struct NativeTypeWrapper {
     Type* mType;
 };
 
+//extension of PyTypeObject that adds a TypeCategory at the end.
+struct NativeTypeCategoryWrapper {
+    PyTypeObject typeObj;
+    Type::TypeCategory mCategory;
+};
+
 class PyClassInstance;
 class PyHeldClassInstance;
 class PyListOfInstance;
@@ -349,7 +355,12 @@ public:
     //otherwise, this version takes over and returns a PyInstance wrapper for the object
     static PyObject* extractPythonObjectConcrete(Type* eltType, instance_ptr data);
 
+    //the tp_new for actual instances of typed_python Types
     static PyObject *tp_new(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
+
+    //the tp_new_for typed_python categories. These objects represent things like 'ListOf'
+    //and when called produced ListOf(T)
+    static PyObject* tp_new_type(PyTypeObject *subtype, PyObject *args, PyObject *kwds);
 
     static PyObject* nb_rshift(PyObject* lhs, PyObject* rhs);
 
@@ -511,6 +522,11 @@ public:
 
     static PyBufferProcs* bufferProcs();
 
+    static PyObject* getInternalModuleMember(const char* name);
+
+    static PyTypeObject* allTypesBaseType();
+
+    static PyTypeObject* typeCategoryBaseType(Type::TypeCategory category);
     /**
          Maintains a symbol-table and returns a PyTypeObject* for the given Type*
     */

@@ -194,6 +194,45 @@ public:
 
     static char byteCompare(uint8_t* l, uint8_t* r, size_t count);
 
+    static std::string categoryToString(TypeCategory category) {
+        if (category == Type::TypeCategory::catNone) { return "None"; }
+        if (category == Type::TypeCategory::catBool) { return "Bool"; }
+        if (category == Type::TypeCategory::catUInt8) { return "UInt8"; }
+        if (category == Type::TypeCategory::catUInt16) { return "UInt16"; }
+        if (category == Type::TypeCategory::catUInt32) { return "UInt32"; }
+        if (category == Type::TypeCategory::catUInt64) { return "UInt64"; }
+        if (category == Type::TypeCategory::catInt8) { return "Int8"; }
+        if (category == Type::TypeCategory::catInt16) { return "Int16"; }
+        if (category == Type::TypeCategory::catInt32) { return "Int32"; }
+        if (category == Type::TypeCategory::catInt64) { return "Int64"; }
+        if (category == Type::TypeCategory::catString) { return "String"; }
+        if (category == Type::TypeCategory::catBytes) { return "Bytes"; }
+        if (category == Type::TypeCategory::catFloat32) { return "Float32"; }
+        if (category == Type::TypeCategory::catFloat64) { return "Float64"; }
+        if (category == Type::TypeCategory::catValue) { return "Value"; }
+        if (category == Type::TypeCategory::catOneOf) { return "OneOf"; }
+        if (category == Type::TypeCategory::catTupleOf) { return "TupleOf"; }
+        if (category == Type::TypeCategory::catPointerTo) { return "PointerTo"; }
+        if (category == Type::TypeCategory::catListOf) { return "ListOf"; }
+        if (category == Type::TypeCategory::catNamedTuple) { return "NamedTuple"; }
+        if (category == Type::TypeCategory::catTuple) { return "Tuple"; }
+        if (category == Type::TypeCategory::catSet) { return "Set"; }
+        if (category == Type::TypeCategory::catDict) { return "Dict"; }
+        if (category == Type::TypeCategory::catConstDict) { return "ConstDict"; }
+        if (category == Type::TypeCategory::catAlternative) { return "Alternative"; }
+        if (category == Type::TypeCategory::catConcreteAlternative) { return "ConcreteAlternative"; }
+        if (category == Type::TypeCategory::catPythonSubclass) { return "PythonSubclass"; }
+        if (category == Type::TypeCategory::catBoundMethod) { return "BoundMethod"; }
+        if (category == Type::TypeCategory::catClass) { return "Class"; }
+        if (category == Type::TypeCategory::catHeldClass) { return "HeldClass"; }
+        if (category == Type::TypeCategory::catFunction) { return "Function"; }
+        if (category == Type::TypeCategory::catForward) { return "Forward"; }
+        if (category == Type::TypeCategory::catEmbeddedMessage) { return "EmbeddedMessage"; }
+        if (category == Type::TypeCategory::catPythonObjectOfType) { return "PythonObjectOfType"; }
+
+        return "Unknown";
+    }
+
     template<class T>
     auto check(const T& f) -> decltype(f(*this)) {
         switch (m_typeCategory) {
