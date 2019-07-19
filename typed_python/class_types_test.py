@@ -861,3 +861,35 @@ class NativeClassTypesTests(unittest.TestCase):
         # get "BaseA" first.
         self.assertEqual(x.g(), "BaseA")
 
+    def test_multiple_inheritance_with_members_in_both_children_fails(self):
+        class BaseA(Class):
+            x = Member(int)
+
+            def f(self, x: int):
+                return "int"
+
+            def g(self):
+                return "BaseA"
+
+        class BaseB(Class):
+            y = Member(int)
+
+            def f(self, x: float):
+                return "float"
+
+            def g(self):
+                return "BaseB"
+
+        with self.assertRaisesRegex(TypeError, "Can't inherit from multiple base classes that both have members."):
+            class BaseBoth(BaseA, BaseB):
+                pass
+
+    def test_member_order(self):
+        class BaseClass(Class):
+            x = Member(int)
+            y = Member(int)
+
+        class ChildClass(BaseClass):
+            z = Member(int)
+
+        self.assertEqual(ChildClass.MemberNames, ('x', 'y', 'z'))

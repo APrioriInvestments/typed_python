@@ -329,7 +329,7 @@ class NativeTypesTests(unittest.TestCase):
         # when we use types in OneOf, we need to wrap them in Value. Otherwise we can't
         # tell the difference between OneOf(int) and OneOf(Value(int))
         with self.assertRaisesRegex(Exception, "arguments must be types or simple values"):
-            OneOf(Alternative)
+            OneOf(lambda: 10)
 
         X = OneOf(Value(int), Value(Alternative))
 
@@ -722,7 +722,10 @@ class NativeTypesTests(unittest.TestCase):
                     self.assertTrue(f(t1, t2) is f(t(t1), t(t2)))
 
     def test_comparisons_equivalence(self):
-        t = TupleOf(OneOf(None, str, bytes, float, int, bool, TupleOf(int)),)
+        t = TupleOf(OneOf(None, str, bytes, float, int, TupleOf(int), bool),)
+
+        self.assertEqual(t((3,))[0], 3)
+        self.assertEqual(t(((3,),))[0], TupleOf(int)((3,)))
 
         def lt(a, b):
             return a < b
@@ -760,7 +763,7 @@ class NativeTypesTests(unittest.TestCase):
                     for t2 in ts:
                         self.assertTrue(
                             f(t1, t2) is f(t((t1,)), t((t2,))),
-                            (f, t1, t2, f(t1, t2), f(t((t1,)), t((t2,))))
+                            (f, t1, t2, t((t1,)), t((t2,)), f(t1, t2), f(t((t1,)), t((t2,))))
                         )
 
     def test_const_dict(self):

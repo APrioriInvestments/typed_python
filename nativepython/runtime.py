@@ -89,6 +89,8 @@ class Runtime:
                     [i.typeRepresentation for i in input_wrappers]
                 )
 
+                self._collectLinktimeHooks()
+
                 return toSingleType(set([callTarget.output_type.typeRepresentation] if callTarget.output_type is not None else []))
 
             if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
@@ -114,6 +116,20 @@ class Runtime:
                 return self.resultTypes(result, argument_types)
 
             assert False, f
+
+    def _collectLinktimeHooks(self):
+        while True:
+            identityAndCallback = self.converter.popLinktimeHook()
+            if identityAndCallback is None:
+                return
+
+            identity, callback = identityAndCallback
+
+            name = self.converter.identityToName(identity)
+
+            fp = self.llvm_compiler.function_pointer_by_name(name)
+
+            callback(fp)
 
     def compile(self, f, argument_types=None):
         """Compile a single FunctionOverload and install the pointer
@@ -160,6 +176,8 @@ class Runtime:
                     callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
                     [i.typeRepresentation for i in input_wrappers]
                 )
+
+                self._collectLinktimeHooks()
 
                 return targets
 

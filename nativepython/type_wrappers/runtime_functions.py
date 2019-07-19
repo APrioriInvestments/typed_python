@@ -483,6 +483,12 @@ print_string = externalCallTarget(
     Void.pointer()
 )
 
+print_int64 = externalCallTarget(
+    "nativepython_print_int64",
+    Void,
+    Int64
+)
+
 int64_to_string = externalCallTarget(
     "nativepython_int64_to_string",
     Void.pointer(),

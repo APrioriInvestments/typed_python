@@ -157,6 +157,13 @@ void HeldClass::constructor(instance_ptr self) {
 }
 
 void HeldClass::destroy(instance_ptr self) {
+    VTable* vtable = vtableFor(self);
+
+    if (vtable->mType != this) {
+        vtable->mType->destroy(self);
+        return;
+    }
+
     for (long k = (long)m_members.size() - 1; k >= 0; k--) {
         Type* member_t = std::get<1>(m_members[k]);
         if (checkInitializationFlag(self, k)) {

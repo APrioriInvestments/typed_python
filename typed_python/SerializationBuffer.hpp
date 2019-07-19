@@ -266,16 +266,6 @@ public:
         return std::pair<uint32_t, bool>(it->second, false);
     }
 
-    std::pair<uint32_t, bool> cachePointerToType(Type* t) {
-        auto it = m_idToPointerCache.find(t);
-        if (it == m_idToPointerCache.end()) {
-            uint32_t id = m_idToPointerCache.size();
-            m_idToPointerCache[t] = id;
-            return std::pair<uint32_t, bool>(id, true);
-        }
-        return std::pair<uint32_t, bool>(it->second, false);
-    }
-
     void finalize() {
         if (m_wants_compress) {
             compress();

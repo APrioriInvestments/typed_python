@@ -50,12 +50,10 @@ class BoundMethodWrapper(Wrapper):
         )
 
     def convert_call(self, context, left, args, kwargs):
-        clsType = typeWrapper(self.typeRepresentation.FirstArgType)
-        funcType = typeWrapper(self.typeRepresentation.Function)
-
-        return funcType.convert_call(
+        return self.firstArgType.convert_method_call(
             context,
-            context.pushPod(funcType, native_ast.nullExpr),
-            (left.changeType(clsType),) + tuple(args),
+            left.changeType(self.firstArgType),
+            self.typeRepresentation.FuncName,
+            args,
             kwargs
         )

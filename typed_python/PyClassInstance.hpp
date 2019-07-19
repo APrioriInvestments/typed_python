@@ -28,9 +28,11 @@ public:
 
     static int classInstanceSetAttributeFromPyObject(Class* cls, uint8_t* data, PyObject* attrName, PyObject* attrVal);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-        return true;
-    }
+    static bool pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, bool isExplicit);
+
+    static PyObject* extractPythonObjectConcrete(Type* eltType, instance_ptr data);
+
+    static void copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 
     static void constructFromPythonArgumentsConcrete(Class* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 

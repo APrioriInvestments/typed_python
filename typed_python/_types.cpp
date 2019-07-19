@@ -160,9 +160,10 @@ PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
         if (t) {
             types.push_back(t);
         } else {
-            PyErr_SetString(PyExc_TypeError,
-                "Type arguments must be types or simple values (like ints, strings, etc.). "
-                "If you need a more complex value (such as a type object itself), wrap it in 'Value'."
+            PyErr_Format(PyExc_TypeError,
+                "Type arguments must be types or simple values (like ints, strings, etc.), not %S. "
+                "If you need a more complex value (such as a type object itself), wrap it in 'Value'.",
+                (PyObject*)item
             );
 
             return NULL;
@@ -286,6 +287,192 @@ PyObject *getVTablePointer(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong((size_t)((Class*)type)->getHeldClass()->getVTable());
 }
 
+PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"classType", "methodName", "signature", NULL};
+
+    PyObject* pyClassType;
+    const char* methodName;
+    PyObject* pyFuncType;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OsO", (char**)kwlist, &pyClassType, &methodName, &pyFuncType)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* classType = PyInstance::unwrapTypeArgToTypePtr(pyClassType);
+        if (!classType || classType->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'classType' to be a Class");
+        }
+
+        Type* funcType = PyInstance::unwrapTypeArgToTypePtr(pyFuncType);
+        if (!funcType || funcType->getTypeCategory() != Type::TypeCategory::catFunction) {
+            throw std::runtime_error("Expected 'signature' to be a Function");
+        }
+        Function* funcTypeAsFunc = (Function*)funcType;
+        if (funcTypeAsFunc->getOverloads().size() != 1 || !funcTypeAsFunc->isSignature()) {
+            throw std::runtime_error(
+                "Expected 'signature' to be a Function with "
+                "exactly 1 argument and to be a signature only."
+            );
+        }
+
+        size_t dispatchSlot = ((Class*)classType)->getHeldClass()->allocateMethodDispatch(methodName, funcTypeAsFunc);
+
+        return PyLong_FromLong(dispatchSlot);
+    });
+}
+
+PyObject *getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {NULL};
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "", (char**)kwlist)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        auto& needing = ClassDispatchTable::globalPointersNeedingCompile();
+
+        if (needing.size() == 0) {
+            return incref(Py_None);
+        }
+
+        std::pair<ClassDispatchTable*, size_t> dispatchAndSlot = *needing.begin();
+        needing.erase(*needing.begin());
+
+        return PyTuple_Pack(
+            3,
+            PyInstance::typeObj(dispatchAndSlot.first->getInterfaceClass()->getClassType()),
+            PyInstance::typeObj(dispatchAndSlot.first->getImplementingClass()->getClassType()),
+            PyLong_FromLong(dispatchAndSlot.second)
+        );
+    });
+}
+
+PyObject *getClassMethodDispatchSignature(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"interfaceClass", "implementingClass", "slot", NULL};
+
+    PyObject* pyInterfaceClass;
+    PyObject* pyImplementingClass;
+    size_t slot;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOl", (char**)kwlist, &pyInterfaceClass, &pyImplementingClass, &slot)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* interfaceClass = PyInstance::unwrapTypeArgToTypePtr(pyInterfaceClass);
+        Type* implementingClass = PyInstance::unwrapTypeArgToTypePtr(pyImplementingClass);
+
+        if (!interfaceClass || interfaceClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'interfaceClass' to be a Class");
+        }
+
+        if (!implementingClass || implementingClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'implementingClass' to be a Class");
+        }
+
+        HeldClass* heldInterface = ((Class*)interfaceClass)->getHeldClass();
+        HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
+
+        ClassDispatchTable* cdt = heldImplementing->dispatchTableAs(heldInterface);
+
+        method_signature_type sig = cdt->dispatchDefinitionForSlot(slot);
+
+        return PyTuple_Pack(
+            2,
+            PyUnicode_FromString(sig.first.c_str()),
+            PyInstance::typeObj(sig.second)
+        );
+    });
+}
+
+PyObject *installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"interfaceClass", "implementingClass", "slot", "funcPtr", NULL};
+
+    PyObject* pyInterfaceClass;
+    PyObject* pyImplementingClass;
+    size_t slot;
+    size_t funcPtr;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OOll", (char**)kwlist, &pyInterfaceClass, &pyImplementingClass, &slot, &funcPtr)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* interfaceClass = PyInstance::unwrapTypeArgToTypePtr(pyInterfaceClass);
+        Type* implementingClass = PyInstance::unwrapTypeArgToTypePtr(pyImplementingClass);
+
+        if (!interfaceClass || interfaceClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'interfaceClass' to be a Class");
+        }
+
+        if (!implementingClass || implementingClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'implementingClass' to be a Class");
+        }
+
+        HeldClass* heldInterface = ((Class*)interfaceClass)->getHeldClass();
+        HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
+
+        ClassDispatchTable* cdt = heldImplementing->dispatchTableAs(heldInterface);
+
+        cdt->define(slot, (untyped_function_ptr)funcPtr);
+
+        return incref(Py_None);
+    });
+}
+
+PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"instance", NULL};
+
+    PyObject* instance;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &instance)) {
+        return NULL;
+    }
+
+
+    return translateExceptionToPyObject([&]() {
+        Type* actualType = PyInstance::extractTypeFrom((PyTypeObject*)instance->ob_type);
+
+        if (!actualType || actualType->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'instance' to be an instance of a class");
+        }
+
+        return PyLong_FromLong(Class::instanceToDispatchTableIndex(((PyInstance*)instance)->dataPtr()));
+    });
+}
+
+PyObject *installClassDestructor(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"implementingClass", "funcPtr", NULL};
+
+    PyObject* pyImplementingClass;
+    size_t funcPtr;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "Ol", (char**)kwlist, &pyImplementingClass, &funcPtr)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* implementingClass = PyInstance::unwrapTypeArgToTypePtr(pyImplementingClass);
+
+        if (!implementingClass || implementingClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'implementingClass' to be a Class");
+        }
+
+        HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
+
+        heldImplementing->getVTable()->installDestructor((destructor_fun_type)funcPtr);
+
+        return incref(Py_None);
+    });
+}
+
 PyObject *RenameType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2
             || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))
@@ -357,7 +544,7 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
 
 PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2) {
-        PyErr_SetString(PyExc_TypeError, "BoundMetho takes 2");
+        PyErr_SetString(PyExc_TypeError, "BoundMethod takes 2 arguments");
         return NULL;
     }
 
@@ -365,18 +552,17 @@ PyObject *MakeBoundMethodType(PyObject* nullValue, PyObject* args) {
     PyObjectHolder a1(PyTuple_GetItem(args,1));
 
     Type* t0 = PyInstance::unwrapTypeArgToTypePtr(a0);
-    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
 
     if (!t0 || t0->getTypeCategory() != Type::TypeCategory::catClass) {
         PyErr_SetString(PyExc_TypeError, "Expected first argument to be a Class");
         return NULL;
     }
-    if (!t1 || t1->getTypeCategory() != Type::TypeCategory::catFunction) {
-        PyErr_SetString(PyExc_TypeError, "Expected second argument to be a Function");
+    if (!PyUnicode_Check(a1)) {
+        PyErr_SetString(PyExc_TypeError, "Expected second argument to be a string");
         return NULL;
     }
 
-    Type* resType = BoundMethod::Make((Class*)t0, (Function*)t1);
+    Type* resType = BoundMethod::Make((Class*)t0, PyUnicode_AsUTF8(a1));
 
     return incref((PyObject*)PyInstance::typeObj(resType));
 }
@@ -416,8 +602,8 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
         PyObjectHolder funcObj(PyTuple_GetItem(args,2));
         PyObjectHolder argTuple(PyTuple_GetItem(args,3));
 
-        if (!PyFunction_Check(funcObj)) {
-            PyErr_SetString(PyExc_TypeError, "Third arg should be a function.");
+        if (!PyFunction_Check(funcObj) && funcObj != Py_None) {
+            PyErr_SetString(PyExc_TypeError, "Third arg should be a function object or None (for a signature).");
             return NULL;
         }
 
@@ -483,7 +669,6 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
             if (val) {
                 incref(val);
             }
-            incref(funcObj);
 
             argList.push_back(Function::FunctionArg(
                 PyUnicode_AsUTF8(k0),
@@ -494,12 +679,21 @@ PyObject *MakeFunctionType(PyObject* nullValue, PyObject* args) {
                 ));
         }
 
-        std::vector<Function::Overload> overloads;
-        overloads.push_back(
-            Function::Overload((PyFunctionObject*)(PyObject*)funcObj, rType, argList)
-            );
+        if (funcObj != Py_None) {
+            incref(funcObj);
+        }
 
-        resType = new Function(PyUnicode_AsUTF8(nameObj), overloads);
+        std::vector<Function::Overload> overloads;
+
+        overloads.push_back(
+            Function::Overload(
+                (PyFunctionObject*)(funcObj != Py_None ? (PyObject*)funcObj : nullptr),
+                rType,
+                argList
+            )
+        );
+
+        resType = Function::Make(PyUnicode_AsUTF8(nameObj), overloads);
     }
 
     return incref((PyObject*)PyInstance::typeObj(resType));
@@ -678,19 +872,21 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
         clsMembers[mf.first] = mf.second;
     }
 
-    return incref(
-        (PyObject*)PyInstance::typeObj(
-            Class::Make(
-                name,
-                baseClasses,
-                members,
-                memberFuncs,
-                staticFuncs,
-                propertyFuncs,
-                clsMembers
+    return translateExceptionToPyObject([&]() {
+        return incref(
+            (PyObject*)PyInstance::typeObj(
+                Class::Make(
+                    name,
+                    baseClasses,
+                    members,
+                    memberFuncs,
+                    staticFuncs,
+                    propertyFuncs,
+                    clsMembers
+                )
             )
-        )
-    );
+        );
+    });
 }
 
 PyObject *refcount(PyObject* nullValue, PyObject* args) {
@@ -1532,6 +1728,12 @@ static PyMethodDef module_methods[] = {
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
+    {"allocateClassMethodDispatch", (PyCFunction)allocateClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getNextUnlinkedClassMethodDispatch", (PyCFunction)getNextUnlinkedClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getClassMethodDispatchSignature", (PyCFunction)getClassMethodDispatchSignature, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"installClassMethodDispatch", (PyCFunction)installClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"installClassDestructor", (PyCFunction)installClassDestructor, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"classGetDispatchIndex", (PyCFunction)classGetDispatchIndex, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 

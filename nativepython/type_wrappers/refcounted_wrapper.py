@@ -27,18 +27,27 @@ class RefcountedWrapper(Wrapper):
         """Generate code to tear down the object when refcount hits zero."""
         raise NotImplementedError()
 
+    def get_refcount_ptr_expr(self, nonref_expr):
+        """Return a pointer to the object's refcount. Subclasses can override.
+
+        Args:
+            nonref_expr - a native expression equivalent to 'self.nonref_expr'. In most cases
+                this will be the pointer to the actual refcounted data structure.
+        """
+        return nonref_expr.ElementPtrIntegers(0, 0)
+
     def convert_incref(self, context, expr):
         if self.CAN_BE_NULL:
             context.pushEffect(
                 native_ast.Expression.Branch(
                     cond=expr.nonref_expr,
                     false=native_ast.nullExpr,
-                    true=expr.nonref_expr.ElementPtrIntegers(0, 0).atomic_add(1) >> native_ast.nullExpr
+                    true=self.get_refcount_ptr_expr(expr.nonref_expr).atomic_add(1) >> native_ast.nullExpr
                 )
             )
         else:
             context.pushEffect(
-                expr.nonref_expr.ElementPtrIntegers(0, 0).atomic_add(1) >> native_ast.nullExpr
+                self.get_refcount_ptr_expr(expr.nonref_expr).atomic_add(1) >> native_ast.nullExpr
             )
 
     def convert_assign(self, context, expr, other):
@@ -61,7 +70,7 @@ class RefcountedWrapper(Wrapper):
                 false=expr.store(other),
                 true=(
                     expr.store(other) >>
-                    expr.load().ElementPtrIntegers(0, 0).atomic_add(1) >>
+                    self.get_refcount_ptr_expr(expr.load()).atomic_add(1) >>
                     native_ast.nullExpr
                 )
             )
@@ -74,10 +83,10 @@ class RefcountedWrapper(Wrapper):
         if self.CAN_BE_NULL:
             with context.ifelse(targetExpr) as (true, false):
                 with true:
-                    with context.ifelse(targetExpr.ElementPtrIntegers(0, 0).atomic_add(-1).eq(1)) as (subtrue, subfalse):
+                    with context.ifelse(self.get_refcount_ptr_expr(targetExpr).atomic_add(-1).eq(1)) as (subtrue, subfalse):
                         with subtrue:
                             context.pushEffect(self.on_refcount_zero(context, target))
         else:
-            with context.ifelse(targetExpr.ElementPtrIntegers(0, 0).atomic_add(-1).eq(1)) as (subtrue, subfalse):
+            with context.ifelse(self.get_refcount_ptr_expr(targetExpr).atomic_add(-1).eq(1)) as (subtrue, subfalse):
                 with subtrue:
                     context.pushEffect(self.on_refcount_zero(context, target))

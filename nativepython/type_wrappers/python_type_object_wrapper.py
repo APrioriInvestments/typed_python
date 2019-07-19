@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import nativepython
-from typed_python import String, Int64, Bool, Float64
+from typed_python import String, Int64, Bool, Float64, Type
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 
@@ -60,5 +60,9 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     typeRep
                 )
             return res
+
+        if Type in self.typeRepresentation.Value.__bases__:
+            # this is one of the type factories (ListOf, Dict, etc.)
+            return super().convert_call(context, left, args, kwargs)
 
         return typeWrapper(self.typeRepresentation.Value).convert_type_call(context, left, args, kwargs)

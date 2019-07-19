@@ -20,6 +20,51 @@ Class* PyClassInstance::type() {
     return (Class*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
+bool PyClassInstance::pyValCouldBeOfTypeConcrete(Class* type, PyObject* pyRepresentation, bool isExplicit) {
+    Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
+    return argType && ((argType == type) || argType->isSubclassOf(type));
+}
+
+PyObject* PyClassInstance::extractPythonObjectConcrete(Type* eltType, instance_ptr data) {
+    // we need to make sure we always produce python objects with a 0 classDispatchOffset.
+    // the standard 'extractPythonObjectConcrete' assumes you can simply pick the concrete subclass
+    // and copy construct as if the binary layouts were identical. But because we have this
+    // odd multi-vtable thing, we need to ensure we produce the proper classDispatch. Our
+    // standard is that the python layer only ever sees actual proper classes
+    Type* concreteT = eltType->pickConcreteSubclass(data);
+
+    return PyInstance::initialize(concreteT, [&](instance_ptr selfData) {
+        Class::initializeInstance(selfData, Class::instanceToLayout(data), 0)->refcount++;
+    });
+}
+
+void PyClassInstance::copyConstructFromPythonInstanceConcrete(Class* eltType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    Type* argType = extractTypeFrom(pyRepresentation->ob_type);
+
+    if (argType && argType->isSubclassOf(eltType)) {
+        instance_ptr argDataPtr = ((PyInstance*)pyRepresentation)->dataPtr();
+
+        // arg data ptrs here should _always_ have the 0 classDispatchOffset, because
+        // we never allow the python representation of a class to be a subclass.
+        if (Class::instanceToDispatchTableIndex(argDataPtr) != 0) {
+            throw std::runtime_error("Corrupt class instance. Expected a zero classDispatchOffset.");
+        }
+
+        Class* childType = (Class*)argType;
+
+        Class::initializeInstance(
+            tgt,
+            Class::instanceToLayout(argDataPtr),
+            childType->getHeldClass()->getMroIndex(eltType->getHeldClass())
+        )->refcount++;
+
+        return;
+    }
+
+    PyInstance::copyConstructFromPythonInstanceConcrete(eltType, tgt, pyRepresentation, isExplicit);
+}
+
 void PyClassInstance::initializeClassWithDefaultArguments(Class* cls, uint8_t* data, PyObject* args, PyObject* kwargs) {
     if (PyTuple_Size(args)) {
         PyErr_Format(PyExc_TypeError,
@@ -238,9 +283,6 @@ Py_ssize_t PyClassInstance::mp_and_sq_length_concrete() {
     return result;
 }
 
-
-
-
 void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_t* data, PyObject* args, PyObject* kwargs) {
     classT->constructor(data);
 
@@ -315,7 +357,7 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
     {
         auto it = type()->getMemberFunctions().find(attrName);
         if (it != type()->getMemberFunctions().end()) {
-            BoundMethod* bm = BoundMethod::Make(type(), it->second);
+            BoundMethod* bm = BoundMethod::Make(type(), attrName);
 
             return PyInstance::initializePythonRepresentation(bm, [&](instance_ptr data) {
                 bm->copy_constructor(data, dataPtr());

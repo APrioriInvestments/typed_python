@@ -460,6 +460,40 @@ class ExpressionConversionContext(object):
 
         return native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
+    def call_function_pointer(self, funcPtr, args, kwargs, returnType):
+        if kwargs:
+            raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
+
+        # force arguments to a type appropriate for argpassing
+        native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
+
+        if returnType.is_pass_by_ref:
+            nativeFunType = native_ast.Type.Function(
+                output=native_ast.Void,
+                args=[returnType.getNativePassingType()] + [a.expr_type.getNativePassingType() for a in args],
+                varargs=False,
+                can_throw=True
+            )
+
+            return self.push(
+                returnType,
+                lambda output_slot:
+                    native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer()))
+                        .call(output_slot.expr, *native_args)
+            )
+        else:
+            nativeFunType = native_ast.Type.Function(
+                output=returnType.getNativePassingType(),
+                args=[a.expr_type.getNativePassingType() for a in args],
+                varargs=False,
+                can_throw=True
+            )
+
+            return self.pushPod(
+                returnType,
+                native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer())).call(*native_args)
+            )
+
     def call_py_function(self, f, args, kwargs, returnTypeOverload=None):
         if kwargs:
             raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")

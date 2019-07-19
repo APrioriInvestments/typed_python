@@ -113,13 +113,17 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    if (argType && (eltType == argType || argType->isSubclassOf(eltType))) {
-        //it's already the right kind of instance
+    Type::TypeCategory cat = eltType->getTypeCategory();
+
+    if (argType && (eltType == argType || (argType->isSubclassOf(eltType) && cat != Type::TypeCategory::catClass))) {
+        // it's already the right kind of instance. Note that we disallow classes in this
+        // case because when child class C masquerades as class B, it needs to have a different
+        // class dispatch offset encoded in it and we don't want to accidentally allow the wrong
+        // dispatch table to come through here. PyClassInstance is supposed to handle this in the concrete
+        // function below.
         eltType->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
         return;
     }
-
-    Type::TypeCategory cat = eltType->getTypeCategory();
 
     //dispatch to the appropriate Py[]Instance type
     specializeStatic(cat, [&](auto* concrete_null_ptr) {
@@ -130,7 +134,7 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
             tgt,
             pyRepresentation,
             isExplicit
-            );
+        );
     });
 }
 
@@ -190,7 +194,7 @@ PyObject* PyInstance::extractPythonObject(instance_ptr data, Type* eltType) {
             return py_instance_type::extractPythonObjectConcrete(
                 (typename py_instance_type::modeled_type*)eltType,
                 data
-                );
+            );
         });
 
         if (result) {

@@ -73,6 +73,14 @@ def type_to_llvm_type(t):
     if t.matches.Int:
         return llvmlite.ir.IntType(t.bits)
 
+    if t.matches.Function:
+        return llvmlite.ir.FunctionType(
+            type_to_llvm_type(t.output),
+            [type_to_llvm_type(x) for x in t.args],
+            var_arg=t.varargs
+        )
+
+
     assert False, "Can't handle %s yet" % t
 
 
@@ -844,7 +852,7 @@ class FunctionConverter:
                         i = offsets[0].val.val
                         return native_type.element_types[i][1]
                 else:
-                    assert native_type.matches.Pointer
+                    assert native_type.matches.Pointer, f"Can't take element '{offsets[0]}' of {native_type}"
                     return gep_type(native_type.value_type, offsets[1:]).pointer()
 
             return TypedLLVMValue(
@@ -972,10 +980,11 @@ class FunctionConverter:
             else:
                 target = self.convert(target_or_ptr.expr)
 
-                assert target.native_type.matches.Pointer
-                assert target.native_type.value_type.matches.Function
+                assert (target.native_type.matches.Pointer and target.native_type.value_type.matches.Function), \
+                    f"{target.native_type} is not a Function pointer"
 
                 func = target
+
             try:
                 if func.native_type.value_type.can_throw:
                     normal_target = self.builder.append_basic_block()

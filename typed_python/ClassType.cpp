@@ -39,17 +39,17 @@ bool Class::_updateAfterForwardTypesChanged() {
 }
 
 instance_ptr Class::eltPtr(instance_ptr self, int64_t ix) const {
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
     return m_heldClass->eltPtr(l.data, ix);
 }
 
 void Class::setAttribute(instance_ptr self, int64_t ix, instance_ptr elt) const {
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
     m_heldClass->setAttribute(l.data, ix, elt);
 }
 
 bool Class::checkInitializationFlag(instance_ptr self, int64_t ix) const {
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
     return m_heldClass->checkInitializationFlag(l.data, ix);
 }
 
@@ -162,7 +162,7 @@ void Class::repr(instance_ptr self, ReprAccumulator& stream) {
     }
 
 
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
     m_heldClass->repr(l.data, stream);
 }
 
@@ -199,7 +199,7 @@ typed_python_hash_type Class::hash(instance_ptr left) {
         throw std::runtime_error("Found a __hash__ method but failed to call it with 'self'");
     }
 
-    layout& l = **(layout**)left;
+    layout& l = *instanceToLayout(left);
     return m_heldClass->hash(l.data);
 }
 
@@ -208,9 +208,9 @@ void Class::emptyConstructor(instance_ptr self) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }
 
-    *(layout**)self = (layout*)malloc(sizeof(layout) + m_heldClass->bytecount());
+    initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
     l.refcount = 1;
 
     m_heldClass->emptyConstructor(l.data);
@@ -221,41 +221,50 @@ void Class::constructor(instance_ptr self) {
         throw std::runtime_error(m_name + " is not default-constructible");
     }
 
-    *(layout**)self = (layout*)malloc(sizeof(layout) + m_heldClass->bytecount());
+    initializeInstance(self, (layout*)malloc(sizeof(layout) + m_heldClass->bytecount()), 0);
 
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
     l.refcount = 1;
 
     m_heldClass->constructor(l.data);
 }
 
 int64_t Class::refcount(instance_ptr self) {
-    layout& l = **(layout**)self;
-    return l.refcount;
+    return instanceToLayout(self)->refcount;
 }
 
 void Class::destroy(instance_ptr self) {
-    layout& l = **(layout**)self;
+    layout& l = *instanceToLayout(self);
 
     if (l.refcount.fetch_sub(1) == 1) {
         m_heldClass->destroy(l.data);
-        free(*(layout**)self);
+        free(instanceToLayout(self));
     }
 }
 
 void Class::copy_constructor(instance_ptr self, instance_ptr other) {
-    (*(layout**)self) = (*(layout**)other);
-    (*(layout**)self)->refcount++;
+    *(size_t*)self = *(size_t*)other;
+    instanceToLayout(self)->refcount++;
 }
 
 void Class::assign(instance_ptr self, instance_ptr other) {
-    layout* old = (*(layout**)self);
+    layout* old = instanceToLayout(self);
 
-    (*(layout**)self) = (*(layout**)other);
+    // bit-copy the instance, which includes both the classDispatch offset
+    // and also the layout pointer.
+    *(size_t*)self = *(size_t*)other;
 
-    if (*(layout**)self) {
-        (*(layout**)self)->refcount++;
+    instanceToLayout(self)->refcount++;
+
+    if (old->refcount.fetch_sub(1) == 1) {
+        m_heldClass->destroy(old->data);
+        free(old);
     }
+}
 
-    destroy((instance_ptr)&old);
+// static entrypoint to be able to destroy classes by looking up their vtable
+void destroyClassInstance(instance_ptr self) {
+    Class::layout& layout = *Class::instanceToLayout(self);
+
+    HeldClass::vtableFor(layout.data)->mType->destroy((instance_ptr)layout.data);
 }

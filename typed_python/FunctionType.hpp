@@ -65,6 +65,41 @@ public:
             }
         }
 
+        bool operator<(const FunctionArg& other) const {
+            if (m_name < other.m_name) {
+                return true;
+            }
+            if (m_name > other.m_name) {
+                return false;
+            }
+            if (m_typeFilter < other.m_typeFilter) {
+                return true;
+            }
+            if (m_typeFilter > other.m_typeFilter) {
+                return false;
+            }
+            if (m_defaultValue < other.m_defaultValue) {
+                return true;
+            }
+            if (m_defaultValue > other.m_defaultValue) {
+                return false;
+            }
+            if (m_isStarArg < other.m_isStarArg) {
+                return true;
+            }
+            if (m_isStarArg > other.m_isStarArg) {
+                return false;
+            }
+            if (m_isKwarg < other.m_isKwarg) {
+                return true;
+            }
+            if (m_isKwarg > other.m_isKwarg) {
+                return false;
+            }
+
+            return false;
+        }
+
     private:
         std::string m_name;
         Type* m_typeFilter;
@@ -117,7 +152,15 @@ public:
         {
         }
 
+        bool isSignature() const {
+            return mFunctionObj == nullptr;
+        }
+
         PyFunctionObject* getFunctionObj() const {
+            if (!mFunctionObj) {
+                throw std::runtime_error("Cannot access the function object of a function signature.");
+            }
+
             return mFunctionObj;
         }
 
@@ -144,6 +187,10 @@ public:
         }
 
         void addCompiledSpecialization(compiled_code_entrypoint e, Type* returnType, const std::vector<Type*>& argTypes) {
+            if (!mFunctionObj) {
+                throw std::runtime_error("Can't add a compiled specialization to a signature");
+            }
+
             mCompiledSpecializations.push_back(CompiledSpecialization(e,returnType,argTypes));
         }
 
@@ -151,6 +198,19 @@ public:
             //force the memory for the compiled specializations to move.
             std::vector<CompiledSpecialization> other = mCompiledSpecializations;
             std::swap(mCompiledSpecializations, other);
+        }
+
+        bool operator<(const Overload& other) const {
+            if (mFunctionObj < other.mFunctionObj) { return true; }
+            if (mFunctionObj > other.mFunctionObj) { return false; }
+
+            if (mReturnType < other.mReturnType) { return true; }
+            if (mReturnType > other.mReturnType) { return false; }
+
+            if (mArgs < other.mArgs) { return true; }
+            if (mArgs > other.mArgs) { return false; }
+
+            return false;
         }
 
     private:
@@ -248,12 +308,40 @@ public:
         Type(catFunction),
         mOverloads(overloads)
     {
+        int countOfSignatures = 0;
+        for (auto& o: overloads) {
+            if (o.isSignature()) {
+                countOfSignatures++;
+            }
+        }
+
+        if (countOfSignatures != 0 && countOfSignatures != overloads.size()) {
+            throw std::runtime_error("Can't create a FunctionType with some concrete and some signatures.");
+        }
+
         m_name = inName;
         m_is_simple = false;
         m_is_default_constructible = true;
         m_size = 0;
 
         endOfConstructorInitialization(); // finish initializing the type object.
+    }
+
+    static Function* Make(std::string inName, std::vector<Overload>& overloads) {
+        static std::mutex guard;
+
+        std::lock_guard<std::mutex> lock(guard);
+
+        typedef std::pair<const std::string, const std::vector<Overload> > keytype;
+
+        static std::map<keytype, Function*> m;
+
+        auto it = m.find(keytype(inName, overloads));
+        if (it == m.end()) {
+            it = m.insert(std::make_pair(keytype(inName, overloads), new Function(inName, overloads))).first;
+        }
+
+        return it->second;
     }
 
     template<class visitor_type>
@@ -272,7 +360,8 @@ public:
         for (auto o: f2->mOverloads) {
             overloads.push_back(o);
         }
-        return new Function(f1->m_name, overloads);
+
+        return Function::Make(f1->m_name, overloads);
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
@@ -294,11 +383,7 @@ public:
     }
 
     typed_python_hash_type hash(instance_ptr left) {
-        HashAccumulator acc((int)getTypeCategory());
-
-        acc.addRegister((uint64_t)mPyFunc);
-
-        return acc.get();
+        return 1;
     }
 
     void constructor(instance_ptr self) {
@@ -313,8 +398,14 @@ public:
     void assign(instance_ptr self, instance_ptr other) {
     }
 
-    const PyFunctionObject* getPyFunc() const {
-        return mPyFunc;
+    bool isSignature() const {
+        for (auto& s: mOverloads) {
+            if (s.isSignature()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     const std::vector<Overload>& getOverloads() const {
@@ -327,6 +418,10 @@ public:
                     Type* returnType,
                     const std::vector<Type*>& argTypes
                     ) {
+        if (isSignature()) {
+            throw std::runtime_error("Can't add a specialization to a Signature");
+        }
+
         if (whichOverload < 0 || whichOverload >= mOverloads.size()) {
             throw std::runtime_error("Invalid overload index.");
         }
@@ -345,7 +440,6 @@ public:
     }
 
 private:
-    PyFunctionObject* mPyFunc;
     std::vector<Overload> mOverloads;
 };
 

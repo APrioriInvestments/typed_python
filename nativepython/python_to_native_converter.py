@@ -14,10 +14,11 @@
 
 import typed_python.python_ast as python_ast
 import typed_python.ast_util as ast_util
-
+import typed_python._types as _types
 import nativepython
 import nativepython.native_ast as native_ast
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
+from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext
@@ -127,8 +128,21 @@ class PythonToNativeConverter(object):
         self._inflight_function_conversions = {}
         self._new_native_functions = set()
         self._used_names = set()
+        self._linktimeHooks = []
 
         self.verbose = False
+
+    def identityToName(self, identity):
+        """Convert a function identity to the link-time name for the function.
+
+        Args:
+            identity - an identity tuple that uniquely identifies the function
+
+        Returns:
+            name - the linker name of the native function this represents, or None
+                if the identity is unknown
+        """
+        return self._names_for_identifier.get(identity)
 
     def extract_new_function_definitions(self):
         """Return a list of all new function definitions from the last conversion."""
@@ -168,7 +182,17 @@ class PythonToNativeConverter(object):
 
         return FunctionConversionContext(self, identity, pyast.args, body, input_types, output_type, freevars)
 
-    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction):
+    def installLinktimeHook(self, identity, callback):
+        """Call 'callback' with the native function pointer for 'identity' after compilation has finished."""
+        self._linktimeHooks.append((identity, callback))
+
+    def popLinktimeHook(self):
+        if self._linktimeHooks:
+            return self._linktimeHooks.pop()
+        else:
+            return None
+
+    def defineNativeFunction(self, name, identity, input_types, output_type, generatingFunction, callback=None):
         """Define a native function if we haven't defined it before already.
 
             name - the name to actually give the function.
@@ -176,6 +200,8 @@ class PythonToNativeConverter(object):
             input_types - list of Wrapper objects for the incoming types
             output_type - Wrapper object for the output type.
             generatingFunction - a function producing a native_function_definition
+            callback - a function taking a function pointer that gets called after codegen
+                to allow us to install this function pointer.
 
         returns a TypedCallTarget. 'generatingFunction' may call this recursively if it wants.
         """
@@ -193,6 +219,9 @@ class PythonToNativeConverter(object):
         self._inflight_function_conversions[identity] = NativeFunctionConversionContext(self, input_types, output_type, generatingFunction)
 
         self._targets[new_name] = self.getTypedCallTarget(new_name, input_types, output_type)
+
+        if callback is not None:
+            self.installLinktimeHook(identity, callback)
 
         return self._targets[new_name]
 
@@ -238,17 +267,23 @@ class PythonToNativeConverter(object):
 
         return pyast, freevars
 
-    def generateCallConverter(self, callTarget):
-        """Given a call target that's optimized for C-style dispatch, produce a (native) call-target that
-        we can dispatch to from our C extension.
+    def generateCallConverter(self, callTarget: TypedCallTarget):
+        """Given a call target that's optimized for llvm-level dispatch (with individual
+        arguments packed into registers), produce a (native) call-target that
+        we can dispatch to from our C extension, where arguments are packed into
+        an array.
 
-        we are given
+        For instance, we are given
             T f(A1, A2, A3 ...)
         and want to produce
             f(T*, X**)
         where X is the union of A1, A2, etc.
 
-        returns the name of the defined native function
+        Args:
+            callTarget - a TypedCallTarget giving the function we need
+                to generate an alternative entrypoint for
+        Returns:
+            the linker name of the defined native function
         """
         identifier = ("call_converter", callTarget.name)
 
@@ -316,7 +351,40 @@ class PythonToNativeConverter(object):
 
                 self._targets[name] = self.getTypedCallTarget(name, functionConverter._input_types, actual_output_type)
 
+        # when we define an entrypoint to a class, we actually need to compile
+        # a version of that function for every override of that function as well.
+        # typed_python keeps track of all the entries in all class vtables that
+        # need pointers (we generate one dispatch entry for each class that implements
+        # a function that gets triggered in a base class). As we resolve inflight
+        # functions, we trigger compilation on each of the individual instantiations
+        # we receive.
+        while self.compileClassDispatch():
+            repeat = True
+
         return repeat or len(self._inflight_function_conversions) != oldCount
+
+    def compileClassDispatch(self):
+        dispatch = _types.getNextUnlinkedClassMethodDispatch()
+
+        if dispatch is None:
+            return False
+
+        interfaceClass, implementingClass, slotIndex = dispatch
+
+        name, signature = _types.getClassMethodDispatchSignature(interfaceClass, implementingClass, slotIndex)
+
+        # generate a callback that takes the linked function pointer and jams
+        # it into the relevant slot in the vtable once it's produced
+        def installOverload(fp):
+            # print("install fp", fp.fp, "for", name, "in", implementingClass, "masquerading as", interfaceClass, " with ", [s.args for s in signature.overloads])
+            _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
+
+        # we are compiling the function 'name' in 'implementingClass' to be installed when
+        # viewing an instance of 'implementingClass' as 'interfaceClass' that's function
+        # 'name' called with signature 'signature'
+        assert ClassWrapper.compileMethodInstantiation(self, interfaceClass, implementingClass, name, signature, callback=installOverload)
+
+        return True
 
     def _resolveAllInflightFunctions(self):
         passCt = 0
@@ -328,7 +396,7 @@ class PythonToNativeConverter(object):
                     print("    ", c.identity[1].__name__, c.identity[2], "->", c._output_type)
                 raise Exception("Exceed max pass count")
 
-    def convert(self, f, input_types, output_type, assertIsRoot=False):
+    def convert(self, f, input_types, output_type, assertIsRoot=False, callback=None):
         """Convert a single pure python function using args of 'input_types'.
 
         It will return no more than 'output_type'. if output_type is None we produce
@@ -337,6 +405,9 @@ class PythonToNativeConverter(object):
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
         identifier = ("pyfunction", f, input_types, output_type)
+
+        if callback is not None:
+            self.installLinktimeHook(identifier, callback)
 
         if identifier in self._names_for_identifier:
             name = self._names_for_identifier[identifier]

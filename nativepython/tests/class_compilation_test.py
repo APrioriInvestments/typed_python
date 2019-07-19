@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, ListOf, Member
+from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf
 import typed_python._types as _types
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
@@ -32,6 +32,15 @@ class AClass(Class):
     def f(self):
         return self.x + self.y
 
+    def f(self, arg):
+        return self.x + self.y + arg
+
+    def g(self) -> float:
+        return 100
+
+    def add(self, x) -> float:
+        return 100 + x
+
     def loop(self, count: int):
         i = 0
         res = self.y
@@ -41,6 +50,15 @@ class AClass(Class):
 
         return res
 
+class AChildClass(AClass):
+    def g(self) -> float:
+        return 1234
+
+    def add(self, x) -> float:
+        if isinstance(x, int):
+            return 0.2
+
+        return 1234 + x
 
 class AClassWithAnotherClass(Class):
     x = Member(int)
@@ -174,26 +192,55 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(_types.refcount(ac2), 2)
         self.assertEqual(get(anAWithAClass).x, 2)
 
-    def test_call_method(self):
+    def test_call_method_basic(self):
         @Compiled
-        def f(c: AClass):
-            return c.f()
+        def g(c: AClass):
+            return c.g()
 
         c = AClass()
+        c2 = AChildClass()
 
-        self.assertEqual(f(c), c.f())
+        self.assertEqual(g(c), c.g())
+        self.assertEqual(g(c2), c2.g())
+
+    def test_call_method_dispatch_perf(self):
+        @Compiled
+        def addCaller(c: AClass, count: int):
+            res = c.add(1) + c.add(2.5)
+
+            for i in range(count - 1):
+                res += c.add(1) + c.add(2.5)
+
+            return res
+
+        c = AClass()
+        c2 = AChildClass()
+
+        t0 = time.time()
+        addCaller(c, 200 * 1000000)
+        t1 = time.time()
+        addCaller(c2, 200 * 1000000)
+        t2 = time.time()
+
+        elapsed1 = t1 - t0
+        elapsed2 = t2 - t1
+
+        print("Times were ", elapsed1, elapsed2)
+        # they should take the same amount of time. Takes about 1 second for me to
+        # tun this test. Note that we generate two entrypoints (one for float, one for int)
+        self.assertTrue(.5 <= elapsed1 / elapsed2 <= 2.0, elapsed1 / elapsed2)
 
     def test_compile_class_method(self):
         c = AClass(x=20)
 
         t0 = time.time()
-        uncompiled_res = c.loop(100000)
+        uncompiled_res = c.loop(1000000)
         uncompiled_time = time.time() - t0
 
         Runtime.singleton().compile(AClass.loop)
 
         t0 = time.time()
-        compiled_res = c.loop(100000)
+        compiled_res = c.loop(1000000)
         compiled_time = time.time() - t0
 
         speedup = uncompiled_time / compiled_time
@@ -240,3 +287,61 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(callRepr(ClassWithReprAndStr()), "repr")
         self.assertEqual(callStr(ClassWithReprAndStr()), "str")
+
+    def test_compiled_class_subclass_layout(self):
+        class BaseClass(Class):
+            x = Member(int)
+            y = Member(int)
+
+        class ChildClass(BaseClass):
+            z = Member(int)
+
+        def f(x: BaseClass):
+            return x.x + x.y
+
+        fCompiled = Compiled(f)
+
+        c = ChildClass(x=10, y=20, z=30)
+
+        self.assertEqual(fCompiled(c), f(c))
+
+    def test_class_subclass_destructors(self):
+        class BaseClass(Class):
+            pass
+
+        class ChildClass(BaseClass):
+            x = Member(ListOf(int))
+
+        aListOfInt = ListOf(int)()
+
+        aListOfBase = ListOf(BaseClass)()
+        aListOfBase.append(ChildClass(x=aListOfInt))
+
+        self.assertEqual(_types.refcount(aListOfInt), 2)
+
+        aListOfBase.clear()
+
+        self.assertEqual(_types.refcount(aListOfInt), 1)
+
+    def test_class_subclass_destructors_compiled(self):
+        class BaseClass(Class):
+            pass
+
+        class ChildClass(BaseClass):
+            x = Member(ListOf(int))
+
+        aListOfInt = ListOf(int)()
+
+        aListOfBase = ListOf(BaseClass)()
+
+        @SpecializedEntrypoint
+        def clearList(l):
+            l.clear()
+
+        aListOfBase.append(ChildClass(x=aListOfInt))
+
+        self.assertEqual(_types.refcount(aListOfInt), 2)
+
+        clearList(aListOfBase)
+
+        self.assertEqual(_types.refcount(aListOfInt), 1)

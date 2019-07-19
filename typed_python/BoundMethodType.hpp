@@ -21,9 +21,9 @@
 
 class BoundMethod : public Type {
 public:
-    BoundMethod(Type* inFirstArg, Function* inFunc) : Type(TypeCategory::catBoundMethod)
+    BoundMethod(Type* inFirstArg, std::string funcName) : Type(TypeCategory::catBoundMethod)
     {
-        m_function = inFunc;
+        m_funcName = funcName;
         m_is_default_constructible = false;
         m_first_arg = inFirstArg;
         m_size = inFirstArg->bytecount();
@@ -40,9 +40,6 @@ public:
     template<class visitor_type>
     void _visitReferencedTypes(const visitor_type& visitor) {
         visitor(m_first_arg);
-        Type* f = m_function;
-        visitor(f);
-        assert(f == m_function);
     }
 
     bool _updateAfterForwardTypesChanged() {
@@ -52,7 +49,7 @@ public:
         // otherwise, the __name__ attribute of the type gets cut off at the last '.' and
         // looks like a memory corruption issue. It also prevents you from knowing what
         // type you're looking at.
-        std::string name = "BoundMethod(" + m_first_arg->name() + "::" + m_function->name() + ")";
+        std::string name = "BoundMethod(" + m_first_arg->name() + ", " + m_funcName + ")";
         size_t size = m_first_arg->bytecount();
 
         anyChanged = (
@@ -66,21 +63,21 @@ public:
         return anyChanged;
     }
 
-    static BoundMethod* Make(Type* c, Function* f) {
+    static BoundMethod* Make(Type* c, std::string funcName) {
         static std::mutex guard;
 
         std::lock_guard<std::mutex> lock(guard);
 
-        typedef std::pair<Type*, Function*> keytype;
+        typedef std::pair<Type*, std::string> keytype;
 
         static std::map<keytype, BoundMethod*> m;
 
-        auto it = m.find(keytype(c,f));
+        auto it = m.find(keytype(c, funcName));
 
         if (it == m.end()) {
             it = m.insert(
-                std::make_pair(keytype(c,f), new BoundMethod(c, f))
-                ).first;
+                std::make_pair(keytype(c, funcName), new BoundMethod(c, funcName))
+            ).first;
         }
 
         return it->second;
@@ -105,7 +102,7 @@ public:
     }
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
-        return m_first_arg->cmp(left,right,pyComparisonOp, suppressExceptions);
+        return m_first_arg->cmp(left, right, pyComparisonOp, suppressExceptions);
     }
 
     void constructor(instance_ptr self) {
@@ -128,12 +125,47 @@ public:
         return m_first_arg;
     }
 
+    std::string getFuncName() const {
+        return m_funcName;
+    }
+
     Function* getFunction() const {
-        return m_function;
+        if (m_first_arg->getTypeCategory() == Type::TypeCategory::catClass) {
+            Class* c = (Class*)m_first_arg;
+
+            auto it = c->getMemberFunctions().find(m_funcName);
+
+            if (it != c->getMemberFunctions().end()) {
+                return it->second;
+            }
+
+            return nullptr;
+        }
+
+        if (m_first_arg->getTypeCategory() == Type::TypeCategory::catAlternative ||
+                m_first_arg->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            Alternative* a;
+
+            if (m_first_arg->getTypeCategory() == Type::TypeCategory::catAlternative) {
+                a = (Alternative*)m_first_arg;
+            } else {
+                a = ((ConcreteAlternative*)m_first_arg)->getAlternative();
+            }
+
+            auto it = a->getMethods().find(m_funcName);
+
+            if (it != a->getMethods().end()) {
+                return it->second;
+            }
+
+            return nullptr;
+        }
+
+        return nullptr;
     }
 
 private:
-    Function* m_function;
+    std::string m_funcName;
     Type* m_first_arg;
 };
 
