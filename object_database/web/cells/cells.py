@@ -1549,9 +1549,6 @@ class Subscribed(Cell):
 
             self._resetSubscriptionsToViewReads(v)
 
-            # temporary js WS refactoring data
-            self.exportData['divStyle'] = self._divStyle()
-
 
 class SubscribedSequence(Cell):
     # TODO: Get a better idea of what is actually happening
@@ -1624,9 +1621,6 @@ class SubscribedSequence(Cell):
         for i in list(self.existingItems):
             if i not in spineAsSet:
                 del self.existingItems[i]
-
-        # temporary js WS refactoring data
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['asColumns'] = self.asColumns
         self.exportData['numSpineChildren'] = len(self.spine)
 
