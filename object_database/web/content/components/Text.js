@@ -9,8 +9,7 @@ import {h} from 'maquette';
 class Text extends Component {
     constructor(props, ...args){
         super(props, ...args);
-
-        this.style = "color:" + this.props.text_color
+        this.style = "color:" + this.props.textColor;
     }
 
     render(){
@@ -27,7 +26,7 @@ class Text extends Component {
 }
 
 Text.propTypes = {
-    text_color: {
+    textColor: {
         description: "Text color.",
         type: PropTypes.oneOf([PropTypes.string])
     },
