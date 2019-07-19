@@ -58,7 +58,6 @@ class CollapsiblePanel extends Component {
                     "data-cell-type": "CollapsiblePanel",
                     "data-expanded": false,
                     id: this.props.id,
-                    style: this.props.extraData.divStyle
                 }, [this.makeContent()])
             );
         }

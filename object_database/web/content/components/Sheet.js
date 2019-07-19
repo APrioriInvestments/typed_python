@@ -65,7 +65,6 @@ class Sheet extends Component {
             }, [
                 h('div', {
                     id: `sheet${this.props.id}`,
-                    style: this.props.extraData.divStyle,
                     class: "handsontable"
                 }, [this.makeError()])
             ])
