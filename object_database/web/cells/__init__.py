@@ -58,6 +58,7 @@ from object_database.web.cells.cells import (
     AsyncDropdown,
     CircleLoader,
     Timestamp,
+    HorizontalSequence
 )
 
 from object_database.web.cells.views.split_view import SplitView

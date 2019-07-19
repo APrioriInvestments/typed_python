@@ -20,7 +20,8 @@ from object_database.web.ActiveWebServiceSchema import active_webservice_schema
 from object_database.web.cells import (
     Main, Subscribed, Sequence, Traceback, Span, Button, Octicon,
     Padding, Tabs, Table, Clickable, Dropdown, Popover, HeaderBar,
-    LargePendingDownloadDisplay, PageView
+    LargePendingDownloadDisplay, PageView,
+    HorizontalSequence
 )
 
 from object_database.web.AuthPlugin import AuthPluginBase
@@ -53,23 +54,25 @@ class Configuration:
 
 
 def view():
-    buttons = Sequence([
+    buttons = HorizontalSequence([
         Padding(),
         Button(
-            Sequence([Octicon('shield', color='green'), Span('Lock ALL')]),
+            HorizontalSequence([Octicon('shield', color='green'), Span('Lock ALL')]),
             lambda: [s.lock() for s in service_schema.Service.lookupAll()]),
+        Padding(),
         Button(
-            Sequence([Octicon('shield', color='orange'), Span('Prepare ALL')]),
+            HorizontalSequence([Octicon('shield', color='orange'), Span('Prepare ALL')]),
             lambda: [s.prepare() for s in service_schema.Service.lookupAll()]),
+        Padding(),
         Button(
-            Sequence([Octicon('stop', color='red'), Span('Unlock ALL')]),
+            HorizontalSequence([Octicon('stop', color='red'), Span('Unlock ALL')]),
             lambda: [s.unlock() for s in service_schema.Service.lookupAll()]),
-    ], split="vertical")
+    ])
     tabs = Tabs(
         Services=servicesTable(),
         Hosts=hostsTable()
     )
-    return Sequence([buttons, tabs], split="horizontal")
+    return Sequence([buttons, tabs])
 
 
 def hostsTable():
@@ -162,23 +165,20 @@ def servicesTableDataPrep(s, field, serviceCounts):
     elif field == 'Codebase Status':
         data = (
             Clickable(
-                Sequence(
-                    [Octicon('stop', color='red'), Span('Unlocked')],
-                    split="vertical"
+                HorizontalSequence(
+                    [Octicon('stop', color='red'), Span('Unlocked')]
                 ),
                 lambda: s.lock()
             ) if s.isUnlocked else
             Clickable(
-                Sequence(
-                    [Octicon('shield', color='green'), Span('Locked')],
-                    split="vertical"
+                HorizontalSequence(
+                    [Octicon('shield', color='green'), Span('Locked')]
                 ),
                 lambda: s.prepare()
             ) if s.isLocked else
             Clickable(
-                Sequence(
-                    [Octicon('shield', color='orange'), Span('Prepared')],
-                    split="vertical"
+                HorizontalSequence(
+                    [Octicon('shield', color='orange'), Span('Prepared')]
                 ), lambda: s.unlock()
             )
         )
@@ -265,7 +265,7 @@ def makeMainHeader(toggles, current_username, authorized_groups_text):
         toggles,
         [
             LargePendingDownloadDisplay(),
-            Octicon('person') + Span(current_username),
+            Octicon('person') >> Span(current_username),
             Span('Authorized Groups: {}'.format(authorized_groups_text)),
             Button(Octicon('sign-out'), '/logout')
         ]
