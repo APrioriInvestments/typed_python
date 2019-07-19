@@ -1648,7 +1648,6 @@ class Popover(Cell):
         }
 
     def recalculate(self):
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['width'] = self.width
 
     def sortsAs(self):
@@ -2249,8 +2248,6 @@ class Expands(Cell):
             'icon': self.openedIcon if self.isExpanded else self.closedIcon
         }
 
-        self.exportData['divStyle'] = self._divStyle()
-
         # TODO: Refactor this. We shouldn't need to send
         # an inline script!
         self.exportData['events'] = {"onclick": inlineScript}
@@ -2322,7 +2319,6 @@ class CodeEditor(Cell):
         self.children = {}  # Is there ever any children for this Cell type?
 
         # temporary js WS refactoring data
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['initialText'] = self.initialText
         self.exportData['autocomplete'] = self.autocomplete
         self.exportData['noScroll'] = self.noScroll
@@ -2423,7 +2419,6 @@ class Sheet(Cell):
         # Should now be implemented completely
         # in the JS side component.
 
-        self.exportData['divStyle'] = self._divStyle()
         self.exportData['columnNames'] = [x for x in self.columnNames]
         self.exportData['rowCount'] = self.rowCount
         self.exportData['columnWidth'] = self.colWidth
@@ -2482,7 +2477,6 @@ class Plot(Cell):
         self.namedDataSubscriptions = namedDataSubscriptions
         self.curXYRanges = xySlot or Slot(None)
         self.error = Slot(None)
-        self.exportData['divStyle'] = self._divStyle()
 
     def recalculate(self):
         chartUpdaterCell = Subscribed(lambda: _PlotUpdater(self))

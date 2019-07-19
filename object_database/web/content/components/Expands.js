@@ -48,7 +48,6 @@ class Expands extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Expands",
-                style: this.props.extraData.divStyle
             },
                 [
                     h('div', {

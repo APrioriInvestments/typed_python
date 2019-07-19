@@ -42,7 +42,7 @@ class Plot extends Component {
                 "data-cell-type": "Plot",
                 class: "cell"
             }, [
-                h('div', {id: `plot${this.props.id}`, style: this.props.extraData.divStyle}),
+                h('div', {id: `plot${this.props.id}`}),
                 this.makeChartUpdater(),
                 this.makeError()
             ])

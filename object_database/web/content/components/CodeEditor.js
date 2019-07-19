@@ -65,11 +65,10 @@ class CodeEditor extends Component {
     render(){
         return h('div',
             {
-                class: "cell",
-                style: this.props.extraData.divStyle,
+                class: "cell h-100",
                 id: this.props.id,
                 "data-cell-id": this.props.id,
-                "data-cell-type": "CodeEditor"
+                "data-cell-type": "CodeEditor",
             },
             [h('div', { id: "editor" + this.props.id, style: this.editorStyle }, [])
         ]);
