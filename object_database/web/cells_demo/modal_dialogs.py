@@ -36,33 +36,24 @@ class BasicModal(CellsTestPage):
         return "When you click Toggle, you should see a basic modal appear and it should be closable"
 
 
-class ModalDialogBox(CellsTestPage):
+class ModalWithUpdateField(CellsTestPage):
     def cell(self):
-        slot = cells.Slot("Some Text")
-        isEditing = cells.Slot(False)
+        isShowing = cells.Slot(False)
+        sharedContent = cells.Slot("Some Text")
 
-        def makeModal():
-            editSlot = cells.Slot(slot.get())
-            def onCancel():
-                isEditing.set(False)
-            def onOk():
-                slot.set(editSlot.get())
+        def buttonCallback():
+            isShowing.set(not isShowing.get())
 
-            return cells.Modal(
-                "A Modal",
-                cells.SingleLineTextBox(editSlot),
-                Cancel=onCancel,
-                OK=onOk
-            )
-
-        return (
-            cells.Card(
-                cells.Text("Here is some text: you should be able to click a button to edit it in a modal.") +
-                cells.Subscribed(lambda: slot.get()) +
-                cells.Button("Edit", lambda: isEditing.set(True))
-            ) +
-            (cells.Subscribed(makeModal) if isEditing.get() else None)
+        button = cells.Button("Open Modal", buttonCallback)
+        textDisplay = cells.Subscribed(lambda: cells.Text(sharedContent.get()))
+        modal = cells.Modal(
+            "Text Updater",
+            cells.SingleLineTextBox(sharedContent),
+            show=isShowing,
+            Close=buttonCallback
         )
+        return cells.Card(
+            button + textDisplay + modal)
 
     def text(self):
         return "You should see a button that lets you edit the 'Some Text' text in a modal popup."
