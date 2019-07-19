@@ -34,18 +34,17 @@ class CollapsiblePanel extends Component {
         if(this.props.extraData.isExpanded){
             return(
                 h('div', {
-                    class: "cell container-fluid",
+                    class: "cell d-flex",
                     "data-cell-id": this.props.id,
                     "data-cell-type": "CollapsiblePanel",
                     "data-expanded": true,
                     id: this.props.id,
-                    style: this.props.extraData.divStyle
                 }, [
                     h('div', {class: "row flex-nowrap no-gutters"}, [
-                        h('div', {class: "col-md-auto"},[
+                        h('div', {class: "col-md-auto", style: "flex-grow:1"},[
                             this.makePanel()
                         ]),
-                        h('div', {class: "col-sm"}, [
+                        h('div', {class: "col-sm", style: "flex-grow:5"}, [
                             this.makeContent()
                         ])
                     ])

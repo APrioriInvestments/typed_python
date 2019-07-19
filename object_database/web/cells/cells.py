@@ -1000,7 +1000,6 @@ class CollapsiblePanel(Cell):
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
         self.exportData['isExpanded'] = expanded
-        self.exportData['divStyle'] = self._divStyle()
         self.children = {
             '____content__': self.content
         }
