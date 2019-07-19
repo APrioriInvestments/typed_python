@@ -855,7 +855,7 @@ class Cell:
     @staticmethod
     def makeCell(x):
         if isinstance(x, (str, float, int, bool)):
-            return Text(str(x), x)
+            return Text(str(x), sortAs=x)
         if x is None:
             return Span("")
         if isinstance(x, Cell):
@@ -1010,7 +1010,7 @@ class CollapsiblePanel(Cell):
 
 
 class Text(Cell):
-    def __init__(self, text, text_color='black', sortAs=None):
+    def __init__(self, text, text_color=None, sortAs=None):
         super().__init__()
         self.text = text
         self._sortAs = sortAs if sortAs is not None else text
@@ -1023,7 +1023,7 @@ class Text(Cell):
         escapedText = html.escape(str(self.text)) if self.text else " "
         self.exportData['escapedText'] = escapedText
         self.exportData['rawText'] = self.text
-        self.exportData['text_color'] = self.text_color
+        self.exportData['textColor'] = self.text_color
 
 
 class Padding(Cell):
