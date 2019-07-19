@@ -55,7 +55,8 @@ class SubprocessServiceManager(ServiceManager):
                  sourceDir, storageDir, authToken,
                  isMaster, maxGbRam=4, maxCores=4, logfileDirectory=None,
                  shutdownTimeout=None, logLevelName="INFO",
-                 metricUpdateInterval=2.0
+                 metricUpdateInterval=2.0,
+                 start_new_session=False
                  ):
         self.cleanupLock = threading.Lock()
         self.host = host
@@ -64,6 +65,7 @@ class SubprocessServiceManager(ServiceManager):
         self.authToken = authToken
         self.logfileDirectory = logfileDirectory
         self.logLevelName = validateLogLevel(logLevelName, fallback='INFO')
+        self.start_new_session = start_new_session
 
         self.lock = threading.Lock()
 
@@ -116,12 +118,14 @@ class SubprocessServiceManager(ServiceManager):
                         os.path.join(self.sourceDir, str(instanceIdentity)),
                         os.path.join(self.storageDir, str(instanceIdentity)),
                         self.authToken,
-                        '--log-level', self.logLevelName
+                        '--log-level',
+                        self.logLevelName
                     ],
                     cwd=self.storageDir,
                     stdin=subprocess.DEVNULL,
                     stdout=output_file,
-                    stderr=subprocess.STDOUT
+                    stderr=subprocess.STDOUT,
+                    start_new_session=self.start_new_session
                 )
                 self._logger.info(
                     f"Started service_entrypoint.py subprocess with PID={process.pid}"
