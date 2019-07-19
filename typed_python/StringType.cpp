@@ -814,3 +814,101 @@ void StringType::assign(instance_ptr self, instance_ptr other) {
 
     destroy((instance_ptr)&old);
 }
+
+#define max(a,b) a < b ? b : a;
+
+void StringType::join(StringType::layout **outString, StringType::layout *separator, ListOfType::layout *toJoin) {
+
+    if (!outString)
+        throw std::invalid_argument("missing return argument");
+
+    StringType::Make()->constructor((instance_ptr)outString);
+
+    // return empty string when there is nothing to join
+    if(toJoin->count == 0)
+    {
+        return;
+    }
+
+    static ListOfType *listOfStrType = ListOfType::Make(StringType::Make());
+
+    // find the max code point
+    int32_t maxCodePoint = 0;
+
+    // separator can be an empty string, then it's a nullptr
+    if (separator != nullptr)
+    {
+        maxCodePoint = max(maxCodePoint, separator->bytes_per_codepoint);
+    }
+
+    for (int64_t i = 0; i < toJoin->count; i++)
+    {
+        instance_ptr item = listOfStrType->eltPtr(toJoin, i);
+        if (item != nullptr)
+        {
+            maxCodePoint = max(maxCodePoint, StringType::Make()->bytes_per_codepoint(item));
+        }
+    }
+
+    int resultCodepoints = 0;
+    std::vector<StringType::layout*> itemsToJoin;
+    StringType::layout* newSeparator;
+
+    // convert to the max code point if needed
+    for (int64_t i = 0; i < toJoin->count; i++)
+    {
+        instance_ptr item = listOfStrType->eltPtr(toJoin, i);
+        StringType::layout** itemLayout = (StringType::layout**)item;
+        StringType::layout* newLayout = StringType::Make()->upgradeCodePoints(*itemLayout, maxCodePoint);
+        itemsToJoin.push_back(newLayout);
+        if (*itemLayout != nullptr)
+        {
+            resultCodepoints += (*itemLayout)->pointcount;
+        }
+    }
+
+    newSeparator = StringType::Make()->upgradeCodePoints((StringType::layout*)separator, maxCodePoint);
+
+    // add the separators size
+    if (separator != nullptr)
+    {
+        resultCodepoints += separator->pointcount * (toJoin->count - 1);
+    }
+
+    // add all the parts together
+    *outString = (layout *) malloc(sizeof(layout) + resultCodepoints * maxCodePoint);
+    (*outString)->bytes_per_codepoint = maxCodePoint;
+    (*outString)->hash_cache = -1;
+    (*outString)->refcount = 1;
+    (*outString)->pointcount = resultCodepoints;
+
+    // position in the output data array
+    int position = 0;
+
+    for (int64_t i = 0; i < itemsToJoin.size(); i++)
+    {
+
+        StringType::layout* item = itemsToJoin[i];
+        if (item != nullptr)
+        {
+            auto addingBytesCount = sizeof(uint8_t) * item->pointcount * maxCodePoint;
+            memcpy((*outString)->data + position, item->data, addingBytesCount);
+            position += addingBytesCount;
+        }
+
+        if (newSeparator != nullptr && i != toJoin->count - 1)
+        {
+            auto addingBytesCount = sizeof(uint8_t) * newSeparator->pointcount * maxCodePoint;
+            memcpy((*outString)->data + position, newSeparator->data, addingBytesCount);
+            position += addingBytesCount;
+        }
+    }
+
+    // clean the temporary objects
+    for(auto item: itemsToJoin)
+    {
+        StringType::Make()->destroy((instance_ptr)&item);
+    }
+    StringType::Make()->destroy((instance_ptr)&newSeparator);
+
+}

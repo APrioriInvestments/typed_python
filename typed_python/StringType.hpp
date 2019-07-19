@@ -68,6 +68,11 @@ public:
     static void split(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);
     static void split_3(ListOfType::layout *outList, layout* l, int64_t max);
 
+    /**
+     * It should behave like outString = separator.join(toJoin).
+     */
+    static void join(StringType::layout **outString, StringType::layout *separator, ListOfType::layout *toJoin);
+
     static bool isalpha(layout *l);
     static bool isalnum(layout *l);
     static bool isdecimal(layout *l);

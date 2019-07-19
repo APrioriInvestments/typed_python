@@ -21,9 +21,29 @@ from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompil
 import nativepython.native_ast as native_ast
 import nativepython
 
+from typed_python import ListOf
+
 from nativepython.native_ast import VoidPtr
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+def strJoinIterable(sep, iterable):
+    """Converts the iterable container to list of strings and call sep.join(iterable).
+
+    If any of the values in the container is not string, an exception is thrown.
+
+    :param sep: string to separate the items
+    :param iterable: iterable container with strings only
+    :return: string with joined values
+    """
+    items = ListOf(str)()
+    for item in iterable:
+        if isinstance(item, String):
+            items.append(item)
+        else:
+            raise Exception("expected str instance, int found")
+    return sep.join(items)
 
 
 class StringWrapper(RefcountedWrapper):
@@ -165,7 +185,7 @@ class StringWrapper(RefcountedWrapper):
     )
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("find", "split") or attr in self._str_methods or attr in self._bool_methods:
+        if attr in ("find", "split", "join") or attr in self._str_methods or attr in self._bool_methods:
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -228,6 +248,23 @@ class StringWrapper(RefcountedWrapper):
                         )
                     )
                 )
+        elif methodname == "join":
+            if len(args) == 1:
+                # we need to pass the list of strings
+                separator = instance
+                itemsToJoin = args[0]
+
+                if itemsToJoin.expr_type.typeRepresentation is ListOf(str):
+                    return context.push(
+                        str,
+                        lambda outStr: runtime_functions.string_join.call(
+                            outStr.expr.cast(VoidPtr),
+                            separator.nonref_expr.cast(VoidPtr),
+                            itemsToJoin.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                else:
+                    return context.call_py_function(strJoinIterable, (separator, itemsToJoin), {})
         elif methodname == "split":
             if len(args) == 2:
                 return context.push(
