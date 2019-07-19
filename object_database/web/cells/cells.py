@@ -1989,7 +1989,7 @@ class Table(Cell):
 
         if self.columnFilters[col].get() is None:
             res = res.nowrap() >> Clickable(Octicon("search"),
-                                           lambda: self.columnFilters[col].set("")).nowrap()
+                                            lambda: self.columnFilters[col].set("")).nowrap()
         else:
             res = res >> SingleLineTextBox(self.columnFilters[col]).nowrap() >> \
                 Button(Octicon("x"), lambda: self.columnFilters[col].set(
