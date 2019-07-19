@@ -225,6 +225,12 @@ string_find_3 = externalCallTarget(
     Void.pointer(), Void.pointer(), Int64
 )
 
+string_join = externalCallTarget(
+    "nativepython_runtime_string_join",
+    Void,
+    Void.pointer(), Void.pointer(), Void.pointer()
+)
+
 string_split = externalCallTarget(
     "nativepython_runtime_string_split",
     Void,

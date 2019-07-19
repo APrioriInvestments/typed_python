@@ -43,6 +43,10 @@ extern "C" {
         return StringType::find(l, sub, start, l ? l->pointcount : 0);
     }
 
+    void nativepython_runtime_string_join(StringType::layout** outString, StringType::layout* separator, ListOfType::layout* toJoin) {
+        StringType::join(outString, separator, toJoin);
+    }
+
     void nativepython_runtime_string_split(ListOfType::layout* outList, StringType::layout* l, StringType::layout* sep, int64_t max) {
         StringType::split(outList, l, sep, max);
     }

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ListOf, _types
+from typed_python import Function, ListOf, _types, TupleOf, Dict, ConstDict
 from typed_python.test_util import currentMemUsageMb
 from nativepython.runtime import Runtime
 import unittest
@@ -457,3 +457,105 @@ class TestStringCompilation(unittest.TestCase):
                 .format(c_elapsed, elapsed)
         )
         """
+
+    def validate_joining_strings(self, function, make_obj):
+        # Test data, the fields are: description, separator, items, expected output
+        test_data = [
+            ["simple data",
+             ",", ["1", "2", "3"], "1,2,3"],
+
+            ["longer separator",
+             "---", ["1", "2", "3"], "1---2---3"],
+
+            ["longer items",
+             "---", ["aaa", "bb", "c"], "aaa---bb---c"],
+
+            ["empty separator",
+             "", ["1", "2", "3"], "123"],
+
+            ["everything empty",
+             "", [], ""],
+
+            ["empty list",
+             "a", [], ""],
+
+            ["empty string in the items",
+             "--", ["", "1", "3"], "--1--3"],
+
+            ["blank string in the items",
+             "--", [" ", "1", "3"], " --1--3"],
+
+            ["separator with 3 codepoints",
+             "☺", ["a", "bb", "ccc"], "a☺bb☺ccc"],
+
+            #   ® - 2B
+            #   ☺ - 3B
+            #   𝍭 - 4B
+            #   a - 1B
+            #   🚀 - 4B
+            #   Ͽ - 2B
+            #   హ - 3B
+            #   ీ - 3B
+            #   c - 1B
+            ["items with 1, 2, and 3 bytes for code point",
+             "--", ["123", "®®", "హీaa"], "123--®®--హీaa"],
+
+            ["separator with 4 bytes for code point, items with less",
+             "𝍭", ["123", "®®", "హీ"], "123𝍭®®𝍭హీ"],
+        ]
+
+        for description, separator, items, expected in test_data:
+            res = function(separator, make_obj(items))
+            self.assertEqual(expected, res, description)
+
+    def test_string_join_for_tuple_of_str(self):
+
+        # test passing tuple of strings
+        @Compiled
+        def f(sep: str, items: TupleOf(str)) -> str:
+            return sep.join(items)
+
+        self.validate_joining_strings(f, lambda items: TupleOf(str)(items))
+
+    def test_string_join_for_list_of_str(self):
+        # test passing list of strings
+        @Compiled
+        def f(sep: str, items: ListOf(str)) -> str:
+            return sep.join(items)
+
+        self.validate_joining_strings(f, lambda items: ListOf(str)(items))
+
+    def test_string_join_for_dict_of_str(self):
+        # test passing list of strings
+        @Compiled
+        def f(sep: str, items: Dict(str, str)) -> str:
+            return sep.join(items)
+
+        self.validate_joining_strings(f, lambda items: Dict(str, str)({i: "a" for i in items}))
+
+    def test_string_join_for_const_dict_of_str(self):
+        # test passing list of strings
+        @Compiled
+        def f(sep: str, items: ConstDict(str, str)) -> str:
+            return sep.join(items)
+
+        self.validate_joining_strings(f, lambda items: ConstDict(str, str)({i: "a" for i in items}))
+
+    def test_string_join_for_bad_types(self):
+        """str.join supports only joining ListOf(str) or TupleOf(str)."""
+
+        # test passing tuple of ints
+        @Compiled
+        def f_tup_int(sep: str, items: TupleOf(int)) -> str:
+            return sep.join(items)
+
+        with self.assertRaisesRegex(TypeError, ""):
+            f_tup_int(",", ListOf(int)([1, 2, 3]))
+
+        # test passing list of other types than strings
+        @Compiled
+        def f_int(sep: str, items: ListOf(int)) -> str:
+            return sep.join(items)
+
+        with self.assertRaisesRegex(TypeError, ""):
+            f_int(",", ListOf(int)([1, 2, 3]))
