@@ -866,6 +866,9 @@ class Cell:
     def __add__(self, other):
         return Sequence([self, Cell.makeCell(other)])
 
+    def __rshift__(self, other):
+        return HorizontalSequence([self, Cell.makeCell(other)])
+
     def withContext(self, **kwargs):
         """Modify our context, and then return self."""
         self.context.update(kwargs)
@@ -1060,11 +1063,11 @@ class Sequence(Cell):
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
 
+        self.split = split
         self.elements = elements
         self.namedChildren['elements'] = elements
         self.children = {"____c_%s__" %
                          i: elements[i] for i in range(len(elements))}
-        self.split = split
         self.overflow = overflow
 
     def __add__(self, other):
@@ -1082,6 +1085,37 @@ class Sequence(Cell):
     def sortsAs(self):
         if self.elements:
             return self.elements[0].sortsAs()
+        return None
+
+
+class HorizontalSequence(Cell):
+    def __init__(self, elements, overflow=True):
+        super().__init__()
+        elements = [Cell.makeCell(x) for x in elements]
+        self.elements = elements
+        self.overflow = overflow
+        self.updateChildren()
+
+    def __rshift__(self, other):
+        other = Cell.makeCell(other)
+        if isinstance(other, HorizontalSequence):
+            return HorizontalSequence(self.elements + other.elements)
+        else:
+            return HorizontalSequence(self.elements + [other])
+
+    def recalculate(self):
+        self.updateChildren()
+        self.exportData['overflow'] = self.overflow
+
+    def updateChildren(self):
+        self.namedChildren['elements'] = self.elements
+        self.children = {}
+        for i in range(len(self.elements)):
+            self.children["____c_{}__".format(i)] = self.elements[i]
+
+    def sortAs(self):
+        if self.elements:
+            return self.elements[0].sortAs()
         return None
 
 
@@ -1940,8 +1974,8 @@ class Table(Cell):
                 return ""
             return Octicon("arrow-up" if not self.sortColumnAscending.get() else "arrow-down")
 
-        cell = Cell.makeCell(self.headerFun(col)).nowrap() + \
-            Padding() + Subscribed(icon).nowrap()
+        cell = Cell.makeCell(self.headerFun(col)).nowrap() >> \
+            Padding() >> Subscribed(icon).nowrap()
 
         def onClick():
             if self.sortColumn.get() == col_ix:
@@ -1954,10 +1988,10 @@ class Table(Cell):
         res = Clickable(cell, onClick, makeBold=True)
 
         if self.columnFilters[col].get() is None:
-            res = res.nowrap() + Clickable(Octicon("search"),
+            res = res.nowrap() >> Clickable(Octicon("search"),
                                            lambda: self.columnFilters[col].set("")).nowrap()
         else:
-            res = res + SingleLineTextBox(self.columnFilters[col]).nowrap() + \
+            res = res >> SingleLineTextBox(self.columnFilters[col]).nowrap() >> \
                 Button(Octicon("x"), lambda: self.columnFilters[col].set(
                     None), small=True)
 

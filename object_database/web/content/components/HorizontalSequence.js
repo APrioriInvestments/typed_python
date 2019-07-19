@@ -1,5 +1,5 @@
 /**
- * Sequence Cell Component
+ * HorizontalSequence Cell Components
  */
 
 import {Component} from './Component';
@@ -9,8 +9,8 @@ import {h} from 'maquette';
 /**
  * About Replacements
  * ------------------
- * Sequence has the following enumerated
- * replacement:
+ * This component has the following
+ * enumerated replacement:
  * * `c`
  */
 
@@ -18,14 +18,13 @@ import {h} from 'maquette';
  * About Named Children
  * --------------------
  * `elements` (array) - A list of Cells that are in the
- *    sequence.
+ *    sequence
  */
-class Sequence extends Component {
+class HorizontalSequence extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
         // Bind component methods
-        //this.makeStyle = this.makeStyle.bind(this);
         this.makeClasses = this.makeClasses.bind(this);
         this.makeElements = this.makeElements.bind(this);
     }
@@ -35,9 +34,8 @@ class Sequence extends Component {
             h('div', {
                 id: this.props.id,
                 class: this.makeClasses(),
-                "data-cell-id": this.props.id,
-                "data-cell-type": "Sequence",
-                //style: this.makeStyle()
+                'data-cell-id': this.props.id,
+                'data-cell-type': "HorizontalSequence"
             }, this.makeElements())
         );
     }
@@ -51,36 +49,19 @@ class Sequence extends Component {
     }
 
     makeClasses(){
-        let classes = ["cell sequence sequence-vertical"];
+        let classes = ["cell", "sequence", "sequence-horizonal"];
         if(this.props.overflow){
             classes.push("overflow");
         }
         return classes.join(" ");
     }
-
-    /*makeStyle(){
-        // Note: the server side uses "split" (axis) to denote the direction
-        let direction = "row";
-        if (this.props.split == "horizontal"){
-            direction = "column";
-        }
-        let overflow = ""
-        if (this.props.overflow) {
-            overflow = "overflow:auto"
-        }
-        return `width:100%;height:100%;display:inline-flex;flex-direction:${direction};${overflow}`;
-        }*/
 }
 
-Sequence.propTypes = {
-    split: {
-        description: "Horizontal/vertical layout of the children.",
-        type: PropTypes.string
-    },
+HorizontalSequence.propTypes = {
     overflow: {
-        description: "Overflow-auto.",
+        description: "If true, sets overflow of container to auto",
         type: PropTypes.boolean
     }
 };
 
-export {Sequence, Sequence as default};
+export {HorizontalSequence, HorizontalSequence as default};
