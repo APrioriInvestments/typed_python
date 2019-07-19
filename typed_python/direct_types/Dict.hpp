@@ -15,6 +15,7 @@
 ******************************************************************************/
 #pragma once
 
+#include "../hash_table_layout.hpp"
 #include "../Type.hpp"
 #include "../PyInstance.hpp"
 
@@ -23,7 +24,7 @@ class Dict {
 public:
     class iterator_type {
     public:
-        iterator_type(DictType::layout* in_dict, int64_t in_offset) :
+        iterator_type(hash_table_layout* in_dict, int64_t in_offset) :
             m_dict(in_dict),
             m_offset(in_offset)
         {}
@@ -61,7 +62,7 @@ public:
         }
 
     private:
-        DictType::layout* m_dict;
+        hash_table_layout* m_dict;
         int64_t m_offset;
     };
 
@@ -75,7 +76,7 @@ public:
     }
 
     static Dict<key_type, value_type> fromPython(PyObject* p) {
-        DictType::layout* l = nullptr;
+        hash_table_layout* l = nullptr;
         PyInstance::copyConstructFromPythonInstance(getType(), (instance_ptr)&l, p, true);
         return Dict<key_type, value_type>(l);
     }
@@ -149,7 +150,7 @@ public:
         return getType()->deleteKey((instance_ptr)&mLayout, (instance_ptr)&k);
     }
 
-    DictType::layout* getLayout() const {
+    hash_table_layout* getLayout() const {
         return mLayout;
     }
 
@@ -162,11 +163,11 @@ public:
     }
 
 private:
-    explicit Dict(DictType::layout* l): mLayout(l) {
+    explicit Dict(hash_table_layout* l): mLayout(l) {
         // deliberately stealing a reference
     }
 
-    DictType::layout* mLayout;
+    hash_table_layout* mLayout;
 };
 
 template<class key_type, class value_type>

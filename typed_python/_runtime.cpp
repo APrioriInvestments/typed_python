@@ -5,6 +5,7 @@
 #include "AllTypes.hpp"
 #include "StringType.hpp"
 #include "BytesType.hpp"
+#include "hash_table_layout.hpp"
 
 thread_local const char* nativepython_cur_exception_value = nullptr;
 
@@ -345,15 +346,15 @@ extern "C" {
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 
-    int32_t nativepython_dict_allocateNewSlot(DictType::layout* layout, size_t kvPairSize) {
+    int32_t nativepython_dict_allocateNewSlot(hash_table_layout* layout, size_t kvPairSize) {
         return layout->allocateNewSlot(kvPairSize);
     }
 
-    void nativepython_dict_resizeTable(DictType::layout* layout) {
+    void nativepython_dict_resizeTable(hash_table_layout* layout) {
         layout->resizeTable();
     }
 
-    void nativepython_dict_compressItemTable(DictType::layout* layout, size_t kvPairSize) {
+    void nativepython_dict_compressItemTable(hash_table_layout* layout, size_t kvPairSize) {
         layout->compressItemTable(kvPairSize);
     }
 

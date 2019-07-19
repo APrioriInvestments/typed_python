@@ -1,4 +1,5 @@
 #include "AllTypes.hpp"
+#include "hash_table_layout.hpp"
 #include <iostream>
 #include <map>
 
@@ -13,7 +14,7 @@ SetType* SetType::Make(Type* eltype) {
 }
 
 bool SetType::discard(instance_ptr self, instance_ptr key) {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     typed_python_hash_type keyHash = m_key_type->hash(key);
     int32_t index = record.remove(m_bytes_per_el, keyHash, [&](instance_ptr ptr) {
         return m_key_type->cmp(key, ptr, Py_EQ);
@@ -26,7 +27,7 @@ bool SetType::discard(instance_ptr self, instance_ptr key) {
 }
 
 void SetType::clear(instance_ptr self) {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     for (long k = 0; k < record.items_reserved; k++) {
         if (record.items_populated[k]) {
             discard(self, keyAtSlot(self, k));
@@ -35,7 +36,7 @@ void SetType::clear(instance_ptr self) {
 }
 
 instance_ptr SetType::insertKey(instance_ptr self, instance_ptr key) {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     typed_python_hash_type keyHash = m_key_type->hash(key);
     int32_t slot = record.allocateNewSlot(m_bytes_per_el);
     record.add(keyHash, slot);
@@ -44,7 +45,7 @@ instance_ptr SetType::insertKey(instance_ptr self, instance_ptr key) {
 }
 
 instance_ptr SetType::lookupKey(instance_ptr self, instance_ptr key) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     typed_python_hash_type keyHash = m_key_type->hash(key);
     int32_t index = record.find(m_bytes_per_el, keyHash,
                                 [&](instance_ptr ptr) { return m_key_type->cmp(key, ptr, Py_EQ); });
@@ -55,7 +56,7 @@ instance_ptr SetType::lookupKey(instance_ptr self, instance_ptr key) const {
 }
 
 int64_t SetType::size(instance_ptr self) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     return record.hash_table_count;
 }
 
@@ -75,19 +76,19 @@ bool SetType::_updateAfterForwardTypesChanged() {
 }
 
 int64_t SetType::refcount(instance_ptr self) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     return record.refcount;
 }
 
 void SetType::constructor(instance_ptr self) {
-    (*(layout**)self) = (layout*)malloc(sizeof(layout));
-    layout& record = **(layout**)self;
-    new (&record) layout();
+    (*(hash_table_layout**)self) = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+    hash_table_layout& record = **(hash_table_layout**)self;
+    new (&record) hash_table_layout();
     record.refcount += 1;
 }
 
 void SetType::destroy(instance_ptr self) {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     if (record.refcount.fetch_sub(1) == 1) {
         for (long k = 0; k < record.items_reserved; k++) {
@@ -105,8 +106,8 @@ void SetType::destroy(instance_ptr self) {
 }
 
 void SetType::copy_constructor(instance_ptr self, instance_ptr other) {
-    (*(layout**)self) = (*(layout**)other);
-    (*(layout**)self)->refcount++;
+    (*(hash_table_layout**)self) = (*(hash_table_layout**)other);
+    (*(hash_table_layout**)self)->refcount++;
 }
 
 bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
@@ -116,8 +117,8 @@ bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
                                  + name());
     }
 
-    layout& l = **(layout**)left;
-    layout& r = **(layout**)right;
+    hash_table_layout& l = **(hash_table_layout**)left;
+    hash_table_layout& r = **(hash_table_layout**)right;
 
     if (&l == &r) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
@@ -150,7 +151,7 @@ void SetType::repr(instance_ptr self, ReprAccumulator& stream) {
     }
 
     stream << "{";
-    layout& l = **(layout**)self;
+    hash_table_layout& l = **(hash_table_layout**)self;
     bool isFirst = true;
 
     for (long k = 0; k < l.items_reserved; k++) {
@@ -169,16 +170,16 @@ void SetType::repr(instance_ptr self, ReprAccumulator& stream) {
 }
 
 int64_t SetType::slotCount(instance_ptr self) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     return record.items_reserved;
 }
 
 bool SetType::slotPopulated(instance_ptr self, size_t offset) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     return record.items_populated[offset];
 }
 
 instance_ptr SetType::keyAtSlot(instance_ptr self, size_t offset) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
     return record.items + m_bytes_per_el * offset;
 }

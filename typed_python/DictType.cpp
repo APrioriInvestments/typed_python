@@ -74,7 +74,7 @@ void DictType::repr(instance_ptr self, ReprAccumulator& stream) {
 
     stream << "{";
 
-    layout& l = **(layout**)self;
+    hash_table_layout& l = **(hash_table_layout**)self;
     bool isFirst = true;
 
     for (long k = 0; k < l.items_reserved;k++) {
@@ -104,8 +104,8 @@ bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bo
         throw std::runtime_error("Ordered comparison not supported between objects of type " + name());
     }
 
-    layout& l = **(layout**)left;
-    layout& r = **(layout**)right;
+    hash_table_layout& l = **(hash_table_layout**)left;
+    hash_table_layout& r = **(hash_table_layout**)right;
 
     if (&l == &r) {
         return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
@@ -136,43 +136,43 @@ bool DictType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bo
 }
 
 int64_t DictType::refcount(instance_ptr self) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     return record.refcount;
 }
 
 int64_t DictType::slotCount(instance_ptr self) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     return record.items_reserved;
 }
 
 bool DictType::slotPopulated(instance_ptr self, size_t slot) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     return record.items_populated[slot];
 }
 
 instance_ptr DictType::keyAtSlot(instance_ptr self, size_t offset) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     return record.items + m_bytes_per_key_value_pair * offset;
 }
 
 instance_ptr DictType::valueAtSlot(instance_ptr self, size_t offset) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     return record.items + m_bytes_per_key_value_pair * offset + m_bytes_per_key;
 }
 
 int64_t DictType::size(instance_ptr self) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     return record.hash_table_count;
 }
 
 instance_ptr DictType::lookupValueByKey(instance_ptr self, instance_ptr key) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     typed_python_hash_type keyHash = m_key->hash(key);
 
@@ -188,7 +188,7 @@ instance_ptr DictType::lookupValueByKey(instance_ptr self, instance_ptr key) con
 }
 
 bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     typed_python_hash_type keyHash = m_key->hash(key);
 
@@ -206,7 +206,7 @@ bool DictType::deleteKey(instance_ptr self, instance_ptr key) const {
 }
 
 bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr key) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     typed_python_hash_type keyHash = m_key->hash(key);
 
@@ -222,7 +222,7 @@ bool DictType::deleteKeyWithUninitializedValue(instance_ptr self, instance_ptr k
 }
 
 instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     typed_python_hash_type keyHash = m_key->hash(key);
 
@@ -237,17 +237,17 @@ instance_ptr DictType::insertKey(instance_ptr self, instance_ptr key) const {
 
 void DictType::constructor(instance_ptr self) {
     assertForwardsResolved();
-    (*(layout**)self) = (layout*)malloc(sizeof(layout));
+    (*(hash_table_layout**)self) = (hash_table_layout*)malloc(sizeof(hash_table_layout));
 
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
-    new (&record) layout();
+    new (&record) hash_table_layout();
 
     record.refcount += 1;
 }
 
 void DictType::destroy(instance_ptr self) {
-    layout& record = **(layout**)self;
+    hash_table_layout& record = **(hash_table_layout**)self;
 
     if (record.refcount.fetch_sub(1) == 1) {
         for (long k = 0; k < record.items_reserved; k++) {
@@ -266,15 +266,15 @@ void DictType::destroy(instance_ptr self) {
 }
 
 void DictType::copy_constructor(instance_ptr self, instance_ptr other) {
-    (*(layout**)self) = (*(layout**)other);
-    (*(layout**)self)->refcount++;
+    (*(hash_table_layout**)self) = (*(hash_table_layout**)other);
+    (*(hash_table_layout**)self)->refcount++;
 }
 
 void DictType::assign(instance_ptr self, instance_ptr other) {
-    layout* old = (*(layout**)self);
+    hash_table_layout* old = (*(hash_table_layout**)self);
 
-    (*(layout**)self) = (*(layout**)other);
-    (*(layout**)self)->refcount++;
+    (*(hash_table_layout**)self) = (*(hash_table_layout**)other);
+    (*(hash_table_layout**)self)->refcount++;
 
     destroy((instance_ptr)&old);
 }
