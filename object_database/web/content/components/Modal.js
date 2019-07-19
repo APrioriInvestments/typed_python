@@ -36,7 +36,6 @@ class Modal extends Component {
     }
 
     render(){
-        console.log(`Rendered modal ${this.props.id} as ${this.props.extraData.show}`);
         return (
             h('div', {
                 id: this.props.id,
