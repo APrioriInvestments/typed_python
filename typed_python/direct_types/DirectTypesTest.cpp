@@ -676,8 +676,8 @@ int direct_cpp_tests() {
     ret += test_bytes();
     ret += test_list_of();
     ret += test_tuple_of();
-    //ret += test_dict();
-    //ret += test_const_dict();
+    ret += test_dict();
+    ret += test_const_dict();
     ret += test_one_of();
     ret += test_named_tuple();
     ret += test_alternative();
