@@ -46,7 +46,6 @@ class Card extends Component {
         return h('div',
             {
                 class: "cell card",
-                style: this.props.divStyle,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Card"
@@ -77,10 +76,6 @@ Card.propTypes = {
     padding: {
         description: "Padding weight as defined by Boostrap css classes.",
         type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
-    },
-    divStyle: {
-        description: "HTML style attribute string.",
-        type: PropTypes.oneOf([PropTypes.string])
     }
 };
 
