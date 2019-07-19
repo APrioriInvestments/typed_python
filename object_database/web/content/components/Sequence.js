@@ -59,7 +59,7 @@ class Sequence extends Component {
         if (this.props.overflow) {
             overflow = "overflow:auto"
         }
-        return `width:100%;height:100%;display:flex;flex-direction:${direction};${overflow}`;
+        return `width:100%;height:100%;display:inline-flex;flex-direction:${direction};${overflow}`;
     }
 }
 
