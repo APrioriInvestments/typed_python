@@ -39,7 +39,7 @@ class ClassWrapper(RefcountedWrapper):
         self.indexToByteOffset = {}
         self.classType = t
 
-        element_types = [('refcount', native_ast.Int64), ('data', native_ast.UInt8)]
+        element_types = [('refcount', native_ast.Int64), ('vtable', native_ast.UInt64), ('data', native_ast.UInt8)]
 
         # this follows the general layout of 'held class' which is 1 bit per field for initialization and then
         # each field packed directly according to byte size
@@ -54,6 +54,10 @@ class ClassWrapper(RefcountedWrapper):
             byteOffset += _types.bytecount(self.classType.MemberTypes[i])
 
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
+
+        # we need this to actually be a global variable that we fill out, but we don't have the machinery
+        # yet in the native_ast. So for now, we just hack it together.
+        self.vtableExpr = native_ast.const_uint64_expr(_types._vtablePointer(self.typeRepresentation))
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -207,7 +211,9 @@ class ClassWrapper(RefcountedWrapper):
                 ).cast(self.getNativeLayoutType())
             ) >>
             # store a refcount
-            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1))
+            out.expr.load().ElementPtrIntegers(0, 0).store(native_ast.const_int_expr(1)) >>
+            # store the vtable
+            out.expr.load().ElementPtrIntegers(0, 1).store(self.vtableExpr)
         )
 
         # clear bits of init flags

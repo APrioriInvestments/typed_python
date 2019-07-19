@@ -55,16 +55,11 @@ public:
         assert(t == m_heldClass);
     }
 
-    /*****
-    //we should have this, except that natively generated code doesn't know how to write
-    //this field yet, so the vtable will be null in those cases.
-
     Type* pickConcreteSubclassConcrete(instance_ptr self) {
         layout& l = **(layout**)self;
 
         return m_heldClass->vtableFor(l.data)->mType->getClassType();
     }
-    ******/
 
     bool _updateAfterForwardTypesChanged();
 
@@ -227,6 +222,14 @@ public:
 
     HeldClass* getHeldClass() const {
         return m_heldClass;
+    }
+
+    bool isSubclassOfConcrete(Type* otherType) {
+        if (otherType->getTypeCategory() != Type::TypeCategory::catClass) {
+            return false;
+        }
+
+        return m_heldClass->isSubclassOfConcrete(((Class*)otherType)->getHeldClass());
     }
 
 private:

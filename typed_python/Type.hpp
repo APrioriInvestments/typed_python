@@ -313,6 +313,25 @@ public:
         return m_base;
     }
 
+    //this checks _strict_ subclass. X is not a subclass of itself.
+    bool isSubclassOf(Type* otherType) {
+        if (otherType == this) {
+            return false;
+        }
+
+        if (otherType == m_base) {
+            return true;
+        }
+
+        return this->check([&](auto& subtype) {
+            return subtype.isSubclassOfConcrete(otherType);
+        });
+    }
+
+    bool isSubclassOfConcrete(Type* otherType) {
+        return false;
+    }
+
     void assertForwardsResolved() const {
         if (!m_resolved) {
             throw std::logic_error("Type " + m_name + " has unresolved forwards.");

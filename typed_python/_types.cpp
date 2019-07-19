@@ -270,6 +270,22 @@ PyObject *MakeNoneType(PyObject* nullValue, PyObject* args) {
     return incref((PyObject*)PyInstance::typeObj(::NoneType::Make()));
 }
 
+PyObject *getVTablePointer(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1 || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))) {
+        PyErr_SetString(PyExc_TypeError, "getVTablePointer takes 1 positional argument (a type)");
+        return NULL;
+    }
+
+    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
+
+    if (type->getTypeCategory() != Type::TypeCategory::catClass) {
+        PyErr_Format(PyExc_TypeError, "Expected a Class, not %s", type->name().c_str());
+        return NULL;
+    }
+
+    return PyLong_FromLong((size_t)((Class*)type)->getHeldClass()->getVTable());
+}
+
 PyObject *RenameType(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 2
             || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))
@@ -1515,6 +1531,7 @@ static PyMethodDef module_methods[] = {
     {"cpp_tests", (PyCFunction)cpp_tests, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
+    {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 

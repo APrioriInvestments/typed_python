@@ -113,7 +113,7 @@ void PyInstance::copyConstructFromPythonInstance(Type* eltType, instance_ptr tgt
 
     Type* argType = extractTypeFrom(pyRepresentation->ob_type);
 
-    if (argType && (eltType == argType || eltType == argType->getBaseType())) {
+    if (argType && (eltType == argType || argType->isSubclassOf(eltType))) {
         //it's already the right kind of instance
         eltType->copy_constructor(tgt, ((PyInstance*)pyRepresentation)->dataPtr());
         return;
@@ -1016,14 +1016,6 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
         types[inType]->typeObj.tp_dict,
         "__typed_python_category__",
         categoryToPyString(inType->getTypeCategory())
-        );
-
-    PyDict_SetItemString(
-        types[inType]->typeObj.tp_dict,
-        "__typed_python_basetype__",
-        inType->getBaseType() ?
-            (PyObject*)typeObjInternal(inType->getBaseType())
-        :   Py_None
         );
 
     mirrorTypeInformationIntoPyType(inType, &types[inType]->typeObj);

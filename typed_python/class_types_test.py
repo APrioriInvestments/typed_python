@@ -815,3 +815,49 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(c.x, 10)
         self.assertEqual(c.y, 20)
         self.assertEqual(c.f(100), 130)
+
+    def test_class_inheritance_and_containers(self):
+        class BaseClass(Class):
+            pass
+
+        class Child1(BaseClass):
+            pass
+
+        class Child2(BaseClass):
+            pass
+
+        l = ListOf(BaseClass)()
+
+        l.append(Child1())
+        l.append(Child2())
+
+        self.assertIsInstance(l[0], Child1)
+        self.assertIsInstance(l[1], Child2)
+
+    def test_class_multiple_inheritence(self):
+        class BaseA(Class):
+            def f(self, x: int):
+                return "int"
+
+            def g(self):
+                return "BaseA"
+
+        class BaseB(Class):
+            def f(self, x: float):
+                return "float"
+
+            def g(self):
+                return "BaseB"
+
+        class BaseBoth(BaseA, BaseB):
+            pass
+
+        x = BaseBoth()
+
+        self.assertEqual(x.f(1), "int")
+        self.assertEqual(x.f(1.0), "float")
+
+        # because of the signature rules, the MRO dictates we'll always
+        # get "BaseA" first.
+        self.assertEqual(x.g(), "BaseA")
+
