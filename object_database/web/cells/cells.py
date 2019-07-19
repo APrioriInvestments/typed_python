@@ -1089,7 +1089,6 @@ class Columns(Cell):
     def __init__(self, *elements):
         super().__init__()
         elements = [Cell.makeCell(x) for x in elements]
-        self.exportData['divStyle'] = self._divStyle()
 
         self.elements = elements
         self.children = {"____c_%s__" %
