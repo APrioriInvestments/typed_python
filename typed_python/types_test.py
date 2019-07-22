@@ -2356,3 +2356,8 @@ class NativeTypesTests(unittest.TestCase):
                 self.assertEqual(CD(d1) == CD(d2), d1 == d2)
                 self.assertEqual(CD(d1) == d2, d1 == d2)
                 self.assertEqual(d1 == CD(d2), d1 == d2)
+
+    def test_construct_named_tuple_from_tuple(self):
+        NT = NamedTuple(x=int, y=str)
+
+        self.assertEqual(NT((1, "2")), NT(x=1, y="2"))

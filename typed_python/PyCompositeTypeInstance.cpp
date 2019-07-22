@@ -106,7 +106,7 @@ void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* n
         return;
     }
 
-    PyInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation, isExplicit);
+    PyCompositeTypeInstance::copyConstructFromPythonInstanceConcrete(namedTupleT, tgt, pyRepresentation, isExplicit);
 }
 
 void PyNamedTupleInstance::constructFromPythonArgumentsConcrete(NamedTuple* namedTupleT, uint8_t* data, PyObject* args, PyObject* kwargs) {
