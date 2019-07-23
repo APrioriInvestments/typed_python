@@ -794,14 +794,14 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
 
             i.type()->serialize(i.data(), b, 0);
         }
+
+        b.finalize();
     } catch (std::exception& e) {
         PyErr_SetString(PyExc_TypeError, e.what());
         return NULL;
     } catch(PythonExceptionSet& e) {
         return NULL;
     }
-
-    b.finalize();
 
     return PyBytes_FromStringAndSize((const char*)b.buffer(), b.size());
 }
