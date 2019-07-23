@@ -23,7 +23,7 @@
 template <typename T>
 class HashTableLayout {
   public:
-    inline static constexpr size_t byte_count_per_el = sizeof(void*);
+    static constexpr size_t byte_count_per_el = sizeof(void*);
 
     HashTableLayout() { new_hash_table(&table); }
 
