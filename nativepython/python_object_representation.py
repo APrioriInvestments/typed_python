@@ -30,6 +30,7 @@ from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
 from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.type_wrappers.const_dict_wrapper import ConstDictWrapper
 from nativepython.type_wrappers.dict_wrapper import DictWrapper
+from nativepython.type_wrappers.set_wrapper import SetWrapper
 from nativepython.type_wrappers.tuple_wrapper import TupleWrapper, NamedTupleWrapper
 from nativepython.type_wrappers.alternative_wrapper import makeAlternativeWrapper
 from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
@@ -137,6 +138,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
     if t.__typed_python_category__ == "Value":
         return ValueWrapper(t)
+
+    if t.__typed_python_category__ == "Set":
+        return SetWrapper(t)
 
     assert False, t
 
