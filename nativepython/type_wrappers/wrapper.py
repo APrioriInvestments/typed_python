@@ -62,6 +62,10 @@ class Wrapper(object):
     # are we a simple arithmetic type
     is_arithmetic = False
 
+    # can we be converted to a pure python representation?
+    # if this is true, then we must also have a 'getCompileTimeConstant' method
+    is_compile_time_constant = False
+
     def __repr__(self):
         return "Wrapper(%s)" % str(self)
 

@@ -27,12 +27,16 @@ class PythonFreeObjectWrapper(Wrapper):
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
+    is_compile_time_constant = True
 
     def __init__(self, f):
         super().__init__(f)
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
+
+    def getCompileTimeConstant(self):
+        return self.typeRepresentation
 
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == self:
@@ -44,13 +48,13 @@ class PythonFreeObjectWrapper(Wrapper):
         return super().convert_bin_op(context, left, op, right)
 
     def convert_call(self, context, left, args, kwargs):
-        if all([isinstance(x.expr_type, PythonFreeObjectWrapper) for x in list(args) + list(kwargs.values())]):
+        if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):
             try:
                 return nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
                     self.typeRepresentation(
-                        *[a.expr_type.typeRepresentation for a in args],
-                        **{k: v.expr_type.typeRepresentation for k, v in kwargs.items()}
+                        *[a.expr_type.getCompileTimeConstant() for a in args],
+                        **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()}
                     )
                 )
             except Exception as e:

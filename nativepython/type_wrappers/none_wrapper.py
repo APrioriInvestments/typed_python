@@ -21,9 +21,13 @@ class NoneWrapper(Wrapper):
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
+    is_compile_time_constant = True
 
     def __init__(self):
         super().__init__(NoneType)
+
+    def getCompileTimeConstant(self):
+        return None
 
     def convert_default_initialize(self, context, target):
         pass

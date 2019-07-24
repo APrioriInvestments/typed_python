@@ -30,7 +30,11 @@ class ValueWrapper(Wrapper):
     is_pod = True
     is_empty = True
     is_pass_by_ref = False
+    is_compile_time_constant = True
     can_unwrap = True
+
+    def getCompileTimeConstant(self):
+        return self.typeRepresentation
 
     def __init__(self, valueType):
         super().__init__(valueType)
