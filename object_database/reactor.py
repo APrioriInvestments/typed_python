@@ -194,6 +194,7 @@ class Reactor:
         try:
             """Update as quickly as possible."""
             exceptionsInARow = 0
+            readKeys = None
 
             while self._isStarted:
                 self._drainTransactionQueue()
