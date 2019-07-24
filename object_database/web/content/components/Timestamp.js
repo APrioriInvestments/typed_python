@@ -21,7 +21,7 @@ class Timestamp extends Component {
     constructor(props, ...args){
         super(props, ...args);
 
-        this.timeformat = 'YYYY-MM-D h:mm:ss'
+        this.timeformat = 'YYYY-MM-D HH:mm:ss'
         this.timezone = this.getCurrentTimeZone()
         this.timestamp = moment.unix(this.props.timestamp)
         // make sure user knows to hover over
@@ -29,12 +29,13 @@ class Timestamp extends Component {
 
         // Bind component methods
         this.handleMouseover = this.handleMouseover.bind(this);
+        this.getMilliseconds = this.getMilliseconds.bind(this);
     }
 
     render(){
         return h('span',
             {
-                class: "cell d-flex justify-content-center",
+                class: "cell",
                 style: this.style,
                 id: this.props.id,
                 "data-cell-id": this.props.id,
@@ -42,9 +43,20 @@ class Timestamp extends Component {
                 onmouseover: this.handleMouseover
             }, [
         h('span', {}, [this.timestamp.format(this.timeformat)]), // Date + time
-        h('span', {style: "font-weight: 150"}, ["." + this.timestamp.format('ms ')]), // Milliseconds in lighter font
+        h('span', {style: "font-weight: 150"}, ["." + this.getMilliseconds()]), // Milliseconds in lighter font
         // h('span', {}, [this.timestamp.format(' A')]), // AM/PM
     ]);
+    }
+
+    getMilliseconds() {
+        let ms = this.timestamp.milliseconds()
+        ms = ms.toString()
+        if (ms.length === 2) {
+            ms = "0" + ms
+        } else if(ms.length === 1) {
+            ms = "00" + ms
+        }
+        return ms
     }
 
     getCurrentTimeZone(){
