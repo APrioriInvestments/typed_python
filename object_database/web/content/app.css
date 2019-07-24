@@ -97,6 +97,7 @@
     background-color: rgba(50, 50, 50, 0.5);
     transition: background-color 0.2s linear;
     z-index: 1050;
+}
 
 /* PageView
  *================================================================*/
@@ -116,4 +117,13 @@
 }
 
 .page-view-footer {
+}
+
+/* Datetime Picker 
+ *================================================================*/
+input.datetimepicker {
+    border: none;
+    outline: none;
+    padding: unset;
+    margin-right: -.3em; /* TODO: is this a good idea? */
 }
