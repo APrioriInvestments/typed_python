@@ -40,6 +40,8 @@ class DateTimePicker extends Component {
         this.datetimeSlider = this.datetimeSlider.bind(this);
         this.showSlider = this.showSlider.bind(this);
         this.hideSlider = this.hideSlider.bind(this);
+        this.setSliderMinMaxValue = this.setSliderMinMaxValue.bind(this);
+        this._prepValue = this._prepValue.bind(this);
     }
 
     render(){
@@ -123,6 +125,7 @@ class DateTimePicker extends Component {
      */
     inputHandler(event, type, callback) {
         let value = event.target.value;
+        value = this._prepValue(value);
         this.updateInputValue(value, type)
         if (callback) {
             // timeformat = 'YYYY-MM-DThh:mm:ss'
@@ -157,6 +160,18 @@ class DateTimePicker extends Component {
         }
     }
 
+
+    /* All our values are strings.
+     * Months, date, hours, minutes, seconds are assumed to be two characters.
+     * Example: "03" (not "3") for March
+     */
+    _prepValue(value) {
+        value = value.toString()
+        if (value.length === 1) {
+            value = "0" + value;
+        }
+        return value;
+    }
     /* Updates the corresponding class attribute with the given value
      */
     updateInputValue(value, type){
@@ -199,9 +214,9 @@ class DateTimePicker extends Component {
             [
                 h("input", {
                     type:"range",
-                    min:"2001",
-                    max:"2020",
-                    value:"2010",
+                    min: this.slider_min,
+                    max: this.slider_max,
+                    value: this.slider_value,
                     step:"1",
                     oninput: (event) => {this.inputHandler(event, this.slider, false)},
                     onchange: (event) => {this.inputHandler(event, this.slider, true)}
@@ -209,6 +224,38 @@ class DateTimePicker extends Component {
                 h("span", {class: "octicon octicon-x", onclick: (event) => {this.hideSlider(event)}}, [])
             ]
         )
+    }
+
+    /* Sets the min, max and default value on the slider input element based on input type
+     */
+    setSliderMinMaxValue(type, slider){
+        switch (type) {
+            case "year":
+                slider.min = 1970;
+                slider.max = 2030;
+                slider.value = 2019;
+                break;
+            case "month":
+                slider.min = 1;
+                slider.max = 12;
+                slider.value = 6;
+                break;
+            case "date":
+                slider.min = 1;
+                slider.max = 31; // TODO: slider.needs to be month specific
+                slider.value = 15;
+                break;
+            case "hour":
+                slider.min = 1;
+                slider.max = 23;
+                slider.value = 12;
+                break;
+            default:
+                slider.min = 0;
+                slider.max = 59;
+                slider.value = 30;
+                break;
+        }
     }
 
     /* show and hide the slider
@@ -220,6 +267,7 @@ class DateTimePicker extends Component {
         let sibling = event.target.closest("#datetimepicker-" + this.props.id)
         let slider = sibling.nextSibling
         slider.classList.remove("invisible")
+        this.setSliderMinMaxValue(type, slider.firstElementChild);
         console.log('going to show slider: ' + this.slider)
     }
 
