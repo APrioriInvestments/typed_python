@@ -84,3 +84,101 @@ def appendPostscript(jsString):
         'type': '#appendPostscript',
         'script': jsString
     }
+
+
+def getStructure(parent_id, cell, name_in_parent, expand=False):
+    """Responds with a dict structure representative of the
+    passed in cell that will be suitable for JSON parsing.
+
+    Notes
+    -----
+    There are two ways to use this function: expanded
+    or not.
+    Expanded will return a recursive dict structure where
+    each named child is represented also as a complete dict
+    along with all of its own namedChildren, and so on.
+    Unexpanded will return just the given Cell's structure,
+    and it's namedChildren structure will all resolve to
+    Cell IDs (rather than expanded dicts)
+
+    Parameters
+    ----------
+    parent_id: str|integer
+        The Cell identity of the passed-in Cell's parent
+    cell: Cell
+        The target Cell whose structure we will map to
+        a dictionary.
+    name_in_parent: str
+        If the passed-in Cell is a namedChild of another cell,
+        we provide that name as this argument
+    expand: boolean
+        Whether or not to return an 'expanded' dictionary
+        meaning all named children of the current cell will
+        also have their own dict structures parsed out.
+        See the Notes above.
+        Defaults to False
+
+    Returns
+    -------
+    dict: A dictionary representing the Cell structure,
+          expanded or otherwise, that can be parsed
+          into JSON
+    """
+    if expand:
+        return _getExpandedStructure(parent_id, cell, name_in_parent)
+    else:
+        return _getFlatStructure(parent_id, cell, name_in_parent)
+
+
+
+"""Helper Functions"""
+def _getFlatStructure(parent_id, cell, name_in_parent):
+    own_children = _getFlatChildren(cell)
+    return {
+        "id": cell.identity,
+        "cellType": cell.__class__.__name__,
+        "properties": cell.exportData,
+        "nameInParent": name_in_parent,
+        "parentId": parent_id,
+        "namedChildren": own_children
+    }
+
+
+def _getFlatChildren(cell):
+    own_children = {}
+    for child_name, child in cell.namedChildren.items():
+        own_children[child_name] = _resolveFlatChild(child)
+
+    return own_children
+
+
+def _resolveFlatChild(cell_or_list):
+    if isinstance(cell_or_list, list):
+        return [_resolveFlatChild(cell) for cell in cell_or_list]
+    return cell_or_list.identity
+
+
+
+def _getExpandedStructure(parent_id, cell, name_in_parent):
+    own_children = _getExpandedChildren(cell)
+    return {
+        "id": cell.identity,
+        "cellType": cell.__class__.__name__,
+        "properties": cell.exportData,
+        "nameInParent": name_in_parent,
+        "parentId": parent_id,
+        "namedChildren": own_children
+    }
+
+
+def _getExpandedChildren(cell):
+    own_children = {}
+    for child_name, child in cell.namedChildren.items():
+        own_children[child_name] = _resolveExpandedChild(cell.identity, child, child_name)
+    return own_children
+
+
+def _resolveExpandedChild(parent_id, cell_or_list, name_in_parent):
+    if isinstance(cell_or_list, list):
+        return [_resolveExpandedChild(parent_id, cell, name_in_parent) for cell in cell_or_list]
+    return _getExpandedStructure(parent_id, cell_or_list, name_in_parent)

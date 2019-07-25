@@ -329,32 +329,6 @@ class Cells:
 
         self._nodesToBroadcast.add(node)
 
-    def getChildrenJSON(self, cellId, cellObject):
-        childrenInfo = []
-        for replacementKey, childCell in cellObject.children.items():
-            childrenInfo.append({
-                'id': childCell.identity,
-                'cellType': childCell.__class__.__name__,
-                'children': self.getChildrenJSON(childCell.identity, childCell),
-                'replacementKey': replacementKey,
-                'properties': childCell.exportData,
-                'parentId': cellId
-            })
-        return childrenInfo
-
-    def currentStructureFromCell(self, aCell, replacement_key=None):
-        """Responds with a JSON representation of
-        the current cell tree with the passed cell as
-        the root"""
-        result = {
-            'id': aCell.identity,
-            'cellType': aCell.__class__.__name__,
-            'children': self.getChildrenJSON(aCell.identity, aCell),
-            'replacementKey': replacement_key,
-            'properties': aCell.exportData
-        }
-        return result
-
     def renderMessages(self):
         self._processCallbacks()
         self._recalculateCells()
@@ -694,6 +668,9 @@ class Cell:
 
     def childrenWithExceptions(self):
         return self.findChildrenMatching(lambda cell: isinstance(cell, Traceback))
+
+    def getCurrentStructure(self, expand=False):
+        return Messenger.getStructure(self.parent.identity, self, expand)
 
     def onMessageWithTransaction(self, *args):
         """Call our inner 'onMessage' function with a transaction and a revision conflict retry loop."""
