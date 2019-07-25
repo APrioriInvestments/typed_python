@@ -71,6 +71,7 @@ class DateTimePicker extends Component {
             {
                 class: "datetimepicker",
                 "data-cell-type": "DateTimePicker-" + type,
+                id: "datetimepicker-" + type + "-" + this.props.id,
                 type: "text",
                 minsize: size,
                 maxsize: size,
@@ -126,6 +127,19 @@ class DateTimePicker extends Component {
                     )
                 );
             }
+        } else {
+            // we need to update the corresponding input element manually
+            let slider = event.target.closest("#datetimepicker-slider-" + this.props.id);
+            let datetimepicker = slider.previousSibling
+            let id = "datetimepicker-" + type + "-" + this.props.id
+            let children = datetimepicker.childNodes
+            for (var i = 0; i < children.length; i++) {
+                if (children[i].id == id) {
+                    let input = children[i]
+                    input.value = value;
+                    break;
+                }
+            }
         }
     }
 
@@ -159,10 +173,12 @@ class DateTimePicker extends Component {
             [
                 h("input", {
                     type:"range",
-                    min:"0",
-                    max:"200",
-                    value:"100",
+                    min:"2001",
+                    max:"2020",
+                    value:"2010",
                     step:"1",
+                    oninput: (event) => {this.inputHandler(event, this.slider, false)},
+                    onchange: (event) => {this.inputHandler(event, this.slider, true)}
                 }, []),
                 h("span", {class: "octicon octicon-x", onclick: (event) => {this.hideSlider(event)}}, [])
             ]
