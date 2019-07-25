@@ -6,6 +6,7 @@
 #include "StringType.hpp"
 #include "BytesType.hpp"
 #include "hash_table_layout.hpp"
+#include "PyInstance.hpp"
 
 thread_local const char* nativepython_cur_exception_value = nullptr;
 
@@ -299,20 +300,139 @@ extern "C" {
         return floorresult;
     }
 
-    PyObject* nativepython_runtime_int_to_pyobj(int64_t i) {
+    // returns layout*
+    void *np_runtime_pyobj_to_typed(PyObject *obj, void* tgt, uint64_t tp) {
+        // tgt is a layout pointer
+        PyEnsureGilAcquired acquireTheGil;
+        PyInstance::copyConstructFromPythonInstance((Type *)tp, (instance_ptr)&tgt, obj, true);
+        // returns modified layout pointer
+        return tgt;
+    }
+
+    PyObject* np_runtime_to_pyobj(PyObject *obj, uint64_t tp) {
+        PyEnsureGilAcquired acquireTheGil;
+        return PyInstance::extractPythonObject((instance_ptr)&obj, (Type*)tp);
+    }
+
+    PyObject* np_runtime_int64_to_pyobj(int64_t i) {
+        return PyLong_FromLongLong(i);
+    }
+
+    PyObject* np_runtime_int32_to_pyobj(int32_t i) {
         return PyLong_FromLong(i);
     }
 
-    PyObject* nativepython_runtime_uint_to_pyobj(uint64_t u) {
+    PyObject* np_runtime_int16_to_pyobj(int16_t i) {
+        return PyLong_FromLong(i);
+    }
+
+    PyObject* np_runtime_int8_to_pyobj(int8_t i) {
+        return PyLong_FromLong(i);
+    }
+
+    PyObject* np_runtime_uint64_to_pyobj(uint64_t u) {
+        return PyLong_FromUnsignedLongLong(u);
+    }
+
+    PyObject* np_runtime_uint32_to_pyobj(uint32_t u) {
         return PyLong_FromUnsignedLong(u);
     }
 
-    int64_t nativepython_runtime_pyobj_to_int(PyObject* i) {
+    PyObject* np_runtime_uint16_to_pyobj(uint16_t u) {
+        return PyLong_FromUnsignedLong(u);
+    }
+
+    PyObject* np_runtime_uint8_to_pyobj(uint8_t u) {
+        return PyLong_FromUnsignedLong(u);
+    }
+
+    PyObject* np_runtime_float64_to_pyobj(double f) {
+        return PyFloat_FromDouble(f);
+    }
+
+    PyObject* np_runtime_float32_to_pyobj(float f) {
+        return PyFloat_FromDouble((double)f);
+    }
+
+    // C identifiers can ignore character 32 and onward, so shorten prefix to just "np_"
+    int64_t np_runtime_pyobj_to_int64(PyObject* i) {
         if (PyLong_Check(i)) {
-            return PyLong_AsLongLong(i);
+            return PyLong_AsLong(i);
         }
 
-        throw std::runtime_error("Couldn't convert to an int64.");
+        throw std::runtime_error("Couldn't convert to int64.");
+    }
+
+    int32_t np_runtime_pyobj_to_int32(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to int32.");
+    }
+
+    int16_t np_runtime_pyobj_to_int16(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to int16.");
+    }
+
+    int8_t np_runtime_pyobj_to_int8(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to int8.");
+    }
+
+    uint64_t np_runtime_pyobj_to_uint64(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsUnsignedLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to uint64.");
+    }
+
+    uint32_t np_runtime_pyobj_to_uint32(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsUnsignedLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to uint32.");
+    }
+
+    uint16_t np_runtime_pyobj_to_uint16(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsUnsignedLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to uint16.");
+    }
+
+    uint8_t np_runtime_pyobj_to_uint8(PyObject* i) {
+        if (PyLong_Check(i)) {
+            return PyLong_AsUnsignedLong(i);
+        }
+
+        throw std::runtime_error("Couldn't convert to uint8.");
+    }
+
+    double np_runtime_pyobj_to_float64(PyObject* o) {
+        if (PyFloat_Check(o)) {
+            return PyFloat_AsDouble(o);
+        }
+
+        throw std::runtime_error("Couldn't convert to float64.");
+    }
+
+    float np_runtime_pyobj_to_float32(PyObject* o) {
+        if (PyFloat_Check(o)) {
+            return (float)PyFloat_AsDouble(o);
+        }
+
+        throw std::runtime_error("Couldn't convert to float32.");
     }
 
     void nativepython_print_string(StringType::layout* layout) {

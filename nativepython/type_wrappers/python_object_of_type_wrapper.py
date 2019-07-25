@@ -13,11 +13,13 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import Int64, UInt64
+from typed_python import Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, Float64
 from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast
+from nativepython.native_ast import VoidPtr
 import nativepython.type_wrappers.runtime_functions as runtime_functions
+from typed_python._types import getTypePointer
 
 
 class PythonObjectOfTypeWrapper(Wrapper):
@@ -91,18 +93,36 @@ class PythonObjectOfTypeWrapper(Wrapper):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-        if target_type.typeRepresentation == Int64:
+        arith_calls = {
+            Int64: runtime_functions.pyobj_to_int64,
+            Int32: runtime_functions.pyobj_to_int32,
+            Int16: runtime_functions.pyobj_to_int16,
+            Int8: runtime_functions.pyobj_to_int8,
+            UInt64: runtime_functions.pyobj_to_uint64,
+            UInt32: runtime_functions.pyobj_to_uint32,
+            UInt16: runtime_functions.pyobj_to_uint16,
+            UInt8: runtime_functions.pyobj_to_uint8,
+            Float64: runtime_functions.pyobj_to_float64,
+            Float32: runtime_functions.pyobj_to_float32
+        }
+
+        t = target_type.typeRepresentation
+        if t in arith_calls:
             context.pushEffect(
                 targetVal.expr.store(
-                    runtime_functions.pyobj_to_int.call(e.nonref_expr)
+                    arith_calls[t].call(e.nonref_expr)
                 )
             )
             return context.constant(True)
 
-        if target_type.typeRepresentation == UInt64:
+        tp = getTypePointer(t)
+        if tp:
             context.pushEffect(
                 targetVal.expr.store(
-                    runtime_functions.pyobj_to_uint.call(e.nonref_expr)
+                    runtime_functions.pyobj_to_typed.call(
+                        e.nonref_expr.cast(VoidPtr),
+                        targetVal.expr.cast(VoidPtr),
+                        tp).cast(target_type.getNativeLayoutType())
                 )
             )
             return context.constant(True)
@@ -113,18 +133,33 @@ class PythonObjectOfTypeWrapper(Wrapper):
         if not explicit:
             return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
 
-        if sourceVal.expr_type.typeRepresentation == Int64:
+        arith_calls = {
+            Int64: runtime_functions.int64_to_pyobj,
+            Int32: runtime_functions.int32_to_pyobj,
+            Int16: runtime_functions.int16_to_pyobj,
+            Int8: runtime_functions.int8_to_pyobj,
+            UInt64: runtime_functions.uint64_to_pyobj,
+            UInt32: runtime_functions.uint32_to_pyobj,
+            UInt16: runtime_functions.uint16_to_pyobj,
+            UInt8: runtime_functions.uint8_to_pyobj,
+            Float64: runtime_functions.float64_to_pyobj,
+            Float32: runtime_functions.float32_to_pyobj,
+        }
+
+        t = sourceVal.expr_type.typeRepresentation
+        if t in arith_calls:
             context.pushEffect(
                 targetVal.expr.store(
-                    runtime_functions.int_to_pyobj.call(sourceVal.nonref_expr)
+                    arith_calls[t].call(sourceVal.nonref_expr)
                 )
             )
             return context.constant(True)
 
-        if sourceVal.expr_type.typeRepresentation == UInt64:
+        tp = getTypePointer(t)
+        if tp:
             context.pushEffect(
                 targetVal.expr.store(
-                    runtime_functions.uint_to_pyobj.call(sourceVal.nonref_expr)
+                    runtime_functions.to_pyobj.call(sourceVal.nonref_expr.cast(VoidPtr), tp)
                 )
             )
             return context.constant(True)

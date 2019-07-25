@@ -736,4 +736,4 @@ class ExpressionConversionContext(object):
 
             return out_slot
 
-        raise ConversionException("can't handle python expression type %s" % ast._which)
+        raise ConversionException("can't handle python expression type %s" % ast.Name)
