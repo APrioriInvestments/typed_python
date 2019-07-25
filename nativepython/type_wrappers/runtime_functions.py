@@ -14,11 +14,17 @@
 
 import nativepython.native_ast as native_ast
 
+
 Bool = native_ast.Bool
 UInt8Ptr = native_ast.UInt8Ptr
 Int64 = native_ast.Int64
-UInt64 = native_ast.UInt64
 Int32 = native_ast.Int32
+Int16 = native_ast.Int16
+Int8 = native_ast.Int8
+UInt64 = native_ast.UInt64
+UInt32 = native_ast.UInt32
+UInt16 = native_ast.UInt16
+UInt8 = native_ast.UInt8
 Float64 = native_ast.Float64
 Float32 = native_ast.Float32
 Void = native_ast.Void
@@ -147,27 +153,138 @@ getattr_pyobj = externalCallTarget(
     UInt8Ptr
 )
 
-int_to_pyobj = externalCallTarget(
-    "nativepython_runtime_int_to_pyobj",
+pyobj_to_typed = externalCallTarget(
+    "np_runtime_pyobj_to_typed",
     Void.pointer(),
-    Int64
-)
-
-uint_to_pyobj = externalCallTarget(
-    "nativepython_runtime_uint_to_pyobj",
+    Void.pointer(),
     Void.pointer(),
     UInt64
 )
 
-pyobj_to_int = externalCallTarget(
-    "nativepython_runtime_pyobj_to_int",
+to_pyobj = externalCallTarget(
+    "np_runtime_to_pyobj",
+    Void.pointer(),
+    Void.pointer(),
+    UInt64,
+)
+
+int64_to_pyobj = externalCallTarget(
+    "np_runtime_int64_to_pyobj",
+    Void.pointer(),
+    Int64
+)
+
+int32_to_pyobj = externalCallTarget(
+    "np_runtime_int32_to_pyobj",
+    Void.pointer(),
+    Int32
+)
+
+int16_to_pyobj = externalCallTarget(
+    "np_runtime_int16_to_pyobj",
+    Void.pointer(),
+    Int16
+)
+
+int8_to_pyobj = externalCallTarget(
+    "np_runtime_int8_to_pyobj",
+    Void.pointer(),
+    Int8
+)
+
+uint64_to_pyobj = externalCallTarget(
+    "np_runtime_uint64_to_pyobj",
+    Void.pointer(),
+    UInt64
+)
+
+uint32_to_pyobj = externalCallTarget(
+    "np_runtime_uint32_to_pyobj",
+    Void.pointer(),
+    UInt32
+)
+
+uint16_to_pyobj = externalCallTarget(
+    "np_runtime_uint16_to_pyobj",
+    Void.pointer(),
+    UInt16
+)
+
+uint8_to_pyobj = externalCallTarget(
+    "np_runtime_uint8_to_pyobj",
+    Void.pointer(),
+    UInt8
+)
+
+float64_to_pyobj = externalCallTarget(
+    "np_runtime_float64_to_pyobj",
+    Void.pointer(),
+    Float64
+)
+
+float32_to_pyobj = externalCallTarget(
+    "np_runtime_float32_to_pyobj",
+    Void.pointer(),
+    Float32
+)
+
+pyobj_to_int64 = externalCallTarget(
+    "np_runtime_pyobj_to_int64",
     Int64,
     Void.pointer()
 )
 
-pyobj_to_uint = externalCallTarget(
-    "nativepython_runtime_pyobj_to_uint",
+pyobj_to_int32 = externalCallTarget(
+    "np_runtime_pyobj_to_int32",
+    Int32,
+    Void.pointer()
+)
+
+pyobj_to_int16 = externalCallTarget(
+    "np_runtime_pyobj_to_int16",
+    Int16,
+    Void.pointer()
+)
+
+pyobj_to_int8 = externalCallTarget(
+    "np_runtime_pyobj_to_int8",
+    Int8,
+    Void.pointer()
+)
+
+pyobj_to_uint64 = externalCallTarget(
+    "np_runtime_pyobj_to_uint64",
     UInt64,
+    Void.pointer()
+)
+
+pyobj_to_uint32 = externalCallTarget(
+    "np_runtime_pyobj_to_uint32",
+    UInt32,
+    Void.pointer()
+)
+
+pyobj_to_uint16 = externalCallTarget(
+    "np_runtime_pyobj_to_uint16",
+    UInt16,
+    Void.pointer()
+)
+
+pyobj_to_uint8 = externalCallTarget(
+    "np_runtime_pyobj_to_uint8",
+    UInt8,
+    Void.pointer()
+)
+
+pyobj_to_float64 = externalCallTarget(
+    "np_runtime_pyobj_to_float64",
+    Float64,
+    Void.pointer()
+)
+
+pyobj_to_float32 = externalCallTarget(
+    "np_runtime_pyobj_to_float32",
+    Float32,
     Void.pointer()
 )
 
