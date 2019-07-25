@@ -121,9 +121,37 @@
 
 /* Datetime Picker 
  *================================================================*/
+.datetimepicker-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 9em;
+}
+
 input.datetimepicker {
     border: none;
     outline: none;
     padding: unset;
     margin-right: -.3em; /* TODO: is this a good idea? */
+}
+
+.invisible {
+    visibility: hidden;
+}
+
+.slider-wrapper {
+  display: inline-block;
+  width: 20px;
+  height: 150px;
+  padding: 0;
+}
+
+.datetimeslider {
+    display: flex;
+    flex-direction: row;
+}
+
+.datetimeslider input {
+    width: 87%;
+    padding-right: 2%;
 }

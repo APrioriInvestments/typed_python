@@ -30,23 +30,28 @@ class DateTimePicker extends Component {
         this.hour = this.datetime.format("hh");
         this.minute = this.datetime.format("mm");
         this.second = this.datetime.format("ss");
+        this.slider = null;
 
         // Bind component methods
         this.inputHandler = this.inputHandler.bind(this);
         this.inputElement = this.inputElement.bind(this);
         this.datetimePicker = this.datetimePicker.bind(this);
         this.updateInputValue = this.updateInputValue.bind(this);
+        this.datetimeSlider = this.datetimeSlider.bind(this);
+        this.showSlider = this.showSlider.bind(this);
+        this.hideSlider = this.hideSlider.bind(this);
     }
 
     render(){
         return h('div',
             {
-                class: "cell",
+                class: "cell datetimepicker-wrapper",
                 id: this.props.id,
                 "data-cell-id": this.props.id,
-                "data-cell-type": "DateTimePicker"
+                "data-cell-type": "DateTimePicker",
             }, [
-                this.datetimePicker()
+                this.datetimePicker(),
+                this.datetimeSlider()
             ]);
     }
 
@@ -71,7 +76,8 @@ class DateTimePicker extends Component {
                 maxsize: size,
                 size: size,
                 value: value,
-                oninput: (event) => {this.inputHandler(event, type, true)}
+                oninput: (event) => {this.inputHandler(event, type, true)},
+                ondblclick: (event) => {this.showSlider(event, type)}
             },
             []
         )
@@ -107,7 +113,6 @@ class DateTimePicker extends Component {
             // timeformat = 'YYYY-MM-DThh:mm:ss'
             let datetime = (this.year + "-" + this.month + "-" + this.date +
                 "T" + this.hour + ":" + this.minute + ":" + this.second)
-            console.log(datetime)
             let unix_val = moment(datetime).unix()
             // don't send back NaN since this can be caused by a "mid" or bad input
             if (!Number.isNaN(unix_val)) {
@@ -139,6 +144,43 @@ class DateTimePicker extends Component {
         } else if (type === "second") {
             this.second = value
         }
+    }
+
+    /*Input Slider related helpers
+     * ==========================*/
+
+    datetimeSlider() {
+        return h(
+            "div",
+            {
+                id: "datetimepicker-slider-" + this.props.id,
+                class: "invisible datetimeslider",
+            },
+            [
+                h("input", {
+                    type:"range",
+                    min:"0",
+                    max:"200",
+                    value:"100",
+                    step:"1",
+                }, []),
+                h("span", {class: "octicon octicon-x", onclick: (event) => {this.hideSlider(event)}}, [])
+            ]
+        )
+    }
+
+    showSlider(event, type) {
+        this.slider = type;
+        let sibling = event.target.closest("#datetimepicker-" + this.props.id)
+        let slider = sibling.nextSibling
+        slider.classList.remove("invisible")
+        console.log('going to show slider: ' + this.slider)
+    }
+
+    hideSlider(event) {
+        this.slider = null;
+        let slider = event.target.closest("#datetimepicker-slider-" + this.props.id)
+        slider.classList.add("invisible")
     }
 }
 
