@@ -10,6 +10,7 @@ PWD = $(shell pwd)
 
 # Path to virtual environment(s)
 VIRTUAL_ENV ?= .venv
+NODE_ENV ?= .nodeenv
 
 TP_SRC_PATH ?= typed_python
 ODB_SRC_PATH ?= object_database
@@ -50,7 +51,7 @@ TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 .PHONY: install
 install: $(VIRTUAL_ENV)
 	. $(VIRTUAL_ENV)/bin/activate; \
-		pip install pipenv==2018.11.26; \
+		pip3 install pipenv==2018.11.26; \
 		pipenv install --dev --deploy; \
 		. $(VIRTUAL_ENV)/bin/activate; \
 		nodeenv -p --prebuilt --node=10.15.3 .nodeenv; \
@@ -64,11 +65,20 @@ install: $(VIRTUAL_ENV)
 	echo "export COVERAGE_PROCESS_START=$(PWD)/tox.ini" >> $@
 	echo "export PYTHONPATH=$(PWD)" >> $@
 
-webpack: $(VIRTUAL_ENV)
-	. $(VIRTUAL_ENV)/bin/activate; \
-	nodeenv -p --prebuilt --node=10.15.3 .nodeenv; \
+.PHONY: node-install
+node-install:
+	pip3 install nodeenv; \
+	nodeenv --prebuilt --node=10.15.3 .nodeenv; \
+	. $(NODE_ENV)/bin/activate; \
+	npm install -g webpack webpack-cli; \
 	cd object_database/web/content; \
-	webpack
+	npm install
+
+.PHONY: build-js
+build-js:
+	. $(NODE_ENV)/bin/activate; \
+	cd object_database/web/content; \
+	npm run build
 
 .PHONY: test
 test: testcert.cert testcert.key install

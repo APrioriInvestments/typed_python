@@ -10,6 +10,7 @@ nativepython.egg-info
 nodeenv
 .nodeenv
 node_modules
+object_database/web/content/dist
 
 # Emacs
 \#*
