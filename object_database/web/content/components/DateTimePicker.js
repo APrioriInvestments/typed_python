@@ -55,6 +55,35 @@ class DateTimePicker extends Component {
             ]);
     }
 
+    /* Helper function that puts all the input elements, and their
+     * respective separators into a nice datetime display
+     */
+    datetimePicker () {
+        return h(
+            "span",
+            {
+                id: "datetimepicker-" + this.props.id,
+            },
+            [
+                this.inputElement("year", this.year),
+                h("span", {}, ["/"]),
+                this.inputElement("month", this.month),
+                h("span", {}, ["/"]),
+                this.inputElement("date", this.date),
+                h("span", {}, [" "]),
+                this.inputElement("hour", this.hour),
+                h("span", {}, [":"]),
+                this.inputElement("minute", this.minute),
+                h("span", {}, [":"]),
+                this.inputElement("second", this.second),
+            ]
+        )
+    }
+
+    /* A basic input element
+     * Note: the size is set here. For the moment we only have the year as size 4,
+     * i.e. YYYY, and everything is size 2
+     */
     inputElement(type, value) {
         let size = 2;
         if (type == "year") {
@@ -85,28 +114,13 @@ class DateTimePicker extends Component {
 
     }
 
-    datetimePicker () {
-        return h(
-            "span",
-            {
-                id: "datetimepicker-" + this.props.id,
-            },
-            [
-                this.inputElement("year", this.year),
-                h("span", {}, ["/"]),
-                this.inputElement("month", this.month),
-                h("span", {}, ["/"]),
-                this.inputElement("date", this.date),
-                h("span", {}, [" "]),
-                this.inputElement("hour", this.hour),
-                h("span", {}, [":"]),
-                this.inputElement("minute", this.minute),
-                h("span", {}, [":"]),
-                this.inputElement("second", this.second),
-            ]
-        )
-    }
-
+    /* This is the core input value change handler.
+     * It handles two types of events: those requiring a WS call to the server
+     * with the updated values (example: manual datetimeinput or releasing the slider)
+     * and those requiring **only** a value update to the corresponding input element.
+     * Note: we only send values back to the server that are valid dates. This prevents errors,
+     * and also invalid dates occur naturally as a user manually updates the input value.
+     */
     inputHandler(event, type, callback) {
         let value = event.target.value;
         this.updateInputValue(value, type)
@@ -143,8 +157,9 @@ class DateTimePicker extends Component {
         }
     }
 
+    /* Updates the corresponding class attribute with the given value
+     */
     updateInputValue(value, type){
-        // TODO: we need a validator here!
         if (type === "year") {
             this.year = value
         } else if (type === "month") {
@@ -163,6 +178,17 @@ class DateTimePicker extends Component {
     /*Input Slider related helpers
      * ==========================*/
 
+    /*Input Slider component
+     * the input slider is made visible by a 'dblclick' event on any of the
+     * datetime input elements and is hidden by a `click` event on its sibling
+     * close icon.
+     * Slider handles two types of events: `oninput` where the user is moving the slider
+     * back and forth, i.e. mouse down, and on `onchange` where the user releases the slider,
+     * i.e. mouse up. `oninput` triggers **only** an update to the input element, while
+     * `onchange` triggers a WS send to the server. This minimizes unnecessary message chatter
+     * and makes sure that the element is not re-rendered. Remember every callback to the server
+     * updates the Slot object which in turns calls a cell.recalculate() causing a re-render.
+     */
     datetimeSlider() {
         return h(
             "div",
@@ -185,6 +211,10 @@ class DateTimePicker extends Component {
         )
     }
 
+    /* show and hide the slider
+     * Note the use of node.closest() relying on the component element and id
+     * structure staying the same
+     */
     showSlider(event, type) {
         this.slider = type;
         let sibling = event.target.closest("#datetimepicker-" + this.props.id)
