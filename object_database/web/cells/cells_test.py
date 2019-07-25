@@ -34,6 +34,7 @@ from object_database.test_util import (
     currentMemUsageMb,
     log_cells_stats
 )
+from .Messenger import getStructure
 
 import logging
 import unittest
@@ -390,3 +391,88 @@ class CellsTests(unittest.TestCase):
         dropdown.slot.set(True)
         self.cells.renderMessages()
         self.assertTrue(changedCell in self.cells)
+
+
+
+class CellsStructureTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        configureLogging(
+            preamble="cells_structure_test",
+            level=logging.INFO
+        )
+        cls._logger = logging.getLogger(__name__)
+
+    def setUp(self):
+        self.token = genToken()
+        self.server = InMemServer(auth_token=self.token)
+        self.server.start()
+
+        self.db = self.server.connect(self.token)
+        self.db.subscribeToSchema(test_schema)
+        self.cells = Cells(self.db)
+
+    def tearDown(self):
+        self.server.stop()
+
+    def test_basic_flat_structure(self):
+        first = Text("Hello")
+        first.cells = self.cells
+        second = Text("World")
+        second.cells = self.cells
+        container = Sequence([first, second])
+        container.cells = self.cells
+        self.cells.withRoot(container)
+        structure = getStructure(None, container, None)
+        expected_subset = {
+            "id": container.identity,
+            "cellType": "Sequence"
+        }
+        self.assertTrue(isinstance(structure, dict))
+        self.assertDictContainsSubset(expected_subset, structure)
+        self.assertIn('elements', structure['namedChildren'].keys())
+        self.assertIn(first.identity, structure['namedChildren']['elements'])
+        self.assertIn(second.identity, structure['namedChildren']['elements'])
+
+    def test_basic_expanded_structure(self):
+        first = Text("Hello")
+        first.cells = self.cells
+        second = Text("World")
+        second.cells = self.cells
+        container = Sequence([first, second])
+        container.cells = self.cells
+        self.cells.withRoot(container)
+        struct = getStructure(None, container, None, expand=True)
+        expected_subset = {
+            "id": container.identity,
+            "cellType": "Sequence"
+        }
+        expected_first_element = {
+            "id": first.identity,
+            "cellType": "Text",
+            "namedChildren": {}
+        }
+        expected_second_element = {
+            "id": second.identity,
+            "cellType": "Text",
+            "namedChildren": {}
+        }
+
+        self.assertTrue(isinstance(struct, dict))
+        self.assertTrue(isinstance(struct['namedChildren'], dict))
+        self.assertDictContainsSubset(expected_subset, struct)
+        self.assertIn("elements", struct['namedChildren'])
+        elements = struct['namedChildren']['elements']
+        self.assertIsInstance(elements, list)
+        self.assertDictContainsSubset(expected_first_element, elements[0])
+        self.assertDictContainsSubset(expected_second_element, elements[1])
+
+    def test_cell_self_flat_struct(self):
+        c = Sequence([
+            Text("Hello"),
+            Text("World")
+        ])
+        self.cells.withRoot(c)
+        self.cells._recalculateCells()
+        struct = c.getCurrentStructure()
+        self.assertIsInstance(struct, dict)
