@@ -478,6 +478,12 @@ def const_int_expr(i):
     )
 
 
+def const_uint64_expr(i):
+    return Expression.Constant(
+        val=Constant.Int(bits=64, val=i, signed=False)
+    )
+
+
 def const_int32_expr(i):
     return Expression.Constant(
         val=Constant.Int(bits=32, val=i, signed=True)
@@ -528,10 +534,14 @@ UInt8Ptr = UInt8.pointer()
 Int8Ptr = Type.Pointer(value_type=Type.Int(bits=8, signed=True))
 Float64 = Type.Float(bits=64)
 Float32 = Type.Float(bits=32)
-UInt64 = Type.Int(bits=64, signed=False)
 Int64 = Type.Int(bits=64, signed=True)
-UInt32 = Type.Int(bits=32, signed=False)
 Int32 = Type.Int(bits=32, signed=True)
+Int16 = Type.Int(bits=16, signed=True)
+Int8 = Type.Int(bits=8, signed=True)
+UInt64 = Type.Int(bits=64, signed=False)
+UInt32 = Type.Int(bits=32, signed=False)
+UInt16 = Type.Int(bits=16, signed=False)
+UInt8 = Type.Int(bits=8, signed=False)
 Int32Ptr = Int32.pointer()
 Int64Ptr = Int64.pointer()
 

@@ -1452,6 +1452,17 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         ));
 }
 
+PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 1 || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))) {
+        PyErr_SetString(PyExc_TypeError, "getTypePointer takes 1 positional argument (a type)");
+        return NULL;
+    }
+
+    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
+
+    return PyLong_FromLong((uint64_t)type);
+}
+
 static PyMethodDef module_methods[] = {
     {"NoneType", (PyCFunction)MakeNoneType, METH_VARARGS, NULL},
     {"Bool", (PyCFunction)MakeBoolType, METH_VARARGS, NULL},
@@ -1505,6 +1516,7 @@ static PyMethodDef module_methods[] = {
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
     {"cpp_tests", (PyCFunction)cpp_tests, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
+    {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {NULL, NULL}
 };
 
