@@ -621,6 +621,9 @@ class ExpressionConversionContext(object):
         if ast.matches.Str:
             return pythonObjectRepresentation(self, ast.s)
 
+        if ast.matches.Bytes:
+            return pythonObjectRepresentation(self, ast.s)
+
         if ast.matches.BoolOp:
             def convertBoolOp(depth=0):
                 with self.subcontext() as sc:

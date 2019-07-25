@@ -121,3 +121,20 @@ class TestBytesCompilation(unittest.TestCase):
 
         # I get about 200
         self.assertGreater(speedup, 100)
+
+    def test_bytes_literals(self):
+
+        def f(i: int):
+            x = b"abcdefghijklmnopqrstuvwxyz"
+            return x[i]
+
+        def g(i: int):
+            y = bytes(b'01234567890123456789012345')
+            return y[i]
+
+        cf = Compiled(f)
+        cg = Compiled(g)
+
+        for i in range(26):
+            self.assertEqual(f(i), cf(i))
+            self.assertEqual(g(i), cg(i))
