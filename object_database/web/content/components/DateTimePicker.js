@@ -175,18 +175,25 @@ class DateTimePicker extends Component {
     /* Updates the corresponding class attribute with the given value
      */
     updateInputValue(value, type){
-        if (type === "year") {
-            this.year = value
-        } else if (type === "month") {
-            this.month = value
-        } else if (type === "date") {
-            this.date = value
-        } else if (type === "hour") {
-            this.hour = value
-        } else if (type === "minute") {
-            this.minute = value
-        } else if (type === "second") {
-            this.second = value
+        switch (type) {
+            case "year":
+                this.year = value
+                break;
+            case "month":
+                this.month = value
+                break;
+            case "date":
+                this.date = value
+                break;
+            case "hour":
+                this.hour = value
+                break;
+            case "minute":
+                this.minute = value
+                break;
+            case "second":
+                this.second = value
+                break;
         }
     }
 
@@ -242,7 +249,7 @@ class DateTimePicker extends Component {
                 break;
             case "date":
                 slider.min = 1;
-                slider.max = 31; // TODO: slider.needs to be month specific
+                slider.max = moment(this.year + "-" + this.month, "YYYY-MM").daysInMonth();
                 slider.value = 15;
                 break;
             case "hour":
