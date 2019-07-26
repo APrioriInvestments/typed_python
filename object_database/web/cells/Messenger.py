@@ -5,7 +5,7 @@ should be formatted using functions in this module
 """
 
 
-def cellUpdated(cell, replaceDict={}):
+def oldCellUpdated(cell, replaceDict={}):
     """A lifecycle message formatter
     to be used when a Cell is created or
     updated.
@@ -40,27 +40,23 @@ def cellUpdated(cell, replaceDict={}):
     return res
 
 
-def newCellUpdated(cell):
-    parent_id = None
-    if cell.parent is not None:
-        parent_id = cell.parent.identity
-
+def cellUpdated(cell, replaceDict):
     structure = getStructure(
-        parent_id,
+        cell.parent.identity,
         cell,
         None,
         expand=True)
-    envelope = {
+    res = {
         "channel": "#main",
         "type": "#cellUpdated",
         "shouldDisplay": cell.shouldDisplay,
         "extraData": cell.exportData
     }
-    structure.update(envelope)
+    res = structure.update(res)
     if cell.postscript:
-        structure['postscript'] = cell.postscript
+        res['postscript'] = cell.postscript
+    return res
 
-    return structure
 
 
 def cellDiscarded(cell):
@@ -149,8 +145,7 @@ def getStructure(parent_id, cell, name_in_parent, expand=False):
     """
     if expand:
         return _getExpandedStructure(parent_id, cell, name_in_parent)
-    else:
-        return _getFlatStructure(parent_id, cell, name_in_parent)
+    return _getFlatStructure(parent_id, cell, name_in_parent)
 
 
 
@@ -160,7 +155,6 @@ def _getFlatStructure(parent_id, cell, name_in_parent):
     return {
         "id": cell.identity,
         "cellType": cell.__class__.__name__,
-        "properties": cell.exportData,
         "nameInParent": name_in_parent,
         "parentId": parent_id,
         "namedChildren": own_children
