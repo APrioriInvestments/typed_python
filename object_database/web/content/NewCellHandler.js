@@ -6,11 +6,7 @@
  * a CellSocket instance.
  */
 import {h} from 'maquette';
-import {render} from './components/Component';
-import {
-    findNamedComponent,
-    allNamedChildrenDo
-} from './components/util/NamedChildren';
+
 
 class NewCellHandler {
     constructor(h, projector, components){
@@ -34,55 +30,25 @@ class NewCellHandler {
 
         // Private properties
         this._sessionId = null;
-        this._newComponents = [];
 
         // Bind component methods
-        this.updatePopovers = this.updatePopovers.bind(this);
-        this.showConnectionClosed = this.showConnectionClosed.bind(this);
-        this.connectionClosedView = this.connectionClosedView.bind(this);
-        this.appendPostscript = this.appendPostscript.bind(this);
-        this.handlePostscript = this.handlePostscript.bind(this);
+        //this.updatePopovers = this.updatePopovers.bind(this);
+        //this.appendPostscript = this.appendPostscript.bind(this);
+        //this.handlePostscript = this.handlePostscript.bind(this);
         this.receive = this.receive.bind(this);
         this.cellUpdated = this.cellUpdated.bind(this);
-        this.cellDiscarded = this.cellDiscarded.bind(this);
+        //this.cellDiscarded = this.cellDiscarded.bind(this);
         this.doesNotUnderstand = this.doesNotUnderstand.bind(this);
-        this._getUpdatedComponent = this._getUpdatedComponent.bind(this);
         this._createAndUpdate = this._createAndUpdate.bind(this);
         this._updateComponentProps = this._updateComponentProps.bind(this);
         this._updateNamedChildren = this._updateNamedChildren.bind(this);
         this._findOrCreateChild = this._findOrCreateChild.bind(this);
-        this._removeFromParent = this._removeFromParent.bind(this);
-        this._removeAllChildren = this._removeAllChildren.bind(this);
-        this._callDidLoadForNew = this._callDidLoadForNew.bind(this);
-    }
-
-    /**
-     * Fills the page's primary div with
-     * an indicator that the socket has been
-     * disconnected.
-     */
-    showConnectionClosed(){
-        this.projector.replace(
-            document.getElementById("page_root"),
-            this.connectionClosedView
-        );
-    }
-
-    /**
-     * Helper function that generates the vdom Node for
-     * to be display when connection closes
-     */
-    connectionClosedView(){
-        return this.h("main.container", {role: "main"}, [
-            this.h("div", {class: "alert alert-primary center-block mt-5"},
-                   ["Disconnected"])
-        ]);
     }
 
     receive(message){
         switch(message.type){
         case '#cellUpdated':
-            return this.cellUpdated(message);
+            return this.cellUpdated(message, true);
         case '#cellDiscarded':
             return this.cellDiscarded(message);
         case '#appendPostscript':
@@ -92,141 +58,40 @@ class NewCellHandler {
         }
     }
 
-    /** Primary Message Handlers **/
-
     doesNotUnderstand(message){
         let msg = `CellHandler does not understand the following message: ${message}`;
         console.error(msg);
         return;
     }
 
-    appendPostscript(message){
-        this.postscripts.push(message.script);
-    }
+    cellUpdated(message, rootCall=false){
+        if(!Object.keys(this.activeComponents).includes(message.id)){
+            // In this case, we are creating a totally new Cell
+            // and component combination.
+            return this._createAndUpdate(message);
+        }
+        let component = this.activeComponents[message.id];
+        this._updateComponentProps(component, message);
+        this._updateNamedChildren(component, message);
 
-    cellUpdated(message){
-        console.log(`Received cellUpdated for ${message.cellType}[${message.id}]`);
-        let component = this._getUpdatedComponent(message);
-        let velement = render(component);
-        let domElement = document.getElementById(component.props.id);
-        this.projector.replace(domElement, () => {
-            return velement;
-        });
-        this._callDidLoadForNew();
-        if(message.poststript){
-            this.postscripts.push(message.postscript);
+        if(rootCall){
+            let velement = component.render();
+            let domElement = document.getElementById(component.props.id);
+            this.projector.replace(domElement, () => {
+                return velement;
+            });
+            component.componentDidUpdate();
         }
         return component;
-    }
-
-    cellDiscarded(message){
-        /*let component = this.activeComponents[message.id];
-        if(!component || component == undefined){
-            console.warn(`Attempted to remove non-existing ${message.cellType} component ${message.id}`);
-            return null;
-        }
-        if(component.parent){
-            let wasRemoved = this._removeFromParent(component);
-            if(!wasRemoved){
-                console.warn(`Could not find discarded ${message.cellType}(${message.id}) in any parent components`);
-            }
-        }
-        this._removeAllChildren(component);
-        delete this.activeComponents[message.id];
-        return component;*/
-        let found = this.activeComponents[message.id];
-        if(found){
-            delete this.activeComponents[message.id];
-        }
-        return found;
-    }
-
-    /* Legacy Methods still required */
-    /**
-     * Primary method for handling
-     * 'postscripts' messages, which tell
-     * this object to go through it's array
-     * of script strings and to evaluate them.
-     * The evaluation is done on the global
-     * window object explicitly.
-     * NOTE: Future refactorings/restructurings
-     * will remove much of the need to call eval!
-     * @param {string} message - The incoming string
-     * from the socket.
-     */
-    handlePostscript(message){
-        // Elsewhere, update popovers first
-        // Now we evaluate scripts coming
-        // across the wire.
-        this.updatePopovers();
-        while(this.postscripts.length){
-            let postscript = this.postscripts.pop();
-            try {
-                window.eval(postscript);
-            } catch(e){
-                console.error("ERROR RUNNING POSTSCRIPT", e);
-                console.log(postscript);
-            }
-        }
-    }
-
-    /**
-     * Convenience method that updates
-     * Bootstrap-style popovers on
-     * the DOM.
-     * See inline comments
-     */
-    updatePopovers() {
-        // This function requires
-        // jQuery and perhaps doesn't
-        // belong in this class.
-        // TODO: Figure out a better way
-        // ALSO NOTE:
-        // -----------------
-        // `getChildProp` is a const function
-        // that is declared in a separate
-        // script tag at the bottom of
-        // page.html. That's a no-no!
-        $('[data-toggle="popover"]').popover({
-            html: true,
-            container: 'body',
-            title: function () {
-                return getChildProp(this, 'title');
-            },
-            content: function () {
-                return getChildProp(this, 'content');
-            },
-            placement: function (popperEl, triggeringEl) {
-                let placement = triggeringEl.dataset.placement;
-                if(placement == undefined){
-                    return "bottom";
-                }
-                return placement;
-            }
-        });
-        $('.popover-dismiss').popover({
-            trigger: 'focus'
-        });
     }
 
 
     /* Private Methods */
-    _getUpdatedComponent(description){
-        if(!Object.keys(this.activeComponents).includes(description.id.toString())){
-            // In this case, we are creating a totally new Cell
-            // and component combination.
-            return this._createAndUpdate(description);
-        }
-        let component = this.activeComponents[description.id];
-        this._updateComponentProps(component, description);
-        this._updateNamedChildren(component, description);
-        return component;
-    }
-
     _createAndUpdate(message){
         let componentClass = this.availableComponents[message.cellType];
         if(!componentClass || componentClass == undefined){
             throw new Error(`Cannot find Component for Cell Type: ${message.cellType}`);
+            return;
         }
         let componentProps = Object.assign({}, message.extraData, {
             id: message.id,
@@ -237,12 +102,11 @@ class NewCellHandler {
         this.activeComponents[newComponent.props.id] = newComponent;
         if(message.id == "page_root"){
             let domElement = document.getElementById('page_root');
-            let velement = render(newComponent);
+            let velement = newComponent.render();
             this.projector.replace(domElement, () => {
                 return velement;
             });
         }
-        this._newComponents.push(newComponent);
         return newComponent;
 
     }
@@ -256,7 +120,7 @@ class NewCellHandler {
             component.props,
             nextProps
         );
-        component._updateProps(newProps);
+        component.props = newProps;
     }
 
     _updateNamedChildren(component, message){
@@ -265,7 +129,7 @@ class NewCellHandler {
             let childDescription = message.namedChildren[childName];
             newNamedChildren[childName] = this._findOrCreateChild(childDescription, component);
         });
-        component.props.namedChildren = newNamedChildren;
+        component.namedChildren = newNamedChildren;
     }
 
     _findOrCreateChild(childDescription, parentComponent){
@@ -274,48 +138,9 @@ class NewCellHandler {
                 return this._findOrCreateChild(item, parentComponent);
             });
         }
-        let childComponent = this._getUpdatedComponent(childDescription);
+        let childComponent = this.cellUpdated(childDescription);
         childComponent.parent = parentComponent;
         return childComponent;
-    }
-
-    _removeFromParent(component){
-        let search = findNamedComponent(component, component.parent);
-        if(search.found == false){
-            console.warn(`Could not find ${component.name}(${component.props.id}) in parent's namedChildren`);
-            return false;
-        } else if(search.found && search.inArray){
-            // In this case, the result was in an array.
-            // So we need to find and splice that array.
-            let idx = search.inArray.indexOf(component);
-            if(idx < 0){
-                throw new Error(`${component.name}(${component.props.id}) removal failed trying to find itself in parent children using utility method.`);
-            }
-            search.inArray.splice(idx, 1);
-            return true;
-        } else if(search.found){
-            let parentNamedChildren = component.parent.props.namedChildren;
-            parentNamedChildren[search.nameInParent] = null;
-            return true;
-        }
-        return false;
-    }
-
-    _removeAllChildren(component){
-        allNamedChildrenDo(component, child => {
-            delete this.activeComponents[child.props.id];
-        });
-    }
-
-    _callDidLoadForNew(){
-        // Goes through the stored list of
-        // new components created during a message handle
-        // and calls componentDidLoad()
-        console.log(`Calling componentDidLoad on ${this._newComponents.length} components`);
-        this._newComponents.forEach(component => {
-            component.componentDidLoad();
-        });
-        this._newComponents = [];
     }
 }
 
