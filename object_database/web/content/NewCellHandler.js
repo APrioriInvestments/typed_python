@@ -120,7 +120,7 @@ class NewCellHandler {
             component.props,
             nextProps
         );
-        component.props = newProps;
+        component._updateProps(newProps);
     }
 
     _updateNamedChildren(component, message){
@@ -129,7 +129,7 @@ class NewCellHandler {
             let childDescription = message.namedChildren[childName];
             newNamedChildren[childName] = this._findOrCreateChild(childDescription, component);
         });
-        component.namedChildren = newNamedChildren;
+        component.props.namedChildren = newNamedChildren;
     }
 
     _findOrCreateChild(childDescription, parentComponent){
