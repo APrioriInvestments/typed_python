@@ -253,11 +253,11 @@ class DateTimePicker extends Component {
                 slider.value = 15;
                 break;
             case "hour":
-                slider.min = 1;
+                slider.min = 0;
                 slider.max = 23;
                 slider.value = 12;
                 break;
-            default:
+            case "minute":
                 slider.min = 0;
                 slider.max = 59;
                 slider.value = 30;
