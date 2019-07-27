@@ -26,15 +26,7 @@ describe('Datetimepicker Component Tests', () => {
             datetimepicker.setSliderMinMaxValue(type, slider)
             assert.equal(slider.min, 1);
             assert.equal(slider.max, 12);
-            assert.equal(slider.value, 6);
-        });
-        it('Setting proper hour value ranges', () => {
-            let slider = h("input", {type: "range"}, [])
-            let type = "hour";
-            datetimepicker.setSliderMinMaxValue(type, slider)
-            assert.equal(slider.min, 0);
-            assert.equal(slider.max, 23);
-            assert.equal(slider.value, 12);
+            assert.equal(slider.value, 1);
         });
         xit('Setting proper date value ranges', () => {
             let slider = h("input", {type: "range"}, [])
@@ -45,15 +37,32 @@ describe('Datetimepicker Component Tests', () => {
             assert.equal(slider.max, maxDate);
             assert.equal(slider.value, 15);
         });
+        it('Setting proper hour value ranges', () => {
+            let slider = h("input", {type: "range"}, [])
+            let type = "hour";
+            datetimepicker.setSliderMinMaxValue(type, slider)
+            assert.equal(slider.min, 0);
+            assert.equal(slider.max, 23);
+            // we need to use moment's hour here to account for potential timezone differences
+            assert.equal(slider.value, datetimepicker._prepSliderValue(datetimepicker.hour));
+        });
         it('Setting proper minute value ranges', () => {
             let slider = h("input", {type: "range"}, [])
             let type = "minute";
             datetimepicker.setSliderMinMaxValue(type, slider)
             assert.equal(slider.min, 0);
             assert.equal(slider.max, 59);
-            assert.equal(slider.value, 30);
+            assert.equal(slider.value, 10);
         });
-        it('Prepping values', () => {
+        it('Setting proper second value ranges', () => {
+            let slider = h("input", {type: "range"}, [])
+            let type = "second";
+            datetimepicker.setSliderMinMaxValue(type, slider)
+            assert.equal(slider.min, 0);
+            assert.equal(slider.max, 59);
+            assert.equal(slider.value, 10);
+        });
+        it('Prepping input values', () => {
             let v = 12
             let prepped_v =datetimepicker._prepValue(v)
             let test_v = "12"
@@ -65,6 +74,16 @@ describe('Datetimepicker Component Tests', () => {
             v = 1
             prepped_v =datetimepicker._prepValue(v)
             test_v = "01"
+            assert.equal(prepped_v, test_v);
+        });
+        it('Prepping slider values', () => {
+            let v = "12"
+            let prepped_v =datetimepicker._prepSliderValue(v)
+            let test_v = 12
+            assert.equal(prepped_v, test_v);
+            v = "01"
+            prepped_v =datetimepicker._prepSliderValue(v)
+            test_v = 1
             assert.equal(prepped_v, test_v);
         });
     });

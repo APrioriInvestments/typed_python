@@ -42,6 +42,7 @@ class DateTimePicker extends Component {
         this.hideSlider = this.hideSlider.bind(this);
         this.setSliderMinMaxValue = this.setSliderMinMaxValue.bind(this);
         this._prepValue = this._prepValue.bind(this);
+        this._prepSliderValue = this._prepSliderValue.bind(this);
     }
 
     render(){
@@ -160,7 +161,6 @@ class DateTimePicker extends Component {
         }
     }
 
-
     /* All our values are strings.
      * Months, date, hours, minutes, seconds are assumed to be two characters.
      * Example: "03" (not "3") for March
@@ -172,6 +172,19 @@ class DateTimePicker extends Component {
         }
         return value;
     }
+
+    /* All our values are strings.
+     * Months, date, hours, minutes, seconds are assumed to be two characters.
+     * But slider values are int. Here we convert all values to an int and account
+     * for preceeding 0's, example: "05" -> 5.
+     */
+    _prepSliderValue(value) {
+        if (value[0] === "0") {
+            value = value[1];
+        }
+        return parseInt(value);
+    }
+
     /* Updates the corresponding class attribute with the given value
      */
     updateInputValue(value, type){
@@ -240,27 +253,32 @@ class DateTimePicker extends Component {
             case "year":
                 slider.min = 1970;
                 slider.max = 2030;
-                slider.value = 2019;
+                slider.value = this._prepSliderValue(this.year);
                 break;
             case "month":
                 slider.min = 1;
                 slider.max = 12;
-                slider.value = 6;
+                slider.value = this._prepSliderValue(this.month);
                 break;
             case "date":
                 slider.min = 1;
                 slider.max = moment(this.year + "-" + this.month, "YYYY-MM").daysInMonth();
-                slider.value = 15;
+                slider.value = this._prepSliderValue(this.date);
                 break;
             case "hour":
                 slider.min = 0;
                 slider.max = 23;
-                slider.value = 12;
+                slider.value = this._prepSliderValue(this.hour);
                 break;
             case "minute":
                 slider.min = 0;
                 slider.max = 59;
-                slider.value = 30;
+                slider.value = this._prepSliderValue(this.minute);
+                break;
+            case "second":
+                slider.min = 0;
+                slider.max = 59;
+                slider.value = this._prepSliderValue(this.second);
                 break;
         }
     }
