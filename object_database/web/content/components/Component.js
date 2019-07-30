@@ -8,6 +8,12 @@ import {KeyListener} from './util/KeyListener';
 import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
+const render = (aComponent) => {
+    let velement = aComponent.render();
+    aComponent.numRenders += 1;
+    return velement;
+};
+
 class Component {
     constructor(props = {}, replacements = []){
         this.isComponent = true;
@@ -28,6 +34,9 @@ class Component {
         if(!this.props.id || this.props.id == undefined){
             throw Error('You must define an id for every component props!');
         }
+
+        // Add any extra utility properties
+        this.numRenders = 0;
 
         this.validateProps();
 
@@ -154,7 +163,9 @@ class Component {
     renderChildNamed(key){
         let foundChild = this.props.namedChildren[key];
         if(foundChild){
-            return foundChild.render();
+            let velement = render(foundChild);
+            velement.key = foundChild;
+            return velement;
         }
         return null;
     }
@@ -170,7 +181,9 @@ class Component {
         let foundChildren = this.props.namedChildren[key];
         if(foundChildren){
             return this._recursivelyMapNamedChildren(foundChildren, child => {
-                return child.render();
+                let velement = render(child);
+                velement.key = child;
+                return velement;
             });
         }
         return [];
@@ -290,4 +303,7 @@ class Component {
     }
 };
 
-export {Component, Component as default};
+export {
+    Component,
+    render,
+    Component as default};
