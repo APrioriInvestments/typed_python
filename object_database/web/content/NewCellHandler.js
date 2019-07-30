@@ -6,7 +6,7 @@
  * a CellSocket instance.
  */
 import {h} from 'maquette';
-
+import {render} from './components/Component';
 
 class NewCellHandler {
     constructor(h, projector, components){
@@ -75,7 +75,7 @@ class NewCellHandler {
         this._updateNamedChildren(component, message);
 
         if(rootCall){
-            let velement = component.render();
+            let velement = render(component);
             let domElement = document.getElementById(component.props.id);
             this.projector.replace(domElement, () => {
                 return velement;
@@ -101,7 +101,7 @@ class NewCellHandler {
         this.activeComponents[newComponent.props.id] = newComponent;
         if(message.id == "page_root"){
             let domElement = document.getElementById('page_root');
-            let velement = newComponent.render();
+            let velement = render(newComponent);
             this.projector.replace(domElement, () => {
                 return velement;
             });

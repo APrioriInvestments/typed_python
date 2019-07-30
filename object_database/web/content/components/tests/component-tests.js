@@ -3,6 +3,7 @@
  */
 require('jsdom-global')();
 var Component = require('../Component.js').Component;
+var render = require('../Component.js').render;
 var chai = require('chai');
 var h = require('maquette').h;
 var assert = chai.assert;
@@ -139,4 +140,23 @@ describe("Base Component Class", () => {
       });
       });
     });*/
+});
+
+describe("Module `render` function", () => {
+    var component;
+    before(() => {
+        component = new SubComponent({id: 'subcomponent'});
+    });
+    it("Can render a component", () => {
+        let result = render(component);
+        assert.exists(result);
+        assert.equal(result.properties.id, 'subcomponent');
+    });
+    it("Should have only rendered once for now", () => {
+        assert.equal(component.numRenders, 1);
+    });
+    it("Should have rendered twice for now", () => {
+        render(component);
+        assert.equal(component.numRenders, 2);
+    });
 });
