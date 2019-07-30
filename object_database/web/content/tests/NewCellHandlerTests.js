@@ -30,10 +30,19 @@ let firstText = {
 };
 
 let secondText = {
-    id: 3,
+    id: 4,
     cellType: "Text",
     extraData: {
         rawText: "Hello"
+    },
+    namedChildren: {}
+};
+
+let thirdText = {
+    id: 5,
+    cellType: "Text",
+    extraData: {
+        rawText: "AGAIN!"
     },
     namedChildren: {}
 };
@@ -140,6 +149,10 @@ describe("Basic Structure Handling Component Tests", () => {
         let stored = handler.activeComponents[simpleRoot.id];
         assert.exists(stored);
     });
+    it("Root component should have only rendered once for now", () => {
+        let component = handler.activeComponents[simpleRoot.id];
+        assert.equal(component.numRenders, 1);
+    });
     it("Initial RootCell instance has no named children", () => {
         let rootComponent = handler.activeComponents[simpleRoot.id];
         assert.notExists(rootComponent.props.namedChildren['child']);
@@ -159,6 +172,14 @@ describe("Basic Structure Handling Component Tests", () => {
         handler.receive(updateMessage);
         let stored = handler.activeComponents[child.id];
         assert.exists(stored);
+    });
+    it("Root should now have rendered exactly twice", () => {
+        let component = handler.activeComponents[simpleRoot.id];
+        assert.equal(component.numRenders, 2);
+    });
+    it("Child Text component should have rendered only once for now", function(){
+        let component = handler.activeComponents[firstText.id];
+        assert.equal(component.numRenders, 1);
     });
     it("RootCell has namedChild 'child' that matches Text component", () => {
         let textComp = handler.activeComponents[firstText.id];
@@ -187,6 +208,144 @@ describe("Basic Structure Handling Component Tests", () => {
         let foo = handler.receive(updateMessage);
         assert.equal(handler.activeComponents[firstText.id], foo);
         assert.equal(textComp.props.rawText, "WORLD");
+    });
+});
+
+describe("Complex Structure Handling Component Tests", () => {
+    var handler;
+    before(() => {
+        let rootEl = document.createElement('div');
+        rootEl.id = "page_root";
+        document.body.append(rootEl);
+        handler = new NewCellHandler(h, projector, registry);
+    });
+    after(() => {
+        let rootEl = document.getElementById("page_root");
+        rootEl.remove();
+    });
+    describe("Initial Render", () => {
+        it("Should create Components from a 3-deep nested description", () => {
+            let struct = Object.assign({}, simpleNestedStructure);
+            let message = makeCreateMessage(struct);
+            let result = handler.receive(message);
+            assert.exists(result);
+        });
+        it("Handler should have Root component", () => {
+            let component = handler.activeComponents[simpleRoot.id];
+            assert.exists(component);
+        });
+        it("Root component should only have rendered once for now", () => {
+            let component = handler.activeComponents[simpleRoot.id];
+            assert.equal(component.numRenders, 1);
+        });
+        it("Handler should have Sequence component", () => {
+            let component = handler.activeComponents[simpleSequence.id];
+            assert.exists(component);
+        });
+        it("Sequence component should only have rendered once for now", () => {
+            let component = handler.activeComponents[simpleSequence.id];
+            assert.equal(component.numRenders, 1);
+        });
+        it("Root namedChild 'child' should be Sequence component", () => {
+            let parent = handler.activeComponents[simpleRoot.id];
+            let child = handler.activeComponents[simpleSequence.id];
+            assert.equal(parent.props.namedChildren['child'], child);
+        });
+        it("Sequence component's parent should be Root component", () => {
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let root = handler.activeComponents[simpleRoot.id];
+            assert.equal(sequence.parent, root);
+        });
+        it("Handler should have the first Text component", () => {
+            let component = handler.activeComponents[firstText.id];
+            assert.exists(component);
+        });
+        it("First Text component should have only rendered once", () => {
+            let component = handler.activeComponents[firstText.id];
+            assert.equal(component.numRenders, 1);
+        });
+        it("First Text component should be in array children of Sequence (elements)", () => {
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let component = handler.activeComponents[firstText.id];
+            let elements = sequence.props.namedChildren['elements'];
+            assert.include(elements, component, "Sequence children elements contains child");
+            assert.equal(elements[0], component);
+        });
+        it("Handler should have the second Text component", () => {
+            let component = handler.activeComponents[secondText.id];
+            assert.exists(component);
+        });
+        it("Second Text component should have only rendered once", () => {
+            let component = handler.activeComponents[secondText.id];
+            assert.equal(component.numRenders, 1);
+        });
+        it("Second Text component should be in array children of Sequence (elements)", () => {
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let component = handler.activeComponents[secondText.id];
+            let elements = sequence.props.namedChildren['elements'];
+            assert.include(elements, component);
+            assert.equal(elements[1], component);
+        });
+    });
+    describe("Update the Sequence, inserting a third text (between original)", () => {
+        it("Should update the Sequence component without error", () => {
+            let newElements = [];
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let newText = Object.assign({}, thirdText);
+            let seqDescription = Object.assign({}, simpleNestedStructure.namedChildren['child']);
+            newElements.push(seqDescription.namedChildren['elements'][0]);
+            newElements.push(newText);
+            newElements.push(seqDescription.namedChildren['elements'][1]);
+            let updatedSequence = Object.assign({}, seqDescription, {
+                namedChildren: {
+                    elements: newElements
+                }
+            });
+            let updateMessage = makeUpdateMessage(updatedSequence);
+            let result = handler.receive(updateMessage);
+            assert.exists(result);
+        });
+        it("Root should still have only rendered once", () => {
+            let root = handler.activeComponents[simpleRoot.id];
+            assert.equal(root.numRenders, 1);
+        });
+        it("Sequence should have now rendered twice", () => {
+            let component = handler.activeComponents[simpleSequence.id];
+            assert.equal(component.numRenders, 2);
+        });
+        it("Sequence should have First Text as the first namedChild element", () => {
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let component = handler.activeComponents[firstText.id];
+            let elements = sequence.props.namedChildren['elements'];
+            assert.include(elements, component);
+            assert.equal(elements[0], component);
+        });
+        it("Sequence should have Third Text as the *second* namedChild element", () => {
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let component = handler.activeComponents[thirdText.id];
+            let elements = sequence.props.namedChildren['elements'];
+            assert.include(elements, component);
+            assert.equal(elements[1], component);
+        });
+        it("Sequence should have the Second text as the *third* namedChild element", () => {
+            let sequence = handler.activeComponents[simpleSequence.id];
+            let component = handler.activeComponents[secondText.id];
+            let elements = sequence.props.namedChildren['elements'];
+            assert.include(elements, component);
+            assert.equal(elements[2], component);
+        });
+        it("First Text should have rendered twice at this point", () => {
+            let component = handler.activeComponents[firstText.id];
+            assert.equal(component.numRenders, 2);
+        });
+        it("Second Text should have rendered twice at this point", () => {
+            let component = handler.activeComponents[secondText.id];
+            assert.equal(component.numRenders, 2);
+        });
+        it("Third text should have only rendered once at this point", () => {
+            let component = handler.activeComponents[thirdText.id];
+            assert.equal(component.numRenders, 1);
+        });
     });
 });
 
