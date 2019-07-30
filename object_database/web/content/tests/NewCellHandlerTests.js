@@ -47,12 +47,6 @@ let simpleSequence = {
     }
 };
 
-let simpleRootUpdate = Object.assign({}, simpleRoot, {
-    type: "#cellUpdated",
-    channel: "#main",
-    shouldDisplay: true
-});
-
 let simpleNestedStructure = Object.assign({}, simpleRoot, {
     namedChildren: {
         "child": Object.assign({}, simpleSequence, {
@@ -76,6 +70,21 @@ let simpleNestedStructure = Object.assign({}, simpleRoot, {
         })
     }
 });
+let makeUpdateMessage = (compDescription) => {
+    return Object.assign({}, compDescription, {
+        channel: "#main",
+        type: "#cellUpdated",
+        shouldDisplay: true
+    });
+};
+
+let makeCreateMessage = (compDescription) => {
+    return Object.assign({}, compDescription, {
+        channel: "#main",
+        type: "#cellUpdated",
+        shouldDisplay: true
+    });
+};
 
 describe("Basic NewCellHandler Tests", () => {
     it('Should be able to initialize', () => {
@@ -113,7 +122,75 @@ describe("Basic Test DOM Tests", () => {
     });
 });
 
-describe("Basic Structure Handling Tests", () => {
+describe("Basic Structure Handling Component Tests", () => {
+    var handler = new NewCellHandler(h, projector, registry);
+    before(() => {
+        let rootEl = document.createElement('div');
+        rootEl.id = 'page_root';
+        document.body.append(rootEl);
+    });
+    after(() => {
+        let rootEl = document.getElementById('page_root');
+        rootEl.remove();
+    });
+
+    it("Creates and stores new RootCell instance", () => {
+        let createMessage = makeCreateMessage(simpleRoot);
+        handler.receive(createMessage);
+        let stored = handler.activeComponents[simpleRoot.id];
+        assert.exists(stored);
+    });
+    it("Initial RootCell instance has no named children", () => {
+        let rootComponent = handler.activeComponents[simpleRoot.id];
+        assert.notExists(rootComponent.props.namedChildren['child']);
+    });
+    it("Creates and stores a new TextCell component", () => {
+        let child = Object.assign({}, firstText, {
+            parentId: simpleRoot.id,
+            nameInParent: 'child'
+        });
+        let updatedParent = Object.assign({}, simpleRoot, {
+            namedChildren: {
+                child: child
+            }
+        });
+        assert.notExists(handler.activeComponents[child.id]);
+        let updateMessage = makeUpdateMessage(updatedParent);
+        handler.receive(updateMessage);
+        let stored = handler.activeComponents[child.id];
+        assert.exists(stored);
+    });
+    it("RootCell has namedChild 'child' that matches Text component", () => {
+        let textComp = handler.activeComponents[firstText.id];
+        let parent = handler.activeComponents[simpleRoot.id];
+        let namedChild = parent.props.namedChildren['child'];
+        assert.equal(textComp, namedChild);
+    });
+    it("Text component parent attribute set to Root", () => {
+        let textComp = handler.activeComponents[firstText.id];
+        let parent = handler.activeComponents[simpleRoot.id];
+        assert.equal(textComp.parent, parent);
+    });
+    it("Text component is present in the handler's store", () => {
+        let found = handler.activeComponents[firstText.id];
+        assert.exists(found);
+        assert.equal(found.name, "Text");
+    });
+    it("Text component has rawText prop value 'WORLD' after update", () => {
+        let textComp = handler.activeComponents[firstText.id];
+        let updatedText = Object.assign({}, firstText, {
+            extraData: {
+                rawText: "WORLD"
+            }
+        });
+        let updateMessage = makeUpdateMessage(updatedText);
+        let foo = handler.receive(updateMessage);
+        assert.equal(handler.activeComponents[firstText.id], foo);
+        assert.equal(textComp.props.rawText, "WORLD");
+    });
+});
+
+describe("Basic Structure Handling DOM Tests", () => {
     var handler;
     before(() => {
         let root = document.createElement('div');
@@ -128,15 +205,10 @@ describe("Basic Structure Handling Tests", () => {
         }
     });
 
-    it("Receives the update and stores new RootCell instance", () => {
+    it("Properly renders new Root Component to the DOM", () => {
         handler = new NewCellHandler(h, projector, registry);
-        handler.receive(simpleRootUpdate);
-        let stored = handler.activeComponents[simpleRoot.id];
-        assert.exists(stored);
-    });
-    it("Updates the new Component by rendering properly to the DOM", () => {
-        handler = new NewCellHandler(h, projector, registry);
-        handler.receive(simpleRootUpdate);
+        let createMessage = makeCreateMessage(simpleRoot);
+        handler.receive(createMessage);
         let pageRoot = document.getElementById('page_root');
         let inlineType = pageRoot.dataset.cellType;
         assert.exists(inlineType);
@@ -157,11 +229,7 @@ describe("Basic Structure Handling Tests", () => {
                     child: newText
                 }
             });
-            let updateMessage = Object.assign({}, struct, {
-                type: "#cellUpdated",
-                channel: "#main",
-                shouldDisplay: true
-            });
+            let updateMessage = makeUpdateMessage(struct);
             handler.receive(updateMessage);
             assert.equal(Object.keys(handler.activeComponents).length, 2);
         });
@@ -196,11 +264,7 @@ describe("Basic Structure Handling Tests", () => {
                     child: newText
                 }
             });
-            let updateMessage = Object.assign({}, parent, {
-                type: "#cellUpdated",
-                channel: "#main",
-                shouldDisplay: true
-            });
+            let updateMessage = makeUpdateMessage(parent);
             handler.receive(updateMessage);
             let pageRoot = document.getElementById(simpleRoot.id);
             assert.equal(pageRoot.children.length, 1);
@@ -240,17 +304,13 @@ describe("Properties Update Tests", () => {
                 child: newText
             }
         });
-        let updateMessage = Object.assign({}, parent, {
-            type: "#cellUpdated",
-            channel: "#main",
-            shouldDisplay: true
-        });
+        let updateMessage = makeUpdateMessage(parent);
         handler.receive(updateMessage);
         let el = document.getElementById(newText.id);
         assert.exists(el);
         assert.equal(el.textContent, "HELLO");
     });
-    it("Has text 'WORLD' after props update", () => {
+    it("Has text 'WORLD' after props update", function(){
         let newText = Object.assign({}, firstText, {
             id: 2,
             parentId: simpleRoot.id,

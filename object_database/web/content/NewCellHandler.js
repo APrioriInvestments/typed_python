@@ -65,7 +65,7 @@ class NewCellHandler {
     }
 
     cellUpdated(message, rootCall=false){
-        if(!Object.keys(this.activeComponents).includes(message.id)){
+        if(!Object.keys(this.activeComponents).includes(message.id.toString())){
             // In this case, we are creating a totally new Cell
             // and component combination.
             return this._createAndUpdate(message);
@@ -91,7 +91,6 @@ class NewCellHandler {
         let componentClass = this.availableComponents[message.cellType];
         if(!componentClass || componentClass == undefined){
             throw new Error(`Cannot find Component for Cell Type: ${message.cellType}`);
-            return;
         }
         let componentProps = Object.assign({}, message.extraData, {
             id: message.id,
