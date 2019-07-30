@@ -1,11 +1,11 @@
 import 'maquette';
 const h = maquette.h;
 //import {langTools} from 'ace/ext/language_tools';
-import {CellHandler} from './CellHandler';
+import {CellHandler as CellHandler} from './CellHandler';
 import {CellSocket} from './CellSocket';
 import {ComponentRegistry} from './ComponentRegistry';
 import {KeyListener} from './components/util/KeyListener';
-import {Component} from './components/Component';
+import {Component, render} from './components/Component';
 
 /**
  * Globals
@@ -36,6 +36,7 @@ const initialRender = function(){
 let projector = maquette.createProjector();
 const cellSocket = new CellSocket();
 const cellHandler = new CellHandler(h, projector, ComponentRegistry);
+window._cellHandler = cellHandler;
 cellSocket.onPostscripts(cellHandler.handlePostscript);
 cellSocket.onMessage(cellHandler.receive);
 cellSocket.onClose(cellHandler.showConnectionClosed);
