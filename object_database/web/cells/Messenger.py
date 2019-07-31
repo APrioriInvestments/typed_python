@@ -46,16 +46,17 @@ def cellUpdated(cell, replaceDict):
         cell,
         None,
         expand=True)
-    res = {
+    envelope = {
         "channel": "#main",
         "type": "#cellUpdated",
         "shouldDisplay": cell.shouldDisplay,
         "extraData": cell.exportData
     }
-    res = structure.update(res)
+    structure.update(envelope)
     if cell.postscript:
-        res['postscript'] = cell.postscript
-    return res
+        structure['postscript'] = cell.postscript
+
+    return structure
 
 
 
