@@ -95,6 +95,13 @@ let makeCreateMessage = (compDescription) => {
     });
 };
 
+let makeDiscardedMessage = (compDescription) => {
+    return Object.assign({}, compDescription, {
+        channel: "#main",
+        type: "#cellDiscarded"
+    });
+};
+
 describe("Basic NewCellHandler Tests", () => {
     it('Should be able to initialize', () => {
         let instance = new NewCellHandler(h, projector, registry);
@@ -346,6 +353,106 @@ describe("Complex Structure Handling Component Tests", () => {
             let component = handler.activeComponents[thirdText.id];
             assert.equal(component.numRenders, 1);
         });
+    });
+});
+
+describe("#cellDiscarded basic", () => {
+    var handler;
+    before(() => {
+        let rootEl = document.createElement('div');
+        rootEl.id = 'page_root';
+        document.body.append(rootEl);
+        handler = new NewCellHandler(h, projector, registry);
+    });
+    after(() => {
+        let rootEl = document.getElementById('page_root');
+        rootEl.remove();
+    });
+
+    it('Initially handles basic structure', () => {
+        let text = Object.assign({}, firstText);
+        let root = Object.assign({}, simpleRoot, {
+            namedChildren: {
+                child: text
+            }
+        });
+        let updateMessage = makeCreateMessage(root);
+        handler.receive(updateMessage);
+        let component = handler.activeComponents[text.id];
+        let rootComponent = handler.activeComponents[root.id];
+        assert.equal(rootComponent, component.parent);
+    });
+    it("Can successfully call the discard method", () => {
+        let text = Object.assign({}, firstText);
+        let discardMessage = makeDiscardedMessage(text);
+        handler.receive(discardMessage);
+        assert.isTrue(true);
+    });
+    it("Is no longer present in handler after discard", () => {
+        let found = handler.activeComponents[firstText.id];
+        assert.notExists(found);
+    });
+    it("Is no longer present in the namedChildren of old parent", () => {
+        let rootComponent = handler.activeComponents[simpleRoot.id];
+        let child = rootComponent.props.namedChildren['child'];
+        assert.notExists(child);
+    });
+});
+
+describe("#cellDiscarded complex case", () => {
+    var handler;
+    before(() => {
+        let rootEl = document.createElement('div');
+        rootEl.id = "page_root";
+        document.body.append(rootEl);
+        handler = new NewCellHandler(h, projector, registry);
+    });
+    after(() => {
+        let rootEl = document.getElementById('page_root');
+        rootEl.remove();
+    });
+    it("Initially creates the complex strutcure", () => {
+        let struct = Object.assign({}, simpleNestedStructure);
+        let createMessage = makeCreateMessage(struct);
+        handler.receive(createMessage);
+        let foundRoot = handler.activeComponents[simpleRoot.id];
+        assert.exists(foundRoot);
+    });
+    it("Can call #cellDiscarded on firstText", () => {
+        let textToRemove = Object.assign({}, firstText);
+        let discardMessage = makeDiscardedMessage(textToRemove);
+        handler.receive(discardMessage);
+        assert.isTrue(true);
+    });
+    it("firstText is removed from handler", () => {
+        let found = handler.activeComponents[firstText.id];
+        assert.notExists(found);
+    });
+    it("firstText is not present in Sequence elements namedChild array", () => {
+        let sequenceComp = handler.activeComponents[simpleSequence.id];
+        let elements = sequenceComp.props.namedChildren['elements'];
+        let elementIds = elements.map(item => {return item.props.id;});
+        assert.equal(elements.length, 1);
+        assert.notInclude(elementIds, firstText.id);
+        assert.include(elementIds, secondText.id);
+    });
+    it("Can remove the entire Sequence", () => {
+        let seqToRemove = Object.assign({}, simpleSequence);
+        let discardMessage = makeDiscardedMessage(seqToRemove);
+        handler.receive(discardMessage);
+        let found = handler.activeComponents[simpleSequence.id];
+        assert.notExists(found);
+    });
+    it("All of Sequence's children should also be removed", () => {
+        let first = handler.activeComponents[firstText.id];
+        let second = handler.activeComponents[secondText.id];
+        assert.notExists(first);
+        assert.notExists(second);
+    });
+    it("Root's namedChild 'child' should be set to null", () => {
+        let root = handler.activeComponents[simpleRoot.id];
+        let child = root.props.namedChildren['child'];
+        assert.equal(child, null);
     });
 });
 
