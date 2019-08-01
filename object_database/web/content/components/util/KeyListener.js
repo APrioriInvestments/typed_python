@@ -89,6 +89,7 @@ class KeyListener {
      * the internal value from instantiation if nothing is passed.
      */
     start(target, socket){
+        console.log('Starting global KeyListener');
         if(target){
             this._target = target;
         }
@@ -106,6 +107,7 @@ class KeyListener {
      * arguments.
      */
     pause(){
+        console.log('keyListener paused');
         this._target.removeEventListener('keydown', this.mainListener);
     }
 
