@@ -1,6 +1,6 @@
 #include "AllTypes.hpp"
 #include "hash_table_layout.hpp"
-#include <iostream>
+
 #include <map>
 
 SetType* SetType::Make(Type* eltype) {
@@ -108,6 +108,13 @@ void SetType::destroy(instance_ptr self) {
 void SetType::copy_constructor(instance_ptr self, instance_ptr other) {
     (*(hash_table_layout**)self) = (*(hash_table_layout**)other);
     (*(hash_table_layout**)self)->refcount++;
+}
+
+void SetType::assign(instance_ptr self, instance_ptr other) {
+    hash_table_layout* old = (*(hash_table_layout**)self);
+    (*(hash_table_layout**)self) = (*(hash_table_layout**)other);
+    (*(hash_table_layout**)self)->refcount++;
+    destroy((instance_ptr)&old);
 }
 
 bool SetType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,

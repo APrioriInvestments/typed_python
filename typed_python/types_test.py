@@ -1945,20 +1945,20 @@ class NativeTypesTests(unittest.TestCase):
         d = Dict(int, ListOf(int))()
         aList = ListOf(int)([1, 2, 3])
 
-        self.assertEquals(_types.refcount(aList), 1)
+        self.assertEqual(_types.refcount(aList), 1)
         d[1] = aList
-        self.assertEquals(_types.refcount(aList), 2)
+        self.assertEqual(_types.refcount(aList), 2)
         d.setdefault(2, aList)
-        self.assertEquals(_types.refcount(aList), 3)
+        self.assertEqual(_types.refcount(aList), 3)
         a = d.setdefault(2, aList)
-        self.assertEquals(_types.refcount(aList), 4)
-        self.assertEquals(a, aList)
+        self.assertEqual(_types.refcount(aList), 4)
+        self.assertEqual(a, aList)
         a = None
-        self.assertEquals(_types.refcount(aList), 3)
+        self.assertEqual(_types.refcount(aList), 3)
         d.setdefault(3, ListOf(int)([1]))
-        self.assertEquals(_types.refcount(aList), 3)
+        self.assertEqual(_types.refcount(aList), 3)
         d.setdefault(3, aList)
-        self.assertEquals(_types.refcount(aList), 3)
+        self.assertEqual(_types.refcount(aList), 3)
 
     def test_mutable_dict_iteration_order(self):
         d = Dict(int, int)()
@@ -2334,6 +2334,173 @@ class NativeTypesTests(unittest.TestCase):
             except StopIteration:
                 break
         self.assertEqual(count, len(s))
+
+    def test_set_assign_from_existing_dict_key_nothrow(self):
+        d = Dict(str, Set(int))()
+        i = Set(int)()
+        d['a'] = i
+        d['a'] = i
+        d['a'] = Set(int)()
+
+    def test_set_uniquification(self):
+        word = 'simsalabim'
+        s = Set(str)()
+        for i in word:
+            s.add(i)
+        ss = sorted(s)
+        ds = sorted(dict.fromkeys(word))
+        self.assertEqual(ss, ds)
+
+    def test_set_copy(self):
+        s = Set(int)(1)
+        dup = s.copy()
+        self.assertEqual(s, dup)
+        self.assertNotEqual(id(s), id(dup))
+        self.assertEqual(_types.refcount(s), 1)
+        self.assertEqual(_types.refcount(dup), 1)
+        dup2 = s.copy()
+        self.assertEqual(_types.refcount(s), 1)
+        s.add(5)
+        self.assertEqual(len(s), 2)
+        self.assertEqual(len(dup), 1)
+        self.assertEqual(len(dup2), 1)
+        self.assertNotIn(5, dup)
+        self.assertNotIn(5, dup2)
+        self.assertRaises(TypeError, s.copy, s)
+        self.assertRaises(TypeError, s.copy, [])
+
+    def test_set_construct_from_str(self):
+        word = 'symbolic'
+        s = Set(str)(word)
+        self.assertEqual(len(s), 8)
+        self.assertEqual(s == word, False)
+        self.assertEqual(s != word, True)
+        self.assertRaises(TypeError, s.add, [])
+        self.assertRaises(TypeError, s.add, 1.0)
+        for c in word:
+            self.assertIn(c, s)
+
+    def test_set_ops_throws_diff_type(self):
+        s = Set(int)(1)
+        self.assertRaises(TypeError, s.union, 1.0)
+        self.assertRaises(TypeError, s.union, 'hello')
+        self.assertRaises(TypeError, s.union, ListOf(str)(['hello']))
+        self.assertRaises(TypeError, s.union, [[]])
+        s = Set(str)('hello')
+        self.assertRaises(TypeError, s.union, 1)
+        self.assertRaises(TypeError, s.union, ListOf(int)([1]))
+        self.assertRaises(TypeError, s.union, [[]])
+
+        self.assertRaises(TypeError, s.difference, [[]])
+
+    def test_set_union_refcounts(self):
+        s = Set(int)(1)
+        s2 = Set(int)(2)
+        k = s.union(s2)
+        self.assertEqual(_types.refcount(s), 1)
+        self.assertEqual(_types.refcount(k), 1)
+        self.assertNotIn(2, s)
+        self.assertNotIn(1, s2)
+        self.assertIn(1, k)
+        self.assertIn(2, k)
+        self.assertNotEqual(id(s), id(s2), id(k))
+
+    def test_set_union(self):
+        word = 'symbolic'
+        word2 = 'word'
+        s = Set(str)(word)
+        u = s.union(Set(str)(word2))
+        self.assertEqual(s, Set(str)(word))
+        self.assertEqual(type(u), type(s))
+
+        def _check(u, s, chars):
+            self.assertEqual(len(u), len(s))
+            self.assertEqual(len(u), len(chars))
+            for c in chars:
+                self.assertIn(c, u)
+                self.assertIn(c, s)
+
+        chars = 'abcd'
+        u = Set(str)('abcba').union(Set(str)('cdc'))
+        s = set(chars)
+        _check(u, s, chars)
+        chars = 'abcefg'
+        u = Set(str)('abcba').union(Set(str)('efgfe'))
+        s = set('abcefg')
+        _check(u, s, chars)
+        chars = 'abc'
+        u = Set(str)('abcba').union(Set(str)('ccb'))
+        s = set(chars)
+        _check(u, s, chars)
+        chars = 'abcef'
+        u = Set(str)('abcba').union(Set(str)('ef'))
+        s = set(chars)
+        _check(u, s, chars)
+        chars = 'abcefg'
+        u = Set(str)('abcba').union(Set(str)('ef'), Set(str)('fg'))
+        s = set(chars)
+        _check(u, s, chars)
+
+        s = Set(int)()
+        self.assertEqual(s.union(Set(int)([1]), s, Set(int)([2])), Set(int)([1, 2]))
+
+    def test_set_ops_with_other_containers(self):
+        # union
+        for C in set, list, tuple, ListOf(str), TupleOf(str), Set(str):
+            self.assertEqual(Set(str)('abcba').union(C('cdc')), Set(str)('abcd'))
+            self.assertEqual(Set(str)('abcba').union(C('ef'), C('fg')), Set(str)('abcefg'))
+
+        # intersection
+        for C in set, list, tuple, ListOf(str), TupleOf(str), Set(str):
+            self.assertEqual(Set(str)('abcba').intersection(C('cdc')), Set(str)('cc'))
+            self.assertEqual(Set(str)('abcba').intersection(C('efgfe')), Set(str)(''))
+            self.assertEqual(Set(str)('abcba').intersection(C('ccb')), Set(str)('bc'))
+            self.assertEqual(Set(str)('abcba').intersection(C('ef')), Set(str)(''))
+            self.assertEqual(Set(str)('abcba').intersection(C('cbcf'), C('bag')), Set(str)('b'))
+
+        # difference
+        for C in list, tuple, ListOf(str), TupleOf(str), Set(str):
+            self.assertEqual(Set(str)('abcba').difference(C('cdc')), Set(str)('ab'))
+            self.assertEqual(Set(str)('abcba').difference(C('efgfe')), Set(str)('abc'))
+            self.assertEqual(Set(str)('abcba').difference(C('ccb')), Set(str)('a'))
+            self.assertEqual(Set(str)('abcba').difference(C('ef')), Set(str)('abc'))
+            self.assertEqual(Set(str)('abcba').difference(), Set(str)('abc'))
+
+    def test_set_intersection(self):
+        word = 'symbolic'
+        word2 = 'words'
+        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+
+        s = Set(str)(word)
+        s1 = Set(str)(word2)
+        d = dict.fromkeys(word)
+        i = s.intersection(s1)
+        self.assertEqual(_types.refcount(s), 1)
+        self.assertEqual(_types.refcount(s1), 1)
+        for c in alphabet:
+            self.assertEqual(c in i, c in d and c in word2)
+
+        self.assertEqual(s, Set(str)(word))
+        self.assertEqual(type(i), Set(str))
+
+        z = s.intersection()
+        self.assertNotEqual(id(s), id(z))
+        self.assertEqual(z, s)
+        self.assertEqual(_types.refcount(s), 1)
+
+    def test_set_difference(self):
+        word = 'symbolic'
+        word2 = 'symbolism'
+        alphabet = 'abcdefghijklmnopqrstuvwxyz'
+        d = dict.fromkeys(word)
+        s = Set(str)(word)
+        s1 = Set(str)(word2)
+        i = s.difference(s1)
+        for c in alphabet:
+            self.assertEqual(c in i, c in d and c not in word2)
+
+        self.assertEqual(s, Set(str)(word))
+        self.assertEqual(type(i), Set(str))
 
     def test_list_of_tuples_transpose(self):
         listOfTuples = ListOf(NamedTuple(x=int, y=str, z=bool))()

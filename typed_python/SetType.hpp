@@ -28,6 +28,7 @@ class SetType : public Type {
     int64_t size(instance_ptr self) const;
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
              bool suppressExceptions = false);
+    void assign(instance_ptr self, instance_ptr other);
     Type* keyType() const { return m_key_type; }
 
     // hash_table_layout accessors
