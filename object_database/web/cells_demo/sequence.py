@@ -16,7 +16,7 @@ from object_database.web import cells as cells
 from object_database.web.CellsTestPage import CellsTestPage
 
 
-class VerticalSplitSequence(CellsTestPage):
+class SplitSequence(CellsTestPage):
     def cell(self):
         return cells.Sequence(
             [cells.Text("item 1", text_color="red"),
@@ -29,10 +29,9 @@ class VerticalSplitSequence(CellsTestPage):
 
 class HorizontalSplitSequence(CellsTestPage):
     def cell(self):
-        return cells.Sequence(
+        return cells.HorizontalSequence(
             [cells.Text("item 1", text_color="red"),
-             cells.Text("item 2", text_color="blue")],
-            split="horizontal"
+             cells.Text("item 2", text_color="blue")]
         )
 
     def text(self):

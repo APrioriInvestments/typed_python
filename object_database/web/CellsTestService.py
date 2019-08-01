@@ -62,20 +62,14 @@ class CellsTestService(ServiceBase):
     coresUsed = 0
 
     @staticmethod
-    def serviceDisplay(serviceObject, instance=None, objType=None,
-                       queryArgs=None):
+    def serviceDisplay(serviceObject, instance=None, objType=None, queryArgs=None):
         queryArgs = queryArgs or {}
 
-        # general sizing
-        resultAreaHeight = '45vh'
-        inputAreaHeight = '45vh'
-        descriptionAreaHeight = '5vh'
         if 'category' in queryArgs and 'name' in queryArgs:
             page = getPages()[queryArgs['category']][queryArgs['name']]
             contentsOverride = cells.Slot()
 
-            pageSource = textwrap.dedent(
-                "".join(getsourcelines(page.cell.__func__)[0]))
+            pageSource = textwrap.dedent("".join(getsourcelines(page.cell.__func__)[0]))
 
             def actualDisplay():
                 if contentsOverride.get() is not None:
@@ -94,38 +88,34 @@ class CellsTestService(ServiceBase):
 
             ed = cells.CodeEditor(keybindings={'Enter': onEnter},
                                   noScroll=True, minLines=20,
-                                  onTextChange=lambda *args: None).height(
-                                      "100%")
+                                  onTextChange=lambda *args: None)
             ed.setContents(pageSource)
 
             description = page.text()
-
         else:
             page = None
             description = ""
-            ed = cells.Card("pick something").height("100%")
+            ed = cells.Card("pick something")
 
             def actualDisplay():
                 return cells.Text("nothing to display")
 
         resultArea = cells.SplitView([
-            (cells.Card(
-                cells.Subscribed(actualDisplay),
-                padding=4).height(resultAreaHeight), 2),
-            (cells.Card(cells.Text(description),
-                        padding=2).height(descriptionAreaHeight),
-             1)], split="horizontal")
+            (cells.Card(cells.Subscribed(actualDisplay), padding=4), 2),
+            (cells.Card(cells.Text(description), padding=2), 1)],
+            split="horizontal"
+        )
 
         inputArea = cells.Card(
             cells.SplitView(
-                [(selectionPanel(page, inputAreaHeight), 1), (ed, 8)]
+                [(selectionPanel(page), 1), (ed, 8)]
             ), padding=2
-        ).height(inputAreaHeight)
+        )
 
         return cells.SplitView([
             (resultArea, 1),
             (inputArea, 1)
-        ], split="horizontal")
+        ], split="horizontal").height("100%")
 
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
@@ -139,7 +129,7 @@ def reload():
     os._exit(0)
 
 
-def selectionPanel(page, height):
+def selectionPanel(page):
     availableCells = cells.Sequence(
         [cells.Clickable(
             x.category() + "." + x.name(),
@@ -147,13 +137,11 @@ def selectionPanel(page, height):
                 dict(category=x.category(), name=x.name())),
             makeBold=x is page)
             for perCategory in getPages().values()
-            for x in perCategory.values()],
-        split="horizontal"
+            for x in perCategory.values()]
     )
     return cells.Card(
         cells.SplitView([
             (cells.Button(cells.Octicon("sync"), reload), 1),
             (availableCells, 6)
         ], split="horizontal")
-    ).background_color(
-        "#FAFAFA").height("100%")
+    ).background_color("#FAFAFA")
