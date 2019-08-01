@@ -96,6 +96,7 @@ class NewCellHandler {
     }
 
     cellUpdated(message, rootCall=false){
+        console.log(`#cellUpdated for ${message.cellType}(${message.id})`);
         if(!Object.keys(this.activeComponents).includes(message.id.toString())){
             // In this case, we are creating a totally new Cell
             // and component combination.
@@ -117,7 +118,7 @@ class NewCellHandler {
     }
 
     cellDiscarded(message){
-        let component = this.activeComponents[message.id];
+        /*let component = this.activeComponents[message.id];
         if(!component || component == undefined){
             console.warn(`Attempted to remove non-existing ${message.cellType} component ${message.id}`);
             return null;
@@ -130,7 +131,12 @@ class NewCellHandler {
         }
         this._removeAllChildren(component);
         delete this.activeComponents[message.id];
-        return component;
+        return component;*/
+        let found = this.activeComponents[message.id];
+        if(found){
+            delete this.activeComponents[message.id];
+        }
+        return found;
     }
 
     /* Legacy Methods still required */
