@@ -40,9 +40,13 @@ def cellUpdated(cell, replaceDict={}):
     return res
 
 
-def newCellUpdated(cell, replaceDict):
+def newCellUpdated(cell):
+    parent_id = None
+    if cell.parent is not None:
+        parent_id = cell.parent.identity
+
     structure = getStructure(
-        cell.parent.identity,
+        parent_id,
         cell,
         None,
         expand=True)
@@ -158,7 +162,8 @@ def _getFlatStructure(parent_id, cell, name_in_parent):
         "cellType": cell.__class__.__name__,
         "nameInParent": name_in_parent,
         "parentId": parent_id,
-        "namedChildren": own_children
+        "namedChildren": own_children,
+        "extraData": cell.exportData
     }
 
 
@@ -181,7 +186,7 @@ def _getExpandedStructure(parent_id, cell, name_in_parent):
     return {
         "id": cell.identity,
         "cellType": cell.__class__.__name__,
-        "properties": cell.exportData,
+        "extraData": cell.exportData,
         "nameInParent": name_in_parent,
         "parentId": parent_id,
         "namedChildren": own_children
