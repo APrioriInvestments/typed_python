@@ -1,7 +1,7 @@
 import 'maquette';
 const h = maquette.h;
 //import {langTools} from 'ace/ext/language_tools';
-import {CellHandler as CellHandler} from './CellHandler';
+import {NewCellHandler as CellHandler} from './NewCellHandler';
 import {CellSocket} from './CellSocket';
 import {ComponentRegistry} from './ComponentRegistry';
 import {KeyListener} from './components/util/KeyListener';
