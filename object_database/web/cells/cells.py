@@ -368,7 +368,6 @@ class Cells:
                 # TODO: in the future this should integrated into a more
                 # structured server side lifecycle management framework
                 n.updateLifecycleState()
-        """
 
         for n in self._nodesToDiscard:
             if n.cells is not None:
@@ -419,7 +418,11 @@ class Cells:
             if not n.garbageCollected:
                 self.markToBroadcast(n)
                 # TODO: lifecycle attribute; see cell.updateLifecycleState()
-
+                if not n.wasCreated:
+                    # if a cell is marked to broadcast it is either new or has
+                    # been updated. Hence, if it's not new here that means it's
+                    # to be updated.
+                    n.wasUpdated = True
 
                 origChildren = self._cellsKnownChildren[n.identity]
 
@@ -680,9 +683,7 @@ class Cell:
             self.wasCreated = False
         if (self.wasUpdated):
             self.wasUpdated = False
-        # NOTE: self.wasRemoved is set to False for self.prepareForReuse
-        if (self.wasRemoved):
-            self.wasRemoved = False
+        # NOTE: self.wasRemoved is left as is - is that ok with cell reuse?
 
     def evaluateWithDependencies(self, fun):
         """Evaluate function within a view and add dependencies for whatever
