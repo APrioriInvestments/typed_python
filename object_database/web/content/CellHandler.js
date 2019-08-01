@@ -236,7 +236,7 @@ class CellHandler {
             component = this.componentUpdated(component, message);
             var velement = component.render();
         } else {
-            let component = this.componentCreated(message);
+            component = this.componentCreated(message);
             newComponents.push(component);
             var velement = component.render();
             // Add the new component to the comp/cell
@@ -249,6 +249,7 @@ class CellHandler {
         // the method here.
         if(!message.shouldDisplay){
             if(component){
+                console.dir(component);
                 component.componentDidLoad();
             }
             return;

@@ -98,6 +98,7 @@
     background-color: rgba(50, 50, 50, 0.5);
     transition: background-color 0.2s linear;
     z-index: 1050;
+}
 
 /* Sequence and HorizontalSequence
  *================================================================*/
