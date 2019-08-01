@@ -5,7 +5,7 @@ should be formatted using functions in this module
 """
 
 
-def oldCellUpdated(cell, replaceDict={}):
+def cellUpdated(cell, replaceDict={}):
     """A lifecycle message formatter
     to be used when a Cell is created or
     updated.
@@ -40,7 +40,7 @@ def oldCellUpdated(cell, replaceDict={}):
     return res
 
 
-def cellUpdated(cell, replaceDict):
+def newCellUpdated(cell, replaceDict):
     structure = getStructure(
         cell.parent.identity,
         cell,

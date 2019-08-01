@@ -683,7 +683,9 @@ class Cell:
             self.wasCreated = False
         if (self.wasUpdated):
             self.wasUpdated = False
-        # NOTE: self.wasRemoved is left as is - is that ok with cell reuse?
+        # NOTE: self.wasRemoved is set to False for self.prepareForReuse
+        if (self.wasRemoved):
+            self.wasRemoved = False
 
     def evaluateWithDependencies(self, fun):
         """Evaluate function within a view and add dependencies for whatever
