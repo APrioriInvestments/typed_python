@@ -7,6 +7,10 @@
  */
 import {h} from 'maquette';
 import {render} from './components/Component';
+import {
+    findNamedComponent,
+    allNamedChildrenDo
+} from './components/util/NamedChildren';
 
 class NewCellHandler {
     constructor(h, projector, components){
@@ -39,12 +43,14 @@ class NewCellHandler {
         this.handlePostscript = this.handlePostscript.bind(this);
         this.receive = this.receive.bind(this);
         this.cellUpdated = this.cellUpdated.bind(this);
-        //this.cellDiscarded = this.cellDiscarded.bind(this);
+        this.cellDiscarded = this.cellDiscarded.bind(this);
         this.doesNotUnderstand = this.doesNotUnderstand.bind(this);
         this._createAndUpdate = this._createAndUpdate.bind(this);
         this._updateComponentProps = this._updateComponentProps.bind(this);
         this._updateNamedChildren = this._updateNamedChildren.bind(this);
         this._findOrCreateChild = this._findOrCreateChild.bind(this);
+        this._removeFromParent = this._removeFromParent.bind(this);
+        this._removeAllChildren = this._removeAllChildren.bind(this);
     }
 
     /**
@@ -107,6 +113,23 @@ class NewCellHandler {
             });
             component.componentDidUpdate();
         }
+        return component;
+    }
+
+    cellDiscarded(message){
+        let component = this.activeComponents[message.id];
+        if(!component || component == undefined){
+            console.warn(`Attempted to remove non-existing ${message.cellType} component ${message.id}`);
+            return null;
+        }
+        if(component.parent){
+            let wasRemoved = this._removeFromParent(component);
+            if(!wasRemoved){
+                console.warn(`Could not find discarded ${message.cellType}(${message.id}) in any parent components`);
+            }
+        }
+        this._removeAllChildren(component);
+        delete this.activeComponents[message.id];
         return component;
     }
 
@@ -233,6 +256,34 @@ class NewCellHandler {
         let childComponent = this.cellUpdated(childDescription);
         childComponent.parent = parentComponent;
         return childComponent;
+    }
+
+    _removeFromParent(component){
+        let search = findNamedComponent(component, component.parent);
+        if(search.found == false){
+            console.warn(`Could not find ${component.name}(${component.props.id}) in parent's namedChildren`);
+            return false;
+        } else if(search.found && search.inArray){
+            // In this case, the result was in an array.
+            // So we need to find and splice that array.
+            let idx = search.inArray.indexOf(component);
+            if(idx < 0){
+                throw new Error(`${component.name}(${component.props.id}) removal failed trying to find itself in parent children using utility method.`);
+            }
+            search.inArray.splice(idx, 1);
+            return true;
+        } else if(search.found){
+            let parentNamedChildren = component.parent.props.namedChildren;
+            parentNamedChildren[search.nameInParent] = null;
+            return true;
+        }
+        return false;
+    }
+
+    _removeAllChildren(component){
+        allNamedChildrenDo(component, child => {
+            delete this.activeComponents[child.props.id];
+        });
     }
 }
 
