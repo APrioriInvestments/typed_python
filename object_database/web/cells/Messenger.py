@@ -59,7 +59,6 @@ def cellUpdated(cell, replaceDict):
     return structure
 
 
-
 def cellDiscarded(cell):
     """A lifecycle message formatter
     to be used when a Cell is discarded
@@ -149,8 +148,9 @@ def getStructure(parent_id, cell, name_in_parent, expand=False):
     return _getFlatStructure(parent_id, cell, name_in_parent)
 
 
-
 """Helper Functions"""
+
+
 def _getFlatStructure(parent_id, cell, name_in_parent):
     own_children = _getFlatChildren(cell)
     return {
@@ -176,7 +176,6 @@ def _resolveFlatChild(cell_or_list):
     return cell_or_list.identity
 
 
-
 def _getExpandedStructure(parent_id, cell, name_in_parent):
     own_children = _getExpandedChildren(cell)
     return {
@@ -192,11 +191,13 @@ def _getExpandedStructure(parent_id, cell, name_in_parent):
 def _getExpandedChildren(cell):
     own_children = {}
     for child_name, child in cell.namedChildren.items():
-        own_children[child_name] = _resolveExpandedChild(cell.identity, child, child_name)
+        own_children[child_name] = _resolveExpandedChild(cell.identity, child,
+                                                         child_name)
     return own_children
 
 
 def _resolveExpandedChild(parent_id, cell_or_list, name_in_parent):
     if isinstance(cell_or_list, list):
-        return [_resolveExpandedChild(parent_id, cell, name_in_parent) for cell in cell_or_list]
+        return [_resolveExpandedChild(parent_id, cell, name_in_parent) for
+                cell in cell_or_list]
     return _getExpandedStructure(parent_id, cell_or_list, name_in_parent)

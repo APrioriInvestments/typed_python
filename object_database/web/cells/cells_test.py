@@ -106,18 +106,6 @@ class CellsTests(unittest.TestCase):
     def test_cells_lifecycle_removed(self):
         basicCell = Cell()
         # new cell note removed
-        self.cells.withRoot(basicCell)
-        self.assertFalse(basicCell.wasRemoved)
-        # now remove
-        self.cells.markToDiscard(basicCell)
-        self.assertTrue(basicCell.wasRemoved)
-        self.cells.renderMessages()
-        # still not removed
-        self.assertFalse(basicCell.wasRemoved)
-
-    def test_cells_lifecycle_notremoved(self):
-        basicCell = Cell()
-        # new cell not removed
         self.assertFalse(basicCell.wasRemoved)
         self.cells.withRoot(basicCell)
         self.cells.renderMessages()
