@@ -323,6 +323,8 @@ class Cells:
             cell, Text) else "")
 
         self._nodesToDiscard.add(cell)
+        # TODO: lifecycle attribute; see cell.updateLifecycleState()
+        cell.wasRemoved = True
 
     def markToBroadcast(self, node):
         assert node.cells is self
@@ -345,11 +347,17 @@ class Cells:
         for level, cells in reversed(sorted(cellsByLevel.items())):
             for n in cells:
                 res.append(self.updateMessageFor(n))
+                # TODO: in the future this should integrated into a more
+                # structured server side lifecycle management framework
+                n.updateLifecycleState()
 
         for n in self._nodesToDiscard:
             if n.cells is not None:
                 assert n.cells == self
                 res.append(Messenger.cellDiscarded(n))
+                # TODO: in the future this should integrated into a more
+                # structured server side lifecycle management framework
+                n.updateLifecycleState()
 
         # the client reverses the order of postscripts because it wants
         # to do parent nodes before child nodes. We want our postscripts
@@ -385,6 +393,12 @@ class Cells:
 
             if not n.garbageCollected:
                 self.markToBroadcast(n)
+                # TODO: lifecycle attribute; see cell.updateLifecycleState()
+                if not n.wasCreated:
+                    # if a cell is marked to broadcast it is either new or has
+                    # been updated. Hence, if it's not new here that means it's
+                    # to be updated.
+                    n.wasUpdated = True
 
                 origChildren = self._cellsKnownChildren[n.identity]
 
@@ -599,6 +613,15 @@ class Cell:
         self.serializationContext = TypedPythonCodebase.coreSerializationContext()
         self.context = {}
 
+        # lifecylce state attributes
+        # These reflect the current state of the cell and
+        # subsequently used in WS message formatting and pre-processing
+        # NOTE: as of this commit these resetting state on (potentially) reused
+        # cells is handled by self.updateLifecycleState.
+        self.wasCreated = True
+        self.wasUpdated = False
+        self.wasRemoved = False
+
         self._logger = logging.getLogger(__name__)
 
         # This is for interim JS refactoring.
@@ -606,6 +629,27 @@ class Cell:
         # components will need to know about
         # when composing DOM.
         self.exportData = {}
+
+    def updateLifecycleState(self):
+        """Handles cell lifecycle state.
+
+        Once a cell has been created, updated or deleted and corresponding
+        messages sent to the client, the cell state is updated accordingly.
+        Example, if `cell.wasCreated=True` from that moment forward it is
+        already in the echosystem and so `cell.Created=False`. The 'was'
+        linking verb is used to to reflect that something has been done to the
+        cell (object DB, or client call back side-effect) and now the reset of
+        the system, server and client side, needs to know about it.
+
+        TODO: At the moment this method **needs** to be called after all
+        message sends to the client. In the future, this should be integrated
+        into a general lifecycle management scheme.
+        """
+        if (self.wasCreated):
+            self.wasCreated = False
+        if (self.wasUpdated):
+            self.wasUpdated = False
+        # NOTE: self.wasRemoved is left as is - is that ok with cell reuse?
 
     def evaluateWithDependencies(self, fun):
         """Evaluate function within a view and add dependencies for whatever
