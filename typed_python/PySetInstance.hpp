@@ -29,6 +29,10 @@ class PySetInstance : public PyInstance {
     static PyObject* setDiscard(PyObject* o, PyObject* args);
     static PyObject* setRemove(PyObject* o, PyObject* args);
     static PyObject* setClear(PyObject* o, PyObject* args);
+    static PyObject* setCopy(PyObject* o, PyObject* args);
+    static PyObject* setUnion(PyObject* o, PyObject* args);
+    static PyObject* setIntersection(PyObject* o, PyObject* args);
+    static PyObject* setDifference(PyObject* o, PyObject* args);
     Py_ssize_t mp_and_sq_length_concrete();
     int sq_contains_concrete(PyObject* item);
     PyObject* tp_iter_concrete();
@@ -44,7 +48,11 @@ class PySetInstance : public PyInstance {
 
   private:
     static int try_insert_key(PySetInstance* self, PyObject* pyKey, instance_ptr key);
-    static PyObject* try_remove(PyObject* o, PyObject* args, bool assertKeyError = false);
+    static PyObject* try_remove(PyObject* o, PyObject* item, bool assertKeyError = false);
+    static void copy_elements(PyObject* dst, PyObject* src);
+    static PyObject* set_intersection(PyObject* o, PyObject* other);
+    static PyObject* set_difference(PyObject* o, PyObject* other);
+    static int set_difference_update(PyObject* o, PyObject* other);
     SetType* type();
 };
 
