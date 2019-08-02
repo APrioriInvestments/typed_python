@@ -182,7 +182,13 @@ class Component {
         if(foundChildren){
             return this._recursivelyMapNamedChildren(foundChildren, child => {
                 let velement = render(child);
-                velement.key = child;
+
+                // In some cases velement
+                // will be null, as in non-display
+                // components.
+                if(velement){
+                    velement.key = child;
+                }
                 return velement;
             });
         }
