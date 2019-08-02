@@ -212,7 +212,7 @@ class Component {
             return [];
         }
         return this.props.children.map(childComponent => {
-            let renderedChild = childComponent.render();
+            let renderedChild = render(childComponent);
             renderedChild.properties.key = `${this.props.id}-child-${childComponent.props.id}`;
             return renderedChild;
         });

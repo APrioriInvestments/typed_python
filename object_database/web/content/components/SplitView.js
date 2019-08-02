@@ -75,7 +75,7 @@ class SplitView extends Component {
             return this.renderChildrenNamed('elements').map((child, idx) => {
                 return h('div', {
                     style: this.makeChildStyle(idx)
-                }, child);
+                }, [child]);
             });
         }
     }
