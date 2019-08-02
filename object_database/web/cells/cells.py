@@ -1655,13 +1655,13 @@ class SubscribedSequence(Cell):
                     try:
                         childCell = self.makeCell(rowKey[0])
                         self.existingItems[rowKey] = new_children["____child_%s__" % ix] = childCell
-                        new_named_children[ix] = childCell
+                        new_named_children['children'].append(childCell)
                     except SubscribeAndRetry:
                         raise
                     except Exception:
                         tracebackCell = Traceback(traceback.format_exc())
                         self.existingItems[rowKey] = new_children["____child_%s__" % ix] = tracebackCell
-                        new_named_children[ix] = tracebackCell
+                        new_named_children['children'].append(tracebackCell)
 
         self.children = new_children
         self.namedChildren = new_named_children
