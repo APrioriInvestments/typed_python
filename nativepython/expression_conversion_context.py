@@ -21,6 +21,7 @@ from nativepython.python_object_representation import pythonObjectRepresentation
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
 from typed_python import NoneType, Alternative, OneOf, Int32
+from typed_python._types import getTypePointer
 
 
 NoneExprType = NoneWrapper()
@@ -740,3 +741,11 @@ class ExpressionConversionContext(object):
             return out_slot
 
         raise ConversionException("can't handle python expression type %s" % ast.Name)
+
+    def getTypePointer(self, t):
+        """Return a raw type pointer for type t
+
+        Args:
+            t - python representation of Type, e.g. int, UInt64, ListOf(String), ...
+        """
+        return getTypePointer(t)

@@ -19,7 +19,6 @@ from nativepython.typed_expression import TypedExpression
 import nativepython.native_ast as native_ast
 from nativepython.native_ast import VoidPtr
 import nativepython.type_wrappers.runtime_functions as runtime_functions
-from typed_python._types import getTypePointer
 
 
 class PythonObjectOfTypeWrapper(Wrapper):
@@ -115,7 +114,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             )
             return context.constant(True)
 
-        tp = getTypePointer(t)
+        tp = context.getTypePointer(t)
         if tp:
             context.pushEffect(
                 targetVal.expr.store(
@@ -155,7 +154,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             )
             return context.constant(True)
 
-        tp = getTypePointer(t)
+        tp = context.getTypePointer(t)
         if tp:
             context.pushEffect(
                 targetVal.expr.store(
