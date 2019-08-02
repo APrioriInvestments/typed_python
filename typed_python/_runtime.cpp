@@ -301,7 +301,7 @@ extern "C" {
     }
 
     // returns layout*
-    void *np_runtime_pyobj_to_typed(PyObject *obj, void* tgt, uint64_t tp) {
+    void *np_runtime_pyobj_to_typed(PyObject *obj, uint8_t* tgt, Type* tp) {
         // tgt is a layout pointer
         PyEnsureGilAcquired acquireTheGil;
         PyInstance::copyConstructFromPythonInstance((Type *)tp, (instance_ptr)&tgt, obj, true);
