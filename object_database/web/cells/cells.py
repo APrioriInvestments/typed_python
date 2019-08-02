@@ -426,11 +426,7 @@ class Cells:
             if not n.garbageCollected:
                 self.markToBroadcast(n)
                 # TODO: lifecycle attribute; see cell.updateLifecycleState()
-                if not n.wasCreated:
-                    # if a cell is marked to broadcast it is either new or has
-                    # been updated. Hence, if it's not new here that means it's
-                    # to be updated.
-                    n.wasUpdated = True
+
 
                 origChildren = self._cellsKnownChildren[n.identity]
 
