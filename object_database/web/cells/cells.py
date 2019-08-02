@@ -181,6 +181,9 @@ class Cells:
 
         self._logger = logging.getLogger(__name__)
 
+        # Testing. Remove.
+        self.updatedCellTypes = set()
+
         self._root = RootCell()
 
         self._shouldStopProcessingTasks = threading.Event()
@@ -395,6 +398,12 @@ class Cells:
 
         self._pendingPostscripts.clear()
 
+        # We need to reset the wasUpdated
+        # and/or wasCreated properties
+        # on all the _nodesToBroadcast
+        for node in self._nodesToBroadcast:
+            node.updateLifecycleState()
+
         self._nodesToBroadcast = set()
         self._nodesToDiscard = set()
 
@@ -417,11 +426,7 @@ class Cells:
             if not n.garbageCollected:
                 self.markToBroadcast(n)
                 # TODO: lifecycle attribute; see cell.updateLifecycleState()
-                if not n.wasCreated:
-                    # if a cell is marked to broadcast it is either new or has
-                    # been updated. Hence, if it's not new here that means it's
-                    # to be updated.
-                    n.wasUpdated = True
+
 
                 origChildren = self._cellsKnownChildren[n.identity]
 
@@ -433,11 +438,19 @@ class Cells:
                         try:
                             n.prepare()
                             n.recalculate()
+                            if not n.wasCreated:
+                                # if a cell is marked to broadcast it is either new or has
+                                # been updated. Hence, if it's not new here that means it's
+                                # to be updated.
+                                n.wasUpdated = True
                             break
                         except SubscribeAndRetry as e:
                             e.callback(self.db)
                     # GLORP
                     for childname, child_cell in n.children.items():
+                        # TODO: We are going to have to update this
+                        # to deal with namedChildren structures (as opposed
+                        # to plain children dicts) in the near future.
                         if not isinstance(child_cell, Cell):
                             raise Exception("Cell of type %s had a non-cell child %s of type %s != Cell." % (
                                 type(n),
