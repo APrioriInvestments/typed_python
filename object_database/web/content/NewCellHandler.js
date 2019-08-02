@@ -34,23 +34,26 @@ class NewCellHandler {
 
         // Private properties
         this._sessionId = null;
+        this._newComponents = [];
 
         // Bind component methods
         this.updatePopovers = this.updatePopovers.bind(this);
         this.showConnectionClosed = this.showConnectionClosed.bind(this);
         this.connectionClosedView = this.connectionClosedView.bind(this);
-        //this.appendPostscript = this.appendPostscript.bind(this);
+        this.appendPostscript = this.appendPostscript.bind(this);
         this.handlePostscript = this.handlePostscript.bind(this);
         this.receive = this.receive.bind(this);
         this.cellUpdated = this.cellUpdated.bind(this);
         this.cellDiscarded = this.cellDiscarded.bind(this);
         this.doesNotUnderstand = this.doesNotUnderstand.bind(this);
+        this._getUpdatedComponent = this._getUpdatedComponent.bind(this);
         this._createAndUpdate = this._createAndUpdate.bind(this);
         this._updateComponentProps = this._updateComponentProps.bind(this);
         this._updateNamedChildren = this._updateNamedChildren.bind(this);
         this._findOrCreateChild = this._findOrCreateChild.bind(this);
         this._removeFromParent = this._removeFromParent.bind(this);
         this._removeAllChildren = this._removeAllChildren.bind(this);
+        this._callDidLoadForNew = this._callDidLoadForNew.bind(this);
     }
 
     /**
@@ -79,7 +82,7 @@ class NewCellHandler {
     receive(message){
         switch(message.type){
         case '#cellUpdated':
-            return this.cellUpdated(message, true);
+            return this.cellUpdated(message);
         case '#cellDiscarded':
             return this.cellDiscarded(message);
         case '#appendPostscript':
@@ -89,30 +92,29 @@ class NewCellHandler {
         }
     }
 
+    /** Primary Message Handlers **/
+
     doesNotUnderstand(message){
         let msg = `CellHandler does not understand the following message: ${message}`;
         console.error(msg);
         return;
     }
 
-    cellUpdated(message, rootCall=false){
-        console.log(`#cellUpdated for ${message.cellType}(${message.id})`);
-        if(!Object.keys(this.activeComponents).includes(message.id.toString())){
-            // In this case, we are creating a totally new Cell
-            // and component combination.
-            return this._createAndUpdate(message);
-        }
-        let component = this.activeComponents[message.id];
-        this._updateComponentProps(component, message);
-        this._updateNamedChildren(component, message);
+    appendPostscript(message){
+        this.postscripts.push(message.script);
+    }
 
-        if(rootCall){
-            let velement = render(component);
-            let domElement = document.getElementById(component.props.id);
-            this.projector.replace(domElement, () => {
-                return velement;
-            });
-            component.componentDidUpdate();
+    cellUpdated(message){
+        console.log(`Received cellUpdated for ${message.cellType}[${message.id}]`);
+        let component = this._getUpdatedComponent(message);
+        let velement = render(component);
+        let domElement = document.getElementById(component.props.id);
+        this.projector.replace(domElement, () => {
+            return velement;
+        });
+        this._callDidLoadForNew();
+        if(message.poststript){
+            this.postscripts.push(message.postscript);
         }
         return component;
     }
@@ -209,6 +211,18 @@ class NewCellHandler {
 
 
     /* Private Methods */
+    _getUpdatedComponent(description){
+        if(!Object.keys(this.activeComponents).includes(description.id.toString())){
+            // In this case, we are creating a totally new Cell
+            // and component combination.
+            return this._createAndUpdate(description);
+        }
+        let component = this.activeComponents[description.id];
+        this._updateComponentProps(component, description);
+        this._updateNamedChildren(component, description);
+        return component;
+    }
+
     _createAndUpdate(message){
         let componentClass = this.availableComponents[message.cellType];
         if(!componentClass || componentClass == undefined){
@@ -228,6 +242,7 @@ class NewCellHandler {
                 return velement;
             });
         }
+        this._newComponents.push(newComponent);
         return newComponent;
 
     }
@@ -259,7 +274,7 @@ class NewCellHandler {
                 return this._findOrCreateChild(item, parentComponent);
             });
         }
-        let childComponent = this.cellUpdated(childDescription);
+        let childComponent = this._getUpdatedComponent(childDescription);
         childComponent.parent = parentComponent;
         return childComponent;
     }
@@ -290,6 +305,17 @@ class NewCellHandler {
         allNamedChildrenDo(component, child => {
             delete this.activeComponents[child.props.id];
         });
+    }
+
+    _callDidLoadForNew(){
+        // Goes through the stored list of
+        // new components created during a message handle
+        // and calls componentDidLoad()
+        console.log(`Calling componentDidLoad on ${this._newComponents.length} components`);
+        this._newComponents.forEach(component => {
+            component.componentDidLoad();
+        });
+        this._newComponents = [];
     }
 }
 
