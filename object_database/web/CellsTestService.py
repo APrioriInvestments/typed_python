@@ -147,8 +147,7 @@ def selectionPanel(page, height):
                 dict(category=x.category(), name=x.name())),
             makeBold=x is page)
             for perCategory in getPages().values()
-            for x in perCategory.values()],
-        split="horizontal"
+            for x in perCategory.values()]
     )
     return cells.Card(
         cells.SplitView([
