@@ -518,7 +518,8 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
     setType->constructor(tgt);
     try {
         if ((PyList_Check(pyRepresentation) || PySet_Check(pyRepresentation)
-             || PyBytes_Check(pyRepresentation) || PyTuple_Check(pyRepresentation))) {
+             || PyUnicode_Check(pyRepresentation) || PyBytes_Check(pyRepresentation)
+             || PyTuple_Check(pyRepresentation))) {
             iterate(pyRepresentation, [&](PyObject* item) {
                 Instance key(setType->keyType(), [&](instance_ptr data) {
                     copyConstructFromPythonInstance(setType->keyType(), data, item);
@@ -540,29 +541,7 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
                 setType->insertKey(tgt, key.data());
             }
             return;
-        } else if (PyUnicode_Check(pyRepresentation)) {
-            if (PyUnicode_READY(pyRepresentation) < 0) {
-                if (PyErr_Occurred()) {
-                    throw PythonExceptionSet();
-                }
-            }
-
-            Py_ssize_t str_size = PyUnicode_GetLength(pyRepresentation);
-            for (size_t i = 0; i < str_size; ++i) {
-                Py_UCS4 c = PyUnicode_ReadChar(pyRepresentation, i);
-                Instance key(setType->keyType(), [&](instance_ptr data) {
-                    copyConstructFromPythonInstance(setType->keyType(), data,
-                                                    PyUnicode_FromFormat("%c", c));
-                });
-
-                instance_ptr found = setType->lookupKey(tgt, key.data());
-                if (!found) {
-                    setType->insertKey(tgt, key.data());
-                }
-            }
-            return;
         }
-
     } catch (...) {
         setType->destroy(tgt);
         throw;
