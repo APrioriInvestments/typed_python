@@ -28,6 +28,6 @@ def min(x, y):
 
 
 def max(x, y):
-    if x < y:
+    if x > y:
         return x
     return y

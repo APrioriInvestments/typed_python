@@ -14,8 +14,7 @@
 
 import nativepython
 
-from typed_python import _types
-
+from typed_python import _types, String
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.native_ast import VoidPtr
@@ -237,7 +236,7 @@ class Wrapper(object):
         """
 
         # check if there's nothing to do
-        if target_type == self:
+        if target_type == self.typeRepresentation or target_type == self:
             return expr
 
         # put conversion into its own function
@@ -293,6 +292,12 @@ class Wrapper(object):
                           (op, str(l.expr_type), str(r.expr_type)))
             )
         )
+
+    def convert_format(self, context, instance, formatSpecOrNone=None):
+        if formatSpecOrNone is None:
+            return self.convert_to_type(context, instance, String)
+        else:
+            raise context.pushException(TypeError, "We don't support conversion in the base wrapper.")
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:

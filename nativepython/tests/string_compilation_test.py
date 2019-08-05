@@ -559,3 +559,22 @@ class TestStringCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, ""):
             f_int(",", ListOf(int)([1, 2, 3]))
+
+    def test_fstring(self):
+        @Compiled
+        def f():
+            a = 1
+            b = "bb"
+            f = 1.23456
+            return f"<< {a} !! {b} ?? {f} -- {a + a + a} || {len(b)} >>"
+        res = f()
+        expected = "<< 1 !! bb ?? 1.23456 -- 3 || 2 >>"
+        self.assertEqual(expected, res)
+
+    def test_fstring_exception(self):
+        @Compiled
+        def f():
+            return f"{not_valid_variable}"  # noqa
+
+        with self.assertRaisesRegex(Exception, "not_valid"):
+            f()

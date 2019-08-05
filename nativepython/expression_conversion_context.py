@@ -20,7 +20,7 @@ from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
-from typed_python import NoneType, Alternative, OneOf, Int32
+from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String
 from typed_python._types import getTypePointer
 
 
@@ -757,7 +757,37 @@ class ExpressionConversionContext(object):
 
             return out_slot
 
-        raise ConversionException("can't handle python expression type %s" % ast.Name)
+        if ast.matches.FormattedValue:
+            value = self.convert_expression_ast(ast.value)
+
+            if value is None:
+                return None
+
+            result = value.convert_format(ast.format_spec)
+
+            if result is None:
+                return
+
+            if result.expr_type.typeRepresentation is not String:
+                self.pushException(TypeError, "Expected string, but got %s" % result.expr_type.typeRepresentation)
+                return None
+
+            return result
+
+        if ast.matches.JoinedStr:
+            items_to_join = self.push(ListOf(str), lambda s: s.convert_default_initialize())
+
+            for v in ast.values:
+                value = self.convert_expression_ast(v)
+                if value is None:
+                    return None
+
+                if items_to_join.convert_method_call("append", (value,), {}) is None:
+                    return None
+
+            return pythonObjectRepresentation(self, "").convert_method_call("join", (items_to_join,), {})
+
+        raise ConversionException("can't handle python expression type %s" % ast._which)
 
     def getTypePointer(self, t):
         """Return a raw type pointer for type t

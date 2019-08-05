@@ -37,12 +37,12 @@ def strJoinIterable(sep, iterable):
     :param iterable: iterable container with strings only
     :return: string with joined values
     """
-    items = ListOf(str)()
+    items = ListOf(String)()
     for item in iterable:
         if isinstance(item, String):
             items.append(item)
         else:
-            raise Exception("expected str instance, int found")
+            raise Exception("expected str instance")
     return sep.join(items)
 
 
