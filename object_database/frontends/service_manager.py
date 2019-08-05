@@ -71,6 +71,7 @@ def startServiceManagerProcess(tempDirectoryName, port, authToken, *,
 
     if logDir:
         cmd.extend(['--logdir', os.path.join(tempDirectoryName, 'logs')])
+
     if sslPath:
         cmd.extend(['--ssl-path', sslPath])
 

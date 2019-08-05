@@ -63,7 +63,9 @@ def main(argv=None):
     with tempfile.TemporaryDirectory() as tmpDirName:
         try:
             server = startServiceManagerProcess(
-                tmpDirName, port, token, loglevelName=loglevel_name
+                tmpDirName, port, token,
+                loglevelName=loglevel_name,
+                logDir=False
             )
 
             database = connect("localhost", port, token, retry=True)
