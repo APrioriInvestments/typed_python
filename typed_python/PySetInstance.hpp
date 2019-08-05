@@ -15,8 +15,8 @@
 ******************************************************************************/
 
 #pragma once
-
 #include "PyInstance.hpp"
+#include <functional>
 
 class PySetInstance : public PyInstance {
   public:
@@ -42,7 +42,8 @@ class PySetInstance : public PyInstance {
                                                         PyObject* pyRepresentation,
                                                         bool isExplicit);
     static void mirrorTypeInformationIntoPyTypeConcrete(SetType* setType, PyTypeObject* pyType);
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation,
+                                           bool isExplicit) {
         return true;
     }
 
@@ -54,5 +55,8 @@ class PySetInstance : public PyInstance {
     static PyObject* set_difference(PyObject* o, PyObject* other);
     static int set_difference_update(PyObject* o, PyObject* other);
     SetType* type();
+    static void getDataFromNative(PySetInstance* src, std::function<void(instance_ptr)> func);
+    static void getDataFromNative(PyTupleOrListOfInstance* src,
+                                  std::function<void(instance_ptr)> func);
 };
 

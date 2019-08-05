@@ -13,8 +13,25 @@
    See the License for the specific language governing permissions and
    limitations under the License.
 ******************************************************************************/
-
 #include "PySetInstance.hpp"
+
+void PySetInstance::getDataFromNative(PySetInstance* src, std::function<void(instance_ptr)> func) {
+    for (size_t i = 0; i < src->type()->slotCount(src->dataPtr())
+                       && src->type()->slotPopulated(src->dataPtr(), i);
+         ++i) {
+        instance_ptr key = src->type()->keyAtSlot(src->dataPtr(), i);
+        func(key);
+    }
+}
+
+void PySetInstance::getDataFromNative(PyTupleOrListOfInstance* src,
+                                      std::function<void(instance_ptr)> func) {
+    for (size_t i = 0; i < src->type()->count(src->dataPtr()); ++i) {
+        instance_ptr key = src->type()->eltPtr(src->dataPtr(), i);
+        func(key);
+    }
+}
+
 
 PyMethodDef* PySetInstance::typeMethodsConcrete(Type* t) {
     return new PyMethodDef[9]{{"add", (PyCFunction)PySetInstance::setAdd, METH_VARARGS, NULL},
@@ -102,31 +119,35 @@ PyObject* PySetInstance::setClear(PyObject* o, PyObject* args) {
 
 void PySetInstance::copy_elements(PyObject* dst, PyObject* src) {
     PySetInstance* dst_w = (PySetInstance*)dst;
-
-    PyObjectStealer iterator(PyObject_GetIter(src));
-    if (!iterator) {
-        throw PythonExceptionSet();
-    }
-
-    PyObject* item;
-    while ((item = PyObjectStealer(PyIter_Next(iterator)))) {
-
-        if (!item) {
-            if (PyErr_Occurred()) {
+    Type* src_type = extractTypeFrom(Py_TYPE(src));
+    // fastpath: first check whether 'src' is a typed_python Set, Tuple, or ListOf with the same
+    // element type, and if so, bypass the python interpreter and insert the elements directly.
+    if (src_type && (src_type->getTypeCategory() == Type::TypeCategory::catSet)
+        && ((SetType*)src_type)->keyType() == dst_w->type()->keyType()) {
+        getDataFromNative((PySetInstance*)src, [&](instance_ptr key) {
+            if (try_insert_key(dst_w, src, key) != 0) {
                 throw PythonExceptionSet();
-            } else {
-                // no more values to iterate over
-                break;
             }
-        }
-
-        Instance key(dst_w->type()->keyType(), [&](instance_ptr data) {
-            PyInstance::copyConstructFromPythonInstance(dst_w->type()->keyType(), data, item, true);
         });
-
-        if (try_insert_key(dst_w, item, key.data()) != 0) {
-            throw PythonExceptionSet();
-        }
+    } else if (src_type
+               && (src_type->getTypeCategory() == Type::TypeCategory::catListOf
+                   || src_type->getTypeCategory() == Type::TypeCategory::catTupleOf)
+               && ((TupleOrListOfType*)src_type)->getEltType() == dst_w->type()->keyType()) {
+        getDataFromNative((PyTupleOrListOfInstance*)src, [&](instance_ptr key) {
+            if (try_insert_key(dst_w, (PyObject*)src, key) != 0) {
+                throw PythonExceptionSet();
+            }
+        });
+    } else {
+        iterate(src, [&](PyObject* item) {
+            Instance key(dst_w->type()->keyType(), [&](instance_ptr data) {
+                PyInstance::copyConstructFromPythonInstance(dst_w->type()->keyType(), data, item,
+                                                            true);
+            });
+            if (try_insert_key(dst_w, item, key.data()) != 0) {
+                throw PythonExceptionSet();
+            }
+        });
     }
 }
 
@@ -166,83 +187,93 @@ PyObject* PySetInstance::set_intersection(PyObject* o, PyObject* other) {
     new_inst->mIteratorFlag = 0;
     new_inst->mIsMatcher = false;
 
-    PyObjectStealer iterator(PyObject_GetIter(other));
-    if (!iterator) {
-        decref((PyObject*)new_inst);
-        return NULL;
-    }
-
     PySetInstance* self_w = (PySetInstance*)o;
-    PyObject* item;
-    while ((item = PyObjectStealer(PyIter_Next(iterator))) != NULL) {
-
-        Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
-            PyInstance::copyConstructFromPythonInstance(self_w->type()->keyType(), data, item,
-                                                        true);
-        });
-
-        instance_ptr existingLoc = self_w->type()->lookupKey(self_w->dataPtr(), key.data());
-        if (!existingLoc) {
-            continue;
+    Type* src_type = extractTypeFrom(Py_TYPE(other));
+    try {
+        if (src_type && (src_type->getTypeCategory() == Type::TypeCategory::catSet)
+            && ((SetType*)src_type)->keyType() == self_w->type()->keyType()) {
+            getDataFromNative((PySetInstance*)other, [&](instance_ptr key) {
+                instance_ptr existingLoc = self_w->type()->lookupKey(self_w->dataPtr(), key);
+                if (existingLoc && try_insert_key(new_inst, other, key) != 0) {
+                    throw PythonExceptionSet();
+                }
+            });
+        } else if (src_type
+                   && (src_type->getTypeCategory() == Type::TypeCategory::catListOf
+                       || src_type->getTypeCategory() == Type::TypeCategory::catTupleOf)
+                   && ((TupleOrListOfType*)src_type)->getEltType() == self_w->type()->keyType()) {
+            getDataFromNative((PyTupleOrListOfInstance*)other, [&](instance_ptr key) {
+                instance_ptr existingLoc = self_w->type()->lookupKey(self_w->dataPtr(), key);
+                if (existingLoc && try_insert_key(new_inst, other, key) != 0) {
+                    throw PythonExceptionSet();
+                }
+            });
+        } else {
+            iterate(other, [&](PyObject* item) {
+                Instance key(self_w->type()->keyType(), [&](instance_ptr data) {
+                    PyInstance::copyConstructFromPythonInstance(self_w->type()->keyType(), data,
+                                                                item, true);
+                });
+                instance_ptr existingLoc = self_w->type()->lookupKey(self_w->dataPtr(), key.data());
+                if (existingLoc && try_insert_key(new_inst, item, key.data()) != 0) {
+                    throw PythonExceptionSet();
+                }
+            });
         }
-        if (existingLoc && try_insert_key(new_inst, item, key.data()) != 0) {
-            decref((PyObject*)new_inst);
-            return NULL;
-        }
-    }
-    if (PyErr_Occurred()) {
+    } catch (PythonExceptionSet& e) {
         decref((PyObject*)new_inst);
         return NULL;
+    } catch (std::exception& e) {
+        decref((PyObject*)new_inst);
+        PyErr_SetString(PyExc_TypeError, e.what());
+        return NULL;
     }
+
     return (PyObject*)new_inst;
 }
 
 PyObject* PySetInstance::set_difference(PyObject* o, PyObject* other) {
-    if (!PySet_Check(other)) {
-        PyObject* new_inst = setCopy(o, NULL);
+    PySetInstance* new_inst = NULL;
+    PySetInstance* self_w = (PySetInstance*)o;
+    Type* src_type = extractTypeFrom(Py_TYPE(other));
+
+    if (src_type && (src_type->getTypeCategory() == Type::TypeCategory::catSet)
+        && ((SetType*)src_type)->keyType() == self_w->type()->keyType()) {
+        new_inst = (PySetInstance*)PyInstance::tp_new(Py_TYPE(o), NULL, NULL);
         if (!new_inst) {
             return NULL;
         }
-        if (set_difference_update(new_inst, other) < 0) {
-            decref(new_inst);
+        new_inst->mIteratorOffset = 0;
+        new_inst->mIteratorFlag = 0;
+        new_inst->mIsMatcher = false;
+
+        try {
+            PySetInstance* other_w = (PySetInstance*)other;
+            getDataFromNative((PySetInstance*)o, [&](instance_ptr key) {
+                instance_ptr existingLoc = other_w->type()->lookupKey(other_w->dataPtr(), key);
+                if (!existingLoc && try_insert_key(new_inst, other, key) != 0) {
+                    throw PythonExceptionSet();
+                }
+            });
+        } catch (PythonExceptionSet& e) {
+            decref((PyObject*)new_inst);
+            return NULL;
+        } catch (std::exception& e) {
+            decref((PyObject*)new_inst);
+            PyErr_SetString(PyExc_TypeError, e.what());
             return NULL;
         }
-        return new_inst;
-    }
-
-    PySetInstance* new_inst = (PySetInstance*)PyInstance::tp_new(Py_TYPE(o), NULL, NULL);
-    if (!new_inst) {
-        return NULL;
-    }
-    new_inst->mIteratorOffset = 0;
-    new_inst->mIteratorFlag = 0;
-    new_inst->mIsMatcher = false;
-
-    PyObjectStealer iterator(PyObject_GetIter(o));
-    if (!iterator) {
-        decref((PyObject*)new_inst);
-        return NULL;
-    }
-
-    PySetInstance* other_w = (PySetInstance*)other;
-    PyObject* item;
-    while ((item = PyObjectStealer(PyIter_Next(iterator))) != NULL) {
-
-        Instance key(other_w->type()->keyType(), [&](instance_ptr data) {
-            PyInstance::copyConstructFromPythonInstance(other_w->type()->keyType(), data, item,
-                                                        true);
-        });
-
-        instance_ptr existingLoc = other_w->type()->lookupKey(other_w->dataPtr(), key.data());
-        if (!existingLoc && try_insert_key(new_inst, item, key.data()) != 0) {
+    } else {
+        new_inst = (PySetInstance*)setCopy(o, NULL);
+        if (!new_inst) {
+            return NULL;
+        }
+        if (set_difference_update((PyObject*)new_inst, other) < 0) {
             decref((PyObject*)new_inst);
             return NULL;
         }
     }
-    if (PyErr_Occurred()) {
-        decref((PyObject*)new_inst);
-        return NULL;
-    }
+
     return (PyObject*)new_inst;
 }
 
@@ -252,21 +283,18 @@ int PySetInstance::set_difference_update(PyObject* o, PyObject* other) {
         return 0;
     }
 
-    PyObjectStealer iterator(PyObject_GetIter(other));
-    if (!iterator) {
+    try {
+        iterate(other, [&](PyObject* item) {
+            if (!try_remove(o, item)) {
+                throw PythonExceptionSet();
+            }
+        });
+    } catch (PythonExceptionSet& e) {
+        return -1;
+    } catch (std::exception& e) {
         return -1;
     }
 
-    PySetInstance* self_w = (PySetInstance*)o;
-    PyObject* item;
-    while ((item = PyObjectStealer(PyIter_Next(iterator))) != NULL) {
-        if (!try_remove(o, item)) {
-            return -1;
-        }
-    }
-    if (PyErr_Occurred()) {
-        return -1;
-    }
     return 0;
 }
 
@@ -366,7 +394,6 @@ PyObject* PySetInstance::setUnion(PyObject* o, PyObject* args) {
             if (item_type == self_w->type()->keyType()) {
                 continue;
             }
-
             copy_elements((PyObject*)new_inst, (PyObject*)arg_item);
         }
 
@@ -488,26 +515,11 @@ SetType* PySetInstance::type() {
 void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, instance_ptr tgt,
                                                             PyObject* pyRepresentation,
                                                             bool isExplicit) {
-
     setType->constructor(tgt);
     try {
         if ((PyList_Check(pyRepresentation) || PySet_Check(pyRepresentation)
              || PyBytes_Check(pyRepresentation) || PyTuple_Check(pyRepresentation))) {
-            PyObjectStealer iterator(PyObject_GetIter(pyRepresentation));
-            if (!iterator) {
-                throw PythonExceptionSet();
-            }
-
-            PyObject* item;
-            while ((item = PyObjectStealer(PyIter_Next(iterator)))) {
-                if (!item) {
-                    if (PyErr_Occurred()) {
-                        throw PythonExceptionSet();
-                    } else {
-                        break;
-                    }
-                }
-
+            iterate(pyRepresentation, [&](PyObject* item) {
                 Instance key(setType->keyType(), [&](instance_ptr data) {
                     copyConstructFromPythonInstance(setType->keyType(), data, item);
                 });
@@ -516,7 +528,7 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
                 if (!found) {
                     setType->insertKey(tgt, key.data());
                 }
-            }
+            });
             return;
         } else if (PyNumber_Check(pyRepresentation)) {
             Instance key(setType->keyType(), [&](instance_ptr data) {

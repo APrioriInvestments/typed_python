@@ -2459,7 +2459,7 @@ class NativeTypesTests(unittest.TestCase):
             self.assertEqual(Set(str)('abcba').intersection(C('cbcf'), C('bag')), Set(str)('b'))
 
         # difference
-        for C in list, tuple, ListOf(str), TupleOf(str), Set(str):
+        for C in set, list, tuple, ListOf(str), TupleOf(str), Set(str):
             self.assertEqual(Set(str)('abcba').difference(C('cdc')), Set(str)('ab'))
             self.assertEqual(Set(str)('abcba').difference(C('efgfe')), Set(str)('abc'))
             self.assertEqual(Set(str)('abcba').difference(C('ccb')), Set(str)('a'))
