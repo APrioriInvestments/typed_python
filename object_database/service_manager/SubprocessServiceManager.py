@@ -102,7 +102,6 @@ class SubprocessServiceManager(ServiceManager):
                     service.name
                     + "-" + str(instanceIdentity) + ".log.txt"
                 )
-
                 if self.logfileDirectory is not None:
                     output_file = open(os.path.join(self.logfileDirectory, logfileName), "w")
                 else:
