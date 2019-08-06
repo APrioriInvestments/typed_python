@@ -81,6 +81,7 @@ def cellDiscarded(cell):
     return {
         'channel': '#main',
         'type': '#cellDiscarded',
+        'cellType': cell.__class__.__name__,
         'id': cell.identity
     }
 
