@@ -24,7 +24,6 @@ class CodeEditor extends Component {
     }
 
     componentDidLoad() {
-
         this.setupEditor();
 
         if (this.editor === null) {
@@ -131,7 +130,6 @@ class CodeEditor extends Component {
     }
 
     setupKeybindings() {
-        console.log("setting up keybindings");
         this.props.extraData.keybindings.map((kb) => {
             this.editor.commands.addCommand(
                 {

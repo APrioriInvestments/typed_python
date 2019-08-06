@@ -107,7 +107,6 @@ class NewCellHandler {
     }
 
     cellUpdated(message){
-        console.log(`Received cellUpdated for ${message.cellType}[${message.id}]`);
         let component = this._getUpdatedComponent(message);
         let velement = render(component);
         let domElement = document.getElementById(component.props.id);
@@ -123,7 +122,6 @@ class NewCellHandler {
     }
 
     cellDiscarded(message){
-        console.log(`Received cellDiscarded for ${message.cellType}[${message.id}]`);
         /*let component = this.activeComponents[message.id];
         if(!component || component == undefined){
             console.warn(`Attempted to remove non-existing ${message.cellType} component ${message.id}`);
@@ -309,12 +307,9 @@ class NewCellHandler {
         // Goes through the stored list of
         // new components created during a message handle
         // and calls componentDidLoad()
-        console.group(`Calling componentDidLoad on ${this._newComponents.length} components`);
         this._newComponents.forEach(component => {
             component.componentDidLoad();
-            console.log(`Called #componentDidLoad on ${component.name}[${component.props.id}]`);
         });
-        console.groupEnd();
         this._newComponents = [];
     }
 
@@ -324,13 +319,10 @@ class NewCellHandler {
         // that were updated during a
         // message handle and calls
         // componenDidUpdate()
-        console.group(`Calling #componendDidUpdate for ${this._updatedComponents.length} components`);
         this._updatedComponents.forEach(component => {
             component.componentDidUpdate();
-            console.log(`Called #componentDidUpdate for ${component.name}[${component.props.id}]`);
         });
         this._updatedComponents = [];
-        console.groupEnd();
     }
 }
 
