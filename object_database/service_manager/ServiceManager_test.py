@@ -30,7 +30,7 @@ import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
     Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
-    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown, ButtonGroup, Octicon
+    Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown, ButtonGroup, Octicon, SplitView
 )
 
 from object_database import (
@@ -182,7 +182,11 @@ class TextEditorService(ServiceBase):
                 if ed.getContents() != TextEditor.lookupAny().code:
                     ed.setContents(TextEditor.lookupAny().code)
 
-        return Columns(ed, Card(Plot(makePlotData).height("100%").width("100%"))) + Subscribed(onCodeChange)
+        # return Columns(ed, Card(Plot(makePlotData).height("100%").width("100%"))) + Subscribed(onCodeChange)
+        return SplitView([
+            (ed, 1),
+            (Card(Plot(makePlotData)), 1)
+        ]) + Subscribed(onCodeChange)
 
 
 class GraphDisplayService(ServiceBase):
@@ -363,7 +367,7 @@ class BigGridTestService(ServiceBase):
 
         passIx = 0
         while not shouldStop.is_set():
-            print("WRITNG ", passIx)
+            #  print("WRITNG ", passIx)
             passIx += 1
             time.sleep(GRID_INTERVAL)
             rows_and_cols = [(row, col) for row in range(ROW_COUNT) for col in range(COL_COUNT)]
