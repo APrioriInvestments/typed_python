@@ -115,7 +115,7 @@ class NewCellHandler {
         });
         this._callDidLoadForNew();
         this._callDidUpdate();
-        if(message.poststript){
+        if(message.postscript){
             this.postscripts.push(message.postscript);
         }
         return component;
