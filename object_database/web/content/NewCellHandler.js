@@ -35,6 +35,7 @@ class NewCellHandler {
         // Private properties
         this._sessionId = null;
         this._newComponents = [];
+        this._updatedComponents = [];
 
         // Bind component methods
         this.updatePopovers = this.updatePopovers.bind(this);
@@ -54,6 +55,7 @@ class NewCellHandler {
         this._removeFromParent = this._removeFromParent.bind(this);
         this._removeAllChildren = this._removeAllChildren.bind(this);
         this._callDidLoadForNew = this._callDidLoadForNew.bind(this);
+        this._callDidUpdate = this._callDidUpdate.bind(this);
     }
 
     /**
@@ -113,6 +115,7 @@ class NewCellHandler {
             return velement;
         });
         this._callDidLoadForNew();
+        this._callDidUpdate();
         if(message.poststript){
             this.postscripts.push(message.postscript);
         }
@@ -120,6 +123,7 @@ class NewCellHandler {
     }
 
     cellDiscarded(message){
+        console.log(`Received cellDiscarded for ${message.cellType}[${message.id}]`);
         /*let component = this.activeComponents[message.id];
         if(!component || component == undefined){
             console.warn(`Attempted to remove non-existing ${message.cellType} component ${message.id}`);
@@ -220,6 +224,7 @@ class NewCellHandler {
         let component = this.activeComponents[description.id];
         this._updateComponentProps(component, description);
         this._updateNamedChildren(component, description);
+        this._updatedComponents.push(component);
         return component;
     }
 
@@ -235,13 +240,6 @@ class NewCellHandler {
         let newComponent = new componentClass(componentProps);
         this._updateNamedChildren(newComponent, message);
         this.activeComponents[newComponent.props.id] = newComponent;
-        if(message.id == "page_root"){
-            let domElement = document.getElementById('page_root');
-            let velement = render(newComponent);
-            this.projector.replace(domElement, () => {
-                return velement;
-            });
-        }
         this._newComponents.push(newComponent);
         return newComponent;
 
@@ -311,11 +309,28 @@ class NewCellHandler {
         // Goes through the stored list of
         // new components created during a message handle
         // and calls componentDidLoad()
-        console.log(`Calling componentDidLoad on ${this._newComponents.length} components`);
+        console.group(`Calling componentDidLoad on ${this._newComponents.length} components`);
         this._newComponents.forEach(component => {
             component.componentDidLoad();
+            console.log(`Called #componentDidLoad on ${component.name}[${component.props.id}]`);
         });
+        console.groupEnd();
         this._newComponents = [];
+    }
+
+    _callDidUpdate(){
+        // Goes through the stored
+        // list of existing components
+        // that were updated during a
+        // message handle and calls
+        // componenDidUpdate()
+        console.group(`Calling #componendDidUpdate for ${this._updatedComponents.length} components`);
+        this._updatedComponents.forEach(component => {
+            component.componentDidUpdate();
+            console.log(`Called #componentDidUpdate for ${component.name}[${component.props.id}]`);
+        });
+        this._updatedComponents = [];
+        console.groupEnd();
     }
 }
 
