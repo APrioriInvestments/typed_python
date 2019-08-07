@@ -81,6 +81,6 @@ class PythonFreeObjectWrapper(Wrapper):
 
         if target_type.typeRepresentation == String:
             targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation)))
-            return context.cosntant(True)
+            return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

@@ -110,6 +110,30 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(x, {i: str(i*i) for i in range(1000)})
 
+    def test_dicts_in_dicts(self):
+        @SpecializedEntrypoint
+        def f():
+            d = Dict(str, Dict(str, float))()
+            d["hi"] = Dict(str, float)()
+            d["hi"]["good"] = 100.0
+            d["bye"] = Dict(str, float)()
+            d2 = Dict(str, Dict(str, float))()
+            return d
+
+        for _ in range(1000):
+            d = f()
+
+        self.assertEqual(d['hi']['good'], 100.0)
+
+    def test_dict_destructors(self):
+        @SpecializedEntrypoint
+        def f():
+            d = Dict(str, Dict(str, float))()
+            d["hi"] = Dict(str, float)()
+            return "OK"
+
+        f()
+
     def test_dict_setdefault(self):
         @SpecializedEntrypoint
         def dict_setdefault(d, k, v):

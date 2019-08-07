@@ -183,7 +183,7 @@ def dict_setitem(instance, key, value):
         instance.initializeKeyByIndexUnsafe(newSlot, key)
         instance.initializeValueByIndexUnsafe(newSlot, value)
     else:
-        instance.initializeValueByIndexUnsafe(slot, value)
+        instance.assignValueByIndexUnsafe(slot, value)
 
 
 def dict_setdefault(dict, item, defaultValue=None):
@@ -245,10 +245,18 @@ class DictWrapper(DictWrapperBase):
     def __init__(self, dictType):
         super().__init__(dictType, None)
 
+    def convert_default_initialize(self, context, instance):
+        context.pushEffect(
+            instance.expr.store(
+                runtime_functions.dict_create.call().cast(self.layoutType)
+            )
+        )
+
     def convert_attribute(self, context, expr, attr):
         if attr in (
                 "getItemByIndexUnsafe", "getKeyByIndexUnsafe", "getValueByIndexUnsafe", "deleteItemByIndexUnsafe",
-                "initializeValueByIndexUnsafe", "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
+                "initializeValueByIndexUnsafe", "assignValueByIndexUnsafe",
+                "initializeKeyByIndexUnsafe", "_allocateNewSlotUnsafe", "_resizeTableUnsafe",
                 "_compressItemTableUnsafe", "get", "items", "keys", "values", "setdefault"):
             return expr.changeType(BoundCompiledMethodWrapper(self, attr))
 
@@ -410,7 +418,7 @@ class DictWrapper(DictWrapperBase):
                     return item.expr_type.refAs(context, item, 1)
 
         if len(args) == 2:
-            if methodname == "initializeValueByIndexUnsafe":
+            if methodname in ("initializeValueByIndexUnsafe", 'assignValueByIndexUnsafe'):
                 index = args[0].convert_to_type(int)
                 if index is None:
                     return None
@@ -426,7 +434,10 @@ class DictWrapper(DictWrapperBase):
                     ).elemPtr(index.toInt64().nonref_expr)
                 )
 
-                item.expr_type.refAs(context, item, 1).convert_copy_initialize(value)
+                if methodname == 'assignValueByIndexUnsafe':
+                    item.expr_type.refAs(context, item, 1).convert_assign(value)
+                else:
+                    item.expr_type.refAs(context, item, 1).convert_copy_initialize(value)
 
                 return context.pushVoid()
 
@@ -524,15 +535,15 @@ class DictWrapper(DictWrapperBase):
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.keyType,
-            expr.nonref_expr.ElementPtrIntegers(0, 1)
-            .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)))
-            .cast(self.keyType.getNativeLayoutType().pointer())
+            expr.nonref_expr.ElementPtrIntegers(0, 1).load()
+                .elemPtr(item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount)))
+                .cast(self.keyType.getNativeLayoutType().pointer())
         )
 
     def convert_getvalue_by_index_unsafe(self, context, expr, item):
         return context.pushReference(
             self.valueType,
-            expr.nonref_expr.ElementPtrIntegers(0, 1)
+            expr.nonref_expr.ElementPtrIntegers(0, 1).load()
             .elemPtr(
                 item.nonref_expr.mul(native_ast.const_int_expr(self.kvBytecount))
                 .add(native_ast.const_int_expr(self.keyBytecount))
@@ -541,7 +552,7 @@ class DictWrapper(DictWrapperBase):
 
     def generateNativeDestructorFunction(self, context, out, inst):
         with context.loop(self.convert_items_reserved(context, inst)) as i:
-            with context.ifelse(self.convert_slot_populated_native(inst, i)) as (then, otherwise):
+            with context.ifelse(self.convert_slot_populated_native(inst, i).neq(0)) as (then, otherwise):
                 with then:
                     self.convert_getkey_by_index_unsafe(context, inst, i).convert_destroy()
                     self.convert_getvalue_by_index_unsafe(context, inst, i).convert_destroy()

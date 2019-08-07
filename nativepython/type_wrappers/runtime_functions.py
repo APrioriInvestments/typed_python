@@ -357,6 +357,11 @@ float32_to_string = externalCallTarget(
     Float32
 )
 
+dict_create = externalCallTarget(
+    "nativepython_dict_create",
+    Void.pointer()
+)
+
 dict_allocateNewSlot = externalCallTarget(
     "nativepython_dict_allocateNewSlot",
     Int32,

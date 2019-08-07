@@ -350,6 +350,18 @@ extern "C" {
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 
+    hash_table_layout* nativepython_dict_create() {
+        hash_table_layout* result;
+
+        result = (hash_table_layout*)malloc(sizeof(hash_table_layout));
+
+        new (result) hash_table_layout();
+
+        result->refcount += 1;
+
+        return result;
+    }
+
     int32_t nativepython_dict_allocateNewSlot(hash_table_layout* layout, size_t kvPairSize) {
         return layout->allocateNewSlot(kvPairSize);
     }
