@@ -110,6 +110,26 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(x, {i: str(i*i) for i in range(1000)})
 
+    def test_adding_to_dicts(self):
+        @SpecializedEntrypoint
+        def f(count):
+            for salt in range(count):
+                for count in range(10):
+                    d = Dict(str, int)()
+
+                    for i in range(count):
+                        d[str(salt) + "hi" + str(i)] = i
+
+                        for j in range(i):
+                            if (str(salt) + "hi" + str(j)) not in d:
+                                return False
+                            if d[str(salt) + "hi" + str(j)] != j:
+                                return False
+
+            return True
+
+        self.assertTrue(f(20000))
+
     def test_dicts_in_dicts(self):
         @SpecializedEntrypoint
         def f():
@@ -117,7 +137,7 @@ class TestDictCompilation(unittest.TestCase):
             d["hi"] = Dict(str, float)()
             d["hi"]["good"] = 100.0
             d["bye"] = Dict(str, float)()
-            d2 = Dict(str, Dict(str, float))()
+            d2 = Dict(str, Dict(str, float))() # noqa
             return d
 
         for _ in range(1000):

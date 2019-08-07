@@ -52,7 +52,8 @@ def dict_add_slot(instance, itemHash, slot):
             return
 
         offset += 1
-        if offset > instance._hash_table_size:
+
+        if offset >= instance._hash_table_size:
             offset = 0
 
 
@@ -81,7 +82,7 @@ def dict_slot_for_key(instance, itemHash, item):
         if offset >= instance._hash_table_size:
             offset = 0
 
-    # not necessary, but currently we don't currently realize that the while loop
+    # not necessary, but currently we don't realize that the while loop
     # never exits, and so we think there's a possibility we return None
     return 0
 
@@ -101,7 +102,7 @@ def dict_remove_key(instance, item, itemHash):
     slots = instance._hash_table_slots
 
     if not slots:
-        raise Exception("Key doesn't exist")
+        raise Exception("Key doesn't exist1")
 
     if instance._items_reserved > (instance._hash_table_count + 2) * 4:
         instance._compressItemTableUnsafe()
@@ -118,7 +119,7 @@ def dict_remove_key(instance, item, itemHash):
         slotIndex = int((slots + offset).get())
 
         if slotIndex == EMPTY:
-            raise Exception("Key doesn't exist")
+            raise Exception("Key doesn't exist2")
 
         if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
@@ -151,7 +152,7 @@ def dict_getitem(instance, item):
     slot = dict_slot_for_key(instance, itemHash, item)
 
     if slot == -1:
-        raise Exception("Key doesn't exist.")
+        raise Exception("Key doesn't exist3")
 
     return instance.getValueByIndexUnsafe(slot)
 
