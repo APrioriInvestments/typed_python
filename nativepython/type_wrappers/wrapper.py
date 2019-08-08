@@ -205,7 +205,7 @@ class Wrapper(object):
             return context.push(
                 str,
                 lambda r: r.expr.store(
-                    runtime_functions.np_repr.call(expr.nonref_expr.cast(VoidPtr), tp).cast(typeWrapper(str).layoutType)
+                    runtime_functions.np_repr.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(str).layoutType)
                 )
             )
         return context.pushTerminal(

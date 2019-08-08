@@ -330,7 +330,7 @@ class StringWrapper(RefcountedWrapper):
         if tp:
             context.pushEffect(
                 targetVal.expr.store(
-                    runtime_functions.np_str.call(sourceVal.nonref_expr.cast(VoidPtr), tp).cast(self.getNativeLayoutType())
+                    runtime_functions.np_str.call(sourceVal.expr.cast(VoidPtr), tp).cast(self.getNativeLayoutType())
                 )
             )
             return context.constant(True)
