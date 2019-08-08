@@ -1444,9 +1444,9 @@ class Container(Cell):
 
 
 class Scrollable(Container):
-    def __init__(self, child=None):
+    def __init__(self, child=None, height=None):
         super().__init__(child)
-        self.overflow('auto')
+        self.exportData['height'] = height
 
 
 class RootCell(Container):
