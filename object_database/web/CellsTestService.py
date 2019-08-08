@@ -98,7 +98,7 @@ class CellsTestService(ServiceBase):
             ed = cells.Card("pick something")
 
             def actualDisplay():
-                return cells.Text("nothing to display")
+                return cells.Card(cells.Text("nothing to display"), padding=10)
 
         resultArea = cells.SplitView([
             (cells.Subscribed(actualDisplay), 4),
