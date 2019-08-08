@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -17,6 +17,11 @@ import nativepython
 from typed_python import _types
 
 from nativepython.type_wrappers.exceptions import generateThrowException
+import nativepython.type_wrappers.runtime_functions as runtime_functions
+from nativepython.native_ast import VoidPtr
+
+
+typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 def replaceTupElt(tup, index, newValue):
@@ -192,6 +197,19 @@ class Wrapper(object):
     def convert_abs(self, context, expr):
         return context.pushTerminal(
             generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
+        )
+
+    def convert_repr(self, context, expr):
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        if tp:
+            return context.push(
+                str,
+                lambda r: r.expr.store(
+                    runtime_functions.np_repr.call(expr.nonref_expr.cast(VoidPtr), tp).cast(typeWrapper(str).layoutType)
+                )
+            )
+        return context.pushTerminal(
+            generateThrowException(context, TypeError("No type pointer for '%s'" % (str(self),)))
         )
 
     def convert_unary_op(self, context, expr, op):

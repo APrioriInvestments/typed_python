@@ -140,6 +140,42 @@ extern "C" {
         return Py_None;
     }
 
+    StringType::layout* nativepython_runtime_repr(PyObject* inst, Type* tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* o = PyInstance::extractPythonObject((instance_ptr)&inst, (Type*)tp);
+        if (!o) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("failed to extract python object");
+        }
+        PyObject *r = PyObject_Repr(o);
+        if (!r) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("PyObject_Repr returned 0");
+        }
+        Py_ssize_t s;
+        const char* c = PyUnicode_AsUTF8AndSize(r, &s);
+        return StringType::createFromUtf8(c, s);
+    }
+
+    StringType::layout* nativepython_runtime_str(PyObject* inst, Type* tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* o = PyInstance::extractPythonObject((instance_ptr)&inst, (Type*)tp);
+        if (!o) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("failed to extract python object");
+        }
+        PyObject *r = PyObject_Str(o);
+        if (!r) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("PyObject_Str returned 0");
+        }
+        Py_ssize_t s;
+        const char* c = PyUnicode_AsUTF8AndSize(r, &s);
+        return StringType::createFromUtf8(c, s);
+    }
+
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
         PyEnsureGilAcquired getTheGil;
 
@@ -305,7 +341,7 @@ extern "C" {
     }
 
     // returns layout*
-    void *np_runtime_pyobj_to_typed(PyObject *obj, uint8_t* tgt, Type* tp) {
+    uint8_t *np_runtime_pyobj_to_typed(PyObject *obj, uint8_t* tgt, Type* tp) {
         // tgt is a layout pointer
         PyEnsureGilAcquired acquireTheGil;
         PyInstance::copyConstructFromPythonInstance((Type *)tp, (instance_ptr)&tgt, obj, true);
