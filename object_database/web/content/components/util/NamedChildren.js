@@ -1,5 +1,7 @@
 /**
  * Utility Functions for Dealing with NamedChildren structures
+ * Note that for the moment, we are using these
+ * functions minimally throughout the code.
  */
 
 function _resursivelySearchArrayChildren(target, haystack, info){

@@ -356,7 +356,20 @@ describe("Complex Structure Handling Component Tests", () => {
     });
 });
 
-describe("#cellDiscarded basic", () => {
+
+
+/**
+ * A Note on cellDiscarded Tests
+ * ------------------------------
+ * Previously we expected #cellDiscarded messages to have to navigate
+ * their paret components and remove themselves from namedChildren collections.
+ * In practice, an updated parent Cell/Component will send #cellUpdated with
+ * the child already removed, so even the most complex kinds of
+ * #cellDiscarded handling seem unnecessary for the moment.
+ * We will preserve these tests in case the need arises again
+ * to implement more complicated discarding handling.
+ */
+describe("#cellDiscarded basic", function(){
     var handler;
     before(() => {
         let rootEl = document.createElement('div');
@@ -392,14 +405,15 @@ describe("#cellDiscarded basic", () => {
         let found = handler.activeComponents[firstText.id];
         assert.notExists(found);
     });
-    it("Is no longer present in the namedChildren of old parent", () => {
+    it("Is no longer present in the namedChildren of old parent", function(){
+        this.skip('For the moment we dont need this test. See test file comments');
         let rootComponent = handler.activeComponents[simpleRoot.id];
         let child = rootComponent.props.namedChildren['child'];
         assert.notExists(child);
     });
 });
 
-describe("#cellDiscarded complex case", () => {
+describe.skip("#cellDiscarded complex case", function(){
     var handler;
     before(() => {
         let rootEl = document.createElement('div');

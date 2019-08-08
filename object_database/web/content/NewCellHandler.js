@@ -122,20 +122,6 @@ class NewCellHandler {
     }
 
     cellDiscarded(message){
-        /*let component = this.activeComponents[message.id];
-        if(!component || component == undefined){
-            console.warn(`Attempted to remove non-existing ${message.cellType} component ${message.id}`);
-            return null;
-        }
-        if(component.parent){
-            let wasRemoved = this._removeFromParent(component);
-            if(!wasRemoved){
-                console.warn(`Could not find discarded ${message.cellType}(${message.id}) in any parent components`);
-            }
-        }
-        this._removeAllChildren(component);
-        delete this.activeComponents[message.id];
-        return component;*/
         let found = this.activeComponents[message.id];
         if(found){
             delete this.activeComponents[message.id];
