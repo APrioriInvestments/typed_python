@@ -140,10 +140,10 @@ extern "C" {
         return Py_None;
     }
 
-    StringType::layout* nativepython_runtime_repr(PyObject* inst, Type* tp) {
+    StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject((instance_ptr)&inst, (Type*)tp);
+        PyObject* o = PyInstance::extractPythonObject(inst, tp);
         if (!o) {
             PyErr_PrintEx(0);
             throw std::runtime_error("failed to extract python object");
@@ -158,10 +158,10 @@ extern "C" {
         return StringType::createFromUtf8(c, s);
     }
 
-    StringType::layout* nativepython_runtime_str(PyObject* inst, Type* tp) {
+    StringType::layout* nativepython_runtime_str(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject((instance_ptr)&inst, (Type*)tp);
+        PyObject* o = PyInstance::extractPythonObject(inst, tp);
         if (!o) {
             PyErr_PrintEx(0);
             throw std::runtime_error("failed to extract python object");

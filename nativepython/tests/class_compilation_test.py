@@ -219,7 +219,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(f().x, 123)
         self.assertEqual(f().y, 0)
 
-    def test_compile_class_repr_and_str_and_hash(self):
+    def test_compile_class_repr_and_str(self):
         class ClassWithReprAndStr(Class):
             def __repr__(self):
                 return "repr"
