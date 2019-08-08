@@ -143,10 +143,11 @@ display: inline-block;
 }
 
 .table-hscroll {
-margin-bottom: 15px;
-overflow-y: hidden;
--ms-overflow-style: -ms-autohiding-scrollbar;
-border: 1px solid #ddd;
+    margin-bottom: 15px;
+    overflow-y: hidden;
+    -ms-overflow-style: -ms-autohiding-scrollbar;
+    border: 1px solid #ddd;
+    width: 100%;
 }
 
 .table {
@@ -154,7 +155,7 @@ border: 1px solid #ddd;
 }
 
 .table-hscroll > .table {
-margin-bottom: 0;
+    margin-bottom: 0;
 }
 .table-hscroll > .table > thead > tr > th,
 .table-hscroll > .table > tbody > tr > th,

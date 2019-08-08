@@ -26,3 +26,16 @@ class basicScrollable(CellsTestPage):
 
     def text(self):
         return "You should see some scrollable content."
+
+
+class basicNonScrollable(CellsTestPage):
+    def cell(self):
+        return cells.Scrollable(
+            cells.Sequence([
+                cells.Card("This is a card", padding=2) for index in range(20)
+            ]), height=None
+        )
+
+    def text(self):
+        return ("This content doesn't scroll; change the 'height' argument to "
+                "a css height value (example: '100px').")
