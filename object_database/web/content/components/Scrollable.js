@@ -3,6 +3,7 @@
  */
 
 import {Component} from './Component';
+import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
 /**
@@ -27,9 +28,15 @@ class Scrollable extends Component {
     }
 
     render(){
+        let style = "";
+        if (this.props.extraData.height){
+            style = "height:" + this.props.extraData.height;
+        }
         return (
             h('div', {
                 id: this.props.id,
+                class: "cell overflow",
+                style: style,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Scrollable"
             }, [this.makeChild()])
@@ -44,5 +51,12 @@ class Scrollable extends Component {
         }
     }
 }
+
+Scrollable.propTypes = {
+    height: {
+        height: "Height of the Scrollable container.",
+        type: PropTypes.oneOf([PropTypes.string])
+    }
+};
 
 export {Scrollable, Scrollable as default};
