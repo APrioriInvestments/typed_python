@@ -19,8 +19,10 @@ from object_database.web.CellsTestPage import CellsTestPage
 class SplitSequence(CellsTestPage):
     def cell(self):
         return cells.Sequence(
-            [cells.Text("item 1", text_color="red"),
-             cells.Text("item 2", text_color="blue")]
+            [
+                cells.Card(cells.Text("item 1", text_color="red")),
+                cells.Card(cells.Text("item 2", text_color="blue"))
+            ]
         )
 
     def text(self):
@@ -30,8 +32,10 @@ class SplitSequence(CellsTestPage):
 class HorizontalSplitSequence(CellsTestPage):
     def cell(self):
         return cells.HorizontalSequence(
-            [cells.Text("item 1", text_color="red"),
-             cells.Text("item 2", text_color="blue")]
+            [
+                cells.Card(cells.Text("item 1", text_color="red")),
+                cells.Card(cells.Text("item 2", text_color="blue"))
+            ]
         )
 
     def text(self):

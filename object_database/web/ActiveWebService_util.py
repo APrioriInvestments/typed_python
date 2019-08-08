@@ -21,7 +21,7 @@ from object_database.web.cells import (
     Main, Subscribed, Sequence, Traceback, Span, Button, Octicon,
     Padding, Tabs, Table, Clickable, Dropdown, Popover, HeaderBar,
     LargePendingDownloadDisplay, PageView,
-    HorizontalSequence
+    HorizontalSequence, SplitView
 )
 
 from object_database.web.AuthPlugin import AuthPluginBase
@@ -72,7 +72,7 @@ def view():
         Services=servicesTable(),
         Hosts=hostsTable()
     )
-    return Sequence([buttons, tabs])
+    return SplitView([(buttons, 0), (tabs, 10)], split="horizontal")
 
 
 def hostsTable():

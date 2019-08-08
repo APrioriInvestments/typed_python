@@ -18,7 +18,7 @@ from object_database.web.CellsTestPage import CellsTestPage
 
 class BasicOcticon(CellsTestPage):
     def cell(self):
-        return cells.Octicon('shield', color='green')
+        return cells.Card(cells.Octicon('shield', color='green'), padding=4)
 
     def text(self):
         return "You should see a single octicon."
@@ -26,11 +26,11 @@ class BasicOcticon(CellsTestPage):
 
 class MultiOcticon(CellsTestPage):
     def cell(self):
-        return cells.HorizontalSequence([
+        return cells.Card(cells.HorizontalSequence([
             cells.Octicon('shield', color='green'),
             cells.Octicon('stop', color='red'),
             cells.Octicon('alert', color='yellow')
-        ])
+        ]), padding=4)
 
     def text(self):
         return "You should see a single octicon."
