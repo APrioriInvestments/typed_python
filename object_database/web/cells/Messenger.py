@@ -148,6 +148,8 @@ def _resolveFlatChild(cell_or_list):
 
 
 def _getExpandedStructure(parent_id, cell, name_in_parent):
+    if cell is None:
+        return None
     own_children = _getExpandedChildren(cell)
     return {
         "id": cell.identity,
