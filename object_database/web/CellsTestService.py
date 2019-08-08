@@ -98,11 +98,11 @@ class CellsTestService(ServiceBase):
             ed = cells.Card("pick something")
 
             def actualDisplay():
-                return cells.Text("nothing to display")
+                return cells.Card(cells.Text("nothing to display"), padding=10)
 
         resultArea = cells.SplitView([
-            (cells.Card(cells.Subscribed(actualDisplay), padding=4), 2),
-            (cells.Card(cells.Text(description), padding=2), 1)],
+            (cells.Subscribed(actualDisplay), 4),
+            (cells.Card(cells.Text(description), padding=2), 0)],
             split="horizontal"
         )
 
