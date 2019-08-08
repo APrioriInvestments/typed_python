@@ -359,23 +359,7 @@ class Cells:
             updatedNodesToSend.add(stableParent)
 
         for nodeToSend in list(updatedNodesToSend):
-            res.append(Messenger.newCellUpdated(nodeToSend))
-
-        """
-        # map<level:int -> cells:set<Cells> >
-        cellsByLevel = {}
-
-        for n in self._nodesToBroadcast:
-            if n not in self._nodesToDiscard:
-                cellsByLevel.setdefault(n.level, set()).add(n)
-
-        for level, cells in reversed(sorted(cellsByLevel.items())):
-            for n in cells:
-                res.append(self.updateMessageFor(n))
-                # TODO: in the future this should integrated into a more
-                # structured server side lifecycle management framework
-                n.updateLifecycleState()
-        """
+            res.append(Messenger.cellUpdated(nodeToSend))
 
         for n in self._nodesToDiscard:
             if n.cells is not None:
@@ -426,7 +410,6 @@ class Cells:
             if not n.garbageCollected:
                 self.markToBroadcast(n)
                 # TODO: lifecycle attribute; see cell.updateLifecycleState()
-
 
                 origChildren = self._cellsKnownChildren[n.identity]
 
@@ -484,14 +467,6 @@ class Cells:
                     self._cellOutOfScope(c)
 
                 self._cellsKnownChildren[n.identity] = newChildren
-
-    def updateMessageFor(self, cell):
-        replaceDict = {}
-
-        for childName, childNode in cell.children.items():
-            replaceDict[cell.identity + "_" + childName] = childNode.identity
-
-        return Messenger.cellUpdated(cell, replaceDict)
 
     def childrenWithExceptions(self):
         return self._root.findChildrenMatching(lambda cell: isinstance(cell, Traceback))
