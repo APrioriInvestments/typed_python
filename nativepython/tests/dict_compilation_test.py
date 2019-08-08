@@ -344,3 +344,27 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(_types.refcount(aTup), 2)
         self.assertEqual(_types.refcount(aTup3), 2)
+
+    def test_dict_hash_perf_compiled(self):
+        @SpecializedEntrypoint
+        def f(dictToLookupIn, items, passes):
+            counts = ListOf(int)()
+            counts.resize(len(items))
+
+            for passIx in range(passes):
+                for i in range(len(items)):
+                    if items[i] in dictToLookupIn:
+                        counts[i] += 1
+
+            return counts
+
+        aDict = Dict(str, int)()
+        someStrings = ListOf(str)()
+
+        for i in range(100):
+            someStrings.append(str(i))
+            aDict[someStrings[-1]] = i
+
+        t0 = time.time()
+        f(aDict, someStrings, 100000)
+        print(time.time() - t0, " to lookup 10mm strings")

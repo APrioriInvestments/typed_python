@@ -30,6 +30,8 @@ class ListOfWrapper(TupleOrListOfWrapper):
     is_empty = False
     is_pass_by_ref = True
 
+    CAN_BE_NULL = False
+
     def convert_len_native(self, expr):
         if isinstance(expr, TypedExpression):
             expr = expr.nonref_expr

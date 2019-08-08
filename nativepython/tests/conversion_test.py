@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf
+from typed_python import Function, OneOf, TupleOf, ListOf
 from nativepython.runtime import Runtime
 import unittest
 import time
@@ -353,3 +353,24 @@ class TestCompilationStructures(unittest.TestCase):
 
         print("Range is %.2f slower than nonrange." % ((t2-t1)/(t1-t0)))  # I get 1.00
         self.assertTrue((t1-t0) < (t2 - t1) * 1.1)
+
+    def test_read_invalid_variables(self):
+        @Compiled
+        def readNonexistentVariable(readIt: bool):
+            if readIt:
+                return y
+            else:
+                return 0
+
+        with self.assertRaisesRegex(Exception, "name 'y' is not defined"):
+            readNonexistentVariable(True)
+
+        self.assertEqual(readNonexistentVariable(False), 0)
+
+    def test_append_float_to_int_rules_same(self):
+        def f():
+            x = ListOf(int)()
+            x.append(1.0)
+            return x
+
+        self.assertEqual(f(), Compiled(f)())

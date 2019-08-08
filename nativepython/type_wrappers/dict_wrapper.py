@@ -199,6 +199,8 @@ class DictWrapperBase(RefcountedWrapper):
     is_empty = False
     is_pass_by_ref = True
 
+    CAN_BE_NULL = False
+
     def __init__(self, t, behavior):
         assert hasattr(t, '__typed_python_category__')
         super().__init__(t if behavior is None else (t, behavior))
