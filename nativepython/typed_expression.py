@@ -136,6 +136,9 @@ class TypedExpression(object):
     def convert_abs(self):
         return self.expr_type.convert_abs(self.context, self)
 
+    def convert_repr(self):
+        return self.expr_type.convert_repr(self.context, self)
+
     def convert_reserved(self):
         return self.expr_type.convert_reserved(self.context, self)
 
