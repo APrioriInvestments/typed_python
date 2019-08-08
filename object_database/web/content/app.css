@@ -2,6 +2,16 @@
  * Application Wide Stylesheet for ActiveWebService
  **/
 
+/* Page Root  and other global-type elements*/
+#page_root {
+    height: 100vh;
+}
+
+.subscribed {
+    width: 100%;
+    height: 100%;
+}
+
 /* ResizablePanel and Friends
  * =====================================================*/
 .resizable-panel {
@@ -123,12 +133,16 @@
 .page-view {
     display: inline-flex;
     flex-direction: column;
-    min-height: 100vh;
+    height: 100%;
     width: 100%;
 }
 
+.page-view > header {
+    height: 5%;
+}
+
 .page-view > main {
-    flex-grow: 1
+    height: 95%;
 }
 
 .page-view-header {
@@ -138,10 +152,6 @@
 .page-view-footer {
 
 }
-
-
-
-
 
 /* Generic and Utility Classes
  *======================================================*/

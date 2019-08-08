@@ -34,9 +34,7 @@ class Main extends Component {
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Main"
             }, [
-                h('div', {class: "container-fluid"}, [
                     this.makeChild()
-                ])
             ])
         );
     }

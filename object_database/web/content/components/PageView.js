@@ -68,9 +68,7 @@ class PageView extends Component {
         } else {
             mainContent = this.renderChildNamed('main');
         }
-        return h('main', {
-            class: 'page-view-main'
-        }, [mainContent]);
+        return mainContent;
     }
 
     makeFooter(){

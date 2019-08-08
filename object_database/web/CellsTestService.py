@@ -101,8 +101,8 @@ class CellsTestService(ServiceBase):
                 return cells.Text("nothing to display")
 
         resultArea = cells.SplitView([
-            (cells.Card(cells.Subscribed(actualDisplay), padding=4), 2),
-            (cells.Card(cells.Text(description), padding=2), 1)],
+            (cells.Subscribed(actualDisplay), 4),
+            (cells.Card(cells.Text(description), padding=2), 0)],
             split="horizontal"
         )
 
