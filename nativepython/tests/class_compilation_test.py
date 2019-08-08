@@ -227,8 +227,8 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def __str__(self):
                 return "str"
 
-        self.assertEqual(str(ListOf(ClassWithReprAndStr)([ClassWithRepr()])), "[str]")
-        self.assertEqual(repr(ListOf(ClassWithReprAndStr)([ClassWithRepr()])), "[repr]")
+        self.assertEqual(str(ListOf(ClassWithReprAndStr)([ClassWithReprAndStr()])), "[str]")
+        self.assertEqual(repr(ListOf(ClassWithReprAndStr)([ClassWithReprAndStr()])), "[repr]")
 
         @SpecializedEntrypoint
         def callRepr(x):
