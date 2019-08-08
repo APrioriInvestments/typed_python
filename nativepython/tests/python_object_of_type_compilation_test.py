@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import (
-    Function, TupleOf, ListOf, String, Dict,
+    Function, TupleOf, ListOf, String, Dict, NamedTuple, OneOf,
     Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
@@ -66,6 +66,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             f(10)
 
     def test_object_conversions(self):
+        NT1 = NamedTuple(a=int, b=float, c=str, d=str)
+        NT2 = NamedTuple(s=String, t=TupleOf(int))
         cases = [
             (Bool, True),
             (Int8, -128),
@@ -90,7 +92,11 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (ListOf(str), ["a", "b", "d"]),
             (Float32, 1.2345),
             (Dict(str, int), {'y': 7, 'n': 6}),
-            (TupleOf(int), tuple(range(10000)))
+            (TupleOf(int), tuple(range(10000))),
+            (OneOf(String, Int64), "ab"),
+            (OneOf(String, Int64), 34),
+            (NT1, NT1(a=1, b=2.3, c="c", d="d")),
+            (NT2, NT2(s="xyz", t=tuple(range(10000))))
         ]
 
         for T, v in cases:
@@ -127,4 +133,4 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
                 w = fro_and_to(w)
             finalMem = psutil.Process().memory_info().rss / 1024 ** 2
 
-            self.assertTrue(finalMem < initMem + 5)
+            self.assertTrue(finalMem < initMem + 2)

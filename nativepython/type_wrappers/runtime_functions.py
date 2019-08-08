@@ -168,7 +168,7 @@ getattr_pyobj = externalCallTarget(
 
 pyobj_to_typed = externalCallTarget(
     "np_runtime_pyobj_to_typed",
-    Void.pointer(),
+    Void,
     Void.pointer(),
     Void.pointer(),
     UInt64
