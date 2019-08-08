@@ -146,6 +146,19 @@ decref_pyobj = externalCallTarget(
     Void.pointer()
 )
 
+np_repr = externalCallTarget(
+    "nativepython_runtime_repr",
+    Void.pointer(),
+    Void.pointer(),
+    UInt64
+)
+
+np_str = externalCallTarget(
+    "nativepython_runtime_str",
+    Void.pointer(),
+    Void.pointer(),
+    UInt64
+)
 getattr_pyobj = externalCallTarget(
     "nativepython_runtime_getattr_pyobj",
     Void.pointer(),

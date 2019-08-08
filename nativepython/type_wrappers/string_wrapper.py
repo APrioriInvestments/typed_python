@@ -320,3 +320,19 @@ class StringWrapper(RefcountedWrapper):
                 )
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)
+
+    def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        if not explicit:
+            return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
+
+        t = sourceVal.expr_type.typeRepresentation
+        tp = context.getTypePointer(t)
+        if tp:
+            context.pushEffect(
+                targetVal.expr.store(
+                    runtime_functions.np_str.call(sourceVal.nonref_expr.cast(VoidPtr), tp).cast(self.getNativeLayoutType())
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)

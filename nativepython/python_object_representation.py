@@ -46,6 +46,7 @@ from nativepython.type_wrappers.string_wrapper import StringWrapper
 from nativepython.type_wrappers.bytes_wrapper import BytesWrapper
 from nativepython.type_wrappers.python_object_of_type_wrapper import PythonObjectOfTypeWrapper
 from nativepython.type_wrappers.abs_wrapper import AbsWrapper
+from nativepython.type_wrappers.repr_wrapper import ReprWrapper
 from types import ModuleType
 from typed_python._types import TypeFor, bytecount
 from typed_python import (
@@ -158,6 +159,9 @@ def pythonObjectRepresentation(context, f):
 
     if f is abs:
         return TypedExpression(context, native_ast.nullExpr, AbsWrapper(), False)
+
+    if f is repr:
+        return TypedExpression(context, native_ast.nullExpr, ReprWrapper(), False)
 
     if f is range:
         return TypedExpression(context, native_ast.nullExpr, _RangeWrapper, False)

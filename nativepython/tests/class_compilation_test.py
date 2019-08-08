@@ -12,9 +12,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, Member
+from typed_python import Function, Class, TupleOf, ListOf, Member
 import typed_python._types as _types
-from nativepython.runtime import Runtime
+from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
 import time
 
@@ -218,3 +218,25 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(f().x, 123)
         self.assertEqual(f().y, 0)
+
+    def test_compile_class_repr_and_str_and_hash(self):
+        class ClassWithReprAndStr(Class):
+            def __repr__(self):
+                return "repr"
+
+            def __str__(self):
+                return "str"
+
+        self.assertEqual(str(ListOf(ClassWithReprAndStr)([ClassWithRepr()])), "[str]")
+        self.assertEqual(repr(ListOf(ClassWithReprAndStr)([ClassWithRepr()])), "[repr]")
+
+        @SpecializedEntrypoint
+        def callRepr(x):
+            return repr(x)
+
+        @SpecializedEntrypoint
+        def callStr(x):
+            return str(x)
+
+        self.assertEqual(callRepr(ClassWithReprAndStr()), "repr")
+        self.assertEqual(callStr(ClassWithReprAndStr()), "str")
