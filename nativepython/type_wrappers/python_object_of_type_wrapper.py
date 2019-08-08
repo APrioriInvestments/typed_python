@@ -117,12 +117,10 @@ class PythonObjectOfTypeWrapper(Wrapper):
         tp = context.getTypePointer(t)
         if tp:
             context.pushEffect(
-                targetVal.expr.store(
-                    runtime_functions.pyobj_to_typed.call(
-                        e.nonref_expr.cast(VoidPtr),
-                        targetVal.expr.cast(VoidPtr),
-                        tp).cast(target_type.getNativeLayoutType())
-                )
+                runtime_functions.pyobj_to_typed.call(
+                    e.nonref_expr.cast(VoidPtr),
+                    targetVal.expr.cast(VoidPtr),
+                    tp)
             )
             return context.constant(True)
 
@@ -158,7 +156,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         if tp:
             context.pushEffect(
                 targetVal.expr.store(
-                    runtime_functions.to_pyobj.call(sourceVal.nonref_expr.cast(VoidPtr), tp)
+                    runtime_functions.to_pyobj.call(sourceVal.expr.cast(VoidPtr), tp)
                 )
             )
             return context.constant(True)

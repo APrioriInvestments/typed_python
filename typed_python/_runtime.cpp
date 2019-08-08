@@ -340,18 +340,14 @@ extern "C" {
         return floorresult;
     }
 
-    // returns layout*
-    uint8_t *np_runtime_pyobj_to_typed(PyObject *obj, uint8_t* tgt, Type* tp) {
-        // tgt is a layout pointer
+    void np_runtime_pyobj_to_typed(PyObject *obj, instance_ptr tgt, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
-        PyInstance::copyConstructFromPythonInstance((Type *)tp, (instance_ptr)&tgt, obj, true);
-        // returns modified layout pointer
-        return tgt;
+        PyInstance::copyConstructFromPythonInstance(tp, tgt, obj, true);
     }
 
-    PyObject* np_runtime_to_pyobj(PyObject *obj, uint64_t tp) {
+    PyObject* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
-        return PyInstance::extractPythonObject((instance_ptr)&obj, (Type*)tp);
+        return PyInstance::extractPythonObject(obj, tp);
     }
 
     PyObject* np_runtime_int64_to_pyobj(int64_t i) {
