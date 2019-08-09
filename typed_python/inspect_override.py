@@ -12,8 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import imp
 import inspect
+import importlib.machinery
 import linecache
 import os
 import re
@@ -98,8 +98,9 @@ def getsourcefile(pyObject):
 
     if filename[-4:].lower() in ('.pyc', '.pyo'):
         filename = filename[:-4] + '.py'
-    for suffix, mode, _ in imp.get_suffixes():
-        if 'b' in mode and filename[-len(suffix):].lower() == suffix:
+
+    for suffix in importlib.machinery.EXTENSION_SUFFIXES:
+        if filename[-len(suffix):].lower() == suffix:
             # Looks like a binary file.  We want to only return a text file.
             return None
 
