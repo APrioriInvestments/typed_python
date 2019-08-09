@@ -278,7 +278,9 @@ class Cells:
     def _addCell(self, cell, parent):
         assert isinstance(cell, Cell), type(cell)
         assert cell.cells is None, cell
-
+        # Degbugging. Remove.
+        print()
+        print("Adding cell {}".format(cell.__class__.__name__))
         cell.cells = self
         cell.parent = parent
         cell.level = parent.level + 1 if parent else 0
@@ -1398,7 +1400,7 @@ class AsyncDropdown(Cell):
         self.contentCell = AsyncDropdownContent(self.slot, contentCellFunc, loadingIndicatorCell)
         self.children = {'____contents__': self.contentCell}
         self.namedChildren['content'] = self.contentCell
-        self.namedChildren['loadingIndicator'] = loadingIndicatorCell
+        # self.namedChildren['loadingIndicator'] = loadingIndicatorCell
 
     def onMessage(self, messageFrame):
         """On `dropdown` events sent to this
@@ -1454,7 +1456,8 @@ class AsyncDropdownContent(Cell):
         self.loadingCell = loadingIndicatorCell
         self.contentCell = Subscribed(self.changeHandler)
         self.children = {
-            '____contents__': self.contentCell
+            '____contents__': self.contentCell,
+            'loadingIndicator': self.loadingCell
         }
         self.namedChildren = {
             'content': self.contentCell,
