@@ -183,6 +183,12 @@ string_cmp = externalCallTarget(
     Void.pointer(), Void.pointer()
 )
 
+string_eq = externalCallTarget(
+    "nativepython_runtime_string_eq",
+    Bool,
+    Void.pointer(), Void.pointer()
+)
+
 string_getitem_int64 = externalCallTarget(
     "nativepython_runtime_string_getitem_int64",
     Void.pointer(),

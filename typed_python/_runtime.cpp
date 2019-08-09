@@ -15,6 +15,14 @@ const char* nativepython_runtime_get_stashed_exception() {
 
 extern "C" {
 
+    bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
+        if (lhs == rhs) {
+            return true;
+        }
+
+        return StringType::cmpStaticEq(lhs, rhs);
+    }
+
     int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::cmpStatic(lhs, rhs);
     }

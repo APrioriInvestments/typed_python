@@ -72,6 +72,23 @@ class StringWrapper(RefcountedWrapper):
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
+                if op.matches.Eq:
+                    return context.pushPod(
+                        bool,
+                        runtime_functions.string_eq.call(
+                            left.nonref_expr.cast(VoidPtr),
+                            right.nonref_expr.cast(VoidPtr)
+                        )
+                    )
+                if op.matches.NotEq:
+                    return context.pushPod(
+                        bool,
+                        runtime_functions.string_eq.call(
+                            left.nonref_expr.cast(VoidPtr),
+                            right.nonref_expr.cast(VoidPtr)
+                        ).logical_not()
+                    )
+
                 cmp_res = context.pushPod(
                     int,
                     runtime_functions.string_cmp.call(
@@ -79,16 +96,7 @@ class StringWrapper(RefcountedWrapper):
                         right.nonref_expr.cast(VoidPtr)
                     )
                 )
-                if op.matches.Eq:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.eq(0)
-                    )
-                if op.matches.NotEq:
-                    return context.pushPod(
-                        bool,
-                        cmp_res.nonref_expr.neq(0)
-                    )
+
                 if op.matches.Lt:
                     return context.pushPod(
                         bool,
