@@ -8,8 +8,8 @@ import {h} from 'maquette';
 /**
  * About Replacements
  * -------------------
- * This component has a single regular
- * replacement:
+ * This component has two regular
+ * replacements:
  * * `contents`
  *
  * NOTE: The Cells version of this child is
