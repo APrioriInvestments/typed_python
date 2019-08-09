@@ -267,7 +267,7 @@ class TestDictCompilation(unittest.TestCase):
         slowdownRatio = (t3 - t2) / (t1 - t0)
 
         self.assertGreater(slowdownRatio, .9)
-        self.assertLess(slowdownRatio, 1.5)
+        self.assertLess(slowdownRatio, 1.75)
 
         print("Multicore slowdown factor was ", slowdownRatio)
 
