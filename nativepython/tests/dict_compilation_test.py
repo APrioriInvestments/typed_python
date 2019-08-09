@@ -366,5 +366,9 @@ class TestDictCompilation(unittest.TestCase):
             aDict[someStrings[-1]] = i
 
         t0 = time.time()
+        f(aDict, someStrings, 1)
+        print(time.time() - t0, "to compile the function.")
+
+        t0 = time.time()
         f(aDict, someStrings, 100000)
-        print(time.time() - t0, " to lookup 10mm strings")
+        print(time.time() - t0, "to lookup 10mm strings")

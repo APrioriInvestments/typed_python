@@ -420,13 +420,19 @@ class ExpressionConversionContext(object):
                     true = results.get(True, native_ast.nullExpr)
                     false = results.get(False, native_ast.nullExpr)
 
-                    self.pushEffect(
-                        native_ast.Expression.Branch(
-                            cond=condition,
-                            true=true,
-                            false=false
+                    if condition.matches.Constant:
+                        if condition.val.truth_value():
+                            self.pushEffect(true)
+                        else:
+                            self.pushEffect(false)
+                    else:
+                        self.pushEffect(
+                            native_ast.Expression.Branch(
+                                cond=condition,
+                                true=true,
+                                false=false
+                            )
                         )
-                    )
 
         return MainScope()
 
@@ -491,6 +497,9 @@ class ExpressionConversionContext(object):
             )
 
     def isInitializedVarExpr(self, name):
+        if self.functionContext.externalScopeVarExpr(self, name) is not None:
+            return self.constant(True)
+
         if self.functionContext._varname_to_type[name] is None:
             raise ConversionException(
                 "variable %s is not in scope here" % name
@@ -510,6 +519,12 @@ class ExpressionConversionContext(object):
         )
 
     def named_var_expr(self, name):
+        # check if the function context already knows this variable
+        # and has an expression for it.
+        scopeExpr = self.functionContext.externalScopeVarExpr(self, name)
+        if scopeExpr is not None:
+            return scopeExpr
+
         if self.functionContext._varname_to_type[name] is None:
             raise ConversionException(
                 "variable %s is not in scope here" % name
@@ -576,7 +591,9 @@ class ExpressionConversionContext(object):
             properName = self.functionContext.mapVarname(ast.id)
 
             if properName in self.functionContext._varname_to_type:
-                with self.ifelse(self.isInitializedVarExpr(properName)) as (true, false):
+                isInitExpr = self.isInitializedVarExpr(properName)
+
+                with self.ifelse(isInitExpr) as (true, false):
                     with false:
                         self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % ast.id)
                 return self.named_var_expr(properName)

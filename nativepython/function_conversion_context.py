@@ -14,6 +14,12 @@
 
 import typed_python.python_ast as python_ast
 
+from nativepython.python_ast_analysis import (
+    computeAssignedVariables,
+    computeReadVariables,
+    computeFunctionArgVariables
+)
+
 import nativepython
 import nativepython.native_ast as native_ast
 from nativepython.expression_conversion_context import ExpressionConversionContext
@@ -32,9 +38,25 @@ class FunctionOutput:
 
 
 class FunctionConversionContext(object):
-    """Helper function for converting a single python function."""
+    """Helper function for converting a single python function given some input and output types"""
 
     def __init__(self, converter, identity, ast_arg, statements, input_types, output_type, free_variable_lookup):
+        """Initialize a FunctionConverter
+
+        Args:
+            converter - a PythonToNativeConverter
+            identity - an object to uniquely identify this instance of the function
+            ast_arg - a python_ast.Arguments object
+            statements - a list of python_ast.Statement objects making up the body of the function
+            input_types - a list of the input types actually passed to us
+            output_type - the output type (if proscribed), or None
+            free_variable_lookup - a dict from name to the actual python object in this
+                function's closure. We don't distinguish between local and global scope yet.
+        """
+        self.variablesAssigned = computeAssignedVariables(statements)
+        self.variablesRead = computeReadVariables(statements)
+        self.variablesBound = computeFunctionArgVariables(ast_arg)
+
         self.converter = converter
         self.identity = identity
         self._ast_arg = ast_arg
@@ -42,6 +64,7 @@ class FunctionConversionContext(object):
         self._statements = statements
         self._input_types = input_types
         self._output_type = output_type
+        self._argumentsWithoutStackslots = set() # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
         self._varname_map = {}
         self._varname_map_count = {}
@@ -165,6 +188,21 @@ class FunctionConversionContext(object):
     def stack_varname(self):
         self._temp_stack_var += 1
         return "stackvar.%s" % (self._temp_stack_var-1)
+
+    def externalScopeVarExpr(self, subcontext, varname):
+        if varname not in self._argumentsWithoutStackslots:
+            return None
+
+        varType = self._varname_to_type[varname]
+
+        isPassByRef = varType.is_pass_by_ref
+
+        return TypedExpression(
+            subcontext,
+            native_ast.Expression.Variable(name=varname),
+            varType,
+            varType.is_pass_by_ref
+        )
 
     def upsizeVariableType(self, varname, new_type):
         varname = self.mapVarname(varname)
@@ -630,6 +668,10 @@ class FunctionConversionContext(object):
 
                     if slot_type.is_empty:
                         pass
+                    elif name in self.variablesBound and name not in self.variablesAssigned:
+                        # this variable is bound but never assigned, so we don't need to
+                        # generate a stackslot. We can just read it directly from our arguments
+                        self._argumentsWithoutStackslots.add(name)
                     elif slot_type.is_pod:
                         # we can just copy this into the stackslot directly. no destructor needed
                         context.pushEffect(
@@ -662,25 +704,26 @@ class FunctionConversionContext(object):
             if name is not FunctionOutput and name != stararg_name:
                 context = ExpressionConversionContext(self)
 
-                if self._varname_to_type[name] is not None and not self._varname_to_type[name].is_empty:
-                    slot_expr = context.named_var_expr(name)
+                if name not in self._argumentsWithoutStackslots:
+                    if self._varname_to_type[name] is not None and not self._varname_to_type[name].is_empty:
+                        slot_expr = context.named_var_expr(name)
 
-                    with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
-                        with true:
-                            slot_expr.convert_destroy()
+                        with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
+                            with true:
+                                slot_expr.convert_destroy()
 
-                    destructors.append(
-                        native_ast.Teardown.Always(
-                            expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                        destructors.append(
+                            native_ast.Teardown.Always(
+                                expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                            )
                         )
-                    )
 
-                    if name not in argnames:
-                        # this is a variable in the function that we assigned to. we need to ensure that
-                        # the initializer flag is zero
-                        context = ExpressionConversionContext(self)
-                        context.markVariableNotInitialized(name)
-                        to_add.append(context.finalize(None))
+                        if name not in argnames:
+                            # this is a variable in the function that we assigned to. we need to ensure that
+                            # the initializer flag is zero
+                            context = ExpressionConversionContext(self)
+                            context.markVariableNotInitialized(name)
+                            to_add.append(context.finalize(None))
 
         if to_add:
             expr = native_ast.Expression.Sequence(
