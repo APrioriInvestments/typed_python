@@ -625,23 +625,6 @@ StringType::layout* StringType::createFromUtf8(const char* utfEncodedString, int
     return new_layout;
 }
 
-typed_python_hash_type StringType::hash(instance_ptr left) {
-    if (!(*(layout**)left)) {
-        return 0x12345;
-    }
-
-    if ((*(layout**)left)->hash_cache == -1) {
-        HashAccumulator acc((int)getTypeCategory());
-        acc.addBytes(eltPtr(left, 0), bytes_per_codepoint(left) * count(left));
-        (*(layout**)left)->hash_cache = acc.get();
-        if ((*(layout**)left)->hash_cache == -1) {
-            (*(layout**)left)->hash_cache = -2;
-        }
-    }
-
-    return (*(layout**)left)->hash_cache;
-}
-
 template<class T1, class T2>
 char typedArrayCompare(T1* l, T2* r, size_t count) {
     for (size_t i = 0; i < count; i++) {
@@ -658,7 +641,59 @@ char typedArrayCompare(T1* l, T2* r, size_t count) {
 }
 
 bool StringType::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
+    if (pyComparisonOp == Py_NE) {
+        return !cmp(left, right, Py_EQ, suppressExceptions);
+    }
+    if (pyComparisonOp == Py_EQ) {
+        return cmpStaticEq(*(layout**)left, *(layout**)right);
+    }
     return cmpResultToBoolForPyOrdering(pyComparisonOp, cmpStatic(*(layout**)left, *(layout**)right));
+}
+
+bool StringType::cmpStaticEq(layout* left, layout* right) {
+    if ( !left && !right ) {
+        return true;
+    }
+    if ( !left && right ) {
+        return false;
+    }
+    if ( left && !right ) {
+        return false;
+    }
+
+    if (left->pointcount != right->pointcount) {
+        return false;
+    }
+
+    int bytesPerLeft = left->bytes_per_codepoint;
+    int bytesPerRight = right->bytes_per_codepoint;
+    int commonCount = std::min(left->pointcount, right->pointcount);
+
+    char res = 0;
+
+    if (bytesPerLeft == 1 && bytesPerRight == 1) {
+        res = byteCompare(left->data, right->data, bytesPerLeft * commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint16_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 1 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint8_t*)left->data, (uint32_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint8_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint16_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 2 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint16_t*)left->data, (uint32_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 1) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint8_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 2) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint16_t*)right->data, commonCount);
+    } else if (bytesPerLeft == 4 && bytesPerRight == 4) {
+        res = typedArrayCompare((uint32_t*)left->data, (uint32_t*)right->data, commonCount);
+    } else {
+        throw std::runtime_error("Nonsensical bytes-per-codepoint");
+    }
+
+    return res == 0;
 }
 
 char StringType::cmpStatic(layout* left, layout* right) {

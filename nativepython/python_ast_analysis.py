@@ -54,6 +54,7 @@ nodeTypes = (
     WithItem
 )
 
+
 def visitPyAstChildren(node, callback):
     """Walk into 'node' calling 'callback' for every object.
 
@@ -149,6 +150,7 @@ def computeFunctionArgVariables(args: Arguments):
 
     return names
 
+
 def computeReadVariables(astNode):
     """Return a set of variable names that are read from by this ast node or children."""
     variables = set()
@@ -179,7 +181,7 @@ def computeReadVariables(astNode):
                     .difference(
                         computeAssignedVariables(x.body)
                         .union(computeFunctionArgVariables(x.args))
-                        .union(set([x.name])) # take out the function's name itself
+                        .union(set([x.name]))  # take out the function's name itself
                     )
                 )
                 variables.update(computeReadVariables(x.decorator_list))
@@ -207,4 +209,3 @@ def computeReadVariables(astNode):
     visitPyAstChildren(astNode, visit)
 
     return variables
-

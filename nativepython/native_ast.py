@@ -423,6 +423,7 @@ Expression = Expression.define(Alternative(
     logical_not=lambda self: Expression.Unaryop(op=UnaryOp.LogicalNot(), operand=self),
     bitwise_not=lambda self: Expression.Unaryop(op=UnaryOp.BitwiseNot(), operand=self),
     negate=lambda self: Expression.Unaryop(op=UnaryOp.Negate(), operand=self),
+    mod=lambda self, other: Expression.Binop(op=BinaryOp.Mod(), left=self, right=ensureExpr(other)),
     sub=lambda self, other: Expression.Binop(op=BinaryOp.Sub(), left=self, right=ensureExpr(other)),
     add=lambda self, other: Expression.Binop(op=BinaryOp.Add(), left=self, right=ensureExpr(other)),
     mul=lambda self, other: Expression.Binop(op=BinaryOp.Mul(), left=self, right=ensureExpr(other)),

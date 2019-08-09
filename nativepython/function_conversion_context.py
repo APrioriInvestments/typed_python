@@ -64,7 +64,7 @@ class FunctionConversionContext(object):
         self._statements = statements
         self._input_types = input_types
         self._output_type = output_type
-        self._argumentsWithoutStackslots = set() # arguments that we don't bother to copy into the stack
+        self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
         self._varname_map = {}
         self._varname_map_count = {}
@@ -194,8 +194,6 @@ class FunctionConversionContext(object):
             return None
 
         varType = self._varname_to_type[varname]
-
-        isPassByRef = varType.is_pass_by_ref
 
         return TypedExpression(
             subcontext,

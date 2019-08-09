@@ -174,11 +174,38 @@ public:
         });
     }
 
-    typed_python_hash_type hash(instance_ptr left);
+    typed_python_hash_type hash(instance_ptr left) {
+        return hash_static(left);
+    }
+
+    static typed_python_hash_type hash_static(instance_ptr left) {
+        if (!(*(layout**)left)) {
+            return 0x12345;
+        }
+
+        layout* stringPtr = *(layout**)left;
+
+        if (stringPtr->hash_cache == -1) {
+            HashAccumulator acc((int)TypeCategory::catString);
+
+            acc.addBytes(stringPtr->data, stringPtr->bytes_per_codepoint * stringPtr->pointcount);
+
+            stringPtr->hash_cache = acc.get();
+            if (stringPtr->hash_cache == -1) {
+                stringPtr->hash_cache = -2;
+            }
+        }
+
+        return (*(layout**)left)->hash_cache;
+    }
+
+
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 
     static char cmpStatic(layout* left, layout* right);
+
+    static bool cmpStaticEq(layout* left, layout* right);
 
     void constructor(instance_ptr self, int64_t bytes_per_codepoint, int64_t count, const char* data) const;
 

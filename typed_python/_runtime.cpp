@@ -407,7 +407,7 @@ extern "C" {
     }
 
     int32_t nativepython_hash_string(StringType::layout* s) {
-        return StringType::Make()->hash((instance_ptr)&s);
+        return StringType::hash_static((instance_ptr)&s);
     }
 
     int32_t nativepython_hash_bytes(BytesType::layout* s) {

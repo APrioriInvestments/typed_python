@@ -94,7 +94,7 @@ js-test: . $(VIRTUAL_ENV)/bin/activate; \
 
 .PHONY: lint
 lint:
-	flake8 --show-source --exclude .nodeenv
+	flake8 --show-source --exclude .nodeenv,.eggs
 
 .PHONY: vlint
 vlint: $(VIRTUAL_ENV)

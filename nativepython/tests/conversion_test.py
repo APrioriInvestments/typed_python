@@ -358,7 +358,7 @@ class TestCompilationStructures(unittest.TestCase):
         @Compiled
         def readNonexistentVariable(readIt: bool):
             if readIt:
-                return y
+                return y  # noqa
             else:
                 return 0
 

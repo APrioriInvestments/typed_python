@@ -17,6 +17,7 @@ from nativepython.typed_expression import TypedExpression
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 from nativepython.type_wrappers.wrapper import Wrapper
+from nativepython.type_wrappers.compilable_builtin import CompilableBuiltin
 from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8
 
 import nativepython.native_ast as native_ast
@@ -29,6 +30,23 @@ EMPTY = -1
 DELETED = -2
 
 
+class CPlusPlusStyleMod(CompilableBuiltin):
+    def convert_call(self, context, instance, args, kwargs):
+        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int32 and args[1].expr_type.typeRepresentation == Int64:
+            return context.pushPod(
+                int,
+                args[0].nonref_expr.cast(native_ast.Int64).mod(args[1].nonref_expr)
+            )
+
+        if len(args) == 2 and args[0].expr_type.typeRepresentation == Int64 and args[1].expr_type.typeRepresentation == Int64:
+            return context.pushPod(
+                int,
+                args[0].nonref_expr.mod(args[1].nonref_expr)
+            )
+
+        return super().convert_call(context, instance, args, kwargs)
+
+
 def dict_add_slot(instance, itemHash, slot):
     if (instance._hash_table_count * 2 + 1 > instance._hash_table_size or
             instance._hash_table_empty_slots < instance._hash_table_size >> 2 + 1):
@@ -37,7 +55,7 @@ def dict_add_slot(instance, itemHash, slot):
     if itemHash < 0:
         itemHash = -itemHash
 
-    offset = itemHash % instance._hash_table_size
+    offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
 
     while True:
         if instance._hash_table_slots[offset] == EMPTY or instance._hash_table_slots[offset] == DELETED:
@@ -64,9 +82,9 @@ def dict_slot_for_key(instance, itemHash, item):
         return -1
 
     if itemHash < 0:
-        itemHash = - itemHash
+        itemHash = -itemHash
 
-    offset = itemHash % instance._hash_table_size
+    offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
 
     while True:
         slotIndex = int((slots + offset).get())
@@ -102,7 +120,7 @@ def dict_remove_key(instance, item, itemHash):
     slots = instance._hash_table_slots
 
     if not slots:
-        raise Exception("Key doesn't exist1")
+        raise Exception("Key doesn't exist")
 
     if instance._items_reserved > (instance._hash_table_count + 2) * 4:
         instance._compressItemTableUnsafe()
@@ -111,15 +129,15 @@ def dict_remove_key(instance, item, itemHash):
         instance._resizeTableUnsafe()
 
     if itemHash < 0:
-        itemHash = - itemHash
+        itemHash = -itemHash
 
-    offset = itemHash % instance._hash_table_size
+    offset = CPlusPlusStyleMod(itemHash, instance._hash_table_size)
 
     while True:
         slotIndex = int((slots + offset).get())
 
         if slotIndex == EMPTY:
-            raise Exception("Key doesn't exist2")
+            raise Exception("Key doesn't exist")
 
         if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
@@ -152,7 +170,7 @@ def dict_getitem(instance, item):
     slot = dict_slot_for_key(instance, itemHash, item)
 
     if slot == -1:
-        raise Exception("Key doesn't exist3")
+        raise Exception("Key doesn't exist")
 
     return instance.getValueByIndexUnsafe(slot)
 

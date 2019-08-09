@@ -17,6 +17,7 @@ import nativepython.python_ast_analysis as python_ast_analysis
 
 import unittest
 
+
 class TestPythonAstAnalysis(unittest.TestCase):
     def freeVarCheck(self, func, readVars, assignedVars):
         """Look at func's _body_ only, and compute which variables it reads and assigns."""
@@ -34,10 +35,9 @@ class TestPythonAstAnalysis(unittest.TestCase):
         )
 
     def test_free_vars_basic(self):
-        self.freeVarCheck(lambda: x, ['x'], [])
-        self.freeVarCheck(lambda: x + y, ['x', 'y'], [])
-        self.freeVarCheck(lambda: f(*args), ['f', 'args'], [])
-
+        self.freeVarCheck(lambda: x, ['x'], [])  # noqa
+        self.freeVarCheck(lambda: x + y, ['x', 'y'], [])  # noqa
+        self.freeVarCheck(lambda: f(*args), ['f', 'args'], [])  # noqa
 
     def test_assignment_shows_up(self):
         def f():
@@ -48,7 +48,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
 
     def test_multi_assignment_shows_up(self):
         def f():
-            x, y = (1, 2)
+            x, y = (1, 2)  # noqa
 
         self.freeVarCheck(f, [], ['x', 'y'])
 
@@ -62,7 +62,7 @@ class TestPythonAstAnalysis(unittest.TestCase):
     def test_function_defs(self):
         def f():
             def aFun(x):
-                return x + y
+                return x + y  # noqa
 
             def aFun2(*args, **kwargs):
                 return args + kwargs
@@ -76,6 +76,6 @@ class TestPythonAstAnalysis(unittest.TestCase):
                 z = 20
 
                 def f(x):
-                    return z
+                    return z  # noqa
 
         self.freeVarCheck(f, ['z'], ['AClass'])

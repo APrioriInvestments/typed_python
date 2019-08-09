@@ -15,6 +15,7 @@
 from nativepython.typed_expression import TypedExpression
 import nativepython.native_ast as native_ast
 from nativepython.type_wrappers.wrapper import Wrapper
+from nativepython.type_wrappers.compilable_builtin import CompilableBuiltin
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.type_wrappers.python_type_object_wrapper import PythonTypeObjectWrapper
 from nativepython.type_wrappers.module_wrapper import ModuleWrapper
@@ -146,6 +147,9 @@ def _typedPythonTypeToTypeWrapper(t):
 
 
 def pythonObjectRepresentation(context, f):
+    if isinstance(f, type) and issubclass(f, CompilableBuiltin):
+        return TypedExpression(context, native_ast.nullExpr, f(), False)
+
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)
 
