@@ -1087,9 +1087,7 @@ class Sequence(Cell):
         elements = [Cell.makeCell(x) for x in elements]
 
         self.elements = elements
-        self.namedChildren['elements'] = elements
-        self.children = {"____c_%s__" %
-                         i: elements[i] for i in range(len(elements))}
+        self.updateChildren()
 
     def __add__(self, other):
         other = Cell.makeCell(other)
@@ -1099,8 +1097,13 @@ class Sequence(Cell):
             return Sequence(self.elements + [other])
 
     def recalculate(self):
-        self.namedChildren['elements'] = self.elements
+        self.updateChildren()
         self.exportData['divStyle'] = self._divStyle()
+
+    def updateChildren(self):
+        self.children = {"____c_%s__" %
+                         i: self.elements[i] for i in range(len(self.elements))}
+        self.namedChildren['elements'] = self.elements
 
     def sortsAs(self):
         if self.elements:
