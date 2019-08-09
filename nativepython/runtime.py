@@ -146,17 +146,19 @@ def SpecializedEntrypoint(f):
             raise Exception(f"Can only compile functions, not {f}")
         f = Function(f)
 
+    lock = threading.RLock()
     signatures = set()
 
     def inner(*args):
         signature = tuple(type(x) for x in args)
 
-        if signature not in signatures:
-            for o in f.overloads:
-                if o.matchesTypes(signature):
-                    argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
-                    Runtime.singleton().compile(o, argTypes)
-            signatures.add(signature)
+        with lock:
+            if signature not in signatures:
+                for o in f.overloads:
+                    if o.matchesTypes(signature):
+                        argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
+                        Runtime.singleton().compile(o, argTypes)
+                signatures.add(signature)
 
         return f(*args)
 
