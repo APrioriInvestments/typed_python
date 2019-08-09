@@ -24,7 +24,7 @@ from object_database.inmem_server import InMemServer
 from object_database.persistence import InMemoryPersistence, RedisPersistence
 from object_database.util import configureLogging, genToken
 from object_database.test_util import currentMemUsageMb
-from object_database.TestRedis import TestRedis
+from object_database.RedisTestHelper import RedisTestHelper
 from object_database.reactor import Reactor
 
 import object_database
@@ -2249,7 +2249,7 @@ class ObjectDatabaseOverChannelTestsWithRedis(unittest.TestCase, ObjectDatabaseT
         if hasattr(self, 'redisProcess') and self.redisProcess:
             self.redisProcess.tearDown()
 
-        self.redisProcess = TestRedis(port=1115)
+        self.redisProcess = RedisTestHelper(port=1115)
 
         try:
             self.mem_store = RedisPersistence(port=1115)

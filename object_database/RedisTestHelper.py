@@ -1,5 +1,5 @@
 """
-TestRedis
+RedisTestHelper
 
 utilities for bringing up a temporary redis backend for testing purposes.
 """
@@ -13,7 +13,7 @@ import os
 CONNECT_TIMEOUT = 0.5
 
 
-class TestRedis:
+class RedisTestHelper:
     def __init__(self, port=1115):
         self.redisProcess = None
         self.port = port

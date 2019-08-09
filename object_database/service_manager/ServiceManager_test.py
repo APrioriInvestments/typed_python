@@ -45,7 +45,7 @@ schema = Schema("core.ServiceManagerTest")
 
 
 @schema.define
-class TestServiceCounter:
+class MockServiceCounter:
     k = int
 
 
@@ -62,7 +62,7 @@ class Feigenbaum:
 
 
 @schema.define
-class TestServiceLastTimestamp:
+class MockServiceLastTimestamp:
     connection = Indexed(core_schema.Connection)
     lastPing = float
     triggerHardKill = bool
@@ -74,7 +74,7 @@ class TestServiceLastTimestamp:
     def aliveServices(window=None):
         res = []
 
-        for i in TestServiceLastTimestamp.lookupAll():
+        for i in MockServiceLastTimestamp.lookupAll():
             if i.connection.exists() and (window is None or time.time() - i.lastPing < window):
                 res.append(i)
 
@@ -82,10 +82,10 @@ class TestServiceLastTimestamp:
 
     @staticmethod
     def aliveCount(window=None):
-        return len(TestServiceLastTimestamp.aliveServices(window))
+        return len(MockServiceLastTimestamp.aliveServices(window))
 
 
-class TestService(ServiceBase):
+class MockService(ServiceBase):
     gbRamUsed = 0
     coresUsed = 0
 
@@ -93,7 +93,7 @@ class TestService(ServiceBase):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
 
         with self.db.transaction():
-            self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+            self.conn = MockServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
             self.conn.ownIp = self.runtimeConfig.ownIpAddress
 
@@ -119,7 +119,7 @@ class HangingService(ServiceBase):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
 
         with self.db.transaction():
-            self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+            self.conn = MockServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
 
     def doWork(self, shouldStop):
@@ -447,7 +447,7 @@ class StorageTest(ServiceBase):
         self.db.subscribeToSchema(core_schema, service_schema, schema)
 
         with self.db.transaction():
-            self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+            self.conn = MockServiceLastTimestamp(connection=self.db.connectionObject)
             self.version = 0
 
     def doWork(self, shouldStop):
@@ -505,7 +505,7 @@ def getTestServiceModule(version):
             schema = Schema("core.ServiceManagerTest")
 
             @schema.define
-            class TestServiceLastTimestamp:
+            class MockServiceLastTimestamp:
                 connection = Indexed(core_schema.Connection)
                 lastPing = float
                 triggerHardKill = bool
@@ -517,7 +517,7 @@ def getTestServiceModule(version):
                     self.db.subscribeToSchema(core_schema, service_schema, schema)
 
                     with self.db.transaction():
-                        self.conn = TestServiceLastTimestamp(connection=self.db.connectionObject)
+                        self.conn = MockServiceLastTimestamp(connection=self.db.connectionObject)
                         self.conn.version = {version}
 
                 def doWork(self, shouldStop):
@@ -542,31 +542,31 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def setCountAndBlock(self, count):
         with self.database.transaction():
-            ServiceManager.startService("TestService", count)
+            ServiceManager.startService("MockService", count)
         self.waitForCount(count)
 
     def waitForCount(self, count, timeout=5.0):
         self.assertTrue(
             self.database.waitForCondition(
-                lambda: TestServiceLastTimestamp.aliveCount() == count,
+                lambda: MockServiceLastTimestamp.aliveCount() == count,
                 timeout=timeout * self.ENVIRONMENT_WAIT_MULTIPLIER
             )
         )
 
     def test_starting_services(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=1)
 
         self.waitForCount(1)
 
     def test_own_ip_populated(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=1)
 
         self.waitForCount(1)
 
         with self.database.view():
-            state = TestServiceLastTimestamp.lookupAny()
+            state = MockServiceLastTimestamp.lookupAny()
 
             # we should always know our ip as 127.0.0.1 because we infer it from
             # the server we connect to, and we connected to localhost.
@@ -643,21 +643,21 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_racheting_service_count_up_and_down(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=1)
 
         numpy.random.seed(42)
 
         for count in numpy.random.choice(6, size=20):
             logging.getLogger(__name__).info(
-                "Setting count for TestService to %s and waiting for it to be alive.", count)
+                "Setting count for MockService to %s and waiting for it to be alive.", count)
 
             with self.database.transaction():
-                ServiceManager.startService("TestService", int(count))
+                ServiceManager.startService("MockService", int(count))
 
             self.waitForCount(count)
 
         with self.database.transaction():
-            ServiceManager.startService("TestService", 0)
+            ServiceManager.startService("MockService", 0)
 
         self.waitForCount(0)
 
@@ -769,7 +769,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
         t0 = time.time()
 
         with self.database.transaction():
-            c = TestServiceCounter()
+            c = MockServiceCounter()
 
         while time.time() - t0 < seconds:
             with self.database.transaction():
@@ -780,21 +780,21 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_throughput_while_adjusting_servicecount(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=0)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=0)
 
         emptyThroughputs = [self.measureThroughput(1.0)]
         fullThroughputs = []
 
         for i in range(2):
             with self.database.transaction():
-                ServiceManager.startService("TestService", 10)
+                ServiceManager.startService("MockService", 10)
 
             self.waitForCount(10)
 
             fullThroughputs.append(self.measureThroughput(1.0))
 
             with self.database.transaction():
-                ServiceManager.startService("TestService", 0)
+                ServiceManager.startService("MockService", 0)
 
             self.waitForCount(0)
 
@@ -810,13 +810,13 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def DISABLEDtest_throughput_with_many_workers(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=0)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=0)
 
         throughputs = []
 
         for ct in [16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 0]:
             with self.database.transaction():
-                ServiceManager.startService("TestService", ct)
+                ServiceManager.startService("MockService", ct)
 
             self.waitForCount(ct)
 
@@ -826,12 +826,12 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_service_restarts_after_soft_kill(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=1)
 
         self.waitForCount(1)
 
         with self.database.transaction():
-            s = TestServiceLastTimestamp.aliveServices()[0]
+            s = MockServiceLastTimestamp.aliveServices()[0]
             s.triggerSoftKill = True
 
         self.database.waitForCondition(
@@ -843,12 +843,12 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_service_restarts_after_killing(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=1)
 
         self.waitForCount(1)
 
         with self.database.transaction():
-            s = TestServiceLastTimestamp.aliveServices()[0]
+            s = MockServiceLastTimestamp.aliveServices()[0]
             s.triggerHardKill = True
 
         self.database.waitForCondition(
@@ -860,7 +860,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
 
     def test_logfiles_exist_and_get_recycled(self):
         with self.database.transaction():
-            ServiceManager.createOrUpdateService(TestService, "TestService", target_count=1)
+            ServiceManager.createOrUpdateService(MockService, "MockService", target_count=1)
         self.waitForCount(1)
 
         self.assertTrue(
@@ -901,14 +901,14 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
                 test_service = __import__("test_service.service")
 
                 with self.database.transaction():
-                    ServiceManager.createOrUpdateService(test_service.service.Service, "TestService", target_count=1)
+                    ServiceManager.createOrUpdateService(test_service.service.Service, "MockService", target_count=1)
 
                 self.waitForCount(1)
             finally:
                 sys.path = [x for x in sys.path if x != tf]
 
     def test_update_module_code(self):
-        serviceName = "TestService"
+        serviceName = "MockService"
 
         def deploy_helper(codebase_version, expected_version, existing_service=None):
             with self.database.transaction():
@@ -933,7 +933,7 @@ class ServiceManagerTest(ServiceManagerTestCommon, unittest.TestCase):
             self.waitForCount(1)
 
             with self.database.transaction():
-                s = TestServiceLastTimestamp.aliveServices()[0]
+                s = MockServiceLastTimestamp.aliveServices()[0]
                 self.assertEqual(s.version, expected_version)
 
             return s
