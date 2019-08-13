@@ -15,7 +15,7 @@
 import json
 import queue
 import os
-import cgi
+import html
 import time
 import traceback
 import logging
@@ -1020,7 +1020,7 @@ class Text(Cell):
         return self._sortAs
 
     def recalculate(self):
-        escapedText = cgi.escape(str(self.text)) if self.text else " "
+        escapedText = html.escape(str(self.text)) if self.text else " "
         self.exportData['escapedText'] = escapedText
         self.exportData['rawText'] = self.text
         self.exportData['divStyle'] = self._divStyle()
