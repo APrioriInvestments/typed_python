@@ -329,7 +329,7 @@ class CellsTests(unittest.TestCase):
 
             workFn(db, cells, iterations=500)
 
-        self.helper_memory_leak(cell, initFn, workFn, 1)
+        self.helper_memory_leak(cell, initFn, workFn, 3)
 
     def test_cells_context(self):
         class X:
