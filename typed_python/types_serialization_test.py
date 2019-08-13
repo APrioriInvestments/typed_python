@@ -21,6 +21,7 @@ import time
 import unittest
 import numpy
 import datetime
+import pytest
 import pytz
 import gc
 import pprint
@@ -778,7 +779,7 @@ class TypesSerializationTest(unittest.TestCase):
         with self.assertRaises(TypeError):
             sc.serialize(MyFrozenSet())
 
-    # THIS FAILS
+    @pytest.mark.skip(reason="it fails with a coredump")
     @unittest.skip
     def test_serialize_unicode_1(self):
         endcases = ['', '<\\u>', '<\\\u1234>', '<\n>',
@@ -818,7 +819,7 @@ class TypesSerializationTest(unittest.TestCase):
                 self.assert_is_copy(expected, n2)
             n = n >> 1
 
-    # FAILS
+    @pytest.mark.skip(reason="it fails")
     @unittest.skip
     def test_serialize_long(self):
         # 256 bytes is where LONG4 begins.
@@ -854,14 +855,14 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(deserializedVal, 1.0)
         self.assertIsInstance(deserializedVal, numpy.float64)
 
-    # FAILS
+    @pytest.mark.skip(reason="it fails")
     @unittest.skip
     def test_serialize_reduce(self):
         inst = AAA()
         loaded = ping_pong(inst, sc)
         self.assertEqual(loaded, REDUCE_A)
 
-    # FAILS with: TypeError: tp_new threw an exception
+    @pytest.mark.skip(reason="fails with: tp_new threw an exception")
     @unittest.skip
     def test_serialize_getinitargs(self):
         inst = initarg(1, 2)
@@ -873,7 +874,7 @@ class TypesSerializationTest(unittest.TestCase):
         b = ping_pong(a, sc)
         self.assertEqual(a.__class__, b.__class__)
 
-    # Didn't even bother
+    @pytest.mark.skip(reason="Didn't even bother")
     @unittest.skip
     def test_serialize_dynamic_class(self):
         import copyreg
@@ -884,7 +885,7 @@ class TypesSerializationTest(unittest.TestCase):
         self.assertEqual(a, b)
         self.assertIs(type(a), type(b))
 
-    # FAILS with: TypeError: Classes derived from `tuple` cannot be serialized
+    @pytest.mark.skip(reason="fails with: TypeError: Classes derived from `tuple` cannot be serialized")
     @unittest.skip
     def test_serialize_structseq(self):
         import time
@@ -902,19 +903,19 @@ class TypesSerializationTest(unittest.TestCase):
             u = ping_pong(t)
             self.assert_is_copy(t, u)
 
-    # FAILS
+    @pytest.mark.skip(reason="fails")
     @unittest.skip
     def test_serialize_ellipsis(self):
         u = ping_pong(...)
         self.assertIs(..., u)
 
-    # FAILS
+    @pytest.mark.skip(reason="fails")
     @unittest.skip
     def test_serialize_notimplemented(self):
         u = ping_pong(NotImplemented)
         self.assertIs(NotImplemented, u)
 
-    # FAILS
+    @pytest.mark.skip(reason="fails")
     @unittest.skip
     def test_serialize_singleton_types(self):
         # Issue #6477: Test that types of built-in singletons can be pickled.
@@ -933,7 +934,7 @@ class TypesSerializationTest(unittest.TestCase):
         loaded = ping_pong(obj)
         self.assert_is_copy(obj, loaded)
 
-    # FAILS with: AssertionError: 'bar' is not 'bar'
+    @pytest.mark.skip(reason="fails with: AssertionError: 'bar' is not 'bar'")
     @unittest.skip
     def test_serialize_attribute_name_interning(self):
         # Test that attribute names of pickled objects are interned when
