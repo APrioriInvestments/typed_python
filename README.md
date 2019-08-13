@@ -108,5 +108,6 @@ best way to use it.
 
 ## How do I run tests?
 
-Checkout the project and run `test.py` from the root.  It will automatically
-compile the python extension and run tests. You can filter tests with a regex using `test.py --filter=PAT`.
+Checkout the project and run `make install` from the root to install the necessary dependencies, then run `make test`.
+The first command will create a python virtualenv and install the necessary dependencies as well as compile the python extensions.
+You can filter tests with a regex using `pytest -k PAT`. from within the created virtualenv (`source .venv/bin/activate` to activate it).

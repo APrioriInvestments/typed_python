@@ -49,11 +49,10 @@ TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 #  MAIN RULES
 
 .PHONY: install
-install: $(VIRTUAL_ENV)
+install: $(VIRTUAL_ENV) testcert.cert testcert.key
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip3 install pipenv==2018.11.26; \
 		pipenv install --dev --deploy; \
-		. $(VIRTUAL_ENV)/bin/activate; \
 		nodeenv -p --prebuilt --node=10.15.3 .nodeenv; \
 		npm install -g webpack webpack-cli; \
 		cd object_database/web/content; \
@@ -76,16 +75,12 @@ build-js:
 	npm run build
 
 .PHONY: test
-test: testcert.cert testcert.key install
-	. $(VIRTUAL_ENV)/bin/activate; \
-		./test.py -s; \
-		cd object_database/web/content; \
-		npm test
+test: testcert.cert testcert.key js-test
+	. $(VIRTUAL_ENV)/bin/activate; pytest
 
 .PHONY:
-js-test: . $(VIRTUAL_ENV)/bin/activate; \
-		cd object_database/web/content/; \
-		npm test
+js-test:
+	cd object_database/web/content/; npm test
 
 .PHONY: lint
 lint:
@@ -116,7 +111,7 @@ docker-test:
 	#run unit tests in the debugger
 	docker run -it --rm --privileged --entrypoint bash \
 		nativepython/cloud:"$(COMMIT)" \
-		-c "gdb -ex run --args python ./test.py -v -s"
+		-c "gdb -ex run --args  python -m pytest"
 
 .PHONY: docker-web
 docker-web:
