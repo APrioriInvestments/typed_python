@@ -28,6 +28,25 @@ class basicScrollable(CellsTestPage):
         return "You should see some scrollable content."
 
 
+class multiScrollable(CellsTestPage):
+    def cell(self):
+        return cells.SplitView([
+            (cells.Card(
+                cells.Scrollable(cells.Sequence([
+                    cells.Card("Row %s of 20" % (item + 1)) for item in range(20)
+                ]), height="200px"),
+                padding=10), 1),
+            (cells.Card(
+                cells.Scrollable(cells.Sequence([
+                    cells.Card("Row %s of 10" % (item + 1)) for item in range(10)
+                ]), height="200px"),
+                padding=10), 10),
+        ])
+
+    def text(self):
+        return "You should see some scrollable content."
+
+
 class basicNonScrollable(CellsTestPage):
     def cell(self):
         return cells.Scrollable(
