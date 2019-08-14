@@ -49,7 +49,7 @@ class HorizontalSequence extends Component {
     }
 
     makeClasses(){
-        let classes = ["cell", "sequence", "sequence-horizonal"];
+        let classes = ["cell", "sequence-horizonal"];
         if(this.props.overflow){
             classes.push("overflow");
         }
