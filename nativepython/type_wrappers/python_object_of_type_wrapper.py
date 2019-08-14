@@ -112,12 +112,14 @@ class PythonObjectOfTypeWrapper(Wrapper):
             return context.constant(True)
 
         tp = context.getTypePointer(t)
+
         if tp:
             context.pushEffect(
                 runtime_functions.pyobj_to_typed.call(
                     e.nonref_expr.cast(VoidPtr),
                     targetVal.expr.cast(VoidPtr),
-                    tp)
+                    tp
+                )
             )
             return context.constant(True)
 
@@ -150,7 +152,11 @@ class PythonObjectOfTypeWrapper(Wrapper):
             return context.constant(True)
 
         tp = context.getTypePointer(t)
+
         if tp:
+            if not sourceVal.isReference:
+                sourceVal = context.push(sourceVal.expr_type, lambda x: x.convert_copy_initialize(sourceVal))
+
             context.pushEffect(
                 targetVal.expr.store(
                     runtime_functions.to_pyobj.call(sourceVal.expr.cast(VoidPtr), tp)
