@@ -108,7 +108,7 @@ class CellsTestService(ServiceBase):
 
         inputArea = cells.Card(
             cells.SplitView(
-                [(selectionPanel(page), 1), (ed, 8)]
+                [(selectionPanel(page), 2), (ed, 9)]
             ), padding=2
         )
 
