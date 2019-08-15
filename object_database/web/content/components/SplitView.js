@@ -68,13 +68,15 @@ class SplitView extends Component {
         if(this.usesReplacements){
             return this.getReplacementElementsFor('element').map((child, idx) => {
                 return h('div', {
-                    style: this.makeChildStyle(idx)
+                    style: this.makeChildStyle(idx),
+                    class: "overflow"
                 }, [child]);
             });
         } else {
             return this.renderChildrenNamed('elements').map((child, idx) => {
                 return h('div', {
-                    style: this.makeChildStyle(idx)
+                    style: this.makeChildStyle(idx),
+                    class: "overflow"
                 }, child);
             });
         }

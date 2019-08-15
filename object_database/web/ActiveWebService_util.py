@@ -55,24 +55,21 @@ class Configuration:
 
 def view():
     buttons = HorizontalSequence([
-        Padding(),
         Button(
             HorizontalSequence([Octicon('shield', color='green'), Span('Lock ALL')]),
             lambda: [s.lock() for s in service_schema.Service.lookupAll()]),
-        Padding(),
         Button(
             HorizontalSequence([Octicon('shield', color='orange'), Span('Prepare ALL')]),
             lambda: [s.prepare() for s in service_schema.Service.lookupAll()]),
-        Padding(),
         Button(
             HorizontalSequence([Octicon('stop', color='red'), Span('Unlock ALL')]),
             lambda: [s.unlock() for s in service_schema.Service.lookupAll()]),
-    ])
+    ], margin=1)
     tabs = Tabs(
         Services=servicesTable(),
         Hosts=hostsTable()
     )
-    return SplitView([(buttons, 0), (tabs, 10)], split="horizontal")
+    return SplitView([(buttons, 1), (tabs, 10)], split="horizontal")
 
 
 def hostsTable():
