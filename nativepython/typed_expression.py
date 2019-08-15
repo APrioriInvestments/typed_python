@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -139,6 +139,9 @@ class TypedExpression(object):
     def convert_abs(self):
         return self.expr_type.convert_abs(self.context, self)
 
+    def convert_builtin(self, f, a1=None):
+        return self.expr_type.convert_builtin(f, self.context, self, a1)
+
     def convert_repr(self):
         return self.expr_type.convert_repr(self.context, self)
 
@@ -148,11 +151,11 @@ class TypedExpression(object):
     def convert_unary_op(self, op):
         return self.expr_type.convert_unary_op(self.context, self, op)
 
-    def convert_bin_op(self, op, rhs):
-        return self.expr_type.convert_bin_op(self.context, self, op, rhs)
+    def convert_bin_op(self, op, rhs, inplace=False):
+        return self.expr_type.convert_bin_op(self.context, self, op, rhs, inplace)
 
-    def convert_bin_op_reverse(self, op, rhs):
-        return self.expr_type.convert_bin_op_reverse(self.context, self, op, rhs)
+    def convert_bin_op_reverse(self, op, rhs, inplace=False):
+        return self.expr_type.convert_bin_op_reverse(self.context, self, op, rhs, inplace)
 
     def convert_call(self, args, kwargs):
         return self.expr_type.convert_call(self.context, self, args, kwargs)

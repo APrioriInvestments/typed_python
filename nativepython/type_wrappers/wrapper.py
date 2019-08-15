@@ -14,7 +14,7 @@
 
 import nativepython
 
-from typed_python import _types, OneOf
+from typed_python import _types, OneOf, ListOf
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.native_ast import VoidPtr
@@ -198,9 +198,32 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
         )
 
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is dir and a1 is None:
+            tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+            if tp:
+                if not expr.isReference:
+                    expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
+                retT = ListOf(str)
+                return context.push(
+                    typeWrapper(retT),
+                    lambda Ref: Ref.expr.store(
+                        runtime_functions.np_dir.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(retT).layoutType)
+                    )
+                )
+        if f is format and a1 is None:
+            return expr.convert_cast(str)
+
+        return context.pushTerminal(
+            generateThrowException(context, TypeError("Can't compile '%s' on instance of type '%s'%s"
+                                                      % (str(f), str(self), " with additional parameter" if a1 else "")))
+        )
+
     def convert_repr(self, context, expr):
         tp = context.getTypePointer(expr.expr_type.typeRepresentation)
         if tp:
+            if not expr.isReference:
+                expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
             return context.push(
                 str,
                 lambda r: r.expr.store(
@@ -338,10 +361,10 @@ class Wrapper(object):
 
         return context.constant(False)
 
-    def convert_bin_op(self, context, l, op, r):
-        return r.expr_type.convert_bin_op_reverse(context, r, op, l)
+    def convert_bin_op(self, context, l, op, r, inplace):
+        return r.expr_type.convert_bin_op_reverse(context, r, op, l, inplace)
 
-    def convert_bin_op_reverse(self, context, r, op, l):
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.Is:
             return context.constant(False)
 
@@ -406,6 +429,13 @@ class Wrapper(object):
                 )
             )
         )
+
+    def convert_call_method(self, context, method, args):
+        t = self.typeRepresentation
+        if getattr(getattr(t, method, None), "__typed_python_category__", None) == 'Function':
+            assert len(getattr(t, method).overloads) == 1
+            return context.call_py_function(getattr(t, method).overloads[0].functionObj, args, {})
+        return None
 
     def get_iteration_expressions(self, context, expr):
         """Return a fixed list of TypedExpressions iterating the object.

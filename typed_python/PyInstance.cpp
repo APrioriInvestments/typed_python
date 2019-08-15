@@ -363,6 +363,12 @@ PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* 
     });
 }
 
+int PyInstance::pyInquiry(PyObject* lhs, const char* op, const char* opErrRep) {
+    return specializeForTypeReturningInt(lhs, [&](auto& subtype) {
+        return subtype.pyInquiryConcrete(op, opErrRep);
+    });
+}
+
 PyObject* PyInstance::pyUnaryOperatorConcrete(const char* op, const char* opErrRep) {
     return incref(Py_NotImplemented);
 }
@@ -377,6 +383,12 @@ PyObject* PyInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, c
 
 PyObject* PyInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErrRep) {
     return incref(Py_NotImplemented);
+}
+
+int PyInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    int typeCat = type()->getTypeCategory();
+    PyErr_Format(PyExc_TypeError, "Operation %s not permitted on type '%S' %d", op, (PyObject*)((PyObject*)this)->ob_type, typeCat);
+    return -1;
 }
 
 PyObject* PyInstance::nb_inplace_add(PyObject* lhs, PyObject* rhs) {
@@ -424,7 +436,7 @@ PyObject* PyInstance::nb_floor_divide(PyObject* lhs, PyObject* rhs) {
 }
 
 PyObject* PyInstance::nb_true_divide(PyObject* lhs, PyObject* rhs) {
-    return pyOperator(lhs, rhs, "__div__", ".");
+    return pyOperator(lhs, rhs, "__truediv__", "/");  // __div__ replaced by __truediv__
 }
 
 PyObject* PyInstance::nb_inplace_floor_divide(PyObject* lhs, PyObject* rhs) {
@@ -467,6 +479,11 @@ PyObject* PyInstance::nb_int(PyObject* lhs) {
 // static
 PyObject* PyInstance::nb_float(PyObject* lhs) {
     return pyUnaryOperator(lhs, "__float__", "float");
+}
+
+// static
+int PyInstance::nb_bool(PyObject* lhs) {
+    return pyInquiry(lhs, "__bool__", "bool");
 }
 
 // static
@@ -547,6 +564,18 @@ PyObject* PyInstance::sq_item_concrete(Py_ssize_t ix) {
 }
 
 // static
+int PyInstance::sq_ass_item(PyObject* o, Py_ssize_t ix, PyObject* v) {
+    return specializeForTypeReturningInt(o, [&](auto& subtype) {
+        return subtype.sq_ass_item_concrete(ix, v);
+    });
+}
+
+int PyInstance::sq_ass_item_concrete(Py_ssize_t ix, PyObject* v) {
+    PyErr_Format(PyExc_TypeError, "%S object is not subscript assignable", (PyObject*)((PyObject*)this)->ob_type);
+    return -1;
+}
+
+// static
 PyTypeObject* PyInstance::typeObj(Type* inType) {
     if (!inType->getTypeRep()) {
         inType->setTypeRep(typeObjInternal(inType));
@@ -557,6 +586,17 @@ PyTypeObject* PyInstance::typeObj(Type* inType) {
 
 // static
 PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
+    if (    t->getTypeCategory() == Type::TypeCategory::catAlternative ||
+            t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        PySequenceMethods* res =
+            new PySequenceMethods {0,0,0,0,0,0,0,0};
+            res->sq_contains = (objobjproc)PyInstance::sq_contains;
+            res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
+            res->sq_item = (ssizeargfunc)PyInstance::sq_item;
+            res->sq_ass_item = (ssizeobjargproc)PyInstance::sq_ass_item;
+        return res;
+    }
+
     if (    t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
             t->getTypeCategory() == Type::TypeCategory::catListOf ||
             t->getTypeCategory() == Type::TypeCategory::catTuple ||
@@ -604,7 +644,7 @@ PyNumberMethods* PyInstance::numberMethods(Type* t) {
             nb_negative, //unaryfunc nb_negative
             nb_positive, //unaryfunc nb_positive
             nb_absolute, //unaryfunc nb_absolute
-            0, //inquiry nb_bool
+            nb_bool, //inquiry nb_bool
             nb_invert, //unaryfunc nb_invert
             nb_lshift, //binaryfunc nb_lshift
             nb_rshift, //binaryfunc nb_rshift
@@ -969,7 +1009,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_weaklistoffset = 0,                     // Py_ssize_t
             .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ||
                         inType->getTypeCategory() == Type::TypeCategory::catDict ||
-                        inType->getTypeCategory() == Type::TypeCategory::catSet
+                        inType->getTypeCategory() == Type::TypeCategory::catSet ||
+                        inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;
@@ -1089,7 +1130,13 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
         Type* self_type = extractTypeFrom(o->ob_type);
         PyInstance* w = (PyInstance*)o;
 
-        int64_t h = self_type->hash(w->dataPtr());
+        int64_t h = -1;
+        if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            h = ((PyConcreteAlternativeInstance*)o)->tryCallHashMethod();
+        }
+        if (h == -1) {
+            h = self_type->hash(w->dataPtr());
+        }
         if (h == -1) {
             h = -2;
         }
@@ -1110,10 +1157,12 @@ bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
         return compare_to_python(valType->value().type(), valType->value().data(), other, exact, pyComparisonOp);
     }
 
-    Type* otherT = extractTypeFrom(other->ob_type);
+    if (t->getTypeCategory() != Type::TypeCategory::catConcreteAlternative) {
+        Type* otherT = extractTypeFrom(other->ob_type);
 
-    if (otherT && otherT == t) {
-        return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
+        if (otherT && otherT == t) {
+            return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
+        }
     }
 
     return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {
@@ -1217,10 +1266,23 @@ PyObject* PyInstance::tp_repr(PyObject *o) {
     Type* self_type = extractTypeFrom(o->ob_type);
     PyInstance* w = (PyInstance*)o;
 
+    if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        self_type = self_type->getBaseType();
+    }
+
+    if (self_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
+        Alternative* a = (Alternative*)self_type;
+        auto it = a->getMethods().find("__repr__");
+        if (it != a->getMethods().end()) {
+            return PyObject_CallFunctionObjArgs(
+                (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
+                o,
+                NULL
+                );
+        }
+    }
     std::ostringstream str;
     ReprAccumulator accumulator(str);
-
-    str << std::showpoint;
 
     self_type->repr(w->dataPtr(), accumulator);
 
@@ -1250,8 +1312,6 @@ PyObject* PyInstance::tp_str(PyObject *o) {
 
     std::ostringstream str;
     ReprAccumulator accumulator(str, true);
-
-    str << std::showpoint;
 
     self_type->repr(self_w->dataPtr(), accumulator);
 

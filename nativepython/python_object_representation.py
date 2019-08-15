@@ -40,6 +40,7 @@ from nativepython.type_wrappers.hash_wrapper import HashWrapper
 from nativepython.type_wrappers.range_wrapper import _RangeWrapper
 from nativepython.type_wrappers.print_wrapper import PrintWrapper
 from nativepython.type_wrappers.math_wrappers import MathFunctionWrapper
+from nativepython.type_wrappers.builtin_wrappers import BuiltinWrapper
 from nativepython.type_wrappers.bytecount_wrapper import BytecountWrapper
 from nativepython.type_wrappers.arithmetic_wrapper import IntWrapper, FloatWrapper, BoolWrapper
 from nativepython.type_wrappers.string_wrapper import StringWrapper
@@ -178,6 +179,9 @@ def pythonObjectRepresentation(context, f):
 
     if f in MathFunctionWrapper.SUPPORTED_FUNCTIONS:
         return TypedExpression(context, native_ast.nullExpr, MathFunctionWrapper(f), False)
+
+    if f in BuiltinWrapper.SUPPORTED_FUNCTIONS:
+        return TypedExpression(context, native_ast.nullExpr, BuiltinWrapper(f), False)
 
     if f is None:
         return TypedExpression(

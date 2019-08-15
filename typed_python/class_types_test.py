@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -520,7 +520,7 @@ class NativeClassTypesTests(unittest.TestCase):
             def __mod__(self, other):
                 return (self, "mod", other)
 
-            def __div__(self, other):
+            def __truediv__(self, other):
                 return (self, "div", other)
 
             def __floordiv__(self, other):
@@ -573,7 +573,7 @@ class NativeClassTypesTests(unittest.TestCase):
             def __rmod__(self, other):
                 return (self, "mod", other)
 
-            def __rdiv__(self, other):
+            def __rtruediv__(self, other):
                 return (self, "div", other)
 
             def __rfloordiv__(self, other):

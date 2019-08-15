@@ -34,6 +34,8 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
+
     PyObject* pyOperatorAdd(PyObject* rhs, const char* op, const char* opErr, bool reversed);
 
     PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep);

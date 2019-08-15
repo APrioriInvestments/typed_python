@@ -34,6 +34,8 @@ public:
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr);
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
+
     PyObject* mp_subscript_concrete(PyObject* item);
 
     static PyObject* constDictItems(PyObject *o);

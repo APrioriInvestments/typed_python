@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import Bytes, Int32
+from typed_python import Bytes, Int32, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -36,7 +36,7 @@ class BytesWrapper(RefcountedWrapper):
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
             ('data', native_ast.UInt8)
-        ), name='StringLayout').pointer()
+        ), name='BytesLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -48,7 +48,12 @@ class BytesWrapper(RefcountedWrapper):
         assert instance.isReference
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is bytes and a1 is None:
+            return expr
+        return super().convert_builtin(f, context, expr, a1)
+
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 cmp_res = context.pushPod(
@@ -100,7 +105,7 @@ class BytesWrapper(RefcountedWrapper):
                     )
                 )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
@@ -146,3 +151,19 @@ class BytesWrapper(RefcountedWrapper):
                 ).cast(self.layoutType)
             )
         )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    self.convert_len_native(e.nonref_expr).neq(0)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)

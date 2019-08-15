@@ -13,8 +13,8 @@
 #   limitations under the License.
 
 from typed_python import (
-    Function, TupleOf, ListOf, String, Dict, NamedTuple, OneOf,
-    Bool,
+    Class, Member, Function, Tuple, TupleOf, ListOf, String, Bytes, ConstDict, Dict, NamedTuple, Set,
+    Alternative, OneOf, NoneType, Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64,
@@ -25,6 +25,7 @@ import psutil
 from nativepython.runtime import Runtime
 from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python._types import refcount
+from nativepython import SpecializedEntrypoint
 
 
 def Compiled(f):
@@ -35,6 +36,16 @@ def Compiled(f):
 class HoldsAnA:
     def __init__(self, a):
         self.a = a
+
+
+class AClassWithBool(Class):
+    x = Member(int)
+
+    def __init__(self, i):
+        self.x = i
+
+    def __bool__(self):
+        return self.x != 0
 
 
 class TestPythonObjectOfTypeCompilation(unittest.TestCase):
@@ -180,3 +191,221 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             finalMem = psutil.Process().memory_info().rss / 1024 ** 2
 
             self.assertTrue(finalMem < initMem + 2)
+
+    def test_bool_cast_and_conv(self):
+
+        IDict = Dict(int, int)
+        IConstDict = ConstDict(int, int)
+        IList = ListOf(int)
+        ITuple = TupleOf(int)
+        ISet = Set(int)
+        NamedTuple0 = NamedTuple()
+        NamedTuple1 = NamedTuple(a=int)
+        OneOf2 = OneOf(int, str)
+        IntTuple2 = Tuple(int, int)
+        # Can define empty Alternative, but can't instantiate it.
+        # A0 = Alternative("A0")
+        A1 = Alternative("A1", a={}, b={})
+        A2 = Alternative("A2", a={}, b={}, __bool__=lambda self: False)
+        A3 = Alternative("A3", a={}, b={}, __bool__=lambda self: True)
+        A4 = Alternative("A4", a={}, b={}, __len__=lambda self: 0)
+        A5 = Alternative("A5", a={}, b={}, __len__=lambda self: 42)
+        B1 = Alternative("B1", a={'s': str}, b={'i': int})
+        B2 = Alternative("B2", a={'s': str}, b={'i': int}, __bool__=lambda self: False)
+        B3 = Alternative("B3", a={'s': str}, b={'i': int}, __bool__=lambda self: True)
+        B4 = Alternative("B4", a={'s': str}, b={'i': int}, __len__=lambda self: 0)
+        B5 = Alternative("B5", a={'s': str}, b={'i': int}, __len__=lambda self: 42)
+        # want to test something like A6 below, but .matches. is not compilable at the moment
+        # A6 = Alternative("A6", a={}, b={}, __len__=lambda self: 0 if self.matches.a else 42)
+
+        test_cases = [
+            (int, 0),
+            (int, 1),
+            (Int8, Int8(0)), (Int8, Int8(1)), (UInt8, UInt8(0)), (UInt8, UInt8(-1)),
+            (Int16, Int16(0)), (Int16, Int16(1)), (UInt16, UInt16(0)), (UInt16, UInt16(-1)),
+            (Int32, Int32(0)), (Int32, Int32(1)), (UInt32, UInt32(0)), (UInt32, UInt32(-1)),
+            (Int64, Int64(0)), (Int64, Int64(1)), (UInt64, UInt64(0)), (UInt64, UInt64(-1)),
+            (Float64, 0.0), (Float64, 0.1),
+            (Float32, 0.0), (Float32, 0.1),
+            (NoneType, NoneType()),
+            (String, ""), (String, "0"), (String, "1"),
+            (Bytes, b""), (Bytes, b"0"), (Bytes, b"\x00"), (Bytes, b"\x01"),
+            (IDict, IDict()), (IDict, IDict({0: 0})), (IDict, IDict({1: 1, 2: 4})),
+            (IConstDict, IConstDict()), (IConstDict, IConstDict({0: 0})), (IConstDict, IConstDict({1: 1, 2: 4})),
+            (NamedTuple0, NamedTuple0()),
+            (NamedTuple1, NamedTuple1(a=0)), (NamedTuple1, NamedTuple1(a=1)),
+            (OneOf2, OneOf2(0)), (OneOf2, OneOf2("")),
+            (OneOf2, OneOf2(1)), (OneOf2, OneOf2("a")),
+            (IntTuple2, IntTuple2((0, 0))),
+            (IntTuple2, IntTuple2((1, 1))),
+            (ISet, ISet([1, 2, 3])),
+            (ISet, ISet([])),
+            (IList, IList()), (IList, IList([0])), (IList, IList(range(1000))),
+            (ITuple, ITuple()), (ITuple, ITuple((0,))), (ITuple, ITuple(range(1000))),
+            (AClassWithBool, AClassWithBool(1)),
+            (AClassWithBool, AClassWithBool(0)),
+            (A1.a, A1.a()),
+            (A1.a, A1.a()),
+            (A1.b, A1.b()),
+            (A2.a, A2.a()),
+            (A2.b, A2.b()),
+            (A3.a, A3.a()),
+            (A3.b, A3.b()),
+            (A4.a, A4.a()),
+            (A4.b, A4.b()),
+            (A5.a, A5.a()),
+            (A5.b, A5.b()),
+            # (A6.a, A6.a()),
+            # (A6.b, A6.b()),
+            (B1.a, B1.a(s='')),
+            (B1.a, B1.a(s='a')),
+            (B2.a, B2.a(s='')),
+            (B2.a, B2.a(s='a')),
+            (B3.a, B3.a(s='')),
+            (B3.a, B3.a(s='a')),
+            (B4.a, B4.a(s='')),
+            (B4.a, B4.a(s='a')),
+            (B5.a, B5.a(s='')),
+            (B5.a, B5.a(s='a')),
+            (A1, A1.a()),
+            (A1, A1.a()),
+            (A1, A1.b()),
+            (A2, A2.a()),
+            (A2, A2.b()),
+            (A3, A3.a()),
+            (A3, A3.b()),
+            (A4, A4.a()),
+            (A4, A4.b()),
+            (A5, A5.a()),
+            (A5, A5.b()),
+            # (A6, A6.a()),
+            # (A6, A6.b()),
+            (B1, B1.a(s='')),
+            (B1, B1.a(s='a')),
+            (B2, B2.a(s='')),
+            (B2, B2.a(s='a')),
+            (B3, B3.a(s='')),
+            (B3, B3.a(s='a')),
+            (B4, B4.a(s='')),
+            (B4, B4.a(s='a')),
+            (B5, B5.a(s='')),
+        ]
+
+        @SpecializedEntrypoint
+        def specialized_cast(x) -> bool:
+            return bool(x)
+
+        @SpecializedEntrypoint
+        def specialized_conv(x) -> bool:
+            return True if x else False
+
+        for T, x in test_cases:
+
+            @Compiled
+            def compiled_cast(x: T) -> bool:
+                return bool(x)
+
+            @Compiled
+            def compiled_conv(x: T) -> bool:
+                return True if x else False
+
+            r1 = bool(x)
+            r2 = compiled_cast(x)
+            r3 = specialized_cast(x)
+            r4 = compiled_conv(x)
+            r5 = specialized_conv(x)
+            self.assertEqual(r1, r2)
+            self.assertEqual(r1, r3)
+            self.assertEqual(r1, r4)
+            self.assertEqual(r1, r5)
+
+    def test_obj_to_bool(self):
+
+        def bool_f(x: object):
+            return bool(x)
+
+        @SpecializedEntrypoint
+        def specialized_bool(x) -> bool:
+            return bool(x)
+
+        class ClassTrue:
+            def __bool__(self):
+                return True
+
+        class ClassFalse:
+            def __bool__(self):
+                return False
+
+        class ClassBool:
+            def __init__(self, b0):
+                self.b = bool(b0)
+
+            def __bool__(self):
+                return self.b
+
+        class ClassLen:
+            def __init__(self, b0):
+                self.b = b0
+
+            def __len__(self):
+                return self.b
+
+        class ClassNoBoolOrLen:
+            pass
+
+        class TPClassTrue(Class):
+            def __bool__(self):
+                return True
+
+        class TPClassFalse(Class):
+            def __bool__(self):
+                return False
+
+        class TPClassBool(Class):
+            b = Member(bool)
+
+            def __init__(self, b0):
+                self.b = b0
+
+            def __bool__(self):
+                return self.b
+
+        class TPClassLen(Class):
+            b = Member(int)
+
+            def __init__(self, b0):
+                self.b = b0
+
+            def __len__(self):
+                return self.b
+
+        class TPClassNoBoolOrLen(Class):
+            pass
+
+        test_cases = [
+            list(),
+            [1, 2],
+            ClassFalse(),
+            ClassTrue(),
+            ClassBool(0),
+            ClassBool(1),
+            ClassLen(0),
+            ClassLen(1),
+            ClassNoBoolOrLen(),
+            TPClassFalse(),
+            TPClassTrue(),
+            TPClassBool(0),
+            TPClassBool(1),
+            TPClassLen(0),
+            TPClassLen(1),
+            TPClassNoBoolOrLen(),
+        ]
+        compiled_bool = Compiled(bool_f)
+        for i, v in enumerate(test_cases):
+            r1 = bool(v)
+            r2 = bool_f(v)
+            r3 = compiled_bool(v)
+            r4 = specialized_bool(v)
+            self.assertEqual(r1, r2)
+            self.assertEqual(r1, r3)
+            self.assertEqual(r1, r4)

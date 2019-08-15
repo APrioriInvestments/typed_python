@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -14,12 +14,15 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from nativepython.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf
+from typed_python import NoneType, _types, OneOf, Bool, Int32
 
 import nativepython.native_ast as native_ast
 import nativepython
+from nativepython.native_ast import VoidPtr
+from math import trunc, floor, ceil
 
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -71,6 +74,46 @@ class SimpleAlternativeWrapper(Wrapper):
             target.expr.store(toStore.nonref_expr)
         )
 
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
+        assert targetVal.isReference
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
+            else:
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_len_native(self, context, expr):
+        alt = self.typeRepresentation
+        if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
+            assert len(alt.__len__.overloads) == 1
+            return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
+        return context.constant(0)
+
+    def convert_len(self, context, expr):
+        intermediate = self.convert_len_native(context, expr)
+        if intermediate is None:
+            return None
+        return context.pushPod(int, intermediate.convert_to_type(int).expr)
+
 
 class AlternativeWrapper(RefcountedWrapper):
     is_empty = False
@@ -99,6 +142,15 @@ class AlternativeWrapper(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_hash(self, context, expr):
+        y = self.convert_call_method(context, "__hash__", (expr,))
+        if y is not None:
+            return y
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        if tp:
+            return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
+        return None
 
     def on_refcount_zero(self, context, instance):
         return (
@@ -140,8 +192,8 @@ class AlternativeWrapper(RefcountedWrapper):
                 validIndices.append(i)
 
         if not validIndices:
-            return super().convert_attribute(context, instance, attribute)
-
+            return self.convert_call_method(context, "__getattr__", (instance, context.constant(attribute))) \
+                or super().convert_attribute(context, instance, attribute)
         if len(validIndices) == 1:
             with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0, 1).load().neq(validIndices[0])) as (then, otherwise):
                 with then:
@@ -164,6 +216,13 @@ class AlternativeWrapper(RefcountedWrapper):
 
             return output
 
+    def convert_set_attribute(self, context, instance, attribute, value):
+        if value is None:
+            return self.convert_call_method(context, "__delattr__", (instance, context.constant(attribute))) \
+                or super().convert_set_attribute(context, instance, attribute, value)
+        return self.convert_call_method(context, "__setattr__", (instance, context.constant(attribute), value)) \
+            or super().convert_set_attribute(context, instance, attribute, value)
+
     def convert_check_matches(self, context, instance, typename):
         index = -1
         for i in range(len(self.typeRepresentation.__typed_python_alternatives__)):
@@ -173,6 +232,167 @@ class AlternativeWrapper(RefcountedWrapper):
         if index == -1:
             return context.constant(False)
         return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0, 1).load().eq(index))
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
+        assert targetVal.isReference
+
+        target_type = targetVal.expr_type
+        if target_type.typeRepresentation == Bool:
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
+            else:
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
+
+        if isinstance(target_type, IntWrapper):
+            y = self.convert_call_method(context, "__int__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_call(self, context, expr, args, kwargs):
+        return self.convert_call_method(context, "__call__", [expr] + args)
+
+    def convert_len_native(self, context, expr):
+        return self.convert_call_method(context, "__len__", (expr,)) or context.constant(0)
+
+    def convert_len(self, context, expr):
+        intermediate = self.convert_len_native(context, expr)
+        if intermediate is None:
+            return None
+        return context.pushPod(int, intermediate.convert_to_type(int).expr)
+
+    def convert_abs(self, context, expr):
+        return self.convert_call_method(context, "__abs__", (expr,))
+
+    def convert_builtin(self, f, context, expr, a1=None):
+        # handle builtins with additional arguments here:
+        if f is format:
+            if a1 is not None:
+                return self.convert_call_method(context, "__format__", (expr, a1))
+            else:
+                return self.convert_call_method(context, "__format__", (expr, context.constant(''))) \
+                    or self.convert_call_method(context, "__str__", (expr,)) \
+                    or expr.convert_cast(str)
+        if f is round:
+            if a1 is not None:
+                return self.convert_call_method(context, "__round__", (expr, a1)) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                )
+            else:
+                return self.convert_call_method(context, "__round__", (expr, context.constant(0))) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                )
+        if a1 is not None:
+            return None
+        # handle builtins with no additional arguments here:
+        if f is bytes:
+            return self.convert_call_method(context, "__bytes__", (expr, ))
+        if f is trunc:
+            return self.convert_call_method(context, "__trunc__", (expr,)) \
+                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
+        if f is floor:
+            return self.convert_call_method(context, "__floor__", (expr,)) \
+                or context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr))
+        if f is ceil:
+            return self.convert_call_method(context, "__ceil__", (expr,)) \
+                or context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr))
+        if f is complex:
+            return self.convert_call_method(context, "__complex__", (expr, ))
+        if f is dir:
+            return self.convert_call_method(context, "__dir__", (expr, )) \
+                or super().convert_builtin(f, context, expr)
+
+        return super().convert_builtin(f, context, expr, a1)
+
+    def convert_unary_op(self, context, expr, op):
+        magic = "__pos__" if op.matches.UAdd else \
+            "__neg__" if op.matches.USub else \
+            "__invert__" if op.matches.Invert else \
+            "__not__" if op.matches.Not else \
+            ""
+        return self.convert_call_method(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
+
+    def convert_bin_op(self, context, l, op, r, inplace):
+        magic = "__add__" if op.matches.Add else \
+            "__sub__" if op.matches.Sub else \
+            "__mul__" if op.matches.Mult else \
+            "__truediv__" if op.matches.Div else \
+            "__floordiv__" if op.matches.FloorDiv else \
+            "__mod__" if op.matches.Mod else \
+            "__matmul__" if op.matches.MatMult else \
+            "__pow__" if op.matches.Pow else \
+            "__lshift__" if op.matches.LShift else \
+            "__rshift__" if op.matches.RShift else \
+            "__or__" if op.matches.BitOr else \
+            "__xor__" if op.matches.BitXor else \
+            "__and__" if op.matches.BitAnd else \
+            "__eq__" if op.matches.Eq else \
+            "__ne__" if op.matches.NotEq else \
+            "__lt__" if op.matches.Lt else \
+            "__gt__" if op.matches.Gt else \
+            "__le__" if op.matches.LtE else \
+            "__ge__" if op.matches.GtE else \
+            ""
+
+        if magic and inplace:
+            magic = '__i' + magic[2:]
+
+        return self.convert_call_method(context, magic, (l, r)) \
+            or self.convert_comparison(context, l, op, r) \
+            or super().convert_bin_op(context, l, op, r, inplace)
+
+    # Default comparison for Alternative types
+    # returns None if no comparison is possible (if op is not a comparison operator to begin with,
+    # or if operands are different types)
+    def convert_comparison(self, context, l, op, r):
+        # TODO: provide nicer translation from op to Py_ comparison codes
+        py_code = 2 if op.matches.Eq else \
+            3 if op.matches.NotEq else \
+            0 if op.matches.Lt else \
+            4 if op.matches.Gt else \
+            1 if op.matches.LtE else \
+            5 if op.matches.GtE else -1
+        if py_code < 0:
+            return None
+        tp_l = context.getTypePointer(l.expr_type.typeRepresentation)
+        tp_r = context.getTypePointer(r.expr_type.typeRepresentation)
+        if tp_l and tp_l == tp_r:
+            return context.pushPod(
+                Bool,
+                runtime_functions.alternative_cmp.call(
+                    tp_l,
+                    l.expr.cast(VoidPtr),
+                    r.expr.cast(VoidPtr),
+                    py_code
+                )
+            )
+        return None
+
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
+        if op.matches.In:
+            ret = self.convert_call_method(context, "__contains__", (r, l))
+            return ret and ret.toBool()
+        return super().convert_bin_op_reverse(context, r, op, l, inplace)
 
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
@@ -208,6 +428,8 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
@@ -215,6 +437,24 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         if target_type == typeWrapper(self.alternativeType):
             targetVal.convert_copy_initialize(e.changeType(target_type))
             return context.constant(True)
+
+        if target_type.typeRepresentation == Bool:
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
+            else:
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
@@ -288,6 +528,10 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
+
+    def convert_builtin(self, f, context, expr, a1=None):
+        altWrapper = typeWrapper(self.alternativeType)
+        return altWrapper.convert_builtin(f, context, expr, a1)
 
 
 class AlternativeMatchingWrapper(Wrapper):

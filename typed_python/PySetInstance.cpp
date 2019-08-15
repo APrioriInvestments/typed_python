@@ -549,3 +549,8 @@ void PySetInstance::copyConstructFromPythonInstanceConcrete(SetType* setType, in
 
     PyInstance::copyConstructFromPythonInstanceConcrete(setType, tgt, pyRepresentation, isExplicit);
 }
+
+int PySetInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return type()->size(dataPtr()) != 0;
+}

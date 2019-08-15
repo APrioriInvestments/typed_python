@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -129,13 +129,13 @@ class OneOfWrapper(Wrapper):
         # just unwrap us
         return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getitem(index))
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         def generator(leftUnwrapped):
             return leftUnwrapped.convert_bin_op(op, right)
 
         return self.unwrap(context, left, generator)
 
-    def convert_bin_op_reverse(self, context, r, op, l):
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
         assert r.expr_type == self
         assert r.isReference
 

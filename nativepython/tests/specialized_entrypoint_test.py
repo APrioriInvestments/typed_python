@@ -125,3 +125,21 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
             t.join()
 
         assert not failed
+
+    def test_specialization_noniterable_after_iterable(self):
+
+        class AClass():
+            pass
+
+        test_cases = [
+            ListOf(int)(),
+            AClass(),
+        ]
+
+        @SpecializedEntrypoint
+        def specialized_f(x):
+            return True
+
+        for x in test_cases:
+            r = specialized_f(x)
+            self.assertTrue(r)

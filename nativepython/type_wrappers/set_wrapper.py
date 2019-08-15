@@ -15,7 +15,7 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.typed_expression import TypedExpression
 import nativepython.type_wrappers.runtime_functions as runtime_functions
-from typed_python import NoneType
+from typed_python import NoneType, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -115,3 +115,19 @@ class SetWrapper(SetWrapperBase):
             runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 6).load().cast(native_ast.UInt8Ptr)) >>
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    self.convert_len_native(e.nonref_expr).neq(0)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)

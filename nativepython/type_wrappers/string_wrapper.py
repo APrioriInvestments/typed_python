@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -71,12 +71,12 @@ class StringWrapper(RefcountedWrapper):
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
     def _can_convert_to_type(self, otherType, explicit):
-        return otherType == self
+        return otherType.typeRepresentation is Bool or otherType == self
 
     def _can_convert_from_type(self, otherType, explicit):
         return False
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 if op.matches.Eq:
@@ -136,7 +136,7 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()
@@ -360,3 +360,19 @@ class StringWrapper(RefcountedWrapper):
             return context.constant(True)
 
         return super().convert_cast_to_self(context, instance)
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    self.convert_len_native(e.nonref_expr).neq(0)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)

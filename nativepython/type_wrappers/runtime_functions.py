@@ -160,6 +160,22 @@ np_str = externalCallTarget(
     UInt64
 )
 
+np_len = externalCallTarget(
+    "nativepython_runtime_len",
+    UInt64,
+    Void.pointer(),
+    UInt64
+)
+
+np_contains = externalCallTarget(
+    "nativepython_runtime_contains",
+    UInt64,
+    Void.pointer(),
+    UInt64,
+    Void.pointer(),
+    UInt64
+)
+
 getattr_pyobj = externalCallTarget(
     "nativepython_runtime_getattr_pyobj",
     Void.pointer(),
@@ -197,6 +213,13 @@ pyobj_to_typed = externalCallTarget(
     Void.pointer(),
     UInt64,
     Bool
+)
+
+instance_to_bool = externalCallTarget(
+    "np_runtime_instance_to_bool",
+    Bool,
+    Void.pointer(),
+    UInt64,
 )
 
 to_pyobj = externalCallTarget(
@@ -326,6 +349,12 @@ pyobj_to_float32 = externalCallTarget(
     Void.pointer()
 )
 
+pyobj_to_bool = externalCallTarget(
+    "np_runtime_pyobj_to_bool",
+    Bool,
+    Void.pointer()
+)
+
 string_concat = externalCallTarget(
     "nativepython_runtime_string_concat",
     Void.pointer(),
@@ -342,6 +371,12 @@ string_eq = externalCallTarget(
     "nativepython_runtime_string_eq",
     Bool,
     Void.pointer(), Void.pointer()
+)
+
+alternative_cmp = externalCallTarget(
+    "np_runtime_alternative_cmp",
+    Bool,
+    UInt64, Void.pointer(), Void.Pointer(), Int64
 )
 
 string_getitem_int64 = externalCallTarget(
@@ -520,6 +555,12 @@ int64_to_string = externalCallTarget(
     Int64
 )
 
+uint64_to_string = externalCallTarget(
+    "nativepython_uint64_to_string",
+    Void.pointer(),
+    Int64
+)
+
 float64_to_string = externalCallTarget(
     "nativepython_float64_to_string",
     Void.pointer(),
@@ -530,6 +571,12 @@ float32_to_string = externalCallTarget(
     "nativepython_float32_to_string",
     Void.pointer(),
     Float32
+)
+
+bool_to_string = externalCallTarget(
+    "nativepython_bool_to_string",
+    Void.pointer(),
+    Bool
 )
 
 dict_create = externalCallTarget(
@@ -591,6 +638,13 @@ hash_bytes = externalCallTarget(
     Void.pointer()
 )
 
+hash_alternative = externalCallTarget(
+    "nativepython_hash_alternative",
+    Int32,
+    Void.pointer(),
+    UInt64
+)
+
 isinf_float32 = externalCallTarget("nativepython_isinf_float32", Bool, Float32)
 
 isnan_float32 = externalCallTarget("nativepython_isnan_float32", Bool, Float32)
@@ -602,3 +656,42 @@ isinf_float64 = externalCallTarget("nativepython_isinf_float64", Bool, Float64)
 isnan_float64 = externalCallTarget("nativepython_isnan_float64", Bool, Float64)
 
 isfinite_float64 = externalCallTarget("nativepython_isfinite_float64", Bool, Float64)
+
+round_float64 = externalCallTarget(
+    "nativepython_runtime_round_float64",
+    Float64,
+    Float64,
+    Int64
+)
+
+trunc_float64 = externalCallTarget(
+    "nativepython_runtime_trunc_float64",
+    Float64,
+    Float64
+)
+
+floor_float64 = externalCallTarget(
+    "nativepython_runtime_floor_float64",
+    Float64,
+    Float64
+)
+
+ceil_float64 = externalCallTarget(
+    "nativepython_runtime_ceil_float64",
+    Float64,
+    Float64
+)
+
+np_complex = externalCallTarget(
+    "nativepython_runtime_complex",
+    Void.pointer(),
+    Float64,
+    Float64
+)
+
+np_dir = externalCallTarget(
+    "nativepython_runtime_dir",
+    Void.pointer(),
+    Void.pointer(),
+    UInt64
+)

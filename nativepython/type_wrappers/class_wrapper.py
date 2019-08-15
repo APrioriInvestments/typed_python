@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ from nativepython.type_wrappers.python_typed_function_wrapper import PythonTyped
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, PointerTo
+from typed_python import NoneType, _types, OneOf, PointerTo, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -102,6 +102,8 @@ class ClassWrapper(RefcountedWrapper):
         ).cast(vtable_type.pointer())
 
     def _can_convert_to_type(self, otherType, explicit):
+        if otherType.typeRepresentation is Bool:
+            return True
         if isinstance(otherType, ClassWrapper):
             if otherType.typeRepresentation in self.typeRepresentation.MRO:
                 return True
@@ -132,6 +134,18 @@ class ClassWrapper(RefcountedWrapper):
 
             elif self.typeRepresentation in otherType.typeRepresentation.MRO:
                 raise Exception("Downcast in compiled code not implemented yet")
+
+        if otherType.typeRepresentation == Bool:
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
+            else:
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
 
         return context.constant(False)
 

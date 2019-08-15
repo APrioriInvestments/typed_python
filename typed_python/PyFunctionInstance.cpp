@@ -253,15 +253,14 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
                 })
             );
         } catch(PythonExceptionSet& s) {
-            //failed to convert
+            // failed to convert, but keep going
             PyErr_Clear();
             return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
         catch(...) {
-            //failed to convert
+            // not a valid conversion
             return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
-
     }
 
     try {
@@ -425,4 +424,9 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
         "is_signature",
         inType->isSignature() ? Py_True : Py_False
     );
+}
+
+int PyFunctionInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return 1;
 }

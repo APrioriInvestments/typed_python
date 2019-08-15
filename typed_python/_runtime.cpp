@@ -2,6 +2,7 @@
 #include <cmath>
 #include <Python.h>
 #include <iostream>
+#include <iomanip>
 #include "AllTypes.hpp"
 #include "StringType.hpp"
 #include "BytesType.hpp"
@@ -18,6 +19,8 @@ bool nativepython_runtime_get_stashed_exception_is_python_exception_set() {
     return nativepython_cur_exception_value == (const char*)-1;
 }
 
+// Note: extern C identifiers are distinguished only up to 32 characters
+// nativepython_runtime_12345678901
 extern "C" {
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
@@ -35,6 +38,10 @@ extern "C" {
 
     int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::cmpStatic(lhs, rhs);
+    }
+
+    bool np_runtime_alternative_cmp(Alternative* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
+        return Alternative::cmpStatic(tp, lhs, rhs, pyComparisonOp);
     }
 
     StringType::layout* nativepython_runtime_string_concat(StringType::layout* lhs, StringType::layout* rhs) {
@@ -164,37 +171,79 @@ extern "C" {
     StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(inst, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("failed to extract python object");
+            throw std::runtime_error("nativepython_runtime_repr: failed to extract python object");
         }
         PyObject *r = PyObject_Repr(o);
         if (!r) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("PyObject_Repr returned 0");
+            throw std::runtime_error("nativepython_runtime_repr: PyObject_Repr returned 0");
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
-        return StringType::createFromUtf8(c, s);
+        StringType::layout *ret = StringType::createFromUtf8(c, s);
+        decref(r);
+        return ret;
     }
 
     StringType::layout* nativepython_runtime_str(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(inst, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("failed to extract python object");
+            throw std::runtime_error("nativepython_runtime_str: failed to extract python object");
         }
         PyObject *r = PyObject_Str(o);
         if (!r) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("PyObject_Str returned 0");
+            throw std::runtime_error("nativepython_runtime_str: PyObject_Str returned 0");
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
-        return StringType::createFromUtf8(c, s);
+        StringType::layout* ret =StringType::createFromUtf8(c, s);
+        decref(r);
+        return ret;
+    }
+
+    uint64_t nativepython_runtime_len(instance_ptr inst, Type* tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
+        if (!o) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_len: failed to extract python object");
+        }
+        Py_ssize_t len = PyObject_Length(o);
+        if (len == -1) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_str: PyObject_Length returned -1");
+        }
+        return len;
+    }
+
+    bool nativepython_runtime_contains(instance_ptr self, Type* self_tp, instance_ptr item, Type* item_tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObjectStealer o(PyInstance::extractPythonObject(self, self_tp));
+        if (!o) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_contains: failed to extract python object");
+        }
+        PyObjectStealer i(PyInstance::extractPythonObject(item, item_tp));
+        if (!i) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_contains: failed to extract item python object");
+        }
+        PyObject* contains = PyObject_GetAttrString(o, "__contains__");
+        if (!contains) {
+            return 0;
+        }
+        int ret = PyObject_IsTrue(contains);
+        decref(contains);
+        return ret;
     }
 
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
@@ -412,6 +461,17 @@ extern "C" {
         }
     }
 
+    bool np_runtime_instance_to_bool(instance_ptr i, Type* tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
+
+        int r = PyObject_IsTrue(o);
+        if (r == -1)
+            throw std::runtime_error("np_runtime_instance_to_bool couldn't convert to bool.");
+        return r;
+    }
+
     PyObject* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
         return PyInstance::extractPythonObject(obj, tp);
@@ -542,35 +602,81 @@ extern "C" {
         std::cout << "function pointer " << t << std::endl;
     }
 
+    bool np_runtime_pyobj_to_bool(PyObject* o) {
+        PyEnsureGilAcquired getTheGil;
+
+        int r = PyObject_IsTrue(o);
+        if (r == -1)
+            throw std::runtime_error("Couldn't convert to bool.");
+        return r;
+    }
+
     void nativepython_print_string(StringType::layout* layout) {
         std::cout << StringType::Make()->toUtf8String((instance_ptr)&layout) << std::flush;
     }
 
     StringType::layout* nativepython_int64_to_string(int64_t i) {
-        char data[20];
+        char data[21];
 
         int64_t count = sprintf((char*)data, "%ld", i);
-
         return StringType::createFromUtf8(data, count);
     }
 
-    StringType::layout* nativepython_float64_to_string(double i) {
+    StringType::layout* nativepython_uint64_to_string(uint64_t u) {
+        char data[24];
+
+        int64_t count = sprintf((char*)data, "%luu64", u);
+        return StringType::createFromUtf8(data, count);
+    }
+
+
+    StringType::layout* nativepython_float64_to_string(double f) {
+        char buf[32] = "";
+        double a = fabs(f);
+
+        if (a >= 1e16) sprintf(buf, "%.16e", f);
+        else if (a >= 1e15 || a == 0.0) sprintf(buf, "%.1f", f);
+        else if (a >= 1e14) sprintf(buf, "%.2f", f);
+        else if (a >= 1e13) sprintf(buf, "%.3f", f);
+        else if (a >= 1e12) sprintf(buf, "%.4f", f);
+        else if (a >= 1e11) sprintf(buf, "%.5f", f);
+        else if (a >= 1e10) sprintf(buf, "%.6f", f);
+        else if (a >= 1e9) sprintf(buf, "%.7f", f);
+        else if (a >= 1e8) sprintf(buf, "%.8f", f);
+        else if (a >= 1e7) sprintf(buf, "%.9f", f);
+        else if (a >= 1e6) sprintf(buf, "%.10f", f);
+        else if (a >= 1e5) sprintf(buf, "%.11f", f);
+        else if (a >= 1e4) sprintf(buf, "%.12f", f);
+        else if (a >= 1e3) sprintf(buf, "%.13f", f);
+        else if (a >= 1e2) sprintf(buf, "%.14f", f);
+        else if (a >= 10) sprintf(buf, "%.15f", f);
+        else if (a >= 1) sprintf(buf, "%.16f", f);
+        else if (a >= 0.1) sprintf(buf, "%.17f", f);
+        else if (a >= 0.01) sprintf(buf, "%.18f", f);
+        else if (a >= 0.001) sprintf(buf, "%.19f", f);
+        else if (a >= 0.0001) sprintf(buf, "%.20f", f);
+        else sprintf(buf, "%.16e", f);
+
+        remove_trailing_zeros_pystyle(buf);
+
+        return StringType::createFromUtf8(&buf[0], strlen(buf));
+    }
+
+    StringType::layout* nativepython_float32_to_string(float f) {
         std::ostringstream s;
-        ReprAccumulator acc(s);
-        acc << i;
+
+        s << f << "f32";
 
         std::string rep = s.str();
+
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 
-    StringType::layout* nativepython_float32_to_string(float i) {
-        std::ostringstream s;
-
-        s << i << "f32";
-
-        std::string rep = s.str();
-
-        return StringType::createFromUtf8(&rep[0], rep.size());
+    StringType::layout* nativepython_bool_to_string(bool b) {
+        if (b)
+            return StringType::createFromUtf8("True", 4);
+        else
+            return StringType::createFromUtf8("False", 5);
     }
 
     hash_table_layout* nativepython_dict_create() {
@@ -637,6 +743,13 @@ extern "C" {
         return BytesType::Make()->hash((instance_ptr)&s);
     }
 
+    int32_t nativepython_hash_alternative(Alternative::layout* s, Alternative* tp) {
+        if (tp->getTypeCategory() != Type::TypeCategory::catAlternative)
+            throw std::logic_error("Called hash_alternative with a non-Alternative type");
+
+        return tp->hash((instance_ptr)&s);
+    }
+
     bool nativepython_isinf_float32(float f) { return std::isinf(f); }
 
     bool nativepython_isnan_float32(float f) { return std::isnan(f); }
@@ -648,5 +761,58 @@ extern "C" {
     bool nativepython_isnan_float64(double f) { return std::isnan(f); }
 
     bool nativepython_isfinite_float64(double f) { return std::isfinite(f); }
+
+    double nativepython_runtime_round_float64(double l, int64_t n) {
+        double ret;
+        int64_t m = 1;
+        int64_t d = 1;
+        for (int64_t i = 0; i < n; i++)
+            m *= 10;
+        for (int64_t i = n; i < 0 ; i++)
+            d *= 10;
+        if (m > 1)
+            l *= m;
+        else if (d > 1)
+            l /= d;
+        ret = round(l);
+        int64_t isodd = int64_t(ret) % 2;
+        if (fabs(l - ret) == 0.5 && isodd)
+            ret -= isodd;
+        if (m > 1)
+            return ret / m;
+        else if (d > 1) {
+            return ret * d;
+        }
+        else
+            return ret;
+    }
+
+    double nativepython_runtime_trunc_float64(double l) {
+        return trunc(l);
+    }
+
+    double nativepython_runtime_floor_float64(double l) {
+        return floor(l);
+    }
+
+    double nativepython_runtime_ceil_float64(double l) {
+        return ceil(l);
+    }
+
+    PyObject* nativepython_runtime_complex(double r, double i) {
+        return PyComplex_FromDoubles(r, i);
+    }
+
+    ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
+        PyEnsureGilAcquired acquireTheGil;
+        PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
+        PyObjectStealer dir(PyObject_Dir(o));
+        ListOfType *retType = ListOfType::Make(StringType::Make());
+        ListOfType::layout* ret = 0;
+
+        PyInstance::copyConstructFromPythonInstance(retType, (instance_ptr)&ret, dir, true);
+
+        return ret;
+    }
 }
 

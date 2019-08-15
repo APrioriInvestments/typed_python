@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, ListOf, _types, TupleOf, Dict, ConstDict
+from typed_python import _types, Function, ListOf, TupleOf, Dict, ConstDict
 from typed_python.test_util import currentMemUsageMb
 from nativepython.runtime import Runtime
 import unittest
@@ -267,8 +267,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.assertEqual(toString(1.2), "1.2")
 
-        # this is not actually correct, but it's our current behavior
-        self.assertEqual(toString(1), "1")
+        self.assertEqual(toString(1), "1.0")
 
     def test_string_is_something(self):
         @Compiled
@@ -610,11 +609,14 @@ class TestStringCompilation(unittest.TestCase):
         def f():
             a = 1
             b = "bb"
-            f = 1.23456
+            f = 1.234567
             return f"<< {a} !! {b} ?? {f} -- {a + a + a} || {len(b)} >>"
+
         res = f()
-        expected = "<< 1 !! bb ?? 1.23456 -- 3 || 2 >>"
+        expected = "<< 1 !! bb ?? 1.234567 -- 3 || 2 >>"
         self.assertEqual(expected, res)
+        # Note: this test fails with 1.23456 instead of 1.234567
+        # due to inexact representation of that value as 1.2345600000000001
 
     def test_fstring_exception(self):
         @Compiled

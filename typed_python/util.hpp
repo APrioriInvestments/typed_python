@@ -196,6 +196,22 @@ inline bool cmpResultToBoolForPyOrdering(int pyComparisonOp, char cmpResult) {
     throw std::logic_error("Invalid pyComparisonOp");
 }
 
+//given a python richcompare flag, such as Py_LT,
+// return a string naming the appropriate magic method implementing this comparison
+inline const char* pyCompareFlagToMethod(int pyComparisonOp) {
+    switch (pyComparisonOp) {
+        case Py_EQ: return "__eq__";
+        case Py_NE: return "__ne__";
+        case Py_LT: return "__lt__";
+        case Py_GT: return "__gt__";
+        case Py_LE: return "__le__";
+        case Py_GE: return "__ge__";
+    }
+
+    throw std::logic_error("Invalid pyComparisonOp");
+}
+
+
 /******
 Call 'f', which must return PyObject*, in a block that guards against
 exceptions returning nakedly to the python interpreter. This is meant
@@ -216,7 +232,7 @@ PyObject* translateExceptionToPyObject(func_type f) {
 
 
 /******
-Call 'f', which must return void, in a block that guards against
+Call 'f', which must return int, in a block that guards against
 exceptions returning nakedly to the python interpreter. This is meant
 to guard the barrier between Python C callbacks and our internals which
 may use exceptions. Returns -1 on failure, the function value on success.
@@ -262,5 +278,54 @@ void iterate(PyObject* o, func_type f) {
 
     if (PyErr_Occurred()) {
         throw PythonExceptionSet();
+    }
+}
+
+
+// Removes trailing zeros from char* representation of a floating-point number
+// in the style of the python str representation.
+// Modifies buffer in place.
+// 1.0 -> 1.0
+// 1.00 -> 1.0
+// 1.00000 -> 1.0
+// 1.20 -> 1.2
+// 1.200 -> 1.2
+// 1.200001 -> 1.200001
+// 1.500e7 -> 1.5e7
+// 1.000e7 -> 1e7
+void remove_trailing_zeros_pystyle(char *s) {
+    char *cur = s;
+    char *decimal = 0;
+    char *firstzero = 0;
+    while (*cur) {
+        if (*cur == '.') {
+            decimal = cur;
+            firstzero = 0;
+        }
+        else if (*cur == '0' && decimal) {
+            if (!firstzero)
+                firstzero = cur;
+        }
+        else if (*cur == 'e' && firstzero)
+            break;
+        else
+            firstzero = 0;
+        cur++;
+    }
+    // *cur is 'e' or \x00
+    if (firstzero) {
+        if (!*cur) {
+            if (firstzero - decimal == 1)
+                firstzero++;
+            if (firstzero < cur)
+                *firstzero = 0;
+        }
+        else {
+            if (firstzero - decimal == 1)
+                firstzero--;
+            while (*cur)
+                *firstzero++ = *cur++;
+            *firstzero = 0;
+        }
     }
 }

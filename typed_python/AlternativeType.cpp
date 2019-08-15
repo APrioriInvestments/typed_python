@@ -123,6 +123,35 @@ bool Alternative::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp,
     return m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data, pyComparisonOp, suppressExceptions);
 }
 
+//static
+bool Alternative::cmpStatic(Alternative* altT, instance_ptr left, instance_ptr right, int64_t pyComparisonOp) {
+    if (altT->m_all_alternatives_empty) {
+        if (*(uint8_t*)left < *(uint8_t*)right) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+        }
+        if (*(uint8_t*)left > *(uint8_t*)right) {
+            return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+        }
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+    }
+
+    layout& record_l = **(layout**)left;
+    layout& record_r = **(layout**)right;
+
+    if ( &record_l == &record_r ) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 0);
+    }
+
+    if (record_l.which < record_r.which) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, -1);
+    }
+    if (record_l.which > record_r.which) {
+        return cmpResultToBoolForPyOrdering(pyComparisonOp, 1);
+    }
+
+    return altT->m_subtypes[record_l.which].second->cmp(record_l.data, record_r.data, pyComparisonOp, false);
+}
+
 void Alternative::repr(instance_ptr self, ReprAccumulator& stream) {
     PushReprState isNew(stream, self);
 

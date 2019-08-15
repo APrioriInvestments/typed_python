@@ -29,6 +29,7 @@ import unittest
 import time
 import numpy
 import os
+import math
 
 
 def typeFor(t):
@@ -990,6 +991,256 @@ class NativeTypesTests(unittest.TestCase):
 
         self.assertEqual(alt.x_0().f(), 1)
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
+
+    def test_alternative_magic_methods(self):
+        A_attrs = {"q": "value-q", "z": "value-z"}
+
+        def A_getattr(s, n):
+            if n not in A_attrs:
+                raise AttributeError(f"no attribute {n}")
+            return A_attrs[n]
+
+        def A_setattr(s, n, v):
+            A_attrs[n] = v
+
+        def A_delattr(s, n):
+            A_attrs.pop(n, None)
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __bool__=lambda self: self.matches.b,
+                        __str__=lambda self: "str",
+                        __repr__=lambda self: "repr",
+                        __call__=lambda self: "call",
+                        __len__=lambda self: 42,
+                        __contains__=lambda self, item: not not item,
+
+                        __add__=lambda lhs, rhs: A.b("add"),
+                        __sub__=lambda lhs, rhs: A.b("sub"),
+                        __mul__=lambda lhs, rhs: A.b("mul"),
+                        __matmul__=lambda lhs, rhs: A.b("matmul"),
+                        __truediv__=lambda lhs, rhs: A.b("truediv"),
+                        __floordiv__=lambda lhs, rhs: A.b("floordiv"),
+                        __divmod=lambda lhs, rhs: A.b("divmod"),
+                        __mod__=lambda lhs, rhs: A.b("mod"),
+                        __pow__=lambda lhs, rhs: A.b("pow"),
+                        __lshift__=lambda lhs, rhs: A.b("lshift"),
+                        __rshift__=lambda lhs, rhs: A.b("rshift"),
+                        __and__=lambda lhs, rhs: A.b("and"),
+                        __or__=lambda lhs, rhs: A.b("or"),
+                        __xor__=lambda lhs, rhs: A.b("xor"),
+
+                        __neg__=lambda self: A.b("neg"),
+                        __pos__=lambda self: A.b("pos"),
+                        __invert__=lambda self: A.b("invert"),
+
+                        __abs__=lambda self: A.b("abs"),
+                        __int__=lambda self: 123,
+                        __float__=lambda self: 234.5,
+                        __index__=lambda self: 124,
+                        __complex__=lambda self: complex(1, 2),
+                        __round__=lambda self: 6,
+                        __trunc__=lambda self: 7,
+                        __floor__=lambda self: 8,
+                        __ceil__=lambda self: 9,
+
+                        __bytes__=lambda self: b'bytes',
+                        __format__=lambda self, spec: "format",
+                        __getattr__=A_getattr,
+                        __setattr__=A_setattr,
+                        __delattr__=A_delattr,
+                        )
+
+        self.assertEqual(A.a().__bool__(), False)
+        self.assertEqual(bool(A.a()), False)
+        self.assertEqual(A.b().__bool__(), True)
+        self.assertEqual(bool(A.b()), True)
+        self.assertEqual(A.a().__str__(), "str")
+        self.assertEqual(str(A.a()), "str")
+        self.assertEqual(A.a().__repr__(), "repr")
+        self.assertEqual(repr(A.a()), "repr")
+        self.assertEqual(A.a().__call__(), "call")
+        self.assertEqual(A.a()(), "call")
+        self.assertEqual(A.a().__contains__(0), False)
+        self.assertEqual(A.a().__contains__(1), True)
+        self.assertEqual(0 in A.a(), False)
+        self.assertEqual(1 in A.a(), True)
+        self.assertEqual(A.a().__len__(), 42)
+        self.assertEqual(len(A.a()), 42)
+
+        self.assertEqual(A.a().__add__(A.a()).Name, "b")
+        self.assertEqual(A.a().__add__(A.a()).b, "add")
+        self.assertEqual((A.a() + A.a()).Name, "b")
+        self.assertEqual((A.a() + A.a()).b, "add")
+        self.assertEqual(A.a().__sub__(A.a()).Name, "b")
+        self.assertEqual(A.a().__sub__(A.a()).b, "sub")
+        self.assertEqual((A.a() - A.a()).Name, "b")
+        self.assertEqual((A.a() - A.a()).b, "sub")
+        self.assertEqual((A.a() * A.a()).Name, "b")
+        self.assertEqual((A.a() * A.a()).b, "mul")
+        self.assertEqual((A.a() @ A.a()).Name, "b")
+        self.assertEqual((A.a() @ A.a()).b, "matmul")
+        self.assertEqual((A.a() / A.a()).Name, "b")
+        self.assertEqual((A.a() / A.a()).b, "truediv")
+        self.assertEqual((A.a() // A.a()).Name, "b")
+        self.assertEqual((A.a() // A.a()).b, "floordiv")
+        self.assertEqual((A.a() % A.a()).Name, "b")
+        self.assertEqual((A.a() % A.a()).b, "mod")
+        self.assertEqual((A.a() ** A.a()).Name, "b")
+        self.assertEqual((A.a() ** A.a()).b, "pow")
+        self.assertEqual((A.a() >> A.a()).Name, "b")
+        self.assertEqual((A.a() >> A.a()).b, "rshift")
+        self.assertEqual((A.a() << A.a()).Name, "b")
+        self.assertEqual((A.a() << A.a()).b, "lshift")
+        self.assertEqual((A.a() & A.a()).Name, "b")
+        self.assertEqual((A.a() & A.a()).b, "and")
+        self.assertEqual((A.a() | A.a()).Name, "b")
+        self.assertEqual((A.a() | A.a()).b, "or")
+        self.assertEqual((A.a() ^ A.a()).Name, "b")
+        self.assertEqual((A.a() ^ A.a()).b, "xor")
+        self.assertEqual((+A.a()).Name, "b")
+        self.assertEqual((+A.a()).b, "pos")
+        self.assertEqual((-A.a()).Name, "b")
+        self.assertEqual((-A.a()).b, "neg")
+        self.assertEqual((~A.a()).Name, "b")
+        self.assertEqual((~A.a()).b, "invert")
+        self.assertEqual(abs(A.a()).Name, "b")
+        self.assertEqual(abs(A.a()).b, "abs")
+        self.assertEqual(int(A.a()), 123)
+        self.assertEqual(float(A.a()), 234.5)
+        self.assertEqual(range(1000)[1:A.a():2], range(1, 124, 2))
+        self.assertEqual(complex(A.a()), 1+2j)
+        self.assertEqual(round(A.a()), 6)
+        self.assertEqual(math.trunc(A.a()), 7)
+        self.assertEqual(math.floor(A.a()), 8)
+        self.assertEqual(math.ceil(A.a()), 9)
+
+        self.assertEqual(bytes(A.a()), b"bytes")
+        self.assertEqual(format(A.a()), "format")
+
+        self.assertEqual(A.a().Name, "a")
+        self.assertEqual(A.a().q, "value-q")
+        self.assertEqual(A.b().z, "value-z")
+        A.a().q = "changedvalue for q"
+        self.assertEqual(A.b().q, "changedvalue for q")
+        with self.assertRaises(AttributeError):
+            print(A.a().invalid)
+        del A.a().z
+        with self.assertRaises(AttributeError):
+            print(A.a().z)
+        A.a().Name = "can't change Name"
+        self.assertEqual(A.a().Name, "a")
+        d = dir(A.a())
+        self.assertEqual(len(d), 96)  # this is the default dir
+
+        A2_items = dict()
+
+        def A2_setitem(self, i, v):
+            A2_items[i] = v
+            return 0
+
+        A2 = Alternative("A2", a={'a': int}, b={'b': str},
+                         __getattribute__=A_getattr,
+                         __setattr__=A_setattr,
+                         __delattr__=A_delattr,
+                         __dir__=lambda self: list(A_attrs.keys()),
+                         __getitem__=lambda self, i: A2_items.get(i, i),
+                         __setitem__=A2_setitem
+                         )
+
+        self.assertEqual(A2.b().q, "changedvalue for q")
+        A2.a().Name = "can change Name"
+        self.assertEqual(A2.b().Name, "can change Name")
+        self.assertEqual(dir(A2.b()), ["Name", "q"])
+        self.assertEqual(A2.b()[123], 123)
+        A2.b()[123] = 7
+        self.assertEqual(A2.b()[123], 7)
+
+    def test_alternative_iter(self):
+
+        class A_iter():
+            def __init__(self):
+                self._cur = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur >= 10:
+                    raise StopIteration
+                self._cur += 1
+                return self._cur
+
+        class A_reversed():
+            def __init__(self):
+                self._cur = 11
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur <= 1:
+                    raise StopIteration
+                self._cur -= 1
+                return self._cur
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __iter__=lambda self: A_iter(),
+                        __reversed__=lambda self: A_reversed()
+                        )
+        self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([x for x in reversed(A.a())], [10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
+
+    def test_alternative_as_iterator(self):
+
+        class B_iter():
+            def __init__(self):
+                self._cur = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur >= 10:
+                    raise StopIteration
+                self._cur += 1
+                return self._cur
+
+        x = B_iter()
+        Iterator = Alternative("B", a={'a': int},
+                               __iter__=lambda self: self,
+                               __next__=lambda self: x.__next__()
+                               )
+        A = Alternative("A", a={'a': int},
+                        __iter__=lambda self: Iterator.a()
+                        )
+        # this is a one-time iterator
+        self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([x for x in A.a()], [])
+
+    def test_alternative_with(self):
+        depth = 0
+
+        def A_enter(s):
+            nonlocal depth
+            depth += 1
+            return depth
+
+        def A_exit(s, t, v, b):
+            nonlocal depth
+            depth -= 1
+            return True
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __enter__=A_enter,
+                        __exit__=A_exit
+                        )
+
+        self.assertEqual(depth, 0)
+        with A.a():
+            self.assertEqual(depth, 1)
+            with A.b():
+                self.assertEqual(depth, 2)
+        self.assertEqual(depth, 0)
 
     def test_named_tuple_subclass_magic_methods(self):
         class X(NamedTuple(x=int, y=int)):

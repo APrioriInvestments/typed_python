@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, Float64
+from typed_python import Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, Float64, Bool
 from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast
@@ -157,7 +157,8 @@ class PythonObjectOfTypeWrapper(Wrapper):
             UInt16: runtime_functions.pyobj_to_uint16,
             UInt8: runtime_functions.pyobj_to_uint8,
             Float64: runtime_functions.pyobj_to_float64,
-            Float32: runtime_functions.pyobj_to_float32
+            Float32: runtime_functions.pyobj_to_float32,
+            Bool: runtime_functions.pyobj_to_bool
         }
 
         t = target_type.typeRepresentation
