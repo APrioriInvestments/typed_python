@@ -75,6 +75,11 @@ Py_ssize_t PyCompositeTypeInstance::mp_and_sq_length_concrete() {
     return type()->getTypes().size();
 }
 
+int PyCompositeTypeInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return type()->getTypes().size() != 0;
+}
+
 void PyNamedTupleInstance::copyConstructFromPythonInstanceConcrete(NamedTuple* namedTupleT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
     if (PyDict_Check(pyRepresentation)) {
         if (namedTupleT->getTypes().size() < PyDict_Size(pyRepresentation)) {

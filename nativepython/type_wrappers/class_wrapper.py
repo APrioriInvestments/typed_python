@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
+from nativepython.native_ast import VoidPtr
 
-from typed_python import NoneType, _types
+from typed_python import NoneType, _types, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -239,3 +240,23 @@ class ClassWrapper(RefcountedWrapper):
                     "Can't construct a " + self.typeRepresentation.__qualname__ +
                     " with positional arguments because it doesn't have an __init__"
                 )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            tp = context.getTypePointer(e.expr_type.typeRepresentation)
+            if tp:
+                if not e.isReference:
+                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
+                    )
+                )
+                return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)

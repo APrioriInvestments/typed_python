@@ -52,6 +52,8 @@ public:
 
     PyObject* pyTernaryUnaryOperatorConcrete(PyObject* rhs, PyObject* ternaryArg, const char* op, const char* opErr);
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
+
     static void mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType);
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);

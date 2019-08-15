@@ -616,6 +616,11 @@ public:
         return NULL;
     }
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep) {
+        // op == '__bool__'
+        return (*(T*)dataPtr() != 0);
+    }
+
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr) {
         if (strcmp(op, "__float__") == 0) {
             return PyFloat_FromDouble(*(T*)dataPtr());

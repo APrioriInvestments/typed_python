@@ -14,7 +14,7 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 
-from typed_python import _types, Int32, OneOf
+from typed_python import _types, Int32, OneOf, Bool
 
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 import nativepython.native_ast as native_ast
@@ -141,6 +141,22 @@ class TupleWrapper(Wrapper):
 
     def get_iteration_expressions(self, context, expr):
         return [self.refAs(context, expr, i) for i in range(len(self.subTypeWrappers))]
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    context.constant(len(self.subTypeWrappers) != 0)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
 
 class NamedTupleWrapper(TupleWrapper):

@@ -66,8 +66,11 @@ public:
         return specializeForTypeReturningSizeT((PyObject*)this, [&](auto& subtype) {
             return subtype.mp_and_sq_length_concrete();
         }, type()->getBaseType());
-
     }
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep) {
+        // op == '__bool__'
+        return 1;
+    }
 };
 

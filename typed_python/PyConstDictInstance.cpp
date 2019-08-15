@@ -372,5 +372,7 @@ bool PyConstDictInstance::compare_to_python_concrete(ConstDictType* dictType, in
     return true;
 }
 
-
-
+int PyConstDictInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return type()->size(dataPtr()) != 0;
+}

@@ -886,3 +886,7 @@ void PyTupleOrListOfInstance::mirrorTypeInformationIntoPyTypeConcrete(TupleOrLis
         );
 }
 
+int PyTupleOrListOfInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return type()->count(dataPtr()) != 0;
+}

@@ -262,7 +262,7 @@ class Server:
     def dropConnection(self, channel):
         with self._lock:
             if channel not in self._clientChannels:
-                self._logger.warn('Tried to drop a nonexistant channel %s', channel)
+                self._logger.warning('Tried to drop a nonexistent channel %s', channel)
                 return
 
             connectedChannel = self._clientChannels[channel]

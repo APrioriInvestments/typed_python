@@ -174,6 +174,13 @@ pyobj_to_typed = externalCallTarget(
     UInt64
 )
 
+instance_to_bool = externalCallTarget(
+    "np_runtime_instance_to_bool",
+    Bool,
+    Void.pointer(),
+    UInt64,
+)
+
 to_pyobj = externalCallTarget(
     "np_runtime_to_pyobj",
     Void.pointer(),
@@ -298,6 +305,12 @@ pyobj_to_float64 = externalCallTarget(
 pyobj_to_float32 = externalCallTarget(
     "np_runtime_pyobj_to_float32",
     Float32,
+    Void.pointer()
+)
+
+pyobj_to_bool = externalCallTarget(
+    "np_runtime_pyobj_to_bool",
+    Bool,
     Void.pointer()
 )
 
@@ -477,6 +490,12 @@ print_string = externalCallTarget(
 
 int64_to_string = externalCallTarget(
     "nativepython_int64_to_string",
+    Void.pointer(),
+    Int64
+)
+
+uint64_to_string = externalCallTarget(
+    "nativepython_uint64_to_string",
     Void.pointer(),
     Int64
 )

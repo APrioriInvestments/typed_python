@@ -201,6 +201,8 @@ class Wrapper(object):
     def convert_repr(self, context, expr):
         tp = context.getTypePointer(expr.expr_type.typeRepresentation)
         if tp:
+            if not expr.isReference:
+                expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
             return context.push(
                 str,
                 lambda r: r.expr.store(

@@ -16,6 +16,7 @@ from nativepython.type_wrappers.wrapper import Wrapper
 
 import nativepython.native_ast as native_ast
 import nativepython
+from typed_python import Bool
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
@@ -59,3 +60,19 @@ class BoundMethodWrapper(Wrapper):
             (left.changeType(clsType),) + tuple(args),
             kwargs
         )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    context.constant(True)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
