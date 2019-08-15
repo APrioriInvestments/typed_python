@@ -312,6 +312,12 @@ PyObject* PyInstance::pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* 
     });
 }
 
+int PyInstance::pyInquiry(PyObject* lhs, const char* op, const char* opErrRep) {
+    return specializeForTypeReturningInt(lhs, [&](auto& subtype) {
+        return subtype.pyInquiryConcrete(op, opErrRep);
+    });
+}
+
 PyObject* PyInstance::pyUnaryOperatorConcrete(const char* op, const char* opErrRep) {
     return incref(Py_NotImplemented);
 }
@@ -326,6 +332,12 @@ PyObject* PyInstance::pyOperatorConcreteReverse(PyObject* lhs, const char* op, c
 
 PyObject* PyInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErrRep) {
     return incref(Py_NotImplemented);
+}
+
+int PyInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    int typeCat = type()->getTypeCategory();
+    PyErr_Format(PyExc_TypeError, "Operation %s not permitted on type '%S' %d", op, (PyObject*)((PyObject*)this)->ob_type, typeCat);
+    return -1;
 }
 
 PyObject* PyInstance::nb_inplace_add(PyObject* lhs, PyObject* rhs) {
@@ -416,6 +428,11 @@ PyObject* PyInstance::nb_int(PyObject* lhs) {
 // static
 PyObject* PyInstance::nb_float(PyObject* lhs) {
     return pyUnaryOperator(lhs, "__float__", "float");
+}
+
+// static
+int PyInstance::nb_bool(PyObject* lhs) {
+    return pyInquiry(lhs, "__bool__", "bool");
 }
 
 // static
@@ -553,7 +570,7 @@ PyNumberMethods* PyInstance::numberMethods(Type* t) {
             nb_negative, //unaryfunc nb_negative
             nb_positive, //unaryfunc nb_positive
             nb_absolute, //unaryfunc nb_absolute
-            0, //inquiry nb_bool
+            nb_bool, //inquiry nb_bool
             nb_invert, //unaryfunc nb_invert
             nb_lshift, //binaryfunc nb_lshift
             nb_rshift, //binaryfunc nb_rshift

@@ -325,7 +325,6 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
 
 }
 
-
 int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
     PyErr_Format(
         PyExc_AttributeError,
@@ -335,7 +334,6 @@ int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* att
     return -1;
 }
 
-
 int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
     PyErr_Format(
         PyExc_AttributeError,
@@ -344,7 +342,6 @@ int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObj
     );
     return -1;
 }
-
 
 PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     auto it = type()->getAlternative()->getMethods().find("__call__");
@@ -367,3 +364,56 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
     throw PythonExceptionSet();
 }
 
+std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char* name, PyObject* arg0, PyObject* arg1) {
+    auto it = type()->getAlternative()->getMethods().find(name);
+
+    if (it == type()->getAlternative()->getMethods().end()) {
+        return std::make_pair(false, (PyObject*)nullptr);
+    }
+
+    Function* method = it->second;
+
+    int argCount = 1;
+    if (arg0) {
+        argCount += 1;
+    }
+    if (arg1) {
+        argCount += 1;
+    }
+
+    PyObjectStealer targetArgTuple(PyTuple_New(argCount));
+
+    PyTuple_SetItem(targetArgTuple, 0, incref((PyObject*)this)); //steals a reference
+
+    if (arg0) {
+        PyTuple_SetItem(targetArgTuple, 1, incref(arg0)); //steals a reference
+    }
+
+    if (arg1) {
+        PyTuple_SetItem(targetArgTuple, 2, incref(arg1)); //steals a reference
+    }
+
+    auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, targetArgTuple, nullptr);
+    if (res.first) {
+        return res;
+    }
+    PyErr_Format(
+        PyExc_TypeError,
+        "'%s.%s' cannot find a valid overload with these arguments",
+        type()->name().c_str(),
+        name
+    );
+    return res;
+}
+
+int PyConcreteAlternativeInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    std::pair<bool, PyObject*> p = callMethod("__bool__", nullptr, nullptr);
+    if (!p.first) {
+        p = callMethod("__len__", nullptr, nullptr);
+        // if neither __bool__ nor __len__ is available, return True
+        if (!p.first)
+            return 1;
+    }
+    return PyObject_IsTrue(p.second);
+}

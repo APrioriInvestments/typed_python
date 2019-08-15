@@ -89,8 +89,11 @@ class TestCompilationStructures(unittest.TestCase):
             return x and y and z
 
         self.assertEqual(f(0, 1, "s"), False)
-        with self.assertRaises(TypeError):
-            f(1, 1, "s")
+        # former behavior was to error on the conversion of "s" to bool
+        # with self.assertRaises(TypeError):
+        #    f(1, 1, "s")
+        # but this is treated as an explicit conversion, so "s" converts to True
+        self.assertEqual(f(1, 1, "s"), True)
 
     def test_object_to_int_conversion(self):
         @Compiled

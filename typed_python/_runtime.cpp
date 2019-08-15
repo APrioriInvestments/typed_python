@@ -2,6 +2,7 @@
 #include <cmath>
 #include <Python.h>
 #include <iostream>
+#include <iomanip>
 #include "AllTypes.hpp"
 #include "StringType.hpp"
 #include "BytesType.hpp"
@@ -154,12 +155,12 @@ extern "C" {
         PyObject* o = PyInstance::extractPythonObject(inst, tp);
         if (!o) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("failed to extract python object");
+            throw std::runtime_error("nativepython_runtime_repr: failed to extract python object");
         }
         PyObject *r = PyObject_Repr(o);
         if (!r) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("PyObject_Repr returned 0");
+            throw std::runtime_error("nativepython_runtime_repr: PyObject_Repr returned 0");
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
@@ -172,12 +173,12 @@ extern "C" {
         PyObject* o = PyInstance::extractPythonObject(inst, tp);
         if (!o) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("failed to extract python object");
+            throw std::runtime_error("nativepython_runtime_str: failed to extract python object");
         }
         PyObject *r = PyObject_Str(o);
         if (!r) {
             PyErr_PrintEx(0);
-            throw std::runtime_error("PyObject_Str returned 0");
+            throw std::runtime_error("nativepython_runtime_str: PyObject_Str returned 0");
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
@@ -353,6 +354,17 @@ extern "C" {
         PyInstance::copyConstructFromPythonInstance(tp, tgt, obj, true);
     }
 
+    bool np_runtime_instance_to_bool(instance_ptr i, Type* tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* o = PyInstance::extractPythonObject(i, tp);
+
+        int r = PyObject_IsTrue(o);
+        if (r == -1)
+            throw std::runtime_error("np_runtime_instance_to_bool couldn't convert to bool.");
+        return r;
+    }
+
     PyObject* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
         return PyInstance::extractPythonObject(obj, tp);
@@ -479,34 +491,70 @@ extern "C" {
         throw std::runtime_error("Couldn't convert to float32.");
     }
 
+    bool np_runtime_pyobj_to_bool(PyObject* o) {
+        PyEnsureGilAcquired getTheGil;
+
+        int r = PyObject_IsTrue(o);
+        if (r == -1)
+            throw std::runtime_error("Couldn't convert to bool.");
+        return r;
+    }
+
     void nativepython_print_string(StringType::layout* layout) {
         std::cout << StringType::Make()->toUtf8String((instance_ptr)&layout) << std::flush;
     }
 
     StringType::layout* nativepython_int64_to_string(int64_t i) {
-        char data[20];
+        char data[21];
 
         int64_t count = sprintf((char*)data, "%ld", i);
-
         return StringType::createFromUtf8(data, count);
     }
 
-    StringType::layout* nativepython_float64_to_string(double i) {
+    StringType::layout* nativepython_uint64_to_string(uint64_t u) {
+        char data[24];
+
+        int64_t count = sprintf((char*)data, "%luu64", u);
+        return StringType::createFromUtf8(data, count);
+    }
+
+    StringType::layout* nativepython_float64_to_string(double f) {
         std::ostringstream s;
         ReprAccumulator acc(s);
-        acc << i;
+        acc << f;
 
         std::string rep = s.str();
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 
-    StringType::layout* nativepython_float32_to_string(float i) {
+//        ReprAccumulator acc(s);
+//    StringType::layout* nativepython_float64_to_string(double f) {
+//        std::ostringstream s;
+//        bool is_scientific = (std::abs(f) >= 1.0e16);
+//        ReprAccumulator acc(s);
+//        if (is_scientific) {
+//            char buffer[32];
+//            if (std::abs(f) == 1.0e16)
+//                std::snprintf(buffer, sizeof(buffer), "%.16g", f);
+//            else
+//                std::snprintf(buffer, sizeof(buffer), "%.17g", f);
+//            acc << buffer;
+//        } else {
+//            acc << std::setprecision(17) << f;
+//            if (std::trunc(f) == f)
+//                acc << ".0";
+//        }
+//
+//        std::string rep = s.str();
+//        return StringType::createFromUtf8(&rep[0], rep.size());
+//    }
+
+    StringType::layout* nativepython_float32_to_string(float f) {
         std::ostringstream s;
 
-        s << i << "f32";
+        s << std::fixed << std::setprecision(5) << f << "f32";
 
         std::string rep = s.str();
-
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 

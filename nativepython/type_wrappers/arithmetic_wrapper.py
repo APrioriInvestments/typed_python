@@ -175,9 +175,15 @@ class IntWrapper(ArithmeticTypeWrapper):
                         runtime_functions.int64_to_string.call(e.nonref_expr).cast(strRef.expr_type.layoutType)
                     )
                 )
+            elif self.typeRepresentation == UInt64:
+                strForm = context.push(
+                    str,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.uint64_to_string.call(e.nonref_expr).cast(strRef.expr_type.layoutType)
+                    )
+                )
             else:
                 suffix = {
-                    UInt64: 'u64',
                     Int32: 'i32',
                     UInt32: 'u32',
                     Int16: 'i16',
@@ -186,7 +192,7 @@ class IntWrapper(ArithmeticTypeWrapper):
                     UInt8: 'u8'
                 }[self.typeRepresentation]
 
-                strForm = e.convert_to_type(int).convert_to_type(str) + context.constant(suffix)
+                strForm = e.convert_to_type(Int64).convert_to_type(str) + context.constant(suffix)
 
             targetVal.convert_copy_initialize(strForm)
             return context.constant(True)
@@ -395,6 +401,32 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 )
             )
             return context.constant(True)
+
+        # elif target_type.typeRepresentation == String:
+        #     #if not e.isReference:
+        #     #    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
+        #     strForm = context.pushPod(
+        #         String,
+        #         lambda strRef: strRef.expr.store(
+        #             runtime_functions.int64_to_string.call(e.nonref_expr).cast(strRef.expr_type.layoutType)
+        #         )
+        #     )
+        #     targetVal.convert_copy_initialize(strForm)
+        #     #targetVal.convert_copy_initialize(context.constant('TRUE'))
+        #     # context.pushEffect(
+        #         # native_ast.Expression.Branch(
+        #         #     cond=e.nonref_expr,
+        #         #     true=targetVal.expr.store(context.constant('TRUE').nonref_expr),
+        #         #     false=targetVal.expr.store(context.constant('FALSE').nonref_expr)
+        #         # targetVal.expr.store(
+        #         #     native_ast.Expression.Branch(
+        #         #         cond=e.nonref_expr,
+        #         #         true=context.constant('TRUE').nonref_expr),
+        #         #         false=context.constant('FALSE').nonref_expr
+        #         #     )
+        #     #     targetVal.expr.store(context.constant('TRUE').nonref_expr)
+        #     # )
+        #     return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 

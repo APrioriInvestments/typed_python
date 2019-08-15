@@ -55,4 +55,6 @@ public:
     static std::string argTupleTypeDescription(PyObject* args, PyObject* kwargs);
 
     static void mirrorTypeInformationIntoPyTypeConcrete(Function* inType, PyTypeObject* pyType);
+
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
 };

@@ -13,8 +13,8 @@
 #   limitations under the License.
 
 from typed_python import (
-    Function, TupleOf, ListOf, String, Dict, NamedTuple, OneOf,
-    Bool,
+    Class, Member, Function, Tuple, TupleOf, ListOf, String, Bytes, ConstDict, Dict, NamedTuple, Set,
+    Alternative, OneOf, NoneType, Bool,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64,
@@ -24,6 +24,7 @@ import unittest
 import psutil
 from nativepython.runtime import Runtime
 from typed_python._types import refcount
+from nativepython import SpecializedEntrypoint
 
 
 def Compiled(f):
@@ -34,6 +35,16 @@ def Compiled(f):
 class HoldsAnA:
     def __init__(self, a):
         self.a = a
+
+
+class AClassWithBool(Class):
+    x = Member(int)
+
+    def __init__(self, i):
+        self.x = i
+
+    def __bool__(self):
+        return self.x != 0
 
 
 class TestPythonObjectOfTypeCompilation(unittest.TestCase):
@@ -134,3 +145,180 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             finalMem = psutil.Process().memory_info().rss / 1024 ** 2
 
             self.assertTrue(finalMem < initMem + 2)
+
+    def test_bool_conv2(self):
+
+        IDict = Dict(int, int)
+        IConstDict = ConstDict(int, int)
+        IList = ListOf(int)
+        ITuple = TupleOf(int)
+        ISet = Set(int)
+        NamedTuple0 = NamedTuple()
+        NamedTuple1 = NamedTuple(a=int)
+        OneOf2 = OneOf(int, str)
+        IntTuple2 = Tuple(int, int)
+        # A0 = Alternative("A0")
+        A1 = Alternative("A1", a={'a': str})
+        A2 = Alternative("A2", a={}, b={})
+        A3 = Alternative("A3", a={}, b={}, __bool__=lambda self: self.Name == 'a')
+        A4 = Alternative("A4", a={}, b={}, __len__=lambda self: 0 if self.Name == 'a' else 1)
+
+        test_cases = [
+            (int, 0),
+            (int, 1),
+            (Int8, Int8(0)), (Int8, Int8(1)), (UInt8, UInt8(0)), (UInt8, UInt8(-1)),
+            (Int16, Int16(0)), (Int16, Int16(1)), (UInt16, UInt16(0)), (UInt16, UInt16(-1)),
+            (Int32, Int32(0)), (Int32, Int32(1)), (UInt32, UInt32(0)), (UInt32, UInt32(-1)),
+            (Int64, Int64(0)), (Int64, Int64(1)), (UInt64, UInt64(0)), (UInt64, UInt64(-1)),
+            (Float64, 0.0), (Float64, 0.1),
+            (Float32, 0.0), (Float32, 0.1),
+            (NoneType, NoneType()),
+            (String, ""), (String, "0"), (String, "1"),
+            (Bytes, b""), (Bytes, b"0"), (Bytes, b"\x00"), (Bytes, b"\x01"),
+            (IDict, IDict()), (IDict, IDict({0: 0})), (IDict, IDict({1: 1, 2: 4})),
+            (IConstDict, IConstDict()), (IConstDict, IConstDict({0: 0})), (IConstDict, IConstDict({1: 1, 2: 4})),
+            (NamedTuple0, NamedTuple0()),
+            (NamedTuple1, NamedTuple1(a=0)), (NamedTuple1, NamedTuple1(a=1)),
+            (OneOf2, OneOf2(0)), (OneOf2, OneOf2("")),
+            (OneOf2, OneOf2(1)), (OneOf2, OneOf2("a")),
+            (IntTuple2, IntTuple2((0, 0))),
+            (IntTuple2, IntTuple2((1, 1))),
+            (ISet, ISet([1, 2, 3])),
+            (ISet, ISet([])),
+            (IList, IList()), (IList, IList([0])), (IList, IList(range(1000))),
+            (ITuple, ITuple()), (ITuple, ITuple((0,))), (ITuple, ITuple(range(1000))),
+            (AClassWithBool, AClassWithBool(1)),
+            (AClassWithBool, AClassWithBool(0)),
+            (A1, A1.a(a='')),
+            (A1, A1.a(a='a')),
+            (A1.a, A1.a(a='')),
+            (A1.a, A1.a(a='a')),
+            (A2, A2.a()),
+            (A2.a, A2.a()),
+            (A2, A2.b()),
+            (A2.b, A2.b()),
+            (A3, A3.a()),
+            (A3.a, A3.a()),
+            (A3, A3.b()),
+            (A3.b, A3.b()),
+            (A4, A4.a()),
+            (A4.a, A4.a()),
+            (A4, A4.b()),
+            (A4.b, A4.b()),
+        ]
+
+        @SpecializedEntrypoint
+        def outer_specialized_bool(x) -> bool:
+            return bool(x)
+
+        for T, x in test_cases:
+
+            @Compiled
+            def compiled_bool(x: T) -> bool:
+                return bool(x)
+
+            @SpecializedEntrypoint
+            def inner_specialized_bool(x) -> bool:
+                return bool(x)
+
+            r1 = bool(x)
+            r2 = compiled_bool(x)
+            r3 = inner_specialized_bool(x)
+            # TODO: outer_specialized_bool will error unpredictably on AClassWithBool if there are many specializations prior to it
+            # it is fine if it is listed among the first 20 or so entries in test_cases
+            # but it fails (error or segfault) if it is near the end of the list
+            # r4 = outer_specialized_bool(x)
+            self.assertEqual(r1, r2)
+            self.assertEqual(r1, r3)
+            # self.assertEqual(r1, r4)
+
+    def test_obj_to_bool(self):
+
+        def bool_f(x: object):
+            return bool(x)
+
+        @SpecializedEntrypoint
+        def specialized_bool(x) -> bool:
+            return bool(x)
+
+        class ClassTrue:
+            def __bool__(self):
+                return True
+
+        class ClassFalse:
+            def __bool__(self):
+                return False
+
+        class ClassBool:
+            def __init__(self, b0):
+                self.b = bool(b0)
+
+            def __bool__(self):
+                return self.b
+
+        class ClassLen:
+            def __init__(self, b0):
+                self.b = b0
+
+            def __len__(self):
+                return self.b
+
+        class ClassNoBoolOrLen:
+            pass
+
+        class TPClassTrue(Class):
+            def __bool__(self):
+                return True
+
+        class TPClassFalse(Class):
+            def __bool__(self):
+                return False
+
+        class TPClassBool(Class):
+            b = Member(bool)
+
+            def __init__(self, b0):
+                self.b = b0
+
+            def __bool__(self):
+                return self.b
+
+        class TPClassLen(Class):
+            b = Member(int)
+
+            def __init__(self, b0):
+                self.b = b0
+
+            def __len__(self):
+                return self.b
+
+        class TPClassNoBoolOrLen(Class):
+            pass
+
+        test_cases = [
+            list(),
+            [1, 2],
+            ClassFalse(),
+            ClassTrue(),
+            ClassBool(0),
+            ClassBool(1),
+            ClassLen(0),
+            ClassLen(1),
+            ClassNoBoolOrLen(),
+            TPClassFalse(),
+            TPClassTrue(),
+            TPClassBool(0),
+            TPClassBool(1),
+            TPClassLen(0),
+            TPClassLen(1),
+            TPClassNoBoolOrLen(),
+        ]
+        compiled_bool = Compiled(bool_f)
+        for i, v in enumerate(test_cases):
+            r1 = bool(v)
+            r2 = bool_f(v)
+            r3 = compiled_bool(v)
+            r4 = specialized_bool(v)
+            self.assertEqual(r1, r2)
+            self.assertEqual(r1, r3)
+            self.assertEqual(r1, r4)

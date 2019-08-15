@@ -155,6 +155,18 @@ PyObject* PyClassInstance::pyTernaryUnaryOperatorConcrete(PyObject* rhs, PyObjec
     return res.second;
 }
 
+int PyClassInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    std::pair<bool, PyObject*> p = callMemberFunction("__bool__", nullptr, nullptr);
+    if (!p.first) {
+        p = callMemberFunction("__len__", nullptr, nullptr);
+        // if neither __bool__ nor __len__ is available, return True
+        if (!p.first)
+            return 1;
+    }
+    return PyObject_IsTrue(p.second);
+}
+
 std::pair<bool, PyObject*> PyClassInstance::callMemberFunction(const char* name, PyObject* arg0, PyObject* arg1) {
     auto it = type()->getMemberFunctions().find(name);
 

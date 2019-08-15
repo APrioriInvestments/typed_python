@@ -26,6 +26,8 @@ public:
 
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
 
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
+
     static void mirrorTypeInformationIntoPyTypeConcrete(BoundMethod* methodT, PyTypeObject* pyType);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {

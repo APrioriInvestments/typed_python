@@ -401,3 +401,8 @@ void PyFunctionInstance::mirrorTypeInformationIntoPyTypeConcrete(Function* inTyp
             overloads
             );
 }
+
+int PyFunctionInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return 1;
+}

@@ -46,6 +46,7 @@ class PySetInstance : public PyInstance {
                                            bool isExplicit) {
         return true;
     }
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
 
   private:
     static int try_insert_key(PySetInstance* self, PyObject* pyKey, instance_ptr key);

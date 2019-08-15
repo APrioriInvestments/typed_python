@@ -18,7 +18,7 @@ import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.compilable_builtin import CompilableBuiltin
-from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8
+from typed_python import NoneType, Tuple, PointerTo, Int32, Int64, UInt8, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -585,6 +585,22 @@ class DictWrapper(DictWrapperBase):
             runtime_functions.free.call(inst.nonref_expr.ElementPtrIntegers(0, 6).load().cast(native_ast.UInt8Ptr)) >>
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    self.convert_len_native(e.nonref_expr).neq(0)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
 
 class DictMakeIteratorWrapper(DictWrapperBase):

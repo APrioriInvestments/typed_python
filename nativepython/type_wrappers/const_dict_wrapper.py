@@ -17,8 +17,9 @@ from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.bound_compiled_method_wrapper import BoundCompiledMethodWrapper
 from nativepython.type_wrappers.util import min
+from nativepython.typed_expression import TypedExpression
 
-from typed_python import NoneType, Tuple
+from typed_python import NoneType, Tuple, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -313,6 +314,8 @@ class ConstDictWrapper(ConstDictWrapperBase):
         return context.call_py_function(const_dict_getitem, (instance, item), {})
 
     def convert_len_native(self, expr):
+        if isinstance(expr, TypedExpression):
+            expr = expr.nonref_expr
         return native_ast.Expression.Branch(
             cond=expr,
             false=native_ast.const_int_expr(0),
@@ -321,6 +324,22 @@ class ConstDictWrapper(ConstDictWrapperBase):
 
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr.nonref_expr))
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    self.convert_len_native(e).neq(0)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
 
 class ConstDictMakeIteratorWrapper(ConstDictWrapperBase):

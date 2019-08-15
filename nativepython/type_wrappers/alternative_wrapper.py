@@ -15,8 +15,9 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
+from nativepython.native_ast import VoidPtr
 
-from typed_python import NoneType, _types, OneOf
+from typed_python import NoneType, _types, OneOf, Bool
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -70,6 +71,27 @@ class SimpleAlternativeWrapper(Wrapper):
         context.pushEffect(
             target.expr.store(toStore.nonref_expr)
         )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
+        assert targetVal.isReference
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            tp = context.getTypePointer(e.expr_type.typeRepresentation)
+            if tp:
+                if not e.isReference:
+                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
+                    )
+                )
+                return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
 
 class AlternativeWrapper(RefcountedWrapper):
@@ -174,6 +196,27 @@ class AlternativeWrapper(RefcountedWrapper):
             return context.constant(False)
         return context.pushPod(bool, instance.nonref_expr.ElementPtrIntegers(0, 1).load().eq(index))
 
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
+        assert targetVal.isReference
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            tp = context.getTypePointer(e.expr_type.typeRepresentation)
+            if tp:
+                if not e.isReference:
+                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
+                    )
+                )
+                return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
     is_empty = False
@@ -208,6 +251,8 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
@@ -215,6 +260,18 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         if target_type == typeWrapper(self.alternativeType):
             targetVal.convert_copy_initialize(e.changeType(target_type))
             return context.constant(True)
+
+        if target_type.typeRepresentation == Bool:
+            tp = context.getTypePointer(e.expr_type.typeRepresentation)
+            if tp:
+                if not e.isReference:
+                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
+                context.pushEffect(
+                    targetVal.expr.store(
+                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
+                    )
+                )
+                return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 

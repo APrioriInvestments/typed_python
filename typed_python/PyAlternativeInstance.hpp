@@ -62,6 +62,10 @@ public:
 
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
+    std::pair<bool, PyObject*> callMethod(const char* name, PyObject* arg0=nullptr, PyObject* arg1=nullptr);
+
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
+
     PyObject* tp_getattr_concrete(PyObject* pyAttrName, const char* attrName);
 
     int tp_setattr_concrete(PyObject* attrName, PyObject* attrVal);

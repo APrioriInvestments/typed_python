@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import NoneType, Int32
+from typed_python import NoneType, Int32, Bool
 import nativepython.native_ast as native_ast
 
 
@@ -59,3 +59,19 @@ class NoneWrapper(Wrapper):
                 return context.constant(False)
 
         return super().convert_bin_op(context, left, op, right)
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        if not explicit:
+            return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+        target_type = targetVal.expr_type
+
+        if target_type.typeRepresentation == Bool:
+            context.pushEffect(
+                targetVal.expr.store(
+                    context.constant(False)
+                )
+            )
+            return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)

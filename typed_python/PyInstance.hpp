@@ -359,6 +359,8 @@ public:
 
     static PyObject* pyTernaryOperator(PyObject* lhs, PyObject* rhs, PyObject* ternary, const char* op, const char* opErrRep);
 
+    static int pyInquiry(PyObject* lhs, const char* op, const char* opErrRep);
+
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErrRep);
 
     PyObject* pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErrRep);
@@ -366,6 +368,8 @@ public:
     PyObject* pyOperatorConcreteReverse(PyObject* lhs, const char* op, const char* opErrRep);
 
     PyObject* pyTernaryOperatorConcrete(PyObject* rhs, PyObject* third, const char* op, const char* opErrRep);
+
+    int pyInquiryConcrete(const char* op, const char* opErrRep);
 
     static PyObject* nb_inplace_add(PyObject* lhs, PyObject* rhs);
 
@@ -410,6 +414,8 @@ public:
     static PyObject* nb_int(PyObject* lhs);
 
     static PyObject* nb_float(PyObject* lhs);
+
+    static int nb_bool(PyObject* lhs);
 
     static PyObject* nb_index(PyObject* lhs);
 
