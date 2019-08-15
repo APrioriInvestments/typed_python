@@ -33,6 +33,8 @@ from object_database.service_manager.ServiceManager_test import (
 
 from object_database.web.CellsTestService import CellsTestService
 
+from object_database.web.EditorDisplayService import EditorDisplayService
+
 from object_database.web.ActiveWebServiceSchema import (
     active_webservice_schema,
 )
@@ -102,7 +104,7 @@ def main(argv=None):
 
             with database.transaction():
                 service = ServiceManager.createOrUpdateService(
-                    CellsTestService, "CellsTestService",
+                    EditorDisplayService, "EditorDisplayService",
                     target_count=1
                 )
 
