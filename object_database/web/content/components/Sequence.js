@@ -55,31 +55,22 @@ class Sequence extends Component {
         if(this.props.overflow){
             classes.push("overflow");
         }
+        if (this.props.margin){
+            classes.push(`child-margin-${this.props.margin}`);
+        }
         return classes.join(" ");
     }
 
-    /*makeStyle(){
-        // Note: the server side uses "split" (axis) to denote the direction
-        let direction = "row";
-        if (this.props.split == "horizontal"){
-            direction = "column";
-        }
-        let overflow = ""
-        if (this.props.overflow) {
-            overflow = "overflow:auto"
-        }
-        return `width:100%;height:100%;display:inline-flex;flex-direction:${direction};${overflow}`;
-        }*/
 }
 
 Sequence.propTypes = {
-    split: {
-        description: "Horizontal/vertical layout of the children.",
-        type: PropTypes.string
-    },
     overflow: {
         description: "Overflow-auto.",
         type: PropTypes.boolean
+    },
+    margin: {
+        description: "Bootstrap margin value for between element spacing",
+        type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
     }
 };
 

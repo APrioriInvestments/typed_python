@@ -53,6 +53,9 @@ class HorizontalSequence extends Component {
         if(this.props.overflow){
             classes.push("overflow");
         }
+        if (this.props.margin){
+            classes.push(`child-margin-${this.props.margin}`);
+        }
         return classes.join(" ");
     }
 }
@@ -61,6 +64,10 @@ HorizontalSequence.propTypes = {
     overflow: {
         description: "If true, sets overflow of container to auto",
         type: PropTypes.boolean
+    },
+    margin: {
+        description: "Bootstrap margin value for between element spacing",
+        type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
     }
 };
 
