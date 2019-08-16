@@ -106,10 +106,8 @@ class CellsTestService(ServiceBase):
             split="horizontal"
         )
 
-        inputArea = cells.Card(
-            cells.SplitView(
-                [(selectionPanel(page), 2), (ed, 9)]
-            ), padding=2
+        inputArea = cells.SplitView(
+            [(selectionPanel(page), 2), (ed, 9)]
         )
 
         return cells.ResizablePanel(
@@ -132,19 +130,23 @@ def reload():
 
 def selectionPanel(page):
     availableCells = cells.Scrollable(
-        cells.Sequence(
-            [cells.Clickable(
-                x.category() + "." + x.name(),
-                "CellsTestService?" + urllib.parse.urlencode(
-                    dict(category=x.category(), name=x.name())),
-                makeBold=x is page)
-                for perCategory in getPages().values()
-                for x in perCategory.values()]
+        cells.Card(
+            cells.Sequence(
+                [cells.Clickable(
+                    x.category() + "." + x.name(),
+                    "CellsTestService?" + urllib.parse.urlencode(
+                        dict(category=x.category(), name=x.name())),
+                    makeBold=x is page)
+                    for perCategory in getPages().values()
+                    for x in perCategory.values()]
+            ), padding=4
         )
     )
-    return cells.Card(
-        cells.SplitView([
-            (cells.Button(cells.Octicon("sync"), reload), 1),
-            (availableCells, 6)
-        ], split="horizontal")
-    ).background_color("#FAFAFA")
+    reloadInput = cells.Card(
+        cells.Button(cells.Octicon("sync"), reload),
+        padding=4
+    )
+    return cells.SplitView([
+        (reloadInput, 1),
+        (availableCells, 6)
+    ], split="horizontal")
