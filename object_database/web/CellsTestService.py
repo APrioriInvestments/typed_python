@@ -112,10 +112,11 @@ class CellsTestService(ServiceBase):
             ), padding=2
         )
 
-        return cells.SplitView([
-            (resultArea, 1),
-            (inputArea, 1)
-        ], split="horizontal").height("100%")
+        return cells.ResizablePanel(
+            resultArea,
+            inputArea,
+            split="horizontal"
+        )
 
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
@@ -130,14 +131,16 @@ def reload():
 
 
 def selectionPanel(page):
-    availableCells = cells.Sequence(
-        [cells.Clickable(
-            x.category() + "." + x.name(),
-            "CellsTestService?" + urllib.parse.urlencode(
-                dict(category=x.category(), name=x.name())),
-            makeBold=x is page)
-            for perCategory in getPages().values()
-            for x in perCategory.values()]
+    availableCells = cells.Scrollable(
+        cells.Sequence(
+            [cells.Clickable(
+                x.category() + "." + x.name(),
+                "CellsTestService?" + urllib.parse.urlencode(
+                    dict(category=x.category(), name=x.name())),
+                makeBold=x is page)
+                for perCategory in getPages().values()
+                for x in perCategory.values()]
+        )
     )
     return cells.Card(
         cells.SplitView([
