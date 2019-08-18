@@ -164,3 +164,30 @@
 .overflow {
     overflow: auto;
 }
+
+.child-margin-1 > * {
+    margin: .25rem!important;
+}
+
+.child-margin-2 > * {
+    margin: .5rem!important;
+}
+
+
+.child-margin-3 > * {
+    margin: 1rem!important;
+}
+
+
+.child-margin-4 > * {
+    margin: 1.5rem!important;
+}
+
+
+.child-margin-5 > * {
+    margin: 3rem!important;
+}
+
+.child-margin-5 > * {
+    margin: 3rem!important;
+}
