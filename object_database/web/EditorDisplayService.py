@@ -55,7 +55,7 @@ class EditorDisplayService(ServiceBase):
         inputArea = cells.SplitView(
             [
                 (cells.Button(cells.Octicon("sync"), reload), 1),
-                (ed, 8)
+                (ed, 25)
             ], split="horizontal"
         )
 
@@ -84,7 +84,7 @@ class EditorDisplayService(ServiceBase):
         return cells.SplitView([
             (displayArea, 3),
             (inputArea, 2)
-        ], split="horizontal")
+        ], split="vertical")
 
     def doWork(self, shouldStop):
         while not shouldStop.is_set():
