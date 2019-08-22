@@ -44,12 +44,22 @@ TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 
 ##########################################################################
 #  MAIN RULES
-
 .PHONY: install
-install: $(VIRTUAL_ENV) testcert.cert testcert.key
+install: install-dependencies install-pre-commit
+
+
+.PHONY: install-dependencies
+install-dependencies: $(VIRTUAL_ENV) testcert.cert testcert.key
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip install pipenv==2018.11.26; \
 		pipenv install --dev --deploy;
+
+
+.PHONY: install-pre-commit
+install-pre-commit:install-dependencies
+	. $(VIRTUAL_ENV)/bin/activate; \
+		pre-commit install
+
 
 .PHONY: test
 test: testcert.cert testcert.key js-test
