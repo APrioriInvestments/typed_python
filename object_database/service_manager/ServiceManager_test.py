@@ -29,7 +29,7 @@ from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
-    Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Columns, Tabs, Grid,
+    Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Tabs, Grid,
     Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown, ButtonGroup, Octicon, SplitView
 )
 

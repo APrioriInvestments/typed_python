@@ -1394,12 +1394,10 @@ class AsyncDropdownContent(Cell):
         self.loadingCell = loadingIndicatorCell
         self.contentCell = Subscribed(self.changeHandler)
         self.children = {
-            '____contents__': Cell.makeCell(self.contentCell),
-            #'loadingIndicator': Cell.makeCell(self.loadingCell)
+            '____contents__': Cell.makeCell(self.contentCell)
         }
         self.namedChildren = {
-            'content': Cell.makeCell(self.contentCell),
-            #'loadingIndicator': Cell.makeCell(self.loadingCell)
+            'content': Cell.makeCell(self.contentCell)
         }
 
     def changeHandler(self):
