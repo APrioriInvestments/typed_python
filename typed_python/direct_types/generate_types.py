@@ -17,6 +17,7 @@
 import sys
 import argparse
 import traceback
+from typing import Tuple as TupleType
 from typed_python.Codebase import Codebase
 from typed_python._types import Dict, ConstDict, NamedTuple, Tuple, ListOf, TupleOf, OneOf, Alternative, Forward
 from typed_python._types import getOrSetTypeResolver
@@ -39,7 +40,7 @@ def anon_name(py_type):
 
 # implementation comment:
 # this is an awkward way to keep track of prerequisites
-def cpp_type(py_type) -> (str, dict):
+def cpp_type(py_type) -> TupleType[str, dict]:
     """Given a python Type, returns the corresponding c++ type name (as a string) and a dict of prerequisites.
 
     examples:
