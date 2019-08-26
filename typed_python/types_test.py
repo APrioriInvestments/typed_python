@@ -972,6 +972,52 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(alt.x_0().f(), 1)
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
 
+    def test_alternative_magic_methods(self):
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __bool__=lambda self: False,
+                        __str__=lambda self: "str",
+                        __repr__=lambda self: "repr",
+                        __call__=lambda self: "call",
+                        __len__=lambda self: 42,
+                        __contains__=lambda self, item: not not item,
+
+                        __add__=lambda lhs, rhs: A.b("add"),
+                        __sub__=lambda lhs, rhs: A.b("sub"),
+                        __mul__=lambda lhs, rhs: A.b("mul"),
+                        __matmul__=lambda lhs, rhs: A.b("matmul"),
+                        __truediv__=lambda lhs, rhs: A.b("truediv"),
+                        __floordiv__=lambda lhs, rhs: A.b("floordiv"),
+                        __mod__=lambda lhs, rhs: A.b("mod"),
+                        __divmod=lambda lhs, rhs: A.b("divmod"),
+                        __pow__=lambda lhs, rhs: A.b("pow"),
+                        __lshift__=lambda lhs, rhs: A.b("lshift"),
+                        __rshift__=lambda lhs, rhs: A.b("rshift"),
+                        __and__=lambda lhs, rhs: A.b("and"),
+                        )
+        self.assertEqual(A.a().__bool__(), False)
+        self.assertEqual(bool(A.a()), False)
+        self.assertEqual(A.a().__str__(), "str")
+        self.assertEqual(str(A.a()), "str")
+        self.assertEqual(A.a().__repr__(), "repr")
+        self.assertEqual(repr(A.a()), "repr")
+        self.assertEqual(A.a().__call__(), "call")
+        self.assertEqual(A.a()(), "call")
+        self.assertEqual(A.a().__contains__(0), False)
+        self.assertEqual(A.a().__contains__(1), True)
+        self.assertEqual(0 in A.a(), False)
+        self.assertEqual(1 in A.a(), True)
+        self.assertEqual(A.a().__len__(), 42)
+        self.assertEqual(len(A.a()), 42)
+
+        self.assertEqual(A.a().__add__(A.a()).Name, "b")
+        self.assertEqual(A.a().__add__(A.a()).b, "add")
+        self.assertEqual((A.a() + A.a()).Name, "b")
+        self.assertEqual((A.a() + A.a()).b, "add")
+        self.assertEqual(A.a().__sub__(A.a()).Name, "b")
+        self.assertEqual(A.a().__sub__(A.a()).b, "sub")
+        self.assertEqual((A.a() - A.a()).Name, "b")
+        self.assertEqual((A.a() - A.a()).b, "sub")
+
     def test_named_tuple_subclass_magic_methods(self):
         class X(NamedTuple(x=int, y=int)):
             def __str__(self):

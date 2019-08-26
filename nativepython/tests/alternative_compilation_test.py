@@ -152,3 +152,56 @@ class TestAlternativeCompilation(unittest.TestCase):
         self.assertEqual(sum, sumCompiled)
         speedup = (t1-t0)/(t2-t1)
         self.assertGreater(speedup, 20)  # I get about 50
+
+    def test_compile_alternative_magic_methods(self):
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        extramethod=lambda self: self.Name,
+                        __bool__=lambda self: False,
+                        __str__=lambda self: "my str",
+                        __repr__=lambda self: "my repr",
+                        __call__=lambda self: "my call",
+                        __len__=lambda self: 42,
+                        __contains__=lambda self, item: not not item,
+
+                        __add__=lambda lhs, rhs: A.b("add"),
+                        __sub__=lambda lhs, rhs: A.b("sub"),
+                        __mul__=lambda lhs, rhs: A.b("mul"),
+                        __matmul__=lambda lhs, rhs: A.b("matmul"),
+                        __truediv__=lambda lhs, rhs: A.b("truediv"),
+                        __floordiv__=lambda lhs, rhs: A.b("floordiv"),
+                        __mod__=lambda lhs, rhs: A.b("mod"),
+                        __divmod=lambda lhs, rhs: A.b("divmod"),
+                        __pow__=lambda lhs, rhs: A.b("pow"),
+                        __lshift__=lambda lhs, rhs: A.b("lshift"),
+                        __rshift__=lambda lhs, rhs: A.b("rshift"),
+                        __and__=lambda lhs, rhs: A.b("and"),
+                        )
+
+        def f_bool(x: A):
+            return bool(x)
+
+        def f_str(x: A):
+            return str(x)
+
+        def f_repr(x: A):
+            return repr(x)
+
+        def f_call(x: A):
+            return x()
+
+        def f_in(x: A):
+            return 1 in x
+
+        def f_len(x: A):
+            return len(x)
+
+        def f_add(x: A):
+            return x + A.a()
+
+        test_cases = [f_bool, f_str, f_repr]
+        # failing_test_cases = [f_call, f_in, f_len, f_add]
+        for f in test_cases:
+            compiled_f = Compiled(f)
+            r1 = f(A.a())
+            r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)

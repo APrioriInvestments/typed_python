@@ -778,7 +778,7 @@ class ExpressionConversionContext(object):
 
             return pythonObjectRepresentation(self, "").convert_method_call("join", (items_to_join,), {})
 
-        raise ConversionException("can't handle python expression type %s" % ast._which)
+        raise ConversionException("can't handle python expression type %s" % ast.Name)
 
     def getTypePointer(self, t):
         """Return a raw type pointer for type t
