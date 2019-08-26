@@ -417,3 +417,22 @@ int PyConcreteAlternativeInstance::pyInquiryConcrete(const char* op, const char*
     }
     return PyObject_IsTrue(p.second);
 }
+
+int PyConcreteAlternativeInstance::sq_contains_concrete(PyObject* item) {
+    std::pair<bool, PyObject*> p = callMethod("__contains__", item, nullptr);
+    if (!p.first) {
+        return 0;
+    }
+    return PyObject_IsTrue(p.second);
+}
+
+Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
+    std::pair<bool, PyObject*> p = callMethod("__len__", nullptr, nullptr);
+    if (!p.first) {
+        return 0;
+    }
+    if (!PyLong_Check(p.second)) {
+        return 0;
+    }
+    return PyLong_AsLong(p.second);
+}

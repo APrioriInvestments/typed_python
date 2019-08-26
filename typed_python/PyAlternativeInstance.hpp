@@ -72,6 +72,10 @@ public:
 
     PyObject* tp_call_concrete(PyObject* args, PyObject* kwargs);
 
+    int sq_contains_concrete(PyObject* item);
+
+    Py_ssize_t mp_and_sq_length_concrete();
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return extractTypeFrom(pyRepresentation->ob_type) == type;
     }

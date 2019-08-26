@@ -385,7 +385,7 @@ PyObject* PyInstance::nb_floor_divide(PyObject* lhs, PyObject* rhs) {
 }
 
 PyObject* PyInstance::nb_true_divide(PyObject* lhs, PyObject* rhs) {
-    return pyOperator(lhs, rhs, "__div__", ".");
+    return pyOperator(lhs, rhs, "__div__", "/");
 }
 
 PyObject* PyInstance::nb_inplace_floor_divide(PyObject* lhs, PyObject* rhs) {
@@ -523,6 +523,15 @@ PyTypeObject* PyInstance::typeObj(Type* inType) {
 
 // static
 PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
+    if (    t->getTypeCategory() == Type::TypeCategory::catAlternative ||
+            t->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        PySequenceMethods* res =
+            new PySequenceMethods {0,0,0,0,0,0,0,0};
+            res->sq_contains = (objobjproc)PyInstance::sq_contains;
+            res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
+        return res;
+    }
+
     if (    t->getTypeCategory() == Type::TypeCategory::catTupleOf ||
             t->getTypeCategory() == Type::TypeCategory::catListOf ||
             t->getTypeCategory() == Type::TypeCategory::catTuple ||
@@ -1028,6 +1037,21 @@ PyObject* PyInstance::tp_repr(PyObject *o) {
     Type* self_type = extractTypeFrom(o->ob_type);
     PyInstance* w = (PyInstance*)o;
 
+    if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        self_type = self_type->getBaseType();
+    }
+
+    if (self_type->getTypeCategory() == Type::TypeCategory::catAlternative) {
+        Alternative* a = (Alternative*)self_type;
+        auto it = a->getMethods().find("__repr__");
+        if (it != a->getMethods().end()) {
+            return PyObject_CallFunctionObjArgs(
+                (PyObject*)it->second->getOverloads()[0].getFunctionObj(),
+                o,
+                NULL
+                );
+        }
+    }
     std::ostringstream str;
     ReprAccumulator accumulator(str);
 
