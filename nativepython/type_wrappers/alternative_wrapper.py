@@ -26,6 +26,11 @@ import nativepython
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
+def c_b(e):
+    context.call_py_function(e.expr_type.typeRepresentation().__bool__, (e,), {}, bool)
+    return True
+
+
 def makeAlternativeWrapper(t):
     if t.__typed_python_category__ == "ConcreteAlternative":
         return ConcreteAlternativeWrapper(t)
@@ -204,18 +209,24 @@ class AlternativeWrapper(RefcountedWrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            tp = context.getTypePointer(e.expr_type.typeRepresentation)
-            if tp:
-                if not e.isReference:
-                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
-                context.pushEffect(
-                    targetVal.expr.store(
-                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
-                    )
-                )
-                return context.constant(True)
+            return context.constant(False)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_call(self, context, expr, args, kwargs):
+        return context.call_py_function(self.alterativeType.__call__, args, kwargs)
+
+    def convert_len_native(self, context, expr):
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        if tp:
+            if not expr.isReference:
+                expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
+            return runtime_functions.np_len.call(expr.expr.cast(VoidPtr), tp)
+        else:
+            return context.constant(0)
+
+    def convert_len(self, context, expr):
+        return context.pushPod(int, self.convert_len_native(context, expr))
 
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
@@ -251,6 +262,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
+
         # there is deliberately no code path for "not explicit" here
         # Alternative conversions must be explicit
         assert targetVal.isReference
@@ -262,13 +274,11 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
             return context.constant(True)
 
         if target_type.typeRepresentation == Bool:
-            tp = context.getTypePointer(e.expr_type.typeRepresentation)
-            if tp:
-                if not e.isReference:
-                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
+            if hasattr(e.expr_type.typeRepresentation(), "__bool__"):
                 context.pushEffect(
                     targetVal.expr.store(
-                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
+                        # context.call_py_function(c_b, (e,), {})
+                        context.constant(False)
                     )
                 )
                 return context.constant(True)

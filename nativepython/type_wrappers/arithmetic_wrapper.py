@@ -402,32 +402,6 @@ class BoolWrapper(ArithmeticTypeWrapper):
             )
             return context.constant(True)
 
-        # elif target_type.typeRepresentation == String:
-        #     #if not e.isReference:
-        #     #    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
-        #     strForm = context.pushPod(
-        #         String,
-        #         lambda strRef: strRef.expr.store(
-        #             runtime_functions.int64_to_string.call(e.nonref_expr).cast(strRef.expr_type.layoutType)
-        #         )
-        #     )
-        #     targetVal.convert_copy_initialize(strForm)
-        #     #targetVal.convert_copy_initialize(context.constant('TRUE'))
-        #     # context.pushEffect(
-        #         # native_ast.Expression.Branch(
-        #         #     cond=e.nonref_expr,
-        #         #     true=targetVal.expr.store(context.constant('TRUE').nonref_expr),
-        #         #     false=targetVal.expr.store(context.constant('FALSE').nonref_expr)
-        #         # targetVal.expr.store(
-        #         #     native_ast.Expression.Branch(
-        #         #         cond=e.nonref_expr,
-        #         #         true=context.constant('TRUE').nonref_expr),
-        #         #         false=context.constant('FALSE').nonref_expr
-        #         #     )
-        #     #     targetVal.expr.store(context.constant('TRUE').nonref_expr)
-        #     # )
-        #     return context.constant(True)
-
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_unary_op(self, context, left, op):

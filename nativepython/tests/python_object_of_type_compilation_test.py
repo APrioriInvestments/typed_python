@@ -146,7 +146,34 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
             self.assertTrue(finalMem < initMem + 2)
 
-    def test_bool_conv2(self):
+    def test_boolconv_specialization_fail(self):
+
+        A1 = Alternative("A1", a={'a': str})
+
+        class AClass():
+            pass
+
+        test_cases = [
+            TupleOf(int)(),  # fail
+            # ListOf(int)((3,4,5)),  # fail
+            # list(),  # pass
+            # tuple(),  # pass
+            # Tuple(int)((1,)),  # pass
+            # Dict(int,int)(),  # pass
+            # ConstDict(int,int)(),  # pass
+            # Set(int)(),  # pass
+            # A1.a(),  # pass
+            AClass(),
+        ]
+
+        @SpecializedEntrypoint
+        def specialized_fail(x):
+            return False
+
+        for x in test_cases:
+            r = specialized_fail(x)
+
+    def test_bool_conv(self):
 
         IDict = Dict(int, int)
         IConstDict = ConstDict(int, int)
@@ -164,6 +191,8 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         A4 = Alternative("A4", a={}, b={}, __len__=lambda self: 0 if self.Name == 'a' else 1)
 
         test_cases = [
+            (A1.a, A1.a(a='')),
+            (A1.a, A1.a(a='a')),
             (int, 0),
             (int, 1),
             (Int8, Int8(0)), (Int8, Int8(1)), (UInt8, UInt8(0)), (UInt8, UInt8(-1)),

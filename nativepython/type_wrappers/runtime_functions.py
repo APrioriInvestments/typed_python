@@ -159,6 +159,23 @@ np_str = externalCallTarget(
     Void.pointer(),
     UInt64
 )
+
+np_len = externalCallTarget(
+    "nativepython_runtime_len",
+    UInt64,
+    Void.pointer(),
+    UInt64
+)
+
+np_len = externalCallTarget(
+    "nativepython_runtime_contains",
+    UInt64,
+    Void.pointer(),
+    UInt64,
+    Void.pointer(),
+    UInt64
+)
+
 getattr_pyobj = externalCallTarget(
     "nativepython_runtime_getattr_pyobj",
     Void.pointer(),

@@ -177,6 +177,9 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __and__=lambda lhs, rhs: A.b("and"),
                         )
 
+        def f_extramethod(x: A):
+            return x.extramethod()
+
         def f_bool(x: A):
             return bool(x)
 
@@ -198,8 +201,8 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_add(x: A):
             return x + A.a()
 
-        test_cases = [f_bool, f_str, f_repr]
-        # failing_test_cases = [f_call, f_in, f_len, f_add]
+        test_cases = [f_in, f_bool, f_str, f_repr, f_len]
+        # failing_test_cases = [f_call, f_in, f_add]
         for f in test_cases:
             compiled_f = Compiled(f)
             r1 = f(A.a())

@@ -185,6 +185,42 @@ extern "C" {
         return StringType::createFromUtf8(c, s);
     }
 
+    uint64_t nativepython_runtime_len(instance_ptr inst, Type* tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* o = PyInstance::extractPythonObject(inst, tp);
+        if (!o) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_len: failed to extract python object");
+        }
+        Py_ssize_t len = PyObject_Length(o);
+        if (len == -1) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_str: PyObject_Length returned -1");
+        }
+        return len;
+    }
+
+    bool nativepython_runtime_contains(instance_ptr self, Type* self_tp, instance_ptr item, Type* item_tp) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyObject* o = PyInstance::extractPythonObject(self, self_tp);
+        if (!o) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_contains: failed to extract python object");
+        }
+        PyObject* i = PyInstance::extractPythonObject(item, item_tp);
+        if (!i) {
+            PyErr_PrintEx(0);
+            throw std::runtime_error("nativepython_runtime_contains: failed to extract item python object");
+        }
+        PyObject* contains = PyObject_GetAttrString(o, "__contains__");
+        if (!contains) {
+            return 0;
+        }
+        return 1;
+    }
+
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
         PyEnsureGilAcquired getTheGil;
 
@@ -526,28 +562,6 @@ extern "C" {
         std::string rep = s.str();
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
-
-//        ReprAccumulator acc(s);
-//    StringType::layout* nativepython_float64_to_string(double f) {
-//        std::ostringstream s;
-//        bool is_scientific = (std::abs(f) >= 1.0e16);
-//        ReprAccumulator acc(s);
-//        if (is_scientific) {
-//            char buffer[32];
-//            if (std::abs(f) == 1.0e16)
-//                std::snprintf(buffer, sizeof(buffer), "%.16g", f);
-//            else
-//                std::snprintf(buffer, sizeof(buffer), "%.17g", f);
-//            acc << buffer;
-//        } else {
-//            acc << std::setprecision(17) << f;
-//            if (std::trunc(f) == f)
-//                acc << ".0";
-//        }
-//
-//        std::string rep = s.str();
-//        return StringType::createFromUtf8(&rep[0], rep.size());
-//    }
 
     StringType::layout* nativepython_float32_to_string(float f) {
         std::ostringstream s;
