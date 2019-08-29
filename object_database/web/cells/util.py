@@ -35,3 +35,15 @@ def waitForCellsCondition(cells: Cells, condition, timeout=10.0):
         raise Exception("\n\n".join([e.childByIndex(0).contents for e in exceptions]))
 
     return None
+
+
+def ShrinkWrap(aCell):
+    aCell.isShrinkWrapped = True
+    aCell.exportData['shrinkwrap'] = True
+    return aCell
+
+
+def Flex(aCell):
+    aCell.isFlex = True
+    aCell.exportData['flexChild'] = True
+    return aCell
