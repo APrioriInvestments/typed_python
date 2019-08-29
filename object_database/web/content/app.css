@@ -113,7 +113,7 @@
 /* Sequence and HorizontalSequence
  *================================================================*/
 .sequence {
-    display: inline-flex;
+    display: inline-block;
     width: 100%;
     height: 100%;
 }
@@ -124,8 +124,24 @@
 }
 
 .sequence-horizontal {
+    display: flex;
     flex-direction: row;
     align-items: center;
+}
+
+/* Flex Parent and Flex Child (Sequences etc)
+ *================================================================*/
+.sequence-vertical.flex-parent {
+    display: flex;
+    flex-direction: column;
+}
+
+.flex-child {
+    overflow-y: auto;
+}
+
+.shrinkwrapped {
+    flex-grow: 0;
 }
 
 /* PageView
