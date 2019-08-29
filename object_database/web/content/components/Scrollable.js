@@ -52,11 +52,4 @@ class Scrollable extends Component {
     }
 }
 
-Scrollable.propTypes = {
-    height: {
-        height: "Height of the Scrollable container.",
-        type: PropTypes.oneOf([PropTypes.string])
-    }
-};
-
 export {Scrollable, Scrollable as default};
