@@ -129,6 +129,14 @@
     align-items: center;
 }
 
+.sequence-horizontal.overflow {
+    /* We handle this for each type of sequence
+     * separately.
+     */
+    overflow-y: hidden;
+    overflow-x: auto;
+}
+
 /* Flex Parent and Flex Child (Sequences etc)
  *================================================================*/
 .sequence-vertical.flex-parent {
@@ -136,8 +144,19 @@
     flex-direction: column;
 }
 
-.flex-child {
+.sequence-horizontal.flex-parent {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+}
+
+.sequence-vertical > .flex-child {
     overflow-y: auto;
+    flex: 1;
+}
+
+.sequence-horizontal > .flex-child {
+    overflow-x: auto;
     flex: 1;
 }
 
