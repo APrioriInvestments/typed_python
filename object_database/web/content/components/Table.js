@@ -46,7 +46,7 @@ class Table extends Component {
         this._getRowDisplayElements = this._getRowDisplayElements.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('table', {
                 id: this.props.id,

@@ -39,7 +39,7 @@ class _PlotUpdater extends Component {
         this.componentDidLoad();
     }
 
-    render(){
+    build(){
         return h('div',
             {
                 class: "cell",

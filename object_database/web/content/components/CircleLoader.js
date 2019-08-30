@@ -11,7 +11,7 @@ class CircleLoader extends Component {
         super(props, ...args);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

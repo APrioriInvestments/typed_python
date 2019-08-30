@@ -26,7 +26,7 @@ class ButtonGroup extends Component {
         this.makeButtons = this.makeButtons.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('div', {
                 id: this.props.id,

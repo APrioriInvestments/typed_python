@@ -34,7 +34,7 @@ class SplitView extends Component {
         this.makeChildElements = this.makeChildElements.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

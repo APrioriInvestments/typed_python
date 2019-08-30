@@ -26,7 +26,7 @@ class Subscribed extends Component {
         this.makeContent = this.makeContent.bind(this);
     }
 
-    render(){
+    build(){
         return h('div',
             {
                 class: "cell subscribed",

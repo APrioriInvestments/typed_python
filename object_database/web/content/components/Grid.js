@@ -39,7 +39,7 @@ class Grid extends Component {
         this._makeReplacementRowElements = this._makeReplacementRowElements.bind(this);
     }
 
-    render(){
+    build(){
         let topTableHeader = null;
         if(this.props.extraData.hasTopHeader){
             topTableHeader = h('th');

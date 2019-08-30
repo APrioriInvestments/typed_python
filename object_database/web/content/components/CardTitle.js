@@ -27,7 +27,7 @@ class CardTitle extends Component {
         this.makeInner = this.makeInner.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('div', {
                 id: this.props.id,

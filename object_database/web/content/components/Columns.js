@@ -26,7 +26,7 @@ class Columns extends Component {
         this.makeInnerChildren = this.makeInnerChildren.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 class: "cell container-fluid",

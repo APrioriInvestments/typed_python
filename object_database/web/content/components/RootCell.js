@@ -26,7 +26,7 @@ class RootCell extends Component {
         this.makeChild = this.makeChild.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

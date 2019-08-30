@@ -32,7 +32,7 @@ class Timestamp extends Component {
         this.getMilliseconds = this.getMilliseconds.bind(this);
     }
 
-    render(){
+    build(){
         return h('span',
             {
                 class: "cell",

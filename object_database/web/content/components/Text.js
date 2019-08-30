@@ -12,7 +12,7 @@ class Text extends Component {
         this.style = "color:" + this.props.textColor;
     }
 
-    render(){
+    build(){
         return(
             h('div', {
                 class: "cell",

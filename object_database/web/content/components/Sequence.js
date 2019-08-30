@@ -30,7 +30,7 @@ class Sequence extends Component {
         this.makeElements = this.makeElements.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

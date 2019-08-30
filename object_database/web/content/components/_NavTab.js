@@ -31,7 +31,7 @@ class _NavTab extends Component {
         this.clickHandler = this.clickHandler.bind(this);
     }
 
-    render(){
+    build(){
         let innerClass = "nav-link";
         if(this.props.extraData.isActive){
             innerClass += " active";

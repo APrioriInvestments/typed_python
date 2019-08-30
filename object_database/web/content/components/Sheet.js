@@ -54,7 +54,7 @@ class Sheet extends Component {
         }));
     }
 
-    render(){
+    build(){
         console.log(`Rendering sheet ${this.props.id}`);
         return (
             h('div', {

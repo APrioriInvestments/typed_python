@@ -32,7 +32,7 @@ class PageView extends Component {
         this.makeFooter = this.makeFooter.bind(this);
     }
 
-    render(){
+    build(){
         return h('div', {
             id: this.props.id,
             'data-cell-id': this.props.id,

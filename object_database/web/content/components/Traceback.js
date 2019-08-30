@@ -25,7 +25,7 @@ class  Traceback extends Component {
         this.makeTraceback = this.makeTraceback.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

@@ -31,7 +31,7 @@ class Popover extends Component {
         this.makeDetail = this.makeDetail.bind(this);
     }
 
-    render(){
+    build(){
         return h('div',
             {
                 class: "cell popover-cell",

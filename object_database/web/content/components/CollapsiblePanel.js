@@ -30,7 +30,7 @@ class CollapsiblePanel extends Component {
         this.makeContent = this.makeContent.bind(this);
     }
 
-    render(){
+    build(){
         if(this.props.extraData.isExpanded){
             return(
                 h('div', {

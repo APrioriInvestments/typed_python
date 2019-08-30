@@ -26,7 +26,7 @@ class Container extends Component {
         this.makeChild = this.makeChild.bind(this);
     }
 
-    render(){
+    build(){
         let child = this.makeChild();
         let style = "";
         if(!child){

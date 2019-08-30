@@ -28,7 +28,7 @@ class Clickable extends Component {
         this._getEvent = this._getEvent.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('div', {
                 id: this.props.id,

@@ -34,7 +34,7 @@ class Plot extends Component {
         this.setupPlot();
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

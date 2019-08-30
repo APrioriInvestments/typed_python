@@ -24,7 +24,7 @@ class Badge extends Component {
         this.makeInner = this.makeInner.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('span', {
                 class: `cell badge badge-${this.props.extraData.badgeStyle}`,
