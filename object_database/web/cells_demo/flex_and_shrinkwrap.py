@@ -29,6 +29,20 @@ class VertSequenceWithFlex(CellsTestPage):
         return "The vertical sequence should display two shrinkwrapped buttons sandwiching a flexed-out card containing a scrollable list of items"
 
 
+class VertSequenceWithMultiFlex(CellsTestPage):
+    def cell(self):
+        firstTextItems = [cells.Text("Item %s" % i) for i in range(50)]
+        firstCard = cells.Card(cells.Sequence(firstTextItems))
+        secondTextItems = [cells.Text("Item %s" % i) for i in range(60)]
+        secondCard = cells.Card(cells.Sequence(secondTextItems))
+        firstButton = cells.Button("First Button", lambda: None)
+        secondButton = cells.Button("Another Button", lambda: None)
+        return (firstButton + Flex(firstCard) + Flex(secondCard) + secondButton)
+
+    def text(self):
+        return "The vertical sequence should display two shrinkwrapped buttons sandwiching *two* flexed-out cards of equal, greedy size containing a scrollable list of items"
+
+
 class VertSequenceWithoutFlex(CellsTestPage):
     def cell(self):
         textItems = [cells.Text("Item %s" % i) for i in range(50)]

@@ -138,6 +138,7 @@
 
 .flex-child {
     overflow-y: auto;
+    flex: 1;
 }
 
 .shrinkwrapped {
