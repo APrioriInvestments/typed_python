@@ -32,7 +32,7 @@ class AsyncDropdown extends Component {
         this.makeContent = this.makeContent.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

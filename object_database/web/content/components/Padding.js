@@ -10,7 +10,7 @@ class Padding extends Component {
         super(props, ...args);
     }
 
-    render(){
+    build(){
         return (
             h('span', {
                 id: this.props.id,

@@ -27,7 +27,7 @@ class Scrollable extends Component {
         this.makeChild = this.makeChild.bind(this);
     }
 
-    render(){
+    build(){
         let style = "";
         if (this.props.extraData.height){
             style = "height:" + this.props.extraData.height;

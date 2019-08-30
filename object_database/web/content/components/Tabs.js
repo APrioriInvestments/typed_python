@@ -34,7 +34,7 @@ class Tabs extends Component {
         this.makeDisplay = this.makeDisplay.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

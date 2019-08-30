@@ -26,7 +26,7 @@ class Main extends Component {
         this.makeChild = this.makeChild.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('main', {
                 id: this.props.id,

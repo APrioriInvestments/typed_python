@@ -14,7 +14,7 @@ class SubComponent extends Component {
         super(props, ...args);
     }
 
-    render(){
+    build(){
         return (
             h('div', {id: this.props.id}, [`Child: ${this.props.id}`])
         );
@@ -88,6 +88,17 @@ describe("Base Component Class", () => {
             assert.equal('SubComponent', instance.name);
         });
     });
+
+    describe('Base Component Rendering', () => {
+        it('#can render basic', () => {
+            let component = new SubComponent({id: 'component'});
+            let result = component.render();
+            assert.exists(result);
+            assert.equal(result.properties.id, 'component');
+        });
+    });
+
+    /*TODO: add test for more advanced rendering when ready*/
 
     describe('Base Component Children Utilities', () => {
         it('#renderedChildren provides hyperscripts for children', () => {

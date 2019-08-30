@@ -55,12 +55,25 @@ class Component {
         this._recursivelyMapNamedChildren = this._recursivelyMapNamedChildren.bind(this);
     }
 
-    render(){
+    build(){
         // Objects that extend from
         // me should override this
-        // method in order to generate
+        // method in order to build
         // some content for the vdom
-        throw new Error('You must implement a `render` method on Component objects!');
+        throw new Error('You must implement a `build` method on Component objects!');
+    }
+
+    /**
+     * I first call the component build()
+     * to generate the v-dom/hyperscript element. Then
+     * alter it if necessary and return the hyperscript.
+     * Instead of calling a render() directly on the
+     * subclassed components themselves I provide the option for
+     * global/component-wide changes before the final rendering.
+    */
+    render() {
+        let velement = this.build()
+        return velement;
     }
 
     /**

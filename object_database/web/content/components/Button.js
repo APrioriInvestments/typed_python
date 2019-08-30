@@ -27,7 +27,7 @@ class Button extends Component {
         this._getHTMLClasses = this._getHTMLClasses.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('button', {
                 id: this.props.id,

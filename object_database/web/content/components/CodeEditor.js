@@ -61,7 +61,7 @@ class CodeEditor extends Component {
         }
     }
 
-    render(){
+    build(){
         return h('div',
             {
                 class: "cell h-100",

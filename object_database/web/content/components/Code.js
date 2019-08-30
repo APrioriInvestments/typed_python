@@ -26,7 +26,7 @@ class Code extends Component {
         this.makeCode = this.makeCode.bind(this);
     }
 
-    render(){
+    build(){
         return h('pre',
                  {
                      class: "cell code",

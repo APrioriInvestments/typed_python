@@ -26,7 +26,7 @@ class ContextualDisplay extends Component {
         this.makeChild = this.makeChild.bind(this);
     }
 
-    render(){
+    build(){
         return h('div',
             {
                 class: "cell contextualDisplay",

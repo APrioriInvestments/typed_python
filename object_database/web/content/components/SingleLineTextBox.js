@@ -13,7 +13,7 @@ class SingleLineTextBox extends Component {
         this.changeHandler = this.changeHandler.bind(this);
     }
 
-    render(){
+    build(){
         let attrs =
             {
                 class: "cell",

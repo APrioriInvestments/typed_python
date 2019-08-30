@@ -33,7 +33,7 @@ class HeaderBar extends Component {
         this.makeCenter = this.makeCenter.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

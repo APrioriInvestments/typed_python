@@ -10,7 +10,7 @@ class LargePendingDownloadDisplay extends Component {
         super(props, ...args);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: 'object_database_large_pending_download_text',

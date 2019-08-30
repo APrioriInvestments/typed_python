@@ -18,7 +18,7 @@ class Octicon extends Component {
         this._getHTMLClasses = this._getHTMLClasses.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('span', {
                 class: this._getHTMLClasses(),

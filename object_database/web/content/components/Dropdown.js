@@ -33,7 +33,7 @@ class Dropdown extends Component {
         this.makeItems = this.makeItems.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,
@@ -115,7 +115,7 @@ class DropdownItem extends Component {
         this.clickHandler = this.clickHandler.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('a', {
                 class: "subcell cell-dropdown-item dropdown-item",

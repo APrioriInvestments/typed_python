@@ -35,7 +35,7 @@ class Modal extends Component {
         this.makeClasses = this.makeClasses.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: this.props.id,

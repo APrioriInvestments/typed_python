@@ -29,7 +29,7 @@ class SubscribedSequence extends Component {
         this._makeReplacementChildren = this._makeReplacementChildren.bind(this);
     }
 
-    render(){
+    build(){
         return h('div',
             {
                 class: this.makeClass(),

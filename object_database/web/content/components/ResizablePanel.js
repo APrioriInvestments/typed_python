@@ -41,7 +41,7 @@ class ResizablePanel extends Component {
         this.afterDestroyed = this.afterDestroyed.bind(this);
     }
 
-    render(){
+    build(){
         let classString = "";
         if(this.props.extraData.split == 'vertical'){
             classString = " horizontal-panel";

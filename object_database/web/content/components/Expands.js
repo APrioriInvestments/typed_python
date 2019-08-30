@@ -42,7 +42,7 @@ class Expands extends Component {
         this._getEvents = this._getEvent.bind(this);
     }
 
-    render(){
+    build(){
         return(
             h('div', {
                 id: this.props.id,

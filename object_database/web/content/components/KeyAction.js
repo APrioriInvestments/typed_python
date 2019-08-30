@@ -23,7 +23,7 @@ class KeyAction extends Component {
         this.registerKeyAction();
     }
 
-    render(){
+    build(){
         // This is a non-display cell
         // and does not add any elements
         // to the DOM.
