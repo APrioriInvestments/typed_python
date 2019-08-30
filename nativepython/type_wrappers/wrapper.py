@@ -241,9 +241,12 @@ class Wrapper(object):
 
         # put conversion into its own function
         targetVal = context.allocateUninitializedSlot(target_type)
+
         succeeded = expr.expr_type.convert_to_type_with_target(context, expr, targetVal, explicit)
+
         if succeeded is None:
             return
+
         succeeded = succeeded.convert_to_type(bool)
         if succeeded is None:
             return
@@ -267,6 +270,10 @@ class Wrapper(object):
         return targetVal.expr_type.convert_to_self_with_target(context, targetVal, expr, explicit)
 
     def convert_to_self_with_target(self, context, targetVal, sourceVal, explicit):
+        if sourceVal.expr_type == self:
+            targetVal.convert_copy_initialize(sourceVal)
+            return context.constant(True)
+
         return context.constant(False)
 
     def convert_bin_op(self, context, l, op, r):

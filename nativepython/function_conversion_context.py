@@ -23,6 +23,7 @@ from nativepython.python_ast_analysis import (
 import nativepython
 import nativepython.native_ast as native_ast
 from nativepython.expression_conversion_context import ExpressionConversionContext
+from nativepython.function_stack_state import FunctionStackState
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.typed_expression import TypedExpression
 from nativepython.conversion_exception import ConversionException
@@ -66,8 +67,6 @@ class FunctionConversionContext(object):
         self._output_type = output_type
         self._argumentsWithoutStackslots = set()  # arguments that we don't bother to copy into the stack
         self._varname_to_type = {}
-        self._varname_map = {}
-        self._varname_map_count = {}
         self._free_variable_lookup = free_variable_lookup
         self._temp_let_var = 0
         self._temp_stack_var = 0
@@ -79,16 +78,63 @@ class FunctionConversionContext(object):
 
         self._constructInitialVarnameToType()
 
+    def isLocalVariable(self, name):
+        return name in self.variablesBound or name in self.variablesAssigned
+
+    def localVariableExpression(self, context: ExpressionConversionContext, name):
+        """Return an TypedExpression reference for the local variable given by  'name'"""
+        slot_type = self._varname_to_type[name]
+
+        return TypedExpression(
+            context,
+            native_ast.Expression.StackSlot(
+                name=name,
+                type=slot_type.getNativeLayoutType()
+            ),
+            slot_type,
+            isReference=True
+        )
+
+    def variableIsAlwaysEmpty(self, name):
+        assert self.isLocalVariable(name), f"{name} is not a local variable here."
+
+        # we have never assigned to this thing, so we need to upcast it
+        if name not in self._varname_to_type:
+            return True
+
+        if self._varname_to_type[name] is None:
+            return True
+
+        return self._varname_to_type[name].is_empty
+
+    def variableNeedsDestructor(self, name):
+        varType = self._varname_to_type.get(name)
+
+        if varType is None or varType.is_empty or varType.is_pod:
+            return False
+
+        return True
+
     def convertToNativeFunction(self):
-        body_native_expr, controlFlowReturns = self.convert_function_body(self._statements)
+        variableStates = FunctionStackState()
+
+        initializer_expr = self.initializeVariableStates(self._argnames, self._star_args_name, variableStates)
+
+        body_native_expr, controlFlowReturns = self.convert_function_body(self._statements, variableStates)
+
+        # destroy our variables if they are in scope
+        destructors = self.generateDestructors(variableStates)
+
         assert not controlFlowReturns
 
-        if self._star_args_name is not None:
-            body_native_expr = self.construct_starargs_around(body_native_expr, self._star_args_name)
+        body_native_expr = initializer_expr >> body_native_expr
 
-        body_native_expr = self.construct_stackslots_around(
-            body_native_expr, self._argnames, self._star_args_name
-        )
+        if destructors:
+            body_native_expr = native_ast.Expression.Finally(
+                teardowns=destructors,
+                expr=body_native_expr
+            )
+
         return_type = self._varname_to_type.get(FunctionOutput, None)
 
         if return_type is None:
@@ -174,8 +220,6 @@ class FunctionConversionContext(object):
         return self._typesAreUnstable
 
     def resetTypeInstabilityFlag(self):
-        self._varname_map_count = {}
-        self._varname_map = {}
         self._typesAreUnstable = False
 
     def markTypesAreUnstable(self):
@@ -190,6 +234,19 @@ class FunctionConversionContext(object):
         return "stackvar.%s" % (self._temp_stack_var-1)
 
     def externalScopeVarExpr(self, subcontext, varname):
+        """If 'varname' refers to a known variable that doesn't use a stack slot, return an expression for it.
+
+        This can happen when a variable is passed to us as a function argument
+        but not assigned to in our scope, in which case we don't have a stackslot
+        for it.
+
+        Args:
+            subcontext - the expression conversion context we're using
+            varname - the python identifier we're looking up
+
+        Returns:
+            a TypedExpression for the given name.
+        """
         if varname not in self._argumentsWithoutStackslots:
             return None
 
@@ -203,8 +260,6 @@ class FunctionConversionContext(object):
         )
 
     def upsizeVariableType(self, varname, new_type):
-        varname = self.mapVarname(varname)
-
         if self._varname_to_type.get(varname) is None:
             if new_type is None:
                 return
@@ -229,37 +284,112 @@ class FunctionConversionContext(object):
 
         self._varname_to_type[varname] = typeWrapper(final_type)
 
-    def maskVarnameWithFreshInstantiation(self, name):
-        """Map all references to 'name' to a freshly named variable."""
-        if name not in self._varname_map:
-            self._varname_map[name] = [name]
+    def initializeVariableStates(self, argnames, stararg_name, variableStates):
+        to_add = []
 
-        self._varname_map_count[name] = self._varname_map_count.get(name, 0) + 1
+        # first, mark every variable that we plan on assigning to as not initialized.
+        for name in self.variablesAssigned:
+            # this is a variable in the function that we assigned to. we need to ensure that
+            # the initializer flag is zero
+            if not self.variableIsAlwaysEmpty(name):
+                context = ExpressionConversionContext(self, variableStates)
+                context.markVariableNotInitialized(name)
+                to_add.append(context.finalize(None))
 
-        self._varname_map[name].append(name + "." + str(self._varname_map_count[name]))
+        for name in argnames:
+            if name is not FunctionOutput and name != stararg_name:
+                if name not in self._varname_to_type:
+                    raise ConversionException("Couldn't find a type for argument %s" % name)
+                slot_type = self._varname_to_type[name]
 
-    def mapVarname(self, name):
-        """Look up the 'real' varname for 'name'.
+                if slot_type.is_empty:
+                    # we don't need to generate a stackslot for this value. Whenever we look it up
+                    # we'll simply make a void expression
+                    pass
+                elif slot_type is not None:
+                    context = ExpressionConversionContext(self, variableStates)
 
-        During codegen, we may have different stack-variables that map to the same
-        python variable. This happens mostly when we have different versions of the same
-        variable that have different types. We give them different names on the stack
-        """
-        return self._varname_map.get(name, [name])[-1]
+                    if slot_type.is_empty:
+                        pass
+                    elif name in self.variablesBound and name not in self.variablesAssigned:
+                        # this variable is bound but never assigned, so we don't need to
+                        # generate a stackslot. We can just read it directly from our arguments
+                        self._argumentsWithoutStackslots.add(name)
+                    elif slot_type.is_pod:
+                        # we can just copy this into the stackslot directly. no destructor needed
+                        context.pushEffect(
+                            native_ast.Expression.Store(
+                                ptr=native_ast.Expression.StackSlot(
+                                    name=name,
+                                    type=slot_type.getNativeLayoutType()
+                                ),
+                                val=(
+                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
+                                    native_ast.Expression.Variable(name=name).load()
+                                )
+                            )
+                        )
+                        context.markVariableInitialized(name)
+                    else:
+                        # need to make a stackslot for this variable
+                        var_expr = context.inputArg(slot_type, name)
 
-    def popMaskedVarname(self, name):
-        self._varname_map[name].pop()
-        if not self._varname_map[name]:
-            del self._varname_map[name]
+                        self.assignToLocalVariable(name, var_expr, variableStates)
 
-    def generateAssignmentExpr(self, varname, val_to_store):
+                        context.markVariableInitialized(name)
+
+                    to_add.append(context.finalize(None))
+
+        return native_ast.makeSequence(to_add)
+
+    def generateDestructors(self, variableStates):
+        destructors = []
+
+        for name in variableStates.variablesThatMightBeActive():
+            if self.variableNeedsDestructor(name):
+                context = ExpressionConversionContext(self, variableStates)
+
+                slot_expr = self.localVariableExpression(context, name)
+
+                with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
+                    with true:
+                        slot_expr.convert_destroy()
+
+                destructors.append(
+                    native_ast.Teardown.Always(
+                        expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
+                    )
+                )
+
+        return destructors
+
+    def construct_starargs_around(self, res, star_args_name):
+        args_type = self._varname_to_type[star_args_name]
+
+        stararg_slot = self.named_var_expr(star_args_name)
+
+        return (
+            args_type.convert_initialize(
+                self,
+                stararg_slot,
+                [
+                    TypedExpression(
+                        native_ast.Expression.Variable(".star_args.%s" % i),
+                        args_type.element_types[i][1]
+                    )
+                    for i in range(len(args_type.element_types))]
+            ).with_comment("initialize *args slot") + res
+        )
+
+    def assignToLocalVariable(self, varname, val_to_store, variableStates):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
-        varname = self.mapVarname(varname)
-
         subcontext = val_to_store.context
 
         self.upsizeVariableType(varname, val_to_store.expr_type)
-        slot_ref = subcontext.named_var_expr(varname)
+
+        assignedType = val_to_store.expr_type.typeRepresentation
+
+        slot_ref = self.localVariableExpression(subcontext, varname)
 
         # convert the value to the target type now that we've upsized it
         val_to_store = val_to_store.convert_to_type(slot_ref.expr_type)
@@ -272,14 +402,22 @@ class FunctionConversionContext(object):
             slot_ref.convert_copy_initialize(val_to_store)
             subcontext.markVariableInitialized(varname)
         else:
-            with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
-                with true_block:
-                    slot_ref.convert_assign(val_to_store)
-                with false_block:
-                    slot_ref.convert_copy_initialize(val_to_store)
-                    subcontext.markVariableInitialized(varname)
+            if variableStates.isDefinitelyInitialized(varname):
+                slot_ref.convert_assign(val_to_store)
+            elif variableStates.isDefinitelyUninitialized(varname):
+                slot_ref.convert_copy_initialize(val_to_store)
+                subcontext.markVariableInitialized(varname)
+            else:
+                with subcontext.ifelse(subcontext.isInitializedVarExpr(varname)) as (true_block, false_block):
+                    with true_block:
+                        slot_ref.convert_assign(val_to_store)
+                    with false_block:
+                        slot_ref.convert_copy_initialize(val_to_store)
+                        subcontext.markVariableInitialized(varname)
 
-    def convert_statement_ast(self, ast):
+        variableStates.variableAssigned(varname, assignedType)
+
+    def convert_statement_ast(self, ast, variableStates: FunctionStackState):
         if ast.matches.Expr and ast.value.matches.Str:
             return native_ast.Expression(), True
 
@@ -298,7 +436,7 @@ class FunctionConversionContext(object):
                 if varname not in self._varname_to_type:
                     self._varname_to_type[varname] = None
 
-                subcontext = ExpressionConversionContext(self)
+                subcontext = ExpressionConversionContext(self, variableStates)
 
                 val_to_store = subcontext.convert_expression_ast(ast.value)
 
@@ -306,23 +444,23 @@ class FunctionConversionContext(object):
                     return subcontext.finalize(None), False
 
                 if op is not None:
-                    if varname not in self._varname_to_type:
-                        raise NotImplementedError()
-                    else:
-                        slot_ref = subcontext.named_var_expr(varname)
-                        val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+                    slot_ref = subcontext.namedVariableLookup(varname)
+                    if slot_ref is None:
+                        return subcontext.finalize(None), False
 
-                        if val_to_store is None:
-                            return subcontext.finalize(None), False
+                    val_to_store = slot_ref.convert_bin_op(op, val_to_store)
 
-                self.generateAssignmentExpr(varname, val_to_store)
+                    if val_to_store is None:
+                        return subcontext.finalize(None), False
+
+                self.assignToLocalVariable(varname, val_to_store, variableStates)
 
                 return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
 
             if target.matches.Subscript and target.ctx.matches.Store:
                 assert target.slice.matches.Index
 
-                subcontext = ExpressionConversionContext(self)
+                subcontext = ExpressionConversionContext(self, variableStates)
 
                 slicing = subcontext.convert_expression_ast(target.value)
                 if slicing is None:
@@ -354,7 +492,7 @@ class FunctionConversionContext(object):
                 return subcontext.finalize(None), True
 
             if target.matches.Attribute and target.ctx.matches.Store:
-                subcontext = ExpressionConversionContext(self)
+                subcontext = ExpressionConversionContext(self, variableStates)
 
                 slicing = subcontext.convert_expression_ast(target.value)
                 attr = target.attr
@@ -377,7 +515,7 @@ class FunctionConversionContext(object):
                 return subcontext.finalize(None), True
 
         if ast.matches.Return:
-            subcontext = ExpressionConversionContext(self)
+            subcontext = ExpressionConversionContext(self, variableStates)
 
             if ast.value is None:
                 e = subcontext.convert_expression_ast(
@@ -423,14 +561,14 @@ class FunctionConversionContext(object):
             return subcontext.finalize(None), False
 
         if ast.matches.Expr:
-            subcontext = ExpressionConversionContext(self)
+            subcontext = ExpressionConversionContext(self, variableStates)
 
             result_expr = subcontext.convert_expression_ast(ast.value)
 
             return subcontext.finalize(result_expr), result_expr is not None
 
         if ast.matches.If:
-            cond_context = ExpressionConversionContext(self)
+            cond_context = ExpressionConversionContext(self, variableStates)
             cond = cond_context.convert_expression_ast(ast.test)
             if cond is None:
                 return cond_context.finalize(None), False
@@ -441,12 +579,20 @@ class FunctionConversionContext(object):
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
 
-                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse)
+                branch, flow_returns = self.convert_statement_list_ast(ast.body if truth_val else ast.orelse, variableStates)
 
                 return cond.expr >> branch, flow_returns
 
-            true, true_returns = self.convert_statement_list_ast(ast.body)
-            false, false_returns = self.convert_statement_list_ast(ast.orelse)
+            variableStatesTrue = variableStates.clone()
+            variableStatesFalse = variableStates.clone()
+
+            true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
+            false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+
+            variableStates.becomeMerge(
+                variableStatesTrue if true_returns else None,
+                variableStatesFalse if false_returns else None
+            )
 
             return (
                 native_ast.Expression.Branch(
@@ -459,26 +605,41 @@ class FunctionConversionContext(object):
             return native_ast.nullExpr, True
 
         if ast.matches.While:
-            cond_context = ExpressionConversionContext(self)
+            while True:
+                # track the initial variable states
+                initVariableStates = variableStates.clone()
 
-            cond = cond_context.convert_expression_ast(ast.test)
+                cond_context = ExpressionConversionContext(self, variableStates)
 
-            if cond is None:
-                return cond_context.finalize(None), False
-            cond = cond.toBool()
-            if cond is None:
-                return cond_context.finalize(None), False
+                cond = cond_context.convert_expression_ast(ast.test)
+                if cond is None:
+                    return cond_context.finalize(None), False
 
-            true, true_returns = self.convert_statement_list_ast(ast.body)
+                cond = cond.toBool()
+                if cond is None:
+                    return cond_context.finalize(None), False
 
-            false, false_returns = self.convert_statement_list_ast(ast.orelse)
+                variableStatesTrue = variableStates.clone()
+                variableStatesFalse = variableStates.clone()
 
-            return (
-                native_ast.Expression.While(
-                    cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false
-                ),
-                true_returns or false_returns
-            )
+                true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
+
+                false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+
+                variableStates.becomeMerge(
+                    variableStatesTrue if true_returns else None,
+                    variableStatesFalse if false_returns else None
+                )
+
+                variableStates.mergeWithSelf(initVariableStates)
+
+                if variableStates == initVariableStates:
+                    return (
+                        native_ast.Expression.While(
+                            cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false
+                        ),
+                        true_returns or false_returns
+                    )
 
         if ast.matches.Try:
             raise NotImplementedError()
@@ -489,10 +650,7 @@ class FunctionConversionContext(object):
 
             target_var_name = ast.target.id
 
-            # create a variable to hold the iterator, and instantiate it there
-            iter_varname = target_var_name + ".iter." + str(ast.line_number)
-
-            iterator_setup_context = ExpressionConversionContext(self)
+            iterator_setup_context = ExpressionConversionContext(self, variableStates)
 
             to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
             if to_iterate is None:
@@ -500,58 +658,80 @@ class FunctionConversionContext(object):
 
             iteration_expressions = to_iterate.get_iteration_expressions()
 
+            # we allow types to explicitly break themselves down into a fixed set of
+            # expressions to unroll, so that we can retain typing information.
             if iteration_expressions is not None:
                 for subexpr in iteration_expressions:
-                    self.maskVarnameWithFreshInstantiation(target_var_name)
+                    self.assignToLocalVariable(target_var_name, subexpr, variableStates)
 
-                    self.generateAssignmentExpr(target_var_name, subexpr)
-
-                    thisOne, thisOneReturns = self.convert_statement_list_ast(ast.body)
+                    thisOne, thisOneReturns = self.convert_statement_list_ast(ast.body, variableStates)
 
                     iterator_setup_context.pushEffect(thisOne)
-
-                    self.popMaskedVarname(target_var_name)
 
                     if not thisOneReturns:
                         return iterator_setup_context.finalize(None), False
 
-                thisOne, thisOneReturns = self.convert_statement_list_ast(ast.orelse)
+                thisOne, thisOneReturns = self.convert_statement_list_ast(ast.orelse, variableStates)
 
                 iterator_setup_context.pushEffect(thisOne)
 
                 return iterator_setup_context.finalize(None), thisOneReturns
             else:
+                # create a variable to hold the iterator, and instantiate it there
+                iter_varname = target_var_name + ".iter." + str(ast.line_number)
+
+                # we are going to assign this
+                self.variablesAssigned.add(iter_varname)
+
                 iterator_object = to_iterate.convert_method_call("__iter__", (), {})
                 if iterator_object is None:
                     return iterator_setup_context.finalize(iterator_object), False
 
-                self.generateAssignmentExpr(iter_varname, iterator_object)
+                self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
 
-                cond_context = ExpressionConversionContext(self)
-                iter_obj = cond_context.named_var_expr(iter_varname)
-                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                while True:
+                    # track the initial variable states
+                    initVariableStates = variableStates.clone()
 
-                if next_ptr is None:
-                    return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
+                    cond_context = ExpressionConversionContext(self, variableStates)
 
-                with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
-                    with if_true:
-                        self.generateAssignmentExpr(target_var_name, next_ptr)
+                    iter_obj = cond_context.namedVariableLookup(iter_varname)
+                    if iter_obj is None:
+                        return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
 
-                true, true_returns = self.convert_statement_list_ast(ast.body)
+                    next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                    if next_ptr is None:
+                        return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
 
-                false, false_returns = self.convert_statement_list_ast(ast.orelse)
+                    with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                        with if_true:
+                            self.assignToLocalVariable(target_var_name, next_ptr, variableStates)
 
-                return (
-                    iterator_setup_context.finalize(None) >>
-                    native_ast.Expression.While(
-                        cond=cond_context.finalize(is_populated), while_true=true, orelse=false
-                    ),
-                    true_returns or false_returns
-                )
+                    variableStatesTrue = variableStates.clone()
+                    variableStatesFalse = variableStates.clone()
+
+                    true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
+                    false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
+
+                    variableStates.becomeMerge(
+                        variableStatesTrue if true_returns else None,
+                        variableStatesFalse if false_returns else None
+                    )
+
+                    variableStates.mergeWithSelf(initVariableStates)
+
+                    if variableStates == initVariableStates:
+                        # if nothing changed, the loop is stable.
+                        return (
+                            iterator_setup_context.finalize(None) >>
+                            native_ast.Expression.While(
+                                cond=cond_context.finalize(is_populated), while_true=true, orelse=false
+                            ),
+                            true_returns or false_returns
+                        )
 
         if ast.matches.Raise:
-            expr_contex = ExpressionConversionContext(self)
+            expr_contex = ExpressionConversionContext(self, variableStates)
             strVal = "Unknown Exception"
             if ast.exc.matches.Call:
                 if ast.exc.func.matches.Name and ast.exc.func.id == "Exception":
@@ -564,7 +744,7 @@ class FunctionConversionContext(object):
         if ast.matches.Delete:
             exprs = None
             for target in ast.targets:
-                subExprs, flowReturns = self.convert_delete(target)
+                subExprs, flowReturns = self.convert_delete(target, variableStates)
                 if exprs is None:
                     exprs = subExprs
                 else:
@@ -576,7 +756,7 @@ class FunctionConversionContext(object):
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
 
-    def convert_delete(self, expression):
+    def convert_delete(self, expression, variableStates):
         """Convert the target of a 'del' statement.
 
         Args:
@@ -586,7 +766,7 @@ class FunctionConversionContext(object):
             a pair of native_ast.Expression and a bool indicating whether control flow
             returns to the caller.
         """
-        expr_contex = ExpressionConversionContext(self)
+        expr_contex = ExpressionConversionContext(self, variableStates)
 
         if expression.matches.Subscript:
             slicing = expr_contex.convert_expression_ast(expression.value)
@@ -607,13 +787,29 @@ class FunctionConversionContext(object):
             expr_contex.pushException(Exception, "Can't delete this")
             return expr_contex.finalize(None), False
 
-    def convert_function_body(self, statements):
-        return self.convert_statement_list_ast(statements, toplevel=True)
+    def convert_function_body(self, statements, variableStates: FunctionStackState):
+        return self.convert_statement_list_ast(statements, variableStates, toplevel=True)
 
-    def convert_statement_list_ast(self, statements, toplevel=False):
+    def convert_statement_list_ast(self, statements, variableStates: FunctionStackState, toplevel=False):
+        """Convert a sequence of statements to a native expression.
+
+        After executing this statement, variableStates will contain the known states of the
+        current variables.
+
+        Args:
+            statements - a list of python_ast.Statement objects
+            variableStates - a FunctionStackState object,
+            toplevel - is this at the root of a function, so that flowing off the end should
+                produce a Return expression?
+
+        Returns:
+            a tuple (expr: native_ast.Expression, controlFlowReturns: bool) giving the result, and
+            whether control flow returns to the invoking native code.
+        """
         exprAndReturns = []
         for s in statements:
-            expr, controlFlowReturns = self.convert_statement_ast(s)
+            expr, controlFlowReturns = self.convert_statement_ast(s, variableStates)
+
             exprAndReturns.append((expr, controlFlowReturns))
 
             if not controlFlowReturns:
@@ -637,119 +833,13 @@ class FunctionConversionContext(object):
                 self.convert_statement_ast(
                     python_ast.Statement.Return(
                         value=None, filename="", line_number=0, col_offset=0
-                    )
+                    ),
+                    variableStates
                 )
             )
 
-        seq_expr = native_ast.Expression.Sequence(
-            vals=[expr for expr, _ in exprAndReturns]
+        seq_expr = native_ast.makeSequence(
+            [expr for expr, _ in exprAndReturns]
         )
 
         return seq_expr, flows_off_end
-
-    def construct_stackslots_around(self, expr, argnames, stararg_name):
-        to_add = []
-        destructors = []
-
-        for name in argnames:
-            if name is not FunctionOutput and name != stararg_name:
-                if name not in self._varname_to_type:
-                    raise ConversionException("Couldn't find a type for argument %s" % name)
-                slot_type = self._varname_to_type[name]
-
-                if slot_type.is_empty:
-                    # we don't need to generate a stackslot for this value. Whenever we look it up
-                    # we'll simply make a void expression
-                    pass
-                elif slot_type is not None:
-                    context = ExpressionConversionContext(self)
-
-                    if slot_type.is_empty:
-                        pass
-                    elif name in self.variablesBound and name not in self.variablesAssigned:
-                        # this variable is bound but never assigned, so we don't need to
-                        # generate a stackslot. We can just read it directly from our arguments
-                        self._argumentsWithoutStackslots.add(name)
-                    elif slot_type.is_pod:
-                        # we can just copy this into the stackslot directly. no destructor needed
-                        context.pushEffect(
-                            native_ast.Expression.Store(
-                                ptr=native_ast.Expression.StackSlot(
-                                    name=name,
-                                    type=slot_type.getNativeLayoutType()
-                                ),
-                                val=(
-                                    native_ast.Expression.Variable(name=name) if not slot_type.is_pass_by_ref else
-                                    native_ast.Expression.Variable(name=name).load()
-                                )
-                            )
-                        )
-                        context.markVariableInitialized(name)
-                    else:
-                        # need to make a stackslot for this variable
-                        # the argument will be a pointer because it's POD
-                        var_expr = context.inputArg(slot_type, name)
-
-                        slot_expr = context.named_var_expr(name)
-
-                        slot_type.convert_copy_initialize(context, slot_expr, var_expr)
-
-                        context.markVariableInitialized(name)
-
-                    to_add.append(context.finalize(None))
-
-        for name in self._varname_to_type:
-            if name is not FunctionOutput and name != stararg_name:
-                context = ExpressionConversionContext(self)
-
-                if name not in self._argumentsWithoutStackslots:
-                    if self._varname_to_type[name] is not None and not self._varname_to_type[name].is_empty:
-                        slot_expr = context.named_var_expr(name)
-
-                        with context.ifelse(context.isInitializedVarExpr(name)) as (true, false):
-                            with true:
-                                slot_expr.convert_destroy()
-
-                        destructors.append(
-                            native_ast.Teardown.Always(
-                                expr=context.finalize(None).with_comment("Cleanup for variable %s" % name)
-                            )
-                        )
-
-                        if name not in argnames:
-                            # this is a variable in the function that we assigned to. we need to ensure that
-                            # the initializer flag is zero
-                            context = ExpressionConversionContext(self)
-                            context.markVariableNotInitialized(name)
-                            to_add.append(context.finalize(None))
-
-        if to_add:
-            expr = native_ast.Expression.Sequence(
-                vals=to_add + [expr]
-            )
-
-        if destructors:
-            expr = native_ast.Expression.Finally(
-                teardowns=destructors,
-                expr=expr
-            )
-
-        return expr
-
-    def construct_starargs_around(self, res, star_args_name):
-        args_type = self._varname_to_type[star_args_name]
-
-        stararg_slot = self.named_var_expr(star_args_name)
-
-        return (
-            args_type.convert_initialize(
-                self,
-                stararg_slot,
-                [
-                    TypedExpression(
-                        native_ast.Expression.Variable(".star_args.%s" % i),
-                        args_type.element_types[i][1]
-                    )
-                    for i in range(len(args_type.element_types))]
-            ).with_comment("initialize *args slot") + res
-        )

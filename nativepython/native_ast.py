@@ -224,24 +224,35 @@ Teardown = Teardown.define(Alternative(
 
 
 def expr_concatenate(self, other):
-    if self.matches.Constant:
-        return other
+    return makeSequence((self, other))
 
-    if self.matches.Sequence and other.matches.Sequence:
-        return Expression.Sequence(vals=self.vals + other.vals)
-    if self.matches.Sequence:
-        return Expression.Sequence(vals=self.vals + (other,))
-    if other.matches.Sequence:
-        return Expression.Sequence(vals=TupleOf(Expression)((self,)) + other.vals)
-    return Expression.Sequence(vals=(self, other))
+
+def makeSequence(elts):
+    if len(elts) == 0:
+        return nullExpr
+    if len(elts) == 1:
+        return elts[0]
+
+    sequenceItems = []
+    for e in elts:
+        if e.matches.Sequence:
+            sequenceItems.extend(e.vals)
+        else:
+            sequenceItems.append(e)
+
+    sequenceItems = [e for e in sequenceItems[:-1] if not e.matches.Constant] + [sequenceItems[-1]]
+
+    if len(sequenceItems) == 1:
+        return sequenceItems[0]
+
+    return Expression.Sequence(vals=sequenceItems)
 
 
 def expr_str(self):
     if self.matches.Comment:
         e = str(self.expr)
         if "\n" in self.comment or "\n" in e:
-            return "\n\t/*" + self.comment + "*/\n"\
-                + indent(str(self.expr).rstrip(), "    ") + "\n"
+            return "\n/*" + self.comment + "*/\n" + str(self.expr).rstrip()
         else:
             return "/*" + str(self.comment) + "*/" + str(self.expr)
     if self.matches.Constant:
@@ -281,8 +292,11 @@ def expr_str(self):
     if self.matches.Branch:
         t = str(self.true)
         f = str(self.false)
-        if "\n" in t or "\n" in f:
-            return "if " + str(self.cond) + ":\n"\
+        c = str(self.cond)
+        if "\n" in t or "\n" in f or "\n" in c:
+            if "\n" in c:
+                c = "(" + indent(indent(c)).strip() + ")"
+            return "if " + c + ":\n"\
                 + indent(t).rstrip() + ("\nelse:\n" + indent(f).rstrip() if self.false != nullExpr else "")
         else:
             return "((%s) if %s else (%s))" % (t, str(self.cond), f)
@@ -292,8 +306,14 @@ def expr_str(self):
     if self.matches.While:
         t = str(self.while_true)
         f = str(self.orelse)
-        return "while " + str(self.cond) + ":\n"\
-               + indent(t).rstrip() + "\nelse:\n" + indent(f).rstrip()
+        c = str(self.cond)
+
+        if "\n" in c:
+            return "while (" + indent(indent(c)).strip() + "):\n"\
+                   + indent(t).rstrip() + "\nelse:\n" + indent(f).rstrip()
+        else:
+            return "while " + c + ":\n"\
+                   + indent(t).rstrip() + "\nelse:\n" + indent(f).rstrip()
     if self.matches.Return:
         s = (str(self.arg) if self.arg is not None else "")
         if "\n" in s:

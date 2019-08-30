@@ -1,0 +1,60 @@
+#   Coyright 2017-2019 Nativepython Authors
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+
+from typed_python import Function, OneOf, TupleOf, ListOf, Int64, Float64
+from nativepython.runtime import Runtime
+import unittest
+import time
+
+
+def resultType(f, **kwargs):
+    return Runtime.singleton().resultTypes(f, kwargs)
+
+
+class TestTypeInference(unittest.TestCase):
+    def test_basic_inference(self):
+        def f(x, y):
+            return x + y
+
+        self.assertEqual(resultType(f, x=int, y=int), Int64)
+        self.assertEqual(resultType(f, x=int, y=float), Float64)
+        self.assertEqual(resultType(f, x=int, y=str), None)
+
+    def test_sequential_assignment(self):
+        def f(x):
+            y = "hi"
+            y = x
+            return y
+
+        self.assertEqual(resultType(f, x=int), Int64)
+
+    def test_if_short_circuit(self):
+        def f(x):
+            if True:
+                y = x
+            else:
+                y = "hi"
+            return y
+
+        self.assertEqual(resultType(f, x=int), Int64)
+
+    def test_if_merging(self):
+        def f(x):
+            if x % 2 == 0:
+                y = x
+            else:
+                y = "hi"
+            return y
+
+        self.assertEqual(resultType(f, x=int), OneOf(Int64, str))

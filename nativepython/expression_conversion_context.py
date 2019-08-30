@@ -15,7 +15,7 @@
 import nativepython
 import nativepython.native_ast as native_ast
 import nativepython.type_wrappers.runtime_functions as runtime_functions
-
+from nativepython.function_stack_state import FunctionStackState
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.python_object_representation import pythonObjectRepresentation
 from nativepython.typed_expression import TypedExpression
@@ -45,10 +45,11 @@ class ExpressionConversionContext(object):
     compound expressions and get back simple variable references.
     """
 
-    def __init__(self, functionContext):
+    def __init__(self, functionContext, variableStates: FunctionStackState):
         self.functionContext = functionContext
         self.intermediates = []
         self.teardowns = []
+        self.variableStates = variableStates
 
     @property
     def converter(self):
@@ -497,52 +498,6 @@ class ExpressionConversionContext(object):
                 call_target.call(*native_args)
             )
 
-    def isInitializedVarExpr(self, name):
-        if self.functionContext.externalScopeVarExpr(self, name) is not None:
-            return self.constant(True)
-
-        if self.functionContext._varname_to_type[name] is None:
-            raise ConversionException(
-                "variable %s is not in scope here" % name
-            )
-
-        if self.functionContext._varname_to_type[name].is_empty:
-            return self.constant(True)
-
-        return TypedExpression(
-            self,
-            native_ast.Expression.StackSlot(
-                name=name + ".isInitialized",
-                type=native_ast.Bool
-            ),
-            bool,
-            isReference=True
-        )
-
-    def named_var_expr(self, name):
-        # check if the function context already knows this variable
-        # and has an expression for it.
-        scopeExpr = self.functionContext.externalScopeVarExpr(self, name)
-        if scopeExpr is not None:
-            return scopeExpr
-
-        if self.functionContext._varname_to_type[name] is None:
-            raise ConversionException(
-                "variable %s is not in scope here" % name
-            )
-
-        slot_type = self.functionContext._varname_to_type[name]
-
-        return TypedExpression(
-            self,
-            native_ast.Expression.StackSlot(
-                name=name,
-                type=slot_type.getNativeLayoutType()
-            ),
-            slot_type,
-            isReference=True
-        )
-
     def pushComment(self, c):
         self.pushEffect(native_ast.nullExpr.with_comment(c))
 
@@ -559,23 +514,65 @@ class ExpressionConversionContext(object):
             )
         )
 
+    def isInitializedVarExpr(self, name):
+        if self.functionContext.variableIsAlwaysEmpty(name):
+            return self.constant(True)
+
+        return TypedExpression(
+            self,
+            native_ast.Expression.StackSlot(
+                name=name + ".isInitialized",
+                type=native_ast.Bool
+            ),
+            bool,
+            isReference=True
+        )
+
     def markVariableInitialized(self, varname):
-        if self.functionContext._varname_to_type[varname].is_empty:
-            raise Exception(
-                f"Can't mark {varname} initialized because its variables are of type"
-                f" {self.functionContext._varname_to_type[varname]} and have no content."
+        if self.functionContext.variableIsAlwaysEmpty(varname):
+            raise ConversionException(
+                f"Can't mark {varname} initialized because its instances have no content."
             )
 
         self.pushEffect(self.isInitializedVarExpr(varname).expr.store(native_ast.trueExpr))
 
     def markVariableNotInitialized(self, varname):
-        if self.functionContext._varname_to_type[varname].is_empty:
-            raise Exception(
-                f"Can't mark {varname} not initialized because its variables are of type"
-                f" {self.functionContext._varname_to_type[varname]} and have no content."
+        if self.functionContext.variableIsAlwaysEmpty(varname):
+            raise ConversionException(
+                f"Can't mark {varname} not initialized because its instances have no content."
             )
 
         self.pushEffect(self.isInitializedVarExpr(varname).expr.store(native_ast.falseExpr))
+
+    def namedVariableLookup(self, name):
+        if self.functionContext.isLocalVariable(name):
+            if self.functionContext.externalScopeVarExpr(self, name) is not None:
+                return self.functionContext.externalScopeVarExpr(self, name)
+
+            if self.variableStates.couldBeUninitialized(name):
+                isInitExpr = self.isInitializedVarExpr(name)
+
+                with self.ifelse(isInitExpr) as (true, false):
+                    with false:
+                        self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % name)
+
+            res = self.functionContext.localVariableExpression(self, name)
+            if res is None:
+                return None
+
+            varType = self.variableStates.currentType(name)
+            if varType is not None and varType != res.expr_type.typeRepresentation:
+                return res.convert_to_type(varType)
+            return res
+
+        if name in self.functionContext._free_variable_lookup:
+            return pythonObjectRepresentation(self, self.functionContext._free_variable_lookup[name])
+
+        if name in __builtins__:
+            return pythonObjectRepresentation(self, __builtins__[name])
+
+        self.pushException(NameError, "name '%s' is not defined" % name)
+        return None
 
     def convert_expression_ast(self, ast):
         if ast.matches.Attribute:
@@ -589,25 +586,8 @@ class ExpressionConversionContext(object):
 
         if ast.matches.Name:
             assert ast.ctx.matches.Load
-            properName = self.functionContext.mapVarname(ast.id)
 
-            if properName in self.functionContext._varname_to_type:
-                isInitExpr = self.isInitializedVarExpr(properName)
-
-                with self.ifelse(isInitExpr) as (true, false):
-                    with false:
-                        self.pushException(UnboundLocalError, "local variable '%s' referenced before assignment" % ast.id)
-                return self.named_var_expr(properName)
-
-            if properName in self.functionContext._free_variable_lookup:
-                return pythonObjectRepresentation(self, self.functionContext._free_variable_lookup[properName])
-
-            elif properName in __builtins__:
-                return pythonObjectRepresentation(self, __builtins__[properName])
-
-            if properName not in self.functionContext._varname_to_type:
-                self.pushException(NameError, "name '%s' is not defined" % ast.id)
-                return None
+            return self.namedVariableLookup(ast.id)
 
         if ast.matches.Num:
             if ast.n.matches.None_:

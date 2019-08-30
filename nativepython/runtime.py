@@ -24,6 +24,15 @@ _singleton = [None]
 typeWrapper = lambda t: python_to_native_converter.typedPythonTypeToTypeWrapper(t)
 
 
+def toSingleType(setOfTypes):
+    if not setOfTypes:
+        return None
+
+    if len(setOfTypes) == 1:
+        return list(setOfTypes)[0]
+
+    return OneOf(*setOfTypes)
+
 class Runtime:
     @staticmethod
     def singleton():
@@ -40,6 +49,72 @@ class Runtime:
     def verboselyDisplayNativeCode(self):
         self.llvm_compiler.mark_converter_verbose()
         self.llvm_compiler.mark_llvm_codegen_verbose()
+
+    def resultTypes(self, f, argument_types):
+        with self.lock:
+            argument_types = dict(argument_types or {})
+
+            if isinstance(f, FunctionOverload):
+                for a in f.args:
+                    assert not a.isStarArg, 'dont support star args yet'
+                    assert not a.isKwarg, 'dont support keyword yet'
+
+                def chooseTypeFilter(a):
+                    return argument_types.pop(a.name, a.typeFilter or object)
+
+                input_wrappers = [typeWrapper(chooseTypeFilter(a)) for a in f.args]
+
+                if len(argument_types):
+                    raise Exception("No argument exists for type overrides %s" % argument_types)
+
+                self.timesCompiled += 1
+
+                callTarget = self.converter.convert(f.functionObj, input_wrappers, f.returnType, assertIsRoot=True)
+
+                assert callTarget is not None
+
+                wrappingCallTargetName = self.converter.generateCallConverter(callTarget)
+
+                targets = self.converter.extract_new_function_definitions()
+
+                self.llvm_compiler.add_functions(targets)
+
+                # if the callTargetName isn't in the list, then we already compiled it and installed it.
+                fp = self.llvm_compiler.function_pointer_by_name(wrappingCallTargetName)
+
+                f._installNativePointer(
+                    fp.fp,
+                    callTarget.output_type.typeRepresentation if callTarget.output_type is not None else NoneType,
+                    [i.typeRepresentation for i in input_wrappers]
+                )
+
+                return toSingleType(set([callTarget.output_type.typeRepresentation] if callTarget.output_type is not None else []))
+
+            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'Function':
+                results = set()
+
+                for o in f.overloads:
+                    results.add(self.resultTypes(o, argument_types))
+
+                return toSingleType(results)
+
+            if hasattr(f, '__typed_python_category__') and f.__typed_python_category__ == 'BoundMethod':
+                results = set()
+
+                for o in f.Function.overloads:
+                    arg_types = dict(argument_types)
+                    arg_types[o.args[0].name] = typeWrapper(f.Class)
+                    results.add(self.resultTypes(o, arg_types))
+
+                return results
+
+            if callable(f):
+                result = Function(f)
+                return self.resultTypes(result, argument_types)
+
+            assert False, f
+
+
 
     def compile(self, f, argument_types=None):
         """Compile a single FunctionOverload and install the pointer

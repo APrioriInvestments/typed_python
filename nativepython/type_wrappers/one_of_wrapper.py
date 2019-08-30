@@ -202,7 +202,7 @@ class OneOfWrapper(Wrapper):
         assert targetVal.isReference
 
         native = context.converter.defineNativeFunction(
-            f'convert({otherExpr.expr_type}, {targetVal.expr_type}, explicit={explicit})',
+            f'convert({otherExpr.expr_type} to {targetVal.expr_type}, explicit={explicit})',
             ('convert', otherExpr.expr_type, targetVal.expr_type, explicit),
             [PointerTo(self.typeRepresentation), otherExpr.expr_type],
             bool,
