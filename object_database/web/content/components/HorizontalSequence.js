@@ -2,7 +2,7 @@
  * HorizontalSequence Cell Components
  */
 
-import {Component} from './Component';
+import {Component, render} from './Component';
 import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
@@ -44,12 +44,23 @@ class HorizontalSequence extends Component {
         if(this.usesReplacements){
             return this.getReplacementElementsFor('c');
         } else {
-            return this.renderChildrenNamed('elements');
+            //return this.renderChildrenNamed('elements');
+            let elements = this.props.namedChildren['elements'];
+            return elements.map(childComponent => {
+                let hyperscript = render(childComponent);
+                if(childComponent.props.flexChild == true && this.props.flexParent){
+                    hyperscript.properties.class += " flex-child";
+                }
+                return hyperscript;
+            });
         }
     }
 
     makeClasses(){
         let classes = ["cell", "sequence", "sequence-horizontal"];
+        if(this.props.flexParent){
+            classes.push("flex-parent");
+        }
         if(this.props.overflow){
             classes.push("overflow");
         }
@@ -68,6 +79,10 @@ HorizontalSequence.propTypes = {
     margin: {
         description: "Bootstrap margin value for between element spacing",
         type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
+    },
+    flexParent: {
+        description: "Whether or not the HorizontalSequence should display using Flexbox",
+        type: PropTypes.boolean
     }
 };
 

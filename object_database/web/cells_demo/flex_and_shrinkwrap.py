@@ -53,3 +53,26 @@ class VertSequenceWithoutFlex(CellsTestPage):
 
     def text(self):
         return "The vertical sequence should not be a flex container and should display all of its contents using as much space as it needs"
+
+
+class HorizSequenceWithFlex(CellsTestPage):
+    def cell(self):
+        textItems = [cells.Button("Inner Button %s" % i, lambda: None) for i in range(50)]
+        middleArea = cells.HorizontalSequence(textItems)
+        firstButton = cells.Button("First Button", lambda: None)
+        secondButton = cells.Button("Another Button", lambda: None)
+        return (firstButton >> Flex(middleArea) >> secondButton)
+
+    def text(self):
+        return "The vertical sequence should display two shrinkwrapped buttons sandwiching a flexed-out sequence containing a scrollable list of inner buttons"
+
+
+class HorizSequenceWithoutFlex(CellsTestPage):
+    def cell(self):
+        buttonItems = [cells.Button("Inner Button %s" % i, lambda: None) for i in range(50)]
+        firstButton = cells.Button("First Button", lambda: None)
+        secondButton = cells.Button("Another Button", lambda: None)
+        return cells.HorizontalSequence([firstButton] + buttonItems + [secondButton])
+
+    def text(self):
+        return "The vertical sequence should not be a flex container and should display all of its contents using as much space as it needs"

@@ -50,9 +50,7 @@ class Sequence extends Component {
             return elements.map(childComponent => {
                 let hyperscript = render(childComponent);
                 if(childComponent.props.flexChild == true && this.props.flexParent){
-                    console.log(`Sequence[${this.props.id}] has child [${childComponent.props.id}] that is specified as a flexChild!`);
                     hyperscript.properties.class += " flex-child";
-                    console.log(hyperscript);
                 }
                 return hyperscript;
             });
