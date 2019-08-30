@@ -72,7 +72,8 @@ class ResizablePanel extends Component {
         }
         return (
             h('div', {
-                class: 'resizable-panel-item'
+                class: 'resizable-panel-item',
+                'data-resizable-panel-item-id': `panel-item-${this.props.id}`
             }, [inner])
         );
     }
@@ -84,9 +85,12 @@ class ResizablePanel extends Component {
         } else {
             inner = this.renderChildNamed('second');
         }
+        // Our panel items must be uniquely identifiable in order to properly insert
+        // the resize splitter. See the .afterCreate().
         return (
             h('div', {
-                class: 'resizable-panel-item'
+                class: 'resizable-panel-item',
+                'data-resizable-panel-item-id': `panel-item-${this.props.id}`
             }, [inner])
         );
     }
@@ -108,11 +112,9 @@ class ResizablePanel extends Component {
         let reverseDirection = 'horizontal';
         if(this.props.extraData.split == 'horizontal'){
             reverseDirection = 'vertical';
-        } else if(this.props.extraData.split == 'vertical'){
-            reverseDirection = 'horizontal';
         }
-        element._splitter = Split(
-            element.querySelectorAll('.resizable-panel-item'),
+        element._splitter = new Split(
+            element.querySelectorAll(`div[data-resizable-panel-item-id=panel-item-${this.props.id}]`),
             {
                 direction: reverseDirection
             }
