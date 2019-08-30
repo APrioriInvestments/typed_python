@@ -2,6 +2,11 @@
  * Application Wide Stylesheet for ActiveWebService
  **/
 
+/* Global Styling Variables */
+:root {
+    --page-view-header-height: 75px;
+}
+
 /* Page Root  and other global-type elements*/
 #page_root {
     height: 100vh;
@@ -174,11 +179,11 @@
 }
 
 .page-view > header {
-    height: 5%;
+    height: var(--page-view-header-height);
 }
 
 .page-view > main {
-    height: 95%;
+    height: calc(100% - var(--page-view-header-height));
 }
 
 .page-view-header {
