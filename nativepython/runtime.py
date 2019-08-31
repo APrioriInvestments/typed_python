@@ -16,7 +16,7 @@ import threading
 
 import nativepython.python_to_native_converter as python_to_native_converter
 import nativepython.llvm_compiler as llvm_compiler
-from typed_python import Function, NoneType
+from typed_python import Function, NoneType, OneOf
 from typed_python.internals import FunctionOverload
 
 _singleton = [None]
@@ -32,6 +32,7 @@ def toSingleType(setOfTypes):
         return list(setOfTypes)[0]
 
     return OneOf(*setOfTypes)
+
 
 class Runtime:
     @staticmethod
@@ -113,8 +114,6 @@ class Runtime:
                 return self.resultTypes(result, argument_types)
 
             assert False, f
-
-
 
     def compile(self, f, argument_types=None):
         """Compile a single FunctionOverload and install the pointer

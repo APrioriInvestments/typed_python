@@ -124,12 +124,6 @@ class TestAlternativeCompilation(unittest.TestCase):
             ))
             return TreeType
 
-            return Alternative(
-                "Tree",
-                Leaf={'value': T},
-                Node={'left': Tree(T), 'right': Tree(T)}
-            )
-
         def treeSum(x: Tree(int)):
             matches = x.matches.Leaf
             if matches:

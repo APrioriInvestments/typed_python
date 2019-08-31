@@ -12,10 +12,16 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Int64, Float64
+from typed_python import OneOf, Int64, Float64, Alternative
 from nativepython.runtime import Runtime
 import unittest
-import time
+
+
+A = Alternative(
+    "A",
+    X={'x': int},
+    Y={'x': str}
+)
 
 
 def resultType(f, **kwargs):
@@ -58,3 +64,36 @@ class TestTypeInference(unittest.TestCase):
             return y
 
         self.assertEqual(resultType(f, x=int), OneOf(Int64, str))
+
+    def test_isinstance_propagates(self):
+        def f(x):
+            if isinstance(x, int):
+                return x
+            else:
+                return 0
+
+        self.assertEqual(resultType(f, x=OneOf(str, int)), Int64)
+
+    def test_alternative_inference(self):
+        def f(anA):
+            return anA.x
+
+        self.assertEqual(resultType(f, anA=A), OneOf(Int64, str))
+
+    def test_alternative_inference_with_branch(self):
+        def f(anA):
+            if anA.matches.X:
+                return anA.x
+            else:
+                return 0
+
+        self.assertEqual(resultType(f, anA=A), Int64)
+
+    def test_alternative_inference_with_nonsense_branch(self):
+        def f(anA):
+            if anA.matches.NotReal:
+                return "compiler realizes we can't get here"
+            else:
+                return 0
+
+        self.assertEqual(resultType(f, anA=A), Int64)

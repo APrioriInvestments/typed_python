@@ -1,5 +1,6 @@
 from typed_python import OneOf
 
+
 def mergeTypes(t1, t2):
     if t1 is None:
         return t2
@@ -8,6 +9,20 @@ def mergeTypes(t1, t2):
     if t1 == t2:
         return t1
     return OneOf(t1, t2)
+
+
+def removeTypeFrom(type, toRemove):
+    if getattr(type, '__typed_python_category__', None) == "OneOf":
+        types = [x for x in type.Types if x is not toRemove]
+        if len(types) == 0:
+            return None
+
+        if len(types) == 1:
+            return types[0]
+
+        return OneOf(*types)
+    return type
+
 
 class FunctionStackState:
     """Model what's known about a set of variables at a particular point in a program.
@@ -91,6 +106,19 @@ class FunctionStackState:
 
     def mergeWithSelf(self, other):
         self.becomeMerge(self.clone(), other)
+
+    def restrictTypeFor(self, varname, toType, shouldHaveType):
+        """Indicate that 'varname' has type toType (or does not have, if shouldHaveType is False)"""
+        if varname not in self._types:
+            return
+
+        if shouldHaveType:
+            self._types[varname] = toType
+        else:
+            newType = removeTypeFrom(self._types[varname], toType)
+
+            if newType is not None:
+                self._types[varname] = newType
 
     def __eq__(self, other):
         if not isinstance(other, FunctionStackState):

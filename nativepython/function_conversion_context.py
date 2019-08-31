@@ -108,6 +108,9 @@ class FunctionConversionContext(object):
         return self._varname_to_type[name].is_empty
 
     def variableNeedsDestructor(self, name):
+        if name in self._argumentsWithoutStackslots:
+            return False
+
         varType = self._varname_to_type.get(name)
 
         if varType is None or varType.is_empty or varType.is_pod:
@@ -295,6 +298,10 @@ class FunctionConversionContext(object):
                 context = ExpressionConversionContext(self, variableStates)
                 context.markVariableNotInitialized(name)
                 to_add.append(context.finalize(None))
+
+        for name in self.variablesBound:
+            if name not in self.variablesAssigned:
+                variableStates.variableAssigned(name, self._varname_to_type[name].typeRepresentation)
 
         for name in argnames:
             if name is not FunctionOutput and name != stararg_name:
@@ -586,6 +593,9 @@ class FunctionConversionContext(object):
             variableStatesTrue = variableStates.clone()
             variableStatesFalse = variableStates.clone()
 
+            self.restrictByCondition(variableStatesTrue, ast.test, result=True)
+            self.restrictByCondition(variableStatesFalse, ast.test, result=False)
+
             true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
             false, false_returns = self.convert_statement_list_ast(ast.orelse, variableStatesFalse)
 
@@ -621,6 +631,9 @@ class FunctionConversionContext(object):
 
                 variableStatesTrue = variableStates.clone()
                 variableStatesFalse = variableStates.clone()
+
+                self.restrictByCondition(variableStatesTrue, ast.test, result=True)
+                self.restrictByCondition(variableStatesFalse, ast.test, result=False)
 
                 true, true_returns = self.convert_statement_list_ast(ast.body, variableStatesTrue)
 
@@ -755,6 +768,44 @@ class FunctionConversionContext(object):
             return exprs, True
 
         raise ConversionException("Can't handle python ast Statement.%s" % ast.Name)
+
+    def freeVariableLookup(self, name):
+        if self.isLocalVariable(name):
+            return None
+
+        if name in self._free_variable_lookup:
+            return self._free_variable_lookup[name]
+
+        if name in __builtins__:
+            return __builtins__[name]
+
+        return None
+
+    def restrictByCondition(self, variableStates, condition, result):
+        if condition.matches.Call and condition.func.matches.Name and len(condition.args) == 2 and condition.args[0].matches.Name:
+            if self.freeVariableLookup(condition.func.id) is isinstance:
+                context = ExpressionConversionContext(self, variableStates)
+                typeExpr = context.convert_expression_ast(condition.args[1])
+
+                PythonTypeObjectWrapper = nativepython.type_wrappers.python_type_object_wrapper.PythonTypeObjectWrapper
+                if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
+                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation, result)
+
+        # check if we are a 'var.matches.Y' expression
+        if (condition.matches.Attribute and
+                condition.value.matches.Attribute and
+                condition.value.attr == "matches" and
+                condition.value.value.matches.Name):
+            curType = variableStates.currentType(condition.value.value.id)
+            if curType is not None and getattr(curType, '__typed_python_category__', None) == "Alternative":
+                if result:
+                    subType = [x for x in curType.__typed_python_alternatives__ if x.Name == condition.attr]
+                    if subType:
+                        variableStates.restrictTypeFor(
+                            condition.value.value.id,
+                            subType[0],
+                            result
+                        )
 
     def convert_delete(self, expression, variableStates):
         """Convert the target of a 'del' statement.
