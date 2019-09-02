@@ -424,102 +424,174 @@ class FunctionConversionContext(object):
 
         variableStates.variableAssigned(varname, assignedType)
 
+    def convert_assignment(self, target, op, val_to_store):
+        subcontext = val_to_store.context
+
+        if target.matches.Name and target.ctx.matches.Store:
+            varname = target.id
+
+            if varname not in self._varname_to_type:
+                self._varname_to_type[varname] = None
+
+            if op is not None:
+                slot_ref = subcontext.namedVariableLookup(varname)
+                if slot_ref is None:
+                    return False
+
+                val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+
+                if val_to_store is None:
+                    return False
+
+            self.assignToLocalVariable(varname, val_to_store, subcontext.variableStates)
+
+            return True
+
+        if target.matches.Subscript and target.ctx.matches.Store:
+            assert target.slice.matches.Index
+
+            slicing = subcontext.convert_expression_ast(target.value)
+            if slicing is None:
+                return False
+
+            # we are assuming this is an index. We ought to be checking this
+            # and doing something else if it's a Slice or an Ellipsis or whatnot
+            index = subcontext.convert_expression_ast(target.slice.value)
+
+            if index is None:
+                return False
+
+            if op is not None:
+                getItem = slicing.convert_getitem(index)
+                if getItem is None:
+                    return False
+
+                val_to_store = getItem.convert_bin_op(op, val_to_store)
+                if val_to_store is None:
+                    return False
+
+            slicing.convert_setitem(index, val_to_store)
+            return True
+
+        if target.matches.Attribute and target.ctx.matches.Store:
+            slicing = subcontext.convert_expression_ast(target.value)
+            attr = target.attr
+
+            if op is not None:
+                input_val = slicing.convert_attribute(attr)
+                if input_val is None:
+                    return False
+
+                val_to_store = input_val.convert_bin_op(op, val_to_store)
+                if val_to_store is None:
+                    return False
+
+            slicing.convert_set_attribute(attr, val_to_store)
+            return True
+
+        if target.matches.Tuple and target.ctx.matches.Store and op is None:
+            return self.convert_multi_assign(target.elts, val_to_store)
+
+        assert False, target
+
+    def convert_multi_assign(self, targets, val_to_store):
+        subcontext = val_to_store.context
+        variableStates = subcontext.variableStates
+
+        iterated_expressions = val_to_store.get_iteration_expressions()
+
+        if iterated_expressions is not None:
+            if len(iterated_expressions) < len(targets):
+                subcontext.pushException(
+                    ValueError,
+                    f"not enough values to unpack (expected {len(targets)}, got {len(iterated_expressions)})"
+                )
+                return False
+            elif len(iterated_expressions) > len(targets):
+                subcontext.pushException(
+                    ValueError,
+                    f"too many values to unpack (expected {len(targets)})"
+                )
+                return False
+
+            for i in range(len(iterated_expressions)):
+                if not self.convert_assignment(targets[i], None, iterated_expressions[i]):
+                    return False
+
+            return True
+        else:
+            # create a variable to hold the iterator, and instantiate it there
+            iter_varname = f".anonymous_iter.{targets[0].line_number}"
+
+            # we are going to assign this
+            self.variablesAssigned.add(iter_varname)
+
+            iterator_object = val_to_store.convert_method_call("__iter__", (), {})
+            if iterator_object is None:
+                return False
+
+            self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
+            iter_obj = subcontext.namedVariableLookup(iter_varname)
+
+            tempVarnames = []
+
+            for targetIndex in range(len(targets) + 1):
+                next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
+                if next_ptr is not None:
+                    with subcontext.ifelse(is_populated.nonref_expr) as (if_true, if_false):
+                        if targetIndex < len(targets):
+                            with if_true:
+                                tempVarnames.append(f".anonyous_iter{targets[0].line_number}.{targetIndex}")
+                                self.variablesAssigned.add(tempVarnames[-1])
+                                self.assignToLocalVariable(tempVarnames[-1], next_ptr, variableStates)
+
+                            with if_false:
+                                subcontext.pushException(
+                                    ValueError,
+                                    f"not enough values to unpack (expected {len(targets)}, got {targetIndex})"
+                                )
+                        else:
+                            with if_true:
+                                subcontext.pushException(ValueError, f"too many values to unpack (expected {len(targets)})")
+
+            for targetIndex in range(len(targets)):
+                self.convert_assignment(
+                    targets[targetIndex],
+                    None,
+                    subcontext.namedVariableLookup(tempVarnames[targetIndex])
+                )
+
+            return True
+
     def convert_statement_ast(self, ast, variableStates: FunctionStackState):
         if ast.matches.Expr and ast.value.matches.Str:
             return native_ast.Expression(), True
 
-        if ast.matches.Assign or ast.matches.AugAssign:
-            if ast.matches.Assign:
-                assert len(ast.targets) == 1
-                op = None
-                target = ast.targets[0]
+        if ast.matches.AugAssign:
+            subcontext = ExpressionConversionContext(self, variableStates)
+            val_to_store = subcontext.convert_expression_ast(ast.value)
+
+            if val_to_store is None:
+                return subcontext.finalize(None), False
+
+            succeeds = self.convert_assignment(ast.target, ast.op, val_to_store)
+
+            return subcontext.finalize(None), succeeds
+
+        if ast.matches.Assign:
+            subcontext = ExpressionConversionContext(self, variableStates)
+
+            val_to_store = subcontext.convert_expression_ast(ast.value)
+
+            if val_to_store is None:
+                return subcontext.finalize(None), False
+
+            if len(ast.targets) == 1:
+                succeeds = self.convert_assignment(ast.targets[0], None, val_to_store)
+                return subcontext.finalize(None), succeeds
             else:
-                target = ast.target
-                op = ast.op
-
-            if target.matches.Name and target.ctx.matches.Store:
-                varname = target.id
-
-                if varname not in self._varname_to_type:
-                    self._varname_to_type[varname] = None
-
-                subcontext = ExpressionConversionContext(self, variableStates)
-
-                val_to_store = subcontext.convert_expression_ast(ast.value)
-
-                if val_to_store is None:
-                    return subcontext.finalize(None), False
-
-                if op is not None:
-                    slot_ref = subcontext.namedVariableLookup(varname)
-                    if slot_ref is None:
-                        return subcontext.finalize(None), False
-
-                    val_to_store = slot_ref.convert_bin_op(op, val_to_store)
-
-                    if val_to_store is None:
-                        return subcontext.finalize(None), False
-
-                self.assignToLocalVariable(varname, val_to_store, variableStates)
-
-                return subcontext.finalize(None).with_comment("Assign %s" % (varname)), True
-
-            if target.matches.Subscript and target.ctx.matches.Store:
-                assert target.slice.matches.Index
-
-                subcontext = ExpressionConversionContext(self, variableStates)
-
-                slicing = subcontext.convert_expression_ast(target.value)
-                if slicing is None:
-                    return subcontext.finalize(None), False
-
-                # we are assuming this is an index. We ought to be checking this
-                # and doing something else if it's a Slice or an Ellipsis or whatnot
-                index = subcontext.convert_expression_ast(target.slice.value)
-
-                if index is None:
-                    return subcontext.finalize(None), False
-
-                val_to_store = subcontext.convert_expression_ast(ast.value)
-
-                if val_to_store is None:
-                    return subcontext.finalize(None), False
-
-                if op is not None:
-                    getItem = slicing.convert_getitem(index)
-                    if getItem is None:
-                        return subcontext.finalize(None), False
-
-                    val_to_store = getItem.convert_bin_op(op, val_to_store)
-                    if val_to_store is None:
-                        return subcontext.finalize(None), False
-
-                slicing.convert_setitem(index, val_to_store)
-
-                return subcontext.finalize(None), True
-
-            if target.matches.Attribute and target.ctx.matches.Store:
-                subcontext = ExpressionConversionContext(self, variableStates)
-
-                slicing = subcontext.convert_expression_ast(target.value)
-                attr = target.attr
-
-                val_to_store = subcontext.convert_expression_ast(ast.value)
-                if val_to_store is None:
-                    return subcontext.finalize(None), False
-
-                if op is not None:
-                    input_val = slicing.convert_attribute(attr)
-                    if input_val is None:
-                        return subcontext.finalize(None), False
-
-                    val_to_store = input_val.convert_bin_op(op, val_to_store)
-                    if val_to_store is None:
-                        return subcontext.finalize(None), False
-
-                slicing.convert_set_attribute(attr, val_to_store)
-
-                return subcontext.finalize(None), True
+                succeeds = self.convert_multi_assign(ast.targets, val_to_store)
+                return subcontext.finalize(None), succeeds
 
         if ast.matches.Return:
             subcontext = ExpressionConversionContext(self, variableStates)

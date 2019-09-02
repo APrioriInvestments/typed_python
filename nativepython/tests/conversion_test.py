@@ -12,8 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, ListOf
-from nativepython.runtime import Runtime
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple
+from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
 import time
 
@@ -374,3 +374,26 @@ class TestCompilationStructures(unittest.TestCase):
             return x
 
         self.assertEqual(f(), Compiled(f)())
+
+    def test_multiple_assignments(self):
+        @SpecializedEntrypoint
+        def f(iterable):
+            x, y, z = iterable
+            return x + y + z
+
+        self.assertEqual(f(TupleOf(int)((1, 2, 3))), 6)
+
+        with self.assertRaisesRegex(Exception, "not enough"):
+            f(TupleOf(int)((1, 2)))
+
+        with self.assertRaisesRegex(Exception, "too many"):
+            f(TupleOf(int)((1, 2, 3, 4)))
+
+        self.assertEqual(f(Tuple(int, int, int)((1, 2, 3))), 6)
+        self.assertEqual(f(NamedTuple(x=int, y=int, z=int)(x=1, y=2, z=3)), 6)
+
+        with self.assertRaisesRegex(Exception, "not enough"):
+            f(Tuple(int, int)((1, 2)))
+
+        with self.assertRaisesRegex(Exception, "too many"):
+            f(Tuple(int, int, int, int)((1, 2, 3, 4)))
