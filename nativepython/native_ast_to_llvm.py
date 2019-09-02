@@ -1216,10 +1216,10 @@ class Converter(object):
                 if res is not None:
                     assert res.llvm_value is None
                     if definition.output_type != native_ast.Void:
-                        print(res)
-                        print(definition.body.body)
-                    assert definition.output_type == native_ast.Void, definition.output_type
-                    builder.ret_void()
+                        if not builder.block.is_terminated:
+                            builder.unreachable()
+                    else:
+                        builder.ret_void()
                 else:
                     if not builder.block.is_terminated:
                         builder.unreachable()

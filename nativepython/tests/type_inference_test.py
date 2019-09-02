@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import OneOf, Int64, Float64, Alternative
-from nativepython.runtime import Runtime
+from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
 
 
@@ -97,3 +97,13 @@ class TestTypeInference(unittest.TestCase):
                 return 0
 
         self.assertEqual(resultType(f, anA=A), Int64)
+
+    def test_no_result_from_while_true(self):
+        def f(x):
+            while True:
+                x = x + 1
+                if x > 10000:
+                    return x
+
+        self.assertEqual(resultType(f, x=int), Int64)
+        self.assertEqual(SpecializedEntrypoint(f)(10), 10001)

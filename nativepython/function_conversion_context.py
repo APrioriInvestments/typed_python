@@ -701,6 +701,17 @@ class FunctionConversionContext(object):
                 if cond is None:
                     return cond_context.finalize(None), False
 
+                if cond.expr.matches.Constant:
+                    truth_value = cond.expr.val.truth_value()
+
+                    if not truth_value:
+                        branch, flow_returns = self.convert_statement_list_ast(ast.orelse, variableStates)
+                        return cond_context.finalize(None) >> branch, flow_returns
+                    else:
+                        isWhileTrue = True
+                else:
+                    isWhileTrue = False
+
                 variableStatesTrue = variableStates.clone()
                 variableStatesFalse = variableStates.clone()
 
@@ -723,7 +734,7 @@ class FunctionConversionContext(object):
                         native_ast.Expression.While(
                             cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false
                         ),
-                        true_returns or false_returns
+                        (true_returns or false_returns) and not isWhileTrue
                     )
 
         if ast.matches.Try:
