@@ -43,6 +43,7 @@ extra_compile_args = [
     '-Wno-narrowing'
 ]
 
+
 ext_modules = [
     Extension(
         'object_database._types',
@@ -66,21 +67,27 @@ ext_modules = [
     )
 ]
 
+
 INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
+
+
+with open('README.md', "r") as f:
+    long_description = f.read()
+
 
 setuptools.setup(
     name='nativepython',
-    version='0.0.1',
+    version='0.0.1dev2',
     description='Tools for generating machine code using python.',
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     author='Braxton Mckee',
     author_email='braxton.mckee@gmail.com',
     url='https://github.com/aprioriinvestments/nativepython',
     packages=setuptools.find_packages(),
     cmdclass={'build_ext': NumpyBuildExtension},
     ext_modules=ext_modules,
-    setup_requires=[
-        'numpy'
-    ],
+    setup_requires=['numpy'],
     install_requires=INSTALL_REQUIRES,
 
     # https://pypi.org/classifiers/
@@ -101,5 +108,6 @@ setuptools.setup(
     data_files=[
         ("", ["requirements.txt"]),
     ],
-    zip_safe=False
+    zip_safe=False,
+    python_requires='~=3.6',
 )

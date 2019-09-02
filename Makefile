@@ -124,11 +124,11 @@ unicodeprops: ./unicodeprops.py
 	$(PYTHON) ./unicodeprops.py > $(UNICODEPROPS)
 
 .PHONY: generatetesttypes
-generatetesttypes: $(DT_SRC_PATH)/generate_types.py
+generatetesttypes: $(VIRTUAL_ENV) $(DT_SRC_PATH)/generate_types.py
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(DT_SRC_PATH)/generate_types.py --testTypes3 $(TESTTYPES)
+	python $(DT_SRC_PATH)/generate_types.py --testTypes3 $(TESTTYPES)
 	. $(VIRTUAL_ENV)/bin/activate; \
-	python3 $(DT_SRC_PATH)/generate_types.py --testTypes2 $(TESTTYPES2)
+	python $(DT_SRC_PATH)/generate_types.py --testTypes2 $(TESTTYPES2)
 
 .PHONY: clean
 clean:
@@ -142,6 +142,19 @@ clean:
 	rm -rf .nodeenv
 	rm -f object_database/web/content/dist/main.bundle.js
 	rm -f .coverage*
+	rm -rf dist/
+
+
+.PHONY: sdist
+sdist: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	python setup.py sdist
+
+
+.PHONY: testpypi-upload
+testpypi-upload: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	twine upload --repository-url https://test.pypi.org/legacy/  dist/*
 
 
 ##########################################################################
