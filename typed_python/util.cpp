@@ -109,7 +109,7 @@ bool unpackTupleToStringTypesAndValues(PyObject* tuple, std::vector<std::tuple<s
 
         PyObjectHolder entry_2(PyTuple_GetItem(entry, 2));
 
-        Instance inst = PyInstance::unwrapPyObjectToInstance(entry_2);
+        Instance inst = PyInstance::unwrapPyObjectToInstance(entry_2, false);
 
         if (PyErr_Occurred()) {
             return false;

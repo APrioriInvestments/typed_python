@@ -105,6 +105,8 @@ public:
 
     static PythonObjectOfType* AnyPyObject();
 
+    static PythonObjectOfType* AnyPyType();
+
     PyTypeObject* pyType() const {
         return mPyTypePtr;
     }

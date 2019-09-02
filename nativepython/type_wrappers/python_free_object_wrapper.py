@@ -15,7 +15,7 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 import nativepython.native_ast as native_ast
 import nativepython
-from typed_python import String
+from typed_python import String, Value
 
 
 class PythonFreeObjectWrapper(Wrapper):
@@ -30,13 +30,13 @@ class PythonFreeObjectWrapper(Wrapper):
     is_compile_time_constant = True
 
     def __init__(self, f):
-        super().__init__(f)
+        super().__init__(Value(f))
 
     def getNativeLayoutType(self):
         return native_ast.Type.Void()
 
     def getCompileTimeConstant(self):
-        return self.typeRepresentation
+        return self.typeRepresentation.Value
 
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == self:
@@ -52,7 +52,7 @@ class PythonFreeObjectWrapper(Wrapper):
             try:
                 return nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
-                    self.typeRepresentation(
+                    self.typeRepresentation.Value(
                         *[a.expr_type.getCompileTimeConstant() for a in args],
                         **{k: v.expr_type.getCompileTimeConstant() for k, v in kwargs.items()}
                     )
@@ -61,13 +61,13 @@ class PythonFreeObjectWrapper(Wrapper):
                 context.pushException(type(e), str(e))
                 return
 
-        return context.call_py_function(self.typeRepresentation, args, kwargs)
+        return context.call_py_function(self.typeRepresentation.Value, args, kwargs)
 
     def convert_attribute(self, context, instance, attribute):
         try:
             return nativepython.python_object_representation.pythonObjectRepresentation(
                 context,
-                getattr(self.typeRepresentation, attribute)
+                getattr(self.typeRepresentation.Value, attribute)
             )
         except Exception as e:
             context.pushException(type(e), str(e))
@@ -80,7 +80,7 @@ class PythonFreeObjectWrapper(Wrapper):
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
         if target_type.typeRepresentation == String:
-            targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation)))
+            targetVal.convert_copy_initialize(context.constant(str(self.typeRepresentation.Value)))
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

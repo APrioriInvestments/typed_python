@@ -31,6 +31,6 @@ class BytecountWrapper(Wrapper):
 
     def convert_call(self, context, expr, args, kwargs):
         if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper) and not kwargs:
-            return context.constant(bytecount(args[0].expr_type.typeRepresentation))
+            return context.constant(bytecount(args[0].expr_type.typeRepresentation.Value))
 
         return super().convert_call(context, expr, args, kwargs)

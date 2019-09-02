@@ -182,7 +182,7 @@ class PointerToWrapper(Wrapper):
 
         if methodname == "cast":
             if len(args) == 1 and isinstance(args[0].expr_type, PythonTypeObjectWrapper):
-                tgtType = typeWrapper(PointerTo(args[0].expr_type.typeRepresentation))
+                tgtType = typeWrapper(PointerTo(args[0].expr_type.typeRepresentation.Value))
                 return context.pushPod(tgtType, instance.nonref_expr.cast(tgtType.getNativeLayoutType()))
 
         return super().convert_method_call(context, instance, methodname, args, kwargs)

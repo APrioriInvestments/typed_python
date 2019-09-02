@@ -901,6 +901,7 @@ bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
 
     if (t->getTypeCategory() == Type::TypeCategory::catValue) {
         Value* valType = (Value*)t;
+
         return compare_to_python(valType->value().type(), valType->value().data(), other, exact, pyComparisonOp);
     }
 
@@ -1117,7 +1118,7 @@ PyObject* PyInstance::categoryToPyString(Type::TypeCategory cat) {
 }
 
 // static
-Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
+Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst, bool allowArbitraryPyObjects) {
     if (inst == Py_None) {
         return Instance();
     }
@@ -1168,14 +1169,30 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
                 StringType::Make()->constructor(i, bytesPerCodepoint, count, data);
             }
         );
+    }
+    if (PyType_Check(inst)) {
+        return Instance::createAndInitialize(
+            PythonObjectOfType::AnyPyType(),
+            [&](instance_ptr i) {
+                *((PyObject**)i) = incref(inst);
+            }
+        );
+    }
 
+    if (allowArbitraryPyObjects) {
+        return Instance::createAndInitialize(
+            PythonObjectOfType::AnyPyObject(),
+            [&](instance_ptr i) {
+                *((PyObject**)i) = incref(inst);
+            }
+        );
     }
 
     assert(!PyErr_Occurred());
+
     PyErr_Format(
         PyExc_TypeError,
-        "Cannot convert %S to an Instance "
-        "(only None, int, bool, bytes, and str are supported currently).",
+        "Cannot convert %S to an Instance in this context. Try wrapping it in Value to be more explicit.",
         inst
     );
 
@@ -1183,16 +1200,13 @@ Instance PyInstance::unwrapPyObjectToInstance(PyObject* inst) {
 }
 
 // static
-Type* PyInstance::tryUnwrapPyInstanceToValueType(PyObject* typearg) {
-    Instance inst = unwrapPyObjectToInstance(typearg);
-
-    if (!PyErr_Occurred()) {
-        return Value::Make(inst);
-    }
-    PyErr_Clear();
-
+Type* PyInstance::tryUnwrapPyInstanceToValueType(PyObject* typearg, bool allowArbitraryPyObjects) {
     Type* nativeType = PyInstance::extractTypeFrom(typearg->ob_type);
     if (nativeType) {
+        if (nativeType->getTypeCategory() == Type::TypeCategory::catClass) {
+            return nullptr;
+        }
+
         return Value::Make(
             Instance::create(
                 nativeType,
@@ -1200,6 +1214,14 @@ Type* PyInstance::tryUnwrapPyInstanceToValueType(PyObject* typearg) {
             )
         );
     }
+
+    Instance inst = unwrapPyObjectToInstance(typearg, allowArbitraryPyObjects);
+
+    if (!PyErr_Occurred()) {
+        return Value::Make(inst);
+    }
+
+    PyErr_Clear();
     return nullptr;
 }
 
@@ -1226,7 +1248,7 @@ Type* PyInstance::tryUnwrapPyInstanceToType(PyObject* arg) {
         return NoneType::Make();
     }
 
-    return  PyInstance::tryUnwrapPyInstanceToValueType(arg);
+    return  PyInstance::tryUnwrapPyInstanceToValueType(arg, false);
 }
 
 // static
@@ -1280,7 +1302,7 @@ Type* PyInstance::unwrapTypeArgToTypePtr(PyObject* typearg) {
 
     }
     // else: typearg is not a type -> it is a value
-    Type* valueType = PyInstance::tryUnwrapPyInstanceToValueType(typearg);
+    Type* valueType = PyInstance::tryUnwrapPyInstanceToValueType(typearg, false);
 
     if (valueType) {
         return valueType;

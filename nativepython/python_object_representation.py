@@ -138,7 +138,9 @@ def _typedPythonTypeToTypeWrapper(t):
         return PythonObjectOfTypeWrapper(t)
 
     if t.__typed_python_category__ == "Value":
-        return ValueWrapper(t)
+        if type(t.Value) in _concreteWrappers or type(t.Value) in (str, int, float, bool):
+            return ValueWrapper(t)
+        return pythonObjectRepresentation(None, t.Value).expr_type
 
     if t.__typed_python_category__ == "Set":
         return SetWrapper(t)
@@ -186,6 +188,7 @@ def pythonObjectRepresentation(context, f):
             NoneWrapper(),
             False
         )
+
     if isinstance(f, bool):
         return TypedExpression(
             context,
@@ -195,6 +198,7 @@ def pythonObjectRepresentation(context, f):
             BoolWrapper(),
             False
         )
+
     if isinstance(f, int):
         return TypedExpression(
             context,
@@ -204,6 +208,7 @@ def pythonObjectRepresentation(context, f):
             IntWrapper(Int64),
             False
         )
+
     if isinstance(f, float):
         return TypedExpression(
             context,
@@ -213,8 +218,10 @@ def pythonObjectRepresentation(context, f):
             FloatWrapper(Float64),
             False
         )
+
     if isinstance(f, str):
         return StringWrapper().constant(context, f)
+
     if isinstance(f, bytes):
         return BytesWrapper().constant(context, f)
 

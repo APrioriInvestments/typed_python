@@ -160,8 +160,9 @@ public:
 
     /* compare two types as closely as possible to how python would.
 
-    If 'suppressExceptions', then don't generate exceptions when comparing objects of unlike type. Sort their
-    type names instead.
+    If 'suppressExceptions', then don't generate exceptions when python doesn't have an ordering.
+    Instead, sort their type names, and compare pointers for objects that have the same type. This
+    allows us to use this function to produce a strict ordering.
     */
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions = false);
 

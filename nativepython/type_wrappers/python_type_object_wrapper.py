@@ -14,6 +14,7 @@
 
 import nativepython
 from typed_python import String, Int64, Bool, Float64
+from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
@@ -21,17 +22,19 @@ typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTyp
 
 class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def __repr__(self):
-        return "Wrapper(TypeObject(%s))" % self.typeRepresentation.__qualname__
+        return "Wrapper(TypeObject(%s))" % self.typeRepresentation.Value.__qualname__
 
     def __str__(self):
-        return "TypeObject(%s)" % self.typeRepresentation.__qualname__
+        return "TypeObject(%s)" % self.typeRepresentation.Value.__qualname__
 
+    @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, left, args, kwargs):
-        if self.typeRepresentation is type:
+        if self.typeRepresentation.Value is type:
             if len(args) != 1 or kwargs:
                 return super().convert_call(context, left, args, kwargs)
 
             argtype = args[0].expr_type
+
             if isinstance(argtype, PythonTypeObjectWrapper):
                 res = nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
@@ -58,4 +61,4 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                 )
             return res
 
-        return typeWrapper(self.typeRepresentation).convert_type_call(context, left, args, kwargs)
+        return typeWrapper(self.typeRepresentation.Value).convert_type_call(context, left, args, kwargs)

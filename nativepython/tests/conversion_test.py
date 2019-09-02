@@ -397,3 +397,19 @@ class TestCompilationStructures(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "too many"):
             f(Tuple(int, int, int, int)((1, 2, 3, 4)))
+
+    def test_print_oneof(self):
+        @Compiled
+        def f(x: OneOf(float, str), y: OneOf(float, str)):
+            print("You can print either a float or a string", x, y)
+
+        f("hi", "hi")
+        f(1.0, "hi")
+
+    def test_type_oneof(self):
+        @Compiled
+        def f(x: OneOf(float, int)):
+            return str(type(x))
+
+        self.assertEqual(f(1), str(int))
+        self.assertEqual(f(1.0), str(float))

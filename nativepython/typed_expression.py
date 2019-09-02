@@ -77,7 +77,7 @@ class TypedExpression(object):
 
     @property
     def nonref_expr(self):
-        """Get our expression (deferenced if necessary) so that it definitely represents the real object, not its location"""
+        """Get our expression (dereferenced if necessary) so that it definitely represents the real object, not its location"""
         if self.expr_type is None:
             return self.expr
 

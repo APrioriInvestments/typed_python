@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import OneOf, Int64, Float64, Alternative
+from typed_python import OneOf, Int64, Float64, Alternative, Value, String
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
 
@@ -63,7 +63,7 @@ class TestTypeInference(unittest.TestCase):
                 y = "hi"
             return y
 
-        self.assertEqual(resultType(f, x=int), OneOf(Int64, str))
+        self.assertEqual(set(resultType(f, x=int).Types), set([Int64, String]))
 
     def test_isinstance_propagates(self):
         def f(x):
@@ -78,7 +78,7 @@ class TestTypeInference(unittest.TestCase):
         def f(anA):
             return anA.x
 
-        self.assertEqual(resultType(f, anA=A), OneOf(Int64, str))
+        self.assertEqual(set(resultType(f, anA=A).Types), set([Int64, String]))
 
     def test_alternative_inference_with_branch(self):
         def f(anA):
@@ -107,3 +107,10 @@ class TestTypeInference(unittest.TestCase):
 
         self.assertEqual(resultType(f, x=int), Int64)
         self.assertEqual(SpecializedEntrypoint(f)(10), 10001)
+
+    def test_infer_type_object(self):
+        def f(x):
+            return type(x)
+
+        self.assertEqual(resultType(f, x=str), Value(str))
+        self.assertEqual(set(resultType(f, x=OneOf(int, str)).Types), set([Value(int), Value(str)]))

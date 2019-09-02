@@ -872,7 +872,7 @@ class FunctionConversionContext(object):
 
                 PythonTypeObjectWrapper = nativepython.type_wrappers.python_type_object_wrapper.PythonTypeObjectWrapper
                 if typeExpr is not None and isinstance(typeExpr.expr_type, PythonTypeObjectWrapper):
-                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation, result)
+                    variableStates.restrictTypeFor(condition.args[0].id, typeExpr.expr_type.typeRepresentation.Value, result)
 
         # check if we are a 'var.matches.Y' expression
         if (condition.matches.Attribute and

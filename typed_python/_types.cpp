@@ -160,7 +160,11 @@ PyObject *MakeOneOfType(PyObject* nullValue, PyObject* args) {
         if (t) {
             types.push_back(t);
         } else {
-            PyErr_SetString(PyExc_TypeError, "Can't handle values like this in Types.");
+            PyErr_SetString(PyExc_TypeError,
+                "Type arguments must be types or simple values (like ints, strings, etc.). "
+                "If you need a more complex value (such as a type object itself), wrap it in 'Value'."
+            );
+
             return NULL;
         }
     }
@@ -325,12 +329,7 @@ PyObject *MakeValueType(PyObject* nullValue, PyObject* args) {
 
     PyObjectHolder arg(PyTuple_GetItem(args,0));
 
-    if (PyType_Check(arg)) {
-        PyErr_SetString(PyExc_TypeError, "Value expects a python primitive or an existing native value");
-        return NULL;
-    }
-
-    Type* type = PyInstance::tryUnwrapPyInstanceToValueType(arg);
+    Type* type = PyInstance::tryUnwrapPyInstanceToValueType(arg, true);
 
     if (type) {
         return incref((PyObject*)PyInstance::typeObj(type));

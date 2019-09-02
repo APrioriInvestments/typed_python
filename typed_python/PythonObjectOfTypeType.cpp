@@ -47,8 +47,12 @@ bool PythonObjectOfType::cmp(instance_ptr left, instance_ptr right, int pyCompar
 
     if (res == -1) {
         if (suppressExceptions) {
-          PyErr_Clear();
-          return cmpResultToBoolForPyOrdering(pyComparisonOp, ::strcmp(l->ob_type->tp_name, r->ob_type->tp_name));
+            PyErr_Clear();
+            if (l->ob_type != r->ob_type) {
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, ::strcmp(l->ob_type->tp_name, r->ob_type->tp_name));
+            } else {
+                return cmpResultToBoolForPyOrdering(pyComparisonOp, l < r ? 1 : l > r ? -1 : 0);
+            }
         }
 
         throw PythonExceptionSet();
@@ -85,4 +89,9 @@ PythonObjectOfType* PythonObjectOfType::AnyPyObject() {
     return Make((PyTypeObject*)t);
 }
 
+PythonObjectOfType* PythonObjectOfType::AnyPyType() {
+    static PyObject* module = PyImport_ImportModule("typed_python.internals");
+    static PyObject* t = PyObject_GetAttrString(module, "type");
 
+    return Make((PyTypeObject*)t);
+}

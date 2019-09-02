@@ -46,11 +46,11 @@ class IsinstanceWrapper(Wrapper):
                 if not isinstance(argType, type):
                     return context.constant(False)
 
-                if not isinstance(args[1].expr_type.typeRepresentation, type):
+                if not isinstance(args[1].expr_type.typeRepresentation.Value, type):
                     return context.pushException(TypeError, "second argument to isinstance must be a type.")
 
                 return context.constant(
-                    issubclass(argType, args[1].expr_type.typeRepresentation)
+                    issubclass(argType, args[1].expr_type.typeRepresentation.Value)
                 )
             else:
                 # we should be actually trying to figure out what type we have on the RHS

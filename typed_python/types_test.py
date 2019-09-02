@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 from typed_python import (
-    Bool,
+    Bool, Value,
     Int8, Int16, Int32, Int64,
     UInt8, UInt16, UInt32, UInt64,
     Float32, Float64,
@@ -324,6 +324,33 @@ class NativeTypesTests(unittest.TestCase):
 
         with self.assertRaisesRegex(AttributeError, "do not accept attributes"):
             tupleOfInt((1, 2, 3)).x = 2
+
+    def test_one_of_and_types(self):
+        # when we use types in OneOf, we need to wrap them in Value. Otherwise we can't
+        # tell the difference between OneOf(int) and OneOf(Value(int))
+        with self.assertRaisesRegex(Exception, "arguments must be types or simple values"):
+            OneOf(Alternative)
+
+        X = OneOf(Value(int), Value(Alternative))
+
+        self.assertEqual(OneOf(Value(int)).__qualname__, "OneOf(<class 'int'>)")
+
+        # these sould work
+        X(int)
+        X(Alternative)
+
+        # these should not
+        with self.assertRaises(Exception):
+            X(float)
+
+        with self.assertRaises(Exception):
+            X(10)
+
+        self.assertNotEqual(Value(int), Value(float))
+
+        X2 = OneOf(Value(int), Value(float))
+        X2(int)
+        X2(float)
 
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
