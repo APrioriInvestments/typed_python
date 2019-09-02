@@ -108,7 +108,6 @@ def _typedPythonTypeToTypeWrapper(t):
         return DictWrapper(t)
 
     if t.__typed_python_category__ == "ConcreteAlternative":
-        print(t, type(t))
         return makeAlternativeWrapper(t)
 
     if t.__typed_python_category__ == "NamedTuple":
