@@ -20,6 +20,7 @@ can still run in interpreter without compilation if you want.
 Nativepython is generously supported by [A Priori Investments](www.aprioriinvestments.com), a quantitative
 hedge fund in New York.  If you're interested in working with us, drop us a line at info@aprioriinvestments.com.
 
+
 ## Where did this come from?
 
 Every time I (Braxton) find myself writing a lot of  Python code, I eventually
@@ -45,6 +46,7 @@ choose, depending on the context, which style of code I want, from totally
 free-form Python with total type chaos, to statically typed, highly performant
 code, and anything in between.
 
+
 ## How does it work?
 
 We start with `typed_python`, which allows you to express the kinds of
@@ -62,7 +64,9 @@ unexpected value inside of it.
 We can also model the natural variation of types present in
 real python programs: for instance, you can say something like
 
-    ListOf(OneOf(None, str, TupleOf(int)))
+```python
+ListOf(OneOf(None, str, TupleOf(int)))
+```
 
 which is a list whose items must be `None`, strings, or tuples of integers.
 This  allows you to continue to write code in a style that's pythonic, where
@@ -72,12 +76,14 @@ the kinds of constraints you need to catch errors early.
 Separately, the `nativepython` module provides a compiler for functions that
 are expressed in terms of `typed_python` types.  For instance, if you write
 
-    @TypedFunction
-    def sum(l: ListOf(int)):
-        res = 0
-        for x in l:
-            res += x
-        return res
+```python
+@TypedFunction
+def sum(l: ListOf(int)):
+    res = 0
+    for x in l:
+        res += x
+    return res
+```
 
 the compiler can generate far more code efficient than a JIT compiler can, because
 it can _assume_ that the list contains integers. In fact, the internal memory representation
@@ -97,6 +103,7 @@ UndefinedNativepythonOperation Exception. In compiled code, we'll drop the
 bounds check entirely, which in some cases can be a significant performance
 improvement.
 
+
 ## How mature is the project?
 
 As of January 25th, 2019, I use `typed_python` and `object_database` daily in
@@ -105,9 +112,3 @@ is just now getting enough features to be useful.  It produces pretty good code,
 but most functions are still missing, and many optimizations remain.  Portions of the
 `object_database` api are likely to change substantially as we work through the
 best way to use it.
-
-## How do I run tests?
-
-Checkout the project and run `make install` from the root to install the necessary dependencies, then run `make test`.
-The first command will create a python virtualenv and install the necessary dependencies as well as compile the python extensions.
-You can filter tests with a regex using `pytest -k PAT`. from within the created virtualenv (`source .venv/bin/activate` to activate it).

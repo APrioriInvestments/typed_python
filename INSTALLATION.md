@@ -1,6 +1,19 @@
 ## Development ##
 There are several methods for building and setting up a development environment.
-  
+
+### Makefile Method (Recommended) ###
+The included Makefile in this repository contains recipes for building, installing,
+and testing.
+
+You can configure your virtual environment and install all the dependencies simply
+by running `make install`.
+
+For the moment, it is explicitly linked to a specific Python interpreter,
+so if you are using, say, an interpreter called `python3.6` (as opposed to `python3`),
+you will need to change the `PYTHON` variable at the top of the Makefile.
+
+You can also customize the name and location of any built virtual environments with the `VIRTUAL_ENV` variable.
+
 ### Manual Method ###
 1. Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it
 2. Install requirements via pip. For the moment there are two options:
@@ -8,26 +21,40 @@ There are several methods for building and setting up a development environment.
    * Install using Pipenv (which reads from the Pipfile)
 3. Build nativepython libraries using `python setup.py build`
 4. Append the root of this repository to your `PYTHONPATH`
-  
+
 ### Pipenv Method ###
 This method is simple, and can take care of virtual environment creation and installation for you.
-1. (Optional) Create a new virtualenv with Python 3.6 (`virtualenv --python=<path-to-py3> venv`) and source it. If you choose to use Pipenv alone, it will create an appropriate virtualenv for you.
+1. (Optional) Create a new virtualenv with Python 3.6
+   (`virtualenv --python=<path-to-py3> venv`) and source it.
+   If you choose to use Pipenv alone, it will create an appropriate virtualenv for you.
 2. Run `pipenv install --dev --deploy`
-  
-### Makefile Method ###
-The included Makefile in this repository contains recipes for building, installing, and testing. For the moment, it is explicitly linked to a specific Python interpreter, so if you are using, say, an interpreter called `python3.6` (as opposed to `python3`), you will need to change the `PYTHON` variable at the top of the Makefile.
-  
-You can also customize the name and location of any built virtual environments with the `VIRTUAL_ENV` variable.
 
 
-## Installation ##
+## Run the Tests ##
+Run `make test`.
+
+If you installed the dependencies using a method other than `Makefile` method,
+look at the test recipe for the commands to run.
+For the python tests, the main command is `pytest` from within any virtualenv
+you configured.
+
+You can select which tests to run with a regular expression using `pytest -k REGEX`
+
+
+## Installation Of system-level Requirements ##
+
+The requirements are python 3.6.x, Redis server, and a C/C++ toolchain.
 
 ### OSX ###
 
 #### Prerequisites ####
 * Python 3.6 (recommended installed with homebrew)
-  * Currently build is tested against `clang`, not `gcc`. For more information about installing `clang` and configuring your environment see [here](https://embeddedartistry.com/blog/2017/2/20/installing-clangllvm-on-osx)
-* It is recommended you use Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv)) to manage the application.
+  * Currently build is tested against `clang`, not `gcc`.
+    For more information about installing `clang` and configuring your environment
+    see [here](https://embeddedartistry.com/blog/2017/2/20/installing-clangllvm-on-osx)
+* It is recommended you use Pipenv
+  ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv))
+  to manage the application.
   * You can also use virtualenv.
 * install Redis (`brew install redis`)
 
@@ -51,4 +78,3 @@ Before building the modules in this repository, you will need to make sure that 
   ```
 * Pipenv ([see this link](https://pipenv.readthedocs.io/en/latest/install/#installing-pipenv))
 * Redis Server (`redis-server`)
-
