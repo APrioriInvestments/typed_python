@@ -1126,12 +1126,19 @@ class Sequence(Cell):
         self.exportData['margin'] = self.margin
 
     def updateChildren(self):
+        newElements = []
+        for childCell in self.elements:
+            if childCell.isFlex:
+                self.isFlexParent = True
+                newElements.append(childCell)
+            elif isinstance(childCell, Sequence):
+                newElements += childCell.elements
+            else:
+                newElements.append(childCell)
+        self.elements = newElements
         self.children = {"____c_%s__" %
                          i: self.elements[i] for i in range(len(self.elements))}
         self.namedChildren['elements'] = self.elements
-        for childCell in self.elements:
-            if childCell.isFlex or childCell.isShrinkWrapped:
-                self.isFlexParent = True
 
     def sortsAs(self):
         if self.elements:
