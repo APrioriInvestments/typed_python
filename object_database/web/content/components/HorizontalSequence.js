@@ -61,27 +61,27 @@ class HorizontalSequence extends Component {
         if(this.props.flexParent){
             classes.push("flex-parent");
         }
-        if(this.props.overflow){
-            classes.push("overflow");
-        }
         if (this.props.margin){
             classes.push(`child-margin-${this.props.margin}`);
+        }
+        if(this.props.wrap){
+            classes.push('flex-wrap');
         }
         return classes.join(" ");
     }
 }
 
 HorizontalSequence.propTypes = {
-    overflow: {
-        description: "If true, sets overflow of container to auto",
-        type: PropTypes.boolean
-    },
     margin: {
         description: "Bootstrap margin value for between element spacing",
         type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
     },
     flexParent: {
         description: "Whether or not the HorizontalSequence should display using Flexbox",
+        type: PropTypes.boolean
+    },
+    wrap: {
+        description: "Whether or not the HorizontalSequence should wrap on overflow",
         type: PropTypes.boolean
     }
 };
