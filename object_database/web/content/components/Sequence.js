@@ -36,8 +36,7 @@ class Sequence extends Component {
                 id: this.props.id,
                 class: this.makeClasses(),
                 "data-cell-id": this.props.id,
-                "data-cell-type": "Sequence",
-                //style: this.makeStyle()
+                "data-cell-type": "Sequence"
             }, this.makeElements())
         );
     }
@@ -62,9 +61,6 @@ class Sequence extends Component {
         if(this.props.flexParent){
             classes.push("flex-parent");
         }
-        if(this.props.overflow){
-            classes.push("overflow");
-        }
         if (this.props.margin){
             classes.push(`child-margin-${this.props.margin}`);
         }
@@ -74,16 +70,16 @@ class Sequence extends Component {
 }
 
 Sequence.propTypes = {
-    overflow: {
-        description: "Overflow-auto.",
-        type: PropTypes.boolean
-    },
     margin: {
         description: "Bootstrap margin value for between element spacing",
         type: PropTypes.oneOf([PropTypes.number, PropTypes.string])
     },
     flexParent: {
         description: "Whether or not the Sequence should display using Flexbox",
+        type: PropTypes.boolean
+    },
+    flexChild: {
+        description: "Whether or not this Sequence is a flexChild of some flexParent",
         type: PropTypes.boolean
     }
 };

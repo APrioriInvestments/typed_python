@@ -55,6 +55,21 @@ class VertSequenceWithoutFlex(CellsTestPage):
         return "The vertical sequence should not be a flex container and should display all of its contents using as much space as it needs"
 
 
+class VertSequenceWithoutFlexNestedSeq(CellsTestPage):
+    def cell(self):
+        letteredTextItems = [cells.Text("Inner %s" % letter) for letter in ['A', 'B', 'C', 'D', 'E']]
+        numberedTextItems = [cells.Text("Item %s" % i) for i in range(50)]
+        numberedTextItems.append(cells.Sequence(letteredTextItems))
+
+        firstButton = cells.Button("Top Button", lambda: None)
+        lastButton = cells.Button("Bottom Button", lambda: None)
+
+        return (firstButton + cells.Sequence(numberedTextItems) + lastButton)
+
+    def text(self):
+        return "Non Flex-Parent Sequences should flatten any nested Sequences and overflow normally"
+
+
 class HorizSequenceWithFlex(CellsTestPage):
     def cell(self):
         textItems = [cells.Button("Inner Button %s" % i, lambda: None) for i in range(50)]
