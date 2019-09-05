@@ -65,7 +65,7 @@ class HorizontalSequence extends Component {
             classes.push(`child-margin-${this.props.margin}`);
         }
         if(this.props.wrap){
-            classes.push('flex-wrap');
+            classes.push('seq-flex-wrap');
         }
         return classes.join(" ");
     }
