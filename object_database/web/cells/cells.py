@@ -1183,13 +1183,20 @@ class HorizontalSequence(Cell):
         self.exportData['margin'] = self.margin
 
     def updateChildren(self):
+        newElements = []
+        for childCell in self.elements:
+            if childCell.isFlex:
+                self.isFlexParent = True
+                newElements.append(childCell)
+            elif isinstance(childCell, HorizontalSequence):
+                newElements += childCell.elements
+            else:
+                newElements.append(childCell)
+        self.elements = newElements
         self.namedChildren['elements'] = self.elements
         self.children = {}
         for i in range(len(self.elements)):
             self.children["____c_{}__".format(i)] = self.elements[i]
-        for element in self.elements:
-            if element.isFlex or element.isShrinkWrapped:
-                self.isFlexParent = True
 
     def sortAs(self):
         if self.elements:

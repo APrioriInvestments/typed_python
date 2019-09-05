@@ -20,6 +20,7 @@ from object_database.web.cells import (
     Card,
     Container,
     Sequence,
+    HorizontalSequence,
     SubscribedSequence,
     Span,
     Text,
@@ -641,6 +642,68 @@ class CellsSequenceHandlingTests(unittest.TestCase):
         self.assertIn(first_child_seq.elements[0], parent_seq.elements)
         self.assertIn(first_child_seq.elements[1], parent_seq.elements)
 
+
+class CellsHorizSequenceHandlingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        configureLogging(
+            preamble="cells_test",
+            level=logging.INFO
+        )
+        cls._logger = logging.getLogger(__name__)
+
+    def setUp(self):
+        self.token = genToken()
+        self.server = InMemServer(auth_token=self.token)
+        self.server.start()
+
+        self.db = self.server.connect(self.token)
+        self.db.subscribeToSchema(test_schema)
+        self.cells = Cells(self.db)
+
+    def tearDown(self):
+        self.server.stop()
+
+    def test_horiz_seq_elements_length(self):
+        child_elements = [Text('One'), Text('Two'), Text('Three')]
+        child_seq = HorizontalSequence(child_elements)
+        parent_seq = HorizontalSequence([Text('First'), child_seq, Text('Third')])
+        self.cells.withRoot(parent_seq)
+        self.cells._recalculateCells()
+        self.assertEqual(len(child_seq.elements), len(child_elements))
+
+    def test_horiz_seq_element_presence(self):
+        child_elements = [Text('One'), Text('Two'), Text('Three')]
+        child_seq = HorizontalSequence(child_elements)
+        parent_seq = HorizontalSequence([Text('First'), child_seq, Text('Third')])
+        self.cells.withRoot(parent_seq)
+
+        self.assertIn(child_elements[0], child_seq.elements)
+
+    def test_horiz_seq_not_flex_parent(self):
+        child_seq = HorizontalSequence([Text('One'), Text('Two'), Text('Three')])
+        parent_seq = HorizontalSequence([Text('First'), child_seq, Text('Last')])
+        parent_seq.recalculate()
+        self.assertFalse(parent_seq.isFlexParent)
+        self.assertFalse(parent_seq.isFlex)
+
+    def test_horiz_seq_becomes_flex_parent(self):
+        child_seq = HorizontalSequence([Text('One'), Text('Two'), Text('Three')])
+        parent_seq = HorizontalSequence([Flex(Text('First')), child_seq, Text('Last')])
+        parent_seq.recalculate()
+        self.assertTrue(parent_seq.isFlexParent)
+
+    def test_horiz_seq_flattens_non_flex(self):
+        first_child_seq = HorizontalSequence([Text('One'), Text('Two')])
+        second_child_seq = HorizontalSequence([Text('Five'), Text('Six')])
+        parent_seq = HorizontalSequence([Text('Outer'), first_child_seq, Flex(second_child_seq), Text('Last')])
+        self.cells.withRoot(parent_seq)
+        self.cells._recalculateCells()
+
+        self.assertNotIn(first_child_seq, parent_seq.elements)
+        self.assertIn(second_child_seq, parent_seq.elements)
+        self.assertIn(first_child_seq.elements[0], parent_seq.elements)
+        self.assertIn(first_child_seq.elements[1], parent_seq.elements)
 
 if __name__ == '__main__':
     unittest.main()
