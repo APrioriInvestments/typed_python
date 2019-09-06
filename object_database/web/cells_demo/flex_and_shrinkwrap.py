@@ -17,6 +17,13 @@ from object_database.web.CellsTestPage import CellsTestPage
 from object_database.web.cells.util import Flex, ShrinkWrap
 
 
+class VertSequenceBasicConcat(CellsTestPage):
+    def cell(self):
+        return (cells.Text("Hello") + cells.Text("There") + cells.Text("This Is A") + cells.Button("Button", lambda: None))
+
+    def text(self):
+        return "Should use plus operator to produce a non-flexed vertical sequence"
+
 class VertSequenceWithFlex(CellsTestPage):
     def cell(self):
         textItems = [cells.Text("Item %s" % i) for i in range(50)]
