@@ -17,6 +17,30 @@
     height: 100%;
 }
 
+/* Clickable and Button
+ * (Note that most of Button styling is from Bootstrap first)
+ * =====================================================*/
+[data-cell-type="Clickable"] {
+    display: inline-block;
+}
+
+/* SplitView
+ * =====================================================*/
+.split-view {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    position: relative;
+}
+
+.split-view-column {
+    flex-direction: column;
+}
+
+.split-view-column {
+    flex-direction: row;
+}
+
 /* ResizablePanel and Friends
  * =====================================================*/
 .resizable-panel {
@@ -177,6 +201,12 @@
 
 .shrinkwrapped {
     flex-grow: 0;
+}
+
+/* Sequence and HorizontalSequence Special Cases
+ * ===============================================================*/
+.sequence-vertical > [data-cell-type="Clickable"] {
+    display: block;
 }
 
 /* PageView
