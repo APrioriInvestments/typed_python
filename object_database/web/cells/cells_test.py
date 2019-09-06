@@ -643,6 +643,11 @@ class CellsSequenceHandlingTests(unittest.TestCase):
         self.assertIn(first_child_seq.elements[0], parent_seq.elements)
         self.assertIn(first_child_seq.elements[1], parent_seq.elements)
 
+    def test_basic_plus_composition(self):
+        result = Text("Hello") + Text("There") + Text("This Is A") + Button("Button", lambda: None)
+        self.assertTrue(isinstance(result, Sequence))
+        self.assertEqual(len(result.elements), 4)
+
 
 class CellsHorizSequenceHandlingTests(unittest.TestCase):
     @classmethod
