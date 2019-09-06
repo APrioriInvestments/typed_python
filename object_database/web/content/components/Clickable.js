@@ -32,6 +32,7 @@ class Clickable extends Component {
         return(
             h('div', {
                 id: this.props.id,
+                class: "cell clickable",
                 "data-cell-id": this.props.id,
                 "data-cell-type": "Clickable",
                 onclick: this._getEvent('onclick'),
@@ -45,9 +46,9 @@ class Clickable extends Component {
 
     getStyle(){
         if(this.props.extraData.bold){
-            return "cursor:pointer;*cursor:hand;font-weight:bold;display:inline-block;";
+            return "cursor:pointer;*cursor:hand;font-weight:bold;";
         } else {
-            return "display:inline-block;";
+            return "";
         }
     }
 
