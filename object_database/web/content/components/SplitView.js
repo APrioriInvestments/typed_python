@@ -29,7 +29,7 @@ class SplitView extends Component {
         super(props, ...args);
 
         // Bind component methods
-        this.makeStyle = this.makeStyle.bind(this);
+        this.makeClasses = this.makeClasses.bind(this);
         this.makeChildStyle = this.makeChildStyle.bind(this);
         this.makeChildElements = this.makeChildElements.bind(this);
     }
@@ -38,21 +38,23 @@ class SplitView extends Component {
         return (
             h('div', {
                 id: this.props.id,
-                class: 'cell split-view',
+                class: this.makeClasses(),
                 'data-cell-id': this.props.id,
-                'data-cell-type': "SplitView",
-                style: this.makeStyle()
+                'data-cell-type': "SplitView"
             }, this.makeChildElements())
         );
     }
 
-    makeStyle(){
-        // Note: the server side uses "split" (axis) to denote the direction
-        let direction = "row";
+    makeClasses(){
+        // Note: the server side uses the "split" (axis) to
+        // denote the direction
+        let classes = ["cell", "split-view"];
+        let directionClass = "split-view-row";
         if(this.props.extraData.split == "horizontal"){
-            direction = "column";
+            directionClass = "split-view-column";
         }
-        return `width:100%;height:100%;display:flex;flex-direction:${direction};`;
+        classes.push(directionClass);
+        return classes.join(" ");
     }
 
     makeChildStyle(index){
@@ -69,14 +71,14 @@ class SplitView extends Component {
             return this.getReplacementElementsFor('element').map((child, idx) => {
                 return h('div', {
                     style: this.makeChildStyle(idx),
-                    class: "overflow"
+                    class: "split-view-area overflow"
                 }, [child]);
             });
         } else {
             return this.renderChildrenNamed('elements').map((child, idx) => {
                 return h('div', {
                     style: this.makeChildStyle(idx),
-                    class: "overflow"
+                    class: "split-view-area overflow"
                 }, [child]);
             });
         }
