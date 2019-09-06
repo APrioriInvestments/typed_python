@@ -106,3 +106,12 @@ class HorizSequenceBasicConcat(CellsTestPage):
 
     def text(self):
         return "Should produce a non-flexed HorizontalSequence of the 4 elements"
+
+
+class MixedSequenceComposition(CellsTestPage):
+    def cell(self):
+        result = (cells.Text("Hi") >> cells.Text("Bye")) + (cells.Text("Go Away") >> cells.Button("Away", lambda: None))
+        return result
+
+    def text(self):
+        return "You should see a complex composition of both kinds of Sequences"
