@@ -24,6 +24,10 @@
     display: inline-block;
 }
 
+[data-cell-type="Clickable"]:hover {
+    cursor: pointer;
+}
+
 /* SplitView
  * =====================================================*/
 .split-view {
