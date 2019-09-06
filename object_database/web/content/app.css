@@ -41,7 +41,7 @@
     flex-direction: column;
 }
 
-.split-view-column {
+.split-view-row {
     flex-direction: row;
 }
 
