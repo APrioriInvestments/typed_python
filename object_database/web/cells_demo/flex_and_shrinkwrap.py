@@ -91,3 +91,11 @@ class HorizSequenceWithoutFlex(CellsTestPage):
 
     def text(self):
         return "The vertical sequence should not be a flex container and should display all of its contents using as much space as it needs"
+
+class HorizSequenceBasicConcat(CellsTestPage):
+    def cell(self):
+        result = (cells.Text("Hi") >> cells.Text("Bye") >> cells.Text("Go Away") >> cells.Button("Away", lambda: None))
+        return result
+
+    def text(self):
+        return "Should produce a non-flexed HorizontalSequence of the 4 elements"

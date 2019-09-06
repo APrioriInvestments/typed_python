@@ -16,6 +16,7 @@ from object_database.web.cells import (
     AsyncDropdown,
     Cell,
     Cells,
+    Button,
     Subscribed,
     Card,
     Container,
@@ -704,6 +705,12 @@ class CellsHorizSequenceHandlingTests(unittest.TestCase):
         self.assertIn(second_child_seq, parent_seq.elements)
         self.assertIn(first_child_seq.elements[0], parent_seq.elements)
         self.assertIn(first_child_seq.elements[1], parent_seq.elements)
+
+    def test_basic_rshift_composition(self):
+        result = (Text("Hi") >> Text("Bye") >> Text("Go Away") >> Button("Away", lambda: None))
+        self.assertTrue(isinstance(result, HorizontalSequence))
+        self.assertEqual(len(result.elements), 4)
+
 
 if __name__ == '__main__':
     unittest.main()
