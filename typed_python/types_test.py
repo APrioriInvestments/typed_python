@@ -352,6 +352,22 @@ class NativeTypesTests(unittest.TestCase):
         X2(int)
         X2(float)
 
+    def test_alternative_and_set(self):
+        A = Alternative("A", X=dict(T=TupleOf(int)))
+
+        # we should be able to implicitly convert 'set' to a TupleOf when
+        # we are constructing an Alternative like this.
+        self.assertEqual(A.X(T=set([1, 2, 3])).T, (1, 2, 3))
+
+    def test_const_dict_and_set(self):
+        T = ConstDict(int, TupleOf(int))
+
+        # we should be able to implicitly convert 'set' to a TupleOf
+        self.assertEqual(
+            T({1: set([2, 3])}),
+            T({1: [2, 3]})
+        )
+
     def test_one_of_alternative(self):
         X = Alternative("X", V={'a': int})
         Ox = OneOf(None, X)

@@ -193,6 +193,12 @@ bool constructTupleOrListInstFromNumpy(TupleOrListOfType* tupT, instance_ptr tgt
     return true;
 }
 void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrListOfType* tupT, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    if (!isExplicit) {
+        throw std::logic_error("Can't convert from " +
+            std::string(pyRepresentation->ob_type->tp_name) + " to " + tupT->name()
+        );
+    }
+
     if (PyArray_Check(pyRepresentation)) {
         if (!PyArray_ISBEHAVED_RO(pyRepresentation)) {
             throw std::logic_error("Can't convert a numpy array that's not contiguous and in machine-native byte order.");
@@ -280,6 +286,7 @@ void PyTupleOrListOfInstance::copyConstructFromPythonInstanceConcrete(TupleOrLis
             );
         return;
     }
+
     if (PySet_Check(pyRepresentation)) {
         if (PySet_Size(pyRepresentation) == 0) {
             tupT->constructor(tgt);

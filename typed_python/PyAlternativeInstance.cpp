@@ -167,7 +167,7 @@ void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(Concret
                 throw std::logic_error("Can't initialize " + alt->name() + " with positional arguments because it doesn't have only one field.");
             }
 
-            PyInstance::copyConstructFromPythonInstance(alternativeEltType->getTypes()[0], p, arg);
+            PyInstance::copyConstructFromPythonInstance(alternativeEltType->getTypes()[0], p, arg, true);
         } else if (PyTuple_Size(args) == 0) {
             //construct an alternative from Kwargs
             constructFromPythonArguments(p, alt->elementType(), args, kwargs);

@@ -44,7 +44,7 @@ PyObject* PyPointerToInstance::pointerInitialize(PyObject* o, PyObject* args) {
         try {
             PyObjectHolder arg0(PyTuple_GetItem(args,0));
 
-            copyConstructFromPythonInstance(pointerT->getEltType(), target, arg0);
+            copyConstructFromPythonInstance(pointerT->getEltType(), target, arg0, true);
             return incref(Py_None);
         } catch(std::exception& e) {
             PyErr_SetString(PyExc_TypeError, e.what());

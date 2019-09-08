@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
 import time
@@ -24,6 +24,27 @@ def Compiled(f):
 
 
 class TestCompilationStructures(unittest.TestCase):
+    def test_dispatch_order_independent(self):
+        class AClass(Class):
+            pass
+
+        someValues = [
+            TupleOf(int)(),
+            (1,2,3),
+            [1,2,3],
+            AClass()
+        ]
+
+        for testCases in [someValues, reversed(someValues)]:
+            # ensure that we are not order-dependent trying to dispatch
+            # a class to a tuple or vice-versa
+            @SpecializedEntrypoint
+            def typeToString(x):
+                return str(type(x))
+
+            for x in testCases:
+                self.assertEqual(typeToString(x), str(type(x)))
+
     def checkFunctionOfIntegers(self, f):
         r = Runtime.singleton()
 

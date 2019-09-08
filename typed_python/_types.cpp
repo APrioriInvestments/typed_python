@@ -786,7 +786,7 @@ PyObject *serialize(PyObject* nullValue, PyObject* args) {
         } else {
             //try to construct a 'serialize type' from the argument and then serialize that
             Instance i = Instance::createAndInitialize(serializeType, [&](instance_ptr p) {
-                PyInstance::copyConstructFromPythonInstance(serializeType, p, a2);
+                PyInstance::copyConstructFromPythonInstance(serializeType, p, a2, true);
             });
 
             PyEnsureGilReleased releaseTheGil;
@@ -870,7 +870,7 @@ PyObject *serializeStream(PyObject* nullValue, PyObject* args) {
         TupleOfType* serializeTupleType = TupleOfType::Make(serializeType);
 
         Instance i = Instance::createAndInitialize(serializeTupleType, [&](instance_ptr p) {
-            PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2);
+            PyInstance::copyConstructFromPythonInstance(serializeTupleType, p, a2, true);
         });
 
         {

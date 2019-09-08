@@ -48,53 +48,11 @@ public:
 
     static void mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType);
 
-    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
-        if (!isExplicit) {
-            if (PyDict_Check(pyRepresentation)) {
-                return true;
-            }
-
-            return false;
-        }
-
-        return true;
-    }
+    static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit);
 
     static bool compare_to_python_concrete(ConstDictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
-    static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
-        if (PyDict_Check(pyRepresentation)) {
-            dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
-
-            try {
-                PyObject *key, *value;
-                Py_ssize_t pos = 0;
-
-                int i = 0;
-
-                while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
-                    copyConstructFromPythonInstance(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key);
-                    try {
-                        copyConstructFromPythonInstance(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value);
-                    } catch(...) {
-                        dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
-                        throw;
-                    }
-                    dictType->incKvPairCount(tgt);
-                    i++;
-                }
-
-                dictType->sortKvPairs(tgt);
-            } catch(...) {
-                dictType->destroy(tgt);
-                throw;
-            }
-            return;
-        }
-
-        PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, isExplicit);
-    }
-
+    static void copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit);
 };
 
 

@@ -235,7 +235,7 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
             });
         } else {
             Instance other(type(), [&](instance_ptr data) {
-                copyConstructFromPythonInstance(type(), data, rhs);
+                copyConstructFromPythonInstance(type(), data, rhs, true);
             });
 
             return PyInstance::initialize(type(), [&](instance_ptr data) {
@@ -248,7 +248,7 @@ PyObject* PyConstDictInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
 
         //convert rhs to a relevant dict type.
         Instance keys(tupleOfKeysType, [&](instance_ptr data) {
-            copyConstructFromPythonInstance(tupleOfKeysType, data, rhs);
+            copyConstructFromPythonInstance(tupleOfKeysType, data, rhs, true);
         });
 
         return PyInstance::initialize(type(), [&](instance_ptr data) {
@@ -305,11 +305,12 @@ PyMethodDef* PyConstDictInstance::typeMethodsConcrete(Type* t) {
 void PyConstDictInstance::mirrorTypeInformationIntoPyTypeConcrete(ConstDictType* constDictT, PyTypeObject* pyType) {
     //expose 'ElementType' as a member of the type object
     PyDict_SetItemString(pyType->tp_dict, "KeyType",
-            typePtrToPyTypeRepresentation(constDictT->keyType())
-            );
+        typePtrToPyTypeRepresentation(constDictT->keyType())
+    );
+
     PyDict_SetItemString(pyType->tp_dict, "ValueType",
-            typePtrToPyTypeRepresentation(constDictT->valueType())
-            );
+        typePtrToPyTypeRepresentation(constDictT->valueType())
+    );
 }
 
 bool PyConstDictInstance::compare_to_python_concrete(ConstDictType* dictType, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
@@ -372,5 +373,49 @@ bool PyConstDictInstance::compare_to_python_concrete(ConstDictType* dictType, in
     return true;
 }
 
+bool PyConstDictInstance::pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
+    if (isExplicit) {
+        if (PyDict_Check(pyRepresentation)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    return false;
+}
+
+void PyConstDictInstance::copyConstructFromPythonInstanceConcrete(ConstDictType* dictType, instance_ptr tgt, PyObject* pyRepresentation, bool isExplicit) {
+    if (PyDict_Check(pyRepresentation) && isExplicit) {
+        dictType->constructor(tgt, PyDict_Size(pyRepresentation), false);
+
+        try {
+            PyObject *key, *value;
+            Py_ssize_t pos = 0;
+
+            int i = 0;
+
+            while (PyDict_Next(pyRepresentation, &pos, &key, &value)) {
+                copyConstructFromPythonInstance(dictType->keyType(), dictType->kvPairPtrKey(tgt, i), key, true);
+                try {
+                    copyConstructFromPythonInstance(dictType->valueType(), dictType->kvPairPtrValue(tgt, i), value, true);
+                } catch(...) {
+                    dictType->keyType()->destroy(dictType->kvPairPtrKey(tgt,i));
+                    throw;
+                }
+                dictType->incKvPairCount(tgt);
+                i++;
+            }
+
+            dictType->sortKvPairs(tgt);
+        } catch(...) {
+            dictType->destroy(tgt);
+            throw;
+        }
+        return;
+    }
+
+    PyInstance::copyConstructFromPythonInstanceConcrete(dictType, tgt, pyRepresentation, isExplicit);
+}
 
 

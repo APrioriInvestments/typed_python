@@ -675,7 +675,7 @@ class NativeClassTypesTests(unittest.TestCase):
 
         c = WithTwoFunctions()
         self.assertEqual(c.f(TupleOf(int)((1, 2, 3))), "Tuple")
-        self.assertEqual(c.f(ListOf(int)((1, 2, 3))), "Tuple")
+        self.assertEqual(c.f(ListOf(int)((1, 2, 3))), "List")
 
     def test_class_comparison_operators(self):
         class ClassWithComparisons(Class):

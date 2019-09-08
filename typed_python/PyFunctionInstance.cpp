@@ -226,6 +226,16 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
 
     std::vector<Instance> instances;
 
+    // first, see if we can short-circuit
+    for (long k = 0; k < overload.getArgs().size(); k++) {
+        auto arg = overload.getArgs()[k];
+        Type* argType = specialization.getArgTypes()[k];
+
+        if (!pyValCouldBeOfType(argType, PyTuple_GetItem(argTuple, k), false)) {
+            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
+        }
+    }
+
     for (long k = 0; k < overload.getArgs().size(); k++) {
         auto arg = overload.getArgs()[k];
         Type* argType = specialization.getArgTypes()[k];
@@ -241,8 +251,12 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
                 Instance::createAndInitialize(argType, [&](instance_ptr p) {
                     copyConstructFromPythonInstance(argType, p, arg);
                 })
-                );
-            }
+            );
+        } catch(PythonExceptionSet& s) {
+            //failed to convert
+            PyErr_Clear();
+            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
+        }
         catch(...) {
             //failed to convert
             return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
