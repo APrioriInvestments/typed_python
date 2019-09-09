@@ -12,7 +12,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
@@ -65,7 +64,7 @@ class ClassWrapper(RefcountedWrapper):
     is_empty = False
     is_pass_by_ref = True
 
-    BYTES_BEFORE_INIT_BITS = 16 # the refcount and vtable are both 8 byte integers.
+    BYTES_BEFORE_INIT_BITS = 16  # the refcount and vtable are both 8 byte integers.
 
     def __init__(self, t):
         super().__init__(t)
@@ -95,15 +94,16 @@ class ClassWrapper(RefcountedWrapper):
         # because we are writing a pointer value directly into the generated code as a constant, we
         # won't be able to reuse the binary we produced in another program.
         self.vtableExpr = native_ast.const_uint64_expr(
-            _types._vtablePointer(self.typeRepresentation)).cast(vtable_type.pointer()
-        )
+            _types._vtablePointer(self.typeRepresentation)
+        ).cast(vtable_type.pointer())
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
-        return (nonref_expr
+        return (
+            nonref_expr
             .cast(native_ast.UInt64)
-            .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF)) # 48 bits of 1s
+            .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))  # 48 bits of 1s
             .cast(self.layoutType)
         )
 
@@ -339,7 +339,8 @@ class ClassWrapper(RefcountedWrapper):
                 # that won't happen if we are just taking the compiled signature's type.
 
                 argTypes = [implementingClass] + [arg.typeFilter for arg in funcOverload.args[1:]]
-                res = converter.convert(
+
+                converter.convert(
                     o2.functionObj,
                     argTypes,
                     funcOverload.returnType if funcOverload.returnType is not None else object,

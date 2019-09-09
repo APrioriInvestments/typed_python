@@ -14,7 +14,7 @@
 import unittest
 from typed_python import (
     ListOf, Set, Dict, TupleOf, OneOf, Tuple, NamedTuple, Int64, Float64, String,
-    ConstDict, Alternative, Forward, Class, PointerTo, Member, Type
+    ConstDict, Alternative, Forward, Class, PointerTo, Type
 )
 
 

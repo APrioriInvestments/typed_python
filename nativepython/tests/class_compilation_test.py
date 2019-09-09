@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf
+from typed_python import Function, Class, TupleOf, ListOf, Member
 import typed_python._types as _types
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
@@ -32,7 +32,7 @@ class AClass(Class):
     def f(self):
         return self.x + self.y
 
-    def f(self, arg):
+    def f(self, arg):  # noqa
         return self.x + self.y + arg
 
     def g(self) -> float:
@@ -50,6 +50,7 @@ class AClass(Class):
 
         return res
 
+
 class AChildClass(AClass):
     def g(self) -> float:
         return 1234
@@ -59,6 +60,7 @@ class AChildClass(AClass):
             return 0.2
 
         return 1234 + x
+
 
 class AClassWithAnotherClass(Class):
     x = Member(int)
@@ -345,3 +347,21 @@ class TestClassCompilationCompilation(unittest.TestCase):
         clearList(aListOfBase)
 
         self.assertEqual(_types.refcount(aListOfInt), 1)
+
+    def test_class_inheritance_method_signatures(self):
+        class Base(Class):
+            def f(self) -> int:
+                return 0
+
+        # if you override a method you can't change its output type.
+        with self.assertRaisesRegex(Exception, "Overloads of 'f' don't have the same return type"):
+            class BadChild(Base):
+                def f(self) -> float:
+                    pass
+
+        # but if you have a non-overlapping signature it's OK because
+        # the compiler wouldn't have a problem figuring out which one
+        # to dispatch to.
+        class GoodChild(Base):
+            def f(self, x) -> float:
+                pass

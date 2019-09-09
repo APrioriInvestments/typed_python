@@ -473,30 +473,6 @@ PyObject *installClassDestructor(PyObject* nullValue, PyObject* args, PyObject* 
     });
 }
 
-PyObject *RenameType(PyObject* nullValue, PyObject* args) {
-    if (PyTuple_Size(args) != 2
-            || !PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0))
-            || !PyUnicode_Check(PyTuple_GetItem(args,1)))
-    {
-        PyErr_SetString(PyExc_TypeError, "RenameType takes 2 positional arguments (a type and a name)");
-        return NULL;
-    }
-
-    Type* type = PyInstance::unwrapTypeArgToTypePtr(PyTuple_GetItem(args,0));
-
-    std::string newName(PyUnicode_AsUTF8(PyTuple_GetItem(args,1)));
-
-    if (type->getTypeCategory() == Type::TypeCategory::catClass) {
-        return incref((PyObject*)PyInstance::typeObj(((Class*)type)->renamed(newName)));
-    }
-    if (type->getTypeCategory() == Type::TypeCategory::catAlternative) {
-        return incref((PyObject*)PyInstance::typeObj(((Alternative*)type)->renamed(newName)));
-    }
-
-    PyErr_Format(PyExc_TypeError, "Can't rename type %s", type->name().c_str());
-    return NULL;
-}
-
 PyObject *MakeTypeFor(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "TypeFor takes 1 positional argument");
@@ -1488,6 +1464,41 @@ PyObject *bytecount(PyObject* nullValue, PyObject* args) {
     return PyLong_FromLong(t->bytecount());
 }
 
+PyObject *canConstructFrom(PyObject* nullValue, PyObject* args) {
+    if (PyTuple_Size(args) != 2) {
+        PyErr_SetString(PyExc_TypeError, "canConstructFrom takes 3 positional arguments");
+        return NULL;
+    }
+    PyObjectHolder a1(PyTuple_GetItem(args, 0));
+    PyObjectHolder a2(PyTuple_GetItem(args, 1));
+
+    Type* t1 = PyInstance::unwrapTypeArgToTypePtr(a1);
+
+    if (!t1) {
+        PyErr_SetString(PyExc_TypeError, "first argument to 'canConstructFrom' must be a native type object");
+        return NULL;
+    }
+
+    Type* t2 = PyInstance::unwrapTypeArgToTypePtr(a2);
+
+    if (!t2) {
+        PyErr_SetString(PyExc_TypeError, "second argument to 'canConstructFrom' must be a native type object");
+        return NULL;
+    }
+
+    Maybe can = t1->canConstructFrom(t2, PyTuple_GetItem(args, 2) == Py_True);
+
+    if (can == Maybe::Maybe) {
+        return PyUnicode_FromString("Maybe");
+    }
+
+    if (can == Maybe::True) {
+        return incref(Py_True);
+    }
+
+    return incref(Py_False);
+}
+
 PyObject *disableNativeDispatch(PyObject* nullValue, PyObject* args) {
     native_dispatch_disabled++;
     return incref(Py_None);
@@ -1704,7 +1715,6 @@ PyObject *getTypePointer(PyObject* nullValue, PyObject* args) {
 
 static PyMethodDef module_methods[] = {
     {"TypeFor", (PyCFunction)MakeTypeFor, METH_VARARGS, NULL},
-    {"RenameType", (PyCFunction)RenameType, METH_VARARGS, NULL},
     {"serialize", (PyCFunction)serialize, METH_VARARGS, NULL},
     {"deserialize", (PyCFunction)deserialize, METH_VARARGS, NULL},
     {"decodeSerializedObject", (PyCFunction)decodeSerializedObject, METH_VARARGS, NULL},
@@ -1714,6 +1724,7 @@ static PyMethodDef module_methods[] = {
     {"deserializeStream", (PyCFunction)deserializeStream, METH_VARARGS, NULL},
     {"is_default_constructible", (PyCFunction)is_default_constructible, METH_VARARGS, NULL},
     {"isSimple", (PyCFunction)isSimple, METH_VARARGS, NULL},
+    {"canConstructFrom", (PyCFunction)canConstructFrom, METH_VARARGS, NULL},
     {"bytecount", (PyCFunction)bytecount, METH_VARARGS, NULL},
     {"isBinaryCompatible", (PyCFunction)isBinaryCompatible, METH_VARARGS, NULL},
     {"Forward", (PyCFunction)MakeForward, METH_VARARGS, NULL},

@@ -262,16 +262,12 @@ public:
     {
         m_name = inName;
 
-        initializeMRO();
-
         if (m_memberFunctions.find("__eq__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__ne__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__lt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__gt__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__le__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
         if (m_memberFunctions.find("__ge__") != m_memberFunctions.end()) { m_hasComparisonOperators = true; }
-
-        endOfConstructorInitialization(); // finish initializing the type object.
     }
 
     bool isBinaryCompatibleWithConcrete(Type* other);
@@ -326,7 +322,24 @@ public:
             throw std::runtime_error("Can't inherit from multiple base classes that both have members.");
         }
 
-        return new HeldClass(inName, bases, members, memberFunctions, staticFunctions, propertyFunctions, classMembers);
+        HeldClass* result = new HeldClass(
+            inName,
+            bases,
+            members,
+            memberFunctions,
+            staticFunctions,
+            propertyFunctions,
+            classMembers
+        );
+
+        // we do these outside of the constructor so that if they throw we
+        // don't destroy the HeldClass type object (and just leak it instead) because
+        // we need to ensure we never delete Type objects.
+        result->initializeMRO();
+
+        result->endOfConstructorInitialization();
+
+        return result;
     }
 
     // this gets called by Class. These types are always produced in pairs.
@@ -601,6 +614,29 @@ public:
             if (it == target.end()) {
                 target[nameAndFunc.first] = nameAndFunc.second;
             } else {
+                // we need to check that the function signatures we produce can obey the
+                // return types dictated by the base class. This means that any function
+                // already in 'target' (the subclass methods we've already accepted) that
+                // overlaps with a method in the base class (meaning that a dispatch to the
+                // child could also dispatch to the base) must have a return type that is
+                // _more_ precise than the base class, so that we can ensure that when we
+                // compile the child class to masquerade as the base class we are able
+                // to comply with the return-type assumptions made by callers.
+                for (auto childOverload: target[nameAndFunc.first]->getOverloads()) {
+                    for (auto baseOverload: nameAndFunc.second->getOverloads()) {
+                        if (!childOverload.disjointFrom(baseOverload)) {
+                            if (childOverload.getReturnType() != baseOverload.getReturnType()) {
+                                // we should really be checking for 'coverage' but for now we just
+                                // check for type equality
+                                throw std::runtime_error(
+                                    "Overloads of '" + nameAndFunc.first + "' don't have the same return type:\n" +
+                                    "    " + childOverload.toString() + "\n" +
+                                    "    " + baseOverload.toString()
+                                );
+                            }
+                        }
+                    }
+                }
                 target[nameAndFunc.first] = Function::merge(target[nameAndFunc.first], nameAndFunc.second);
             }
         }

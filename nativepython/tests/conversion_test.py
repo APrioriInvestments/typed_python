@@ -30,8 +30,8 @@ class TestCompilationStructures(unittest.TestCase):
 
         someValues = [
             TupleOf(int)(),
-            (1,2,3),
-            [1,2,3],
+            (1, 2, 3),
+            [1, 2, 3],
             AClass()
         ]
 

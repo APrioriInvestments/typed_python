@@ -376,7 +376,6 @@ class PythonToNativeConverter(object):
         # generate a callback that takes the linked function pointer and jams
         # it into the relevant slot in the vtable once it's produced
         def installOverload(fp):
-            # print("install fp", fp.fp, "for", name, "in", implementingClass, "masquerading as", interfaceClass, " with ", [s.args for s in signature.overloads])
             _types.installClassMethodDispatch(interfaceClass, implementingClass, slotIndex, fp.fp)
 
         # we are compiling the function 'name' in 'implementingClass' to be installed when

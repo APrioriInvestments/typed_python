@@ -479,7 +479,7 @@ class ExpressionConversionContext(object):
                 returnType,
                 lambda output_slot:
                     native_ast.CallTarget.Pointer(expr=funcPtr.cast(nativeFunType.pointer()))
-                        .call(output_slot.expr, *native_args)
+                    .call(output_slot.expr, *native_args)
             )
         else:
             nativeFunType = native_ast.Type.Function(

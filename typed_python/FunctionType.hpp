@@ -148,8 +148,117 @@ public:
                 mFunctionObj(functionObj),
                 mReturnType(returnType),
                 mArgs(args),
-                mCompiledCodePtr(nullptr)
+                mCompiledCodePtr(nullptr),
+                mHasKwarg(false),
+                mHasStarArg(false),
+                mMinPositionalArgs(0),
+                mMaxPositionalArgs(-1)
         {
+            long argsWithDefaults = 0;
+            long argsDefinitelyConsuming = 0;
+
+            for (auto arg: mArgs) {
+                if (arg.getIsStarArg()) {
+                    mHasStarArg = true;
+                }
+                else if (arg.getIsKwarg()) {
+                    mHasKwarg = true;
+                }
+                else if (arg.getDefaultValue()) {
+                    argsWithDefaults++;
+                } else {
+                    argsDefinitelyConsuming++;
+                }
+            }
+
+            mMinPositionalArgs = argsDefinitelyConsuming;
+            if (!mHasStarArg) {
+                mMaxPositionalArgs = argsDefinitelyConsuming + argsWithDefaults;
+            }
+        }
+
+        std::string toString() const {
+            std::ostringstream str;
+
+            str << "(";
+
+            for (long k = 0; k < mArgs.size(); k++) {
+                if (k) {
+                    str << ", ";
+                }
+
+                if (mArgs[k].getIsStarArg()) {
+                    str << "*";
+                }
+
+                if (mArgs[k].getIsKwarg()) {
+                    str << "**";
+                }
+
+                str << mArgs[k].getName();
+
+                if (mArgs[k].getDefaultValue()) {
+                    str << "=...";
+                }
+
+                if (mArgs[k].getTypeFilter()) {
+                    str << ": " << mArgs[k].getTypeFilter()->name();
+                }
+            }
+
+            str << ")";
+
+            if (mReturnType) {
+                str << " -> " << mReturnType->name();
+            }
+
+            return str.str();
+        }
+
+        // return the FunctionArg* that a positional argument would map to, or 'nullptr' if
+        // it wouldn't
+        const FunctionArg* argForPositionalArgument(long argIx) const {
+            if (argIx >= mArgs.size()) {
+                return nullptr;
+            }
+
+            if (mArgs[argIx].getIsStarArg() || mArgs[argIx].getIsKwarg()) {
+                return nullptr;
+            }
+
+            return &mArgs[argIx];
+        }
+
+        // can we possibly match 'argCount' positional arguments?
+        bool couldMatchPositionalCount(long argCount) const {
+            return argCount >= mMinPositionalArgs && argCount < mMaxPositionalArgs;
+        }
+
+        bool disjointFrom(const Overload& other) const {
+            // we need to determine if all possible call signatures of these overloads
+            // would route to one or the other unambiguously. we ignore keyword callsignatures
+            // for the moment. For each possible positional argument, if we get disjointedness
+            // then the whole set is disjoint.
+
+            // if the set of numbers of arguments we can accept are disjoint, then we can't possibly
+            // match the same queries.
+            if (mMaxPositionalArgs < other.mMinPositionalArgs || other.mMaxPositionalArgs < mMinPositionalArgs) {
+                return true;
+            }
+
+            // now check each positional argument
+            for (long k = 0; k < mArgs.size() && k < other.mArgs.size(); k++) {
+                const FunctionArg* arg1 = argForPositionalArgument(k);
+                const FunctionArg* arg2 = other.argForPositionalArgument(k);
+
+                if (!arg1->getDefaultValue() && !arg2->getDefaultValue() && arg1->getTypeFilter() && arg2->getTypeFilter()) {
+                    if (arg1->getTypeFilter()->canConstructFrom(arg2->getTypeFilter(), false) == Maybe::False) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         bool isSignature() const {
@@ -219,6 +328,11 @@ public:
         std::vector<FunctionArg> mArgs;
         std::vector<CompiledSpecialization> mCompiledSpecializations;
         compiled_code_entrypoint mCompiledCodePtr; //accepts a pointer to packed arguments and another pointer with the return value
+
+        bool mHasStarArg;
+        bool mHasKwarg;
+        size_t mMinPositionalArgs;
+        size_t mMaxPositionalArgs;
     };
 
     class Matcher {

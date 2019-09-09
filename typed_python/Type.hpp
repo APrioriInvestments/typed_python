@@ -80,6 +80,12 @@ void updateTypeRepForType(Type* t, PyTypeObject* pyType);
 
 PyObject* getOrSetTypeResolver(PyObject* module = nullptr, PyObject* args = nullptr);
 
+enum class Maybe {
+    True,
+    False,
+    Maybe
+};
+
 class Type {
 public:
     //the indices are part of the binary serialization format (except for 'Forward'),
@@ -456,6 +462,15 @@ public:
         m_is_recursive = true;
     }
 
+    // can we construct an instance of 'this' from an instance of 'otherType'
+    // if 'True' then we can always do this. if False, then never. If Maybe, then
+    // we cannot make any assumptions..
+    Maybe canConstructFrom(Type* otherType, bool isExplicit);
+
+    Maybe canConstructFromConcrete(Type* otherType, bool isExplicit) {
+        return Maybe::Maybe;
+    }
+
 protected:
     Type(TypeCategory in_typeCategory) :
             m_typeCategory(in_typeCategory),
@@ -493,6 +508,10 @@ protected:
     enum BinaryCompatibilityCategory { Incompatible, Checking, Compatible };
 
     std::map<Type*, BinaryCompatibilityCategory> mIsBinaryCompatible;
+
+    std::map<Type*, Maybe> mCanConvert;
+
+    std::set<Type*> mCanConvertOnStack;
 
     // a set of forward types that we need to be resolved before we
     // could be resolved

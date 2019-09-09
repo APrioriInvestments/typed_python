@@ -14,7 +14,6 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 
-import nativepython.native_ast as native_ast
 import nativepython
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)

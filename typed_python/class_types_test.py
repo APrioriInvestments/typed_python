@@ -826,13 +826,13 @@ class NativeClassTypesTests(unittest.TestCase):
         class Child2(BaseClass):
             pass
 
-        l = ListOf(BaseClass)()
+        clsList = ListOf(BaseClass)()
 
-        l.append(Child1())
-        l.append(Child2())
+        clsList.append(Child1())
+        clsList.append(Child2())
 
-        self.assertIsInstance(l[0], Child1)
-        self.assertIsInstance(l[1], Child2)
+        self.assertIsInstance(clsList[0], Child1)
+        self.assertIsInstance(clsList[1], Child2)
 
     def test_class_multiple_inheritence(self):
         class BaseA(Class):
