@@ -23,6 +23,13 @@ class Component {
         this.replacements = new ReplacementsHandler(replacements);
         this.usesReplacements = (replacements.length > 0);
 
+        // Whether or not the the component
+        // is a Subscribed. We do this
+        // because Subscribed is a proxy
+        // for its children and we check it
+        // in NewCellHandler.
+        this.isSubscribed = false;
+
         // Setup parent relationship, if
         // any. In this abstract class
         // there isn't one by default
@@ -43,6 +50,7 @@ class Component {
         // Bind context to methods
         this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
         this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
+        this.getDOMElement = this.getDOMElement.bind(this);
         this.componentDidLoad = this.componentDidLoad.bind(this);
         this.componentDidUpdate = this.componentDidUpdate.bind(this);
         this.componentWillReceiveProps = this.componentWillReceiveProps.bind(this);
@@ -114,6 +122,20 @@ class Component {
      */
     componentDidUpdate(){
         return null;
+    }
+
+    /**
+     * Responds with an actual DOM Element
+     * instance into which one can project
+     * this Component's hyperscripts.
+     * Here we have the most commonly used
+     * default implementation.
+     * See `Subscribed` for an example of
+     * an alternative override/use.
+     * I am consumed by updates in the handler.
+     */
+    getDOMElement(){
+        return document.getElementById(this.props.id);
     }
 
     /**
