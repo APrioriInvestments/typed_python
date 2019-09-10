@@ -612,7 +612,8 @@ class Cell:
         self.contents = ""  # some contents containing a local node def
         self.shouldDisplay = True  # Whether or not this is a cell that will be displayed
         self.isShrinkWrapped = False # If will be shrinkwrapped inside flex parent
-        self.isFlex = False # If it will be a flex container
+        self.isFlex = False # If it will be a flex child
+        self.isFlexParent = False # If it will be a parent flex
         self._identity = None
         self._tag = None
         self._nowrap = None
