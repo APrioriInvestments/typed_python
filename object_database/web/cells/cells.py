@@ -1633,6 +1633,11 @@ class Subscribed(Cell):
 
         self.f = f  # What is f? A lambda?
 
+        # We need this to properly
+        # cooperate with nested
+        # Sequences
+        self.wrapsSequence = False
+
     def prepareForReuse(self):
         if not self.garbageCollected:
             return False
@@ -1654,6 +1659,8 @@ class Subscribed(Cell):
                 c = Cell.makeCell(self.f())
                 if c.cells is not None:
                     c.prepareForReuse()
+                if isinstance(c, Sequence):
+                    self.wrapsSequence = True
                 self.children = {'____contents__': c}
                 self.namedChildren['content'] = c
             except SubscribeAndRetry:
@@ -1697,6 +1704,9 @@ class SubscribedSequence(Cell):
             return self.children['____child_0__'].sortsAs()
 
     def makeCell(self, item):
+        innerCell = Cell.makeCell(self.rendererFun(item))
+        wrapperCell = Subscribed(lambda: innerCell)
+        wrapperCell.isFlex = innerCell.isFlex #  Important
         return Subscribed(lambda: Cell.makeCell(self.rendererFun(item)))
 
     def recalculate(self):
@@ -1712,29 +1722,7 @@ class SubscribedSequence(Cell):
 
             self._resetSubscriptionsToViewReads(v)
 
-            new_children = {}
-            new_named_children = {
-                'children': []
-            }
-            for ix, rowKey in enumerate(self.spine):
-                if rowKey in self.existingItems:
-                    new_children["____child_%s__" %
-                                 ix] = self.existingItems[rowKey]
-                    new_named_children['children'].append(self.existingItems[rowKey])
-                else:
-                    try:
-                        childCell = self.makeCell(rowKey[0])
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = childCell
-                        new_named_children['children'].append(childCell)
-                    except SubscribeAndRetry:
-                        raise
-                    except Exception:
-                        tracebackCell = Traceback(traceback.format_exc())
-                        self.existingItems[rowKey] = new_children["____child_%s__" % ix] = tracebackCell
-                        new_named_children['children'].append(tracebackCell)
-
-        self.children = new_children
-        self.namedChildren = new_named_children
+            self.updateChildren()
 
         spineAsSet = set(self.spine)
         for i in list(self.existingItems):
@@ -1742,6 +1730,44 @@ class SubscribedSequence(Cell):
                 del self.existingItems[i]
         self.exportData['asColumns'] = self.asColumns
         self.exportData['numSpineChildren'] = len(self.spine)
+        if self.isFlexParent:
+            self.exportData['flexParent'] = True
+
+    def updateChildren(self):
+        #import web_pdb; web_pdb.set_trace()
+        new_children = []
+        current_child = None
+
+        for ix, rowKey in enumerate(self.spine):
+            if rowKey in self.existingItems:
+                current_child = self.existingItems[rowKey]
+            else:
+                try:
+                    current_child = self.makeCell(rowKey[0])
+                    self.existingItems[rowKey] = current_child
+                except SubscribeAndRetry:
+                    raise
+                except Exception:
+                    current_child = Traceback(traceback.format_exc())
+
+            if current_child.isFlex:
+                self.isFlexParent = True
+                new_children.append(current_child)
+            elif isinstance(current_child, Subscribed) and current_child.wrapsSequence:
+                subscribed_content = current_child.namedChildren['content']
+                if isinstance(subscribed_content, Sequence):
+                    # Here we care if the child of the Subscribed
+                    # is itself a Sequence. As with nested Sequences,
+                    # we add all of its elements to the children here.
+                    new_children += subscribed_content.elements
+                else:
+                    new_children.append(current_child)
+            else:
+                new_children.append(current_child)
+
+        self.children = {"____child_%s__" %
+                         i: new_children[i] for i in range(len(new_children))}
+        self.namedChildren['children'] = new_children
 
 
 class Popover(Cell):
