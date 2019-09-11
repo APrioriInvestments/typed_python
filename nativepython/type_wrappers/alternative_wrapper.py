@@ -87,12 +87,7 @@ class SimpleAlternativeWrapper(Wrapper):
                 if y is None:
                     return context.constant(False)
 
-                ret_type = y.expr_type.typeRepresentation
-                if ret_type is not Bool:
-                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
-
-                context.pushEffect(targetVal.expr.store(y))
-                return context.constant(True)
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
             elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
                 assert len(alt.__len__.overloads) == 1
                 y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
@@ -226,12 +221,7 @@ class AlternativeWrapper(RefcountedWrapper):
                 if y is None:
                     return context.constant(False)
 
-                ret_type = y.expr_type.typeRepresentation
-                if ret_type is not Bool:
-                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
-
-                context.pushEffect(targetVal.expr.store(y))
-                return context.constant(True)
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
             elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
                 assert len(alt.__len__.overloads) == 1
                 y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
@@ -315,12 +305,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                 if y is None:
                     return context.constant(False)
 
-                ret_type = y.expr_type.typeRepresentation
-                if ret_type is not Bool:
-                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
-
-                context.pushEffect(targetVal.expr.store(y))
-                return context.constant(True)
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
             elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
                 assert len(alt.__len__.overloads) == 1
                 y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})

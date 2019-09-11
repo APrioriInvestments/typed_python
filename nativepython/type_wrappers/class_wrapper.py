@@ -254,12 +254,7 @@ class ClassWrapper(RefcountedWrapper):
                 if y is None:
                     return context.constant(False)
 
-                ret_type = y.expr_type.typeRepresentation
-                if ret_type is not Bool:
-                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
-
-                context.pushEffect(targetVal.expr.store(y))
-                return context.constant(True)
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
             elif hasattr(cl.__len__, "__typed_python_category__") and cl.__len__.__typed_python_category__ == 'Function':
                 assert len(cl.__len__.overloads) == 1
                 y = context.call_py_function(cl.__len__.overloads[0].functionObj, (e,), {})
