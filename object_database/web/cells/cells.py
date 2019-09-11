@@ -1638,6 +1638,7 @@ class Subscribed(Cell):
         # cooperate with nested
         # Sequences
         self.wrapsSequence = False
+        self.wrapsHorizSequence = False
 
     def prepareForReuse(self):
         if not self.garbageCollected:
@@ -1662,6 +1663,8 @@ class Subscribed(Cell):
                     c.prepareForReuse()
                 if isinstance(c, Sequence):
                     self.wrapsSequence = True
+                elif isinstance(c, HorizontalSequence):
+                    self.wrapsHorizSequence = True
                 self.children = {'____contents__': c}
                 self.namedChildren['content'] = c
             except SubscribeAndRetry:
@@ -1678,14 +1681,15 @@ class Subscribed(Cell):
 
 
 class SubscribedSequence(Cell):
-    # This is the new version! (DELETE)
-    def __init__(self, itemsFun, rendererFun):
+    def __init__(self, itemsFun, rendererFun, orientation='vertical'):
         super().__init__()
 
         self.itemsFun = itemsFun
         self.rendererFun = rendererFun
         self.existingItems = {}
         self.items = []
+
+        self.orientation = orientation
 
     def makeCell(self, item):
         itemCell = Cell.makeCell(self.rendererFun(item))
@@ -1701,7 +1705,7 @@ class SubscribedSequence(Cell):
             self._updateExistingItems()
             self.updateChildren()
 
-            self.exportData['numItems'] = len(self.items)
+            self.exportData['orientation'] = self.orientation
             if self.isFlexParent:
                 self.exportData['flexParent'] = True
 
@@ -1727,8 +1731,11 @@ class SubscribedSequence(Cell):
 
         self.children = {"____child_%s__" %
                          i: new_children[i] for i in range(len(new_children))}
-        self.namedChildren['children'] = new_children
+        self.namedChildren['elements'] = new_children
 
+    def sortAs(self):
+        if len(self.namedChildren['elements']):
+            return self.namedChildren['elements'][0].sortAs()
 
     def _processChild(self, child, children):
         if child.isFlex:
@@ -1736,12 +1743,11 @@ class SubscribedSequence(Cell):
             children.append(child)
         elif not isinstance(child, Subscribed):
             children.append(child)
-        elif child.wrapsSequence:
-            # In this case, the child is a
-            # Subscribed wrapping a Sequence.
-            # We need to use the Flex rules to
-            # determine whether or not we
-            # flatten this underlying Sequence.
+        elif self.childWrapsOwnKind(child):
+            # In this case the child is a Subscribed
+            # wrapping a Sequence or Horizontal Sequence.
+            # In this case, we need to flatten its elements.
+            # Note that only matching orientations flatten.
             children += child.namedChildren['elements']
         else:
             children.append(child)
@@ -1764,99 +1770,20 @@ class SubscribedSequence(Cell):
             if item not in itemSet:
                 del self.existingItems[item]
 
-class OldSubscribedSequence(Cell):
-    # TODO: Get a better idea of what is actually happening
-    # in this cell. For example, what is with all the existing
-    # items funging, and what is actually needed in terms of
-    # information to display this correctly in the new
-    # JS-component based setup?
-    def __init__(self, itemsFun, rendererFun, asColumns=False):
-        super().__init__()
+    def childWrapsOwnKind(self, child):
+        if self.orientation == 'vertical':
+            return child.wrapsSequence
+        elif self.orientation == 'horizontal':
+            return child.wrapsHorizSequence
+        return False
 
-        self.itemsFun = itemsFun
-        self.rendererFun = rendererFun
-        self.existingItems = {}
-        self.spine = []
-        self.asColumns = asColumns
+def HorizontalSubscribedSequence(itemsFun, rendererFun):
+    return SubscribedSequence(itemsFun, rendererFun, orientation='horizontal')
 
-    def prepareForReuse(self):
-        if not self.garbageCollected:
-            return False
-        self._clearSubscriptions()
-        self.existingItems = {}
-        self.spine = []
-        return super().prepareForReuse()
+HSubscribedSequence = HorizontalSubscribedSequence
 
-    def sortsAs(self):
-        if '____child_0__' in self.children:
-            return self.children['____child_0__'].sortsAs()
-
-    def makeCell(self, item):
-        innerCell = Cell.makeCell(self.rendererFun(item))
-        wrapperCell = Subscribed(lambda: innerCell)
-        wrapperCell.isFlex = innerCell.isFlex #  Important
-        return Subscribed(lambda: Cell.makeCell(self.rendererFun(item)))
-
-    def recalculate(self):
-        import web_pdb; web_pdb.set_trace()
-        with self.view() as v:
-            try:
-                self.spine = augmentToBeUnique(self.itemsFun())
-            except SubscribeAndRetry:
-                raise
-            except Exception:
-                self._logger.error(
-                    "Spine calc threw an exception:\n%s", traceback.format_exc())
-                self.spine = []
-
-            self._resetSubscriptionsToViewReads(v)
-
-            self.updateChildren()
-
-        spineAsSet = set(self.spine)
-        for i in list(self.existingItems):
-            if i not in spineAsSet:
-                del self.existingItems[i]
-        self.exportData['asColumns'] = self.asColumns
-        self.exportData['numSpineChildren'] = len(self.spine)
-        if self.isFlexParent:
-            self.exportData['flexParent'] = True
-
-    def updateChildren(self):
-        #import web_pdb; web_pdb.set_trace()
-        new_children = []
-        current_child = None
-
-        for ix, rowKey in enumerate(self.spine):
-            if rowKey in self.existingItems:
-                current_child = self.existingItems[rowKey]
-            else:
-                try:
-                    current_child = self.makeCell(rowKey[0])
-                    self.existingItems[rowKey] = current_child
-                except SubscribeAndRetry:
-                    raise
-                except Exception:
-                    current_child = Traceback(traceback.format_exc())
-
-            if current_child.isFlex:
-                self.isFlexParent = True
-                new_children.append(current_child)
-            elif isinstance(current_child, Subscribed) and current_child.wrapsSequence:
-                subscribed_content = current_child.namedChildren['content']
-                if isinstance(subscribed_content, Sequence):
-                    # Here we care if the child of the Subscribed
-                    # is itself a Sequence. As with nested Sequences,
-                    # we add all of its elements to the children here.
-                    new_children += subscribed_content.elements
-                else:
-                    new_children.append(current_child)
-            else:
-                new_children.append(current_child)
-
-        self.children = {"____child_%s__" %
-                         i: new_children[i] for i in range(len(new_children))}
-        self.namedChildren['children'] = new_children
+def VSubscribedSequence(itemsFun, rendererFun):
+    return SubscribedSequence(itemsFun, rendererFun)
 
 
 class Popover(Cell):
