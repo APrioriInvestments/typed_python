@@ -3,6 +3,7 @@
  */
 
 import {Component, render} from './Component';
+import {PropTypes} from './util/PropertyValidator';
 import {h} from 'maquette';
 
 /**
@@ -16,7 +17,7 @@ import {h} from 'maquette';
 /**
  * About Named Replacements
  * ------------------------
- * `children` (array) - An array of Cells that are subscribed
+ * `elements` (array) - An array of Cells that are subscribed
  */
 class SubscribedSequence extends Component {
     constructor(props, ...args){
@@ -42,7 +43,7 @@ class SubscribedSequence extends Component {
         if(this.usesReplacements){
             return this.getReplacementElementsFor("child");
         } else {
-            let elements = this.props.namedChildren["children"];
+            let elements = this.props.namedChildren["elements"];
             return elements.map(childComponent => {
                 let hyperscript = render(childComponent);
                 if(childComponent.props.flexChild == true && this.props.flexParent){
@@ -57,9 +58,13 @@ class SubscribedSequence extends Component {
         let classes = [
             "cell",
             "sequence",
-            "subscribed-sequence",
-            "sequence-vertical"
+            "subscribed-sequence"
         ];
+        if(this.props.orientation == 'horizontal'){
+            classes.push("sequence-vertical");
+        } else {
+            classes.push("sequence-vertical");
+        }
         if(this.props.flexParent){
             classes.push("flex-parent");
         }
@@ -69,5 +74,12 @@ class SubscribedSequence extends Component {
         return classes.join(" ");
     }
 }
+
+SubscribedSequence.propTypes = {
+    orientation: {
+        description: "Whether it's a vertical or horizontal sequence",
+        type: PropTypes.oneOf(['vertical', 'horizontal'])
+    }
+};
 
 export {SubscribedSequence, SubscribedSequence as default};
