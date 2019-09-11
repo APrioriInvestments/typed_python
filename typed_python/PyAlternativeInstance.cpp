@@ -296,6 +296,14 @@ void PyAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Alternative*
         "__typed_python_alternatives__",
         alternatives
         );
+
+    for (auto method_pair: alt->getMethods()) {
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            method_pair.first.c_str(),
+            (PyObject*)typeObj(method_pair.second)
+        );
+    }
 }
 
 void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(ConcreteAlternative* alt, PyTypeObject* pyType) {
@@ -323,6 +331,13 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
         (PyObject*)typeObjInternal(alt->elementType())
         );
 
+    for (auto method_pair: alt->getAlternative()->getMethods()) {
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            method_pair.first.c_str(),
+            (PyObject*)typeObj(method_pair.second)
+        );
+    }
 }
 
 int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {

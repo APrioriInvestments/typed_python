@@ -146,33 +146,6 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
             self.assertTrue(finalMem < initMem + 2)
 
-    def test_boolconv_specialization_fail(self):
-
-        A1 = Alternative("A1", a={'a': str})
-
-        class AClass():
-            pass
-
-        test_cases = [
-            TupleOf(int)(),  # fail
-            # ListOf(int)((3,4,5)),  # fail
-            # list(),  # pass
-            # tuple(),  # pass
-            # Tuple(int)((1,)),  # pass
-            # Dict(int,int)(),  # pass
-            # ConstDict(int,int)(),  # pass
-            # Set(int)(),  # pass
-            # A1.a(),  # pass
-            AClass(),
-        ]
-
-        @SpecializedEntrypoint
-        def specialized_fail(x):
-            return False
-
-        for x in test_cases:
-            r = specialized_fail(x)
-
     def test_bool_conv(self):
 
         IDict = Dict(int, int)
@@ -184,15 +157,22 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         NamedTuple1 = NamedTuple(a=int)
         OneOf2 = OneOf(int, str)
         IntTuple2 = Tuple(int, int)
+        # Can define empty Alternative, but can't instantiate it.
         # A0 = Alternative("A0")
-        A1 = Alternative("A1", a={'a': str})
-        A2 = Alternative("A2", a={}, b={})
-        A3 = Alternative("A3", a={}, b={}, __bool__=lambda self: self.Name == 'a')
-        A4 = Alternative("A4", a={}, b={}, __len__=lambda self: 0 if self.Name == 'a' else 1)
+        A1 = Alternative("A1", a={}, b={})
+        A2 = Alternative("A2", a={}, b={}, __bool__=lambda self: False)
+        A3 = Alternative("A3", a={}, b={}, __bool__=lambda self: True)
+        A4 = Alternative("A4", a={}, b={}, __len__=lambda self: 0)
+        A5 = Alternative("A5", a={}, b={}, __len__=lambda self: 42)
+        B1 = Alternative("B1", a={'s': str}, b={'i': int})
+        B2 = Alternative("B2", a={'s': str}, b={'i': int}, __bool__=lambda self: False)
+        B3 = Alternative("B3", a={'s': str}, b={'i': int}, __bool__=lambda self: True)
+        B4 = Alternative("B4", a={'s': str}, b={'i': int}, __len__=lambda self: 0)
+        B5 = Alternative("B5", a={'s': str}, b={'i': int}, __len__=lambda self: 42)
+        # want to test something like A6 below, but .matches. is not compilable at the moment
+        # A6 = Alternative("A6", a={}, b={}, __len__=lambda self: 0 if self.matches.a else 42)
 
         test_cases = [
-            (A1.a, A1.a(a='')),
-            (A1.a, A1.a(a='a')),
             (int, 0),
             (int, 1),
             (Int8, Int8(0)), (Int8, Int8(1)), (UInt8, UInt8(0)), (UInt8, UInt8(-1)),
@@ -218,26 +198,55 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             (ITuple, ITuple()), (ITuple, ITuple((0,))), (ITuple, ITuple(range(1000))),
             (AClassWithBool, AClassWithBool(1)),
             (AClassWithBool, AClassWithBool(0)),
-            (A1, A1.a(a='')),
-            (A1, A1.a(a='a')),
-            (A1.a, A1.a(a='')),
-            (A1.a, A1.a(a='a')),
-            (A2, A2.a()),
+            (A1.a, A1.a()),
+            (A1.a, A1.a()),
+            (A1.b, A1.b()),
             (A2.a, A2.a()),
-            (A2, A2.b()),
             (A2.b, A2.b()),
-            (A3, A3.a()),
             (A3.a, A3.a()),
-            (A3, A3.b()),
             (A3.b, A3.b()),
-            (A4, A4.a()),
             (A4.a, A4.a()),
-            (A4, A4.b()),
             (A4.b, A4.b()),
+            (A5.a, A5.a()),
+            (A5.b, A5.b()),
+            # (A6.a, A6.a()),
+            # (A6.b, A6.b()),
+            (B1.a, B1.a(s='')),
+            (B1.a, B1.a(s='a')),
+            (B2.a, B2.a(s='')),
+            (B2.a, B2.a(s='a')),
+            (B3.a, B3.a(s='')),
+            (B3.a, B3.a(s='a')),
+            (B4.a, B4.a(s='')),
+            (B4.a, B4.a(s='a')),
+            (B5.a, B5.a(s='')),
+            (B5.a, B5.a(s='a')),
+            (A1, A1.a()),
+            (A1, A1.a()),
+            (A1, A1.b()),
+            (A2, A2.a()),
+            (A2, A2.b()),
+            (A3, A3.a()),
+            (A3, A3.b()),
+            (A4, A4.a()),
+            (A4, A4.b()),
+            (A5, A5.a()),
+            (A5, A5.b()),
+            # (A6, A6.a()),
+            # (A6, A6.b()),
+            (B1, B1.a(s='')),
+            (B1, B1.a(s='a')),
+            (B2, B2.a(s='')),
+            (B2, B2.a(s='a')),
+            (B3, B3.a(s='')),
+            (B3, B3.a(s='a')),
+            (B4, B4.a(s='')),
+            (B4, B4.a(s='a')),
+            (B5, B5.a(s='')),
         ]
 
         @SpecializedEntrypoint
-        def outer_specialized_bool(x) -> bool:
+        def specialized_bool(x) -> bool:
             return bool(x)
 
         for T, x in test_cases:
@@ -246,20 +255,11 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             def compiled_bool(x: T) -> bool:
                 return bool(x)
 
-            @SpecializedEntrypoint
-            def inner_specialized_bool(x) -> bool:
-                return bool(x)
-
             r1 = bool(x)
             r2 = compiled_bool(x)
-            r3 = inner_specialized_bool(x)
-            # TODO: outer_specialized_bool will error unpredictably on AClassWithBool if there are many specializations prior to it
-            # it is fine if it is listed among the first 20 or so entries in test_cases
-            # but it fails (error or segfault) if it is near the end of the list
-            # r4 = outer_specialized_bool(x)
+            r3 = specialized_bool(x)
             self.assertEqual(r1, r2)
             self.assertEqual(r1, r3)
-            # self.assertEqual(r1, r4)
 
     def test_obj_to_bool(self):
 

@@ -26,11 +26,6 @@ import nativepython
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
 
 
-def c_b(e):
-    context.call_py_function(e.expr_type.typeRepresentation().__bool__, (e,), {}, bool)
-    return True
-
-
 def makeAlternativeWrapper(t):
     if t.__typed_python_category__ == "ConcreteAlternative":
         return ConcreteAlternativeWrapper(t)
@@ -85,15 +80,30 @@ class SimpleAlternativeWrapper(Wrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            tp = context.getTypePointer(e.expr_type.typeRepresentation)
-            if tp:
-                if not e.isReference:
-                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
-                context.pushEffect(
-                    targetVal.expr.store(
-                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
-                    )
-                )
+            alt = e.expr_type.typeRepresentation
+            if hasattr(alt.__bool__, "__typed_python_category__") and alt.__bool__.__typed_python_category__ == 'Function':
+                assert len(alt.__bool__.overloads) == 1
+                y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                ret_type = y.expr_type.typeRepresentation
+                if ret_type is not Bool:
+                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
+
+                context.pushEffect(targetVal.expr.store(y))
+                return context.constant(True)
+            elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+                assert len(alt.__len__.overloads) == 1
+                y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                return context.constant(True)
+            else:
+                # default behavior for Alternatives is for __bool__ to always be True
+                context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
@@ -209,7 +219,31 @@ class AlternativeWrapper(RefcountedWrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            return context.constant(False)
+            alt = e.expr_type.typeRepresentation
+            if hasattr(alt.__bool__, "__typed_python_category__") and alt.__bool__.__typed_python_category__ == 'Function':
+                assert len(alt.__bool__.overloads) == 1
+                y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                ret_type = y.expr_type.typeRepresentation
+                if ret_type is not Bool:
+                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
+
+                context.pushEffect(targetVal.expr.store(y))
+                return context.constant(True)
+            elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+                assert len(alt.__len__.overloads) == 1
+                y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                return context.constant(True)
+            else:
+                # default behavior for Alternatives is for __bool__ to always be True
+                context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
@@ -274,13 +308,30 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
             return context.constant(True)
 
         if target_type.typeRepresentation == Bool:
-            if hasattr(e.expr_type.typeRepresentation(), "__bool__"):
-                context.pushEffect(
-                    targetVal.expr.store(
-                        # context.call_py_function(c_b, (e,), {})
-                        context.constant(False)
-                    )
-                )
+            alt = e.expr_type.typeRepresentation
+            if hasattr(alt.__bool__, "__typed_python_category__") and alt.__bool__.__typed_python_category__ == 'Function':
+                assert len(alt.__bool__.overloads) == 1
+                y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                ret_type = y.expr_type.typeRepresentation
+                if ret_type is not Bool:
+                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
+
+                context.pushEffect(targetVal.expr.store(y))
+                return context.constant(True)
+            elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+                assert len(alt.__len__.overloads) == 1
+                y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                return context.constant(True)
+            else:
+                # default behavior for Alternatives is for __bool__ to always be True
+                context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

@@ -243,11 +243,15 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
                 })
                 );
             }
-        catch(...) {
-            //failed to convert
+        catch(PythonExceptionSet& e) {
+            //not a valid conversion, but keep going
+            PyErr_Clear();
             return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
         }
-
+        catch(...) {
+            //not a valid conversion
+            return std::pair<bool, PyObject*>(false, (PyObject*)nullptr);
+        }
     }
 
     try {

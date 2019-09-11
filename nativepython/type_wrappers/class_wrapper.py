@@ -15,7 +15,6 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
-from nativepython.native_ast import VoidPtr
 
 from typed_python import NoneType, _types, Bool
 
@@ -248,15 +247,30 @@ class ClassWrapper(RefcountedWrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            tp = context.getTypePointer(e.expr_type.typeRepresentation)
-            if tp:
-                if not e.isReference:
-                    e = context.push(e.expr_type, lambda x: x.convert_copy_initialize(e))
-                context.pushEffect(
-                    targetVal.expr.store(
-                        runtime_functions.instance_to_bool.call(e.expr.cast(VoidPtr), tp)
-                    )
-                )
+            cl = e.expr_type.typeRepresentation
+            if hasattr(cl.__bool__, "__typed_python_category__") and cl.__bool__.__typed_python_category__ == 'Function':
+                assert len(cl.__bool__.overloads) == 1
+                y = context.call_py_function(cl.__bool__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                ret_type = y.expr_type.typeRepresentation
+                if ret_type is not Bool:
+                    raise Exception(f"__bool__ should return bool, returned {y.ret_type}")
+
+                context.pushEffect(targetVal.expr.store(y))
+                return context.constant(True)
+            elif hasattr(cl.__len__, "__typed_python_category__") and cl.__len__.__typed_python_category__ == 'Function':
+                assert len(cl.__len__.overloads) == 1
+                y = context.call_py_function(cl.__len__.overloads[0].functionObj, (e,), {})
+                if y is None:
+                    return context.constant(False)
+
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                return context.constant(True)
+            else:
+                # default behavior for Class is for __bool__ to always be True
+                context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
