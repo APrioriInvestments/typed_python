@@ -2,7 +2,7 @@
  * SubscribedSequence Cell Component
  */
 
-import {Component} from './Component';
+import {Component, render} from './Component';
 import {h} from 'maquette';
 
 /**
@@ -21,12 +21,10 @@ import {h} from 'maquette';
 class SubscribedSequence extends Component {
     constructor(props, ...args){
         super(props, ...args);
-        //this.addReplacement('contents', '_____contents__');
-        //
+
         // Bind context to methods
         this.makeClass = this.makeClass.bind(this);
         this.makeChildren = this.makeChildren.bind(this);
-        this._makeReplacementChildren = this._makeReplacementChildren.bind(this);
     }
 
     build(){
@@ -36,57 +34,36 @@ class SubscribedSequence extends Component {
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "SubscribedSequence"
-            }, [this.makeChildren()]
+            }, this.makeChildren()
         );
     }
 
     makeChildren(){
         if(this.usesReplacements){
-            return this._makeReplacementChildren();
+            return this.getReplacementElementsFor("child");
         } else {
-            if(this.props.extraData.asColumns){
-                let formattedChildren = this.renderChildrenNamed('children').map(childEl => {
-                    return(
-                        h('div', {class: "col-sm", key: childElement.id}, [
-                            h('span', {}, [childEl])
-                        ])
-                    );
-                });
-                return (
-                    h('div', {class: "row flex-nowrap", key: `${this.props.id}-spine-wrapper`}, formattedChildren)
-                );
-            } else {
-                return (
-                    h('div', {key: `${this.props.id}-spine-wrapper`}, this.renderChildrenNamed('children'))
-                );
-            }
+            let elements = this.props.namedChildren["children"];
+            return elements.map(childComponent => {
+                let hyperscript = render(childComponent);
+                if(childComponent.props.flexChild == true && this.props.flexParent){
+                    hyperscrupt.properties.class += " flex-child";
+                }
+                return hyperscript;
+            });
         }
     }
 
     makeClass() {
-        if (this.props.extraData.asColumns) {
-            return "cell subscribedSequence container-fluid";
+        let classes = [
+            "cell",
+            "sequence",
+            "subscribed-sequence",
+            "sequence-vertical"
+        ];
+        if(this.props.flexParent){
+            classes.push("flex-parent");
         }
-        return "cell subscribedSequence";
-    }
-
-    _makeReplacementChildren(){
-        if(this.props.extraData.asColumns){
-            let formattedChildren = this.getReplacementElementsFor('child').map(childElement => {
-                return(
-                    h('div', {class: "col-sm", key: childElement.id}, [
-                        h('span', {}, [childElement])
-                    ])
-                );
-            });
-            return (
-                h('div', {class: "row flex-nowrap", key: `${this.props.id}-spine-wrapper`}, formattedChildren)
-            );
-        } else {
-            return (
-                h('div', {key: `${this.props.id}-spine-wrapper`}, this.getReplacementElementsFor('child'))
-            );
-        }
+        return classes.join(" ");
     }
 }
 
