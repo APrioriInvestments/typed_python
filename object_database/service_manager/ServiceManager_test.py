@@ -29,7 +29,7 @@ from object_database.service_manager.ServiceBase import ServiceBase
 import object_database.service_manager.ServiceInstance as ServiceInstance
 from object_database.web.cells import (
     Button, SubscribedSequence, Subscribed,
-    Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Tabs, Grid,
+    Text, Dropdown, Card, Plot, Code, Slot, CodeEditor, Tabs, Grid, Flex,
     Sheet, ensureSubscribedType, SubscribeAndRetry, Expands, AsyncDropdown, ButtonGroup, Octicon, SplitView
 )
 
@@ -405,10 +405,10 @@ class HappyService(ServiceBase):
         return Card(
             Subscribed(lambda: Text("There are %s happy objects <this should not have lessthans>" % len(Happy.lookupAll()))) +
             Expands(Text("Closed"), Subscribed(lambda: HappyService.serviceDisplay(serviceObject)))
-        ) + Button("go to google", "http://google.com/") + SubscribedSequence(
+        ) + Button("go to google", "http://google.com/") + Flex(SubscribedSequence(
             lambda: Happy.lookupAll(),
             lambda h: Button("go to the happy", serviceObject.urlForObject(h, x=10))
-        ) + Subscribed(
+        )) + Subscribed(
             lambda:
                 ButtonGroup([
                     Button(
