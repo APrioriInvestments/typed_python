@@ -112,7 +112,7 @@ class AsyncDropdownContent extends Component {
         this.makeContent = this.makeContent.bind(this);
     }
 
-    render(){
+    build(){
         return (
             h('div', {
                 id: `dropdownContent-${this.props.id}`,

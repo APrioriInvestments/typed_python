@@ -8,7 +8,7 @@ class FakeHeader extends Component {
         super(props, ...args);
     }
 
-    render(){
+    build(){
         return (
             h('p', ["CARD HEADER"])
         );
@@ -20,7 +20,7 @@ class FakeContent extends Component {
         super(props, ...args);
     }
 
-    render(){
+    build(){
         return (
             h('p', {}, ["THIS IS THE BODY"])
         );
