@@ -63,6 +63,9 @@ class SubscribedSequence extends Component {
         if(this.props.flexParent){
             classes.push("flex-parent");
         }
+        if(this.props.flexChild){
+            classes.push("flex-child");
+        }
         return classes.join(" ");
     }
 }
