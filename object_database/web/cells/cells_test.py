@@ -23,6 +23,9 @@ from object_database.web.cells import (
     Sequence,
     HorizontalSequence,
     SubscribedSequence,
+    HorizontalSubscribedSequence,
+    HSubscribedSequence,
+    VSubscribedSequence,
     Span,
     Text,
     Slot,
@@ -716,6 +719,73 @@ class CellsHorizSequenceHandlingTests(unittest.TestCase):
         self.assertTrue(isinstance(result, HorizontalSequence))
         self.assertEqual(len(result.elements), 4)
 
+
+class CellsSubscribedSequenceHandlingTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        configureLogging(
+            preamble="cells_test",
+            level=logging.INFO
+        )
+        cls._logger = logging.getLogger(__name__)
+
+    def setUp(self):
+        self.token = genToken()
+        self.server = InMemServer(auth_token=self.token)
+        self.server.start()
+
+        self.db = self.server.connect(self.token)
+        self.db.subscribeToSchema(test_schema)
+        self.cells = Cells(self.db)
+
+        # Set up fake data
+        self.exampleItems = []
+        for num in range(50):
+            item = ("Item {}".format(num), num)
+            self.exampleItems.append(item)
+
+    def tearDown(self):
+        self.server.stop()
+
+    def itemsFun(self):
+        return self.exampleItems
+
+    def rendererFun(self, item):
+        return Text(item)
+
+    def test_element_length(self):
+        sub_seq = SubscribedSequence(self.itemsFun, self.rendererFun)
+        self.cells.withRoot(sub_seq)
+        self.cells._recalculateCells()
+        self.assertEqual(len(sub_seq.items), 50)
+        self.assertEqual(len(sub_seq.namedChildren['elements']), 50)
+
+    def test_elements_length_changed(self):
+        exampleData = self.exampleItems
+        def itemsFun():
+            exampleData.pop()
+            return exampleData
+        sub_seq = SubscribedSequence(itemsFun, self.rendererFun)
+        self.cells.withRoot(sub_seq)
+        self.cells._recalculateCells()
+        self.assertEqual(len(sub_seq.items), 49)
+        sub_seq.recalculate()
+        self.assertEqual(len(sub_seq.items), 48)
+
+    def test_horizontal_constructor(self):
+        sub_seq = HorizontalSubscribedSequence(self.itemsFun, self.rendererFun)
+        self.assertEqual(sub_seq.orientation, 'horizontal')
+        self.assertIsInstance(sub_seq, SubscribedSequence)
+
+    def test_abbrev_vert_constructor(self):
+        sub_seq = VSubscribedSequence(self.itemsFun, self.rendererFun)
+        self.assertEqual(sub_seq.orientation, 'vertical')
+        self.assertIsInstance(sub_seq, SubscribedSequence)
+
+    def test_abbrev_horiz_constructor(self):
+        sub_seq = HSubscribedSequence(self.itemsFun, self.rendererFun)
+        self.assertEqual(sub_seq.orientation, 'horizontal')
+        self.assertIsInstance(sub_seq, SubscribedSequence)
 
 if __name__ == '__main__':
     unittest.main()
