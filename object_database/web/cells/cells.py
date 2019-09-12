@@ -1681,7 +1681,52 @@ class Subscribed(Cell):
 
 
 class SubscribedSequence(Cell):
+    """SubscribedSequence Cell
+
+    This Cell acts like a Sequence, but each of its elements
+    will be wrapped in a `Subscribed`. See constructor
+    comments for more information.
+
+    Properties
+    ----------
+    itemsFun: func
+        A function that will be called each cycle
+        that returns a list of Tuples, each containing
+        an object we would like to have as a subscribed
+        sequence element.
+    rendererFun: func
+        A function that takes a single item from the
+        itemsFun results, turns its object into a Cell,
+        and wraps that in a `Subscribed`.
+    items: list
+        A stored version that is the current result
+        of calling itemsFun
+    existingItems: dict
+        A dictionary that maps items as keys to
+        any composed Cells of that item that have
+        already been made. This way we don't have
+        to re-create Cells every cycle.
+    orientation: str
+        The axis along which this SubscribedSequence
+        should lay itself out.
+    """
     def __init__(self, itemsFun, rendererFun, orientation='vertical'):
+        """
+        Parameters
+        ----------
+        itemsFun: func
+            A function that will return a list
+            of Tuples that contain the objects
+            to be transformed into element Cells.
+        rendererFun: func
+            A function that will take an item as
+            retrieved from `itemsFunc`, turn it into
+            a Cell object, and wrap that in a `Subscribed`.
+        orientation: str
+            Tells the Cell which direction it should have as
+            a sequence. Can be 'vertical' or 'horizontal'.
+            Defaults to 'vertical'
+        """
         super().__init__()
 
         self.itemsFun = itemsFun
@@ -1692,13 +1737,25 @@ class SubscribedSequence(Cell):
         self.orientation = orientation
 
     def makeCell(self, item):
+        """Makes a Cell instance from an object.
+        Note that we also wrap this in a
+        `Subscribed` instance.
+
+        Parameters
+        ----------
+        item: object
+            An item that will be turned into a Cell
+
+        Returns
+        -------
+        A Cell instance
+        """
         itemCell = Cell.makeCell(self.rendererFun(item))
         wrapperCell = Subscribed(lambda: itemCell)
         wrapperCell.isFlex = itemCell.isFlex
         return wrapperCell
 
     def recalculate(self):
-        # import web_pdb; web_pdb.set_trace()
         with self.view() as v:
             self._getItems()
             self._resetSubscriptionsToViewReads(v)
@@ -1710,6 +1767,17 @@ class SubscribedSequence(Cell):
                 self.exportData['flexParent'] = True
 
     def updateChildren(self):
+        """Updates the stored children and namedChildren
+
+        Notes
+        -----
+        First we check to ensure that any new item
+        hasn't already been made into a Cell via
+        the existingItems cache.
+        Otherwise we use makeCell to create a new
+        instance.
+        See `_processChild` for deeper information
+        """
         count = 0
         new_children = []
         current_child = None
@@ -1738,6 +1806,8 @@ class SubscribedSequence(Cell):
             return self.namedChildren['elements'][0].sortAs()
 
     def _processChild(self, child, children):
+        """Determines whether or not to flatten nested
+        Sequences based on flex properties."""
         if child.isFlex:
             self.isFlexParent = True
             children.append(child)
@@ -1754,6 +1824,9 @@ class SubscribedSequence(Cell):
 
 
     def _getItems(self):
+        """Retrieves the items using itemsFunc
+        and updates this object's internal items
+        list"""
         try:
             self.items = augmentToBeUnique(self.itemsFun())
         except SubscribeAndRetry:
@@ -1765,12 +1838,19 @@ class SubscribedSequence(Cell):
             self.items = []
 
     def _updateExistingItems(self):
+        """Updates the dict storing cached
+        Cells that were already created.
+        Note that we might need to remove
+        some entries that no longer apply"""
         itemSet = set(self.items)
         for item in list(self.existingItems):
             if item not in itemSet:
                 del self.existingItems[item]
 
     def childWrapsOwnKind(self, child):
+        """Returns true if this object wraps
+        a Subscribed that wraps a Sequence that
+        has the same orientation as itself"""
         if self.orientation == 'vertical':
             return child.wrapsSequence
         elif self.orientation == 'horizontal':
