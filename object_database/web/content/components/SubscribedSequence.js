@@ -46,8 +46,11 @@ class SubscribedSequence extends Component {
             let elements = this.props.namedChildren["elements"];
             return elements.map(childComponent => {
                 let hyperscript = render(childComponent);
+                let childComponentName = childComponent.constructor.name;
+                console.log(`[${this.props.id}] rendering ${childComponentName}[${childComponent.props.id}] flexing: ${childComponent.props.flexChild}`);
+                // End Debugging
                 if(childComponent.props.flexChild == true && this.props.flexParent){
-                    hyperscrupt.properties.class += " flex-child";
+                    hyperscript.properties.class += " flex-child";
                 }
                 return hyperscript;
             });

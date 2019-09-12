@@ -160,6 +160,10 @@
     height: 100%;
 }
 
+.sequence-horizontal > .sequence {
+    width: auto;
+}
+
 .sequence-vertical > * {
     display: block;
 }
