@@ -79,31 +79,22 @@ class SimpleAlternativeWrapper(Wrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            alt = e.expr_type.typeRepresentation
-            if getattr(alt.__bool__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__bool__.overloads) == 1
-                y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__len__.overloads) == 1
-                y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                return context.constant(True)
             else:
-                # default behavior for Alternatives is for __bool__ to always be True
-                context.pushEffect(targetVal.expr.store(context.constant(True)))
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_len_native(self, context, expr):
-        alt = expr.expr_type.typeRepresentation
+        # alt = expr.expr_type.typeRepresentation
+        alt = self.typeRepresentation
         if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
             assert len(alt.__len__.overloads) == 1
             return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
@@ -224,41 +215,25 @@ class AlternativeWrapper(RefcountedWrapper):
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
-
         if target_type.typeRepresentation == Bool:
-            alt = e.expr_type.typeRepresentation
-
-            if getattr(alt.__bool__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__bool__.overloads) == 1
-                y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__len__.overloads) == 1
-                y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                return context.constant(True)
             else:
-                # default behavior for Alternatives is for __bool__ to always be True
-                context.pushEffect(targetVal.expr.store(context.constant(True)))
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_call(self, context, expr, args, kwargs):
-        return context.call_py_function(self.alterativeType.__call__, args, kwargs)
+        return self.convert_call_method(context, "__call__", [expr] + args)
 
     def convert_len_native(self, context, expr):
-        alt = expr.expr_type.typeRepresentation
-        if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
-            assert len(alt.__len__.overloads) == 1
-            return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
-        return context.constant(0)
+        return self.convert_call_method(context, "__len__", (expr,)) or context.constant(0)
 
     def convert_len(self, context, expr):
         intermediate = self.convert_len_native(context, expr)
@@ -269,23 +244,25 @@ class AlternativeWrapper(RefcountedWrapper):
     def convert_bin_op(self, context, l, op, r):
         magic = "__add__" if op.matches.Add else \
             "__sub__" if op.matches.Sub else \
-            "__mul__" if op.matches.Mul else \
-            "__div__" if op.matches.Div else ""
-        alt = r.expr_type.typeRepresentation
-        if getattr(getattr(alt, magic), "__typed_python_category__", None) == 'Function':
-            assert len(getattr(alt, magic).overloads) == 1
-            return context.call_py_function(getattr(alt, magic).overloads[0].functionObj, (l, r), {})
-        return super().convert_bin_op(context, l, op, r)
+            "__mul__" if op.matches.Mult else \
+            "__truediv__" if op.matches.Div else \
+            "__floordiv__" if op.matches.FloorDiv else \
+            "__mod__" if op.matches.Mod else \
+            "__matmul__" if op.matches.MatMult else \
+            "__pow__" if op.matches.Pow else \
+            "__lshift__" if op.matches.LShift else \
+            "__rshift__" if op.matches.RShift else \
+            "__or__" if op.matches.BitOr else \
+            "__xor__" if op.matches.BitXor else \
+            "__and__" if op.matches.BitAnd else \
+            ""
+
+        return self.convert_call_method(context, magic, (l, r)) or super().convert_bin_op(context, l, op, r)
 
     def convert_bin_op_reverse(self, context, r, op, l):
         if op.matches.In:
-            alt = r.expr_type.typeRepresentation
-            if getattr(alt.__contains__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__contains__.overloads) == 1
-                intermediate = context.call_py_function(alt.__contains__.overloads[0].functionObj, (r, l), {})
-                if intermediate is None:
-                    return None
-                return intermediate.toBool()
+            ret = self.convert_call_method(context, "__contains__", (r, l))
+            return ret and ret.toBool()
         return super().convert_bin_op_reverse(context, r, op, l)
 
 
@@ -303,6 +280,13 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         self.indexInParent = t.Index
         self.underlyingLayout = typeWrapper(t.ElementType)  # a NamedTuple
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
+
+    # def call_method(self, context, method, args):
+    #     alt = self.typeRepresentation
+    #     if getattr(getattr(alt, method, None), "__typed_python_category__", None) == 'Function':
+    #         assert len(getattr(alt, method).overloads) == 1
+    #         return context.call_py_function(getattr(alt, method).overloads[0].functionObj, args, {})
+    #     return None
 
     def getNativeLayoutType(self):
         return self.layoutType
@@ -334,25 +318,15 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
             return context.constant(True)
 
         if target_type.typeRepresentation == Bool:
-            alt = e.expr_type.typeRepresentation
-            if getattr(alt.__bool__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__bool__.overloads) == 1
-                y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
-                assert len(alt.__len__.overloads) == 1
-                y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                return context.constant(True)
             else:
-                # default behavior for Alternatives is for __bool__ to always be True
-                context.pushEffect(targetVal.expr.store(context.constant(True)))
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

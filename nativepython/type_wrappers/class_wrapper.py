@@ -247,25 +247,15 @@ class ClassWrapper(RefcountedWrapper):
         target_type = targetVal.expr_type
 
         if target_type.typeRepresentation == Bool:
-            cl = e.expr_type.typeRepresentation
-            if getattr(cl.__bool__, "__typed_python_category__", None) == 'Function':
-                assert len(cl.__bool__.overloads) == 1
-                y = context.call_py_function(cl.__bool__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif getattr(cl.__len__, "__typed_python_category__", None) == 'Function':
-                assert len(cl.__len__.overloads) == 1
-                y = context.call_py_function(cl.__len__.overloads[0].functionObj, (e,), {})
-                if y is None:
-                    return context.constant(False)
-
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
-                return context.constant(True)
             else:
-                # default behavior for Class is for __bool__ to always be True
-                context.pushEffect(targetVal.expr.store(context.constant(True)))
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

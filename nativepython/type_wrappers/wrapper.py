@@ -333,6 +333,13 @@ class Wrapper(object):
             )
         )
 
+    def convert_call_method(self, context, method, args):
+        t = self.typeRepresentation
+        if getattr(getattr(t, method, None), "__typed_python_category__", None) == 'Function':
+            assert len(getattr(t, method).overloads) == 1
+            return context.call_py_function(getattr(t, method).overloads[0].functionObj, args, {})
+        return None
+
     def get_iteration_expressions(self, context, expr):
         """Return a fixed list of TypedExpressions iterating the object.
 

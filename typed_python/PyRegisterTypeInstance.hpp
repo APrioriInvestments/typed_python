@@ -340,7 +340,7 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
         return registerValueToPyValue(pyPow(self,other));
     }
 
-    if (strcmp(op, "__div__") == 0) {
+    if (strcmp(op, "__truediv__") == 0) {
         if (other == 0) {
             PyErr_Format(PyExc_ZeroDivisionError, "Divide by zero");
             throw PythonExceptionSet();
@@ -371,7 +371,7 @@ static PyObject* pyOperatorConcreteForRegisterPromoted(T self, T other, const ch
 template<class T, class T2>
 static PyObject* pyOperatorConcreteForRegister(T self, T2 other, const char* op, const char* opErr) {
     typedef typename PromotesTo<T, T2>::result_type target_type;
-    if (strcmp(op, "__div__") == 0) {
+    if (strcmp(op, "__truediv__") == 0) {
         typedef typename PromotesTo<target_type, float>::result_type div_target_type;
         return pyOperatorConcreteForRegisterPromoted(div_target_type(self), div_target_type(other), op, opErr);
     }

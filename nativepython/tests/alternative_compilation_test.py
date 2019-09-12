@@ -159,23 +159,25 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __bool__=lambda self: False,
                         __str__=lambda self: "my str",
                         __repr__=lambda self: "my repr",
-                        __call__=lambda self: "my call",
+                        __call__=lambda self, i: "my call",
                         __len__=lambda self: 42,
                         __contains__=lambda self, item: item == 1,
                         # __contains__=lambda self, item: not item,  # TODO: why doesn't this compile?
 
-                        __add__=lambda lhs, rhs: A.b("add"),
-                        __sub__=lambda lhs, rhs: A.b("sub"),
-                        __mul__=lambda lhs, rhs: A.b("mul"),
-                        __matmul__=lambda lhs, rhs: A.b("matmul"),
-                        __truediv__=lambda lhs, rhs: A.b("truediv"),
-                        __floordiv__=lambda lhs, rhs: A.b("floordiv"),
-                        __mod__=lambda lhs, rhs: A.b("mod"),
-                        __divmod__=lambda lhs, rhs: A.b("divmod"),
-                        __pow__=lambda lhs, rhs: A.b("pow"),
-                        __lshift__=lambda lhs, rhs: A.b("lshift"),
-                        __rshift__=lambda lhs, rhs: A.b("rshift"),
-                        __and__=lambda lhs, rhs: A.b("and"),
+                        __add__=lambda self, other: A.b("add"),
+                        __sub__=lambda self, other: A.b("sub"),
+                        __mul__=lambda self, other: A.b("mul"),
+                        __matmul__=lambda self, other: A.b("matmul"),
+                        __truediv__=lambda self, other: A.b("truediv"),
+                        __floordiv__=lambda self, other: A.b("floordiv"),
+                        __mod__=lambda self, other: A.b("mod"),
+                        __divmod__=lambda self, other: A.b("divmod"),
+                        __pow__=lambda self, other: A.b("pow"),
+                        __lshift__=lambda self, other: A.b("lshift"),
+                        __rshift__=lambda self, other: A.b("rshift"),
+                        __and__=lambda self, other: A.b("and"),
+                        __or__=lambda self, other: A.b("or"),
+                        __xor__=lambda self, other: A.b("xor"),
                         )
 
         def f_extramethod(x: A):
@@ -191,7 +193,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             return repr(x)
 
         def f_call(x: A):
-            return x()
+            return x(1)
 
         def f_1in(x: A):
             return 1 in x
@@ -205,8 +207,53 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_add(x: A):
             return x + A.a()
 
-        test_cases = [f_bool, f_str, f_repr, f_len, f_0in, f_1in, f_add]
-        # failing_test_cases = [f_call, ...]
+        def f_sub(x: A):
+            return x - A.a()
+
+        def f_mul(x: A):
+            return x * A.a()
+
+        def f_div(x: A):
+            return x / A.a()
+
+        def f_floordiv(x: A):
+            return x // A.a()
+
+        def f_matmul(x: A):
+            return x @ A.a()
+
+        def f_mod(x: A):
+            return x % A.a()
+
+        def f_and(x: A):
+            return x & A.a()
+
+        def f_or(x: A):
+            return x | A.a()
+
+        def f_xor(x: A):
+            return x ^ A.a()
+
+        def f_rshift(x: A):
+            return x >> A.a()
+
+        def f_lshift(x: A):
+            return x << A.a()
+
+        def f_pow(x: A):
+            return x ** A.a()
+
+        def f_neg(x: A):
+            return -x
+
+        def f_pos(x: A):
+            return +x
+
+        def f_invert(x: A):
+            return ~x
+
+        test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len, f_add, f_sub, f_mul, f_div,
+                      f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift]
 
         for f in test_cases:
             compiled_f = Compiled(f)

@@ -385,7 +385,7 @@ PyObject* PyInstance::nb_floor_divide(PyObject* lhs, PyObject* rhs) {
 }
 
 PyObject* PyInstance::nb_true_divide(PyObject* lhs, PyObject* rhs) {
-    return pyOperator(lhs, rhs, "__div__", "/");
+    return pyOperator(lhs, rhs, "__truediv__", "/");  // __div__ replaced by __truediv__
 }
 
 PyObject* PyInstance::nb_inplace_floor_divide(PyObject* lhs, PyObject* rhs) {
