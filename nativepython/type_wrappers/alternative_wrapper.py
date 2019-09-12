@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -80,14 +80,14 @@ class SimpleAlternativeWrapper(Wrapper):
 
         if target_type.typeRepresentation == Bool:
             alt = e.expr_type.typeRepresentation
-            if hasattr(alt.__bool__, "__typed_python_category__") and alt.__bool__.__typed_python_category__ == 'Function':
+            if getattr(alt.__bool__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__bool__.overloads) == 1
                 y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
                 if y is None:
                     return context.constant(False)
 
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+            elif getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__len__.overloads) == 1
                 y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
                 if y is None:
@@ -104,7 +104,7 @@ class SimpleAlternativeWrapper(Wrapper):
 
     def convert_len_native(self, context, expr):
         alt = expr.expr_type.typeRepresentation
-        if hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+        if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
             assert len(alt.__len__.overloads) == 1
             return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
         return context.constant(0)
@@ -227,14 +227,15 @@ class AlternativeWrapper(RefcountedWrapper):
 
         if target_type.typeRepresentation == Bool:
             alt = e.expr_type.typeRepresentation
-            if hasattr(alt.__bool__, "__typed_python_category__") and alt.__bool__.__typed_python_category__ == 'Function':
+
+            if getattr(alt.__bool__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__bool__.overloads) == 1
                 y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
                 if y is None:
                     return context.constant(False)
 
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+            elif getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__len__.overloads) == 1
                 y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
                 if y is None:
@@ -254,7 +255,7 @@ class AlternativeWrapper(RefcountedWrapper):
 
     def convert_len_native(self, context, expr):
         alt = expr.expr_type.typeRepresentation
-        if hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+        if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
             assert len(alt.__len__.overloads) == 1
             return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
         return context.constant(0)
@@ -265,10 +266,21 @@ class AlternativeWrapper(RefcountedWrapper):
             return None
         return context.pushPod(int, intermediate.convert_to_type(int).expr)
 
+    def convert_bin_op(self, context, l, op, r):
+        magic = "__add__" if op.matches.Add else \
+            "__sub__" if op.matches.Sub else \
+            "__mul__" if op.matches.Mul else \
+            "__div__" if op.matches.Div else ""
+        alt = r.expr_type.typeRepresentation
+        if getattr(getattr(alt, magic), "__typed_python_category__", None) == 'Function':
+            assert len(getattr(alt, magic).overloads) == 1
+            return context.call_py_function(getattr(alt, magic).overloads[0].functionObj, (l, r), {})
+        return super().convert_bin_op(context, l, op, r)
+
     def convert_bin_op_reverse(self, context, r, op, l):
         if op.matches.In:
             alt = r.expr_type.typeRepresentation
-            if hasattr(alt.__contains__, "__typed_python_category__") and alt.__contains__.__typed_python_category__ == 'Function':
+            if getattr(alt.__contains__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__contains__.overloads) == 1
                 intermediate = context.call_py_function(alt.__contains__.overloads[0].functionObj, (r, l), {})
                 if intermediate is None:
@@ -323,14 +335,14 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
         if target_type.typeRepresentation == Bool:
             alt = e.expr_type.typeRepresentation
-            if hasattr(alt.__bool__, "__typed_python_category__") and alt.__bool__.__typed_python_category__ == 'Function':
+            if getattr(alt.__bool__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__bool__.overloads) == 1
                 y = context.call_py_function(alt.__bool__.overloads[0].functionObj, (e,), {})
                 if y is None:
                     return context.constant(False)
 
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+            elif getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
                 assert len(alt.__len__.overloads) == 1
                 y = context.call_py_function(alt.__len__.overloads[0].functionObj, (e,), {})
                 if y is None:

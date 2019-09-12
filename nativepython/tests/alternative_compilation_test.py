@@ -162,7 +162,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __call__=lambda self: "my call",
                         __len__=lambda self: 42,
                         __contains__=lambda self, item: item == 1,
-                        # __contains__=lambda self, item: not(item),  TODO: why doesn't this compile?
+                        # __contains__=lambda self, item: not item,  # TODO: why doesn't this compile?
 
                         __add__=lambda lhs, rhs: A.b("add"),
                         __sub__=lambda lhs, rhs: A.b("sub"),
@@ -171,7 +171,7 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __truediv__=lambda lhs, rhs: A.b("truediv"),
                         __floordiv__=lambda lhs, rhs: A.b("floordiv"),
                         __mod__=lambda lhs, rhs: A.b("mod"),
-                        __divmod=lambda lhs, rhs: A.b("divmod"),
+                        __divmod__=lambda lhs, rhs: A.b("divmod"),
                         __pow__=lambda lhs, rhs: A.b("pow"),
                         __lshift__=lambda lhs, rhs: A.b("lshift"),
                         __rshift__=lambda lhs, rhs: A.b("rshift"),
@@ -205,8 +205,9 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_add(x: A):
             return x + A.a()
 
-        test_cases = [f_0in, f_1in, f_bool, f_str, f_repr, f_len]
-        # failing_test_cases = [f_call, f_add]
+        test_cases = [f_bool, f_str, f_repr, f_len, f_0in, f_1in, f_add]
+        # failing_test_cases = [f_call, ...]
+
         for f in test_cases:
             compiled_f = Compiled(f)
             r1 = f(A.a())

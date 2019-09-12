@@ -248,14 +248,14 @@ class ClassWrapper(RefcountedWrapper):
 
         if target_type.typeRepresentation == Bool:
             cl = e.expr_type.typeRepresentation
-            if hasattr(cl.__bool__, "__typed_python_category__") and cl.__bool__.__typed_python_category__ == 'Function':
+            if getattr(cl.__bool__, "__typed_python_category__", None) == 'Function':
                 assert len(cl.__bool__.overloads) == 1
                 y = context.call_py_function(cl.__bool__.overloads[0].functionObj, (e,), {})
                 if y is None:
                     return context.constant(False)
 
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
-            elif hasattr(cl.__len__, "__typed_python_category__") and cl.__len__.__typed_python_category__ == 'Function':
+            elif getattr(cl.__len__, "__typed_python_category__", None) == 'Function':
                 assert len(cl.__len__.overloads) == 1
                 y = context.call_py_function(cl.__len__.overloads[0].functionObj, (e,), {})
                 if y is None:
