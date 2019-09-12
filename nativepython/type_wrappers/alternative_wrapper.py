@@ -241,6 +241,16 @@ class AlternativeWrapper(RefcountedWrapper):
             return None
         return context.pushPod(int, intermediate.convert_to_type(int).expr)
 
+    def convert_abs(self, context, expr):
+        return self.convert_call_method(context, "__abs__", (expr,))
+
+    def convert_unary_op(self, context, expr, op):
+        magic = "__pos__" if op.matches.UAdd else \
+            "__neg__" if op.matches.USub else \
+            "__invert__" if op.matches.Invert else \
+            ""
+        return self.convert_call_method(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
+
     def convert_bin_op(self, context, l, op, r):
         magic = "__add__" if op.matches.Add else \
             "__sub__" if op.matches.Sub else \

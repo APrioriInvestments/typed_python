@@ -178,6 +178,12 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __and__=lambda self, other: A.b("and"),
                         __or__=lambda self, other: A.b("or"),
                         __xor__=lambda self, other: A.b("xor"),
+
+                        __neg__=lambda self: A.b("neg"),
+                        __pos__=lambda self: A.b("pos"),
+                        __invert__=lambda self: A.b("invert"),
+
+                        __abs__=lambda self: A.b("abs"),
                         )
 
         def f_extramethod(x: A):
@@ -252,8 +258,11 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_invert(x: A):
             return ~x
 
+        def f_abs(x: A):
+            return abs(x)
+
         test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len, f_add, f_sub, f_mul, f_div,
-                      f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift]
+                      f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_neg, f_pos, f_invert, f_abs]
 
         for f in test_cases:
             compiled_f = Compiled(f)

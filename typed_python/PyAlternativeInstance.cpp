@@ -109,7 +109,7 @@ PyObject* PyAlternativeInstance::pyUnaryOperatorConcrete(const char* op, const c
         Function* f = it->second;
 
         PyObjectStealer argTuple(
-            PyTuple_Pack(2, (PyObject*)this)
+            PyTuple_Pack(1, (PyObject*)this)
             );
 
         std::pair<bool, PyObject*> res =
@@ -128,7 +128,7 @@ PyObject* PyConcreteAlternativeInstance::pyUnaryOperatorConcrete(const char* op,
         Function* f = it->second;
 
         PyObjectStealer argTuple(
-            PyTuple_Pack(2, (PyObject*)this)
+            PyTuple_Pack(1, (PyObject*)this)
             );
 
         std::pair<bool, PyObject*> res =
