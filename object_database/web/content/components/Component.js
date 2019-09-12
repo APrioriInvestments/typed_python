@@ -80,7 +80,14 @@ class Component {
      * global/component-wide changes before the final rendering.
     */
     render() {
-        let velement = this.build()
+        let velement = this.build();
+
+        // All components that have a flexChild
+        // property should add the class to their
+        // root hyperscript's CSS.
+        if(this.props.flexChild){
+            velement.properties.class += " flex-child";
+        }
         return velement;
     }
 

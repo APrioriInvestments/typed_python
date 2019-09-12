@@ -16,7 +16,10 @@ class SubComponent extends Component {
 
     build(){
         return (
-            h('div', {id: this.props.id}, [`Child: ${this.props.id}`])
+            h('div', {
+                id: this.props.id,
+                class: "test-component subcomponent"
+            }, [`Child: ${this.props.id}`])
         );
     }
 };
@@ -169,5 +172,20 @@ describe("Module `render` function", () => {
     it("Should have rendered twice for now", () => {
         render(component);
         assert.equal(component.numRenders, 2);
+    });
+});
+
+describe("Component post-build render functionality", () => {
+    it("Should add the `flex-child` CSS class to any component with `flexChild` prop", () => {
+        let component = new SubComponent({id: 'subcomponent', flexChild: true});
+        let result = render(component);
+        let classes = result.properties.class.split(" ");
+        assert.include(classes, 'flex-child');
+    });
+    it("Should not add the `flex-child` CSS class when `flexChild` is explicitly false", () => {
+        let component = new SubComponent({id: 'subcomponent', flexChild: false});
+        let result = render(component);
+        let classes = result.properties.class.split(" ");
+        assert.notInclude(classes, 'flex-child');
     });
 });
