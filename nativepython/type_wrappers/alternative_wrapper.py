@@ -15,7 +15,6 @@
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
-from nativepython.native_ast import VoidPtr
 
 from typed_python import NoneType, _types, OneOf, Bool
 
@@ -102,6 +101,19 @@ class SimpleAlternativeWrapper(Wrapper):
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_len_native(self, context, expr):
+        alt = expr.expr_type.typeRepresentation
+        if hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+            assert len(alt.__len__.overloads) == 1
+            return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
+        return context.constant(0)
+
+    def convert_len(self, context, expr):
+        intermediate = self.convert_len_native(context, expr)
+        if intermediate is None:
+            return None
+        return context.pushPod(int, intermediate.convert_to_type(int).expr)
 
 
 class AlternativeWrapper(RefcountedWrapper):
@@ -241,16 +253,28 @@ class AlternativeWrapper(RefcountedWrapper):
         return context.call_py_function(self.alterativeType.__call__, args, kwargs)
 
     def convert_len_native(self, context, expr):
-        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
-        if tp:
-            if not expr.isReference:
-                expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
-            return runtime_functions.np_len.call(expr.expr.cast(VoidPtr), tp)
-        else:
-            return context.constant(0)
+        alt = expr.expr_type.typeRepresentation
+        if hasattr(alt.__len__, "__typed_python_category__") and alt.__len__.__typed_python_category__ == 'Function':
+            assert len(alt.__len__.overloads) == 1
+            return context.call_py_function(alt.__len__.overloads[0].functionObj, (expr,), {})
+        return context.constant(0)
 
     def convert_len(self, context, expr):
-        return context.pushPod(int, self.convert_len_native(context, expr))
+        intermediate = self.convert_len_native(context, expr)
+        if intermediate is None:
+            return None
+        return context.pushPod(int, intermediate.convert_to_type(int).expr)
+
+    def convert_bin_op_reverse(self, context, r, op, l):
+        if op.matches.In:
+            alt = r.expr_type.typeRepresentation
+            if hasattr(alt.__contains__, "__typed_python_category__") and alt.__contains__.__typed_python_category__ == 'Function':
+                assert len(alt.__contains__.overloads) == 1
+                intermediate = context.call_py_function(alt.__contains__.overloads[0].functionObj, (r, l), {})
+                if intermediate is None:
+                    return None
+                return intermediate.toBool()
+        return super().convert_bin_op_reverse(context, r, op, l)
 
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
