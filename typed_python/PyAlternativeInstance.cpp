@@ -31,8 +31,9 @@ PyObject* PyAlternativeInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObje
     if (it != type()->getMethods().end()) {
         Function* f = it->second;
 
+        // for now, restrict usage to only 2 arguments
         PyObjectStealer argTuple(
-            PyTuple_Pack(3, (PyObject*)this, (PyObject*)rhs, (PyObject*)thirdArg)
+            PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
             );
 
         std::pair<bool, PyObject*> res =
@@ -50,8 +51,9 @@ PyObject* PyConcreteAlternativeInstance::pyTernaryOperatorConcrete(PyObject* rhs
     if (it != type()->getAlternative()->getMethods().end()) {
         Function* f = it->second;
 
+        // for now, restrict usage to only 2 arguments
         PyObjectStealer argTuple(
-            PyTuple_Pack(3, (PyObject*)this, (PyObject*)rhs, (PyObject*)thirdArg)
+            PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
             );
         std::pair<bool, PyObject*> res =
             PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
