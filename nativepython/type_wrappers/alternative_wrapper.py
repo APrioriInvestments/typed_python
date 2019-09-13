@@ -93,7 +93,6 @@ class SimpleAlternativeWrapper(Wrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_len_native(self, context, expr):
-        # alt = expr.expr_type.typeRepresentation
         alt = self.typeRepresentation
         if getattr(alt.__len__, "__typed_python_category__", None) == 'Function':
             assert len(alt.__len__.overloads) == 1
@@ -291,13 +290,6 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         self.underlyingLayout = typeWrapper(t.ElementType)  # a NamedTuple
         self.layoutType = native_ast.Type.Struct(element_types=element_types, name=t.__qualname__+"Layout").pointer()
 
-    # def call_method(self, context, method, args):
-    #     alt = self.typeRepresentation
-    #     if getattr(getattr(alt, method, None), "__typed_python_category__", None) == 'Function':
-    #         assert len(getattr(alt, method).overloads) == 1
-    #         return context.call_py_function(getattr(alt, method).overloads[0].functionObj, args, {})
-    #     return None
-
     def getNativeLayoutType(self):
         return self.layoutType
 
@@ -316,7 +308,6 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
         )
 
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
-
         # there is deliberately no code path for "not explicit" here
         # Alternative conversions must be explicit
         assert targetVal.isReference
