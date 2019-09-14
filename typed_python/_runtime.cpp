@@ -636,6 +636,13 @@ extern "C" {
         return BytesType::Make()->hash((instance_ptr)&s);
     }
 
+    int32_t nativepython_hash_alternative(Alternative::layout* s, Alternative* tp) {
+        if (tp->getTypeCategory() != Type::TypeCategory::catAlternative)
+            throw std::logic_error("Called hash_alternative with a non-Alternative type");
+
+        return tp->hash((instance_ptr)&s);
+    }
+
     bool nativepython_isinf_float32(float f) { return std::isinf(f); }
 
     bool nativepython_isnan_float32(float f) { return std::isnan(f); }

@@ -588,6 +588,13 @@ hash_bytes = externalCallTarget(
     Void.pointer()
 )
 
+hash_alternative = externalCallTarget(
+    "nativepython_hash_alternative",
+    Int32,
+    Void.pointer(),
+    UInt64
+)
+
 isinf_float32 = externalCallTarget("nativepython_isinf_float32", Bool, Float32)
 
 isnan_float32 = externalCallTarget("nativepython_isnan_float32", Bool, Float32)

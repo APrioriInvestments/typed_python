@@ -265,8 +265,8 @@ class TestAlternativeCompilation(unittest.TestCase):
             return hash(x)
 
         test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len, f_add, f_sub, f_mul, f_div,
-                      f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_neg, f_pos, f_invert, f_abs, f_pow]
-        # failing_test_cases = [f_hash, ...]
+                      f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift,
+                      f_neg, f_pos, f_invert, f_abs, f_pow, f_hash]
 
         for f in test_cases:
             compiled_f = Compiled(f)

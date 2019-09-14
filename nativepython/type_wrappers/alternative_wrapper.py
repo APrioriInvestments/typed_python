@@ -16,10 +16,11 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, Bool
+from typed_python import NoneType, _types, OneOf, Bool, Int32
 
 import nativepython.native_ast as native_ast
 import nativepython
+from nativepython.native_ast import VoidPtr
 
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -133,6 +134,13 @@ class AlternativeWrapper(RefcountedWrapper):
 
     def getNativeLayoutType(self):
         return self.layoutType
+
+    def convert_hash(self, context, expr):
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        if tp:
+            return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
+        else:
+            return None
 
     def on_refcount_zero(self, context, instance):
         return (
