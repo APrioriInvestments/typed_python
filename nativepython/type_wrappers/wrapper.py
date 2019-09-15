@@ -14,7 +14,7 @@
 
 import nativepython
 
-from typed_python import _types, String
+from typed_python import _types, String, OneOf
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.native_ast import VoidPtr
@@ -216,6 +216,54 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))
         )
 
+    def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
+        """Can we convert to another type? This should match what typed_python does.
+
+        Subclasses may not override this! If either of (self, otherType) knows what to do here,
+        we assume that that works. If either has 'Maybe', then we're 'Maybe'
+
+        Args:
+            otherType - another Wrapper instance.
+            explicit - are we allowing explicit conversion?
+
+        Returns:
+            True if we can always convert to this other type
+            False if we can never convert
+            "Maybe" if it depends on the types involved.
+        """
+        if otherType == self:
+            return True
+
+        toType = self._can_convert_to_type(otherType, explicit)
+        fromType = otherType._can_convert_from_type(self, explicit)
+
+        if toType is True or fromType is True:
+            return True
+
+        if fromType is False and toType is False:
+            return False
+
+        return "Maybe"
+
+    def _can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
+        """Does this wrapper know how to convert to 'otherType'?
+
+        Return True if we can convert to this type in all cases. Return False if we
+        definitely don't know how. Return "Maybe" if we sometimes can.
+        """
+        if otherType == self:
+            return True
+
+        return "Maybe"
+
+    def _can_convert_from_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
+        """Analagous to _can_convert_to_type.
+        """
+        if otherType == self:
+            return True
+
+        return "Maybe"
+
     def convert_to_type(self, context, expr, target_type, explicit=True):
         """Convert to 'target_type' and return a handle on the resulting expression.
 
@@ -239,6 +287,12 @@ class Wrapper(object):
         if target_type == self.typeRepresentation or target_type == self:
             return expr
 
+        canConvert = self.can_convert_to_type(target_type, explicit)
+
+        if canConvert is False:
+            context.pushException(TypeError, "Definitely can't convert from type %s to type %s" % (self, target_type))
+            return None
+
         # put conversion into its own function
         targetVal = context.allocateUninitializedSlot(target_type)
 
@@ -246,6 +300,12 @@ class Wrapper(object):
 
         if succeeded is None:
             return
+
+        # if we know with certainty that we can convert, then don't produce the exception
+        # code.
+        if canConvert is True:
+            context.markUninitializedSlotInitialized(targetVal)
+            return targetVal
 
         succeeded = succeeded.convert_to_type(bool)
         if succeeded is None:

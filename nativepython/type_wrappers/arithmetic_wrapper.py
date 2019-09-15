@@ -93,6 +93,14 @@ class ArithmeticTypeWrapper(Wrapper):
 
         return super().convert_unary_op(context, instance, op)
 
+    def _can_convert_to_type(self, otherType, explicit):
+        if not explicit:
+            return self == otherType
+
+        return isinstance(otherType, ArithmeticTypeWrapper)
+
+    def _can_convert_from_type(self, otherType, explicit):
+        return False
 
 def toWrapper(T):
     if T is Bool:

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, ListOf, Member
+from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf, Int64, String
 import typed_python._types as _types
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
@@ -22,6 +22,10 @@ import time
 def Compiled(f):
     f = Function(f)
     return Runtime.singleton().compile(f)
+
+
+def resultType(f, **kwargs):
+    return Runtime.singleton().resultTypes(f, kwargs)
 
 
 class AClass(Class):
@@ -252,6 +256,18 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         print("speedup is ", speedup)  # I get about 75
 
+    def test_dispatch_up_to_class_method(self):
+        class TestClass(Class):
+            def f(self, x: OneOf(int, float)):
+                return x + 1
+
+        @Compiled
+        def compiled(c: TestClass, x: float):
+            return c.f(x)
+
+        self.assertEqual(compiled(TestClass(), 123), 124.0)
+        self.assertEqual(compiled(TestClass(), 123.5), 124.5)
+
     def test_compile_class_init(self):
         @Compiled
         def f(x: int) -> AClassWithInit:
@@ -365,3 +381,29 @@ class TestClassCompilationCompilation(unittest.TestCase):
         class GoodChild(Base):
             def f(self, x) -> float:
                 pass
+
+    def test_dispatch_with_multiple_overloads(self):
+        # check that we can dispatch appropriately
+        class TestClass(Class):
+            def f(self, x: int) -> int:
+                return x + 1
+
+            def f(self, y: str) -> str:
+                return y + "hi"
+
+        self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=int), Int64)
+        self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=str), String)
+        self.assertEqual(set(resultType(lambda c, a: c.f(a), c=TestClass, a=OneOf(str, int)).Types), set(OneOf(str, int).Types))
+        self.assertEqual(set(resultType(lambda c, a: c.f(a), c=TestClass, a=object).Types), set(OneOf(str, int).Types))
+
+        @Compiled
+        def callWithStr(c: TestClass, x: str):
+            return c.f(x)
+
+        @Compiled
+        def callWithInt(c: TestClass, x: int):
+            return c.f(x)
+
+        self.assertEqual(callWithInt(TestClass(), 1), TestClass().f(1))
+        self.assertEqual(callWithStr(TestClass(), ""), TestClass().f(""))
+        self.assertEqual(callWithStr(TestClass(), "hi"), TestClass().f("hi"))

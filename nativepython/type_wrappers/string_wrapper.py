@@ -70,6 +70,12 @@ class StringWrapper(RefcountedWrapper):
         assert instance.isReference
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
+    def _can_convert_to_type(self, otherType, explicit):
+        return otherType == self
+
+    def _can_convert_from_type(self, otherType, explicit):
+        return False
+
     def convert_bin_op(self, context, left, op, right):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:

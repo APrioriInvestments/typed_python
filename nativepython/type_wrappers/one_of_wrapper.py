@@ -183,6 +183,12 @@ class OneOfWrapper(Wrapper):
                     with subcontext:
                         self.refAs(context, expr, ix).convert_destroy()
 
+    def _can_convert_from_type(self, targetType, explicit):
+        if targetType.typeRepresentation in self.typeRepresentation.Types:
+            return True
+
+        return "Maybe"
+
     def convert_to_type_with_target(self, context, expr, targetVal, explicit):
         assert expr.isReference
 

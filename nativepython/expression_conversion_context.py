@@ -129,6 +129,36 @@ class ExpressionConversionContext(object):
             ExpressionIntermediate.Effect(expression)
         )
 
+    def pushReturnValue(self, expression, isMove=False):
+        """Push an expression returning 'expression' in the current function context.
+
+        If 'isMove', then don't incref the result.
+        """
+        returnType = self.functionContext.currentReturnType()
+
+        assert returnType == expression.expr_type
+
+        if returnType.is_pass_by_ref:
+            returnTarget = TypedExpression(
+                self,
+                native_ast.Expression.Variable(name=".return"),
+                returnType,
+                True
+            )
+
+            if isMove:
+                returnTarget.expr.store(expression.nonref_expr)
+            else:
+                returnTarget.convert_copy_initialize(expression)
+
+            self.pushTerminal(
+                native_ast.Expression.Return(arg=None)
+            )
+        else:
+            self.pushTerminal(
+                native_ast.Expression.Return(arg=expression.nonref_expr)
+            )
+
     def pushTerminal(self, expression):
         """Push a native expression that does not return control flow."""
         self.intermediates.append(
@@ -199,6 +229,7 @@ class ExpressionConversionContext(object):
             )
 
         return resExpr
+
 
     def markUninitializedSlotInitialized(self, slot):
         if slot.expr_type.is_pod:
@@ -498,14 +529,17 @@ class ExpressionConversionContext(object):
         if kwargs:
             raise NotImplementedError("Kwargs not implemented for py-function dispatch yet")
 
-        # force arguments to a type appropriate for argpassing
-        native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
-
         call_target = self.functionContext.converter.convert(f, [a.expr_type for a in args], returnTypeOverload)
 
         if call_target is None:
             self.pushException(TypeError, "Function %s was not convertible." % f.__qualname__)
             return
+
+        return self.call_typed_call_target(call_target, args, kwargs)
+
+    def call_typed_call_target(self, call_target, args, kwargs):
+        # force arguments to a type appropriate for argpassing
+        native_args = [a.as_native_call_arg() for a in args if not a.expr_type.is_empty]
 
         if call_target.output_type is None:
             # this always throws
@@ -525,7 +559,11 @@ class ExpressionConversionContext(object):
             )
         else:
             assert call_target.output_type.is_pod
-            assert len(call_target.named_call_target.arg_types) == len(native_args)
+            if len(call_target.named_call_target.arg_types) != len(native_args):
+                raise Exception(
+                    f"Can't call {call_target} with {args} because we need "
+                    f"{len(call_target.named_call_target.arg_types)} and we got {len(native_args)}"
+                )
 
             return self.pushPod(
                 call_target.output_type,

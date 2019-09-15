@@ -160,10 +160,13 @@ class TypedExpression(object):
     def convert_method_call(self, methodname, args, kwargs):
         return self.expr_type.convert_method_call(self.context, self, methodname, args, kwargs)
 
-    def convert_to_type(self, target_type):
+    def convert_to_type(self, target_type, explicit=True):
         target_type = typeWrapper(target_type)
 
-        return self.expr_type.convert_to_type(self.context, self, target_type)
+        return self.expr_type.convert_to_type(self.context, self, target_type, explicit=explicit)
+
+    def convert_to_type_with_target(self, targetVal, explicit=True):
+        return self.expr_type.convert_to_type_with_target(self.context, self, targetVal, explicit=explicit)
 
     def get_iteration_expressions(self):
         return self.expr_type.get_iteration_expressions(self.context, self)
@@ -191,6 +194,9 @@ class TypedExpression(object):
             return None
 
     def __str__(self):
+        return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
+
+    def __repr__(self):
         return "TypedExpression(%s%s)" % (self.expr_type, ",[ref]" if self.isReference else "")
 
     def __rshift__(self, other):

@@ -78,6 +78,9 @@ class FunctionConversionContext(object):
 
         self._constructInitialVarnameToType()
 
+    def currentReturnType(self):
+        return self._varname_to_type.get(FunctionOutput)
+
     def isLocalVariable(self, name):
         return name in self.variablesBound or name in self.variablesAssigned
 
@@ -619,23 +622,7 @@ class FunctionConversionContext(object):
             if e is None:
                 return subcontext.finalize(None), False
 
-            if e.expr_type.is_pass_by_ref:
-                returnTarget = TypedExpression(
-                    subcontext,
-                    native_ast.Expression.Variable(name=".return"),
-                    self._varname_to_type[FunctionOutput],
-                    True
-                )
-
-                returnTarget.convert_copy_initialize(e)
-
-                subcontext.pushTerminal(
-                    native_ast.Expression.Return(arg=None)
-                )
-            else:
-                subcontext.pushTerminal(
-                    native_ast.Expression.Return(arg=e.nonref_expr)
-                )
+            subcontext.pushReturnValue(e)
 
             return subcontext.finalize(None), False
 

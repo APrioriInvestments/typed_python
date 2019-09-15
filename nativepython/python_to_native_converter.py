@@ -22,78 +22,12 @@ from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext
+from nativepython.native_function_conversion_context import NativeFunctionConversionContext
 
 NoneExprType = NoneWrapper()
 
+
 typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
-
-
-class NativeFunctionConversionContext:
-    def __init__(self, converter, input_types, output_type, generatingFunction):
-        self.varnames = 0
-        self.converter = converter
-        self._input_types = input_types
-        self._output_type = output_type
-        self._generatingFunction = generatingFunction
-
-    @property
-    def identity(self):
-        return ("native", self._generatingFunction, self._input_types, self._output_type)
-
-    def let_varname(self):
-        self.varnames += 1
-        return ".var_%s" % self.varnames
-
-    def stack_varname(self):
-        return self.let_varname()
-
-    def typesAreUnstable(self):
-        return False
-
-    def resetTypeInstabilityFlag(self):
-        pass
-
-    def convertToNativeFunction(self):
-        return self.getFunction(), self._output_type
-
-    def getFunction(self):
-        try:
-            subcontext = ExpressionConversionContext(self, None)
-            output_type = self._output_type
-            input_types = self._input_types
-            generatingFunction = self._generatingFunction
-
-            if output_type.is_pass_by_ref:
-                outputArg = subcontext.inputArg(output_type, '.return')
-            else:
-                outputArg = None
-
-            inputArgs = [subcontext.inputArg(input_types[i], 'a_%s' % i) if not input_types[i].is_empty
-                         else subcontext.pushPod(input_types[i], native_ast.nullExpr)
-                         for i in range(len(input_types))]
-
-            generatingFunction(subcontext, outputArg, *inputArgs)
-
-            native_args = [
-                ('a_%s' % i, input_types[i].getNativePassingType())
-                for i in range(len(input_types)) if not input_types[i].is_empty
-            ]
-
-            if output_type.is_pass_by_ref:
-                # the first argument is actually the output
-                native_output_type = native_ast.Void
-                native_args = [('.return', output_type.getNativePassingType())] + native_args
-            else:
-                native_output_type = output_type.getNativeLayoutType()
-
-            return native_ast.Function(
-                args=native_args,
-                output_type=native_output_type,
-                body=native_ast.FunctionBody.Internal(subcontext.finalize(None))
-            )
-        except Exception:
-            print("Failing function is ", self.identity)
-            raise
 
 
 class TypedCallTarget(object):
@@ -199,7 +133,11 @@ class PythonToNativeConverter(object):
             identity - a unique identifier for this function to allow us to cache it.
             input_types - list of Wrapper objects for the incoming types
             output_type - Wrapper object for the output type.
-            generatingFunction - a function producing a native_function_definition
+            generatingFunction - a function producing a native_function_definition.
+                It should accept an expression_conversion_context, an expression for the output
+                if it's not pass-by-value (or None if it is), and a bunch of TypedExpressions
+                and produce code that always ends in a terminal expression, (or if it's pass by value,
+                flows off the end of the function)
             callback - a function taking a function pointer that gets called after codegen
                 to allow us to install this function pointer.
 
@@ -208,7 +146,7 @@ class PythonToNativeConverter(object):
         output_type = typeWrapper(output_type)
         input_types = [typeWrapper(x) for x in input_types]
 
-        identity = ("native", identity, tuple(input_types))
+        identity = ("native", identity, output_type, tuple(input_types))
 
         if identity in self._names_for_identifier:
             return self._targets[self._names_for_identifier[identity]]
@@ -216,7 +154,7 @@ class PythonToNativeConverter(object):
         new_name = self.new_name(name, "runtime.")
 
         self._names_for_identifier[identity] = new_name
-        self._inflight_function_conversions[identity] = NativeFunctionConversionContext(self, input_types, output_type, generatingFunction)
+        self._inflight_function_conversions[identity] = NativeFunctionConversionContext(self, input_types, output_type, generatingFunction, identity)
 
         self._targets[new_name] = self.getTypedCallTarget(new_name, input_types, output_type)
 

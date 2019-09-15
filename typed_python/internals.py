@@ -221,14 +221,6 @@ class FunctionOverload:
     def addArg(self, name, defaultVal, typeFilter, isStarArg, isKwarg):
         self.args = self.args + (FunctionOverloadArg(name, defaultVal, typeFilter, isStarArg, isKwarg),)
 
-    def signatureForSubtypes(self, name, argTypes):
-        return typed_python._types.Function(
-            name,
-            self.returnType,
-            None,
-            tuple((a.name, argTypes[i], a.defaultValue, a.isStarArg, a.isKwarg) for i, a in enumerate(self.args))
-        )
-
     def matchesTypes(self, argTypes):
         """Do the types in 'argTypes' match our argument typeFilters at a binary level"""
         if len(argTypes) == len(self.args) and not any(x.isStarArg or x.isKwarg for x in self.args):

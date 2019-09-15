@@ -17,7 +17,7 @@ from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, Type
+from typed_python import NoneType, _types, Type, OneOf, PointerTo
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -49,6 +49,7 @@ class_dispatch_table_type = native_ast.Type.Struct(
     name="ClassDispatchTable"
 )
 
+
 vtable_type = native_ast.Type.Struct(
     element_types=[
         ('heldTypePtr', native_ast.VoidPtr),
@@ -57,6 +58,77 @@ vtable_type = native_ast.Type.Struct(
     ],
     name="VTable"
 )
+
+
+def pickCallSignatureToImplement(overload, name, argTypes):
+    """Pick the actual signature to use when calling 'overload' with 'argTypes'
+
+    We can have a function like f(x: int), where we always know the signature.
+    But for something like f(x), we may need to generate a different signature
+    for each possible 'x' we pass it.
+
+    Args:
+        overload - a typed_python.internal.FunctionOverload
+        name - the name of the function
+        argTypes - a list of typed_python Type objects
+
+    Returns:
+        a typed_python.Function object representing the signature we'll implement
+        for this overload.
+    """
+    argTuples = []
+
+    if len(argTypes) != len(overload.args):
+        raise Exception(f"Signature mismatch; can't call {overload} with {argTypes}")
+
+    for i, arg in enumerate(overload.args):
+        # when choosing the signature we want to generate for a given call signature,
+        # we specialize anything with _no signature at all_, but otherwise take the given
+        # signature. Otherwise, we'd produce an exorbitant number of signatures (for every
+        # possible subtype combination we encounter in code).
+
+        if arg.typeFilter is None:
+            argType = argTypes[i].typeRepresentation
+        else:
+            argType = arg.typeFilter
+
+        argTuples.append(
+            (arg.name, argType, arg.defaultValue, arg.isStarArg, arg.isKwarg)
+        )
+
+    return _types.Function(
+        name,
+        overload.returnType,
+        None,
+        tuple(argTuples)
+    )
+
+
+
+def overloadMatchesSignature(overload, argTypes, isExplicit):
+    """Is it possible we could dispatch to FunctionOverload 'overload' with 'argTypes'?
+
+    Returns:
+        True if we _definitely_ match
+        "Maybe" if we might match
+        False if we definitely don't match the arguments.
+    """
+    if not (len(argTypes) == len(overload.args) and not any(x.isStarArg or x.isKwarg for x in overload.args)):
+        return False
+
+    allTrue = True
+    for i in range(len(argTypes)):
+        canConvert = argTypes[i].can_convert_to_type(typeWrapper(overload.args[i].typeFilter), isExplicit)
+
+        if canConvert is False:
+            return False
+        elif canConvert == "Maybe":
+            allTrue = False
+
+    if allTrue:
+        return allTrue
+    else:
+        return "Maybe"
 
 
 class ClassWrapper(RefcountedWrapper):
@@ -226,12 +298,68 @@ class ClassWrapper(RefcountedWrapper):
             )
         )
 
+    def resultTypesForCall(self, func, argTypes):
+        resultTypes = set()
+
+        for isExplicit in [False, True]:
+            for o in func.overloads:
+                # check each overload that we might match.
+                mightMatch = overloadMatchesSignature(o, argTypes, isExplicit)
+
+                if mightMatch is False:
+                    return resultTypes
+
+                if o.returnType is None:
+                    resultTypes.add(object)
+                else:
+                    resultTypes.add(o.returnType)
+
+                if mightMatch is True:
+                    return resultTypes
+
+        return resultTypes
+
+    def pickSingleOverloadForCall(self, func, argTypes):
+        """See if there is a single function overload that might match 'argTypes' and nothing else.
+
+        Returns:
+            None, or a tuple (FunctionOverload, explicit) indicating that one single overload
+            is the one version of this function we might match.
+        """
+
+        possibleMaybe = None
+
+        for isExplicit in [False, True]:
+            for o in func.overloads:
+                # check each overload that we might match.
+                mightMatch = overloadMatchesSignature(o, argTypes, isExplicit)
+
+                if mightMatch is False:
+                    pass
+                elif mightMatch is True:
+                    if possibleMaybe is not None:
+                        if possibleMaybe == (o, False) and isExplicit:
+                            return (o, True)
+                        else:
+                            return None
+                    else:
+                        return (o, isExplicit)
+                else:
+                    if possibleMaybe is None:
+                        possibleMaybe = (o, isExplicit)
+                    elif possibleMaybe == (o, False) and isExplicit:
+                        possibleMaybe = (o, isExplicit)
+                    else:
+                        return None
+
+        return possibleMaybe
+
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
-        argTypes = [instance.expr_type.typeRepresentation] + [a.expr_type.typeRepresentation for a in args]
+        if kwargs:
+            raise Exception("Can't call methods with keyword args yet.")
 
-        for a in argTypes:
-            assert issubclass(a, Type), a
+        argTypes = [instance.expr_type] + [a.expr_type for a in args]
 
         func = self.typeRepresentation.MemberFunctions[methodName]
 
@@ -241,7 +369,7 @@ class ClassWrapper(RefcountedWrapper):
         # and we should invoke the first one that matches the specific values that we have
         # in our argTypes. In fact, we may match more than one (for instance if we know all of
         # our values as 'object') in which case we need to generate runtime tests for each value
-        # against each type pattern.
+        # against each type pattern and take the union of the return types.
 
         # each term that we might match against generates an entrypoint in the class vtable
         # for this class and for all of its children. That entry represents calling the function
@@ -256,50 +384,241 @@ class ClassWrapper(RefcountedWrapper):
         # insist on that we can't make any assumptions about the types that come out
         # of a base class implementation.
 
-        for o in func.overloads:
-            # for the moment, we fail to generate code if we don't definitely match a single
-            # term in the pattern. We should be testing whether our argument types are definitely
-            # covered by 'o', or only partially, in which case we should generate code to test
-            # the relevant types and then trigger a call if we are successful.
-            if o.matchesTypes(argTypes):
-                # get the Function object representing this entrypoint as a signature.
-                # we specialize on the types in 'argTypes' because we might be specializing
-                # a generic method on a specific subtype.
-                signature = o.signatureForSubtypes(methodName, argTypes)
+        # first, see if there is exacly one possible overload
+        overloadAndIsExplicit = self.pickSingleOverloadForCall(func, argTypes)
 
-                # each entrypoint generates a slot we could call.
-                dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
+        if overloadAndIsExplicit is not None:
+            return self.dispatchToSingleOverload(
+                context,
+                overloadAndIsExplicit[0],
+                overloadAndIsExplicit[1],
+                methodName,
+                argTypes,
+                instance,
+                args
+            )
 
-                classDispatchTables = (
-                    self.get_layout_pointer(instance.nonref_expr)
-                    .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
+        resultTypes = self.resultTypesForCall(func, argTypes)
+
+        if not resultTypes:
+            # we can't call anything
+            context.pushException(
+                Exception,
+                f"No overload could be found for compiled dispatch to "
+                f"{self}.{methodName} with args {argTypes}."
+            )
+            return None
+
+        # compute the return type of dispatching to this function. it will be a one-of if we
+        # might dispatch to multiple possible functions.
+        if len(resultTypes) == 1:
+            output_type = typeWrapper(list(resultTypes)[0])
+        else:
+            output_type = typeWrapper(OneOf(*resultTypes))
+
+        dispatchToOverloads = context.converter.defineNativeFunction(
+            f'call_method.{self}.{methodName}.{argTypes[1:]}',
+            ('call_method', self, methodName, tuple(argTypes[1:])),
+            list(argTypes),
+            output_type,
+            lambda context, outputVar, *args: self.generateMethodDispatch(context, methodName, output_type, args)
+        )
+
+        return context.call_typed_call_target(dispatchToOverloads, [instance] + args, {})
+
+    def generateMethodDispatch(self, context, methodName, methodReturnType, args):
+        """Generate native code that tries to dispatch to each of func's overloads
+
+        We try each overload, first with 'isExplicit' as False, then with True. The first one that
+        succeeds gets to produce the output.
+
+        Args:
+            context - an expression_conversion_context
+            methodName - the name of the method we're trying to dispatch to
+            methodReturnType - the output type we are expecting to return. This will be the union
+                of the return types of all the overloads that might participate in this dispatch.
+            args - the typed_expression for all of our actual arguments, which in this case
+                are the instance, and then the actual arguments we want to convert.
+        """
+        func = self.typeRepresentation.MemberFunctions[methodName]
+
+        argTypes = [a.expr_type for a in args]
+
+        def makeOverloadDispatcher(overload, isExplicit):
+            return lambda context, _, outputVar, *args: self.generateOverloadDispatch(
+                context, methodName, overload, isExplicit, outputVar, args
+            )
+
+        for isExplicit in [False, True]:
+            for overloadIndex, overload in enumerate(func.overloads):
+                mightMatch = overloadMatchesSignature(overload, argTypes, isExplicit)
+
+                if mightMatch is not False:
+                    overloadRetType = overload.returnType or object
+
+                    testSingleOverloadForm = context.converter.defineNativeFunction(
+                        f'call_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}->{overloadRetType}',
+                        ('call_overload', self, methodName, overloadIndex, isExplicit, overloadRetType, tuple(argTypes[1:])),
+                        [PointerTo(overloadRetType)] + list(argTypes),
+                        typeWrapper(bool),
+                        makeOverloadDispatcher(overload, isExplicit)
+                    )
+
+                    outputSlot = context.allocateUninitializedSlot(overloadRetType)
+
+                    successful = context.call_typed_call_target(
+                        testSingleOverloadForm,
+                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
+                        {}
+                    )
+
+                    with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            context.markUninitializedSlotInitialized(outputSlot)
+
+                            # upcast the result
+                            actualResult = outputSlot.convert_to_type(methodReturnType)
+
+                            if actualResult is not None:
+                                context.pushReturnValue(actualResult)
+
+                    # if we definitely match, we can return early
+                    if mightMatch is True:
+                        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+                        return
+
+        # generate a cleanup handler for the cases where we don't match a method signature.
+        # this should actually be hitting the interpreter instead.
+        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+
+    def generateOverloadDispatch(self, context, methodName, overload, isExplicit, outputVar, args):
+        """Produce the code that calls this specific overload.
+
+        We return True if successful, False otherwise, and the output is a pointer to the result
+        of the function call if we're successful.
+
+        We attempt to convert each argument in 'args' to the relevant type, returning early if we
+        can't.  If we're successful,
+
+        Args:
+            context - an expression_conversion_context
+            methodName - the name of the method we're compiling
+            overload - the FunctionOverload we're trying to convert.
+            isExplicit - are we using explicit conversion?
+            outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
+            args - the arguments to pass to the method (including the instance)
+
+        """
+        instance = args[0]
+
+        argTypes = [a.expr_type for a in args]
+
+        # get the Function object representing this entrypoint as a signature.
+        # we specialize on the types in 'argTypes' because we might be specializing
+        # a generic method on a specific subtype.
+        signature = pickCallSignatureToImplement(overload, methodName, argTypes)
+
+        assert len(signature.overloads[0].args) == len(argTypes)
+
+        # each entrypoint generates a slot we could call.
+        dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
+
+        classDispatchTables = (
+            self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
+        )
+
+        # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
+        # for each one indicating how to dispatch method calls to the concrete class when they
+        # are masquerading as that particular base class. Whenever we represent a child class
+        # as a base class, we need to track which of the class' concrete vtable entries we should
+        # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
+        # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
+        # itanium, we'll have to rethink this.
+        classDispatchTable = classDispatchTables.elemPtr(
+            self.get_dispatch_index(instance)
+        )
+
+        funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+
+        retType = overload.returnType or object
+
+        convertedArgs = []
+
+        for argIx, argExpr in enumerate(args):
+            argType = typeWrapper(signature.overloads[0].args[argIx].typeFilter or object)
+
+            convertedArg = context.allocateUninitializedSlot(argType)
+
+            successful = argExpr.convert_to_type_with_target(convertedArg, isExplicit)
+
+            with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushTerminal(
+                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+                    )
+
+                with ifTrue:
+                    context.markUninitializedSlotInitialized(convertedArg)
+
+            convertedArgs.append(convertedArg)
+
+        if outputVar.expr_type.typeRepresentation.ElementType != retType:
+            raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
+
+        outputVar.changeType(typeWrapper(retType), True).convert_copy_initialize(
+            context.call_function_pointer(funcPtr, convertedArgs, {}, typeWrapper(retType))
+        )
+
+        context.pushReturnValue(context.constant(True))
+
+    def dispatchToSingleOverload(self, context, overload, explicitConversions, methodName, argTypes, instance, args):
+        # get the Function object representing this entrypoint as a signature.
+        # we specialize on the types in 'argTypes' because we might be specializing
+        # a generic method on a specific subtype.
+        signature = pickCallSignatureToImplement(overload, methodName, argTypes)
+
+        # each entrypoint generates a slot we could call.
+        dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
+
+        classDispatchTables = (
+            self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
+        )
+
+        # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
+        # for each one indicating how to dispatch method calls to the concrete class when they
+        # are masquerading as that particular base class. Whenever we represent a child class
+        # as a base class, we need to track which of the class' concrete vtable entries we should
+        # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
+        # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
+        # itanium, we'll have to rethink this.
+        classDispatchTable = classDispatchTables.elemPtr(
+            self.get_dispatch_index(instance)
+        )
+
+        funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+
+        retType = overload.returnType or object
+
+        convertedArgs = []
+        actualArgs = (instance,) + tuple(args)
+
+        for argIx, argExpr in enumerate(actualArgs):
+            convertedArgs.append(
+                argExpr.convert_to_type(
+                    signature.overloads[0].args[argIx].typeFilter or object,
+                    explicit=explicitConversions
                 )
+            )
 
-                # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
-                # for each one indicating how to dispatch method calls to the concrete class when they
-                # are masquerading as that particular base class. Whenever we represent a child class
-                # as a base class, we need to track which of the class' concrete vtable entries we should
-                # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
-                # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
-                # itanium, we'll have to rethink this.
-                classDispatchTable = classDispatchTables.elemPtr(
-                    self.get_dispatch_index(instance)
-                )
+            if convertedArgs[-1] is None:
+                return None
 
-                funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
+        kwargs = {}
+        res = context.call_function_pointer(funcPtr, convertedArgs, kwargs, typeWrapper(retType))
 
-                if o.returnType is None:
-                    retType = object
-                else:
-                    retType = o.returnType
-
-                res = context.call_function_pointer(funcPtr, (instance,) + tuple(args), kwargs, typeWrapper(retType))
-
-                # context.pushEffect(
-                #     runtime_functions.print_int64.call(res.nonref_expr.cast(native_ast.Int64))
-                # )
-
-                return res
+        return res
 
     @staticmethod
     def compileMethodInstantiation(converter, interfaceClass, implementingClass, methodName, signature, callback):
