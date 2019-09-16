@@ -255,6 +255,7 @@ class AlternativeWrapper(RefcountedWrapper):
         magic = "__pos__" if op.matches.UAdd else \
             "__neg__" if op.matches.USub else \
             "__invert__" if op.matches.Invert else \
+            "__not__" if op.matches.Not else \
             ""
         return self.convert_call_method(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
 
@@ -272,6 +273,12 @@ class AlternativeWrapper(RefcountedWrapper):
             "__or__" if op.matches.BitOr else \
             "__xor__" if op.matches.BitXor else \
             "__and__" if op.matches.BitAnd else \
+            "__eq__" if op.matches.Eq else \
+            "__ne__" if op.matches.NotEq else \
+            "__lt__" if op.matches.Lt else \
+            "__gt__" if op.matches.Gt else \
+            "__le__" if op.matches.LtE else \
+            "__ge__" if op.matches.GtE else \
             ""
 
         return self.convert_call_method(context, magic, (l, r)) or super().convert_bin_op(context, l, op, r)

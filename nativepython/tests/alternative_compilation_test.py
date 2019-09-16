@@ -170,8 +170,8 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __matmul__=lambda self, other: A.b("matmul"),
                         __truediv__=lambda self, other: A.b("truediv"),
                         __floordiv__=lambda self, other: A.b("floordiv"),
-                        __mod__=lambda self, other: A.b("mod"),
                         __divmod__=lambda self, other: A.b("divmod"),
+                        __mod__=lambda self, other: A.b("mod"),
                         __pow__=lambda self, other: A.b("pow"),
                         __lshift__=lambda self, other: A.b("lshift"),
                         __rshift__=lambda self, other: A.b("rshift"),
@@ -179,11 +179,33 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __or__=lambda self, other: A.b("or"),
                         __xor__=lambda self, other: A.b("xor"),
 
+                        __iadd__=lambda self, other: A.b("iadd"),
+                        __isub__=lambda self, other: A.b("isub"),
+                        __imul__=lambda self, other: A.b("imul"),
+                        __imatmul__=lambda self, other: A.b("imatmul"),
+                        __itruediv__=lambda self, other: A.b("itruediv"),
+                        __ifloordiv__=lambda self, other: A.b("ifloordiv"),
+                        __imod__=lambda self, other: A.b("imod"),
+                        __ipow__=lambda self, other: A.b("ipow"),
+                        __ilshift__=lambda self, other: A.b("ilshift"),
+                        __irshift__=lambda self, other: A.b("irshift"),
+                        __iand__=lambda self, other: A.b("iand"),
+                        __ior__=lambda self, other: A.b("ior"),
+                        __ixor__=lambda self, other: A.b("ixor"),
+
                         __neg__=lambda self: A.b("neg"),
                         __pos__=lambda self: A.b("pos"),
                         __invert__=lambda self: A.b("invert"),
 
                         __abs__=lambda self: A.b("abs"),
+                        __hash__=lambda self: 123,
+                        __eq__=lambda self, other: False,
+                        __ne__=lambda self, other: True,
+                        __lt__=lambda self, other: False,
+                        __gt__=lambda self, other: True,
+                        __le__=lambda self, other: False,
+                        __ge__=lambda self, other: True,
+                        __cmp__=lambda self, other: -1,
                         )
 
         def f_extramethod(x: A):
@@ -261,12 +283,91 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_abs(x: A):
             return abs(x)
 
+        # Note: hash is not overridden by method __hash__ in compiled or interpreted case
         def f_hash(x: A):
             return hash(x)
 
-        test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len, f_add, f_sub, f_mul, f_div,
-                      f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift,
-                      f_neg, f_pos, f_invert, f_abs, f_pow, f_hash]
+        def f_lt(x: A):
+            return x < A.a()
+
+        def f_gt(x: A):
+            return x > A.a()
+
+        def f_le(x: A):
+            return x <= A.a()
+
+        def f_ge(x: A):
+            return x >= A.a()
+
+        def f_eq(x: A):
+            return x == A.a()
+
+        def f_ne(x: A):
+            return x != A.a()
+
+        def f_iadd(x: A):
+            x += A.a()
+            return x
+
+        def f_isub(x: A):
+            x -= A.a()
+            return x
+
+        def f_imul(x: A):
+            x *= A.a()
+            return x
+
+        def f_idiv(x: A):
+            x /= A.a()
+            return x
+
+        def f_ifloordiv(x: A):
+            x //= A.a()
+            return x
+
+        def f_imatmul(x: A):
+            x @= A.a()
+            return x
+
+        def f_imod(x: A):
+            x %= A.a()
+            return x
+
+        def f_iand(x: A):
+            x &= A.a()
+            return x
+
+        def f_ior(x: A):
+            x |= A.a()
+            return x
+
+        def f_ixor(x: A):
+            x ^= A.a()
+            return x
+
+        def f_irshift(x: A):
+            x >>= A.a()
+            return x
+
+        def f_ilshift(x: A):
+            x <<= A.a()
+            return x
+
+        def f_ipow(x: A):
+            x **= A.a()
+            return x
+
+        test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
+                      f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
+                      f_neg, f_pos, f_invert, f_abs, f_hash,
+                      f_lt, f_gt, f_le, f_ge]
+        # These fail when compiling, because eq and ne are checked before any override is called:
+        #   failing_test_cases = [f_eq, f_ne]
+        # These fail when compiling, because python_ast and native_ast have no representation of in-place operators:
+        #   failing_test_cases = [f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
+        #                         f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]
+        # These are consistent between compiled and interpreted cases, but don't use the override:
+        #   no_override_test_cases = [f_hash]
 
         for f in test_cases:
             compiled_f = Compiled(f)
