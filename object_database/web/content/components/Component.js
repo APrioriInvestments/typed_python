@@ -88,6 +88,15 @@ class Component {
         if(this.props.flexChild){
             velement.properties.class += " flex-child";
         }
+
+        // Add any custom inline styles required
+        // from the server side. For now this is
+        // limited to `padding` and `margin`
+        // inset values.
+        if(this.props.customStyle){
+            addCustomStyles(this.props.customStyle, velement);
+        }
+
         return velement;
     }
 
@@ -349,6 +358,80 @@ class Component {
             }
         });
     }
+};
+
+/**
+ * Given a dictionary of `customStyles`
+ * (usually provided by a Component),
+ * adds those styles to a given `velement`'s
+ * existing `style` string.
+ * Note that we use helper methods to translate
+ * to and from dicts/strings for convenience.
+ * @param {object} customStyles - An object
+ * mapping CSS style names to values.
+ * @param {maquette.VNode} velement - A Maquette
+ * virtual element whose `properties.style` string
+ * we will update with the new given styles.
+ * @returns {maquette.VNode} - The modified
+ * maquette virtual element with updated
+ * styling.
+ */
+const addCustomStyles = (customStyles, velement) => {
+    let sourceStyle = velement.properties.style;
+    let styleDict = {};
+    if(sourceStyle){
+        styleDict = styleToDict(sourceStyle);
+    }
+
+    Object.keys(customStyles).forEach(key => {
+        styleDict[key] = customStyles[key];
+    });
+
+    let styleString = dictToStyle(styleDict);
+
+    return velement.properties.style = styleString;
+};
+
+
+/**
+ * Helper function that translates
+ * HTML style attribute strings
+ * (ie, `style="width:100%;padding-left:10px;"`)
+ * to dictionary/object form for easier
+ * manipulation.
+ * @param {String} styleString - The source
+ * HTML attribute style string
+ * @param {object} - An object/dictionary
+ * like version of the styles
+ */
+const styleToDict = (styleString) => {
+    let items = styleString.split(";");
+    let keysAndVals = items.map(item => {
+        return item.split(":");
+    });
+    let result = {};
+    keysAndVals.forEach(part => {
+        result[part[0]] = part[1];
+    });
+};
+
+/**
+ * Helper function that translates
+ * objects/dictionaries of HTML/CSS
+ * style names (keys) and values to
+ * an HTML attribute string form
+ * (ie, inline HTML style string)
+ * @param {object} styleDict - An object
+ * whose keys are the style names and
+ * values are the style values.
+ * @returns {String} - An HTML attribute
+ * style string, ie inline style string.
+ */
+const dictToStyle = (styleDict) => {
+    let items = Object.keys(styleDict).map(key => {
+        return `${key}:${styleDict[key]}`;
+    });
+    return items.join(";");
 };
 
 export {
