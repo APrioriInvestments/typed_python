@@ -74,7 +74,12 @@ from object_database.web.cells.CellsTestMixin import CellsTestMixin
 
 from object_database.web.cells.util import waitForCellsCondition
 
-from object_database.web.cells.util import Flex, ShrinkWrap
+from object_database.web.cells.util import (
+    Flex,
+    ShrinkWrap,
+    Padding,
+    Margin
+)
 
 from object_database.web.cells.views.resizable_panel import ResizablePanel
 

@@ -88,6 +88,15 @@ class Component {
         if(this.props.flexChild){
             velement.properties.class += " flex-child";
         }
+
+        // Add any custom inline styles required
+        // from the server side. For now this is
+        // limited to `padding` and `margin`
+        // inset values.
+        if(this.props.customStyle){
+            addCustomStyles(this.props.customStyle, velement);
+        }
+
         return velement;
     }
 
@@ -349,6 +358,40 @@ class Component {
             }
         });
     }
+};
+
+const addCustomStyles = (customStyles, velement) => {
+    let sourceStyle = velement.properties.style;
+    let styleDict = {};
+    if(sourceStyle){
+        styleDict = styleToDict(sourceStyle);
+    }
+
+    Object.keys(customStyles).forEach(key => {
+        styleDict[key] = customStyles[key];
+    });
+
+    let styleString = dictToStyle(styleDict);
+
+    return velement.properties.style = styleString;
+};
+
+const styleToDict = (styleString) => {
+    let items = styleString.split(";");
+    let keysAndVals = items.map(item => {
+        return item.split(":");
+    });
+    let result = {};
+    keysAndVals.forEach(part => {
+        result[part[0]] = part[1];
+    });
+};
+
+const dictToStyle = (styleDict) => {
+    let items = Object.keys(styleDict).map(key => {
+        return `${key}:${styleDict[key]}`;
+    });
+    return items.join(";");
 };
 
 export {

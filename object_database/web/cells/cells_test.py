@@ -42,6 +42,7 @@ from object_database.test_util import (
     log_cells_stats
 )
 from object_database.web.cells.Messenger import getStructure
+from object_database.web.cells import Padding, Margin
 
 import logging
 import unittest
@@ -786,6 +787,24 @@ class CellsSubscribedSequenceHandlingTests(unittest.TestCase):
         sub_seq = HSubscribedSequence(self.itemsFun, self.rendererFun)
         self.assertEqual(sub_seq.orientation, 'horizontal')
         self.assertIsInstance(sub_seq, SubscribedSequence)
+
+
+class CellsUtilTests(unittest.TestCase):
+
+    def test_padding_all_dimensions(self):
+        cell = Text('test')
+        Padding(10, cell)
+        self.assertTrue('padding' in cell.exportData['customStyle'])
+        self.assertEqual('10px', cell.exportData['customStyle']['padding'])
+
+    def test_margin_all_dimensions(self):
+        cell = Text("test")
+        Margin(15, cell)
+        self.assertTrue('margin' in cell.exportData['customStyle'])
+        self.assertEqual('15px', cell.exportData['customStyle']['margin'])
+
+
+
 
 if __name__ == '__main__':
     unittest.main()
