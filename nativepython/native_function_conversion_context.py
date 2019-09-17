@@ -12,12 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import nativepython
 import nativepython.native_ast as native_ast
-from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from nativepython.expression_conversion_context import ExpressionConversionContext
-
-typeWrapper = lambda t: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(t)
 
 
 class NativeFunctionConversionContext:

@@ -249,7 +249,10 @@ class TestOneOfOfCompilation(unittest.TestCase):
         def f4(x: float) -> OneOf(str, int):
             return x
 
-        self.assertEqual(f4(1.5), "1.5")
+        # it'll pick '1' because we won't just convert something
+        # to a string just because of the return type. That would
+        # require an explicit cast.
+        self.assertEqual(f4(1.5), 1)
 
     def test_oneof_method_dispatch(self):
         @Compiled

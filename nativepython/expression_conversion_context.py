@@ -230,7 +230,6 @@ class ExpressionConversionContext(object):
 
         return resExpr
 
-
     def markUninitializedSlotInitialized(self, slot):
         if slot.expr_type.is_pod:
             return

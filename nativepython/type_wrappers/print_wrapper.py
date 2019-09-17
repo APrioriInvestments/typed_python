@@ -49,7 +49,7 @@ class PrintWrapper(Wrapper):
 
         # it would be better to use join
         for a in args:
-            converted = a.convert_to_type(str)
+            converted = a.convert_cast(str)
             if converted is None:
                 return None
 

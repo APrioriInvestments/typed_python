@@ -388,7 +388,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, x: int) -> int:
                 return x + 1
 
-            def f(self, y: str) -> str:
+            def f(self, y: str) -> str:  # noqa
                 return y + "hi"
 
         self.assertEqual(resultType(lambda c, a: c.f(a), c=TestClass, a=int), Int64)

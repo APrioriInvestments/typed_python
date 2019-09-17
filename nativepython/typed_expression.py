@@ -160,7 +160,16 @@ class TypedExpression(object):
     def convert_method_call(self, methodname, args, kwargs):
         return self.expr_type.convert_method_call(self.context, self, methodname, args, kwargs)
 
+    def convert_cast(self, target_type):
+        """Convert an explicit cast to another type (e.g. str(x))."""
+        return self.expr_type.convert_cast(self.context, self, typeWrapper(target_type))
+
     def convert_to_type(self, target_type, explicit=True):
+        """Convert to a target type as a function argument.
+
+        If 'explicit', then allow conversions that may change type (e.g. int->float). Otherwise
+        insist on strict conversion.
+        """
         target_type = typeWrapper(target_type)
 
         return self.expr_type.convert_to_type(self.context, self, target_type, explicit=explicit)

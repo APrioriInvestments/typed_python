@@ -20,7 +20,6 @@ import nativepython.native_ast as native_ast
 from nativepython.type_wrappers.none_wrapper import NoneWrapper
 from nativepython.type_wrappers.class_wrapper import ClassWrapper
 from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
-from nativepython.expression_conversion_context import ExpressionConversionContext
 from nativepython.function_conversion_context import FunctionConversionContext
 from nativepython.native_function_conversion_context import NativeFunctionConversionContext
 
@@ -154,7 +153,9 @@ class PythonToNativeConverter(object):
         new_name = self.new_name(name, "runtime.")
 
         self._names_for_identifier[identity] = new_name
-        self._inflight_function_conversions[identity] = NativeFunctionConversionContext(self, input_types, output_type, generatingFunction, identity)
+        self._inflight_function_conversions[identity] = NativeFunctionConversionContext(
+            self, input_types, output_type, generatingFunction, identity
+        )
 
         self._targets[new_name] = self.getTypedCallTarget(new_name, input_types, output_type)
 

@@ -17,7 +17,7 @@ from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, Type, OneOf, PointerTo
+from typed_python import NoneType, _types, OneOf, PointerTo
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -102,7 +102,6 @@ def pickCallSignatureToImplement(overload, name, argTypes):
         None,
         tuple(argTuples)
     )
-
 
 
 def overloadMatchesSignature(overload, argTypes, isExplicit):

@@ -14,7 +14,7 @@
 
 import nativepython
 
-from typed_python import _types, String, OneOf
+from typed_python import _types, OneOf
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.native_ast import VoidPtr
@@ -231,6 +231,8 @@ class Wrapper(object):
             False if we can never convert
             "Maybe" if it depends on the types involved.
         """
+        otherType = typeWrapper(otherType)
+
         if otherType == self:
             return True
 
@@ -362,16 +364,30 @@ class Wrapper(object):
 
     def convert_format(self, context, instance, formatSpecOrNone=None):
         if formatSpecOrNone is None:
-            return self.convert_to_type(context, instance, String)
+            return instance.convert_cast(str)
         else:
             raise context.pushException(TypeError, "We don't support conversion in the base wrapper.")
+
+    def convert_cast(self, context, instance, target_type):
+        """Convert an explicit cast of 'instance' to our type."""
+        return target_type.convert_cast_to_self(context, instance)
+
+    def convert_cast_to_self(self, context, instance):
+        """Convert 'instance' to type 'self'
+
+        Someone called T(x) where T is self and 'x' is instance, and instance didn't know
+        how to handle it. Now we get a chance to process it.
+        """
+
+        # by default, allow standard argument propagation to take over as an explicit conversion
+        return instance.expr_type.convert_to_type(context, instance, self, explicit=True)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         if len(args) == 0 and not kwargs:
             return context.push(self, lambda x: x.convert_default_initialize())
 
         if len(args) == 1 and not kwargs:
-            return args[0].convert_to_type(self)
+            return args[0].convert_cast(self)
 
         return context.pushException(
             TypeError,
