@@ -376,6 +376,26 @@ PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char*
 }
 
 void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyTypeObject* pyType) {
+    PyObjectStealer bases(PyTuple_New(classT->getHeldClass()->getBases().size()));
+
+    for (long k = 0; k < classT->getHeldClass()->getBases().size(); k++) {
+        PyTuple_SetItem(
+            bases,
+            k,
+            incref(typePtrToPyTypeRepresentation(classT->getHeldClass()->getBases()[k]->getClassType()))
+        );
+    }
+
+    PyObjectStealer mro(PyTuple_New(classT->getHeldClass()->getMro().size()));
+
+    for (long k = 0; k < classT->getHeldClass()->getMro().size(); k++) {
+        PyTuple_SetItem(
+            mro,
+            k,
+            incref(typePtrToPyTypeRepresentation(classT->getHeldClass()->getMro()[k]->getClassType()))
+        );
+    }
+
     PyObjectStealer types(PyTuple_New(classT->getMembers().size()));
 
     for (long k = 0; k < classT->getMembers().size(); k++) {
@@ -417,6 +437,8 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     //expose 'ElementType' as a member of the type object
     PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
     PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
+    PyDict_SetItemString(pyType->tp_dict, "BaseClasses", bases);
+    PyDict_SetItemString(pyType->tp_dict, "MRO", mro);
     PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
     PyDict_SetItemString(pyType->tp_dict, "MemberDefaultValues", defaults);
 

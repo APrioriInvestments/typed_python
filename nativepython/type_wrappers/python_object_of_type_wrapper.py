@@ -83,11 +83,17 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
         )
 
+    def _can_convert_to_type(self, otherType, explicit):
+        return super()._can_convert_to_type(otherType, explicit)
+
+    def _can_convert_from_type(self, otherType, explicit):
+        if self.typeRepresentation.PyType is object:
+            return True
+
+        return super()._can_convert_from_type(otherType, explicit)
+
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type
-
-        if not explicit:
-            return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
         arith_calls = {
             Int64: runtime_functions.pyobj_to_int64,
@@ -103,7 +109,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         }
 
         t = target_type.typeRepresentation
-        if t in arith_calls:
+        if t in arith_calls and explicit:
             context.pushEffect(
                 targetVal.expr.store(
                     arith_calls[t].call(e.nonref_expr)
@@ -114,14 +120,15 @@ class PythonObjectOfTypeWrapper(Wrapper):
         tp = context.getTypePointer(t)
 
         if tp:
-            context.pushEffect(
+            return context.pushPod(
+                bool,
                 runtime_functions.pyobj_to_typed.call(
                     e.nonref_expr.cast(VoidPtr),
                     targetVal.expr.cast(VoidPtr),
-                    tp
+                    tp,
+                    context.constant(explicit)
                 )
             )
-            return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 

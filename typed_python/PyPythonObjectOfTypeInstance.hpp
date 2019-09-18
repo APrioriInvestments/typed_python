@@ -52,5 +52,14 @@ public:
     static PyObject* extractPythonObjectConcrete(PythonObjectOfType* valueType, instance_ptr data) {
         return incref(*(PyObject**)data);
     }
+
+    static void mirrorTypeInformationIntoPyTypeConcrete(PythonObjectOfType* inType, PyTypeObject* pyType) {
+        //expose 'ElementType' as a member of the type object
+        PyDict_SetItemString(
+            pyType->tp_dict,
+            "PyType",
+            (PyObject*)inType->pyType()
+        );
+    }
 };
 

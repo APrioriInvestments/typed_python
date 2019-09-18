@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import nativepython
-from typed_python import String, Int64, Bool, Float64, Type
+from typed_python import String, Int64, Bool, Float64, Type, PythonObjectOfType
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
 
@@ -54,6 +54,8 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     typeRep = bool
                 elif typeRep == String:
                     typeRep = str
+                elif issubclass(typeRep, PythonObjectOfType):
+                    typeRep = typeRep.PyType
 
                 res = nativepython.python_object_representation.pythonObjectRepresentation(
                     context,

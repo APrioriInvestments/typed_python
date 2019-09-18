@@ -407,3 +407,76 @@ class TestClassCompilationCompilation(unittest.TestCase):
         self.assertEqual(callWithInt(TestClass(), 1), TestClass().f(1))
         self.assertEqual(callWithStr(TestClass(), ""), TestClass().f(""))
         self.assertEqual(callWithStr(TestClass(), "hi"), TestClass().f("hi"))
+
+    def test_multiple_child_dispatches(self):
+        # child specializations should get to look at an argument
+        # of type 'OneOf(int, float)' and get to decide if they want to handle it.
+
+        class BaseClass(Class):
+            def f(self, x: OneOf(int, float)) -> str:
+                if type(x) is int:
+                    return "base: int"
+                else:
+                    return "base: float"
+
+        class ChildClass(BaseClass):
+            def f(self, x: float) -> str:
+                return "child: float"
+
+            def f(self, x: int) -> str:  # noqa
+                return "child: int"
+
+        @Compiled
+        def call(c: BaseClass, x: OneOf(int, float)):
+            return c.f(x)
+
+        self.assertEqual(call(BaseClass(), 1.0), "base: float")
+        self.assertEqual(call(BaseClass(), 1), "base: int")
+        self.assertEqual(call(ChildClass(), 1), "child: int")
+        self.assertEqual(call(ChildClass(), 1.0), "child: float")
+
+    def test_multiple_child_dispatches_with_arg_dispatch(self):
+        # the child specializations should get to look at an argument
+        # of type 'OneOf(int, float)' and get to decide if they want to handle it.
+        class BaseClass(Class):
+            def f(self, x) -> int:
+                return 1
+
+            def f(self, x, y) -> int:  # noqa
+                return 2
+
+        class ChildClass(BaseClass):
+            def f(self, x: int) -> int:
+                return 11
+
+            def f(self, x: int, y: int) -> int:  # noqa
+                return 12
+
+        @Compiled
+        def call1(c: BaseClass, x: int):
+            return c.f(x)
+
+        @Compiled
+        def call2(c: BaseClass, x: int, y: int):
+            return c.f(x, y)
+
+        self.assertEqual(call1(BaseClass(), 1), 1)
+        self.assertEqual(call2(BaseClass(), 1, 2), 2)
+        self.assertEqual(call1(ChildClass(), 1), 11)
+        self.assertEqual(call2(ChildClass(), 1, 2), 12)
+
+    def test_dispatch_to_none_works(self):
+        class BaseClass(Class):
+            def f(self, x) -> int:
+                return 1
+
+        class ChildClass(BaseClass):
+            def f(self, x) -> int:  # noqa
+                return 2
+
+        @Compiled
+        def call(c: BaseClass, x: int):
+            return c.f(x)
+
+        self.assertEqual(call(BaseClass(), 1), 1)
+        self.assertEqual(call(ChildClass(), 1), 2)

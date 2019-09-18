@@ -23,6 +23,7 @@ from typed_python import (
 import unittest
 import psutil
 from nativepython.runtime import Runtime
+from nativepython.python_object_representation import typedPythonTypeToTypeWrapper
 from typed_python._types import refcount
 
 
@@ -37,6 +38,9 @@ class HoldsAnA:
 
 
 class TestPythonObjectOfTypeCompilation(unittest.TestCase):
+    def test_typeWrapper_for_object(self):
+        self.assertIs(typedPythonTypeToTypeWrapper(object).typeRepresentation.PyType, object)
+
     def test_can_pass_object_in_and_out(self):
         @Compiled
         def f(x):

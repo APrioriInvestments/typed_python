@@ -90,7 +90,7 @@ def pickCallSignatureToImplement(overload, name, argTypes):
         if arg.typeFilter is None:
             argType = argTypes[i].typeRepresentation
         else:
-            argType = arg.typeFilter
+            argType = arg.typeFilter or object
 
         argTuples.append(
             (arg.name, argType, arg.defaultValue, arg.isStarArg, arg.isKwarg)
@@ -98,7 +98,7 @@ def pickCallSignatureToImplement(overload, name, argTypes):
 
     return _types.Function(
         name,
-        overload.returnType,
+        overload.returnType or object,
         None,
         tuple(argTuples)
     )
@@ -117,11 +117,12 @@ def overloadMatchesSignature(overload, argTypes, isExplicit):
 
     allTrue = True
     for i in range(len(argTypes)):
-        canConvert = argTypes[i].can_convert_to_type(typeWrapper(overload.args[i].typeFilter), isExplicit)
+        canConvert = argTypes[i].can_convert_to_type(typeWrapper(overload.args[i].typeFilter or object), isExplicit)
 
         if canConvert is False:
             return False
         elif canConvert == "Maybe":
+            print(argTypes[i], " to ", overload.args[i].typeFilter)
             allTrue = False
 
     if allTrue:
@@ -167,6 +168,18 @@ class ClassWrapper(RefcountedWrapper):
         self.vtableExpr = native_ast.const_uint64_expr(
             _types._vtablePointer(self.typeRepresentation)
         ).cast(vtable_type.pointer())
+
+    def _can_convert_to_type(self, otherType, explicit):
+        if isinstance(otherType, ClassWrapper):
+            if otherType.typeRepresentation in self.typeRepresentation.MRO:
+                return True
+            elif self.typeRepresentation in otherType.typeRepresentation.MRO:
+                return "Maybe"
+
+        return False
+
+    def _can_convert_from_type(self, otherType, explicit):
+        return False
 
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
@@ -318,7 +331,8 @@ class ClassWrapper(RefcountedWrapper):
 
         return resultTypes
 
-    def pickSingleOverloadForCall(self, func, argTypes):
+    @staticmethod
+    def pickSingleOverloadForCall(func, argTypes):
         """See if there is a single function overload that might match 'argTypes' and nothing else.
 
         Returns:
@@ -384,7 +398,7 @@ class ClassWrapper(RefcountedWrapper):
         # of a base class implementation.
 
         # first, see if there is exacly one possible overload
-        overloadAndIsExplicit = self.pickSingleOverloadForCall(func, argTypes)
+        overloadAndIsExplicit = ClassWrapper.pickSingleOverloadForCall(func, argTypes)
 
         if overloadAndIsExplicit is not None:
             return self.dispatchToSingleOverload(
@@ -432,7 +446,7 @@ class ClassWrapper(RefcountedWrapper):
         succeeds gets to produce the output.
 
         Args:
-            context - an expression_conversion_context
+            context - an ExpressionConversionContext
             methodName - the name of the method we're trying to dispatch to
             methodReturnType - the output type we are expecting to return. This will be the union
                 of the return types of all the overloads that might participate in this dispatch.
@@ -490,6 +504,124 @@ class ClassWrapper(RefcountedWrapper):
         # this should actually be hitting the interpreter instead.
         context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
 
+    def generateMethodImplementation(self, context, methodName, methodReturnType, args):
+        """Generate native code that implements 'methodName' with a given return type and set of arguments.
+
+        We try each overload, first with 'isExplicit' as False, then with True. The first one that
+        succeeds gets to produce the output.
+
+        Args:
+            context - an ExpressionConversionContext
+            methodName - the name of the method we're trying to dispatch to
+            methodReturnType - the output type we are expecting to return. This will be the union
+                of the return types of all the overloads that might participate in this dispatch.
+            args - the typed_expression for all of our actual arguments, which in this case
+                are the instance, and then the actual arguments we want to convert.
+        """
+        func = self.typeRepresentation.MemberFunctions[methodName]
+
+        argTypes = [a.expr_type for a in args]
+
+        def makeOverloadImplementor(overload, isExplicit):
+            return lambda context, _, outputVar, *args: self.generateOverloadImplement(
+                context, methodName, overload, isExplicit, outputVar, args
+            )
+
+        for isExplicit in [False, True]:
+            for overloadIndex, overload in enumerate(func.overloads):
+                mightMatch = overloadMatchesSignature(overload, argTypes, isExplicit)
+
+                if mightMatch is not False:
+                    overloadRetType = overload.returnType or object
+
+                    testSingleOverloadForm = context.converter.defineNativeFunction(
+                        f'implement_overload.{self}.{methodName}.{overloadIndex}.{isExplicit}.{argTypes[1:]}->{overloadRetType}',
+                        ('implement_overload', self, methodName, overloadIndex, isExplicit, overloadRetType, tuple(argTypes[1:])),
+                        [PointerTo(overloadRetType)] + list(argTypes),
+                        typeWrapper(bool),
+                        makeOverloadImplementor(overload, isExplicit)
+                    )
+
+                    outputSlot = context.allocateUninitializedSlot(overloadRetType)
+
+                    successful = context.call_typed_call_target(
+                        testSingleOverloadForm,
+                        (outputSlot.changeType(PointerTo(overloadRetType), False),) + args,
+                        {}
+                    )
+
+                    with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                        with ifTrue:
+                            context.markUninitializedSlotInitialized(outputSlot)
+
+                            # upcast the result
+                            actualResult = outputSlot.convert_to_type(methodReturnType)
+
+                            if actualResult is not None:
+                                context.pushReturnValue(actualResult)
+
+                    # if we definitely match, we can return early
+                    if mightMatch is True:
+                        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+                        return
+
+        # generate a cleanup handler for the cases where we don't match a method signature.
+        # this should actually be hitting the interpreter instead.
+        context.pushException(TypeError, f"Failed to find an overload for {self}.{methodName} matching {args}")
+
+    def generateOverloadImplement(self, context, methodName, overload, isExplicit, outputVar, args):
+        """Produce the code that implements this specific overload.
+
+        We return True if successful, False otherwise, and the output is a pointer to the result
+        of the function call if we're successful.
+
+        Args:
+            context - an ExpressionConversionContext
+            methodName - the name of the method we're compiling
+            overload - the FunctionOverload we're trying to convert.
+            isExplicit - are we using explicit conversion?
+            outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
+            args - the arguments to pass to the method (including the instance)
+        """
+        signature = pickCallSignatureToImplement(overload, methodName, [a.expr_type for a in args])
+
+        argTypes = [a.typeFilter for a in signature.overloads[0].args]
+
+        retType = overload.returnType or object
+
+        convertedArgs = []
+
+        for argIx, argExpr in enumerate(args):
+            argType = argTypes[argIx]
+
+            convertedArg = context.allocateUninitializedSlot(argType)
+
+            successful = argExpr.convert_to_type_with_target(convertedArg, isExplicit)
+
+            with context.ifelse(successful.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushTerminal(
+                        native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
+                    )
+
+                with ifTrue:
+                    context.markUninitializedSlotInitialized(convertedArg)
+
+            convertedArgs.append(convertedArg)
+
+        if outputVar.expr_type.typeRepresentation.ElementType != retType:
+            raise Exception(f"Output type mismatch: {outputVar.expr_type.typeRepresentation} vs {retType}")
+
+        res = context.call_py_function(overload.functionObj, convertedArgs, {}, typeWrapper(retType))
+
+        if res is None:
+            context.pushException(Exception, "unreachable")
+            return
+
+        outputVar.changeType(typeWrapper(retType), True).convert_copy_initialize(res)
+
+        context.pushReturnValue(context.constant(True))
+
     def generateOverloadDispatch(self, context, methodName, overload, isExplicit, outputVar, args):
         """Produce the code that calls this specific overload.
 
@@ -497,10 +629,10 @@ class ClassWrapper(RefcountedWrapper):
         of the function call if we're successful.
 
         We attempt to convert each argument in 'args' to the relevant type, returning early if we
-        can't.  If we're successful,
+        can't.  If we're successful, the value at the output pointer is initialized.
 
         Args:
-            context - an expression_conversion_context
+            context - an ExpressionConversionContext
             methodName - the name of the method we're compiling
             overload - the FunctionOverload we're trying to convert.
             isExplicit - are we using explicit conversion?
@@ -623,6 +755,10 @@ class ClassWrapper(RefcountedWrapper):
     def compileMethodInstantiation(converter, interfaceClass, implementingClass, methodName, signature, callback):
         """Compile a concrete method instantiation.
 
+        In this case, we have a call signature dicatated by a definition in the interface class,
+        and our responsibility is to generate code for how the implementing class would implement
+        a call of that signature.
+
         Args:
             converter - the PythonToNativeConverter that needs the concrete definition.
             interfaceClass - the Type for the class that instances will be masquerading as.
@@ -639,34 +775,50 @@ class ClassWrapper(RefcountedWrapper):
         # this is a FunctionOverload object representing the signature we're compiling.
         funcOverload = signature.overloads[0]
 
-        # this is the function we're actually implementing. It has its own type signature
+        # these are the types that we actually know at this point. They should be concrete (with
+        # None replaced with actual signatures).
+        argTypes = [implementingClass] + [arg.typeFilter for arg in funcOverload.args[1:]]
+
+        for a in argTypes:
+            assert a is not None
+
+        argTypes = [typeWrapper(a) for a in argTypes]
+
+        # this is the function we're implementing. It has its own type signature
         # but we have the signature from the base class as well, which may be more precise
         # in the inputs and less precise in the outputs.
         pyImpl = implementingClass.MemberFunctions[methodName]
 
-        # this is a very imprecise proxy for the search we want to do to find the
-        # actual concrete method we'd dispatch to in these circumstances. In reality,
-        # we might dispatch to multiple methods depending on the signature. For the
-        # moment, we just pick one.
-        for o2 in pyImpl.overloads:
-            if o2.matchesTypes([implementingClass] + [a.typeFilter for a in funcOverload.args[1:]]):
-                # really, we should be generating a function that has our signature, and then
-                # calling the inner one. For instance, if we are marked to return 'object' and
-                # the inner function is marked to return 'int', we need to first check that
-                # we return 'int' as our semantics dictate, and then return the object.
-                # that won't happen if we are just taking the compiled signature's type.
+        overloadAndIsExplicit = ClassWrapper.pickSingleOverloadForCall(pyImpl, argTypes)
 
-                argTypes = [implementingClass] + [arg.typeFilter for arg in funcOverload.args[1:]]
+        if overloadAndIsExplicit is not None:
+            overload = overloadAndIsExplicit[0]
 
-                converter.convert(
-                    o2.functionObj,
-                    argTypes,
-                    funcOverload.returnType if funcOverload.returnType is not None else object,
-                    callback=callback
-                )
-                return True
+            # just one overload will do. We can just instantiate this particular function
+            # with a signature that comes from the method overload signature itself.
+            converter.convert(
+                overload.functionObj,
+                argTypes,
+                funcOverload.returnType if funcOverload.returnType is not None else object,
+                callback=callback
+            )
 
-        return False
+            return True
+
+        outputType = funcOverload.returnType or object
+
+        converter.defineNativeFunction(
+            f'implement_method.{implementingClass}.{interfaceClass}.{methodName}.{argTypes[1:]}',
+            ('implement_method', implementingClass, interfaceClass, methodName, tuple(argTypes[1:])),
+            list(argTypes),
+            outputType,
+            lambda context, outputVar, *args: (
+                typeWrapper(implementingClass).generateMethodImplementation(context, methodName, outputType, args)
+            ),
+            callback=callback
+        )
+
+        return True
 
     def convert_set_attribute(self, context, instance, attribute, value):
         if not isinstance(attribute, int):
