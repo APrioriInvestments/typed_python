@@ -453,3 +453,28 @@ Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
     }
     return PyLong_AsLong(p.second);
 }
+
+// static
+bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternative* altT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
+    PyObjectStealer self_object(extractPythonObject(self, altT));
+    if (!self_object) {
+        PyErr_PrintEx(0);
+        throw std::runtime_error("failed to extract python object");
+    }
+    PyConcreteAlternativeInstance *self_inst = (PyConcreteAlternativeInstance*)(PyObject*)self_object;
+
+    std::pair<bool, PyObject*> p = self_inst->callMethod(pyCompareFlagToMethod(pyComparisonOp), other, nullptr);
+    if (p.first)
+        return PyObject_IsTrue(p.second);
+
+    Type* otherT = extractTypeFrom(other->ob_type);
+    if (otherT && otherT->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+        if (((ConcreteAlternative *)otherT)->getAlternative() == altT->getAlternative())
+        {
+            PyConcreteAlternativeInstance* altInstance = (PyConcreteAlternativeInstance*)other;
+            return altT->cmp(self, altInstance->dataPtr(), pyComparisonOp, false);
+        }
+    }
+
+    return PyInstance::compare_to_python_concrete(altT, self, other, exact, pyComparisonOp);
+}

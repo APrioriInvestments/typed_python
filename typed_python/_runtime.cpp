@@ -15,6 +15,8 @@ const char* nativepython_runtime_get_stashed_exception() {
     return nativepython_cur_exception_value;
 }
 
+// Note: extern C identifiers are distinguished only up to 32 characters
+// nativepython_runtime_12345678901
 extern "C" {
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
@@ -27,6 +29,10 @@ extern "C" {
 
     int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
         return StringType::cmpStatic(lhs, rhs);
+    }
+
+    bool np_runtime_alternative_cmp(Alternative* tp, instance_ptr lhs, instance_ptr rhs, int64_t pyComparisonOp) {
+        return Alternative::cmpStatic(tp, lhs, rhs, pyComparisonOp);
     }
 
     StringType::layout* nativepython_runtime_string_concat(StringType::layout* lhs, StringType::layout* rhs) {
@@ -152,7 +158,7 @@ extern "C" {
     StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(inst, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
             PyErr_PrintEx(0);
             throw std::runtime_error("nativepython_runtime_repr: failed to extract python object");
@@ -170,7 +176,7 @@ extern "C" {
     StringType::layout* nativepython_runtime_str(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(inst, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
             PyErr_PrintEx(0);
             throw std::runtime_error("nativepython_runtime_str: failed to extract python object");
@@ -188,7 +194,7 @@ extern "C" {
     uint64_t nativepython_runtime_len(instance_ptr inst, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(inst, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(inst, tp));
         if (!o) {
             PyErr_PrintEx(0);
             throw std::runtime_error("nativepython_runtime_len: failed to extract python object");
@@ -204,12 +210,12 @@ extern "C" {
     bool nativepython_runtime_contains(instance_ptr self, Type* self_tp, instance_ptr item, Type* item_tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(self, self_tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(self, self_tp));
         if (!o) {
             PyErr_PrintEx(0);
             throw std::runtime_error("nativepython_runtime_contains: failed to extract python object");
         }
-        PyObject* i = PyInstance::extractPythonObject(item, item_tp);
+        PyObjectStealer i(PyInstance::extractPythonObject(item, item_tp));
         if (!i) {
             PyErr_PrintEx(0);
             throw std::runtime_error("nativepython_runtime_contains: failed to extract item python object");
@@ -393,7 +399,7 @@ extern "C" {
     bool np_runtime_instance_to_bool(instance_ptr i, Type* tp) {
         PyEnsureGilAcquired getTheGil;
 
-        PyObject* o = PyInstance::extractPythonObject(i, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
 
         int r = PyObject_IsTrue(o);
         if (r == -1)

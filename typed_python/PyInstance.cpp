@@ -931,10 +931,12 @@ bool PyInstance::compare_to_python(Type* t, instance_ptr self, PyObject* other, 
         return compare_to_python(valType->value().type(), valType->value().data(), other, exact, pyComparisonOp);
     }
 
-    Type* otherT = extractTypeFrom(other->ob_type);
+    if (t->getTypeCategory() != Type::TypeCategory::catConcreteAlternative) {
+        Type* otherT = extractTypeFrom(other->ob_type);
 
-    if (otherT && otherT == t) {
-        return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
+        if (otherT && otherT == t) {
+            return t->cmp(self, ((PyInstance*)other)->dataPtr(), pyComparisonOp, false);
+        }
     }
 
     return specializeStatic(t->getTypeCategory(), [&](auto* concrete_null_ptr) {

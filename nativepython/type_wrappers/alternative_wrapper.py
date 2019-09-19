@@ -281,7 +281,36 @@ class AlternativeWrapper(RefcountedWrapper):
             "__ge__" if op.matches.GtE else \
             ""
 
-        return self.convert_call_method(context, magic, (l, r)) or super().convert_bin_op(context, l, op, r)
+        return self.convert_call_method(context, magic, (l, r)) \
+            or self.convert_comparison(context, l, op, r) \
+            or super().convert_bin_op(context, l, op, r)
+
+    # Default comparison for Alternative types
+    # returns None if no comparison is possible (if op is not a comparison operator to begin with,
+    # or if operands are different types)
+    def convert_comparison(self, context, l, op, r):
+        # TODO: provide nicer translation from op to Py_ comparison codes
+        py_code = 2 if op.matches.Eq else \
+            3 if op.matches.NotEq else \
+            0 if op.matches.Lt else \
+            4 if op.matches.Gt else \
+            1 if op.matches.LtE else \
+            5 if op.matches.GtE else -1
+        if py_code < 0:
+            return None
+        tp_l = context.getTypePointer(l.expr_type.typeRepresentation)
+        tp_r = context.getTypePointer(r.expr_type.typeRepresentation)
+        if tp_l and tp_l == tp_r:
+            return context.pushPod(
+                Bool,
+                runtime_functions.alternative_cmp.call(
+                    tp_l,
+                    l.expr.cast(VoidPtr),
+                    r.expr.cast(VoidPtr),
+                    py_code
+                )
+            )
+        return None
 
     def convert_bin_op_reverse(self, context, r, op, l):
         if op.matches.In:

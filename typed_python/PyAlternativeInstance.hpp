@@ -76,6 +76,8 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
+    static bool compare_to_python_concrete(ConcreteAlternative* altT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
+
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
         return extractTypeFrom(pyRepresentation->ob_type) == type;
     }

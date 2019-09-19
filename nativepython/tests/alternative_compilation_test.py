@@ -155,7 +155,6 @@ class TestAlternativeCompilation(unittest.TestCase):
 
     def test_compile_alternative_magic_methods(self):
         A = Alternative("A", a={'a': int}, b={'b': str},
-                        extramethod=lambda self: self.Name,
                         __bool__=lambda self: False,
                         __str__=lambda self: "my str",
                         __repr__=lambda self: "my repr",
@@ -198,14 +197,6 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __invert__=lambda self: A.b("invert"),
 
                         __abs__=lambda self: A.b("abs"),
-                        __hash__=lambda self: 123,
-                        __eq__=lambda self, other: False,
-                        __ne__=lambda self, other: True,
-                        __lt__=lambda self, other: False,
-                        __gt__=lambda self, other: True,
-                        __le__=lambda self, other: False,
-                        __ge__=lambda self, other: True,
-                        __cmp__=lambda self, other: -1,
                         )
 
         def f_extramethod(x: A):
@@ -283,28 +274,6 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_abs(x: A):
             return abs(x)
 
-        # Note: hash is not overridden by method __hash__ in compiled or interpreted case
-        def f_hash(x: A):
-            return hash(x)
-
-        def f_lt(x: A):
-            return x < A.a()
-
-        def f_gt(x: A):
-            return x > A.a()
-
-        def f_le(x: A):
-            return x <= A.a()
-
-        def f_ge(x: A):
-            return x >= A.a()
-
-        def f_eq(x: A):
-            return x == A.a()
-
-        def f_ne(x: A):
-            return x != A.a()
-
         def f_iadd(x: A):
             x += A.a()
             return x
@@ -359,18 +328,89 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
                       f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
-                      f_neg, f_pos, f_invert, f_abs, f_hash,
-                      f_lt, f_gt, f_le, f_ge]
-        # These fail when compiling, because eq and ne are checked before any override is called:
-        #   failing_test_cases = [f_eq, f_ne]
+                      f_neg, f_pos, f_invert, f_abs]
         # These fail when compiling, because python_ast and native_ast have no representation of in-place operators:
         #   failing_test_cases = [f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
         #                         f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]
-        # These are consistent between compiled and interpreted cases, but don't use the override:
-        #   no_override_test_cases = [f_hash]
 
         for f in test_cases:
             compiled_f = Compiled(f)
             r1 = f(A.a())
             r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)
+
+    def test_compile_alternative_comparison_defaults(self):
+
+        B = Alternative("B", a={'a': int}, b={'b': str})
+
+        def f_eq(x: B, y: B):
+            return x == y
+
+        def f_ne(x: B, y: B):
+            return x != y
+
+        def f_lt(x: B, y: B):
+            return x < y
+
+        def f_gt(x: B, y: B):
+            return x > y
+
+        def f_le(x: B, y: B):
+            return x <= y
+
+        def f_ge(x: B, y: B):
+            return x >= y
+
+        test_cases = [f_eq, f_ne, f_lt, f_gt, f_le, f_ge]
+        values = [B.a(0), B.a(1), B.b("a"), B.b("b")]
+        for f in test_cases:
+            for v1 in values:
+                for v2 in values:
+                    compiled_f = Compiled(f)
+                    r1 = f(v1, v2)
+                    r2 = compiled_f(v1, v2)
+                    self.assertEqual(r1, r2)
+
+    def test_compile_alternative_comparison_methods(self):
+
+        C = Alternative("C", a={'a': int}, b={'b': str},
+                        __eq__=lambda self, other: True,
+                        __ne__=lambda self, other: False,
+                        __lt__=lambda self, other: True,
+                        __gt__=lambda self, other: False,
+                        __le__=lambda self, other: True,
+                        __ge__=lambda self, other: False,
+                        __hash__=lambda self: 123,
+                        )
+
+        def f_eq(x: C):
+            return x == C.a()
+
+        def f_ne(x: C):
+            return x != C.a()
+
+        def f_lt(x: C):
+            return x < C.a()
+
+        def f_gt(x: C):
+            return x > C.a()
+
+        def f_le(x: C):
+            return x <= C.a()
+
+        def f_ge(x: C):
+            return x >= C.a()
+
+        # Note: hash is not overridden by method __hash__ in compiled or interpreted case
+        def f_hash(x: C):
+            return hash(x)
+
+        test_cases = [f_eq, f_ne, f_lt, f_gt, f_le, f_ge, f_hash]
+        # These are consistent between compiled and interpreted cases, but don't use the override:
+        #   no_override_test_cases = [f_hash]
+
+        for f in test_cases:
+            compiled_f = Compiled(f)
+            r1 = f(C.a())
+            r2 = compiled_f(C.a())
             self.assertEqual(r1, r2)

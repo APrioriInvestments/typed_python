@@ -196,6 +196,22 @@ inline bool cmpResultToBoolForPyOrdering(int pyComparisonOp, char cmpResult) {
     throw std::logic_error("Invalid pyComparisonOp");
 }
 
+//given a python richcompare flag, such as Py_LT,
+// return a string naming the appropriate magic method implementing this comparison
+inline const char* pyCompareFlagToMethod(int pyComparisonOp) {
+    switch (pyComparisonOp) {
+        case Py_EQ: return "__eq__";
+        case Py_NE: return "__ne__";
+        case Py_LT: return "__lt__";
+        case Py_GT: return "__gt__";
+        case Py_LE: return "__le__";
+        case Py_GE: return "__ge__";
+    }
+
+    throw std::logic_error("Invalid pyComparisonOp");
+}
+
+
 /******
 Call 'f', which must return PyObject*, in a block that guards against
 exceptions returning nakedly to the python interpreter. This is meant
