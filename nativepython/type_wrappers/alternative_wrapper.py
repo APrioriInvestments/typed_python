@@ -136,11 +136,13 @@ class AlternativeWrapper(RefcountedWrapper):
         return self.layoutType
 
     def convert_hash(self, context, expr):
+        y = self.convert_call_method(context, "__hash__", (expr,))
+        if y is not None:
+            return y
         tp = context.getTypePointer(expr.expr_type.typeRepresentation)
         if tp:
             return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
-        else:
-            return None
+        return None
 
     def on_refcount_zero(self, context, instance):
         return (

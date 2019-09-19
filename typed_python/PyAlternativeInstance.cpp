@@ -381,6 +381,17 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
     throw PythonExceptionSet();
 }
 
+// try to call user-defined hash method
+// returns -1 if not defined or if it returns an invalid value
+int64_t PyConcreteAlternativeInstance::tryCallHashMethod() {
+    auto result = callMethod("__hash__", nullptr, nullptr);
+    if (!result.first)
+        return -1;
+    if (!PyLong_Check(result.second))
+        return -1;
+    return PyLong_AsLong(result.second);
+}
+
 std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char* name, PyObject* arg0, PyObject* arg1) {
     auto it = type()->getAlternative()->getMethods().find(name);
 

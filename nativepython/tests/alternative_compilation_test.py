@@ -361,8 +361,11 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_ge(x: B, y: B):
             return x >= y
 
-        test_cases = [f_eq, f_ne, f_lt, f_gt, f_le, f_ge]
+        def f_hash(x: B):
+            return hash(x)
+
         values = [B.a(0), B.a(1), B.b("a"), B.b("b")]
+        test_cases = [f_eq, f_ne, f_lt, f_gt, f_le, f_ge]
         for f in test_cases:
             for v1 in values:
                 for v2 in values:
@@ -370,6 +373,13 @@ class TestAlternativeCompilation(unittest.TestCase):
                     r1 = f(v1, v2)
                     r2 = compiled_f(v1, v2)
                     self.assertEqual(r1, r2)
+        test_cases = [f_hash]
+        for f in test_cases:
+            for v in values:
+                compiled_f = Compiled(f)
+                r1 = f(v)
+                r2 = compiled_f(v)
+                self.assertEqual(r1, r2)
 
     def test_compile_alternative_comparison_methods(self):
 
@@ -406,8 +416,6 @@ class TestAlternativeCompilation(unittest.TestCase):
             return hash(x)
 
         test_cases = [f_eq, f_ne, f_lt, f_gt, f_le, f_ge, f_hash]
-        # These are consistent between compiled and interpreted cases, but don't use the override:
-        #   no_override_test_cases = [f_hash]
 
         for f in test_cases:
             compiled_f = Compiled(f)

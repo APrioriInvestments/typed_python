@@ -910,7 +910,13 @@ Py_hash_t PyInstance::tp_hash(PyObject *o) {
         Type* self_type = extractTypeFrom(o->ob_type);
         PyInstance* w = (PyInstance*)o;
 
-        int64_t h = self_type->hash(w->dataPtr());
+        int64_t h = -1;
+        if (self_type->getTypeCategory() == Type::TypeCategory::catConcreteAlternative) {
+            h = ((PyConcreteAlternativeInstance*)o)->tryCallHashMethod();
+        }
+        if (h == -1) {
+            h = self_type->hash(w->dataPtr());
+        }
         if (h == -1) {
             h = -2;
         }
