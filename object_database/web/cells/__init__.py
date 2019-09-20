@@ -23,6 +23,7 @@ from object_database.web.cells.cells import (
     CollapsiblePanel,
     Text,
     Padding,
+    Panel,
     Span,
     Sequence,
     Columns,
