@@ -2895,7 +2895,27 @@ class Timestamp(Cell):
 
 
 class Panel(Cell):
+    """Panel Cell
+
+    This cell acts as a generic, bordered container.
+    It has a single child Cell element.
+
+    Properties
+    ----------
+    content: Cell
+        A child cell that will be displayed within
+        the bordered Panel area.
+    """
     def __init__(self, content):
+        """
+        Parameters
+        ----------
+        content: Cell
+            A child cell that will be displyed
+            within the bordered Panel area.
+            Will be set on instance as `content`
+            property.
+        """
         super().__init__()
 
         self.content = Cell.makeCell(content)
