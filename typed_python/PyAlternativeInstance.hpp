@@ -88,4 +88,7 @@ public:
 
     static void constructFromPythonArgumentsConcrete(ConcreteAlternative* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 
+    static PyObject* altFormat(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altBytes(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyMethodDef* typeMethodsConcrete(Type* t);
 };

@@ -973,8 +973,18 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(str(alt.x_0()), "not_your_usual_str")
 
     def test_alternative_magic_methods(self):
+        A_attrs = {"q": "value-q", "z": "value-z"}
+
+        def A_getattr(s, n):
+            if n not in A_attrs:
+                raise AttributeError(f"no attribute {n}")
+            return A_attrs[n]
+
+        def A_setattr(s, n, v):
+            A_attrs[n] = v
+
         A = Alternative("A", a={'a': int}, b={'b': str},
-                        __bool__=lambda self: False,
+                        __bool__=lambda self: self.matches.b,
                         __str__=lambda self: "str",
                         __repr__=lambda self: "repr",
                         __call__=lambda self: "call",
@@ -987,15 +997,30 @@ class NativeTypesTests(unittest.TestCase):
                         __matmul__=lambda lhs, rhs: A.b("matmul"),
                         __truediv__=lambda lhs, rhs: A.b("truediv"),
                         __floordiv__=lambda lhs, rhs: A.b("floordiv"),
-                        __mod__=lambda lhs, rhs: A.b("mod"),
                         __divmod=lambda lhs, rhs: A.b("divmod"),
+                        __mod__=lambda lhs, rhs: A.b("mod"),
                         __pow__=lambda lhs, rhs: A.b("pow"),
                         __lshift__=lambda lhs, rhs: A.b("lshift"),
                         __rshift__=lambda lhs, rhs: A.b("rshift"),
                         __and__=lambda lhs, rhs: A.b("and"),
+                        __or__=lambda lhs, rhs: A.b("or"),
+                        __xor__=lambda lhs, rhs: A.b("xor"),
+
+                        __neg__=lambda self: A.b("neg"),
+                        __pos__=lambda self: A.b("pos"),
+                        __invert__=lambda self: A.b("invert"),
+
+                        __abs__=lambda self: A.b("abs"),
+
+                        __bytes__=lambda self: b'bytes',
+                        __format__=lambda self: "format",
+                        __getattr__=A_getattr,
+                        __setattr__=A_setattr
                         )
         self.assertEqual(A.a().__bool__(), False)
         self.assertEqual(bool(A.a()), False)
+        self.assertEqual(A.b().__bool__(), True)
+        self.assertEqual(bool(A.b()), True)
         self.assertEqual(A.a().__str__(), "str")
         self.assertEqual(str(A.a()), "str")
         self.assertEqual(A.a().__repr__(), "repr")
@@ -1017,6 +1042,48 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(A.a().__sub__(A.a()).b, "sub")
         self.assertEqual((A.a() - A.a()).Name, "b")
         self.assertEqual((A.a() - A.a()).b, "sub")
+        self.assertEqual((A.a() * A.a()).Name, "b")
+        self.assertEqual((A.a() * A.a()).b, "mul")
+        self.assertEqual((A.a() @ A.a()).Name, "b")
+        self.assertEqual((A.a() @ A.a()).b, "matmul")
+        self.assertEqual((A.a() / A.a()).Name, "b")
+        self.assertEqual((A.a() / A.a()).b, "truediv")
+        self.assertEqual((A.a() // A.a()).Name, "b")
+        self.assertEqual((A.a() // A.a()).b, "floordiv")
+        self.assertEqual((A.a() % A.a()).Name, "b")
+        self.assertEqual((A.a() % A.a()).b, "mod")
+        self.assertEqual((A.a() ** A.a()).Name, "b")
+        self.assertEqual((A.a() ** A.a()).b, "pow")
+        self.assertEqual((A.a() >> A.a()).Name, "b")
+        self.assertEqual((A.a() >> A.a()).b, "rshift")
+        self.assertEqual((A.a() << A.a()).Name, "b")
+        self.assertEqual((A.a() << A.a()).b, "lshift")
+        self.assertEqual((A.a() & A.a()).Name, "b")
+        self.assertEqual((A.a() & A.a()).b, "and")
+        self.assertEqual((A.a() | A.a()).Name, "b")
+        self.assertEqual((A.a() | A.a()).b, "or")
+        self.assertEqual((A.a() ^ A.a()).Name, "b")
+        self.assertEqual((A.a() ^ A.a()).b, "xor")
+        self.assertEqual((+A.a()).Name, "b")
+        self.assertEqual((+A.a()).b, "pos")
+        self.assertEqual((-A.a()).Name, "b")
+        self.assertEqual((-A.a()).b, "neg")
+        self.assertEqual((~A.a()).Name, "b")
+        self.assertEqual((~A.a()).b, "invert")
+        self.assertEqual(abs(A.a()).Name, "b")
+        self.assertEqual(abs(A.a()).b, "abs")
+
+        self.assertEqual(bytes(A.a()), b"bytes")
+        self.assertEqual(format(A.a()), "format")
+
+        self.assertEqual(A.a().Name, "a")
+        self.assertEqual(A.a().q, "value-q")
+        self.assertEqual(A.b().z, "value-z")
+        A.a().q = "changedvalue-q"
+        self.assertEqual(A.b().q, "changedvalue-q")
+
+        with self.assertRaises(AttributeError):
+            print(A.a().invalid)
 
     def test_named_tuple_subclass_magic_methods(self):
         class X(NamedTuple(x=int, y=int)):

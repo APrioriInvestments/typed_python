@@ -36,7 +36,7 @@ class BytesWrapper(RefcountedWrapper):
         self.layoutType = native_ast.Type.Struct(element_types=(
             ('refcount', native_ast.Int64),
             ('data', native_ast.UInt8)
-        ), name='StringLayout').pointer()
+        ), name='BytesLayout').pointer()
 
     def getNativeLayoutType(self):
         return self.layoutType

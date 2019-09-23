@@ -235,6 +235,12 @@ class AlternativeWrapper(RefcountedWrapper):
                 else:
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
+        # TODO: Compile this properly
+        # if target_type.typeRepresentation == Bytes:
+        #     y = self.convert_call_method(context, "__bytes__", (e,))
+        #     if y is not None:
+        #         context.pushEffect(targetVal.expr.store(y))
+        #         return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 

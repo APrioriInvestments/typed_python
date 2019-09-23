@@ -12,6 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import pytest
 from typed_python import TypeFunction, Function, Alternative, Forward
 import typed_python._types as _types
 from nativepython.runtime import Runtime
@@ -153,6 +154,40 @@ class TestAlternativeCompilation(unittest.TestCase):
         speedup = (t1-t0)/(t2-t1)
         self.assertGreater(speedup, 20)  # I get about 50
 
+    @unittest.skip
+    @pytest.mark.skip(reason="work in progress")
+    def test_compile_alternative_2(self):
+        A_attrs = {"q": "attributeq", "z": "attributez"}
+
+        def A_getattr(s, n):
+            if n not in A_attrs:
+                raise AttributeError(f"no attribute {n}")
+            return A_attrs[n]
+
+        def A_setattr(s, n, v):
+            A_attrs[n] = v
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __bytes__=lambda self: b'my bytes',
+                        __format__=lambda self: "my format",
+                        __getattr__=A_getattr,
+                        # __getattr__=lambda self, name: A_attrs[name],
+                        __setattr__=A_setattr
+                        )
+
+        def f_bytes(x: A):
+            return bytes(x)
+
+        def f_format(x: A):
+            return format(x)
+
+        test_cases = [f_bytes, f_format]
+        for f in test_cases:
+            r1 = f(A.a())
+            compiled_f = Compiled(f)
+            r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)
+
     def test_compile_alternative_magic_methods(self):
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __bool__=lambda self: False,
@@ -162,6 +197,8 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __len__=lambda self: 42,
                         __contains__=lambda self, item: item == 1,
                         # __contains__=lambda self, item: not item,  # TODO: why doesn't this compile?
+                        __bytes__=lambda self: b'my bytes',
+                        __format__=lambda self, spec: "my format",
 
                         __add__=lambda self, other: A.b("add"),
                         __sub__=lambda self, other: A.b("sub"),
@@ -222,6 +259,12 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         def f_len(x: A):
             return len(x)
+
+        def f_bytes(x: A):
+            return bytes(x)
+
+        def f_format(x: A):
+            return format(x)
 
         def f_add(x: A):
             return x + A.a()

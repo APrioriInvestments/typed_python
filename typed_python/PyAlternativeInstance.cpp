@@ -275,7 +275,19 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
             );
     }
 
-    return PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+    PyObject* ret = PyInstance::tp_getattr_concrete(pyAttrName, attrName);
+    // TODO: Make this specific to an AttributeError exception
+    if (PyErr_Occurred()) {
+        PyErr_Clear();
+        std::pair<bool, PyObject*> p = callMethod("__getattr__", pyAttrName, nullptr);
+        if (p.first) {
+            return p.second;
+        }
+        else {
+            PyErr_Format(PyExc_AttributeError, "no attribute %s for instance of type %s", attrName, type()->name().c_str());
+        }
+    }
+    return ret;
 }
 
 void PyAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Alternative* alt, PyTypeObject* pyType) {
@@ -334,6 +346,9 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
         );
 
     for (auto method_pair: alt->getAlternative()->getMethods()) {
+        if (method_pair.first == "__format__"
+                || method_pair.first == "__bytes__")
+            continue;
         PyDict_SetItemString(
             pyType->tp_dict,
             method_pair.first.c_str(),
@@ -352,6 +367,10 @@ int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* att
 }
 
 int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
+    std::pair<bool, PyObject*> p = callMethod("__setattr__", attrName, attrVal);
+    if (p.first)
+        return 0;
+
     PyErr_Format(
         PyExc_AttributeError,
         "Cannot set attributes on instance of type '%s' because it is immutable",
@@ -488,4 +507,49 @@ bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternati
     }
 
     return PyInstance::compare_to_python_concrete(altT, self, other, exact, pyComparisonOp);
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altFormat(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    auto result = self->callMethod("__format__", nullptr, nullptr);
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__format__ not defined for type %s", self->type()->name().c_str());
+        return NULL;
+    }
+    if (!PyUnicode_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__format__ returned non-string for type %s", self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altBytes(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    auto result = self->callMethod("__bytes__", nullptr, nullptr);
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__bytes__ not defined for type %s", self->type()->name().c_str());
+        return NULL;
+    }
+    if (!PyBytes_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__bytes__ returned non--bytes %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyMethodDef* PyConcreteAlternativeInstance::typeMethodsConcrete(Type* t) {
+
+    return new PyMethodDef[3] {
+        {"__format__", (PyCFunction)PyConcreteAlternativeInstance::altFormat, METH_VARARGS | METH_KEYWORDS, NULL},
+        {"__bytes__", (PyCFunction)PyConcreteAlternativeInstance::altBytes, METH_VARARGS | METH_KEYWORDS, NULL},
+        {NULL, NULL}
+    };
+
 }
