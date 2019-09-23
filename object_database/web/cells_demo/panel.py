@@ -36,3 +36,43 @@ class BasicPanelInFlexSequence(CellsTestPage):
 
     def text(self):
         return "Should see a flex parent vert sequence where the Panel is flexing as the child, no longer taking up 100% in both dimensions (since we are flexing)"
+
+
+class NestedVertFlexPanel(CellsTestPage):
+    def cell(self):
+        return cells.Panel(cells.Text("Button in a Panel") + cells.Button("A Button", lambda: None)) + cells.Flex(cells.Panel(cells.Text("something else")))
+
+    def text(self):
+        return "Should see vertical sequence of two panels, the second is flexed, first is shrinkwrapped vertically, and both expand fully on horizontal axis"
+
+
+class NestedVertHorizPanel(CellsTestPage):
+    def cell(self):
+        return cells.Panel(cells.Text("Button in a Panel") + cells.Button("A Button", lambda: None)) >> cells.Flex(cells.Panel(cells.Text("something else")))
+
+    def text(self):
+        return "Should see horizontal sequence of two panels, the second is flexed, first is shrinkwrapped horizontally, and both expand fully on horizontal axis"
+
+
+class HorizPanelNonWrapSequence(CellsTestPage):
+    def cell(self):
+        def make_panel(num):
+            return cells.Panel(
+                cells.Text("Panel {}".format(num)) + cells.Button("Button {}".format(num), lambda: None))
+        panels = [make_panel(i) for i in range(50)]
+        return cells.HorizontalSequence(panels, wrap=False)
+
+    def text(self):
+        return "Should see 50 panels horizontally across the screen without wrapping"
+
+
+class HorizPanelDoesWrapSequence(CellsTestPage):
+    def cell(self):
+        def make_panel(num):
+            return cells.Panel(
+                cells.Text("Panel {}".format(num)) + cells.Button("Button {}".format(num), lambda: None))
+        panels = [make_panel(i) for i in range(50)]
+        return cells.HorizontalSequence(panels)
+
+    def text(self):
+        return "Should see 50 panels horizontally across the screen with wrapping"

@@ -242,6 +242,21 @@
     height: auto;
 }
 
+.sequence-horizontal > .cell-panel {
+    height: auto;
+    width: auto;
+}
+
+.sequence-horizontal.flex-parent > .cell.panel {
+    height: 100%;
+    width: auto;
+}
+
+.sequence-vertical.flex-parent > .cell-panel {
+    height: auto;
+    width: 100%;
+}
+
 /* PageView
  *================================================================*/
 .page-view {
