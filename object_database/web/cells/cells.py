@@ -2898,7 +2898,7 @@ class Panel(Cell):
     def __init__(self, content):
         super().__init__()
 
-        self.content = content
+        self.content = Cell.makeCell(content)
 
     def recalculate(self):
         self.children['____content__'] = Cell.makeCell(self.content)
