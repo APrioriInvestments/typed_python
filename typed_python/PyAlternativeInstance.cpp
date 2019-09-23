@@ -236,6 +236,16 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
+    std::pair<bool, PyObject*> p = callMethod("__getattribute__", pyAttrName, nullptr);
+    if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
+        PyErr_Clear();
+    }
+    else {
+        if (p.first) {
+            return p.second;
+        }
+    }
+
     if (mIsMatcher) {
         if (type()->getAlternative()->subtypes()[type()->getAlternative()->which(dataPtr())].first == attrName) {
             return incref(Py_True);
@@ -276,8 +286,7 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
     }
 
     PyObject* ret = PyInstance::tp_getattr_concrete(pyAttrName, attrName);
-    // TODO: Make this specific to an AttributeError exception
-    if (PyErr_Occurred()) {
+    if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
         std::pair<bool, PyObject*> p = callMethod("__getattr__", pyAttrName, nullptr);
         if (p.first) {
@@ -367,9 +376,16 @@ int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* att
 }
 
 int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
-    std::pair<bool, PyObject*> p = callMethod("__setattr__", attrName, attrVal);
-    if (p.first)
-        return 0;
+    if (!attrVal) {
+        std::pair<bool, PyObject*> p = callMethod("__delattr__", attrName, attrVal);
+        if (p.first)
+            return 0;
+    }
+    else {
+        std::pair<bool, PyObject*> p = callMethod("__setattr__", attrName, attrVal);
+        if (p.first)
+            return 0;
+    }
 
     PyErr_Format(
         PyExc_AttributeError,

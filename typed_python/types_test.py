@@ -983,6 +983,9 @@ class NativeTypesTests(unittest.TestCase):
         def A_setattr(s, n, v):
             A_attrs[n] = v
 
+        def A_delattr(s, n):
+            A_attrs.pop(n, None)
+
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __bool__=lambda self: self.matches.b,
                         __str__=lambda self: "str",
@@ -1015,8 +1018,10 @@ class NativeTypesTests(unittest.TestCase):
                         __bytes__=lambda self: b'bytes',
                         __format__=lambda self: "format",
                         __getattr__=A_getattr,
-                        __setattr__=A_setattr
+                        __setattr__=A_setattr,
+                        __delattr__=A_delattr
                         )
+
         self.assertEqual(A.a().__bool__(), False)
         self.assertEqual(bool(A.a()), False)
         self.assertEqual(A.b().__bool__(), True)
@@ -1079,11 +1084,27 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(A.a().Name, "a")
         self.assertEqual(A.a().q, "value-q")
         self.assertEqual(A.b().z, "value-z")
-        A.a().q = "changedvalue-q"
-        self.assertEqual(A.b().q, "changedvalue-q")
+        A.a().q = "changedvalue for q"
+        self.assertEqual(A.b().q, "changedvalue for q")
 
         with self.assertRaises(AttributeError):
             print(A.a().invalid)
+
+        del A.a().z
+        with self.assertRaises(AttributeError):
+            print(A.a().z)
+
+        A.a().Name = "can't change Name"
+        self.assertEqual(A.a().Name, "a")
+
+        A2 = Alternative("A", a={'a': int}, b={'b': str},
+                         __getattribute__=A_getattr,
+                         __setattr__=A_setattr,
+                         __delattr__=A_delattr
+                         )
+        self.assertEqual(A2.b().q, "changedvalue for q")
+        A2.a().Name = "can change Name"
+        self.assertEqual(A2.b().Name, "can change Name")
 
     def test_named_tuple_subclass_magic_methods(self):
         class X(NamedTuple(x=int, y=int)):
