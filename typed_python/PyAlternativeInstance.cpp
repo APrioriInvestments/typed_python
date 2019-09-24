@@ -356,7 +356,9 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
 
     for (auto method_pair: alt->getAlternative()->getMethods()) {
         if (method_pair.first == "__format__"
-                || method_pair.first == "__bytes__")
+                || method_pair.first == "__bytes__"
+                || method_pair.first == "__dir__"
+                )
             continue;
         PyDict_SetItemString(
             pyType->tp_dict,
@@ -500,6 +502,48 @@ Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
     return PyLong_AsLong(p.second);
 }
 
+PyObject* PyConcreteAlternativeInstance::sq_item_concrete(Py_ssize_t ix) {
+    PyObjectStealer arg0(PyLong_FromUnsignedLong(ix));
+    std::pair<bool, PyObject*> p = callMethod("__getitem__", arg0, nullptr);
+    if (!p.first) {
+        PyErr_Format(PyExc_TypeError, "__getitem__ not defined for type %s", type()->name().c_str());
+        return NULL;
+    }
+    return p.second;
+}
+
+int PyConcreteAlternativeInstance::sq_ass_item_concrete(Py_ssize_t ix, PyObject* v) {
+    PyObjectStealer arg0(PyLong_FromUnsignedLong(ix));
+    std::pair<bool, PyObject*> p = callMethod("__setitem__", arg0, v);
+    if (!p.first) {
+        PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
+        return -1;
+    }
+    if (!PyLong_Check(p.second)) {
+        PyErr_Format(PyExc_TypeError, "__setitem__ returned non-integer");
+        return -1;
+    }
+    return PyLong_AsLong(p.second);
+}
+
+PyObject* PyConcreteAlternativeInstance::tp_iter_concrete() {
+    std::pair<bool, PyObject*> p = callMethod("__iter__", nullptr, nullptr);
+    if (!p.first) {
+        PyErr_Format(PyExc_TypeError, "__iter__ not defined for type %s", type()->name().c_str());
+        return NULL;
+    }
+    return p.second;
+}
+
+PyObject* PyConcreteAlternativeInstance::tp_iternext_concrete() {
+    std::pair<bool, PyObject*> p = callMethod("__next__", nullptr, nullptr);
+    if (!p.first) {
+        PyErr_Format(PyExc_TypeError, "__next__ not defined for type %s", type()->name().c_str());
+        return NULL;
+    }
+    return p.second;
+}
+
 // static
 bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternative* altT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp) {
     PyObjectStealer self_object(extractPythonObject(self, altT));
@@ -552,7 +596,24 @@ PyObject* PyConcreteAlternativeInstance::altBytes(PyObject* o, PyObject* args, P
         return NULL;
     }
     if (!PyBytes_Check(result.second)) {
-        PyErr_Format(PyExc_TypeError, "__bytes__ returned non--bytes %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        PyErr_Format(PyExc_TypeError, "__bytes__ returned non-bytes %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altDir(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    auto result = self->callMethod("__dir__", nullptr, nullptr);
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "shouldn't happen");
+        return NULL;
+    }
+    if (!PySequence_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__dir__ returned non-sequence %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
         return NULL;
     }
 
@@ -561,11 +622,19 @@ PyObject* PyConcreteAlternativeInstance::altBytes(PyObject* o, PyObject* args, P
 
 // static
 PyMethodDef* PyConcreteAlternativeInstance::typeMethodsConcrete(Type* t) {
-
-    return new PyMethodDef[3] {
-        {"__format__", (PyCFunction)PyConcreteAlternativeInstance::altFormat, METH_VARARGS | METH_KEYWORDS, NULL},
-        {"__bytes__", (PyCFunction)PyConcreteAlternativeInstance::altBytes, METH_VARARGS | METH_KEYWORDS, NULL},
-        {NULL, NULL}
-    };
-
+    const int max_entries = 3;
+    int cur= 0;
+    auto altMethods = ((ConcreteAlternative*)t)->getAlternative()->getMethods();
+    PyMethodDef* ret = new PyMethodDef[max_entries + 1];
+    if (altMethods.find("__format__") != altMethods.end()) {
+        ret[cur++] =  {"__format__", (PyCFunction)PyConcreteAlternativeInstance::altFormat, METH_VARARGS | METH_KEYWORDS, NULL};
+    }
+    if (altMethods.find("__bytes__") != altMethods.end()) {
+        ret[cur++] =  {"__bytes__", (PyCFunction)PyConcreteAlternativeInstance::altBytes, METH_VARARGS | METH_KEYWORDS, NULL};
+    }
+    if (altMethods.find("__dir__") != altMethods.end()) {
+        ret[cur++] =  {"__dir__", (PyCFunction)PyConcreteAlternativeInstance::altDir, METH_VARARGS | METH_KEYWORDS, NULL};
+    }
+    ret[cur++] = {NULL, NULL};
+    return ret;
 }

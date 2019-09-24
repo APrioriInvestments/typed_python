@@ -78,6 +78,13 @@ public:
 
     Py_ssize_t mp_and_sq_length_concrete();
 
+    PyObject* sq_item_concrete(Py_ssize_t ix);
+    int sq_ass_item_concrete(Py_ssize_t ix, PyObject* v);
+
+    PyObject* tp_iter_concrete();
+
+    PyObject* tp_iternext_concrete();
+
     static bool compare_to_python_concrete(ConcreteAlternative* altT, instance_ptr self, PyObject* other, bool exact, int pyComparisonOp);
 
     static bool pyValCouldBeOfTypeConcrete(modeled_type* type, PyObject* pyRepresentation, bool isExplicit) {
@@ -90,5 +97,6 @@ public:
 
     static PyObject* altFormat(PyObject* o, PyObject* args, PyObject* kwargs);
     static PyObject* altBytes(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altDir(PyObject* o, PyObject* args, PyObject* kwargs);
     static PyMethodDef* typeMethodsConcrete(Type* t);
 };

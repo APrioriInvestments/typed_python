@@ -443,6 +443,10 @@ public:
 
     PyObject* sq_item_concrete(Py_ssize_t ix);
 
+    static int sq_ass_item(PyObject* o, Py_ssize_t ix, PyObject* v);
+
+    int sq_ass_item_concrete(Py_ssize_t ix, PyObject* v);
+
     static PyTypeObject* typeObj(Type* inType);
 
     static PyObject* undefinedBehaviorException();

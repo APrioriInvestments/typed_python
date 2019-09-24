@@ -513,6 +513,18 @@ PyObject* PyInstance::sq_item_concrete(Py_ssize_t ix) {
 }
 
 // static
+int PyInstance::sq_ass_item(PyObject* o, Py_ssize_t ix, PyObject* v) {
+    return specializeForTypeReturningInt(o, [&](auto& subtype) {
+        return subtype.sq_ass_item_concrete(ix, v);
+    });
+}
+
+int PyInstance::sq_ass_item_concrete(Py_ssize_t ix, PyObject* v) {
+    PyErr_Format(PyExc_TypeError, "%S object is not subscript assignable", (PyObject*)((PyObject*)this)->ob_type);
+    return -1;
+}
+
+// static
 PyTypeObject* PyInstance::typeObj(Type* inType) {
     if (!inType->getTypeRep()) {
         inType->setTypeRep(typeObjInternal(inType));
@@ -529,6 +541,8 @@ PySequenceMethods* PyInstance::sequenceMethodsFor(Type* t) {
             new PySequenceMethods {0,0,0,0,0,0,0,0};
             res->sq_contains = (objobjproc)PyInstance::sq_contains;
             res->sq_length = (lenfunc)PyInstance::mp_and_sq_length;
+            res->sq_item = (ssizeargfunc)PyInstance::sq_item;
+            res->sq_ass_item = (ssizeobjargproc)PyInstance::sq_ass_item;
         return res;
     }
 
@@ -791,7 +805,8 @@ PyTypeObject* PyInstance::typeObjInternal(Type* inType) {
             .tp_weaklistoffset = 0,                     // Py_ssize_t
             .tp_iter = inType->getTypeCategory() == Type::TypeCategory::catConstDict ||
                         inType->getTypeCategory() == Type::TypeCategory::catDict ||
-                        inType->getTypeCategory() == Type::TypeCategory::catSet
+                        inType->getTypeCategory() == Type::TypeCategory::catSet ||
+                        inType->getTypeCategory() == Type::TypeCategory::catConcreteAlternative
                          ?
                 PyInstance::tp_iter
             :   0,                                      // getiterfunc tp_iter;

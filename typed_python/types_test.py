@@ -1019,7 +1019,7 @@ class NativeTypesTests(unittest.TestCase):
                         __format__=lambda self: "format",
                         __getattr__=A_getattr,
                         __setattr__=A_setattr,
-                        __delattr__=A_delattr
+                        __delattr__=A_delattr,
                         )
 
         self.assertEqual(A.a().__bool__(), False)
@@ -1086,25 +1086,85 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual(A.b().z, "value-z")
         A.a().q = "changedvalue for q"
         self.assertEqual(A.b().q, "changedvalue for q")
-
         with self.assertRaises(AttributeError):
             print(A.a().invalid)
-
         del A.a().z
         with self.assertRaises(AttributeError):
             print(A.a().z)
-
         A.a().Name = "can't change Name"
         self.assertEqual(A.a().Name, "a")
+        d = dir(A.a())
+        self.assertEqual(len(d), 92)  # this is the default dir
 
-        A2 = Alternative("A", a={'a': int}, b={'b': str},
+        A2_items = dict()
+
+        def A2_setitem(self, i, v):
+            A2_items[i] = v
+            return 0
+
+        A2 = Alternative("A2", a={'a': int}, b={'b': str},
                          __getattribute__=A_getattr,
                          __setattr__=A_setattr,
-                         __delattr__=A_delattr
+                         __delattr__=A_delattr,
+                         __dir__=lambda self: list(A_attrs.keys()),
+                         __getitem__=lambda self, i: A2_items.get(i, i),
+                         __setitem__=A2_setitem
                          )
+
         self.assertEqual(A2.b().q, "changedvalue for q")
         A2.a().Name = "can change Name"
         self.assertEqual(A2.b().Name, "can change Name")
+        self.assertEqual(dir(A2.b()), ["Name", "q"])
+        self.assertEqual(A2.b()[123], 123)
+        A2.b()[123] = 7
+        self.assertEqual(A2.b()[123], 7)
+
+    def test_alternative_iter(self):
+
+        class A_iter():
+            def __init__(self):
+                self._cur = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur > 9:
+                    raise StopIteration
+                self._cur += 1
+                return self._cur
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __iter__=lambda self: A_iter()
+                        )
+        self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+
+    def test_alternative_as_iterator(self):
+
+        class B_iter():
+            def __init__(self):
+                self._cur = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur > 9:
+                    raise StopIteration
+                self._cur += 1
+                return self._cur
+
+        x = B_iter()
+        Iterator = Alternative("B", a={'a': int},
+                               __iter__=lambda self: self,
+                               __next__=lambda self: x.__next__()
+                               )
+        A = Alternative("A", a={'a': int},
+                        __iter__=lambda self: Iterator.a()
+                        )
+        # this is a one-time iterator
+        self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([x for x in A.a()], [])
 
     def test_named_tuple_subclass_magic_methods(self):
         class X(NamedTuple(x=int, y=int)):
