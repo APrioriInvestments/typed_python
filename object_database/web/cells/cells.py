@@ -646,6 +646,14 @@ class Cell:
         # when composing DOM.
         self.exportData = {}
 
+    def applyCellDecorator(self, decorator):
+        """Return a new cell which applies the function 'decorator' to 'self'.
+
+        By default we just call the function. But some subclasses may want to apply
+        the decorator to child cells instead.
+        """
+        return decorator(self)
+
     def updateLifecycleState(self):
         """Handles cell lifecycle state.
 
@@ -1632,7 +1640,10 @@ class Subscribed(Cell):
     def __init__(self, f):
         super().__init__()
 
-        self.f = f  # What is f? A lambda?
+        # a function of no arguments that proces a cell.
+        # we call it and watch which view values it reads to know
+        # when to recalculate the element.
+        self.cellFactory = f
 
         # We need this to properly
         # cooperate with nested
@@ -1647,18 +1658,31 @@ class Subscribed(Cell):
         return super().prepareForReuse()
 
     def __repr__(self):
-        return "Subscribed(%s)" % self.f
+        return "Subscribed(%s)" % self.cellFactory
+
+    def applyCellDecorator(self, decorator):
+        """Return a new cell which applies the function 'decorator' to 'self'.
+
+        By default we just call the function. But some subclasses may want to apply
+        the decorator to child cells instead.
+        """
+        cellFactory = self.cellFactory
+
+        # produce a new cellFactory that applies the decorator to the interior.
+        newCellFactory = lambda: Cell.makeCell(cellFactory()).applyCellDecorator(decorator)
+
+        return Subscribed(newCellFactory)
 
     def sortsAs(self):
         for c in self.children.values():
             return c.sortsAs()
 
-        return Cell.makeCell(self.f()).sortsAs()
+        return Cell.makeCell(self.cellFactory()).sortsAs()
 
     def recalculate(self):
         with self.view() as v:
             try:
-                c = Cell.makeCell(self.f())
+                c = Cell.makeCell(self.cellFactory())
                 if c.cells is not None:
                     c.prepareForReuse()
                 if isinstance(c, Sequence):

@@ -37,6 +37,19 @@ def waitForCellsCondition(cells: Cells, condition, timeout=10.0):
     return None
 
 
+class CellDecorator(object):
+    """A function that takes (and returns) a single Cell, and can be applied with the '*' operator."""
+    def __init__(self, cellFunction, name):
+        self.cellFunction = cellFunction
+        self.name = name
+
+    def __mul__(self, aCell):
+        return aCell.applyCellDecorator(self.cellFunction)
+
+    def __str__(self):
+        return self.name
+
+
 def ShrinkWrap(aCell):
     """Cell modifier function
     that marks the cell as shrinkwrapped.
@@ -145,7 +158,7 @@ def CustomInset(aCell, kind='padding', top=None, right=None, bottom=None, left=N
     return aCell
 
 
-def Padding(amount, cell):
+def Padding(amount, cell=None):
     """Cell modifier function that
     adds Padding on all dimensions
     to the resulting Cell component.
@@ -158,17 +171,21 @@ def Padding(amount, cell):
         cell's component will display with
     cell: Cell
         The Cell instance that will be
-        modified.
+        modified. If 'None', then return a
+        'CellDecorator' instead.
 
     Returns
     -------
     A modified Cell instance
     """
+    if cell is None:
+        return CellDecorator(lambda cell: Padding(amount, cell), f"Padding({amount})")
+
     return CustomInset(cell, 'padding', top=amount,
                        right=amount, bottom=amount, left=amount)
 
 
-def Margin(amount, cell):
+def Margin(amount, cell=None):
     """Cell modifier function that
     adds Margin on all dimensions
     to the resulting Cell component.
@@ -181,11 +198,15 @@ def Margin(amount, cell):
         cell's component will display with
     cell: Cell
         The Cell instance that will be
-        modified.
+        modified. If None, then return a
+        CellDecorator.
 
     Returns
     -------
     A modified Cell instance
     """
+    if cell is None:
+        return CellDecorator(lambda cell: Margin(amount, cell), f"Margin({amount})")
+
     return CustomInset(cell, 'margin', top=amount,
                        right=amount, bottom=amount, left=amount)
