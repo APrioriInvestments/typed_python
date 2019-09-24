@@ -480,3 +480,62 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(call(BaseClass(), 1), 1)
         self.assertEqual(call(ChildClass(), 1), 2)
+
+    def test_dispatch_to_subclass_from_list(self):
+        class BaseClass(Class):
+            def f(self) -> int:
+                return 1
+
+        class ChildClass1(BaseClass):
+            def f(self) -> int:
+                return 2
+
+        class ChildClass2(BaseClass):
+            def f(self) -> int:
+                return 3
+
+        class ChildChildClass(ChildClass1, ChildClass2):
+            def f(self) -> int:
+                return 3
+
+        def addFsUncompiled(c: ListOf(BaseClass), times: int):
+            res = 0
+            for t in range(times):
+                for i in c:
+                    res += i.f()
+            return res
+
+        addFs = Compiled(addFsUncompiled)
+
+        aList = ListOf(BaseClass)()
+
+        aList.append(BaseClass())
+        self.assertEqual(addFs(aList, 1), sum(c.f() for c in aList))
+
+        aList.append(ChildClass1())
+        self.assertEqual(addFs(aList, 1), sum(c.f() for c in aList))
+
+        aList.append(ChildClass2())
+        self.assertEqual(addFs(aList, 1), sum(c.f() for c in aList))
+
+        aList.append(ChildChildClass())
+        self.assertEqual(addFs(aList, 1), sum(c.f() for c in aList))
+
+
+        count = 100000
+
+        t0 = time.time()
+        val1 = addFs(aList, count)
+        t1 = time.time()
+        val2 = addFsUncompiled(aList, count)
+        t2 = time.time()
+
+        self.assertEqual(val1, val2)
+
+        elapsedCompiled = t1 - t0
+        elapsedUncompiled = t2 - t1
+        speedup = elapsedUncompiled / elapsedCompiled
+
+        print(f"speedup is {speedup}. Compiled took {elapsedCompiled} to do {count * len(aList)}")
+
+        self.assertGreater(speedup, 20)

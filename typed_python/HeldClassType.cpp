@@ -228,3 +228,20 @@ int HeldClass::memberNamed(const char* c) const {
     return -1;
 }
 
+BoundMethod* HeldClass::getMemberFunctionMethodType(const char* attr) {
+    if (m_memberFunctionMethodTypes.size() != m_memberFunctions.size()) {
+        for (auto name: m_memberFunctions) {
+            // note that we explicitly leak the string so that the refcount on c_str
+            // stays active. I'm sure there's a better way to do this, but types are
+            // permanent, so we would never have cleaned this up anyways.
+            m_memberFunctionMethodTypes[(new std::string(name.first))->c_str()] = BoundMethod::Make(getClassType(), name.first);
+        }
+    }
+
+    auto it = m_memberFunctionMethodTypes.find(attr);
+    if (it != m_memberFunctionMethodTypes.end()) {
+        return it->second;
+    }
+
+    return nullptr;
+}

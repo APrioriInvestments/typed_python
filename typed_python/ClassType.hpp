@@ -241,6 +241,14 @@ public:
         return m_heldClass->getMembers();
     }
 
+    int getMemberIndex(const char* name) const {
+        return m_heldClass->getMemberIndex(name);
+    }
+
+    BoundMethod* getMemberFunctionMethodType(const char* name) const {
+        return m_heldClass->getMemberFunctionMethodType(name);
+    }
+
     const std::map<std::string, Function*>& getMemberFunctions() const {
         return m_heldClass->getMemberFunctions();
     }
