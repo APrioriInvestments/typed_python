@@ -62,7 +62,7 @@ public:
 
     PyObject* pyUnaryOperatorConcrete(const char* op, const char* opErr);
 
-    std::pair<bool, PyObject*> callMethod(const char* name, PyObject* arg0=nullptr, PyObject* arg1=nullptr);
+    std::pair<bool, PyObject*> callMethod(const char* name, PyObject* arg0=nullptr, PyObject* arg1=nullptr, PyObject* arg2=nullptr);
 
     int64_t tryCallHashMethod();
 
@@ -95,8 +95,17 @@ public:
 
     static void constructFromPythonArgumentsConcrete(ConcreteAlternative* t, uint8_t* data, PyObject* args, PyObject* kwargs);
 
+    static PyMethodDef* typeMethodsConcrete(Type* t);
+private:
     static PyObject* altFormat(PyObject* o, PyObject* args, PyObject* kwargs);
     static PyObject* altBytes(PyObject* o, PyObject* args, PyObject* kwargs);
     static PyObject* altDir(PyObject* o, PyObject* args, PyObject* kwargs);
-    static PyMethodDef* typeMethodsConcrete(Type* t);
+    static PyObject* altReversed(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altComplex(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altRound(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altTrunc(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altFloor(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altCeil(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altEnter(PyObject* o, PyObject* args, PyObject* kwargs);
+    static PyObject* altExit(PyObject* o, PyObject* args, PyObject* kwargs);
 };

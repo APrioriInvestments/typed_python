@@ -29,6 +29,7 @@ import unittest
 import time
 import numpy
 import os
+import math
 
 
 def typeFor(t):
@@ -1014,9 +1015,17 @@ class NativeTypesTests(unittest.TestCase):
                         __invert__=lambda self: A.b("invert"),
 
                         __abs__=lambda self: A.b("abs"),
+                        __int__=lambda self: 123,
+                        __float__=lambda self: 234.5,
+                        __index__=lambda self: 124,
+                        __complex__=lambda self: complex(1, 2),
+                        __round__=lambda self: 6,
+                        __trunc__=lambda self: 7,
+                        __floor__=lambda self: 8,
+                        __ceil__=lambda self: 9,
 
                         __bytes__=lambda self: b'bytes',
-                        __format__=lambda self: "format",
+                        __format__=lambda self, spec: "format",
                         __getattr__=A_getattr,
                         __setattr__=A_setattr,
                         __delattr__=A_delattr,
@@ -1077,6 +1086,14 @@ class NativeTypesTests(unittest.TestCase):
         self.assertEqual((~A.a()).b, "invert")
         self.assertEqual(abs(A.a()).Name, "b")
         self.assertEqual(abs(A.a()).b, "abs")
+        self.assertEqual(int(A.a()), 123)
+        self.assertEqual(float(A.a()), 234.5)
+        self.assertEqual(range(1000)[1:A.a():2], range(1, 124, 2))
+        self.assertEqual(complex(A.a()), 1+2j)
+        self.assertEqual(round(A.a()), 6)
+        self.assertEqual(math.trunc(A.a()), 7)
+        self.assertEqual(math.floor(A.a()), 8)
+        self.assertEqual(math.ceil(A.a()), 9)
 
         self.assertEqual(bytes(A.a()), b"bytes")
         self.assertEqual(format(A.a()), "format")
@@ -1094,7 +1111,7 @@ class NativeTypesTests(unittest.TestCase):
         A.a().Name = "can't change Name"
         self.assertEqual(A.a().Name, "a")
         d = dir(A.a())
-        self.assertEqual(len(d), 92)  # this is the default dir
+        self.assertEqual(len(d), 97)  # this is the default dir
 
         A2_items = dict()
 
@@ -1129,15 +1146,30 @@ class NativeTypesTests(unittest.TestCase):
                 return self
 
             def __next__(self):
-                if self._cur > 9:
+                if self._cur >= 10:
                     raise StopIteration
                 self._cur += 1
                 return self._cur
 
+        class A_reversed():
+            def __init__(self):
+                self._cur = 11
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur <= 1:
+                    raise StopIteration
+                self._cur -= 1
+                return self._cur
+
         A = Alternative("A", a={'a': int}, b={'b': str},
-                        __iter__=lambda self: A_iter()
+                        __iter__=lambda self: A_iter(),
+                        __reversed__=lambda self: A_reversed()
                         )
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([x for x in reversed(A.a())], [10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
 
     def test_alternative_as_iterator(self):
 
@@ -1149,7 +1181,7 @@ class NativeTypesTests(unittest.TestCase):
                 return self
 
             def __next__(self):
-                if self._cur > 9:
+                if self._cur >= 10:
                     raise StopIteration
                 self._cur += 1
                 return self._cur
@@ -1165,6 +1197,31 @@ class NativeTypesTests(unittest.TestCase):
         # this is a one-time iterator
         self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         self.assertEqual([x for x in A.a()], [])
+
+    def test_alternative_with(self):
+        depth = 0
+
+        def A_enter(s):
+            nonlocal depth
+            depth += 1
+            return depth
+
+        def A_exit(s, t, v, b):
+            nonlocal depth
+            depth -= 1
+            return True
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __enter__=A_enter,
+                        __exit__=A_exit
+                        )
+
+        self.assertEqual(depth, 0)
+        with A.a():
+            self.assertEqual(depth, 1)
+            with A.b():
+                self.assertEqual(depth, 2)
+        self.assertEqual(depth, 0)
 
     def test_named_tuple_subclass_magic_methods(self):
         class X(NamedTuple(x=int, y=int)):

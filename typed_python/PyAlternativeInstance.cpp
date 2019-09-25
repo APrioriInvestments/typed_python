@@ -236,7 +236,7 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
-    std::pair<bool, PyObject*> p = callMethod("__getattribute__", pyAttrName, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__getattribute__", pyAttrName);
     if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
     }
@@ -288,7 +288,7 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
     PyObject* ret = PyInstance::tp_getattr_concrete(pyAttrName, attrName);
     if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
-        std::pair<bool, PyObject*> p = callMethod("__getattr__", pyAttrName, nullptr);
+        std::pair<bool, PyObject*> p = callMethod("__getattr__", pyAttrName);
         if (p.first) {
             return p.second;
         }
@@ -355,16 +355,17 @@ void PyConcreteAlternativeInstance::mirrorTypeInformationIntoPyTypeConcrete(Conc
         );
 
     for (auto method_pair: alt->getAlternative()->getMethods()) {
-        if (method_pair.first == "__format__"
-                || method_pair.first == "__bytes__"
-                || method_pair.first == "__dir__"
-                )
-            continue;
-        PyDict_SetItemString(
-            pyType->tp_dict,
-            method_pair.first.c_str(),
-            (PyObject*)typeObj(method_pair.second)
-        );
+        // TODO: find a predefined function that does this method search
+        PyMethodDef* defined = pyType->tp_methods;
+        while (defined && defined->ml_name && !!strcmp(defined->ml_name, method_pair.first.c_str()))
+            defined++;
+
+        if (!defined || !defined->ml_name)
+            PyDict_SetItemString(
+                pyType->tp_dict,
+                method_pair.first.c_str(),
+                (PyObject*)typeObj(method_pair.second)
+            );
     }
 }
 
@@ -421,7 +422,7 @@ PyObject* PyConcreteAlternativeInstance::tp_call_concrete(PyObject* args, PyObje
 // try to call user-defined hash method
 // returns -1 if not defined or if it returns an invalid value
 int64_t PyConcreteAlternativeInstance::tryCallHashMethod() {
-    auto result = callMethod("__hash__", nullptr, nullptr);
+    auto result = callMethod("__hash__");
     if (!result.first)
         return -1;
     if (!PyLong_Check(result.second))
@@ -429,7 +430,7 @@ int64_t PyConcreteAlternativeInstance::tryCallHashMethod() {
     return PyLong_AsLong(result.second);
 }
 
-std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char* name, PyObject* arg0, PyObject* arg1) {
+std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char* name, PyObject* arg0, PyObject* arg1, PyObject* arg2) {
     auto it = type()->getAlternative()->getMethods().find(name);
 
     if (it == type()->getAlternative()->getMethods().end()) {
@@ -445,6 +446,9 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
     if (arg1) {
         argCount += 1;
     }
+    if (arg2) {
+        argCount += 1;
+    }
 
     PyObjectStealer targetArgTuple(PyTuple_New(argCount));
 
@@ -453,9 +457,11 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
     if (arg0) {
         PyTuple_SetItem(targetArgTuple, 1, incref(arg0)); //steals a reference
     }
-
     if (arg1) {
         PyTuple_SetItem(targetArgTuple, 2, incref(arg1)); //steals a reference
+    }
+    if (arg2) {
+        PyTuple_SetItem(targetArgTuple, 3, incref(arg2)); //steals a reference
     }
 
     auto res = PyFunctionInstance::tryToCallAnyOverload(method, nullptr, targetArgTuple, nullptr);
@@ -473,7 +479,7 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
 
 int PyConcreteAlternativeInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     // op == '__bool__'
-    std::pair<bool, PyObject*> p = callMethod("__bool__", nullptr, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__bool__");
     if (!p.first) {
         p = callMethod("__len__", nullptr, nullptr);
         // if neither __bool__ nor __len__ is available, return True
@@ -484,7 +490,7 @@ int PyConcreteAlternativeInstance::pyInquiryConcrete(const char* op, const char*
 }
 
 int PyConcreteAlternativeInstance::sq_contains_concrete(PyObject* item) {
-    std::pair<bool, PyObject*> p = callMethod("__contains__", item, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__contains__", item);
     if (!p.first) {
         return 0;
     }
@@ -492,7 +498,7 @@ int PyConcreteAlternativeInstance::sq_contains_concrete(PyObject* item) {
 }
 
 Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
-    std::pair<bool, PyObject*> p = callMethod("__len__", nullptr, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__len__");
     if (!p.first) {
         return 0;
     }
@@ -504,7 +510,7 @@ Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
 
 PyObject* PyConcreteAlternativeInstance::sq_item_concrete(Py_ssize_t ix) {
     PyObjectStealer arg0(PyLong_FromUnsignedLong(ix));
-    std::pair<bool, PyObject*> p = callMethod("__getitem__", arg0, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__getitem__", arg0);
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__getitem__ not defined for type %s", type()->name().c_str());
         return NULL;
@@ -527,7 +533,7 @@ int PyConcreteAlternativeInstance::sq_ass_item_concrete(Py_ssize_t ix, PyObject*
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_iter_concrete() {
-    std::pair<bool, PyObject*> p = callMethod("__iter__", nullptr, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__iter__");
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__iter__ not defined for type %s", type()->name().c_str());
         return NULL;
@@ -536,7 +542,7 @@ PyObject* PyConcreteAlternativeInstance::tp_iter_concrete() {
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_iternext_concrete() {
-    std::pair<bool, PyObject*> p = callMethod("__next__", nullptr, nullptr);
+    std::pair<bool, PyObject*> p = callMethod("__next__");
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__next__ not defined for type %s", type()->name().c_str());
         return NULL;
@@ -553,7 +559,7 @@ bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternati
     }
     PyConcreteAlternativeInstance *self_inst = (PyConcreteAlternativeInstance*)(PyObject*)self_object;
 
-    std::pair<bool, PyObject*> p = self_inst->callMethod(pyCompareFlagToMethod(pyComparisonOp), other, nullptr);
+    std::pair<bool, PyObject*> p = self_inst->callMethod(pyCompareFlagToMethod(pyComparisonOp), other);
     if (p.first)
         return PyObject_IsTrue(p.second);
 
@@ -573,7 +579,13 @@ bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternati
 PyObject* PyConcreteAlternativeInstance::altFormat(PyObject* o, PyObject* args, PyObject* kwargs) {
     PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
 
-    auto result = self->callMethod("__format__", nullptr, nullptr);
+    if (PyTuple_Size(args) != 1 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__format__ invalid number of parameters");
+        return NULL;
+    }
+    PyObjectStealer arg0(PyTuple_GetItem(args, 0));
+
+    auto result = self->callMethod("__format__", arg0);
     if (!result.first) {
         PyErr_Format(PyExc_TypeError, "__format__ not defined for type %s", self->type()->name().c_str());
         return NULL;
@@ -590,7 +602,12 @@ PyObject* PyConcreteAlternativeInstance::altFormat(PyObject* o, PyObject* args, 
 PyObject* PyConcreteAlternativeInstance::altBytes(PyObject* o, PyObject* args, PyObject* kwargs) {
     PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
 
-    auto result = self->callMethod("__bytes__", nullptr, nullptr);
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__bytes__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__bytes__");
     if (!result.first) {
         PyErr_Format(PyExc_TypeError, "__bytes__ not defined for type %s", self->type()->name().c_str());
         return NULL;
@@ -607,9 +624,14 @@ PyObject* PyConcreteAlternativeInstance::altBytes(PyObject* o, PyObject* args, P
 PyObject* PyConcreteAlternativeInstance::altDir(PyObject* o, PyObject* args, PyObject* kwargs) {
     PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
 
-    auto result = self->callMethod("__dir__", nullptr, nullptr);
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__dir__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__dir__");
     if (!result.first) {
-        PyErr_Format(PyExc_TypeError, "shouldn't happen");
+        PyErr_Format(PyExc_TypeError, "__dir__ missing");
         return NULL;
     }
     if (!PySequence_Check(result.second)) {
@@ -621,20 +643,201 @@ PyObject* PyConcreteAlternativeInstance::altDir(PyObject* o, PyObject* args, PyO
 }
 
 // static
+PyObject* PyConcreteAlternativeInstance::altReversed(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__reversed__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__reversed__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__reversed__ missing");
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altComplex(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__complex__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__complex__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__complex__ missing");
+        return NULL;
+    }
+    if (!PyComplex_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__complex__ returned non-complex %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altRound(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__round__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__round__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__round__ missing");
+        return NULL;
+    }
+    if (!PyLong_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__round__ returned non-integer %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altTrunc(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__trunc__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__trunc__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__trunc__ missing");
+        return NULL;
+    }
+    if (!PyLong_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__trunc__ returned non-integer %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altFloor(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__floor__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__floor__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__floor__ missing");
+        return NULL;
+    }
+    if (!PyLong_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__floor__ returned non-integer %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altCeil(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__ceil__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__ceil__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__ceil__ missing");
+        return NULL;
+    }
+    if (!PyLong_Check(result.second)) {
+        PyErr_Format(PyExc_TypeError, "__ceil__ returned non-integer %s for type %s", result.second->ob_type->tp_name, self->type()->name().c_str());
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altEnter(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) > 0 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__enter__ invalid number of parameters");
+        return NULL;
+    }
+
+    auto result = self->callMethod("__enter__");
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__enter__ missing");
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
+PyObject* PyConcreteAlternativeInstance::altExit(PyObject* o, PyObject* args, PyObject* kwargs) {
+    PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
+
+    if (PyTuple_Size(args) != 3 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__exit__ invalid number of parameters");
+        return NULL;
+    }
+    PyObjectStealer arg0(PyTuple_GetItem(args, 0));
+    PyObjectStealer arg1(PyTuple_GetItem(args, 1));
+    PyObjectStealer arg2(PyTuple_GetItem(args, 2));
+
+    auto result = self->callMethod("__exit__", arg0, arg1, arg2);
+    if (!result.first) {
+        PyErr_Format(PyExc_TypeError, "__exit__ missing");
+        return NULL;
+    }
+
+    return result.second;
+}
+
+// static
 PyMethodDef* PyConcreteAlternativeInstance::typeMethodsConcrete(Type* t) {
-    const int max_entries = 3;
-    int cur= 0;
+
+    // List of magic methods that are not attached to direct function pointers in PyTypeObject.
+    //   These need to be defined by adding entries to PyTypeObject.tp_methods
+    //   and we need to avoid adding them to PyTypeObject.tp_dict ourselves.
+    //   Also, we only want to add the entry to tp_methods if they are explicitly defined.
+    const std::map<const char*, PyCFunction> special_magic_methods = {
+            {"__format__", (PyCFunction)altFormat},
+            {"__bytes__", (PyCFunction)altBytes},
+            {"__dir__", (PyCFunction)altDir},
+            {"__reversed__", (PyCFunction)altReversed},
+            {"__complex__", (PyCFunction)altComplex},
+            {"__round__", (PyCFunction)altRound},
+            {"__trunc__", (PyCFunction)altTrunc},
+            {"__floor__", (PyCFunction)altFloor},
+            {"__ceil__", (PyCFunction)altCeil},
+            {"__enter__", (PyCFunction)altEnter},
+            {"__exit__", (PyCFunction)altExit}
+        };
+
+    int cur = 0;
     auto altMethods = ((ConcreteAlternative*)t)->getAlternative()->getMethods();
-    PyMethodDef* ret = new PyMethodDef[max_entries + 1];
-    if (altMethods.find("__format__") != altMethods.end()) {
-        ret[cur++] =  {"__format__", (PyCFunction)PyConcreteAlternativeInstance::altFormat, METH_VARARGS | METH_KEYWORDS, NULL};
+    PyMethodDef* ret = new PyMethodDef[special_magic_methods.size() + 1];
+    for (auto m: special_magic_methods) {
+        if (altMethods.find(m.first) != altMethods.end()) {
+            ret[cur++] =  {m.first, m.second, METH_VARARGS | METH_KEYWORDS, NULL};
+        }
     }
-    if (altMethods.find("__bytes__") != altMethods.end()) {
-        ret[cur++] =  {"__bytes__", (PyCFunction)PyConcreteAlternativeInstance::altBytes, METH_VARARGS | METH_KEYWORDS, NULL};
-    }
-    if (altMethods.find("__dir__") != altMethods.end()) {
-        ret[cur++] =  {"__dir__", (PyCFunction)PyConcreteAlternativeInstance::altDir, METH_VARARGS | METH_KEYWORDS, NULL};
-    }
-    ret[cur++] = {NULL, NULL};
+    ret[cur] = {NULL, NULL};
     return ret;
 }
