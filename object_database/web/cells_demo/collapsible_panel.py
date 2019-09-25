@@ -26,8 +26,17 @@ class BasicCollapsiblePanel(CellsTestPage):
                 lambda: isExpanded.set(not isExpanded.get())
             )
         ) + cells.CollapsiblePanel(
-            panel=cells.Card("I am a panel", padding=2),
-            content=cells.Card("I am some content"),
+            panel=cells.SubscribedSequence(
+                lambda: [1],
+                lambda i: cells.Text("PANE") +
+                    # somehow, the presence of this cell prevents you from opening and closing
+                    # the panel more than once?
+                    cells.Subscribed(lambda: "Some Text")
+            ),
+            content=cells.ResizablePanel(
+                cells.Subscribed(lambda: cells.Card("I am some content")),
+                cells.Subscribed(lambda: cells.Card("I am the other half of content"))
+            ),
             isExpanded=lambda: isExpanded.get()
         )
 
