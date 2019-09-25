@@ -521,7 +521,6 @@ class TestClassCompilationCompilation(unittest.TestCase):
         aList.append(ChildChildClass())
         self.assertEqual(addFs(aList, 1), sum(c.f() for c in aList))
 
-
         count = 100000
 
         t0 = time.time()
@@ -539,3 +538,27 @@ class TestClassCompilationCompilation(unittest.TestCase):
         print(f"speedup is {speedup}. Compiled took {elapsedCompiled} to do {count * len(aList)}")
 
         self.assertGreater(speedup, 20)
+
+    def test_convert_up_in_compiled_code(self):
+        class BaseClass(Class):
+            def f(self) -> int:
+                return 1
+
+        class ChildClass(BaseClass):
+            def f(self) -> int:
+                return 2
+
+        class ChildChildClass(ChildClass):
+            def f(self) -> int:
+                return 3
+
+        class DispatchCls(Class):
+            def fOnBase(self, x: BaseClass):
+                return x.f()
+
+        @Compiled
+        def dispatchUp(x: ChildClass):
+            return DispatchCls().fOnBase(x)
+
+        self.assertEqual(dispatchUp(ChildClass()), ChildClass().f())
+        self.assertEqual(dispatchUp(ChildChildClass()), ChildChildClass().f())

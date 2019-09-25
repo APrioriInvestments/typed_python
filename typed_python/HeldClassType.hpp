@@ -107,6 +107,8 @@ public:
             mIndicesNeedingDefinition.insert(k);
             globalPointersNeedingCompile().insert(std::make_pair(this, k));
         }
+
+        allocateUpcastDispatchTables();
     }
 
     size_t allocateMethodDispatch(std::string funcName, const function_signature_type& signature) {
@@ -192,6 +194,8 @@ public:
         return it->second;
     }
 
+    void allocateUpcastDispatchTables();
+
 private:
     // the class actually represented by this instance
     HeldClass* mImplementingClass;
@@ -201,8 +205,12 @@ private:
 
     untyped_function_ptr* mFuncPtrs;
 
-    // for each base class of mInterfaceClass, in the MRO that it would have,
-    // the dispatch table we want to use for that interface.
+    // for each base class of mInterfaceClass, what is the MRO index of that class
+    // in the implementing class. We need this to allow compiled code to upcast
+    // an already-upcast class pointer. For instance if we have Base, Child, ChildChild,
+    // and we know an instance of ChildChild as 'Child', and we want to cast it as 'Base',
+    // we need to find out that we're using index '2' for Base, because we have ChildChild's
+    // vtable.
     uint16_t* mUpcastDispatches;
 
     size_t mFuncPtrsAllocated;

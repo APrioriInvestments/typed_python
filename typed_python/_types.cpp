@@ -425,6 +425,36 @@ PyObject *installClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObje
     });
 }
 
+PyObject *getDispatchIndexForType(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"interfaceClass", "implementingClass", NULL};
+
+    PyObject* pyInterfaceClass;
+    PyObject* pyImplementingClass;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "OO", (char**)kwlist, &pyInterfaceClass, &pyImplementingClass)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* interfaceClass = PyInstance::unwrapTypeArgToTypePtr(pyInterfaceClass);
+        Type* implementingClass = PyInstance::unwrapTypeArgToTypePtr(pyImplementingClass);
+
+        if (!interfaceClass || interfaceClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'interfaceClass' to be a Class");
+        }
+
+        if (!implementingClass || implementingClass->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'implementingClass' to be a Class");
+        }
+
+        HeldClass* heldInterface = ((Class*)interfaceClass)->getHeldClass();
+        HeldClass* heldImplementing = ((Class*)implementingClass)->getHeldClass();
+
+        return PyLong_FromLong(heldImplementing->getMroIndex(heldInterface));
+    });
+}
+
 PyObject* classGetDispatchIndex(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
     static const char *kwlist[] = {"instance", NULL};
@@ -1745,6 +1775,7 @@ static PyMethodDef module_methods[] = {
     {"installClassMethodDispatch", (PyCFunction)installClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
     {"installClassDestructor", (PyCFunction)installClassDestructor, METH_VARARGS | METH_KEYWORDS, NULL},
     {"classGetDispatchIndex", (PyCFunction)classGetDispatchIndex, METH_VARARGS | METH_KEYWORDS, NULL},
+    {"getDispatchIndexForType", (PyCFunction)getDispatchIndexForType, METH_VARARGS | METH_KEYWORDS, NULL},
     {NULL, NULL}
 };
 
@@ -1810,7 +1841,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "Function", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFunction)));
     PyModule_AddObject(module, "BoundMethod", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBoundMethod)));
     PyModule_AddObject(module, "EmbeddedMessage", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
-    PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
+    PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
 
 
     if (module == NULL)

@@ -122,7 +122,6 @@ def overloadMatchesSignature(overload, argTypes, isExplicit):
         if canConvert is False:
             return False
         elif canConvert == "Maybe":
-            print(argTypes[i], " to ", overload.args[i].typeFilter)
             allTrue = False
 
     if allTrue:
@@ -181,6 +180,28 @@ class ClassWrapper(RefcountedWrapper):
     def _can_convert_from_type(self, otherType, explicit):
         return False
 
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        otherType = targetVal.expr_type
+
+        if isinstance(otherType, ClassWrapper):
+            if otherType.typeRepresentation in self.typeRepresentation.MRO:
+                # this is an upcast
+                index = _types.getDispatchIndexForType(otherType.typeRepresentation, self.typeRepresentation)
+
+                context.pushEffect(
+                    targetVal.expr.store(
+                        self.withDispatchIndex(e, index)
+                    )
+                )
+                targetVal.convert_incref()
+
+                return context.constant(True)
+
+            elif self.typeRepresentation in otherType.typeRepresentation.MRO:
+                raise Exception("Downcast in compiled code not implemented yet")
+
+        return context.constant(False)
+
     def get_layout_pointer(self, nonref_expr):
         # our layout is 48 bits of pointer and 16 bits of classDispatchTableIndex.
         # so whenever we interact with the pointer we need to chop off the top 16 bits
@@ -188,6 +209,43 @@ class ClassWrapper(RefcountedWrapper):
             nonref_expr
             .cast(native_ast.UInt64)
             .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))  # 48 bits of 1s
+            .cast(self.layoutType)
+        )
+
+    def classDispatchTable(self, instance):
+        classDispatchTables = (
+            self.get_layout_pointer(instance.nonref_expr)
+            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
+        )
+
+        # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
+        # for each one indicating how to dispatch method calls to the concrete class when they
+        # are masquerading as that particular base class. Whenever we represent a child class
+        # as a base class, we need to track which of the class' concrete vtable entries we should
+        # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
+        # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
+        # itanium, we'll have to rethink this.
+        return classDispatchTables.elemPtr(
+            self.get_dispatch_index(instance)
+        )
+
+    def withDispatchIndex(self, instance, index):
+        """Return a native expression representing 'instance' as the 'index'th base class in the MRO.
+
+        To do this we have to look at the 'upcastIndices' in the class dispatch table. This is because
+        we might have a child class that's already been cast to an intermediate layer in the type hierarchy,
+        and we can't compute at compile time exactly which index the new interface class is. So we have
+        to look it up.
+        """
+        classDispatchTable = self.classDispatchTable(instance)
+
+        actualIndexExpr = classDispatchTable.ElementPtrIntegers(0, 3).load().ElementPtrIntegers(index).load()
+
+        return (
+            instance.nonref_expr
+            .cast(native_ast.UInt64)
+            .bitand(native_ast.const_uint64_expr(0xFFFFFFFFFFFF))
+            .add(actualIndexExpr.cast(native_ast.UInt64).lshift(native_ast.const_uint64_expr(48)))
             .cast(self.layoutType)
         )
 
@@ -654,21 +712,7 @@ class ClassWrapper(RefcountedWrapper):
         # each entrypoint generates a slot we could call.
         dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
 
-        classDispatchTables = (
-            self.get_layout_pointer(instance.nonref_expr)
-            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
-        )
-
-        # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
-        # for each one indicating how to dispatch method calls to the concrete class when they
-        # are masquerading as that particular base class. Whenever we represent a child class
-        # as a base class, we need to track which of the class' concrete vtable entries we should
-        # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
-        # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
-        # itanium, we'll have to rethink this.
-        classDispatchTable = classDispatchTables.elemPtr(
-            self.get_dispatch_index(instance)
-        )
+        classDispatchTable = self.classDispatchTable(instance)
 
         funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
 
@@ -712,21 +756,7 @@ class ClassWrapper(RefcountedWrapper):
         # each entrypoint generates a slot we could call.
         dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
 
-        classDispatchTables = (
-            self.get_layout_pointer(instance.nonref_expr)
-            .ElementPtrIntegers(0, 1).load().ElementPtrIntegers(0, 2).load()
-        )
-
-        # instances of a class can 'masquerade' as any one of their base classes. They have a vtable
-        # for each one indicating how to dispatch method calls to the concrete class when they
-        # are masquerading as that particular base class. Whenever we represent a child class
-        # as a base class, we need to track which of the class' concrete vtable entries we should
-        # be using for dispatch. We encode this in the top 16 bits of the pointer because on modern
-        # x64 systems, the pointer address space is 48 bits. If somehow we need to compile on
-        # itanium, we'll have to rethink this.
-        classDispatchTable = classDispatchTables.elemPtr(
-            self.get_dispatch_index(instance)
-        )
+        classDispatchTable = self.classDispatchTable(instance)
 
         funcPtr = classDispatchTable.ElementPtrIntegers(0, 2).load().elemPtr(dispatchSlot).load()
 
