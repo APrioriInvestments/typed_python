@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Member
+from typed_python import Function, OneOf, TupleOf, Forward, ConstDict, Class, Member, ListOf
 from typed_python import Value as ValueType
 import typed_python._types as _types
 from nativepython.runtime import Runtime
@@ -274,3 +274,11 @@ class TestOneOfOfCompilation(unittest.TestCase):
 
         self.assertEqual(f(anA), anA.x)
         self.assertEqual(f(aB), aB.x)
+
+    def test_oneof_getitem(self):
+        @Compiled
+        def f(c: OneOf(TupleOf(int), ListOf(float))):
+            return c[0]
+
+        self.assertEqual(f(TupleOf(int)((1,))), 1)
+        self.assertEqual(f(ListOf(float)((1.5,))), 1.5)

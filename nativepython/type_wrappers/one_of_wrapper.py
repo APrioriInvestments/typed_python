@@ -104,6 +104,10 @@ class OneOfWrapper(Wrapper):
         # just unwrap us
         return self.unwrap(context, left, lambda realInstance: realInstance.convert_call(args, kwargs))
 
+    def convert_getitem(self, context, expr, index):
+        # just unwrap us
+        return self.unwrap(context, expr, lambda realInstance: realInstance.convert_getitem(index))
+
     def convert_bin_op(self, context, left, op, right):
         def generator(leftUnwrapped):
             return leftUnwrapped.convert_bin_op(op, right)
