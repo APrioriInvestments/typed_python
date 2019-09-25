@@ -541,6 +541,9 @@ class Slot:
 
             self._subscribedCells = set()
 
+    def toggle(self):
+        self.set(not self.get())
+
 
 class SessionState(object):
     """Represents a piece of session-specific interface state. You may access state

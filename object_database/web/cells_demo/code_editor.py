@@ -28,3 +28,29 @@ class CodeEditorDemo(CellsTestPage):
 
     def text(self):
         return "You should see a button that lets you see a text editor."
+
+class CodeEditorInHorizSequence(CellsTestPage):
+    def cell(self):
+        editorShown = cells.Slot(False)
+        contentsShown = cells.Slot(False)
+
+        contents = cells.Slot("")
+
+        def onTextChange(buffer, selection):
+            contents.set(buffer)
+
+        return (
+            cells.Button("Show the editor", editorShown.toggle) +
+            cells.Button("Show the editor's contents", contentsShown.toggle) +
+            cells.HorizontalSubscribedSequence(lambda:
+                (["Ed"] if editorShown.get() else []) +
+                (["Contents"] if contentsShown.get() else []),
+                lambda which:
+                    cells.CodeEditor(onTextChange=onTextChange) if which == "Ed" else
+                    cells.Subscribed(lambda: contents.get()) if which == "Contents" else
+                    None
+            )
+        )
+
+    def text(self):
+        return "You should see two buttons that let you turn the editor on and off, and also see its contents."
