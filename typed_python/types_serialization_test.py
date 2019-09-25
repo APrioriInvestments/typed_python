@@ -34,7 +34,7 @@ from typed_python.test_util import currentMemUsageMb
 from typed_python import (
     NoneType, TupleOf, ListOf, OneOf, Tuple, NamedTuple, Int64, Float64, Class,
     Member, String, Bool, Bytes, ConstDict, Alternative, serialize, deserialize,
-    Dict, SerializationContext, EmbeddedMessage,
+    Dict, Set, SerializationContext, EmbeddedMessage,
     serializeStream, deserializeStream, decodeSerializedObject,
     Forward
 )
@@ -1103,6 +1103,21 @@ class TypesSerializationTest(unittest.TestCase):
         d2 = x.deserialize(x.serialize(d))
 
         self.assertEqual(d, d2)
+
+    def test_serialize_set(self):
+        x = SerializationContext({})
+
+        s = Set(str)()
+        self.assertEqual(s, x.deserialize(x.serialize(s)))
+
+        s.add("hi")
+        self.assertEqual(s, x.deserialize(x.serialize(s)))
+
+        s.add("bye")
+        self.assertEqual(s, x.deserialize(x.serialize(s)))
+
+        s.clear()
+        self.assertEqual(s, x.deserialize(x.serialize(s)))
 
     def test_serialize_recursive_dict_more(self):
         D = Forward("D")
