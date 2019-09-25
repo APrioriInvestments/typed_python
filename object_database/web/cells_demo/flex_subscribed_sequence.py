@@ -17,6 +17,20 @@ from object_database.web.CellsTestPage import CellsTestPage
 from object_database.web.cells.util import Flex
 
 
+class HorizontalSubscribedSequenceNotFlex(CellsTestPage):
+    def cell(self):
+        x = cells.Slot(())
+        top_button = cells.Button("Add Item", lambda: x.set(x.get() + (len(x.get()),)))
+        bottom_button = cells.Button("This does nothing", lambda: None)
+        sub_sequence = cells.HorizontalSubscribedSequence(
+            lambda: x.get(),
+            lambda item: cells.Text("Item: {}".format(item))
+        )
+        return (top_button >> sub_sequence >> bottom_button)
+
+    def text(self):
+        return "Should display a horizontal sequence that is NOT flexed"
+
 class VerticalSubscribedSequenceNotFlex(CellsTestPage):
     def cell(self):
         x = cells.Slot(())

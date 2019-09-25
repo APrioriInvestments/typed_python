@@ -64,7 +64,7 @@ class SubscribedSequence extends Component {
             "subscribed-sequence"
         ];
         if(this.props.orientation == 'horizontal'){
-            classes.push("sequence-vertical");
+            classes.push("sequence-horizontal");
         } else {
             classes.push("sequence-vertical");
         }

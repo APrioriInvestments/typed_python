@@ -154,8 +154,8 @@ def selectionPanel(page):
 
 def selectionPanel(page):
     availableCells = []
-    for category in getPages().values():
-        for item in category.values():
+    for _, category in sorted(getPages().items()):
+        for _, item in sorted(category.items()):
             displayName = "{}.{}".format(item.category(), item.name())
             url = "CellsTestService?{}".format(
                 urllib.parse.urlencode(
@@ -164,4 +164,6 @@ def selectionPanel(page):
             availableCells.append(clickable)
     reloadInput = cells.Button(cells.Octicon("sync"), reload)
 
-    return cells.Sequence([reloadInput, cells.Flex(cells.Sequence(availableCells))])
+    return cells.Panel(
+        cells.Sequence([reloadInput, cells.Flex(cells.Sequence(availableCells))])
+    )
