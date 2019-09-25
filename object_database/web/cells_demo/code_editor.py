@@ -54,3 +54,38 @@ class CodeEditorInHorizSequence(CellsTestPage):
 
     def text(self):
         return "You should see two buttons that let you turn the editor on and off, and also see its contents."
+
+class CodeEditorInSplitView(CellsTestPage):
+    def cell(self):
+        contents = cells.Slot("")
+
+        def onTextChange(buffer, selection):
+            contents.set(buffer)
+
+        return (
+            cells.ResizablePanel(
+                cells.CodeEditor(onTextChange=onTextChange),
+                cells.Subscribed(lambda: cells.Code(contents.get())),
+            )
+        )
+
+    def text(self):
+        return "You should see a code editor and a mirror of its contents."
+
+class CodeEditorInSplitViewWithHeader(CellsTestPage):
+    def cell(self):
+        contents = cells.Slot("")
+
+        def onTextChange(buffer, selection):
+            contents.set(buffer)
+
+        return (
+            cells.ResizablePanel(
+                cells.Text("This is an editor:") + cells.CodeEditor(onTextChange=onTextChange),
+                cells.Text("This should show what's in the editor") +
+                    cells.Subscribed(lambda: cells.Code(contents.get())),
+            )
+        )
+
+    def text(self):
+        return "You should see a code editor and a mirror of its contents."
