@@ -555,7 +555,6 @@ class TestStringCompilation(unittest.TestCase):
             self.assertEqual(expected, res, description)
 
     def test_string_join_for_tuple_of_str(self):
-
         # test passing tuple of strings
         @Compiled
         def f(sep: str, items: TupleOf(str)) -> str:

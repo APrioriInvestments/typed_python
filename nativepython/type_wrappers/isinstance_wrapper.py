@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Int64, Float64, Bool
+from typed_python import Int64, Float64, Bool, String
 from nativepython import native_ast
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.python_free_object_wrapper import PythonFreeObjectWrapper
@@ -42,6 +42,8 @@ class IsinstanceWrapper(Wrapper):
                     argType = float
                 if argType == Bool:
                     argType = bool
+                if argType == String:
+                    argType = str
 
                 if not isinstance(argType, type):
                     return context.constant(False)

@@ -36,6 +36,14 @@ class TestIsinstanceCompilation(unittest.TestCase):
         self.assertTrue(isIntOneOf(0))
         self.assertFalse(isIntOneOf(1.0))
 
+    def test_isinstance_with_oneof_and_str(self):
+        @Entrypoint
+        def isStrOneOf(x: OneOf(int, str)):
+            return isinstance(x, str)
+
+        self.assertFalse(isStrOneOf(0))
+        self.assertTrue(isStrOneOf("1.0"))
+
     def test_isinstance_with_value(self):
         @Entrypoint
         def isIntValue(x: OneOf(0, 1.0)):

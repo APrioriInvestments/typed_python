@@ -38,8 +38,9 @@ def strJoinIterable(sep, iterable):
     :return: string with joined values
     """
     items = ListOf(String)()
+
     for item in iterable:
-        if isinstance(item, String):
+        if isinstance(item, str):
             items.append(item)
         else:
             raise Exception("expected str instance")
