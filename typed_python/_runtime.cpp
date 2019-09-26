@@ -40,6 +40,10 @@ extern "C" {
         return StringType::upper(l);
     }
 
+    StringType::layout* nativepython_runtime_string_strip(StringType::layout* l, bool fromLeft, bool fromRight) {
+        return StringType::strip(l, fromLeft, fromRight);
+    }
+
     int64_t nativepython_runtime_string_find(StringType::layout* l, StringType::layout* sub, int64_t start, int64_t end) {
         return StringType::find(l, sub, start, end);
     }

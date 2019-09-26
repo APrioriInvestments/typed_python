@@ -331,6 +331,14 @@ string_from_utf8_and_len = externalCallTarget(
     UInt8Ptr, Int64
 )
 
+string_strip = externalCallTarget(
+    "nativepython_runtime_string_strip",
+    Void.pointer(),
+    Void.pointer(),
+    Bool,
+    Bool
+)
+
 string_lower = externalCallTarget(
     "nativepython_runtime_string_lower",
     Void.pointer(),

@@ -471,6 +471,10 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
         return l;
     }
 
+    if (start >= stop) {
+        return nullptr;
+    }
+
     if (start < 0) {
         start += l->pointcount;
         if (start < 0) start = 0;
@@ -498,6 +502,62 @@ StringType::layout* StringType::getsubstr(layout* l, int64_t start, int64_t stop
     memcpy(new_layout->data, l->data + start * l->bytes_per_codepoint, datalength);
 
     return new_layout;
+}
+
+// specialized form of the strip left/right algorithm based on the codepoint type.
+template<class elt_type>
+void stripInset(int64_t& ioLeftPos, int64_t& ioRightPos, elt_type* data, bool fromLeft, bool fromRight) {
+    if (fromLeft) {
+        while (ioLeftPos < ioRightPos && uprops[data[ioLeftPos]] & Uprops_SPACE) {
+            ioLeftPos++;
+        }
+    }
+
+    if (fromRight) {
+        while (ioLeftPos < ioRightPos && uprops[data[ioRightPos-1]] & Uprops_SPACE) {
+            ioRightPos--;
+        }
+    }
+}
+
+StringType::layout* StringType::strip(layout* l, bool fromLeft, bool fromRight) {
+    if (!l) {
+        return l;
+    }
+
+    int64_t leftPos = 0;
+    int64_t rightPos = l->pointcount;
+
+    uint8_t* dataPtr = l->data;
+
+    if (l->bytes_per_codepoint == 1) {
+        stripInset(leftPos, rightPos, (uint8_t*)dataPtr, fromLeft, fromRight);
+    }
+    else if (l->bytes_per_codepoint == 2) {
+        stripInset(leftPos, rightPos, (uint16_t*)dataPtr, fromLeft, fromRight);
+    }
+    else if (l->bytes_per_codepoint == 4) {
+        stripInset(leftPos, rightPos, (uint32_t*)dataPtr, fromLeft, fromRight);
+    }
+
+    if (leftPos == rightPos) {
+        return nullptr;
+    }
+
+    if (leftPos == 0 && rightPos == l->pointcount) {
+        l->refcount++;
+        return l;
+    }
+
+    return getsubstr(l, leftPos, rightPos);
+}
+
+StringType::layout* StringType::lstrip(layout* l) {
+    return strip(l, true, false);
+}
+
+StringType::layout* StringType::rstrip(layout* l) {
+    return strip(l, false, true);
 }
 
 

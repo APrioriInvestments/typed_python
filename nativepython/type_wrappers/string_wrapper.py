@@ -189,11 +189,11 @@ class StringWrapper(RefcountedWrapper):
 
     _str_methods = dict(
         lower=runtime_functions.string_lower,
-        upper=runtime_functions.string_upper
+        upper=runtime_functions.string_upper,
     )
 
     def convert_attribute(self, context, instance, attr):
-        if attr in ("find", "split", "join") or attr in self._str_methods or attr in self._bool_methods:
+        if attr in ("find", "split", "join", 'strip', 'rstrip', 'lstrip') or attr in self._str_methods or attr in self._bool_methods:
             return instance.changeType(BoundCompiledMethodWrapper(self, attr))
 
         return super().convert_attribute(context, instance, attr)
@@ -202,7 +202,22 @@ class StringWrapper(RefcountedWrapper):
         if kwargs:
             return super().convert_method_call(context, instance, methodname, args, kwargs)
 
-        if methodname in self._str_methods:
+        if methodname in ['strip', 'lstrip', 'rstrip']:
+            fromLeft = methodname in ['strip', 'lstrip']
+            fromRight = methodname in ['strip', 'rstrip']
+            if len(args) == 0:
+                return context.push(
+                    str,
+                    lambda strRef: strRef.expr.store(
+                        runtime_functions.string_strip.call(
+                            instance.nonref_expr.cast(VoidPtr),
+                            native_ast.const_bool_expr(fromLeft),
+                            native_ast.const_bool_expr(fromRight)
+                        ).cast(self.layoutType)
+                    )
+                )
+
+        elif methodname in self._str_methods:
             if len(args) == 0:
                 return context.push(
                     str,

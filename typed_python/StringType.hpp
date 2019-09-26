@@ -63,6 +63,12 @@ public:
     //return an increffed uppercase conversion layout of l
     static layout* upper(layout *l);
 
+    static layout* strip(layout *l, bool fromLeft=true, bool fromRight=true);
+
+    static layout* lstrip(layout *l);
+
+    static layout* rstrip(layout *l);
+
     //return the lowest index in the string where substring sub is found within l[start, end]
     static int64_t find(layout* l, layout* sub, int64_t start, int64_t end);
     static void split(ListOfType::layout *outList, layout* l, layout* sep, int64_t max);

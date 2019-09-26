@@ -16,6 +16,7 @@ from typed_python import Function, ListOf, _types, TupleOf, Dict, ConstDict
 from typed_python.test_util import currentMemUsageMb
 from nativepython.runtime import Runtime
 import unittest
+import time
 
 
 def Compiled(f):
@@ -347,6 +348,51 @@ class TestStringCompilation(unittest.TestCase):
         ]
         for s in titlestrings:
             self.assertEqual(c_istitle(s), s.istitle(), s)
+
+    def test_string_strip(self):
+        @Compiled
+        def strip(s: str):
+            return s.strip()
+
+        @Compiled
+        def rstrip(s: str):
+            return s.rstrip()
+
+        @Compiled
+        def lstrip(s: str):
+            return s.lstrip()
+
+        for s in ["", "asdf", "       ", "   asdf", "asdf   ", "\nasdf", "\tasdf"]:
+            self.assertEqual(s.strip(), strip(s), s)
+            self.assertEqual(s.rstrip(), rstrip(s), s)
+            self.assertEqual(s.lstrip(), lstrip(s), s)
+
+    def test_string_strip_perf(self):
+        bigS = " " * 1000000
+        littleS = " "
+
+        def stripMany(s: str, times: int):
+            res = 0
+            for i in range(times):
+                res += len(s.strip())
+            return res
+
+        compiledStripMany = Compiled(stripMany)
+
+        for s, expectedRatio, passCount in [(bigS, 1.5, 100), (littleS, .25, 10000)]:
+            t0 = time.time()
+            stripMany(s, passCount)
+            t1 = time.time()
+            compiledStripMany(s, passCount)
+            t2 = time.time()
+
+            pyTime = t1 - t0
+            compiledTime = t2 - t1
+            ratio = compiledTime / pyTime
+
+            print(f"Ratio of compiled to python for string of len {len(s)} is {ratio}")
+
+            self.assertLess(ratio, expectedRatio)
 
     def test_string_split(self):
         @Compiled
