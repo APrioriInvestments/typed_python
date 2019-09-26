@@ -16,11 +16,12 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, Bool, Int32
+from typed_python import NoneType, _types, OneOf, Bool, Int32, Float32, Float64
 
 import nativepython.native_ast as native_ast
 import nativepython
 from nativepython.native_ast import VoidPtr
+from math import trunc, floor, ceil
 
 
 typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTypeToTypeWrapper(x)
@@ -89,6 +90,12 @@ class SimpleAlternativeWrapper(Wrapper):
                     context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
                 else:
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
+
+        if target_type.typeRepresentation in [Float32, Float64]:
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
@@ -235,6 +242,13 @@ class AlternativeWrapper(RefcountedWrapper):
                 else:
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
+
+        if target_type.typeRepresentation in [Float32, Float64]:
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
+
         # TODO: Compile this properly
         # if target_type.typeRepresentation == Bytes:
         #     y = self.convert_call_method(context, "__bytes__", (e,))
@@ -258,6 +272,33 @@ class AlternativeWrapper(RefcountedWrapper):
 
     def convert_abs(self, context, expr):
         return self.convert_call_method(context, "__abs__", (expr,))
+
+    def convert_basicbuiltin(self, f, context, expr, a1=None):
+        if f is round:
+            if a1 is not None:
+                return self.convert_call_method(context, "__round__", (expr, a1)) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                )
+            else:
+                return self.convert_call_method(context, "__round__", (expr, context.constant(0))) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                )
+        if f is trunc:
+            return self.convert_call_method(context, "__trunc__", (expr,)) \
+                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
+        if f is floor:
+            return self.convert_call_method(context, "__floor__", (expr,)) \
+                or context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr))
+        if f is ceil:
+            return self.convert_call_method(context, "__ceil__", (expr,)) \
+                or context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr))
+
+        # should never reach this point
+        return None
 
     def convert_unary_op(self, context, expr, op):
         magic = "__pos__" if op.matches.UAdd else \
@@ -380,6 +421,12 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
                 else:
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
+
+        if target_type.typeRepresentation in [Float32, Float64]:
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)

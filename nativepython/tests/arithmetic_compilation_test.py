@@ -288,6 +288,16 @@ class TestArithmeticCompilation(unittest.TestCase):
             def f_ceil(x: T):
                 return ceil(x)
 
+            def f_int(x: T):
+                return int(x)
+
+            def f_float(x: T):
+                return float(x)
+
+            def f_complex(x: T):
+                return complex(x)
+
+            # not_tested_yet = [f_int, f_float, f_complex]
             ops = [f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
             for op in ops:
                 c_op = Compiled(op)

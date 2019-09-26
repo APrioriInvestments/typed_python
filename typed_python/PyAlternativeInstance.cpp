@@ -686,9 +686,19 @@ PyObject* PyConcreteAlternativeInstance::altComplex(PyObject* o, PyObject* args,
 PyObject* PyConcreteAlternativeInstance::altRound(PyObject* o, PyObject* args, PyObject* kwargs) {
     PyConcreteAlternativeInstance* self = (PyConcreteAlternativeInstance*)o;
 
-    if (PyTuple_Size(args) > 0 || kwargs) {
-        PyErr_Format(PyExc_TypeError, "__round__ invalid number of parameters");
+    if (PyTuple_Size(args) > 1 || kwargs) {
+        PyErr_Format(PyExc_TypeError, "__round__ invalid number of parameters %d %d", PyTuple_Size(args), kwargs);
         return NULL;
+    }
+
+    if (PyTuple_Size(args) == 1) {
+        PyObjectStealer arg0(PyTuple_GetItem(args, 0));
+        auto result = self->callMethod("__round__", arg0);
+        if (!result.first) {
+            PyErr_Format(PyExc_TypeError, "__round__ missing");
+            return NULL;
+        }
+        return result.second;
     }
 
     auto result = self->callMethod("__round__");

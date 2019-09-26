@@ -159,21 +159,6 @@ class TestAlternativeCompilation(unittest.TestCase):
     @pytest.mark.skip(reason="work in progress")
     def test_compile_alternative_2(self):
 
-        def f_round(x: float):
-            return round(x)
-
-        def f_round2(x: float, n: int):
-            return round(x, n)
-
-        def f_trunc(x: float):
-            return trunc(x)
-
-        def f_floor(x: float):
-            return floor(x)
-
-        def f_ceil(x: float):
-            return ceil(x)
-
         A_attrs = {"q": "attributeq", "z": "attributez"}
 
         def A_getattr(s, n):
@@ -188,9 +173,21 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __bytes__=lambda self: b'my bytes',
                         __format__=lambda self, spec: "my format",
                         __getattr__=A_getattr,
-                        # __getattr__=lambda self, name: A_attrs[name],
-                        __setattr__=A_setattr
+                        __setattr__=A_setattr,
+                        __float__=lambda self: 1.5
                         )
+
+        def f_round0(x: A):
+            return round(x)
+
+        def f_trunc(x: A):
+            return trunc(x)
+
+        def f_floor(x: A):
+            return floor(x)
+
+        def f_ceil(x: A):
+            return ceil(x)
 
         def f_bytes(x: A):
             return bytes(x)
@@ -198,12 +195,70 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_format(x: A):
             return format(x)
 
-        test_cases = [f_format]
+        test_cases = [f_floor, f_round0, f_trunc, f_floor, f_ceil]
         # failing_test_cases = [f_bytes
         for f in test_cases:
             r1 = f(A.a())
             compiled_f = Compiled(f)
             r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)
+
+    def test_compile_alternative_float_methods(self):
+        # if __float__ is defined, then floor() and ceil() are based off this conversion,
+        # when __floor__ and __ceil__ are not defined
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __float__=lambda self: 1234.5
+                        )
+
+        def f_floor(x: A):
+            return floor(x)
+
+        def f_ceil(x: A):
+            return ceil(x)
+
+        test_cases = [f_floor, f_ceil]
+        for f in test_cases:
+            r1 = f(A.a())
+            compiled_f = Compiled(f)
+            r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)
+
+        B = Alternative("B", a={'a': int}, b={'b': str},
+                        __round__=lambda self, n: 1234 + n,
+                        __trunc__=lambda self: 1,
+                        __floor__=lambda self: 2,
+                        __ceil__=lambda self: 3
+                        )
+
+        def f_round0(x: B):
+            return round(x, 0)
+
+        def f_round1(x: B):
+            return round(x, 1)
+
+        def f_round2(x: B):
+            return round(x, 2)
+
+        def f_round_1(x: B):
+            return round(x, -1)
+
+        def f_round_2(x: B):
+            return round(x, -2)
+
+        def f_trunc(x: B):
+            return trunc(x)
+
+        def f_floor(x: B):
+            return floor(x)
+
+        def f_ceil(x: B):
+            return ceil(x)
+
+        test_cases = [f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+        for f in test_cases:
+            r1 = f(B.a())
+            compiled_f = Compiled(f)
+            r2 = compiled_f(B.a())
             self.assertEqual(r1, r2)
 
     def test_compile_alternative_magic_methods(self):
@@ -214,7 +269,6 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __call__=lambda self, i: "my call",
                         __len__=lambda self: 42,
                         __contains__=lambda self, item: item == 1,
-                        # __contains__=lambda self, item: not item,  # TODO: why doesn't this compile?
                         __bytes__=lambda self: b'my bytes',
                         __format__=lambda self, spec: "my format",
 
