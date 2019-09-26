@@ -20,6 +20,7 @@ from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
 import nativepython
+from math import trunc, floor, ceil
 
 from typed_python import (
     Float32, Float64, Int64, Bool, String, Int8, UInt8, Int16, UInt16, Int32, UInt32, UInt64
@@ -211,6 +212,15 @@ class IntWrapper(ArithmeticTypeWrapper):
             )
         else:
             return context.pushPod(self, expr.nonref_expr)
+
+    def convert_basicbuiltin(self, f, context, expr, a1=None):
+        if f is round and a1 is not None:
+            return context.pushPod(
+                float,
+                runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+            ).convert_to_type(self)
+
+        return context.pushPod(self, expr.nonref_expr)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
@@ -404,6 +414,18 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
+    def convert_basicbuiltin(self, f, context, expr, a1=None):
+        if f is round and a1 is not None:
+            return context.pushPod(
+                self,
+                native_ast.Expression.Binop(
+                    left=expr.nonref_expr,
+                    right=a1.nonref_expr.gte(0),
+                    op=native_ast.BinaryOp.BitAnd()
+                )
+            )
+        return context.pushPod(self, expr.nonref_expr)
+
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
             return context.pushPod(self, left.nonref_expr.logical_not())
@@ -509,19 +531,22 @@ class FloatWrapper(ArithmeticTypeWrapper):
             )
             return context.constant(True)
 
-        if target_type.typeRepresentation == Int64:
+        if target_type.typeRepresentation == Bool:
+            targetVal.convert_copy_initialize(e != 0.0)
+            return context.constant(True)
+
+        if isinstance(target_type, IntWrapper):
             context.pushEffect(
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
                         left=e.nonref_expr,
-                        to_type=native_ast.Type.Int(bits=64, signed=True)
+                        to_type=native_ast.Type.Int(
+                            bits=target_type.typeRepresentation.Bits,
+                            signed=target_type.typeRepresentation.IsSignedInt
+                        )
                     )
                 )
             )
-            return context.constant(True)
-
-        if target_type.typeRepresentation == Bool:
-            targetVal.convert_copy_initialize(e != 0.0)
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
@@ -535,6 +560,28 @@ class FloatWrapper(ArithmeticTypeWrapper):
                 false=expr.nonref_expr.negate()
             )
         )
+
+    def convert_basicbuiltin(self, f, context, expr, a1=None):
+        if f is round:
+            if a1:
+                return context.pushPod(
+                    float,
+                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                ).convert_to_type(self)
+            else:
+                return context.pushPod(
+                    float,
+                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                ).convert_to_type(self)
+        if f is trunc:
+            return context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
+        if f is floor:
+            return context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
+        if f is ceil:
+            return context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
+
+        # should never reach this point
+        return None
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:

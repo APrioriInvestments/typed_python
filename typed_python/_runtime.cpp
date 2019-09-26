@@ -660,5 +660,42 @@ extern "C" {
     bool nativepython_isnan_float64(double f) { return std::isnan(f); }
 
     bool nativepython_isfinite_float64(double f) { return std::isfinite(f); }
+
+    double nativepython_runtime_round_float64(double l, int64_t n) {
+        double ret;
+        int64_t m = 1;
+        int64_t d = 1;
+        for (int64_t i = 0; i < n; i++)
+            m *= 10;
+        for (int64_t i = n; i < 0 ; i++)
+            d *= 10;
+        if (m > 1)
+            l *= m;
+        else if (d > 1)
+            l /= d;
+        ret = round(l);
+        int64_t isodd = int64_t(ret) % 2;
+        if (fabs(l - ret) == 0.5 && isodd)
+            ret -= isodd;
+        if (m > 1)
+            return ret / m;
+        else if (d > 1) {
+            return ret * d;
+        }
+        else
+            return ret;
+    }
+
+    double nativepython_runtime_trunc_float64(double l) {
+        return trunc(l);
+    }
+
+    double nativepython_runtime_floor_float64(double l) {
+        return floor(l);
+    }
+
+    double nativepython_runtime_ceil_float64(double l) {
+        return ceil(l);
+    }
 }
 

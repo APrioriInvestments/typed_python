@@ -612,3 +612,28 @@ isinf_float64 = externalCallTarget("nativepython_isinf_float64", Bool, Float64)
 isnan_float64 = externalCallTarget("nativepython_isnan_float64", Bool, Float64)
 
 isfinite_float64 = externalCallTarget("nativepython_isfinite_float64", Bool, Float64)
+
+round_float64 = externalCallTarget(
+    "nativepython_runtime_round_float64",
+    Float64,
+    Float64,
+    Int64
+)
+
+trunc_float64 = externalCallTarget(
+    "nativepython_runtime_trunc_float64",
+    Float64,
+    Float64
+)
+
+floor_float64 = externalCallTarget(
+    "nativepython_runtime_floor_float64",
+    Float64,
+    Float64
+)
+
+ceil_float64 = externalCallTarget(
+    "nativepython_runtime_ceil_float64",
+    Float64,
+    Float64
+)

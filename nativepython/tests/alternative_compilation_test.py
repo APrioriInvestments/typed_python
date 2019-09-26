@@ -18,6 +18,7 @@ import typed_python._types as _types
 from nativepython.runtime import Runtime
 import unittest
 import time
+from math import trunc, floor, ceil
 
 
 def Compiled(f):
@@ -157,6 +158,22 @@ class TestAlternativeCompilation(unittest.TestCase):
     @unittest.skip
     @pytest.mark.skip(reason="work in progress")
     def test_compile_alternative_2(self):
+
+        def f_round(x: float):
+            return round(x)
+
+        def f_round2(x: float, n: int):
+            return round(x, n)
+
+        def f_trunc(x: float):
+            return trunc(x)
+
+        def f_floor(x: float):
+            return floor(x)
+
+        def f_ceil(x: float):
+            return ceil(x)
+
         A_attrs = {"q": "attributeq", "z": "attributez"}
 
         def A_getattr(s, n):
@@ -169,7 +186,7 @@ class TestAlternativeCompilation(unittest.TestCase):
 
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __bytes__=lambda self: b'my bytes',
-                        __format__=lambda self: "my format",
+                        __format__=lambda self, spec: "my format",
                         __getattr__=A_getattr,
                         # __getattr__=lambda self, name: A_attrs[name],
                         __setattr__=A_setattr
@@ -181,7 +198,8 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_format(x: A):
             return format(x)
 
-        test_cases = [f_bytes, f_format]
+        test_cases = [f_format]
+        # failing_test_cases = [f_bytes
         for f in test_cases:
             r1 = f(A.a())
             compiled_f = Compiled(f)
@@ -372,6 +390,8 @@ class TestAlternativeCompilation(unittest.TestCase):
         test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
                       f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
                       f_neg, f_pos, f_invert, f_abs]
+        # These fail:
+        #   failing_test_cases = [f_bytes, f_format
         # These fail when compiling, because python_ast and native_ast have no representation of in-place operators:
         #   failing_test_cases = [f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
         #                         f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]

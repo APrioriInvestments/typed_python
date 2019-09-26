@@ -14,7 +14,7 @@
 
 import operator
 import sys
-from math import isfinite
+from math import isfinite, trunc, floor, ceil
 from typed_python import (
     Function, OneOf,
     Bool,
@@ -250,7 +250,56 @@ class TestArithmeticCompilation(unittest.TestCase):
         self.assertEqual(toString(UInt16(10)), "10u16")
         self.assertEqual(toString(UInt8(10)), "10u8")
 
-    def test_can_compile_all_register_types(self):
+    def test_can_compile_register_builtins(self):
+        registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
+
+        def suitable_range(t):
+            if t in [Bool]:
+                return [Bool(0), Bool(1)]
+            elif t.IsUnsignedInt:
+                return [0, 5, 10, 15, 100, 150]
+            elif t.IsSignedInt:
+                return [0, 5, 10, 15, 100, -5, -10, -15, -100]
+            elif t in [Float32, Float64]:
+                return [x/2.0 for x in range(-100, 100)]
+
+        for T in registerTypes:
+            def f_round0(x: T):
+                return round(x)
+
+            def f_round1(x: T):
+                return round(x, 1)
+
+            def f_round2(x: T):
+                return round(x, 2)
+
+            def f_round_1(x: T):
+                return round(x, -1)
+
+            def f_round_2(x: T):
+                return round(x, -2)
+
+            def f_trunc(x: T):
+                return trunc(x)
+
+            def f_floor(x: T):
+                return floor(x)
+
+            def f_ceil(x: T):
+                return ceil(x)
+
+            ops = [f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+            for op in ops:
+                c_op = Compiled(op)
+                for v in suitable_range(T):
+                    r1 = op(v)
+                    r2 = c_op(v)
+                    self.assertEqual(r1, r2)
+                    # note that types are necessarily different sometimes,
+                    # e.g. round(Float64(1), 0) returns int when interpreted,
+                    # but Float64 when compiled
+
+    def test_can_compile_register_operations(self):
         registerTypes = [Bool, Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Float32, Float64]
 
         def result_or_exception(f, *p):
@@ -282,10 +331,11 @@ class TestArithmeticCompilation(unittest.TestCase):
                 return [0, 1, 2, (1 << (t.Bits // 2 - 1)) - 1, (1 << (t.Bits - 1)) - 1,
                         -1, -2, -(1 << (t.Bits // 2 - 1)), -(1 << (t.Bits - 1))]
             elif t in [Float32]:
-                return [0.0, 1.0/3.0, 1.0, 2.0, (2 - 1 / (2**23)) * 2**127, -1.0/3.0, -1.0, -2.0, -(2 - 1 / (2**23)) * 2**127]
+                return [0.0, 1.0/3.0, 0.5, 1.0, 1.5, 2.0, (2 - 1 / (2**23)) * 2**127,
+                        -1.0/3.0, -0.5, -1.0, -1.5, -2.0, -(2 - 1 / (2**23)) * 2**127]
             elif t in [Float64]:
-                return [0.0, 1e-16, 9.876e-16, 1.0/3.0, 1.0, 10.0/7.0, 2.0, 3.0, 10.0/3.0, 100.0/3.0, sys.float_info.max,
-                        -1e-16, -9.876e-16, -1.0/3.0, -1.0, -10.0/7.0, -2.0, -3.0, -10.0/3.0, -100.0/3.0, -sys.float_info.max]
+                return [0.0, 1e-16, 9.876e-16, 1.0/3.0, 0.5, 1.0, 1.5, 10.0/7.0, 2.0, 3.0, 10.0/3.0, 100.0/3.0, sys.float_info.max,
+                        -1e-16, -9.876e-16, -1.0/3.0, -0.5, -1.0, -10.0/7.0, -1.5, -2.0, -3.0, -10.0/3.0, -100.0/3.0, -sys.float_info.max]
 
         for T in registerTypes:
             def not_(x: T):

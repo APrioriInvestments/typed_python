@@ -198,6 +198,11 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
         )
 
+    def convert_basicbuiltin(f, self, context, expr, a1=None):
+        return context.pushTerminal(
+            generateThrowException(context, TypeError("Can't take '%s' of instance of type '%s'" % (str(f), str(self))))
+        )
+
     def convert_repr(self, context, expr):
         tp = context.getTypePointer(expr.expr_type.typeRepresentation)
         if tp:
