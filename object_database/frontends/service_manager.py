@@ -251,7 +251,7 @@ def main(argv=None):
                             logLevelName=level_name
                         )
                         logger.info("Connected the service-manager")
-                    except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
+                    except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError, OSError):
                         serviceManager = None
 
                     if serviceManager is None:
@@ -265,7 +265,7 @@ def main(argv=None):
                     try:
                         serviceManager.cleanup()
 
-                    except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError):
+                    except (ConnectionRefusedError, DisconnectedException, concurrent.futures._base.TimeoutError, OSError):
                         # try to reconnect
                         logger.error("Disconnected from object_database host. Attempting to reconnect.")
                         serviceManager.stop(gracefully=False)
