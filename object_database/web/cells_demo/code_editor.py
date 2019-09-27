@@ -39,9 +39,15 @@ class CodeEditorInHorizSequence(CellsTestPage):
         def onTextChange(buffer, selection):
             contents.set(buffer)
 
+        def toggle(aSlot):
+            print("Toggling")
+            print(aSlot.get())
+            aSlot.toggle()
+            print(aSlot.get())
+
         return (
-            cells.Button("Show the editor", editorShown.toggle) +
-            cells.Button("Show the editor's contents", contentsShown.toggle) +
+            cells.Button("Show the editor", lambda: toggle(editorShown)) +
+            cells.Button("Show the editor's contents", lambda: toggle(contentsShown)) +
             cells.HorizontalSubscribedSequence(lambda:
                 (["Ed"] if editorShown.get() else []) +
                 (["Contents"] if contentsShown.get() else []),
@@ -54,6 +60,25 @@ class CodeEditorInHorizSequence(CellsTestPage):
 
     def text(self):
         return "You should see two buttons that let you turn the editor on and off, and also see its contents."
+
+
+class CodeEditorBasicHorizSequence(CellsTestPage):
+
+    def cell(self):
+        contents = cells.Slot("No Text Entered Yet!")
+
+        def onTextChange(content, selection):
+            contents.set(content)
+
+        return cells.HorizontalSequence([
+            cells.CodeEditor(onTextChange=onTextChange),
+            cells.Panel(
+                cells.Subscribed(contents.get)
+            )
+        ])
+
+    def text(self):
+        return "Should see a CodeEditor and its content (in panel) in a HorizontalSequence that is not a flex parent"
 
 class CodeEditorInSplitView(CellsTestPage):
     def cell(self):

@@ -232,8 +232,9 @@
     display: block;
 }
 
-.sequence-vertical > [data-cell-type="CodeEditor"].flex-child {
-    width: 100%;
+:not(.sequence) > .sequence-horizontal {
+    position: relative;
+    height: 100%;
 }
 
 /* Panel
@@ -265,6 +266,23 @@
 
 .sequence-vertical.flex-parent > .cell-panel {
     height: auto;
+    width: 100%;
+}
+
+/* CodeEditor
+ * ===============================================================*/
+.code-editor {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+.sequence-horizontal:not(.flex-parent) > .code-editor {
+    min-width: 300px;
+    flex: 1;
+}
+
+.sequence-vertical > .code-editor.flex-child {
     width: 100%;
 }
 

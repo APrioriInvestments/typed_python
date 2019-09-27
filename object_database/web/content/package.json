@@ -8,8 +8,8 @@
     "test-libs": "./node_modules/mocha/bin/mocha --require esm ./tests/",
     "test-components": "./node_modules/mocha/bin/mocha --require esm ./components/tests/",
     "build": "webpack",
-      "build:frontend": "webpack",
-      "frontend": "webpack && python ../../frontends/object_database_webtest.py"
+    "build:frontend": "webpack",
+    "frontend": "webpack && python ../../frontends/object_database_webtest.py"
   },
   "author": "",
   "license": "ISC",

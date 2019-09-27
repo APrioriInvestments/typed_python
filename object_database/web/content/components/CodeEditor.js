@@ -53,6 +53,8 @@ class CodeEditor extends Component {
 
             if (this.props.extraData.minLines !== undefined) {
                 this.editor.setOption("minLines", this.props.extraData.minLines);
+            } else {
+                this.editor.setOption("minLines", Infinity);
             }
 
             this.setupKeybindings();
@@ -61,10 +63,11 @@ class CodeEditor extends Component {
         }
     }
 
+
     build(){
         return h('div',
             {
-                class: "cell h-100",
+                class: "cell code-editor",
                 id: this.props.id,
                 "data-cell-id": this.props.id,
                 "data-cell-type": "CodeEditor",
