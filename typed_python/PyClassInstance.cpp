@@ -321,6 +321,7 @@ void PyClassInstance::constructFromPythonArgumentsConcrete(Class* classT, uint8_
 
 PyObject* PyClassInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
     int index = type()->getMemberIndex(attrName);
+
     if (index >= 0) {
         Type* eltType = type()->getMemberType(index);
 
@@ -433,6 +434,7 @@ void PyClassInstance::mirrorTypeInformationIntoPyTypeConcrete(Class* classT, PyT
     PyDict_SetItemString(pyType->tp_dict, "HeldClass", typePtrToPyTypeRepresentation(classT->getHeldClass()));
     PyDict_SetItemString(pyType->tp_dict, "MemberTypes", types);
     PyDict_SetItemString(pyType->tp_dict, "BaseClasses", bases);
+    PyDict_SetItemString(pyType->tp_dict, "IsFinal", classT->isFinal() ? Py_True : Py_False);
     PyDict_SetItemString(pyType->tp_dict, "MRO", mro);
     PyDict_SetItemString(pyType->tp_dict, "MemberNames", names);
     PyDict_SetItemString(pyType->tp_dict, "MemberDefaultValues", defaults);

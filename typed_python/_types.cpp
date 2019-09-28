@@ -323,6 +323,27 @@ PyObject *allocateClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObj
     });
 }
 
+PyObject *makeClassFinal(PyObject* nullValue, PyObject* args, PyObject* kwargs)
+{
+    static const char *kwlist[] = {"classType", NULL};
+
+    PyObject* pyClassType;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O", (char**)kwlist, &pyClassType)) {
+        return NULL;
+    }
+
+    return translateExceptionToPyObject([&]() {
+        Type* classType = PyInstance::unwrapTypeArgToTypePtr(pyClassType);
+
+        if (!classType || classType->getTypeCategory() != Type::TypeCategory::catClass) {
+            throw std::runtime_error("Expected 'classType' to be a Class");
+        }
+
+        return incref((PyObject*)PyInstance::typeObj(((Class*)classType)->asFinal()));
+    });
+}
+
 PyObject *getNextUnlinkedClassMethodDispatch(PyObject* nullValue, PyObject* args, PyObject* kwargs)
 {
     static const char *kwlist[] = {NULL};
@@ -884,6 +905,7 @@ PyObject *MakeClassType(PyObject* nullValue, PyObject* args) {
                 Class::Make(
                     name,
                     baseClasses,
+                    false,
                     members,
                     memberFuncs,
                     staticFuncs,
@@ -1769,6 +1791,7 @@ static PyMethodDef module_methods[] = {
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},
+    {"makeClassFinal", (PyCFunction)makeClassFinal, METH_VARARGS | METH_KEYWORDS, NULL},
     {"allocateClassMethodDispatch", (PyCFunction)allocateClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getNextUnlinkedClassMethodDispatch", (PyCFunction)getNextUnlinkedClassMethodDispatch, METH_VARARGS | METH_KEYWORDS, NULL},
     {"getClassMethodDispatchSignature", (PyCFunction)getClassMethodDispatchSignature, METH_VARARGS | METH_KEYWORDS, NULL},

@@ -274,6 +274,7 @@ class HeldClass : public Type {
 public:
     HeldClass(std::string inName,
           const std::vector<HeldClass*>& baseClasses,
+          bool isFinal,
           const std::vector<std::tuple<std::string, Type*, Instance> >& members,
           const std::map<std::string, Function*>& memberFunctions,
           const std::map<std::string, Function*>& staticFunctions,
@@ -284,6 +285,7 @@ public:
             m_vtable(new VTable(this)),
             m_bases(baseClasses),
             m_classType(nullptr),
+            m_is_final(isFinal),
             m_own_members(members),
             m_own_memberFunctions(memberFunctions),
             m_own_staticFunctions(staticFunctions),
@@ -329,9 +331,27 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
+    HeldClass* asFinal() {
+        if (m_is_final) {
+            return this;
+        }
+
+        return Make(
+            m_name,
+            m_bases,
+            true,
+            m_own_members,
+            m_memberFunctions,
+            m_staticFunctions,
+            m_propertyFunctions,
+            m_classMembers
+        );
+    }
+
     static HeldClass* Make(
             std::string inName,
             const std::vector<HeldClass*>& bases,
+            bool isFinal,
             const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
@@ -347,6 +367,10 @@ public:
             if (base->m_members.size()) {
                 countWithMembers++;
             }
+
+            if (base->isFinal()) {
+                throw std::runtime_error("Can't subclass " + base->name() + " because it's marked 'final'.");
+            }
         }
 
         if (countWithMembers > 1) {
@@ -356,6 +380,7 @@ public:
         HeldClass* result = new HeldClass(
             inName,
             bases,
+            isFinal,
             members,
             memberFunctions,
             staticFunctions,
@@ -389,6 +414,7 @@ public:
         return Make(
             newName,
             m_bases,
+            m_is_final,
             m_members,
             m_memberFunctions,
             m_staticFunctions,
@@ -483,6 +509,10 @@ public:
         int byte = memberIndex / 8 + sizeof(vtable_ptr);
         int bit = memberIndex % 8;
         return bool( ((uint8_t*)self)[byte] & (1 << bit) );
+    }
+
+    bool isFinal() {
+        return m_is_final;
     }
 
     void setInitializationFlag(instance_ptr self, int memberIndex) const;
@@ -728,6 +758,9 @@ private:
     std::vector<size_t> m_byte_offsets;
 
     std::vector<HeldClass*> m_bases;
+
+    // if final, we can't subclass this class
+    bool m_is_final;
 
     // equivalent to python's method resolution order, so we can
     // search for methods at runtime.

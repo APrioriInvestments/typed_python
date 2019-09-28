@@ -97,6 +97,7 @@ public:
     static Class* Make(
             std::string inName,
             const std::vector<Class*>& bases,
+            bool isFinal,
             const std::vector<std::tuple<std::string, Type*, Instance> >& members,
             const std::map<std::string, Function*>& memberFunctions,
             const std::map<std::string, Function*>& staticFunctions,
@@ -114,6 +115,7 @@ public:
             HeldClass::Make(
                 inName,
                 heldClassBases,
+                isFinal,
                 members,
                 memberFunctions,
                 staticFunctions,
@@ -121,6 +123,18 @@ public:
                 classMembers
             )
         );
+    }
+
+    bool isFinal() {
+        return m_heldClass->isFinal();
+    }
+
+    Class* asFinal() {
+        if (isFinal()) {
+            return this;
+        }
+
+        return new Class(m_heldClass->asFinal());
     }
 
     Class* renamed(std::string newName) {

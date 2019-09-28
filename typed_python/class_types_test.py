@@ -18,7 +18,7 @@ import gc
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types, Forward
+    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types, Forward, Final
 )
 
 
@@ -893,3 +893,18 @@ class NativeClassTypesTests(unittest.TestCase):
             z = Member(int)
 
         self.assertEqual(ChildClass.MemberNames, ('x', 'y', 'z'))
+
+    def test_final_classes(self):
+        class BaseClass(Class):
+            pass
+
+        @Final
+        class ChildClass(Class):
+            pass
+
+        self.assertFalse(BaseClass.IsFinal)
+        self.assertTrue(ChildClass.IsFinal)
+
+        with self.assertRaisesRegex(Exception, "Can't subclass ChildClass because it's marked 'final'."):
+            class BadClass(ChildClass):
+                pass
