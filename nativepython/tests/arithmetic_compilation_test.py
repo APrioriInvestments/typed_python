@@ -255,13 +255,13 @@ class TestArithmeticCompilation(unittest.TestCase):
 
         def suitable_range(t):
             if t in [Bool]:
-                return [Bool(0), Bool(1)]
+                return [0, 1]
             elif t.IsUnsignedInt:
-                return [0, 5, 10, 15, 100, 150]
+                return [0, 5, 10, 15, 50, 100, 150]
             elif t.IsSignedInt:
-                return [0, 5, 10, 15, 100, -5, -10, -15, -100]
+                return [0, 5, 10, 15, 50, 100, -5, -10, -15, -50, -100]
             elif t in [Float32, Float64]:
-                return [x/2.0 for x in range(-100, 100)]
+                return [x / 2.0 for x in range(-100, 100)]
 
         for T in registerTypes:
             def f_round0(x: T):
@@ -297,13 +297,16 @@ class TestArithmeticCompilation(unittest.TestCase):
             def f_complex(x: T):
                 return complex(x)
 
+            def f_format(x: T):
+                return format(x)
+
             # not_tested_yet = [f_int, f_float, f_complex]
-            ops = [f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+            ops = [f_format, f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
             for op in ops:
                 c_op = Compiled(op)
                 for v in suitable_range(T):
-                    r1 = op(v)
-                    r2 = c_op(v)
+                    r1 = op(T(v))
+                    r2 = c_op(T(v))
                     self.assertEqual(r1, r2)
                     # note that types are necessarily different sometimes,
                     # e.g. round(Float64(1), 0) returns int when interpreted,

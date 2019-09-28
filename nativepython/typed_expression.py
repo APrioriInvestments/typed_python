@@ -139,8 +139,8 @@ class TypedExpression(object):
     def convert_abs(self):
         return self.expr_type.convert_abs(self.context, self)
 
-    def convert_basicbuiltin(self, f, a1=None):
-        return self.expr_type.convert_basicbuiltin(f, self.context, self, a1)
+    def convert_builtin(self, f, a1=None):
+        return self.expr_type.convert_builtin(f, self.context, self, a1)
 
     def convert_repr(self):
         return self.expr_type.convert_repr(self.context, self)

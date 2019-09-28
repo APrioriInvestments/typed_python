@@ -564,6 +564,8 @@ extern "C" {
         std::ostringstream s;
         ReprAccumulator acc(s);
         acc << f;
+        if (fabs(f) < 1e16 - 1 && f == floor(f))
+            acc << ".0";
 
         std::string rep = s.str();
         return StringType::createFromUtf8(&rep[0], rep.size());
@@ -576,6 +578,13 @@ extern "C" {
 
         std::string rep = s.str();
         return StringType::createFromUtf8(&rep[0], rep.size());
+    }
+
+    StringType::layout* nativepython_bool_to_string(bool b) {
+        if (b)
+            return StringType::createFromUtf8("True", 4);
+        else
+            return StringType::createFromUtf8("False", 5);
     }
 
     hash_table_layout* nativepython_dict_create() {
@@ -696,6 +705,10 @@ extern "C" {
 
     double nativepython_runtime_ceil_float64(double l) {
         return ceil(l);
+    }
+
+    PyObject* nativepython_runtime_complex(double r, double i) {
+        return PyComplex_FromDoubles(r, i);
     }
 }
 

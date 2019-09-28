@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function
+from typed_python import Function, Bytes
 from nativepython.runtime import Runtime
 import unittest
 import time
@@ -138,3 +138,22 @@ class TestBytesCompilation(unittest.TestCase):
         for i in range(26):
             self.assertEqual(f(i), cf(i))
             self.assertEqual(g(i), cg(i))
+
+    def test_bytes_conversions(self):
+
+        def f(x: Bytes):
+            return bytes(x)
+
+        cf = Compiled(f)
+
+        for v in [b'123', b'abcdefgh', b'\x00\x01\x02\x00']:
+            self.assertEqual(f(v), cf(v))
+
+        # TODO: support this
+        # def g(x: str):
+        #     return bytes(x, "utf8")
+        #
+        # cg = Compiled(g)
+        #
+        # for v in ['123', 'abcdefgh', 'a\u00CAb', 'XyZ\U0001D471']:
+        #     self.assertEqual(g(v), cg(v))

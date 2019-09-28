@@ -535,6 +535,12 @@ float32_to_string = externalCallTarget(
     Float32
 )
 
+bool_to_string = externalCallTarget(
+    "nativepython_bool_to_string",
+    Void.pointer(),
+    Bool
+)
+
 dict_create = externalCallTarget(
     "nativepython_dict_create",
     Void.pointer()
@@ -634,6 +640,13 @@ floor_float64 = externalCallTarget(
 
 ceil_float64 = externalCallTarget(
     "nativepython_runtime_ceil_float64",
+    Float64,
+    Float64
+)
+
+np_complex = externalCallTarget(
+    "nativepython_runtime_complex",
+    Void.pointer(),
     Float64,
     Float64
 )

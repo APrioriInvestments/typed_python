@@ -12,10 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-import pytest
 from typed_python import TypeFunction, Function, Alternative, Forward
 import typed_python._types as _types
 from nativepython.runtime import Runtime
+from nativepython import SpecializedEntrypoint
 import unittest
 import time
 from math import trunc, floor, ceil
@@ -155,53 +155,71 @@ class TestAlternativeCompilation(unittest.TestCase):
         speedup = (t1-t0)/(t2-t1)
         self.assertGreater(speedup, 20)  # I get about 50
 
-    @unittest.skip
-    @pytest.mark.skip(reason="work in progress")
-    def test_compile_alternative_2(self):
+    def test_compile_alternative_format(self):
+        A1 = Alternative("A1", a={'a': int}, b={'b': str})
+        A2 = Alternative("A2", a={'a': int}, b={'b': str},
+                         __str__=lambda self: "my str"
+                         )
+        A3 = Alternative("A3", a={'a': int}, b={'b': str},
+                         __format__=lambda self, spec: "my format " + spec
+                         )
 
-        A_attrs = {"q": "attributeq", "z": "attributez"}
+        def a1_format(x: A1):
+            return format(x)
 
-        def A_getattr(s, n):
-            if n not in A_attrs:
-                raise AttributeError(f"no attribute {n}")
-            return A_attrs[n]
+        def a2_format(x: A2):
+            return format(x)
 
-        def A_setattr(s, n, v):
-            A_attrs[n] = v
+        def a3_format(x: A3):
+            return format(x)
 
+        def a3_format_spec(x: A3):
+            return format(x, "spec")
+
+        r1 = a1_format(A1.a())
+        c1_format = Compiled(a1_format)
+        r2 = c1_format(A1.a())
+        self.assertEqual(r1, r2)
+
+        r1 = a2_format(A2.a())
+        c2_format = Compiled(a2_format)
+        r2 = c2_format(A2.a())
+        self.assertEqual(r1, r2)
+
+        r1 = a3_format(A3.a())
+        c3_format = Compiled(a3_format)
+        r2 = c3_format(A3.a())
+        self.assertEqual(r1, r2)
+
+        r1 = a3_format_spec(A3.a())
+        c3_format_spec = Compiled(a3_format_spec)
+        r2 = c3_format_spec(A3.a())
+        self.assertEqual(r1, r2)
+
+        # This failed when I forgot to support ConcreteAlternativeWrappers
+        @SpecializedEntrypoint
+        def specialized_format(x):
+            return format(x)
+
+        test_values = [A1.a(), A1.b(), A2.a(), A2.b(), A3.a(), A3.b()]
+        for v in test_values:
+            r1 = format(v)
+            r2 = specialized_format(v)
+            self.assertEqual(r1, r2)
+
+    def test_compile_alternative_bytes(self):
         A = Alternative("A", a={'a': int}, b={'b': str},
-                        __bytes__=lambda self: b'my bytes',
-                        __format__=lambda self, spec: "my format",
-                        __getattr__=A_getattr,
-                        __setattr__=A_setattr,
-                        __float__=lambda self: 1.5
+                        __bytes__=lambda self: b'my bytes'
                         )
-
-        def f_round0(x: A):
-            return round(x)
-
-        def f_trunc(x: A):
-            return trunc(x)
-
-        def f_floor(x: A):
-            return floor(x)
-
-        def f_ceil(x: A):
-            return ceil(x)
 
         def f_bytes(x: A):
             return bytes(x)
 
-        def f_format(x: A):
-            return format(x)
-
-        test_cases = [f_floor, f_round0, f_trunc, f_floor, f_ceil]
-        # failing_test_cases = [f_bytes
-        for f in test_cases:
-            r1 = f(A.a())
-            compiled_f = Compiled(f)
-            r2 = compiled_f(A.a())
-            self.assertEqual(r1, r2)
+        v = A.a()
+        r1 = f_bytes(v)
+        c_f = Compiled(f_bytes)
+        r2 = c_f(v)
+        self.assertEqual(r1, r2)
 
     def test_compile_alternative_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,

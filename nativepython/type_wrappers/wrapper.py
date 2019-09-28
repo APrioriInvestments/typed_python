@@ -198,7 +198,7 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
         )
 
-    def convert_basicbuiltin(f, self, context, expr, a1=None):
+    def convert_builtin(f, self, context, expr, a1=None):
         return context.pushTerminal(
             generateThrowException(context, TypeError("Can't take '%s' of instance of type '%s'" % (str(f), str(self))))
         )

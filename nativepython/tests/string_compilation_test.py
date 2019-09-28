@@ -269,8 +269,7 @@ class TestStringCompilation(unittest.TestCase):
 
         self.assertEqual(toString(1.2), "1.2")
 
-        # this is not actually correct, but it's our current behavior
-        self.assertEqual(toString(1), "1")
+        self.assertEqual(toString(1), "1.0")
 
     def test_string_is_something(self):
         @Compiled

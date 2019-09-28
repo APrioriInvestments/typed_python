@@ -18,11 +18,11 @@ import nativepython.native_ast as native_ast
 from math import trunc, floor, ceil
 
 
-class BasicBuiltinWrapper(Wrapper):
+class BuiltinWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
-    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil)
+    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, bytes)
 
     def __init__(self, builtin):
         assert builtin in self.SUPPORTED_FUNCTIONS
@@ -34,9 +34,10 @@ class BasicBuiltinWrapper(Wrapper):
     def convert_call(self, context, expr, args, kwargs):
         builtin = self.typeRepresentation
         if len(args) == 1 and not kwargs:
-            return args[0].convert_basicbuiltin(builtin)
+            return args[0].convert_builtin(builtin)
 
-        if builtin is round and len(args) == 2 and not kwargs:
-            return args[0].convert_basicbuiltin(builtin, args[1])
+        # builtins that optionally have a second parameter:
+        if builtin in [round, format] and len(args) == 2 and not kwargs:
+            return args[0].convert_builtin(builtin, args[1])
 
         return super().convert_call(context, expr, args, kwargs)

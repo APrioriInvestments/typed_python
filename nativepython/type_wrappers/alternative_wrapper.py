@@ -14,9 +14,10 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
+from nativepython.type_wrappers.arithmetic_wrapper import FloatWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
-from typed_python import NoneType, _types, OneOf, Bool, Int32, Float32, Float64
+from typed_python import NoneType, _types, OneOf, Bool, Int32
 
 import nativepython.native_ast as native_ast
 import nativepython
@@ -92,7 +93,7 @@ class SimpleAlternativeWrapper(Wrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        if target_type.typeRepresentation in [Float32, Float64]:
+        if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
                 context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
@@ -243,18 +244,11 @@ class AlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        if target_type.typeRepresentation in [Float32, Float64]:
+        if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
                 context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
                 return context.constant(True)
-
-        # TODO: Compile this properly
-        # if target_type.typeRepresentation == Bytes:
-        #     y = self.convert_call_method(context, "__bytes__", (e,))
-        #     if y is not None:
-        #         context.pushEffect(targetVal.expr.store(y))
-        #         return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
@@ -273,7 +267,16 @@ class AlternativeWrapper(RefcountedWrapper):
     def convert_abs(self, context, expr):
         return self.convert_call_method(context, "__abs__", (expr,))
 
-    def convert_basicbuiltin(self, f, context, expr, a1=None):
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is bytes:
+            return self.convert_call_method(context, "__bytes__", (expr, ))
+        if f is format:
+            if a1 is not None:
+                return self.convert_call_method(context, "__format__", (expr, a1))
+            else:
+                return self.convert_call_method(context, "__format__", (expr, context.constant(''))) \
+                    or self.convert_call_method(context, "__str__", (expr,)) \
+                    or expr.convert_to_type(str)
         if f is round:
             if a1 is not None:
                 return self.convert_call_method(context, "__round__", (expr, a1)) \
@@ -423,7 +426,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        if target_type.typeRepresentation in [Float32, Float64]:
+        if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
                 context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
@@ -501,6 +504,10 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
 
     def convert_check_matches(self, context, instance, typename):
         return context.constant(typename == self.typeRepresentation.Name)
+
+    def convert_builtin(self, f, context, expr, a1=None):
+        altWrapper = typeWrapper(self.alternativeType)
+        return altWrapper.convert_builtin(f, context, expr, a1)
 
 
 class AlternativeMatchingWrapper(Wrapper):

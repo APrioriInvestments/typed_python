@@ -139,7 +139,7 @@ class IntWrapper(ArithmeticTypeWrapper):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-        if target_type.typeRepresentation in (Float64, Float32):
+        if isinstance(target_type, FloatWrapper):
             context.pushEffect(
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
@@ -213,14 +213,23 @@ class IntWrapper(ArithmeticTypeWrapper):
         else:
             return context.pushPod(self, expr.nonref_expr)
 
-    def convert_basicbuiltin(self, f, context, expr, a1=None):
-        if f is round and a1 is not None:
-            return context.pushPod(
-                float,
-                runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
-            ).convert_to_type(self)
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is format and a1 is None:
+            return expr.convert_to_type(str)
+        if f is round:
+            if a1 is None:
+                return context.pushPod(
+                    float,
+                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                ).convert_to_type(self)
+            else:
+                return context.pushPod(
+                    float,
+                    runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                ).convert_to_type(self)
 
-        return context.pushPod(self, expr.nonref_expr)
+        if f in [trunc, floor, ceil]:
+            return context.pushPod(self, expr.nonref_expr)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
@@ -387,7 +396,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-        if target_type.typeRepresentation in (Float64, Float32):
+        if isinstance(target_type, FloatWrapper):
             context.pushEffect(
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
@@ -412,9 +421,17 @@ class BoolWrapper(ArithmeticTypeWrapper):
             )
             return context.constant(True)
 
+        if target_type.typeRepresentation == String:
+            context.pushEffect(
+                targetVal.expr.store(runtime_functions.bool_to_string.call(e.nonref_expr).cast(target_type.layoutType))
+            )
+            return context.constant(True)
+
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_basicbuiltin(self, f, context, expr, a1=None):
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is format and a1 is None:
+            return expr.convert_to_type(str)
         if f is round and a1 is not None:
             return context.pushPod(
                 self,
@@ -424,7 +441,9 @@ class BoolWrapper(ArithmeticTypeWrapper):
                     op=native_ast.BinaryOp.BitAnd()
                 )
             )
-        return context.pushPod(self, expr.nonref_expr)
+        if f in [round, trunc, floor, ceil]:
+            return context.pushPod(self, expr.nonref_expr)
+        return None
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
@@ -509,7 +528,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
         if not explicit:
             return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-        if target_type.typeRepresentation in (Float32, Float64):
+        if isinstance(target_type, FloatWrapper):
             context.pushEffect(
                 targetVal.expr.store(
                     native_ast.Expression.Cast(
@@ -561,7 +580,9 @@ class FloatWrapper(ArithmeticTypeWrapper):
             )
         )
 
-    def convert_basicbuiltin(self, f, context, expr, a1=None):
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is format and a1 is None:
+            return expr.convert_to_type(str)
         if f is round:
             if a1:
                 return context.pushPod(
@@ -580,7 +601,6 @@ class FloatWrapper(ArithmeticTypeWrapper):
         if f is ceil:
             return context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
 
-        # should never reach this point
         return None
 
     def convert_unary_op(self, context, left, op):

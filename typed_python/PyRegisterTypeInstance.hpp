@@ -885,7 +885,8 @@ private:
             return NULL;
         }
 
-        return PyComplex_FromDoubles(1.2,3.4);
+        T val = *(T*)(self->dataPtr());
+        return PyComplex_FromDoubles((double)val,0);
     }
 
     static PyObject* _round(PyObject* o, PyObject* args, PyObject* kwargs) {
@@ -898,7 +899,7 @@ private:
 
         T val = *(T*)(self->dataPtr());
         if (PyTuple_Size(args) == 0) {
-            return registerValueToPyValue(pyRound(val, 0));
+            return registerValueToPyValue(T(pyRound(val, 0)));
         }
         PyObject *arg0 = PyTuple_GetItem(args, 0);
         if (!PyLong_Check(arg0)) {
@@ -906,7 +907,7 @@ private:
             return NULL;
         }
 
-        return registerValueToPyValue(pyRound(val, PyLong_AsLong(arg0)));
+        return registerValueToPyValue(T(pyRound(val, PyLong_AsLong(arg0))));
     }
 
     static PyObject* _trunc(PyObject* o, PyObject* args, PyObject* kwargs) {
