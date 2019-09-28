@@ -2564,6 +2564,13 @@ class CodeEditor(Cell):
         self.onTextChange = onTextChange
         self.initialText = ""
 
+        # All CodeEditors will be
+        # flexed inside of Sequences,
+        # and will cause parent Sequences
+        # to become flex parent
+        self.isFlex = True
+        self.exportData['flexChild'] = True
+
     def getContents(self):
         return self._slot.get()[1]
 
