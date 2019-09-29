@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Function, Alternative, Forward
+from typed_python import TypeFunction, Function, Alternative, Forward, Dict
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 from nativepython import SpecializedEntrypoint
@@ -220,6 +220,110 @@ class TestAlternativeCompilation(unittest.TestCase):
         c_f = Compiled(f_bytes)
         r2 = c_f(v)
         self.assertEqual(r1, r2)
+
+    def test_compile_alternative_attr(self):
+
+        def A_getattr(self, n):
+            return self.d[n]
+
+        def A_setattr(self, n, v):
+            self.d[n] = v
+
+        def A_delattr(self, n):
+            del self.d[n]
+
+        A = Alternative("A", a={'d': Dict(str, str), 'i': int},
+                        __getattr__=A_getattr,
+                        __setattr__=A_setattr,
+                        __delattr__=A_delattr
+                        )
+
+        def f_getattr1(x: A):
+            return x.q
+
+        def f_getattr2(x: A):
+            return x.z
+
+        def f_setattr1(x: A, s: str):
+            x.q = s
+
+        def f_setattr2(x: A, s: str):
+            x.z = s
+
+        def f_delattr1(x: A):
+            del x.q
+
+        def f_delattr2(x: A):
+            del x.z
+
+        c_getattr1 = Compiled(f_getattr1)
+        c_getattr2 = Compiled(f_getattr2)
+        c_setattr1 = Compiled(f_setattr1)
+        c_setattr2 = Compiled(f_setattr2)
+        c_delattr1 = Compiled(f_delattr1)
+        c_delattr2 = Compiled(f_delattr2)
+        for v in [A.a()]:
+            f_setattr1(v, "0")
+            f_setattr2(v, "0")
+            self.assertEqual(f_getattr1(v), "0")
+            self.assertEqual(f_getattr1(v), c_getattr1(v))
+            self.assertEqual(f_getattr2(v), "0")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            f_setattr1(v, "1")
+            self.assertEqual(f_getattr1(v), "1")
+            self.assertEqual(f_getattr1(v), c_getattr1(v))
+            self.assertEqual(f_getattr2(v), "0")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            c_setattr1(v, "2")
+            self.assertEqual(f_getattr1(v), "2")
+            self.assertEqual(f_getattr1(v), c_getattr1(v))
+            self.assertEqual(f_getattr2(v), "0")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            f_setattr2(v, "3")
+            self.assertEqual(f_getattr1(v), "2")
+            self.assertEqual(f_getattr1(v), c_getattr1(v))
+            self.assertEqual(f_getattr2(v), "3")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            c_setattr2(v, "4")
+            self.assertEqual(f_getattr1(v), "2")
+            self.assertEqual(f_getattr1(v), c_getattr1(v))
+            self.assertEqual(f_getattr2(v), "4")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            f_delattr1(v)
+            # exception types are different
+            with self.assertRaises(KeyError):
+                f_getattr1(v)
+            with self.assertRaises(TypeError):
+                c_getattr1(v)
+            self.assertEqual(f_getattr2(v), "4")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            f_delattr2(v)
+            with self.assertRaises(KeyError):
+                f_getattr1(v)
+            with self.assertRaises(TypeError):
+                c_getattr1(v)
+            with self.assertRaises(KeyError):
+                f_getattr2(v)
+            with self.assertRaises(TypeError):
+                c_getattr2(v)
+            f_setattr1(v, "5")
+            f_setattr2(v, "6")
+            c_delattr1(v)
+            with self.assertRaises(KeyError):
+                f_getattr1(v)
+            with self.assertRaises(TypeError):
+                c_getattr1(v)
+            self.assertEqual(f_getattr2(v), "6")
+            self.assertEqual(f_getattr2(v), c_getattr2(v))
+            c_delattr2(v)
+            with self.assertRaises(KeyError):
+                f_getattr1(v)
+            with self.assertRaises(TypeError):
+                c_getattr1(v)
+            with self.assertRaises(KeyError):
+                f_getattr2(v)
+            with self.assertRaises(TypeError):
+                c_getattr2(v)
 
     def test_compile_alternative_float_methods(self):
         # if __float__ is defined, then floor() and ceil() are based off this conversion,

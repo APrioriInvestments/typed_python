@@ -161,7 +161,7 @@ def dict_remove_key(instance, item, itemHash):
 def dict_delitem(instance, item):
     itemHash = hash(item)
 
-    dict_remove_key(instance, itemHash, item)
+    dict_remove_key(instance, item, itemHash)
 
 
 def dict_getitem(instance, item):

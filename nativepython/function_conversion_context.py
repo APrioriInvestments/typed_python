@@ -900,26 +900,34 @@ class FunctionConversionContext(object):
             a pair of native_ast.Expression and a bool indicating whether control flow
             returns to the caller.
         """
-        expr_contex = ExpressionConversionContext(self, variableStates)
+        expr_context = ExpressionConversionContext(self, variableStates)
 
         if expression.matches.Subscript:
-            slicing = expr_contex.convert_expression_ast(expression.value)
+            slicing = expr_context.convert_expression_ast(expression.value)
             if slicing is None:
-                return expr_contex.finalize(None), False
+                return expr_context.finalize(None), False
 
             # we are assuming this is an index. We ought to be checking this
             # and doing something else if it's a Slice or an Ellipsis or whatnot
-            index = expr_contex.convert_expression_ast(expression.slice.value)
+            index = expr_context.convert_expression_ast(expression.slice.value)
 
             if slicing is None:
-                return expr_contex.finalize(None), False
+                return expr_context.finalize(None), False
 
             res = slicing.convert_delitem(index)
 
-            return expr_contex.finalize(None), res is not None
+            return expr_context.finalize(None), res is not None
+        elif expression.matches.Attribute:
+            slicing = expr_context.convert_expression_ast(expression.value)
+            attr = expression.attr
+            if attr is None:
+                return expr_context.finalize(None), False
+
+            res = slicing.convert_set_attribute(attr, None)
+            return expr_context.finalize(None), res is not None
         else:
-            expr_contex.pushException(Exception, "Can't delete this")
-            return expr_contex.finalize(None), False
+            expr_context.pushException(Exception, "Can't delete this")
+            return expr_context.finalize(None), False
 
     def convert_function_body(self, statements, variableStates: FunctionStackState):
         return self.convert_statement_list_ast(statements, variableStates, toplevel=True)

@@ -380,7 +380,7 @@ int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* att
 
 int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
     if (!attrVal) {
-        std::pair<bool, PyObject*> p = callMethod("__delattr__", attrName, attrVal);
+        std::pair<bool, PyObject*> p = callMethod("__delattr__", attrName);
         if (p.first)
             return 0;
     }

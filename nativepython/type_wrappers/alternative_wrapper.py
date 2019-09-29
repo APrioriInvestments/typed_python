@@ -192,8 +192,8 @@ class AlternativeWrapper(RefcountedWrapper):
                 validIndices.append(i)
 
         if not validIndices:
-            return super().convert_attribute(context, instance, attribute)
-
+            return self.convert_call_method(context, "__getattr__", (instance, context.constant(attribute))) \
+                or super().convert_attribute(context, instance, attribute)
         if len(validIndices) == 1:
             with context.ifelse(instance.nonref_expr.ElementPtrIntegers(0, 1).load().neq(validIndices[0])) as (then, otherwise):
                 with then:
@@ -215,6 +215,13 @@ class AlternativeWrapper(RefcountedWrapper):
                         context.markUninitializedSlotInitialized(output)
 
             return output
+
+    def convert_set_attribute(self, context, instance, attribute, value):
+        if value is None:
+            return self.convert_call_method(context, "__delattr__", (instance, context.constant(attribute))) \
+                or super().convert_set_attribute(context, instance, attribute, value)
+        return self.convert_call_method(context, "__setattr__", (instance, context.constant(attribute), value)) \
+            or super().convert_set_attribute(context, instance, attribute, value)
 
     def convert_check_matches(self, context, instance, typename):
         index = -1
