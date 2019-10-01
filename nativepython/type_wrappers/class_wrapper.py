@@ -326,9 +326,13 @@ class ClassWrapper(RefcountedWrapper):
         if kwargs:
             raise Exception("Can't call methods with keyword args yet.")
 
-        argTypes = [instance.expr_type] + [a.expr_type for a in args]
-
         func = self.typeRepresentation.MemberFunctions[methodName]
+
+        if self.typeRepresentation.IsFinal:
+            # we can sidestep the vtable entirely
+            return typeWrapper(func).convert_call(context, None, [instance] + list(args), kwargs)
+
+        argTypes = [instance.expr_type] + [a.expr_type for a in args]
 
         # each of 'func''s overloads represents one of the functions defined with this name
         # in this class and in its base classes, ordered by the method resolution order.

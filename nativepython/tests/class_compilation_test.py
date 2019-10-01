@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf, Int64, String
+from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf, Int64, String, Final
 import typed_python._types as _types
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
@@ -562,3 +562,35 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(dispatchUp(ChildClass()), ChildClass().f())
         self.assertEqual(dispatchUp(ChildChildClass()), ChildChildClass().f())
+
+    def test_dispatch_with_final_is_fast(self):
+        class BaseClass(Class):
+            def f(self) -> float:
+                return 1.0
+
+        @Final
+        class ChildClass(BaseClass):
+            pass
+
+        @SpecializedEntrypoint
+        def addFs(c, times: int):
+            res = 0.0
+            for t in range(times):
+                res += c.f()
+            return res
+
+        addFs(ChildClass(), 1)
+        addFs(BaseClass(), 1)
+
+        passes = 1e7
+        t0 = time.time()
+        addFs(BaseClass(), passes)
+        t1 = time.time()
+        addFs(ChildClass(), passes)
+        t2 = time.time()
+
+        elapsedDispatch = t1 - t0
+        elapsedNoDispatch = t2 - t1
+        speedup = elapsedDispatch / elapsedNoDispatch
+
+        print(f"speedup is {speedup}. {elapsedNoDispatch} to do {passes} without dispatch.")

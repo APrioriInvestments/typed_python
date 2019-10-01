@@ -33,31 +33,20 @@ class PythonTypedFunctionWrapper(Wrapper):
         return native_ast.Type.Void()
 
     def convert_call(self, context, left, args, kwargs):
-        for a in list(args) + list(kwargs.items()):
-            if not hasattr(a.expr_type.typeRepresentation, '__typed_python_category__'):
-                # we don't know how to push around non-typed-python argument types yet. Eventually we should
-                # defer to the interpreter in these cases.
-                context.pushException(TypeError, "Can't pass arguments of type %s yet" % a.typeRepresentation)
-                return
-
         if kwargs:
             raise NotImplementedError("can't dispatch to native code with kwargs yet as our matcher doesn't understand it")
 
-        f = self.typeRepresentation
+        callTarget = self.compileCall(
+            context.functionContext.converter,
+            None,
+            [a.expr_type for a in args],
+            None
+        )
+        if not callTarget:
+            context.pushException(TypeError, f"Failed to dispatch to {self} with args {args}")
+            return
 
-        for overload in f.overloads:
-            if overload.matchesTypes([a.expr_type.typeRepresentation for a in args]):
-                return context.call_py_function(
-                    overload.functionObj,
-                    args,
-                    kwargs,
-                    overload.returnType
-                )
-
-        context.pushException(TypeError, "No overload for %s with args of type (%s)" % (
-            self.typeRepresentation.__qualname__,
-            ",".join([str(x.expr_type) for x in args])
-        ))
+        return context.call_typed_call_target(callTarget, args, {})
 
     @staticmethod
     def pickCallSignatureToImplement(overload, argTypes):
