@@ -15,6 +15,8 @@
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
 from nativepython.type_wrappers.exceptions import generateThrowException
+from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
+
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
 from typed_python import NoneType, _types, OneOf, PointerTo
@@ -58,76 +60,6 @@ vtable_type = native_ast.Type.Struct(
     ],
     name="VTable"
 )
-
-
-def pickCallSignatureToImplement(overload, name, argTypes):
-    """Pick the actual signature to use when calling 'overload' with 'argTypes'
-
-    We can have a function like f(x: int), where we always know the signature.
-    But for something like f(x), we may need to generate a different signature
-    for each possible 'x' we pass it.
-
-    Args:
-        overload - a typed_python.internal.FunctionOverload
-        name - the name of the function
-        argTypes - a list of typed_python Type objects
-
-    Returns:
-        a typed_python.Function object representing the signature we'll implement
-        for this overload.
-    """
-    argTuples = []
-
-    if len(argTypes) != len(overload.args):
-        raise Exception(f"Signature mismatch; can't call {overload} with {argTypes}")
-
-    for i, arg in enumerate(overload.args):
-        # when choosing the signature we want to generate for a given call signature,
-        # we specialize anything with _no signature at all_, but otherwise take the given
-        # signature. Otherwise, we'd produce an exorbitant number of signatures (for every
-        # possible subtype combination we encounter in code).
-
-        if arg.typeFilter is None:
-            argType = argTypes[i].typeRepresentation
-        else:
-            argType = arg.typeFilter or object
-
-        argTuples.append(
-            (arg.name, argType, arg.defaultValue, arg.isStarArg, arg.isKwarg)
-        )
-
-    return _types.Function(
-        name,
-        overload.returnType or object,
-        None,
-        tuple(argTuples)
-    )
-
-
-def overloadMatchesSignature(overload, argTypes, isExplicit):
-    """Is it possible we could dispatch to FunctionOverload 'overload' with 'argTypes'?
-
-    Returns:
-        True if we _definitely_ match
-        "Maybe" if we might match
-        False if we definitely don't match the arguments.
-    """
-    if not (len(argTypes) == len(overload.args) and not any(x.isStarArg or x.isKwarg for x in overload.args)):
-        return False
-
-    allTrue = True
-    for i in range(len(argTypes)):
-        canConvert = argTypes[i].can_convert_to_type(typeWrapper(overload.args[i].typeFilter or object), isExplicit)
-
-        if canConvert is False:
-            return False
-        elif canConvert == "Maybe":
-            allTrue = False
-
-    if allTrue:
-        return allTrue
-    else:
-        return "Maybe"
 
 
 class ClassWrapper(RefcountedWrapper):
@@ -374,7 +306,7 @@ class ClassWrapper(RefcountedWrapper):
         for isExplicit in [False, True]:
             for o in func.overloads:
                 # check each overload that we might match.
-                mightMatch = overloadMatchesSignature(o, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(o, argTypes, isExplicit)
 
                 if mightMatch is False:
                     return resultTypes
@@ -388,42 +320,6 @@ class ClassWrapper(RefcountedWrapper):
                     return resultTypes
 
         return resultTypes
-
-    @staticmethod
-    def pickSingleOverloadForCall(func, argTypes):
-        """See if there is a single function overload that might match 'argTypes' and nothing else.
-
-        Returns:
-            None, or a tuple (FunctionOverload, explicit) indicating that one single overload
-            is the one version of this function we might match.
-        """
-
-        possibleMaybe = None
-
-        for isExplicit in [False, True]:
-            for o in func.overloads:
-                # check each overload that we might match.
-                mightMatch = overloadMatchesSignature(o, argTypes, isExplicit)
-
-                if mightMatch is False:
-                    pass
-                elif mightMatch is True:
-                    if possibleMaybe is not None:
-                        if possibleMaybe == (o, False) and isExplicit:
-                            return (o, True)
-                        else:
-                            return None
-                    else:
-                        return (o, isExplicit)
-                else:
-                    if possibleMaybe is None:
-                        possibleMaybe = (o, isExplicit)
-                    elif possibleMaybe == (o, False) and isExplicit:
-                        possibleMaybe = (o, isExplicit)
-                    else:
-                        return None
-
-        return possibleMaybe
 
     def convert_method_call(self, context, instance, methodName, args, kwargs):
         # figure out which signature we'd want to use on the given args/kwargs
@@ -456,7 +352,7 @@ class ClassWrapper(RefcountedWrapper):
         # of a base class implementation.
 
         # first, see if there is exacly one possible overload
-        overloadAndIsExplicit = ClassWrapper.pickSingleOverloadForCall(func, argTypes)
+        overloadAndIsExplicit = PythonTypedFunctionWrapper.pickSingleOverloadForCall(func, argTypes)
 
         if overloadAndIsExplicit is not None:
             return self.dispatchToSingleOverload(
@@ -522,7 +418,7 @@ class ClassWrapper(RefcountedWrapper):
 
         for isExplicit in [False, True]:
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = overloadMatchesSignature(overload, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, isExplicit)
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
@@ -587,7 +483,7 @@ class ClassWrapper(RefcountedWrapper):
 
         for isExplicit in [False, True]:
             for overloadIndex, overload in enumerate(func.overloads):
-                mightMatch = overloadMatchesSignature(overload, argTypes, isExplicit)
+                mightMatch = PythonTypedFunctionWrapper.overloadMatchesSignature(overload, argTypes, isExplicit)
 
                 if mightMatch is not False:
                     overloadRetType = overload.returnType or object
@@ -641,7 +537,7 @@ class ClassWrapper(RefcountedWrapper):
             outputVar - a TypedExpression(PointerTo(returnType)) we're supposed to initialize.
             args - the arguments to pass to the method (including the instance)
         """
-        signature = pickCallSignatureToImplement(overload, methodName, [a.expr_type for a in args])
+        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, [a.expr_type for a in args])
 
         argTypes = [a.typeFilter for a in signature.overloads[0].args]
 
@@ -705,7 +601,7 @@ class ClassWrapper(RefcountedWrapper):
         # get the Function object representing this entrypoint as a signature.
         # we specialize on the types in 'argTypes' because we might be specializing
         # a generic method on a specific subtype.
-        signature = pickCallSignatureToImplement(overload, methodName, argTypes)
+        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)
 
         assert len(signature.overloads[0].args) == len(argTypes)
 
@@ -751,7 +647,7 @@ class ClassWrapper(RefcountedWrapper):
         # get the Function object representing this entrypoint as a signature.
         # we specialize on the types in 'argTypes' because we might be specializing
         # a generic method on a specific subtype.
-        signature = pickCallSignatureToImplement(overload, methodName, argTypes)
+        signature = PythonTypedFunctionWrapper.pickCallSignatureToImplement(overload, argTypes)
 
         # each entrypoint generates a slot we could call.
         dispatchSlot = _types.allocateClassMethodDispatch(self.typeRepresentation, methodName, signature)
@@ -819,34 +715,9 @@ class ClassWrapper(RefcountedWrapper):
         # in the inputs and less precise in the outputs.
         pyImpl = implementingClass.MemberFunctions[methodName]
 
-        overloadAndIsExplicit = ClassWrapper.pickSingleOverloadForCall(pyImpl, argTypes)
+        returnType = funcOverload.returnType if funcOverload.returnType is not None else object
 
-        if overloadAndIsExplicit is not None:
-            overload = overloadAndIsExplicit[0]
-
-            # just one overload will do. We can just instantiate this particular function
-            # with a signature that comes from the method overload signature itself.
-            converter.convert(
-                overload.functionObj,
-                argTypes,
-                funcOverload.returnType if funcOverload.returnType is not None else object,
-                callback=callback
-            )
-
-            return True
-
-        outputType = funcOverload.returnType or object
-
-        converter.defineNativeFunction(
-            f'implement_method.{implementingClass}.{interfaceClass}.{methodName}.{argTypes[1:]}',
-            ('implement_method', implementingClass, interfaceClass, methodName, tuple(argTypes[1:])),
-            list(argTypes),
-            outputType,
-            lambda context, outputVar, *args: (
-                typeWrapper(implementingClass).generateMethodImplementation(context, methodName, outputType, args)
-            ),
-            callback=callback
-        )
+        typeWrapper(pyImpl).compileCall(converter, returnType, argTypes, callback)
 
         return True
 
