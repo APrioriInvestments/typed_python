@@ -156,8 +156,6 @@ class PythonTypedFunctionWrapper(Wrapper):
         else:
             return "Maybe"
 
-
-
     @staticmethod
     def pickSingleOverloadForCall(func, argTypes):
         """See if there is a single function overload that might match 'argTypes' and nothing else.

@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import OneOf, ListOf
+from typed_python import OneOf, ListOf, Int32
 from nativepython.runtime import SpecializedEntrypoint
 import unittest
 
@@ -29,3 +29,14 @@ class TestCompilingTypeOperations(unittest.TestCase):
             type(f(10)).ElementType,
             OneOf(None, int)
         )
+
+    def test_stringification_of_type(self):
+        @SpecializedEntrypoint
+        def f(x):
+            return str(type(x))
+
+        def check(T):
+            self.assertEqual(f(T()), str(T))
+
+        for typ in [str, int, Int32, bool, float, type(None), ListOf(int), ListOf(OneOf(int, float))]:
+            check(typ)

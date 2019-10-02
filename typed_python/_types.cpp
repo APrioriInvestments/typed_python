@@ -1864,7 +1864,7 @@ PyInit__types(void)
     PyModule_AddObject(module, "Function", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catFunction)));
     PyModule_AddObject(module, "BoundMethod", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catBoundMethod)));
     PyModule_AddObject(module, "EmbeddedMessage", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
-    PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catEmbeddedMessage)));
+    PyModule_AddObject(module, "PythonObjectOfType", (PyObject*)incref(PyInstance::typeCategoryBaseType(Type::TypeCategory::catPythonObjectOfType)));
 
 
     if (module == NULL)

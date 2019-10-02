@@ -27,6 +27,35 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
     def __str__(self):
         return "TypeObject(%s)" % self.typeRepresentation.Value.__qualname__
 
+    def convert_cast(self, context, instance, targetType):
+        if targetType == typeWrapper(str):
+            typ = self.typedPythonTypeToRegularType(self.typeRepresentation.Value)
+            return context.constant(str(typ))
+
+        return super().convert_call(context, instance, targetType)
+
+    @staticmethod
+    def typedPythonTypeToRegularType(typeRep):
+        """Unwrap a typed_python type back to the normal python representation.
+
+        For things where typed_python has its own internal representation,
+        like Int64 <-> int, we convert back to normal python values.
+        """
+        # internally, we track int, bool, float, and str as Int64, Bool, Float64, etc.
+        # but that's now how python programs would see them. So, we have to convert
+        # to the python object representation of those objects.
+        if typeRep == Int64:
+            return int
+        if typeRep == Float64:
+            return float
+        elif typeRep == Bool:
+            return bool
+        elif typeRep == String:
+            return str
+        elif issubclass(typeRep, PythonObjectOfType):
+            return typeRep.PyType
+        return typeRep
+
     @Wrapper.unwrapOneOfAndValue
     def convert_call(self, context, left, args, kwargs):
         if self.typeRepresentation.Value is type:
@@ -41,21 +70,7 @@ class PythonTypeObjectWrapper(PythonFreeObjectWrapper):
                     type
                 )
             else:
-                typeRep = argtype.typeRepresentation
-
-                # internally, we track int, bool, float, and str as Int64, Bool, Float64, etc.
-                # but that's now how python programs would see them. So, we have to convert
-                # to the python object representation of those objects.
-                if typeRep == Int64:
-                    typeRep = int
-                if typeRep == Float64:
-                    typeRep = float
-                elif typeRep == Bool:
-                    typeRep = bool
-                elif typeRep == String:
-                    typeRep = str
-                elif issubclass(typeRep, PythonObjectOfType):
-                    typeRep = typeRep.PyType
+                typeRep = self.typedPythonTypeToRegularType(argtype.typeRepresentation)
 
                 res = nativepython.python_object_representation.pythonObjectRepresentation(
                     context,
