@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf, Int64, String, Final
+from typed_python import Function, Class, TupleOf, ListOf, Member, OneOf, Int64, Float64, String, Final
 import typed_python._types as _types
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
@@ -608,3 +608,39 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(f(BaseClass(), 0), "int")
         self.assertEqual(f(BaseClass(), 1.0), "float")
+
+    def test_dispatch_with_different_output_types(self):
+        class BaseClass(Class, Final):
+            def f(self, x: int) -> int:
+                return x + 1
+
+            def f(self, x: float) -> float:
+                return x * 2
+
+        def f(x):
+            return BaseClass().f(x)
+
+        self.assertEqual(resultType(f, x=int), Int64)
+        self.assertEqual(resultType(f, x=float), Float64)
+        self.assertEqual(resultType(f, x=OneOf(int, float)), OneOf(float, int))
+        self.assertEqual(resultType(f, x=object), OneOf(float, int))
+
+    def test_dispatch_with_no_specified_output_types(self):
+        class BaseClass(Class):
+            def f(self, x: int):
+                return x + 1
+
+            def f(self, x: float):
+                return x * 2
+
+        class BaseClassFinal(BaseClass, Final):
+            pass
+
+        def f(x):
+            return BaseClass().f(x)
+
+        def fFinal(x):
+            return BaseClassFinal().f(x)
+
+        self.assertEqual(resultType(f, x=OneOf(int, float)).PyType, object)
+        self.assertEqual(resultType(fFinal, x=OneOf(int, float)), OneOf(float, int))

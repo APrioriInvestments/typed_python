@@ -53,6 +53,31 @@ class OneOfWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
+    @staticmethod
+    def mergeTypes(types):
+        """Produce a canonical 'OneOf' type wrapper from all of the arguments.
+
+        If there is only one argument, it will not be a one-of. If there are no arguments,
+        we return None.
+        """
+        allTypes = set()
+        for t in types:
+            if isinstance(t, Wrapper):
+                t = t.typeRepresentation
+
+            if isinstance(t, OneOf):
+                allTypes.update(t.Types)
+            else:
+                allTypes.add(t)
+
+        if not allTypes:
+            return None
+
+        if len(allTypes) == 1:
+            return typeWrapper(list(allTypes)[0])
+
+        return typeWrapper(OneOf(*sorted(allTypes, key=str)))
+
     def unwrap(self, context, expr, generator):
         types = []
         exprs = []
@@ -72,14 +97,10 @@ class OneOfWrapper(Wrapper):
                         typesSeen.add(t)
                         types.append(t)
 
-            if len(types) == 0:
-                # all paths throw exceptions. we're done
-                return None
+            output_type = OneOfWrapper.mergeTypes(types)
 
-            if len(types) == 1:
-                output_type = types[0]
-            else:
-                output_type = typeWrapper(OneOf(*[t.typeRepresentation for t in types]))
+            if output_type is None:
+                return None
 
             out_slot = context.allocateUninitializedSlot(output_type)
 
