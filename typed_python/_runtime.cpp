@@ -170,6 +170,7 @@ extern "C" {
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
+        decref(r);
         return StringType::createFromUtf8(c, s);
     }
 
@@ -188,6 +189,7 @@ extern "C" {
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
+        decref(r);
         return StringType::createFromUtf8(c, s);
     }
 
@@ -222,8 +224,10 @@ extern "C" {
         }
         PyObject* contains = PyObject_GetAttrString(o, "__contains__");
         if (!contains) {
+            decref(contains);
             return 0;
         }
+        decref(contains);
         return 1;
     }
 
@@ -713,12 +717,12 @@ extern "C" {
 
     ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
-        PyObject *o = PyInstance::extractPythonObject(i, tp);
+        PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
+        PyObjectStealer dir(PyObject_Dir(o));
         ListOfType *retType = ListOfType::Make(StringType::Make());
         ListOfType::layout* ret = 0;
-        instance_ptr data = (instance_ptr)&ret;
 
-        PyInstance::copyConstructFromPythonInstance(retType, data, PyObject_Dir(o), true);
+        PyInstance::copyConstructFromPythonInstance(retType, (instance_ptr)&ret, dir, true);
 
         return ret;
     }

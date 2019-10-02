@@ -19,6 +19,7 @@ from nativepython import SpecializedEntrypoint
 import unittest
 import pytest
 import time
+import psutil
 from math import trunc, floor, ceil
 
 
@@ -419,6 +420,18 @@ class TestAlternativeCompilation(unittest.TestCase):
             r1 = f(A.a())
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
+
+        c0 = Compiled(f_dir0)
+        c = Compiled(f_dir)
+        initMem = psutil.Process().memory_info().rss / 1024 ** 2
+
+        for i in range(10000):
+            c0(A0.a(i))
+            c(A.a(i))
+
+        finalMem = psutil.Process().memory_info().rss / 1024 ** 2
+
+        self.assertTrue(finalMem < initMem + 2)
 
     def test_compile_alternative_magic_methods(self):
 
