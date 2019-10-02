@@ -239,8 +239,9 @@ public:
     base classes we might masquerade as.
     *****/
 
-    void finalize(ClassDispatchTable* dispatchers) {
+    void finalize(ClassDispatchTable* dispatchers, long inInitializationBitByteCount) {
         mDispatchTables = dispatchers;
+        mInitializationBitByteCount = inInitializationBitByteCount;
     }
 
     void installDestructor(destructor_fun_type fun) {
@@ -265,6 +266,11 @@ public:
     // by index using the top 16 bits of the class pointer.
 
     ClassDispatchTable* mDispatchTables;
+
+    // the number of bytes of initialization bits. We have to keep track of how many
+    // members are in this particular layout, so that we know how far ahead to look in
+    // the object when we are looking up a particular data member.
+    int64_t mInitializationBitByteCount;
 };
 
 typedef VTable* vtable_ptr;
@@ -640,7 +646,7 @@ public:
             ancestor->m_implementors.insert(this);
         }
 
-        m_vtable->finalize(&mClassDispatchTables[0]);
+        m_vtable->finalize(&mClassDispatchTables[0], (m_members.size() + 7) / 8);
 
         // make sure that, for every interface we can take on, we have slots allocated
         // that the compiler can come along and compile.

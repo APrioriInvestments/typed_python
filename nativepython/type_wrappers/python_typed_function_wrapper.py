@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 
-from typed_python import PointerTo, _types, OneOf
+from typed_python import PointerTo, _types
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.one_of_wrapper import OneOfWrapper
 import nativepython.native_ast as native_ast
@@ -194,7 +194,6 @@ class PythonTypedFunctionWrapper(Wrapper):
                         return returnTypes
 
         return returnTypes
-
 
     @staticmethod
     def pickSingleOverloadForCall(func, argTypes):

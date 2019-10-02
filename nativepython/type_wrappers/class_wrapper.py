@@ -56,7 +56,8 @@ vtable_type = native_ast.Type.Struct(
     element_types=[
         ('heldTypePtr', native_ast.VoidPtr),
         ('destructorFun', native_destructor_function_type),
-        ('classDispatchTable', class_dispatch_table_type.pointer())
+        ('classDispatchTable', class_dispatch_table_type.pointer()),
+        ('initializationBitsBytecount', native_ast.Int64)
     ],
     name="VTable"
 )
@@ -80,9 +81,9 @@ class ClassWrapper(RefcountedWrapper):
 
         # this follows the general layout of 'held class' which is 1 bit per field for initialization and then
         # each field packed directly according to byte size
-        byteOffset = self.BYTES_BEFORE_INIT_BITS + (len(self.classType.MemberNames) // 8 + 1)
+        self.bytesOfInitBits = (len(self.classType.MemberNames) + 7) // 8
 
-        self.bytesOfInitBits = byteOffset - self.BYTES_BEFORE_INIT_BITS
+        byteOffset = 0
 
         for i, name in enumerate(self.classType.MemberNames):
             self.nameToIndex[name] = i
@@ -181,6 +182,23 @@ class ClassWrapper(RefcountedWrapper):
             .cast(self.layoutType)
         )
 
+    def bytesOfInitBitsForInstance(self, instance):
+        if self.typeRepresentation.IsFinal:
+            # if we're final, there are no subclasses, so we can be confident
+            # we know the number of bits in the layout
+            return native_ast.const_uint64_expr(self.bytesOfInitBits)
+        else:
+            return (
+                self.get_layout_pointer(instance.nonref_expr)
+                # get a pointer to the vtable
+                .ElementPtrIntegers(0, 1)
+                # load it
+                .load()
+                # get a pointer to the initializer flag area bytecount
+                .ElementPtrIntegers(0, 3)
+                .load()
+            )
+
     def get_refcount_ptr_expr(self, nonref_expr):
         """Return a pointer to the object's refcount. Subclasses can override.
 
@@ -236,7 +254,9 @@ class ClassWrapper(RefcountedWrapper):
         return (
             self.get_layout_pointer(instance.nonref_expr)
             .cast(native_ast.UInt8.pointer())
+            .elemPtr(self.bytesOfInitBitsForInstance(instance))
             .ElementPtrIntegers(self.indexToByteOffset[ix])
+            .ElementPtrIntegers(self.BYTES_BEFORE_INIT_BITS)
             .cast(
                 typeWrapper(self.typeRepresentation.MemberTypes[ix])
                 .getNativeLayoutType()

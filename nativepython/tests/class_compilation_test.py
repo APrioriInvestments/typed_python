@@ -594,12 +594,14 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         print(f"speedup is {speedup}. {elapsedNoDispatch} to do {passes} without dispatch.")
 
+        self.assertGreater(speedup, 1.5)
+
     def test_dispatch_with_different_types(self):
         class BaseClass(Class, Final):
             def f(self, x: int) -> str:
                 return "int"
 
-            def f(self, y: float) -> str:
+            def f(self, y: float) -> str:  # noqa
                 return "float"
 
         @Compiled
@@ -614,7 +616,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, x: int) -> int:
                 return x + 1
 
-            def f(self, x: float) -> float:
+            def f(self, x: float) -> float:  # noqa
                 return x * 2
 
         def f(x):
@@ -630,7 +632,7 @@ class TestClassCompilationCompilation(unittest.TestCase):
             def f(self, x: int):
                 return x + 1
 
-            def f(self, x: float):
+            def f(self, x: float):  # noqa
                 return x * 2
 
         class BaseClassFinal(BaseClass, Final):
@@ -644,3 +646,70 @@ class TestClassCompilationCompilation(unittest.TestCase):
 
         self.assertEqual(resultType(f, x=OneOf(int, float)).PyType, object)
         self.assertEqual(resultType(fFinal, x=OneOf(int, float)), OneOf(float, int))
+
+    def test_classes_with_lots_of_members(self):
+        class BaseClass(Class):
+            x00 = Member(int)
+            x01 = Member(int)
+            x02 = Member(int)
+            x03 = Member(int)
+            x04 = Member(int)
+            x05 = Member(int)
+            x06 = Member(int)
+            x07 = Member(int)
+
+        class ChildClass(BaseClass):
+            x10 = Member(int)
+            x11 = Member(int)
+            x12 = Member(int)
+            x13 = Member(int)
+            x14 = Member(int)
+            x15 = Member(int)
+            x16 = Member(int)
+            x17 = Member(int)
+
+        @Compiled
+        def f(c: BaseClass):
+            return c.x02
+
+        c = BaseClass()
+        c.x02 = 10
+        self.assertEqual(f(c), 10)
+
+        c = ChildClass()
+        c.x02 = 10
+        self.assertEqual(f(c), 10)
+
+    def test_class_member_perf_with_final(self):
+        class BaseClass(Class):
+            x0 = Member(float)
+
+        class ChildClass(BaseClass, Final):
+            pass
+
+        @Compiled
+        def sumX0(x: BaseClass, t: int):
+            res = 0.0
+            for i in range(t):
+                res += x.x0
+            return res
+
+        @Compiled
+        def sumX0Child(x: ChildClass, t: int):
+            res = 0.0
+            for i in range(t):
+                res += x.x0
+            return res
+
+        passes = 1e7
+        t0 = time.time()
+        sumX0(BaseClass(), passes)
+        t1 = time.time()
+        sumX0Child(ChildClass(), passes)
+        t2 = time.time()
+
+        elapsedDispatch = t1 - t0
+        elapsedNoDispatch = t2 - t1
+        speedup = elapsedDispatch / elapsedNoDispatch
+
+        self.assertTrue(.8 < speedup < 1.2, speedup)
