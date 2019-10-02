@@ -32,13 +32,13 @@ object = object
 type = type
 
 
-def Final(classType):
-    """Given a class type, make it 'Final'.
+class Final:
+    """Mixin to make a class type 'Final'.
 
     Final classes can't be subclassed, but generate faster code because
     we don't have to look up method dispatch in the vtable.
     """
-    return typed_python._types.makeClassFinal(classType)
+    pass
 
 
 class Member:
@@ -141,7 +141,10 @@ class ClassMetaclass(type):
             return type.__new__(cls, name, bases, namespace.ns, **kwds)
 
         members = []
-        bases = [x for x in bases if x is not typed_python._types.Class]
+        isFinal = Final in bases
+
+        bases = [x for x in bases if x is not typed_python._types.Class and x is not Final]
+
         memberFunctions = {}
         staticFunctions = {}
         classMembers = []
@@ -177,6 +180,7 @@ class ClassMetaclass(type):
         actualClass = actualClass.define(typed_python._types.Class(
             name,
             tuple(bases),
+            isFinal,
             tuple(members),
             tuple(memberFunctions.items()),
             tuple(staticFunctions.items()),

@@ -331,23 +331,6 @@ public:
 
     bool _updateAfterForwardTypesChanged();
 
-    HeldClass* asFinal() {
-        if (m_is_final) {
-            return this;
-        }
-
-        return Make(
-            m_name,
-            m_bases,
-            true,
-            m_own_members,
-            m_memberFunctions,
-            m_staticFunctions,
-            m_propertyFunctions,
-            m_classMembers
-        );
-    }
-
     static HeldClass* Make(
             std::string inName,
             const std::vector<HeldClass*>& bases,
