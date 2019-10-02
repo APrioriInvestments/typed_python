@@ -48,6 +48,7 @@ class Component {
         this.validateProps();
 
         // Bind context to methods
+        this.toString = this.toString.bind(this);
         this.getReplacementElementFor = this.getReplacementElementFor.bind(this);
         this.getReplacementElementsFor = this.getReplacementElementsFor.bind(this);
         this.getDOMElement = this.getDOMElement.bind(this);
@@ -254,6 +255,13 @@ class Component {
      */
     get name(){
         return this.constructor.name;
+    }
+
+    /**
+     * Override default string representation
+     */
+    toString(){
+        return `${this.name} [${this.props.id}]`;
     }
 
     /**

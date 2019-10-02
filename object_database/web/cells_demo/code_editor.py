@@ -22,9 +22,9 @@ class CodeEditorDemo(CellsTestPage):
     def cell(self):
         isShown = cells.Slot(False)
 
-        return cells.Button("Toggle the editor", lambda: isShown.set(not isShown.get())) + cells.Subscribed(
+        return cells.Button("Toggle the editor", lambda: isShown.set(not isShown.get())) + cells.Flex(cells.Subscribed(
             lambda: cells.CodeEditor() if isShown.get() else None
-        )
+        ))
 
     def text(self):
         return "You should see a button that lets you see a text editor."
@@ -40,22 +40,19 @@ class CodeEditorInHorizSequence(CellsTestPage):
             contents.set(buffer)
 
         def toggle(aSlot):
-            print("Toggling")
-            print(aSlot.get())
             aSlot.toggle()
-            print(aSlot.get())
 
         return (
             cells.Button("Show the editor", lambda: toggle(editorShown)) +
             cells.Button("Show the editor's contents", lambda: toggle(contentsShown)) +
-            cells.HorizontalSubscribedSequence(lambda:
+            cells.Flex(cells.HorizontalSubscribedSequence(lambda:
                 (["Ed"] if editorShown.get() else []) +
                 (["Contents"] if contentsShown.get() else []),
                 lambda which:
                     cells.CodeEditor(onTextChange=onTextChange) if which == "Ed" else
                     cells.Subscribed(lambda: contents.get()) if which == "Contents" else
                     None
-            )
+            ))
         )
 
     def text(self):
