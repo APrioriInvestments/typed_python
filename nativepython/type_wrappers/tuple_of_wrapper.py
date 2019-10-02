@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -138,7 +138,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             runtime_functions.free.call(inst.nonref_expr.cast(native_ast.UInt8Ptr))
         )
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
             if op.matches.Add:
                 return context.push(
@@ -167,7 +167,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             if op.matches.GtE:
                 return context.call_py_function(tuple_compare_gte, (left, right), {})
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_attribute(self, context, expr, attr):
         if attr == '_hash_cache':

@@ -539,7 +539,7 @@ class DictWrapper(DictWrapperBase):
     def convert_len(self, context, expr):
         return context.pushPod(int, self.convert_len_native(expr))
 
-    def convert_bin_op_reverse(self, context, left, op, right):
+    def convert_bin_op_reverse(self, context, left, op, right, inplace):
         if op.matches.In or op.matches.NotIn:
             right = right.convert_to_type(self.keyType)
             if right is None:
@@ -551,7 +551,7 @@ class DictWrapper(DictWrapperBase):
                 {}
             )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getkey_by_index_unsafe(self, context, expr, item):
         return context.pushReference(

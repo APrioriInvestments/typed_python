@@ -14,7 +14,7 @@
 
 import nativepython
 
-from typed_python import _types, String
+from typed_python import _types, String, ListOf
 from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.native_ast import VoidPtr
@@ -198,9 +198,22 @@ class Wrapper(object):
             generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
         )
 
-    def convert_builtin(f, self, context, expr, a1=None):
+    def convert_builtin(self, f, context, expr, a1=None):
+        if f is dir and a1 is None:
+            tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+            if tp:
+                if not expr.isReference:
+                    expr = context.push(expr.expr_type, lambda x: x.convert_copy_initialize(expr))
+                retT = ListOf(str)
+                return context.push(
+                    typeWrapper(retT),
+                    lambda Ref: Ref.expr.store(
+                        runtime_functions.np_dir.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(retT).layoutType)
+                    )
+                )
+
         return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't take '%s' of instance of type '%s'" % (str(f), str(self))))
+            generateThrowException(context, TypeError("Can't compile '%s' on instance of type '%s'" % (str(f), str(self))))
         )
 
     def convert_repr(self, context, expr):
@@ -283,10 +296,10 @@ class Wrapper(object):
 
         return context.constant(False)
 
-    def convert_bin_op(self, context, l, op, r):
-        return r.expr_type.convert_bin_op_reverse(context, r, op, l)
+    def convert_bin_op(self, context, l, op, r, inplace):
+        return r.expr_type.convert_bin_op_reverse(context, r, op, l, inplace)
 
-    def convert_bin_op_reverse(self, context, r, op, l):
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.Is:
             return context.constant(False)
 

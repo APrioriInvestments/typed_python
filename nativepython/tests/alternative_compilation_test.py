@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -12,11 +12,12 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Function, Alternative, Forward, Dict
+from typed_python import TypeFunction, Function, Alternative, Forward, Dict, ListOf
 import typed_python._types as _types
 from nativepython.runtime import Runtime
 from nativepython import SpecializedEntrypoint
 import unittest
+import pytest
 import time
 from math import trunc, floor, ceil
 
@@ -383,7 +384,44 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(B.a())
             self.assertEqual(r1, r2)
 
+    def test_compile_dir(self):
+        # The interpreted dir() calls __dir__() and sorts the result.
+        # I expected the compiled dir() to do the same thing, but it doesn't sort.
+        # So if you append these elements out of order, the test will fail.
+
+        A0 = Alternative("A", a={'a': int}, b={'b': str})
+
+        def A_dir(self):
+            x = ListOf(str)()
+            x.append("x")
+            x.append("y")
+            x.append("z")
+            return x
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __dir__=A_dir,
+                        )
+
+        def f_dir0(x: A0):
+            return dir(x)
+
+        def f_dir(x: A):
+            return dir(x)
+
+        for f in [f_dir0]:
+            compiled_f = Compiled(f)
+            r1 = f(A0.a())
+            r2 = compiled_f(A0.a())
+            self.assertEqual(r1, r2)
+
+        for f in [f_dir]:
+            compiled_f = Compiled(f)
+            r1 = f(A.a())
+            r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)
+
     def test_compile_alternative_magic_methods(self):
+
         A = Alternative("A", a={'a': int}, b={'b': str},
                         __bool__=lambda self: False,
                         __str__=lambda self: "my str",
@@ -393,6 +431,10 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __contains__=lambda self, item: item == 1,
                         __bytes__=lambda self: b'my bytes',
                         __format__=lambda self, spec: "my format",
+
+                        __int__=lambda self: 43,
+                        __float__=lambda self: 44.44,
+                        __complex__=lambda self: 3+4j,
 
                         __add__=lambda self, other: A.b("add"),
                         __sub__=lambda self, other: A.b("sub"),
@@ -430,9 +472,6 @@ class TestAlternativeCompilation(unittest.TestCase):
                         __abs__=lambda self: A.b("abs"),
                         )
 
-        def f_extramethod(x: A):
-            return x.extramethod()
-
         def f_bool(x: A):
             return bool(x)
 
@@ -454,11 +493,11 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_len(x: A):
             return len(x)
 
-        def f_bytes(x: A):
-            return bytes(x)
+        def f_int(x: A):
+            return int(x)
 
-        def f_format(x: A):
-            return format(x)
+        def f_float(x: A):
+            return float(x)
 
         def f_add(x: A):
             return x + A.a()
@@ -563,18 +602,32 @@ class TestAlternativeCompilation(unittest.TestCase):
             x **= A.a()
             return x
 
-        test_cases = [f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
+        test_cases = [f_int, f_float, f_bool, f_str, f_repr, f_call, f_0in, f_1in, f_len,
                       f_add, f_sub, f_mul, f_div, f_floordiv, f_matmul, f_mod, f_and, f_or, f_xor, f_rshift, f_lshift, f_pow,
-                      f_neg, f_pos, f_invert, f_abs]
-        # These fail:
-        #   failing_test_cases = [f_bytes, f_format
-        # These fail when compiling, because python_ast and native_ast have no representation of in-place operators:
-        #   failing_test_cases = [f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
-        #                         f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]
+                      f_neg, f_pos, f_invert, f_abs,
+                      f_iadd, f_isub, f_imul, f_idiv, f_ifloordiv, f_imatmul,
+                      f_imod, f_iand, f_ior, f_ixor, f_irshift, f_ilshift, f_ipow]
 
         for f in test_cases:
             compiled_f = Compiled(f)
             r1 = f(A.a())
+            r2 = compiled_f(A.a())
+            self.assertEqual(r1, r2)
+
+    @pytest.mark.skip(reason="not supported yet")
+    def test_compile_alternative_reverse_methods(self):
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __radd__=lambda self, other: A.b("radd")
+                        )
+
+        def f_radd(x: A):
+            return 1 + x
+
+        test_cases = [f_radd]
+        for f in test_cases:
+            r1 = f(A.a())
+            compiled_f = Compiled(f)
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
 
@@ -650,7 +703,6 @@ class TestAlternativeCompilation(unittest.TestCase):
         def f_ge(x: C):
             return x >= C.a()
 
-        # Note: hash is not overridden by method __hash__ in compiled or interpreted case
         def f_hash(x: C):
             return hash(x)
 

@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -438,7 +438,7 @@ class FunctionConversionContext(object):
                 if slot_ref is None:
                     return False
 
-                val_to_store = slot_ref.convert_bin_op(op, val_to_store)
+                val_to_store = slot_ref.convert_bin_op(op, val_to_store, True)
 
                 if val_to_store is None:
                     return False
@@ -466,7 +466,7 @@ class FunctionConversionContext(object):
                 if getItem is None:
                     return False
 
-                val_to_store = getItem.convert_bin_op(op, val_to_store)
+                val_to_store = getItem.convert_bin_op(op, val_to_store, True)
                 if val_to_store is None:
                     return False
 
@@ -482,7 +482,7 @@ class FunctionConversionContext(object):
                 if input_val is None:
                     return False
 
-                val_to_store = input_val.convert_bin_op(op, val_to_store)
+                val_to_store = input_val.convert_bin_op(op, val_to_store, True)
                 if val_to_store is None:
                     return False
 

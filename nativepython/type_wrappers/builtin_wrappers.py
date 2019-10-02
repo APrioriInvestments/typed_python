@@ -9,7 +9,7 @@
 #   Unless required by applicable law or agreed to in writing, software
 #   distributed under the License is distributed on an "AS IS" BASIS,
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#   See the License for the specific language governing permissions and
+#   See the License for the specific language governing permissions and:w
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
@@ -22,7 +22,7 @@ class BuiltinWrapper(Wrapper):
     is_pod = True
     is_empty = False
     is_pass_by_ref = False
-    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, bytes)
+    SUPPORTED_FUNCTIONS = (round, trunc, floor, ceil, format, bytes, dir)
 
     def __init__(self, builtin):
         assert builtin in self.SUPPORTED_FUNCTIONS

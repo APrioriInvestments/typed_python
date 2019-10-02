@@ -710,5 +710,17 @@ extern "C" {
     PyObject* nativepython_runtime_complex(double r, double i) {
         return PyComplex_FromDoubles(r, i);
     }
+
+    ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
+        PyEnsureGilAcquired acquireTheGil;
+        PyObject *o = PyInstance::extractPythonObject(i, tp);
+        ListOfType *retType = ListOfType::Make(StringType::Make());
+        ListOfType::layout* ret = 0;
+        instance_ptr data = (instance_ptr)&ret;
+
+        PyInstance::copyConstructFromPythonInstance(retType, data, PyObject_Dir(o), true);
+
+        return ret;
+    }
 }
 

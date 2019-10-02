@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ class StringWrapper(RefcountedWrapper):
         assert instance.isReference
         return runtime_functions.free.call(instance.nonref_expr.cast(native_ast.UInt8Ptr))
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
             if op.matches.Eq or op.matches.NotEq or op.matches.Lt or op.matches.LtE or op.matches.GtE or op.matches.Gt:
                 if op.matches.Eq:
@@ -129,7 +129,7 @@ class StringWrapper(RefcountedWrapper):
                     )
                 )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, expr, item):
         item = item.toInt64()

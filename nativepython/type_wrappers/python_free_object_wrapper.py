@@ -38,14 +38,14 @@ class PythonFreeObjectWrapper(Wrapper):
     def getCompileTimeConstant(self):
         return self.typeRepresentation.Value
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == self:
             if op.matches.Eq or op.matches.Is:
                 return context.constant(True)
             if op.matches.NotEq or op.matches.IsNot:
                 return context.constant(False)
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_call(self, context, left, args, kwargs):
         if all([x.expr_type.is_compile_time_constant for x in list(args) + list(kwargs.values())]):

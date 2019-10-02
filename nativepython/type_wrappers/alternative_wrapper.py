@@ -14,7 +14,7 @@
 
 from nativepython.type_wrappers.wrapper import Wrapper
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
-from nativepython.type_wrappers.arithmetic_wrapper import FloatWrapper
+from nativepython.type_wrappers.arithmetic_wrapper import FloatWrapper, IntWrapper
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 
 from typed_python import NoneType, _types, OneOf, Bool, Int32
@@ -251,6 +251,12 @@ class AlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
+        if isinstance(target_type, IntWrapper):
+            y = self.convert_call_method(context, "__int__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
+
         if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
@@ -275,8 +281,7 @@ class AlternativeWrapper(RefcountedWrapper):
         return self.convert_call_method(context, "__abs__", (expr,))
 
     def convert_builtin(self, f, context, expr, a1=None):
-        if f is bytes:
-            return self.convert_call_method(context, "__bytes__", (expr, ))
+        # handle builtins with additional arguments here:
         if f is format:
             if a1 is not None:
                 return self.convert_call_method(context, "__format__", (expr, a1))
@@ -297,6 +302,11 @@ class AlternativeWrapper(RefcountedWrapper):
                         float,
                         runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
                 )
+        if a1 is not None:
+            return None
+        # handle builtins with no additional arguments here:
+        if f is bytes:
+            return self.convert_call_method(context, "__bytes__", (expr, ))
         if f is trunc:
             return self.convert_call_method(context, "__trunc__", (expr,)) \
                 or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
@@ -306,8 +316,12 @@ class AlternativeWrapper(RefcountedWrapper):
         if f is ceil:
             return self.convert_call_method(context, "__ceil__", (expr,)) \
                 or context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr))
+        if f is complex:
+            return self.convert_call_method(context, "__complex__", (expr, ))
+        if f is dir:
+            return self.convert_call_method(context, "__dir__", (expr, )) \
+                or super().convert_builtin(f, context, expr)
 
-        # should never reach this point
         return None
 
     def convert_unary_op(self, context, expr, op):
@@ -318,7 +332,7 @@ class AlternativeWrapper(RefcountedWrapper):
             ""
         return self.convert_call_method(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
 
-    def convert_bin_op(self, context, l, op, r):
+    def convert_bin_op(self, context, l, op, r, inplace):
         magic = "__add__" if op.matches.Add else \
             "__sub__" if op.matches.Sub else \
             "__mul__" if op.matches.Mult else \
@@ -340,9 +354,12 @@ class AlternativeWrapper(RefcountedWrapper):
             "__ge__" if op.matches.GtE else \
             ""
 
+        if magic and inplace:
+            magic = '__i' + magic[2:]
+
         return self.convert_call_method(context, magic, (l, r)) \
             or self.convert_comparison(context, l, op, r) \
-            or super().convert_bin_op(context, l, op, r)
+            or super().convert_bin_op(context, l, op, r, inplace)
 
     # Default comparison for Alternative types
     # returns None if no comparison is possible (if op is not a comparison operator to begin with,
@@ -371,11 +388,11 @@ class AlternativeWrapper(RefcountedWrapper):
             )
         return None
 
-    def convert_bin_op_reverse(self, context, r, op, l):
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
         if op.matches.In:
             ret = self.convert_call_method(context, "__contains__", (r, l))
             return ret and ret.toBool()
-        return super().convert_bin_op_reverse(context, r, op, l)
+        return super().convert_bin_op_reverse(context, r, op, l, inplace)
 
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):

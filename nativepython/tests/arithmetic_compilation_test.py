@@ -300,8 +300,8 @@ class TestArithmeticCompilation(unittest.TestCase):
             def f_format(x: T):
                 return format(x)
 
-            # not_tested_yet = [f_int, f_float, f_complex]
-            ops = [f_format, f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
+            # not_tested_yet = [f_complex]
+            ops = [f_int, f_float, f_format, f_round0, f_round1, f_round2, f_round_1, f_round_2, f_trunc, f_floor, f_ceil]
             for op in ops:
                 c_op = Compiled(op)
                 for v in suitable_range(T):

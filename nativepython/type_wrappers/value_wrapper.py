@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -64,9 +64,9 @@ class ValueWrapper(Wrapper):
     def convert_destroy(self, context, instance):
         pass
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         """Apply a binary operator to a Value and something else."""
         return context.constant(self.typeRepresentation.Value).convert_bin_op(op, right)
 
-    def convert_bin_op_reverse(self, context, left, op, right):
+    def convert_bin_op_reverse(self, context, left, op, right, inplace):
         return right.convert_bin_op(op, context.constant(self.typeRepresentation.Value))

@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -88,7 +88,7 @@ class PointerToWrapper(Wrapper):
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Add:
             right = right.toInt64()
             if right is None:
@@ -129,7 +129,7 @@ class PointerToWrapper(Wrapper):
         if op.matches.NotEq and right.expr_type == left.expr_type:
             return context.pushPod(bool, left.nonref_expr.cast(native_ast.Int64).neq(right.nonref_expr.cast(native_ast.Int64)))
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:

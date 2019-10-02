@@ -650,3 +650,10 @@ np_complex = externalCallTarget(
     Float64,
     Float64
 )
+
+np_dir = externalCallTarget(
+    "nativepython_runtime_dir",
+    Void.pointer(),
+    Void.pointer(),
+    UInt64
+)

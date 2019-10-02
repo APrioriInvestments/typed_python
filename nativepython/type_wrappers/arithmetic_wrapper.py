@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -243,7 +243,7 @@ class IntWrapper(ArithmeticTypeWrapper):
 
         return super().convert_unary_op(context, left, op)
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Div:
             T = toWrapper(
                 computeArithmeticBinaryResultType(
@@ -278,7 +278,7 @@ class IntWrapper(ArithmeticTypeWrapper):
 
                 return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
 
-            return super().convert_bin_op(context, left, op, right)
+            return super().convert_bin_op(context, left, op, right, inplace)
 
         if op.matches.Mod:
             if left.expr_type.typeRepresentation.IsSignedInt:
@@ -377,7 +377,7 @@ class IntWrapper(ArithmeticTypeWrapper):
             )
 
         # we must have a bad binary operator
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
 
 class BoolWrapper(ArithmeticTypeWrapper):
@@ -451,7 +451,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
         return super().convert_unary_op(context, left, op)
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if op.matches.Is and right.expr_type == self:
             op = python_ast.ComparisonOp.Eq()
 
@@ -481,7 +481,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
 
                 return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
 
-            return super().convert_bin_op(context, left, op, right)
+            return super().convert_bin_op(context, left, op, right, inplace)
 
         if right.expr_type == left.expr_type:
             if op.matches.BitOr or op.matches.BitAnd or op.matches.BitXor:
@@ -504,7 +504,7 @@ class BoolWrapper(ArithmeticTypeWrapper):
                 )
             )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
 
 class FloatWrapper(ArithmeticTypeWrapper):
@@ -613,7 +613,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
 
         return super().convert_unary_op(context, left, op)
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type != self:
             if isinstance(right.expr_type, ArithmeticTypeWrapper):
                 if op.matches.Pow:
@@ -626,7 +626,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
                         )
                     )
                 return left.convert_to_type(promoteType).convert_bin_op(op, right.convert_to_type(promoteType))
-            return super().convert_bin_op(context, left, op, right)
+            return super().convert_bin_op(context, left, op, right, inplace)
 
         if op.matches.Mod:
             # TODO: might define mod_float32_float32 instead of doing these conversions
@@ -685,4 +685,4 @@ class FloatWrapper(ArithmeticTypeWrapper):
                 )
             )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)

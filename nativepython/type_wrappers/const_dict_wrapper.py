@@ -1,4 +1,4 @@
-#   Coyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 Nativepython Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -275,7 +275,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
             ).cast(self.valueType.getNativeLayoutType().pointer())
         )
 
-    def convert_bin_op(self, context, left, op, right):
+    def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:
             if op.matches.Eq:
                 return context.call_py_function(const_dict_eq, (left, right), {})
@@ -290,9 +290,9 @@ class ConstDictWrapper(ConstDictWrapperBase):
             if op.matches.GtE:
                 return context.call_py_function(const_dict_gte, (left, right), {})
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
-    def convert_bin_op_reverse(self, context, left, op, right):
+    def convert_bin_op_reverse(self, context, left, op, right, inplace):
         if op.matches.In or op.matches.NotIn:
             right = right.convert_to_type(self.keyType)
             if right is None:
@@ -304,7 +304,7 @@ class ConstDictWrapper(ConstDictWrapperBase):
                 {}
             )
 
-        return super().convert_bin_op(context, left, op, right)
+        return super().convert_bin_op(context, left, op, right, inplace)
 
     def convert_getitem(self, context, instance, item):
         item = item.convert_to_type(self.keyType)
