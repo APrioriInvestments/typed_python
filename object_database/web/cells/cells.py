@@ -1049,7 +1049,6 @@ class CollapsiblePanel(Cell):
 
     def sortsAs(self):
         return self.content.sortsAs()
-
     def recalculate(self):
         expanded = self.evaluateWithDependencies(self.isExpanded)
         self.exportData['isExpanded'] = expanded
@@ -1842,10 +1841,11 @@ class SubscribedSequence(Cell):
             children.append(child)
         elif self.childWrapsOwnKind(child):
             # In this case the child is a Subscribed
-            # wrapping a Sequence or Horizontal Sequence.
+            # wrapping a Sequence, Horizontal Sequence,
+            # or SubscribedSequence of some kind.
             # In this case, we need to flatten its elements.
             # Note that only matching orientations flatten.
-            children += child.namedChildren['elements']
+            children += child.namedChildren['content'].namedChildren['elements']
         else:
             children.append(child)
 
