@@ -170,8 +170,9 @@ extern "C" {
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
+        StringType::layout *ret = StringType::createFromUtf8(c, s);
         decref(r);
-        return StringType::createFromUtf8(c, s);
+        return ret;
     }
 
     StringType::layout* nativepython_runtime_str(instance_ptr inst, Type* tp) {
@@ -189,8 +190,9 @@ extern "C" {
         }
         Py_ssize_t s;
         const char* c = PyUnicode_AsUTF8AndSize(r, &s);
+        StringType::layout* ret =StringType::createFromUtf8(c, s);
         decref(r);
-        return StringType::createFromUtf8(c, s);
+        return ret;
     }
 
     uint64_t nativepython_runtime_len(instance_ptr inst, Type* tp) {
@@ -224,11 +226,11 @@ extern "C" {
         }
         PyObject* contains = PyObject_GetAttrString(o, "__contains__");
         if (!contains) {
-            decref(contains);
             return 0;
         }
+        int ret = PyObject_IsTrue(contains);
         decref(contains);
-        return 1;
+        return ret;
     }
 
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
