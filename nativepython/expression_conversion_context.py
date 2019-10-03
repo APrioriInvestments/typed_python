@@ -83,6 +83,8 @@ class ExpressionConversionContext(object):
             return TypedExpression(self, native_ast.const_int32_expr(int(x)), Int32, False)
         if isinstance(x, float):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False)
+        if x is None:
+            return TypedExpression(self, native_ast.nullExpr, type(None), False)
         assert False
 
     def pushVoid(self, t=None):

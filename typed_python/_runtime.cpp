@@ -14,6 +14,10 @@ const char* nativepython_runtime_get_stashed_exception() {
     return nativepython_cur_exception_value;
 }
 
+bool nativepython_runtime_get_stashed_exception_is_python_exception_set() {
+    return nativepython_cur_exception_value == (const char*)-1;
+}
+
 extern "C" {
 
     bool nativepython_runtime_string_eq(StringType::layout* lhs, StringType::layout* rhs) {
@@ -22,6 +26,11 @@ extern "C" {
         }
 
         return StringType::cmpStaticEq(lhs, rhs);
+    }
+
+    void nativepython_runtime_throw_python_exception_set() {
+        nativepython_cur_exception_value = (const char*)-1;
+        throw PythonExceptionSet();
     }
 
     int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
@@ -194,11 +203,20 @@ extern "C" {
         PyObject* res = PyObject_GetAttrString(p, a);
 
         if (!res) {
-            PyErr_PrintEx(0);
-            throw std::runtime_error("python code threw an exception");
+            nativepython_runtime_throw_python_exception_set();
         }
 
         return res;
+    }
+
+    void nativepython_runtime_setattr_pyobj(PyObject* p, const char* a, PyObject* val) {
+        PyEnsureGilAcquired getTheGil;
+
+        int res = PyObject_SetAttrString(p, a, val);
+
+        if (res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
     }
 
     void nativepython_runtime_decref_pyobj(PyObject* p) {

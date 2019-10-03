@@ -279,7 +279,12 @@ std::pair<bool, PyObject*> PyFunctionInstance::dispatchFunctionCallToCompiledSpe
         });
 
         return std::pair<bool, PyObject*>(true, (PyObject*)extractPythonObject(result.data(), result.type()));
-    } catch(...) {
+    }
+    catch(...) {
+        if (nativepython_runtime_get_stashed_exception_is_python_exception_set()) {
+            throw PythonExceptionSet();
+        }
+
         const char* e = nativepython_runtime_get_stashed_exception();
         if (!e) {
             e = "Generated code threw an unknown exception.";

@@ -83,6 +83,23 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
         )
 
+    def convert_set_attribute(self, context, instance, attr, val):
+        assert isinstance(attr, str)
+
+        valAsObj = val.convert_to_type(object)
+        if valAsObj is None:
+            return None
+
+        context.pushEffect(
+            runtime_functions.setattr_pyobj.call(
+                instance.nonref_expr,
+                native_ast.const_utf8_cstr(attr),
+                valAsObj.nonref_expr
+            )
+        )
+
+        return context.constant(None)
+
     def _can_convert_to_type(self, otherType, explicit):
         return super()._can_convert_to_type(otherType, explicit)
 

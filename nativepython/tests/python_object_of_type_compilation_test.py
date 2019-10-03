@@ -69,6 +69,26 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaises(Exception):
             f(10)
 
+    def test_set_attribute(self):
+        @Compiled
+        def f_int(x:object, y: int):
+            x.a = y
+
+        @Compiled
+        def f(x:object, y: object):
+            x.a = y
+
+        c = HoldsAnA(0)
+
+        f_int(c, 10)
+        self.assertEqual(c.a, 10)
+
+        f(c, "hi")
+        self.assertEqual(c.a, "hi")
+
+        with self.assertRaisesRegex(Exception, "'dict' object has no attribute 'a'"):
+            f(dict(), "hi")
+
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=String, t=TupleOf(int))
