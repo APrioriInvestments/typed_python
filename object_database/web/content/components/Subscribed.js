@@ -28,7 +28,6 @@ class Subscribed extends Component {
 
         // Bind component methods
         this.makeContent = this.makeContent.bind(this);
-        this.toString = this.toString.bind(this);
     }
 
     build(){
@@ -38,8 +37,18 @@ class Subscribed extends Component {
     }
 
     getDOMElement(){
+        // Sometimes you can have a Subscribed in another Subscribed,
+        // which can really throw off the whole "non-display"
+        // rendering process. So, as long as the parent of this
+        // instance isn't a Subscribed, we do a basic lookup.
+        // Otherwise, call the same method on the parent.
         let el = document.querySelector(`[data-subscribed-to="${this.props.id}"]`);
-        return el;
+        if(el){
+            return el;
+        } else if(this.parent && this.parent.name == "Subscribed"){
+            return this.parent.getDOMElement();
+        }
+        return null;
     }
 
     makeContent(){
@@ -48,10 +57,6 @@ class Subscribed extends Component {
         } else {
             return this.renderChildNamed('content');
         }
-    }
-
-    toString(){
-        return `Sub[${this.props.id}]<${this.props.namedChildren.content}>`;
     }
 }
 
