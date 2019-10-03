@@ -51,7 +51,7 @@ class BytesWrapper(RefcountedWrapper):
     def convert_builtin(self, f, context, expr, a1=None):
         if f is bytes and a1 is None:
             return expr
-        return None
+        return super().convert_builtin(f, context, expr, a1)
 
     def convert_bin_op(self, context, left, op, right, inplace):
         if right.expr_type == left.expr_type:

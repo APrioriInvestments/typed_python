@@ -214,8 +214,6 @@ class IntWrapper(ArithmeticTypeWrapper):
             return context.pushPod(self, expr.nonref_expr)
 
     def convert_builtin(self, f, context, expr, a1=None):
-        if f is format and a1 is None:
-            return expr.convert_to_type(str)
         if f is round:
             if a1 is None:
                 return context.pushPod(
@@ -230,6 +228,8 @@ class IntWrapper(ArithmeticTypeWrapper):
 
         if f in [trunc, floor, ceil]:
             return context.pushPod(self, expr.nonref_expr)
+
+        return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
@@ -430,8 +430,6 @@ class BoolWrapper(ArithmeticTypeWrapper):
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
 
     def convert_builtin(self, f, context, expr, a1=None):
-        if f is format and a1 is None:
-            return expr.convert_to_type(str)
         if f is round and a1 is not None:
             return context.pushPod(
                 self,
@@ -443,7 +441,8 @@ class BoolWrapper(ArithmeticTypeWrapper):
             )
         if f in [round, trunc, floor, ceil]:
             return context.pushPod(self, expr.nonref_expr)
-        return None
+
+        return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:
@@ -581,8 +580,6 @@ class FloatWrapper(ArithmeticTypeWrapper):
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
-        if f is format and a1 is None:
-            return expr.convert_to_type(str)
         if f is round:
             if a1:
                 return context.pushPod(
@@ -601,7 +598,7 @@ class FloatWrapper(ArithmeticTypeWrapper):
         if f is ceil:
             return context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr)).convert_to_type(self)
 
-        return None
+        return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, left, op):
         if op.matches.Not:

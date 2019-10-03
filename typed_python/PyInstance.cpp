@@ -1079,8 +1079,6 @@ PyObject* PyInstance::tp_repr(PyObject *o) {
     std::ostringstream str;
     ReprAccumulator accumulator(str);
 
-    str << std::showpoint;
-
     self_type->repr(w->dataPtr(), accumulator);
 
     return PyUnicode_FromString(str.str().c_str());
@@ -1109,8 +1107,6 @@ PyObject* PyInstance::tp_str(PyObject *o) {
 
     std::ostringstream str;
     ReprAccumulator accumulator(str, true);
-
-    str << std::showpoint;
 
     self_type->repr(self_w->dataPtr(), accumulator);
 

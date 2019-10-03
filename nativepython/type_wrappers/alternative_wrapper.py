@@ -322,7 +322,7 @@ class AlternativeWrapper(RefcountedWrapper):
             return self.convert_call_method(context, "__dir__", (expr, )) \
                 or super().convert_builtin(f, context, expr)
 
-        return None
+        return super().convert_builtin(f, context, expr, a1)
 
     def convert_unary_op(self, context, expr, op):
         magic = "__pos__" if op.matches.UAdd else \

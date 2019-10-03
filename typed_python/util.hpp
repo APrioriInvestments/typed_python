@@ -280,3 +280,52 @@ void iterate(PyObject* o, func_type f) {
         throw PythonExceptionSet();
     }
 }
+
+
+// Removes trailing zeros from char* representation of a floating-point number
+// in the style of the python str representation.
+// Modifies buffer in place.
+// 1.0 -> 1.0
+// 1.00 -> 1.0
+// 1.00000 -> 1.0
+// 1.20 -> 1.2
+// 1.200 -> 1.2
+// 1.200001 -> 1.200001
+// 1.500e7 -> 1.5e7
+// 1.000e7 -> 1e7
+void remove_trailing_zeros_pystyle(char *s) {
+    char *cur = s;
+    char *decimal = 0;
+    char *firstzero = 0;
+    while (*cur) {
+        if (*cur == '.') {
+            decimal = cur;
+            firstzero = 0;
+        }
+        else if (*cur == '0' && decimal) {
+            if (!firstzero)
+                firstzero = cur;
+        }
+        else if (*cur == 'e' && firstzero)
+            break;
+        else
+            firstzero = 0;
+        cur++;
+    }
+    // *cur is 'e' or \x00
+    if (firstzero) {
+        if (!*cur) {
+            if (firstzero - decimal == 1)
+                firstzero++;
+            if (firstzero < cur)
+                *firstzero = 0;
+        }
+        else {
+            if (firstzero - decimal == 1)
+                firstzero--;
+            while (*cur)
+                *firstzero++ = *cur++;
+            *firstzero = 0;
+        }
+    }
+}

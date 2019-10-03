@@ -564,23 +564,46 @@ extern "C" {
         return StringType::createFromUtf8(data, count);
     }
 
-    StringType::layout* nativepython_float64_to_string(double f) {
-        std::ostringstream s;
-        ReprAccumulator acc(s);
-        acc << f;
-        if (fabs(f) < 1e16 - 1 && f == floor(f))
-            acc << ".0";
 
-        std::string rep = s.str();
-        return StringType::createFromUtf8(&rep[0], rep.size());
+    StringType::layout* nativepython_float64_to_string(double f) {
+        char buf[32] = "";
+        double a = fabs(f);
+
+        if (a >= 1e16) sprintf(buf, "%.16e", f);
+        else if (a >= 1e15 || a == 0.0) sprintf(buf, "%.1f", f);
+        else if (a >= 1e14) sprintf(buf, "%.2f", f);
+        else if (a >= 1e13) sprintf(buf, "%.3f", f);
+        else if (a >= 1e12) sprintf(buf, "%.4f", f);
+        else if (a >= 1e11) sprintf(buf, "%.5f", f);
+        else if (a >= 1e10) sprintf(buf, "%.6f", f);
+        else if (a >= 1e9) sprintf(buf, "%.7f", f);
+        else if (a >= 1e8) sprintf(buf, "%.8f", f);
+        else if (a >= 1e7) sprintf(buf, "%.9f", f);
+        else if (a >= 1e6) sprintf(buf, "%.10f", f);
+        else if (a >= 1e5) sprintf(buf, "%.11f", f);
+        else if (a >= 1e4) sprintf(buf, "%.12f", f);
+        else if (a >= 1e3) sprintf(buf, "%.13f", f);
+        else if (a >= 1e2) sprintf(buf, "%.14f", f);
+        else if (a >= 10) sprintf(buf, "%.15f", f);
+        else if (a >= 1) sprintf(buf, "%.16f", f);
+        else if (a >= 0.1) sprintf(buf, "%.17f", f);
+        else if (a >= 0.01) sprintf(buf, "%.18f", f);
+        else if (a >= 0.001) sprintf(buf, "%.19f", f);
+        else if (a >= 0.0001) sprintf(buf, "%.20f", f);
+        else sprintf(buf, "%.16e", f);
+
+        remove_trailing_zeros_pystyle(buf);
+
+        return StringType::createFromUtf8(&buf[0], strlen(buf));
     }
 
     StringType::layout* nativepython_float32_to_string(float f) {
         std::ostringstream s;
 
-        s << std::fixed << std::setprecision(5) << f << "f32";
+        s << f << "f32";
 
         std::string rep = s.str();
+
         return StringType::createFromUtf8(&rep[0], rep.size());
     }
 

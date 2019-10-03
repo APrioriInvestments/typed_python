@@ -231,7 +231,7 @@ public:
     }
 
     void repr(instance_ptr self, ReprAccumulator& stream) {
-        stream << std::fixed << std::setprecision(5) << *(float*)self << "f32";
+        stream << *(float*)self << "f32";
     }
 
     static Float32* Make() { static Float32* res = new Float32(); return res; }
@@ -246,7 +246,7 @@ public:
 
     void repr(instance_ptr self, ReprAccumulator& stream) {
         // this is never actually called
-        stream << std::fixed << std::setprecision(16) << *(double*)self;
+        stream << *(double*)self;
     }
 
     static Float64* Make() { static Float64* res = new Float64(); return res; }

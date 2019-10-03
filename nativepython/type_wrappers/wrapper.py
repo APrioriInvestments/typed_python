@@ -211,9 +211,12 @@ class Wrapper(object):
                         runtime_functions.np_dir.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(retT).layoutType)
                     )
                 )
+        if f is format and a1 is None:
+            return expr.convert_to_type(str)
 
         return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't compile '%s' on instance of type '%s'" % (str(f), str(self))))
+            generateThrowException(context, TypeError("Can't compile '%s' on instance of type '%s'%s"
+                                                      % (str(f), str(self), " with additional parameter" if a1 else "")))
         )
 
     def convert_repr(self, context, expr):
