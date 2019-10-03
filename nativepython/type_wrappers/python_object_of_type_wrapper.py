@@ -100,6 +100,22 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         return context.constant(None)
 
+    def convert_getitem(self, context, instance, item):
+        itemAsObj = item.convert_to_type(object)
+        if itemAsObj is None:
+            return None
+
+        return context.push(
+            self,
+            lambda targetSlot:
+                targetSlot.expr.store(
+                    runtime_functions.getitem_pyobj.call(
+                        instance.nonref_expr,
+                        itemAsObj.nonref_expr
+                    )
+                )
+        )
+
     def _can_convert_to_type(self, otherType, explicit):
         return super()._can_convert_to_type(otherType, explicit)
 

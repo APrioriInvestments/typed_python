@@ -175,6 +175,13 @@ setattr_pyobj = externalCallTarget(
     Void.pointer()
 )
 
+getitem_pyobj = externalCallTarget(
+    "nativepython_runtime_getitem_pyobj",
+    Void.pointer(),
+    Void.pointer(),
+    Void.pointer()
+)
+
 pyobj_to_typed = externalCallTarget(
     "np_runtime_pyobj_to_typed",
     Bool,

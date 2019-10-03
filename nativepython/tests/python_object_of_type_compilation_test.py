@@ -89,6 +89,16 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "'dict' object has no attribute 'a'"):
             f(dict(), "hi")
 
+    def test_getitem(self):
+        @Compiled
+        def f(x):
+            return x[10]
+
+        self.assertEqual(f({10: "hi"}), "hi")
+
+        with self.assertRaisesRegex(Exception, "string index out of range"):
+            f("a")
+
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=String, t=TupleOf(int))
