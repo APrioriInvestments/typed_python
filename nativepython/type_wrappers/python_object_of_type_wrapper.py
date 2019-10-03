@@ -116,6 +116,25 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
         )
 
+    def convert_setitem(self, context, instance, index, value):
+        indexAsObj = index.convert_to_type(object)
+        if indexAsObj is None:
+            return None
+
+        valueAsObj = value.convert_to_type(object)
+        if valueAsObj is None:
+            return None
+
+        context.pushEffect(
+            runtime_functions.setitem_pyobj.call(
+                instance.nonref_expr,
+                indexAsObj.nonref_expr,
+                valueAsObj.nonref_expr
+            )
+        )
+
+        return context.constant(None)
+
     def _can_convert_to_type(self, otherType, explicit):
         return super()._can_convert_to_type(otherType, explicit)
 

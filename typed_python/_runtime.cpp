@@ -221,6 +221,16 @@ extern "C" {
         return res;
     }
 
+    void nativepython_runtime_setitem_pyobj(PyObject* p, PyObject* index, PyObject* value) {
+        PyEnsureGilAcquired getTheGil;
+
+        int res = PyObject_SetItem(p, index, value);
+
+        if (res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+    }
+
     void nativepython_runtime_setattr_pyobj(PyObject* p, const char* a, PyObject* val) {
         PyEnsureGilAcquired getTheGil;
 

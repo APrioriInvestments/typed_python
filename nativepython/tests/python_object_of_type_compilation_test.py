@@ -71,11 +71,11 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
     def test_set_attribute(self):
         @Compiled
-        def f_int(x:object, y: int):
+        def f_int(x: object, y: int):
             x.a = y
 
         @Compiled
-        def f(x:object, y: object):
+        def f(x: object, y: object):
             x.a = y
 
         c = HoldsAnA(0)
@@ -98,6 +98,18 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(Exception, "string index out of range"):
             f("a")
+
+    def test_setitem(self):
+        @Compiled
+        def f(x, item, y):
+            x[item] = y
+
+        d = {}
+        f(d, 10, 20)
+        self.assertEqual(d, {10: 20})
+
+        with self.assertRaisesRegex(Exception, "unhashable type"):
+            f({}, [], [])
 
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
