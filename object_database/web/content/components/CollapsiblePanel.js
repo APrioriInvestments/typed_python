@@ -3,6 +3,7 @@
  */
 import {Component} from './Component.js';
 import {h} from 'maquette';
+import {PropTypes} from './util/PropertyValidator.js';
 
 /**
  * About Replacements
@@ -31,54 +32,53 @@ class CollapsiblePanel extends Component {
     }
 
     build(){
-        if(this.props.extraData.isExpanded){
-            return(
-                h('div', {
-                    class: "cell d-flex",
-                    "data-cell-id": this.props.id,
-                    "data-cell-type": "CollapsiblePanel",
-                    "data-expanded": true,
-                    id: this.props.id,
-                }, [
-                    h('div', {class: "row flex-nowrap no-gutters"}, [
-                        h('div', {class: "col-md-auto", style: "flex-grow:1"},[
-                            this.makePanel()
-                        ]),
-                        h('div', {class: "col-sm", style: "flex-grow:5"}, [
-                            this.makeContent()
-                        ])
-                    ])
-                ])
-            );
-        } else {
-            return (
-                h('div', {
-                    class: "cell container-fluid",
-                    "data-cell-id": this.props.id,
-                    "data-cell-type": "CollapsiblePanel",
-                    "data-expanded": false,
-                    id: this.props.id,
-                }, [this.makeContent()])
-            );
+        let content = this.makeContent();
+        let panel = null;
+        if(this.props.isExpanded){
+            panel = this.makePanel();
         }
+        return (
+            h('div', {
+                class: "cell collapsible-panel",
+                id: this.props.id,
+                "data-cell-id": this.props.id,
+                "data-cell-type": "CollapsiblePanel",
+                "data-is-expanded": (this.props.isExpanded == true)
+            }, [panel, content])
+        );
     }
 
     makeContent(){
+        let result = null;
         if(this.usesReplacements){
-            return this.getReplacementElementFor('content');
+            result = this.getReplacementElementFor('content');
         } else {
-            return this.renderChildNamed('content');
+            result = this.renderChildNamed('content');
         }
+        return (
+            h('div', {class: "collapsible-panel-content"}, [result])
+        );
     }
 
     makePanel(){
+        let result = null;
         if(this.usesReplacements){
-            return this.getReplacementElementFor('panel');
+            result = this.getReplacementElementFor('panel');
         } else {
-            return this.renderChildNamed('panel');
+            result = this.renderChildNamed('panel');
         }
+        return (
+            h('div', {class: "collapsible-panel-panel"}, [result])
+        );
     }
 }
+
+CollapsiblePanel.propTypes = {
+    isExpanded: {
+        description: "Whether or not the Panel is expanded (showing)",
+        type: PropTypes.boolean
+    }
+};
 
 
 export {CollapsiblePanel, CollapsiblePanel as default}
