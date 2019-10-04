@@ -136,11 +136,11 @@ class ClassWrapper(RefcountedWrapper):
                 raise Exception("Downcast in compiled code not implemented yet")
 
         if otherType.typeRepresentation == Bool:
-            y = self.convert_call_method(context, "__bool__", (e,))
+            y = self.generate_method_call(context, "__bool__", (e,))
             if y is not None:
                 return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
             else:
-                y = self.convert_call_method(context, "__len__", (e,))
+                y = self.generate_method_call(context, "__len__", (e,))
                 if y is not None:
                     context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
                 else:

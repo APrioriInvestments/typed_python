@@ -430,7 +430,14 @@ class Wrapper(object):
             )
         )
 
-    def convert_call_method(self, context, method, args):
+    def generate_method_call(self, context, method, args):
+        """
+        Generate code to call the named method with these arguments.
+        :param context: compilation context
+        :param method: method name, as a string
+        :param args: tuple of expressions for arguments for generated call
+        :return: intermediate compiled result, or None if method does not exist or can't be called with these args
+        """
         t = self.typeRepresentation
         if getattr(getattr(t, method, None), "__typed_python_category__", None) == 'Function':
             assert len(getattr(t, method).overloads) == 1
