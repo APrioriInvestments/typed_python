@@ -30,7 +30,10 @@ typeWrapper = lambda x: nativepython.python_object_representation.typedPythonTyp
 
 def makeAlternativeWrapper(t):
     if t.__typed_python_category__ == "ConcreteAlternative":
-        return ConcreteAlternativeWrapper(t)
+        if _types.all_alternatives_empty(t):
+            return ConcreteSimpleAlternativeWrapper(t)
+        else:
+            return ConcreteAlternativeWrapper(t)
 
     if _types.all_alternatives_empty(t):
         return SimpleAlternativeWrapper(t)
@@ -52,12 +55,14 @@ class SimpleAlternativeWrapper(Wrapper):
     def getNativeLayoutType(self):
         return self.layoutType
 
-    def convert_default_initialize(self, context, target):
-        self.convert_copy_initialize(
-            context,
-            target,
-            nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
-        )
+    def convert_hash(self, context, expr):
+        y = self.convert_call_method(context, "__hash__", (expr,))
+        if y is not None:
+            return y
+        tp = context.getTypePointer(expr.expr_type.typeRepresentation)
+        if tp:
+            return context.pushPod(Int32, runtime_functions.hash_alternative.call(expr.nonref_expr.cast(VoidPtr), tp))
+        return None
 
     def convert_destroy(self, context, target):
         pass
@@ -80,7 +85,6 @@ class SimpleAlternativeWrapper(Wrapper):
         assert targetVal.isReference
 
         target_type = targetVal.expr_type
-
         if target_type.typeRepresentation == Bool:
             y = self.convert_call_method(context, "__bool__", (e,))
             if y is not None:
@@ -93,6 +97,7 @@ class SimpleAlternativeWrapper(Wrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
+        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
         if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
@@ -100,6 +105,22 @@ class SimpleAlternativeWrapper(Wrapper):
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_cast(self, context, e, target_type):
+        if isinstance(target_type, IntWrapper):
+            y = self.convert_call_method(context, "__int__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        return super().convert_cast(context, e, target_type)
+
+    def convert_call(self, context, expr, args, kwargs):
+        return self.convert_call_method(context, "__call__", [expr] + args)
 
     def convert_len_native(self, context, expr):
         alt = self.typeRepresentation
@@ -114,10 +135,203 @@ class SimpleAlternativeWrapper(Wrapper):
             return None
         return context.pushPod(int, intermediate.convert_to_type(int).expr)
 
+    def convert_abs(self, context, expr):
+        return self.convert_call_method(context, "__abs__", (expr,))
+
+    def convert_builtin(self, f, context, expr, a1=None):
+        # handle builtins with additional arguments here:
+        if f is format:
+            if a1 is not None:
+                return self.convert_call_method(context, "__format__", (expr, a1))
+            else:
+                return self.convert_call_method(context, "__format__", (expr, context.constant(''))) \
+                    or self.convert_call_method(context, "__str__", (expr,)) \
+                    or expr.convert_cast(str)
+        if f is round:
+            if a1 is not None:
+                return self.convert_call_method(context, "__round__", (expr, a1)) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, a1.toInt64().nonref_expr)
+                )
+            else:
+                return self.convert_call_method(context, "__round__", (expr, context.constant(0))) \
+                    or context.pushPod(
+                        float,
+                        runtime_functions.round_float64.call(expr.toFloat64().nonref_expr, context.constant(0))
+                )
+        if a1 is not None:
+            return None
+        # handle builtins with no additional arguments here:
+        if f is bytes:
+            return self.convert_call_method(context, "__bytes__", (expr, ))
+        if f is trunc:
+            return self.convert_call_method(context, "__trunc__", (expr,)) \
+                or context.pushPod(float, runtime_functions.trunc_float64.call(expr.toFloat64().nonref_expr))
+        if f is floor:
+            return self.convert_call_method(context, "__floor__", (expr,)) \
+                or context.pushPod(float, runtime_functions.floor_float64.call(expr.toFloat64().nonref_expr))
+        if f is ceil:
+            return self.convert_call_method(context, "__ceil__", (expr,)) \
+                or context.pushPod(float, runtime_functions.ceil_float64.call(expr.toFloat64().nonref_expr))
+        if f is complex:
+            return self.convert_call_method(context, "__complex__", (expr, ))
+        if f is dir:
+            return self.convert_call_method(context, "__dir__", (expr, )) \
+                or super().convert_builtin(f, context, expr)
+
+        return super().convert_builtin(f, context, expr, a1)
+
+    def convert_unary_op(self, context, expr, op):
+        magic = "__pos__" if op.matches.UAdd else \
+            "__neg__" if op.matches.USub else \
+            "__invert__" if op.matches.Invert else \
+            "__not__" if op.matches.Not else \
+            ""
+        return self.convert_call_method(context, magic, (expr,)) or super().convert_unary_op(context, expr, op)
+
+    def convert_bin_op(self, context, l, op, r, inplace):
+        magic = "__add__" if op.matches.Add else \
+            "__sub__" if op.matches.Sub else \
+            "__mul__" if op.matches.Mult else \
+            "__truediv__" if op.matches.Div else \
+            "__floordiv__" if op.matches.FloorDiv else \
+            "__mod__" if op.matches.Mod else \
+            "__matmul__" if op.matches.MatMult else \
+            "__pow__" if op.matches.Pow else \
+            "__lshift__" if op.matches.LShift else \
+            "__rshift__" if op.matches.RShift else \
+            "__or__" if op.matches.BitOr else \
+            "__xor__" if op.matches.BitXor else \
+            "__and__" if op.matches.BitAnd else \
+            "__eq__" if op.matches.Eq else \
+            "__ne__" if op.matches.NotEq else \
+            "__lt__" if op.matches.Lt else \
+            "__gt__" if op.matches.Gt else \
+            "__le__" if op.matches.LtE else \
+            "__ge__" if op.matches.GtE else \
+            ""
+
+        if magic and inplace:
+            magic = '__i' + magic[2:]
+
+        return self.convert_call_method(context, magic, (l, r)) \
+            or self.convert_comparison(context, l, op, r) \
+            or super().convert_bin_op(context, l, op, r, inplace)
+
+    def convert_comparison(self, context, left, op, right):
+        # TODO: provide nicer translation from op to Py_ comparison codes
+        py_code = 2 if op.matches.Eq else \
+            3 if op.matches.NotEq else \
+            0 if op.matches.Lt else \
+            4 if op.matches.Gt else \
+            1 if op.matches.LtE else \
+            5 if op.matches.GtE else -1
+        if py_code < 0:
+            return None
+        tp_left = context.getTypePointer(left.expr_type.typeRepresentation)
+        tp_right = context.getTypePointer(right.expr_type.typeRepresentation)
+        if tp_left and tp_left == tp_right:
+            if not left.isReference:
+                left = context.push(left.expr_type, lambda x: x.convert_copy_initialize(left))
+            if not right.isReference:
+                right = context.push(right.expr_type, lambda x: x.convert_copy_initialize(right))
+            return context.pushPod(
+                Bool,
+                runtime_functions.alternative_cmp.call(
+                    tp_left,
+                    left.expr.cast(VoidPtr),
+                    right.expr.cast(VoidPtr),
+                    py_code
+                )
+            )
+        return None
+
+    def convert_bin_op_reverse(self, context, r, op, l, inplace):
+        if op.matches.In:
+            ret = self.convert_call_method(context, "__contains__", (r, l))
+            return ret and ret.toBool()
+        return super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+
+class ConcreteSimpleAlternativeWrapper(Wrapper):
+    """Wrapper around alternatives with all empty arguments, after choosing a specific alternative."""
+    is_pod = True
+    is_empty = False
+    is_pass_by_ref = False
+
+    def __init__(self, t):
+        super().__init__(t)
+
+        self.layoutType = native_ast.UInt8
+        self.alternativeType = t.Alternative
+
+    def getNativeLayoutType(self):
+        return self.layoutType
+
+    def convert_default_initialize(self, context, target):
+        self.convert_copy_initialize(
+            context,
+            target,
+            nativepython.python_object_representation.pythonObjectRepresentation(context, self.typeRepresentation())
+        )
+
+    def convert_to_type_with_target(self, context, e, targetVal, explicit):
+        # there is deliberately no code path for "not explicit" here
+        # Alternative conversions must be explicit
+        assert targetVal.isReference
+
+        target_type = targetVal.expr_type
+
+        if target_type == typeWrapper(self.alternativeType):
+            targetVal.convert_copy_initialize(e.changeType(target_type))
+            return context.constant(True)
+
+        if target_type.typeRepresentation == Bool:
+            y = self.convert_call_method(context, "__bool__", (e,))
+            if y is not None:
+                return y.expr_type.convert_to_type_with_target(context, y, targetVal, False)
+            else:
+                y = self.convert_call_method(context, "__len__", (e,))
+                if y is not None:
+                    context.pushEffect(targetVal.expr.store(y.convert_to_type(int).nonref_expr.neq(0)))
+                else:
+                    context.pushEffect(targetVal.expr.store(context.constant(True)))
+                return context.constant(True)
+
+        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
+                return context.constant(True)
+
+        return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_cast(self, context, e, target_type):
+        if isinstance(target_type, IntWrapper):
+            y = self.convert_call_method(context, "__int__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        return super().convert_cast(context, e, target_type)
+
+    def convert_call(self, context, expr, args, kwargs):
+        return self.convert_call_method(context, "__call__", [expr] + args)
+
+    def convert_builtin(self, f, context, expr, a1=None):
+        altWrapper = typeWrapper(self.alternativeType)
+        return altWrapper.convert_builtin(f, context, expr, a1)
+
 
 class AlternativeWrapper(RefcountedWrapper):
-    is_empty = False
     is_pod = False
+    is_empty = False
     is_pass_by_ref = True
 
     def __init__(self, t):
@@ -251,12 +465,7 @@ class AlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
-        if isinstance(target_type, IntWrapper):
-            y = self.convert_call_method(context, "__int__", (e,))
-            if y is not None:
-                context.pushEffect(targetVal.expr.store(y.convert_to_type(target_type)))
-                return context.constant(True)
-
+        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
         if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
@@ -264,6 +473,19 @@ class AlternativeWrapper(RefcountedWrapper):
                 return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_cast(self, context, e, target_type):
+        if isinstance(target_type, IntWrapper):
+            y = self.convert_call_method(context, "__int__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        if isinstance(target_type, FloatWrapper):
+            y = self.convert_call_method(context, "__float__", (e,))
+            if y is not None:
+                return y.convert_to_type(target_type)
+
+        return super().convert_cast(context, e, target_type)
 
     def convert_call(self, context, expr, args, kwargs):
         return self.convert_call_method(context, "__call__", [expr] + args)
@@ -361,9 +583,6 @@ class AlternativeWrapper(RefcountedWrapper):
             or self.convert_comparison(context, l, op, r) \
             or super().convert_bin_op(context, l, op, r, inplace)
 
-    # Default comparison for Alternative types
-    # returns None if no comparison is possible (if op is not a comparison operator to begin with,
-    # or if operands are different types)
     def convert_comparison(self, context, l, op, r):
         # TODO: provide nicer translation from op to Py_ comparison codes
         py_code = 2 if op.matches.Eq else \
@@ -396,8 +615,8 @@ class AlternativeWrapper(RefcountedWrapper):
 
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):
-    is_empty = False
     is_pod = False
+    is_empty = False
     is_pass_by_ref = True
 
     def __init__(self, t):
@@ -450,6 +669,7 @@ class ConcreteAlternativeWrapper(RefcountedWrapper):
                     context.pushEffect(targetVal.expr.store(context.constant(True)))
                 return context.constant(True)
 
+        # seem to need this conversion for floor() and ceil() to behave the same as interpreted code
         if isinstance(target_type, FloatWrapper):
             y = self.convert_call_method(context, "__float__", (e,))
             if y is not None:
