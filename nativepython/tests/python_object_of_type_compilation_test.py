@@ -122,6 +122,16 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "unhashable type"):
             f({}, [], [])
 
+    def test_call_with_args_and_kwargs(self):
+        @Compiled
+        def f(x, a, k):
+            return x(a, keyword=k)
+
+        def aFunc(*args, **kwargs):
+            return (args, kwargs)
+
+        self.assertEqual(f(aFunc, 'arg', 'the kwarg'), (('arg',), ({'keyword': 'the kwarg'})))
+
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)
         NT2 = NamedTuple(s=String, t=TupleOf(int))

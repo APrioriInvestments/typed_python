@@ -135,6 +135,48 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
         return context.constant(None)
 
+    def convert_call(self, context, instance, args, kwargs):
+        argsAsObjects = []
+        for a in args:
+            argsAsObjects.append(a.convert_to_type(object))
+            if argsAsObjects[-1] is None:
+                return None
+
+        kwargsAsObjects = {}
+
+        for k, a in kwargs.items():
+            kwargsAsObjects[k] = a.convert_to_type(object)
+
+            if kwargsAsObjects[k] is None:
+                return None
+
+        # we converted everything to python objects. We need to pass this
+        # ensemble to the interpreter. We use c-style variadic arguments here
+        # since everything is a pointer.
+        arguments = []
+        kwarguments = []
+
+        for a in argsAsObjects:
+            arguments.append(a.nonref_expr)
+
+        for kwargName, kwargVal in kwargsAsObjects.items():
+            kwarguments.append(kwargVal.nonref_expr)
+            kwarguments.append(native_ast.const_utf8_cstr(kwargName))
+
+        return context.push(
+            object,
+            lambda oPtr:
+                oPtr.expr.store(
+                    runtime_functions.call_pyobj.call(
+                        instance.nonref_expr,
+                        native_ast.const_int_expr(len(arguments)),
+                        native_ast.const_int_expr(len(kwargsAsObjects)),
+                        *arguments,
+                        *kwarguments,
+                    )
+                )
+        )
+
     def _can_convert_to_type(self, otherType, explicit):
         return super()._can_convert_to_type(otherType, explicit)
 

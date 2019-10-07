@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdarg.h>
 #include <cmath>
 #include <Python.h>
 #include <iostream>
@@ -244,6 +245,32 @@ extern "C" {
         int ret = PyObject_IsTrue(contains);
         decref(contains);
         return ret;
+    }
+
+    PyObject* nativepython_runtime_call_pyobj(PyObject* toCall, int argCount, int kwargCount, ...) {
+        PyEnsureGilAcquired getTheGil;
+
+        // each of 'argCount' arguments is a PyObject* followed by a const char*
+        va_list va_args;
+        va_start(va_args, kwargCount);
+
+        PyObjectStealer args(PyTuple_New(argCount));
+        PyObjectStealer kwargs(PyDict_New());
+
+        for (int i = 0; i < argCount; ++i) {
+            PyTuple_SetItem((PyObject*)args, i, incref(va_arg(va_args, PyObject*)));
+        }
+
+        for (int i = 0; i < kwargCount; ++i) {
+            PyObject* kwargVal = va_arg(va_args, PyObject*);
+            const char* kwargName = va_arg(va_args, const char*);
+
+            PyDict_SetItemString((PyObject*)kwargs, kwargName, kwargVal);
+        }
+
+        va_end(va_args);
+
+        return PyObject_Call(toCall, args, kwargs);
     }
 
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {

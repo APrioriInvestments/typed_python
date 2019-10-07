@@ -30,14 +30,14 @@ Float32 = native_ast.Float32
 Void = native_ast.Void
 
 
-def externalCallTarget(name, output, *inputs):
+def externalCallTarget(name, output, *inputs, varargs=False):
     return native_ast.CallTarget.Named(
         target=native_ast.NamedCallTarget(
             name=name,
             arg_types=inputs,
             output_type=output,
             external=True,
-            varargs=False,
+            varargs=varargs,
             intrinsic=False,
             can_throw=False
         )
@@ -126,6 +126,13 @@ floordiv_float64_float64 = externalCallTarget(
     "nativepython_runtime_floordiv_float64_float64",
     Float64,
     Float64, Float64
+)
+
+call_pyobj = externalCallTarget(
+    "nativepython_runtime_call_pyobj",
+    Void.pointer(),
+    Void.pointer(),
+    varargs=True
 )
 
 get_pyobj_None = externalCallTarget(
