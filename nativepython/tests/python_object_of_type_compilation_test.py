@@ -110,6 +110,19 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "string index out of range"):
             f("a")
 
+    def test_delitem(self):
+        @Compiled
+        def f(x, item):
+            del x[item]
+
+        d = {1: 2, 3: 4}
+        f(d, 1)
+
+        self.assertEqual(d, {3: 4})
+
+        with self.assertRaisesRegex(KeyError, "1"):
+            f(d, 1)
+
     def test_setitem(self):
         @Compiled
         def f(x, item, y):
@@ -131,6 +144,13 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
             return (args, kwargs)
 
         self.assertEqual(f(aFunc, 'arg', 'the kwarg'), (('arg',), ({'keyword': 'the kwarg'})))
+
+    def test_len(self):
+        @Compiled
+        def f(x):
+            return len(x)
+
+        self.assertEqual(f([1, 2, 3]), 3)
 
     def test_object_conversions(self):
         NT1 = NamedTuple(a=int, b=float, c=str, d=str)

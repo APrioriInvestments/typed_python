@@ -183,6 +183,12 @@ np_contains = externalCallTarget(
     UInt64
 )
 
+pyobj_len = externalCallTarget(
+    "nativepython_pyobj_len",
+    Int64,
+    Void.pointer()
+)
+
 getattr_pyobj = externalCallTarget(
     "nativepython_runtime_getattr_pyobj",
     Void.pointer(),
@@ -195,6 +201,13 @@ setattr_pyobj = externalCallTarget(
     Void,
     Void.pointer(),
     UInt8Ptr,
+    Void.pointer()
+)
+
+delitem_pyobj = externalCallTarget(
+    "nativepython_runtime_delitem_pyobj",
+    Void,
+    Void.pointer(),
     Void.pointer()
 )
 

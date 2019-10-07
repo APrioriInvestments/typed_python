@@ -116,6 +116,18 @@ class PythonObjectOfTypeWrapper(Wrapper):
                 )
         )
 
+    def convert_delitem(self, context, instance, item):
+        itemAsObj = item.convert_to_type(object)
+        if itemAsObj is None:
+            return None
+
+        return context.pushEffect(
+            runtime_functions.delitem_pyobj.call(
+                instance.nonref_expr,
+                itemAsObj.nonref_expr
+            )
+        )
+
     def convert_setitem(self, context, instance, index, value):
         indexAsObj = index.convert_to_type(object)
         if indexAsObj is None:
@@ -175,6 +187,17 @@ class PythonObjectOfTypeWrapper(Wrapper):
                         *kwarguments,
                     )
                 )
+        )
+
+    def convert_len(self, context, instance):
+        return context.push(
+            int,
+            lambda outLen:
+            outLen.expr.store(
+                runtime_functions.pyobj_len.call(
+                    instance.nonref_expr
+                )
+            )
         )
 
     def _can_convert_to_type(self, otherType, explicit):

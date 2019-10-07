@@ -225,6 +225,12 @@ extern "C" {
         return len;
     }
 
+    uint64_t nativepython_pyobj_len(PyObject* pyobj) {
+        PyEnsureGilAcquired getTheGil;
+
+        return PyObject_Length(pyobj);
+    }
+
     bool nativepython_runtime_contains(instance_ptr self, Type* self_tp, instance_ptr item, Type* item_tp) {
         PyEnsureGilAcquired getTheGil;
 
@@ -295,6 +301,16 @@ extern "C" {
         }
 
         return res;
+    }
+
+    void nativepython_runtime_delitem_pyobj(PyObject* p, PyObject* a) {
+        PyEnsureGilAcquired getTheGil;
+
+        int success = PyObject_DelItem(p, a);
+
+        if (success != 0) {
+            nativepython_runtime_throw_python_exception_set();
+        }
     }
 
     void nativepython_runtime_setitem_pyobj(PyObject* p, PyObject* index, PyObject* value) {
