@@ -23,6 +23,8 @@ ODB_LIB_PATH ?= build/lib.linux-x86_64-3.6/object_database
 
 CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
+            -Wno-terminate -Wno-bool-compare \
+            -Wno-cpp \
             -Wformat  -Werror=format-security  -Wdate-time -Wno-reorder     \
             -Wno-sign-compare  -Wno-narrowing  -Wno-int-in-bool-context     \
             -I$(VIRTUAL_ENV)/include/python3.6m                             \
