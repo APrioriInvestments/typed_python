@@ -128,6 +128,47 @@ class PythonObjectOfTypeWrapper(Wrapper):
             )
         )
 
+    def convert_unary_op(self, context, l, op):
+        tgt = runtime_functions.pyOpToUnaryCallTarget.get(op)
+
+        if tgt is not None:
+            if op.matches.Not:
+                return context.pushPod(
+                    bool,
+                    tgt.call(l.nonref_expr)
+                )
+
+            return context.push(
+                object,
+                lambda objPtr:
+                objPtr.expr.store(
+                    tgt.call(l.nonref_expr)
+                )
+            )
+
+        raise Exception(f"Unknown unary operator {op}")
+
+    def convert_bin_op(self, context, l, op, r, inplace):
+        rAsObj = r.convert_to_type(object)
+        if rAsObj is None:
+            return None
+
+        if not inplace:
+            tgt = runtime_functions.pyOpToBinaryCallTarget.get(op)
+        else:
+            tgt = runtime_functions.pyInplaceOpToBinaryCallTarget.get(op)
+
+        if tgt is not None:
+            return context.push(
+                object,
+                lambda objPtr:
+                objPtr.expr.store(
+                    tgt.call(l.nonref_expr, rAsObj.nonref_expr)
+                )
+            )
+
+        raise Exception(f"Unknown binary operator {op}")
+
     def convert_setitem(self, context, instance, index, value):
         indexAsObj = index.convert_to_type(object)
         if indexAsObj is None:

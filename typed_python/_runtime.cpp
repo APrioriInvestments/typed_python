@@ -857,5 +857,209 @@ extern "C" {
 
         return ret;
     }
+
+    PyObject* np_pyobj_Add(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Add(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Subtract(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Subtract(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Multiply(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Multiply(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Pow(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Power(lhs, rhs, Py_None);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_MatrixMultiply(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_MatrixMultiply(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_TrueDivide(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_TrueDivide(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_FloorDivide(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_FloorDivide(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Remainder(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Remainder(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Lshift(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Lshift(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Rshift(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Rshift(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Or(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Or(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Xor(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Xor(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_And(PyObject* lhs, PyObject* rhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_And(lhs, rhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Invert(PyObject* lhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Invert(lhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Positive(PyObject* lhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Positive(lhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    PyObject* np_pyobj_Negative(PyObject* lhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        PyObject* res = PyNumber_Negative(lhs);
+
+        if (!res) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
+    bool np_pyobj_Not(PyObject* lhs) {
+        PyEnsureGilAcquired acquireTheGil;
+
+        int64_t res = PyObject_Not(lhs);
+        if (res == -1) {
+            nativepython_runtime_throw_python_exception_set();
+        }
+
+        return res;
+    }
+
 }
 

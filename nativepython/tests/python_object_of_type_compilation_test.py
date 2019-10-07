@@ -123,6 +123,43 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         with self.assertRaisesRegex(KeyError, "1"):
             f(d, 1)
 
+    def test_binary_ops(self):
+        fcn = [
+            lambda x, y: x + y,
+            lambda x, y: x - y,
+            lambda x, y: x * y,
+            lambda x, y: x / y,
+            lambda x, y: x // y,
+            lambda x, y: x & y,
+            lambda x, y: x | y,
+            lambda x, y: x ^ y,
+            lambda x, y: x ** y,
+            lambda x, y: x % y
+        ]
+
+        for f in fcn:
+            compiled = Compiled(f)
+
+            self.assertEqual(compiled(1, 2), f(1, 2))
+
+            with self.assertRaises(Exception):
+                compiled(2.5, "hi")
+
+    def test_unary_ops(self):
+        fcn = [
+            lambda x: +x,
+            lambda x: -x,
+            lambda x: ~x,
+            lambda x: not x,
+        ]
+
+        for f in fcn:
+            compiled = Compiled(f)
+
+            self.assertEqual(compiled(1), f(1))
+            self.assertEqual(compiled(0), f(0))
+            self.assertEqual(compiled(-1), f(-1))
+
     def test_setitem(self):
         @Compiled
         def f(x, item, y):

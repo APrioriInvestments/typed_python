@@ -13,6 +13,7 @@
 #   limitations under the License.
 
 import nativepython.native_ast as native_ast
+import typed_python.python_ast as python_ast
 
 
 Bool = native_ast.Bool
@@ -43,6 +44,45 @@ def externalCallTarget(name, output, *inputs, varargs=False):
         )
     )
 
+
+def binaryPyobjCallTarget(name):
+    return externalCallTarget(name,
+        Void.pointer(),
+        Void.pointer(),
+        Void.pointer(),
+    )
+
+def unaryPyobjCallTarget(name, retType=Void.pointer()):
+    return externalCallTarget(name,
+        retType,
+        Void.pointer(),
+    )
+
+pyOpToBinaryCallTarget = {
+    python_ast.BinaryOp.Add(): binaryPyobjCallTarget("np_pyobj_Add"),
+    python_ast.BinaryOp.Sub(): binaryPyobjCallTarget("np_pyobj_Subtract"),
+    python_ast.BinaryOp.Mult(): binaryPyobjCallTarget("np_pyobj_Multiply"),
+    python_ast.BinaryOp.Pow(): binaryPyobjCallTarget("np_pyobj_Pow"),
+    python_ast.BinaryOp.MatMult(): binaryPyobjCallTarget("np_pyobj_MatrixMultiply"),
+    python_ast.BinaryOp.Div(): binaryPyobjCallTarget("np_pyobj_TrueDivide"),
+    python_ast.BinaryOp.FloorDiv(): binaryPyobjCallTarget("np_pyobj_FloorDivide"),
+    python_ast.BinaryOp.Mod(): binaryPyobjCallTarget("np_pyobj_Remainder"),
+    python_ast.BinaryOp.LShift(): binaryPyobjCallTarget("np_pyobj_Lshift"),
+    python_ast.BinaryOp.RShift(): binaryPyobjCallTarget("np_pyobj_Rshift"),
+    python_ast.BinaryOp.BitOr(): binaryPyobjCallTarget("np_pyobj_Or"),
+    python_ast.BinaryOp.BitXor(): binaryPyobjCallTarget("np_pyobj_Xor"),
+    python_ast.BinaryOp.BitAnd(): binaryPyobjCallTarget("np_pyobj_And"),
+}
+
+pyInplaceOpToBinaryCallTarget = {
+}
+
+pyOpToUnaryCallTarget = {
+    python_ast.UnaryOp.Not(): externalCallTarget("np_pyobj_Not", Bool, Void.pointer()),
+    python_ast.UnaryOp.Invert(): unaryPyobjCallTarget("np_pyobj_Invert"),
+    python_ast.UnaryOp.UAdd(): unaryPyobjCallTarget("np_pyobj_Positive"),
+    python_ast.UnaryOp.USub(): unaryPyobjCallTarget("np_pyobj_Negative"),
+}
 
 free = externalCallTarget("free", Void, UInt8Ptr)
 malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
