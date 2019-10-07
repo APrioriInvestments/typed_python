@@ -41,11 +41,12 @@ class FunctionOutput:
 class FunctionConversionContext(object):
     """Helper function for converting a single python function given some input and output types"""
 
-    def __init__(self, converter, identity, ast_arg, statements, input_types, output_type, free_variable_lookup):
+    def __init__(self, converter, name, identity, ast_arg, statements, input_types, output_type, free_variable_lookup):
         """Initialize a FunctionConverter
 
         Args:
             converter - a PythonToNativeConverter
+            name - the function name
             identity - an object to uniquely identify this instance of the function
             ast_arg - a python_ast.Arguments object
             statements - a list of python_ast.Statement objects making up the body of the function
@@ -54,6 +55,7 @@ class FunctionConversionContext(object):
             free_variable_lookup - a dict from name to the actual python object in this
                 function's closure. We don't distinguish between local and global scope yet.
         """
+        self.name = name
         self.variablesAssigned = computeAssignedVariables(statements)
         self.variablesRead = computeReadVariables(statements)
         self.variablesBound = computeFunctionArgVariables(ast_arg)
@@ -814,15 +816,11 @@ class FunctionConversionContext(object):
                         )
 
         if ast.matches.Raise:
-            expr_contex = ExpressionConversionContext(self, variableStates)
-            strVal = "Unknown Exception"
-            if ast.exc.matches.Call:
-                if ast.exc.func.matches.Name and ast.exc.func.id == "Exception":
-                    if len(ast.exc.args) == 1 and ast.exc.args[0].matches.Str:
-                        strVal = ast.exc.args[0].s
+            expr_context = ExpressionConversionContext(self, variableStates)
+            toThrow = expr_context.convert_expression_ast(ast.exc)
 
-            expr_contex.pushException(KeyError, strVal)
-            return expr_contex.finalize(None), False
+            expr_context.pushExceptionObject(toThrow, ast.exc.filename, ast.exc.line_number)
+            return expr_context.finalize(None), False
 
         if ast.matches.Delete:
             exprs = None

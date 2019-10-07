@@ -506,36 +506,36 @@ class TestAlternativeCompilation(unittest.TestCase):
             # exception types are different
             with self.assertRaises(KeyError):
                 f_getattr1(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr1(v)
             self.assertEqual(f_getattr2(v), "4")
             self.assertEqual(f_getattr2(v), c_getattr2(v))
             f_delattr2(v)
             with self.assertRaises(KeyError):
                 f_getattr1(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr1(v)
             with self.assertRaises(KeyError):
                 f_getattr2(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr2(v)
             f_setattr1(v, "5")
             f_setattr2(v, "6")
             c_delattr1(v)
             with self.assertRaises(KeyError):
                 f_getattr1(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr1(v)
             self.assertEqual(f_getattr2(v), "6")
             self.assertEqual(f_getattr2(v), c_getattr2(v))
             c_delattr2(v)
             with self.assertRaises(KeyError):
                 f_getattr1(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr1(v)
             with self.assertRaises(KeyError):
                 f_getattr2(v)
-            with self.assertRaises(TypeError):
+            with self.assertRaises(KeyError):
                 c_getattr2(v)
 
     def test_compile_alternative_float_methods(self):

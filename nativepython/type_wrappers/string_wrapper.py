@@ -43,7 +43,7 @@ def strJoinIterable(sep, iterable):
         if isinstance(item, str):
             items.append(item)
         else:
-            raise Exception("expected str instance")
+            raise TypeError("expected str instance")
     return sep.join(items)
 
 
@@ -59,6 +59,15 @@ class StringWrapper(RefcountedWrapper):
             ('refcount', native_ast.Int64),
             ('data', native_ast.UInt8)
         ), name='StringLayout').pointer()
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_cast(self)
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
     def convert_hash(self, context, expr):
         return context.pushPod(Int32, runtime_functions.hash_string.call(expr.nonref_expr.cast(VoidPtr)))

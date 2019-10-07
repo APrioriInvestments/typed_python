@@ -212,6 +212,9 @@ class NamedTupleWrapper(TupleWrapper):
             # the tuple is now initialized
             return uninitializedNamedTuple
 
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_to_type(self, True)
+
         return super().convert_type_call(context, typeInst, args, kwargs)
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):

@@ -13,7 +13,7 @@
 #   limitations under the License.
 
 import threading
-
+import os
 import nativepython.python_to_native_converter as python_to_native_converter
 import nativepython.llvm_compiler as llvm_compiler
 from typed_python import Function, NoneType, OneOf
@@ -39,6 +39,10 @@ class Runtime:
     def singleton():
         if _singleton[0] is None:
             _singleton[0] = Runtime()
+
+        if os.getenv("NATIVEPYTHON_VERBOSE"):
+            _singleton[0].verboselyDisplayNativeCode()
+
         return _singleton[0]
 
     def __init__(self):

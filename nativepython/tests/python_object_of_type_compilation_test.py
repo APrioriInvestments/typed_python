@@ -224,13 +224,17 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
         ]
 
         for T, v in cases:
+            @Function
+            def toObject(x: object):
+                return x
+
             @Compiled
             def to_and_fro(x: T) -> T:
-                return T(object(x))
+                return T(toObject(x))
 
             @Compiled
             def fro_and_to(x):
-                return object(T(x))
+                return toObject(T(x))
 
             if T in [Float32, Float64]:
                 self.assertEqual(to_and_fro(v), T(v))
@@ -252,9 +256,11 @@ class TestPythonObjectOfTypeCompilation(unittest.TestCase):
 
             initMem = psutil.Process().memory_info().rss / 1024 ** 2
             w = v
+
             for _ in range(10000):
                 v = to_and_fro(v)
                 w = fro_and_to(w)
+
             finalMem = psutil.Process().memory_info().rss / 1024 ** 2
 
             self.assertTrue(finalMem < initMem + 2)

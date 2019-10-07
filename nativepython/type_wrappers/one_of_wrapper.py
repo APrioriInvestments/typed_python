@@ -310,3 +310,12 @@ class OneOfWrapper(Wrapper):
         context.pushEffect(
             native_ast.Expression.Return(arg=native_ast.const_bool_expr(False))
         )
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_to_type(self, True)
+
+        return super().convert_type_call(context, typeInst, args, kwargs)

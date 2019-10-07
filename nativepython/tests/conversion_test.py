@@ -12,9 +12,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, Function
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
+import traceback
 import time
 
 
@@ -113,9 +114,13 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(1, 1, "s"), True)
 
     def test_object_to_int_conversion(self):
+        @Function
+        def toObject(o: object):
+            return o
+
         @Compiled
         def f(x: int) -> int:
-            return int(object(x))
+            return int(toObject(x))
 
         self.assertEqual(f(10), 10)
 
@@ -433,3 +438,19 @@ class TestCompilationStructures(unittest.TestCase):
 
         self.assertEqual(f(1), str(int))
         self.assertEqual(f(1.0), str(float))
+
+    def test_can_raise_exceptions(self):
+        @Compiled
+        def aFunctionThatRaises(x):
+            raise AttributeError(f"you gave me {x}")
+
+        with self.assertRaisesRegex(AttributeError, "you gave me hihi"):
+            aFunctionThatRaises("hihi")
+
+        try:
+            aFunctionThatRaises("hihi")
+        except:
+            trace = traceback.format_exc()
+            # the traceback should know where we are
+            self.assertIn('conversion_test', trace)
+            self.assertIn('aFunctionThatRaises', trace)

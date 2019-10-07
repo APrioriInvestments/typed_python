@@ -383,4 +383,7 @@ class ListOfWrapper(TupleOrListOfWrapper):
                     ).call(out, args[0])
             )
 
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_to_type(self, True)
+
         return super().convert_type_call(context, typeInst, args, kwargs)

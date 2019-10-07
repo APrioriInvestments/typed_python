@@ -35,7 +35,9 @@ def llvm_bool(i):
 def assertTagDictsSame(left_tags, right_tags):
     for which in [left_tags, right_tags]:
         for tag in which:
-            assert tag in left_tags and tag in right_tags and right_tags[tag] is left_tags[tag], "Tag %s is not the same" % tag
+            assert tag in left_tags and tag in right_tags and right_tags[tag] is left_tags[tag], (
+                f"Tag {tag} is not the same: {left_tags} vs {right_tags}"
+            )
 
 
 def type_to_llvm_type(t):
@@ -441,11 +443,12 @@ class FunctionConverter:
 
             self.builder.branch(block)
 
-    def convert_teardown(self, teardown):
+    def convert_teardown(self, teardown, justClearTags=False):
         orig_tags = dict(self.tags_initialized)
 
         if teardown.matches.Always:
-            self.convert(teardown.expr)
+            if not justClearTags:
+                self.convert(teardown.expr)
         else:
             assert teardown.matches.ByTag
 
@@ -456,11 +459,12 @@ class FunctionConverter:
                 del self.tags_initialized[teardown.tag]
                 del orig_tags[teardown.tag]
 
-                if tagVal is True:
-                    self.convert(teardown.expr)
-                else:
-                    with self.builder.if_then(tagVal):
+                if not justClearTags:
+                    if tagVal is True:
                         self.convert(teardown.expr)
+                    else:
+                        with self.builder.if_then(tagVal):
+                            self.convert(teardown.expr)
 
         assertTagDictsSame(self.tags_initialized, orig_tags)
 
@@ -1113,6 +1117,9 @@ class FunctionConverter:
             if finally_result is not None:
                 for teardown in expr.teardowns:
                     self.convert_teardown(teardown)
+            else:
+                for teardown in expr.teardowns:
+                    self.convert_teardown(teardown, justClearTags=True)
 
             def generate_teardowns(new_tags):
                 with self.tags_as(new_tags):

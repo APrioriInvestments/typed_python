@@ -113,7 +113,7 @@ class PythonToNativeConverter(object):
                 filename=pyast.body.filename
             )]
 
-        return FunctionConversionContext(self, identity, pyast.args, body, input_types, output_type, freevars)
+        return FunctionConversionContext(self, f.__name__, identity, pyast.args, body, input_types, output_type, freevars)
 
     def installLinktimeHook(self, identity, callback):
         """Call 'callback' with the native function pointer for 'identity' after compilation has finished."""

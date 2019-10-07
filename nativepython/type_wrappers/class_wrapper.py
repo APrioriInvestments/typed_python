@@ -14,7 +14,6 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.type_wrappers.bound_method_wrapper import BoundMethodWrapper
-from nativepython.type_wrappers.exceptions import generateThrowException
 from nativepython.type_wrappers.python_typed_function_wrapper import PythonTypedFunctionWrapper
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
@@ -315,23 +314,19 @@ class ClassWrapper(RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            return context.pushTerminal(
-                generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)))
+            return context.pushException(
+                AttributeError,
+                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)
             )
 
-        if nocheck:
-            return context.pushReference(
-                self.typeRepresentation.MemberTypes[ix],
-                self.memberPtr(instance, ix)
-            )
+        if not nocheck:
+            with context.ifelse(self.isInitializedNativeExpr(instance, ix)) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(AttributeError, "Attribute %s is not initialized" % attribute)
 
         return context.pushReference(
             self.typeRepresentation.MemberTypes[ix],
-            native_ast.Expression.Branch(
-                cond=self.isInitializedNativeExpr(instance, ix),
-                false=generateThrowException(context, AttributeError("Attribute %s is not initialized" % attribute)),
-                true=self.memberPtr(instance, ix)
-            )
+            self.memberPtr(instance, ix)
         )
 
     def resultTypesForCall(self, func, argTypes):
@@ -766,8 +761,9 @@ class ClassWrapper(RefcountedWrapper):
             ix = attribute
 
         if ix is None:
-            return context.pushTerminal(
-                generateThrowException(context, AttributeError("Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)))
+            return context.pushException(
+                AttributeError,
+                "Attribute %s doesn't exist in %s" % (attribute, self.typeRepresentation)
             )
 
         attr_type = typeWrapper(self.typeRepresentation.MemberTypes[ix])
@@ -794,6 +790,7 @@ class ClassWrapper(RefcountedWrapper):
     def convert_type_call(self, context, typeInst, args, kwargs):
         if kwargs:
             raise NotImplementedError("can't kwargs-initialize a class yet")
+
         return context.push(
             self,
             lambda new_class:

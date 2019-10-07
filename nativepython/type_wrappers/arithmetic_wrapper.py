@@ -17,7 +17,6 @@ from typed_python.type_promotion import computeArithmeticBinaryResultType
 
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.native_ast as native_ast
 import nativepython
 from math import trunc, floor, ceil
@@ -102,6 +101,15 @@ class ArithmeticTypeWrapper(Wrapper):
 
     def _can_convert_from_type(self, otherType, explicit):
         return False
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_cast(self)
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
 
 def toWrapper(T):
@@ -290,28 +298,25 @@ class IntWrapper(ArithmeticTypeWrapper):
             return super().convert_bin_op(context, left, op, right, inplace)
 
         if op.matches.Mod:
+            with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(ZeroDivisionError)
+
             if left.expr_type.typeRepresentation.IsSignedInt:
                 return context.pushPod(
                     int,
-                    native_ast.Expression.Branch(
-                        cond=right.nonref_expr,
-                        true=runtime_functions.mod_int64_int64.call(
-                            left.toInt64().nonref_expr,
-                            right.toInt64().nonref_expr
-                        ),
-                        false=generateThrowException(context, ZeroDivisionError())
+                    runtime_functions.mod_int64_int64.call(
+                        left.toInt64().nonref_expr,
+                        right.toInt64().nonref_expr
                     )
                 ).convert_to_type(self)
+
             # unsigned int
             return context.pushPod(
                 int,
-                native_ast.Expression.Branch(
-                    cond=right.nonref_expr,
-                    true=runtime_functions.mod_uint64_uint64.call(
-                        left.toUInt64().nonref_expr,
-                        right.toUInt64().nonref_expr
-                    ),
-                    false=generateThrowException(context, ZeroDivisionError())
+                runtime_functions.mod_uint64_uint64.call(
+                    left.toUInt64().nonref_expr,
+                    right.toUInt64().nonref_expr
                 )
             ).convert_to_type(self)
         if op.matches.Pow:
@@ -354,16 +359,16 @@ class IntWrapper(ArithmeticTypeWrapper):
                     runtime_functions.floordiv_int64_int64.call(left.toInt64().nonref_expr, right.toInt64().nonref_expr)
                 ).convert_to_type(self)
             # unsigned int
+            with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(ZeroDivisionError)
+
             return context.pushPod(
                 self,
-                native_ast.Expression.Branch(
-                    cond=right.nonref_expr,
-                    true=native_ast.Expression.Binop(
-                        left=left.nonref_expr,
-                        right=right.nonref_expr,
-                        op=native_ast.BinaryOp.Div()
-                    ),
-                    false=generateThrowException(context, ZeroDivisionError())
+                native_ast.Expression.Binop(
+                    left=left.nonref_expr,
+                    right=right.nonref_expr,
+                    op=native_ast.BinaryOp.Div()
                 )
             )
         if op in pyOpToNative:
@@ -648,27 +653,30 @@ class FloatWrapper(ArithmeticTypeWrapper):
             if left.expr_type.typeRepresentation == Float32:
                 return left.toFloat64().convert_bin_op(
                     op, right.toFloat64()).convert_to_type(toWrapper(Float32))
+
+            with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(ZeroDivisionError)
+
             return context.pushPod(
                 self,
-                native_ast.Expression.Branch(
-                    cond=right.nonref_expr,
-                    true=runtime_functions.mod_float64_float64.call(left.nonref_expr, right.nonref_expr),
-                    false=generateThrowException(context, ZeroDivisionError())
-                )
+                runtime_functions.mod_float64_float64.call(left.nonref_expr, right.nonref_expr)
             )
+
         if op.matches.Div:
+            with context.ifelse(right.nonref_expr) as (ifTrue, ifFalse):
+                with ifFalse:
+                    context.pushException(ZeroDivisionError)
+
             return context.pushPod(
                 self,
-                native_ast.Expression.Branch(
-                    cond=right.nonref_expr,
-                    true=native_ast.Expression.Binop(
-                        left=left.nonref_expr,
-                        right=right.nonref_expr,
-                        op=pyOpToNative[op]
-                    ),
-                    false=generateThrowException(context, ZeroDivisionError())
+                native_ast.Expression.Binop(
+                    left=left.nonref_expr,
+                    right=right.nonref_expr,
+                    op=pyOpToNative[op]
                 )
             )
+
         if op.matches.Pow:
             return context.pushPod(
                 float,

@@ -81,7 +81,7 @@ class TestDictCompilation(unittest.TestCase):
 
         self.assertEqual(dict_getitem(x, 1), 2)
 
-        with self.assertRaisesRegex(Exception, "Key doesn't exist"):
+        with self.assertRaisesRegex(KeyError, "2"):
             dict_getitem(x, 2)
 
     def test_dict_setitem(self):

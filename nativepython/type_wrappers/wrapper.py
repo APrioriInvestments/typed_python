@@ -15,7 +15,6 @@
 import nativepython
 
 from typed_python import _types, OneOf, ListOf
-from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.native_ast import VoidPtr
 
@@ -120,34 +119,40 @@ class Wrapper(object):
 
         If continue_iteration is False, then next_value will be ignored. It should be a reference.
         """
-        return context.pushTerminal(
-            generateThrowException(context, AttributeError("%s object cannot be iterated" % self))
+        return context.pushException(
+            AttributeError,
+            "%s object cannot be iterated" % self
         )
 
     def convert_attribute(self, context, instance, attribute):
         """Produce code to access 'attribute' on an object represented by TypedExpression 'instance'."""
-        return context.pushTerminal(
-            generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
+        return context.pushException(
+            AttributeError,
+            "%s object has no attribute %s" % (self, attribute)
         )
 
     def convert_set_attribute(self, context, instance, attribute, value):
-        return context.pushTerminal(
-            generateThrowException(context, AttributeError("%s object has no attribute %s" % (self, attribute)))
+        return context.pushException(
+            AttributeError,
+            "%s object has no attribute %s" % (self, attribute)
         )
 
     def convert_delitem(self, context, instance, item):
-        return context.pushTerminal(
-            generateThrowException(context, AttributeError("%s is not subscriptable" % str(self)))
+        return context.pushException(
+            AttributeError,
+            "%s is not subscriptable" % str(self)
         )
 
     def convert_getitem(self, context, instance, item):
-        return context.pushTerminal(
-            generateThrowException(context, AttributeError("%s is not subscriptable" % str(self)))
+        return context.pushException(
+            AttributeError,
+            "%s is not subscriptable" % str(self)
         )
 
     def convert_setitem(self, context, instance, index, value):
-        return context.pushTerminal(
-            generateThrowException(context, AttributeError("%s does not support item assignment" % str(self)))
+        return context.pushException(
+            AttributeError,
+            "%s does not support item assignment" % str(self)
         )
 
     def convert_assign(self, context, target, toStore):
@@ -184,18 +189,21 @@ class Wrapper(object):
         ))
 
     def convert_len(self, context, expr):
-        return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't take 'len' of instance of type '%s'" % (str(self),)))
+        return context.pushException(
+            TypeError,
+            "Can't take 'len' of instance of type '%s'" % (str(self),)
         )
 
     def convert_hash(self, context, expr):
-        return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't hash instance of type '%s'" % (str(self),)))
+        return context.pushException(
+            TypeError,
+            "Can't hash instance of type '%s'" % (str(self),)
         )
 
     def convert_abs(self, context, expr):
-        return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't take 'abs' of instance of type '%s'" % (str(self),)))
+        return context.pushException(
+            TypeError,
+            "Can't take 'abs' of instance of type '%s'" % (str(self),)
         )
 
     def convert_builtin(self, f, context, expr, a1=None):
@@ -214,9 +222,10 @@ class Wrapper(object):
         if f is format and a1 is None:
             return expr.convert_cast(str)
 
-        return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't compile '%s' on instance of type '%s'%s"
-                                                      % (str(f), str(self), " with additional parameter" if a1 else "")))
+        return context.pushException(
+            TypeError,
+            "Can't compile '%s' on instance of type '%s'%s"
+                % (str(f), str(self), " with additional parameter" if a1 else "")
         )
 
     def convert_repr(self, context, expr):
@@ -230,13 +239,15 @@ class Wrapper(object):
                     runtime_functions.np_repr.call(expr.expr.cast(VoidPtr), tp).cast(typeWrapper(str).layoutType)
                 )
             )
-        return context.pushTerminal(
-            generateThrowException(context, TypeError("No type pointer for '%s'" % (str(self),)))
+        return context.pushException(
+            TypeError,
+            "No type pointer for '%s'" % (str(self),)
         )
 
     def convert_unary_op(self, context, expr, op):
-        return context.pushTerminal(
-            generateThrowException(context, TypeError("Can't apply unary op %s to type '%s'" % (op, expr.expr_type)))
+        return context.pushException(
+            TypeError,
+            "Can't apply unary op %s to type '%s'" % (op, expr.expr_type)
         )
 
     def can_convert_to_type(self, otherType, explicit) -> OneOf(False, True, "Maybe"):
@@ -307,7 +318,6 @@ class Wrapper(object):
             target_type - a Wrapper for the target type we're converting to
             explicit (bool) - should we allow conversion or not?
         """
-
         # check if there's nothing to do
         if target_type == self.typeRepresentation or target_type == self:
             return expr
@@ -377,12 +387,10 @@ class Wrapper(object):
         if op.matches.NotEq and l.expr_type != r.expr_type:
             return context.constant(True)
 
-        return context.pushTerminal(
-            generateThrowException(
-                context,
-                TypeError("Can't apply op %s to expressions of type %s and %s" %
-                          (op, str(l.expr_type), str(r.expr_type)))
-            )
+        return context.pushException(
+            TypeError,
+            "Can't apply op %s to expressions of type %s and %s" %
+                      (op, str(l.expr_type), str(r.expr_type))
         )
 
     def convert_format(self, context, instance, formatSpecOrNone=None):
@@ -406,16 +414,7 @@ class Wrapper(object):
         return instance.expr_type.convert_to_type(context, instance, self, explicit=True)
 
     def convert_type_call(self, context, typeInst, args, kwargs):
-        if len(args) == 0 and not kwargs:
-            return context.push(self, lambda x: x.convert_default_initialize())
-
-        if len(args) == 1 and not kwargs:
-            return args[0].convert_cast(self)
-
-        return context.pushException(
-            TypeError,
-            "%s() takes at most 1 positional argument" % str(self)
-        )
+        raise Exception(f"We can't call type {self.typeRepresentation} with args {args} and kwargs {kwargs}")
 
     def convert_method_call(self, context, instance, methodname, args, kwargs):
         return context.pushException(

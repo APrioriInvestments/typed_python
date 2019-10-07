@@ -10,16 +10,6 @@
 #include "hash_table_layout.hpp"
 #include "PyInstance.hpp"
 
-thread_local const char* nativepython_cur_exception_value = nullptr;
-
-const char* nativepython_runtime_get_stashed_exception() {
-    return nativepython_cur_exception_value;
-}
-
-bool nativepython_runtime_get_stashed_exception_is_python_exception_set() {
-    return nativepython_cur_exception_value == (const char*)-1;
-}
-
 // Note: extern C identifiers are distinguished only up to 32 characters
 // nativepython_runtime_12345678901
 extern "C" {
@@ -30,11 +20,6 @@ extern "C" {
         }
 
         return StringType::cmpStaticEq(lhs, rhs);
-    }
-
-    void nativepython_runtime_throw_python_exception_set() {
-        nativepython_cur_exception_value = (const char*)-1;
-        throw PythonExceptionSet();
     }
 
     int64_t nativepython_runtime_string_cmp(StringType::layout* lhs, StringType::layout* rhs) {
@@ -153,10 +138,39 @@ extern "C" {
         return BytesType::createFromPtr(utf8_str, len);
     }
 
-    //a temporary kluge to allow us to communicate between exception throw sites and
-    //the native-code invoker until we have a more complete exception model built out.
-    void nativepython_runtime_stash_const_char_ptr_for_exception(const char* m) {
-        nativepython_cur_exception_value = m;
+    void np_initialize_exception(PyObject* o) {
+        PyEnsureGilAcquired getTheGil;
+
+        PyTypeObject* tp = o->ob_type;
+        bool hasBaseE = false;
+
+        while (tp) {
+            if (tp == (PyTypeObject*)PyExc_BaseException) {
+                hasBaseE = true;
+            }
+            tp = tp->tp_base;
+        }
+
+        if (!hasBaseE) {
+            PyErr_Format(PyExc_TypeError, "exceptions must derive from BaseException, not %S", (PyObject*)o->ob_type);
+            return;
+        }
+
+        PyErr_Restore((PyObject*)incref(o->ob_type), incref(o), nullptr);
+    }
+
+    void np_add_traceback(const char* funcname, const char* filename, int lineno) {
+        PyEnsureGilAcquired getTheGil;
+
+        _PyTraceback_Add(funcname, filename, lineno);
+    }
+
+    PyObject* np_builtin_pyobj_by_name(const char* utf8_name) {
+        PyEnsureGilAcquired getTheGil;
+
+        static PyObject* module = PyImport_ImportModule("builtins");
+
+        return PyObject_GetAttrString(module, utf8_name);
     }
 
     void nativepython_runtime_incref_pyobj(PyObject* p) {
@@ -166,7 +180,9 @@ extern "C" {
     }
 
     PyObject* nativepython_runtime_get_pyobj_None() {
-        return Py_None;
+        PyEnsureGilAcquired acquireTheGil;
+
+        return incref(Py_None);
     }
 
     StringType::layout* nativepython_runtime_repr(instance_ptr inst, Type* tp) {
@@ -276,7 +292,13 @@ extern "C" {
 
         va_end(va_args);
 
-        return PyObject_Call(toCall, args, kwargs);
+        PyObject* res = PyObject_Call(toCall, args, kwargs);
+
+        if (!res) {
+            throw PythonExceptionSet();
+        }
+
+        return res;
     }
 
     PyObject* nativepython_runtime_getattr_pyobj(PyObject* p, const char* a) {
@@ -285,7 +307,7 @@ extern "C" {
         PyObject* res = PyObject_GetAttrString(p, a);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -297,7 +319,7 @@ extern "C" {
         PyObject* res = PyObject_GetItem(p, a);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -309,7 +331,7 @@ extern "C" {
         int success = PyObject_DelItem(p, a);
 
         if (success != 0) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
     }
 
@@ -319,7 +341,7 @@ extern "C" {
         int res = PyObject_SetItem(p, index, value);
 
         if (res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
     }
 
@@ -329,7 +351,7 @@ extern "C" {
         int res = PyObject_SetAttrString(p, a, val);
 
         if (res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
     }
 
@@ -488,6 +510,7 @@ extern "C" {
     // are able to do so.
     bool np_runtime_pyobj_to_typed(PyObject *obj, instance_ptr tgt, Type* tp, bool isExplicit) {
         PyEnsureGilAcquired acquireTheGil;
+
         try {
             if (!PyInstance::pyValCouldBeOfType(tp, obj,  isExplicit)) {
                 return false;
@@ -510,148 +533,24 @@ extern "C" {
         PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
 
         int r = PyObject_IsTrue(o);
-        if (r == -1)
-            throw std::runtime_error("np_runtime_instance_to_bool couldn't convert to bool.");
+
+        if (r == -1) {
+            throw PythonExceptionSet();
+        }
+
         return r;
     }
 
     PyObject* np_runtime_to_pyobj(instance_ptr obj, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
-        return PyInstance::extractPythonObject(obj, tp);
-    }
 
-    PyObject* np_runtime_int64_to_pyobj(int64_t i) {
-        return PyLong_FromLongLong(i);
-    }
+        PyObject* res = PyInstance::extractPythonObject(obj, tp);
 
-    PyObject* np_runtime_int32_to_pyobj(int32_t i) {
-        return PyLong_FromLong(i);
-    }
-
-    PyObject* np_runtime_int16_to_pyobj(int16_t i) {
-        return PyLong_FromLong(i);
-    }
-
-    PyObject* np_runtime_int8_to_pyobj(int8_t i) {
-        return PyLong_FromLong(i);
-    }
-
-    PyObject* np_runtime_uint64_to_pyobj(uint64_t u) {
-        return PyLong_FromUnsignedLongLong(u);
-    }
-
-    PyObject* np_runtime_uint32_to_pyobj(uint32_t u) {
-        return PyLong_FromUnsignedLong(u);
-    }
-
-    PyObject* np_runtime_uint16_to_pyobj(uint16_t u) {
-        return PyLong_FromUnsignedLong(u);
-    }
-
-    PyObject* np_runtime_uint8_to_pyobj(uint8_t u) {
-        return PyLong_FromUnsignedLong(u);
-    }
-
-    PyObject* np_runtime_float64_to_pyobj(double f) {
-        return PyFloat_FromDouble(f);
-    }
-
-    PyObject* np_runtime_float32_to_pyobj(float f) {
-        return PyFloat_FromDouble((double)f);
-    }
-
-    // C identifiers can ignore character 32 and onward, so shorten prefix to just "np_"
-    int64_t np_runtime_pyobj_to_int64(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsLong(i);
+        if (!res) {
+            throw PythonExceptionSet();
         }
 
-        throw std::runtime_error("Couldn't convert to int64.");
-    }
-
-    int32_t np_runtime_pyobj_to_int32(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to int32.");
-    }
-
-    int16_t np_runtime_pyobj_to_int16(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to int16.");
-    }
-
-    int8_t np_runtime_pyobj_to_int8(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to int8.");
-    }
-
-    uint64_t np_runtime_pyobj_to_uint64(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsUnsignedLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to uint64.");
-    }
-
-    uint32_t np_runtime_pyobj_to_uint32(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsUnsignedLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to uint32.");
-    }
-
-    uint16_t np_runtime_pyobj_to_uint16(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsUnsignedLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to uint16.");
-    }
-
-    uint8_t np_runtime_pyobj_to_uint8(PyObject* i) {
-        if (PyLong_Check(i)) {
-            return PyLong_AsUnsignedLong(i);
-        }
-
-        throw std::runtime_error("Couldn't convert to uint8.");
-    }
-
-    double np_runtime_pyobj_to_float64(PyObject* o) {
-        if (PyFloat_Check(o)) {
-            return PyFloat_AsDouble(o);
-        }
-
-        throw std::runtime_error("Couldn't convert to float64.");
-    }
-
-    float np_runtime_pyobj_to_float32(PyObject* o) {
-        if (PyFloat_Check(o)) {
-            return (float)PyFloat_AsDouble(o);
-        }
-
-        throw std::runtime_error("Couldn't convert to float32.");
-    }
-
-    void nativepython_print_int64(int64_t t) {
-        std::cout << "function pointer " << t << std::endl;
-    }
-
-    bool np_runtime_pyobj_to_bool(PyObject* o) {
-        PyEnsureGilAcquired getTheGil;
-
-        int r = PyObject_IsTrue(o);
-        if (r == -1)
-            throw std::runtime_error("Couldn't convert to bool.");
-        return r;
+        return res;
     }
 
     void nativepython_print_string(StringType::layout* layout) {
@@ -843,11 +742,14 @@ extern "C" {
     }
 
     PyObject* nativepython_runtime_complex(double r, double i) {
+        PyEnsureGilAcquired acquireTheGil;
+
         return PyComplex_FromDoubles(r, i);
     }
 
     ListOfType::layout* nativepython_runtime_dir(instance_ptr i, Type* tp) {
         PyEnsureGilAcquired acquireTheGil;
+
         PyObjectStealer o(PyInstance::extractPythonObject(i, tp));
         PyObjectStealer dir(PyObject_Dir(o));
         ListOfType *retType = ListOfType::Make(StringType::Make());
@@ -864,7 +766,7 @@ extern "C" {
         PyObject* res = PyNumber_Add(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -876,7 +778,7 @@ extern "C" {
         PyObject* res = PyNumber_Subtract(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -888,7 +790,7 @@ extern "C" {
         PyObject* res = PyNumber_Multiply(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -900,7 +802,7 @@ extern "C" {
         PyObject* res = PyNumber_Power(lhs, rhs, Py_None);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -912,7 +814,7 @@ extern "C" {
         PyObject* res = PyNumber_MatrixMultiply(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -924,7 +826,7 @@ extern "C" {
         PyObject* res = PyNumber_TrueDivide(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -936,7 +838,7 @@ extern "C" {
         PyObject* res = PyNumber_FloorDivide(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -948,7 +850,7 @@ extern "C" {
         PyObject* res = PyNumber_Remainder(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -960,7 +862,7 @@ extern "C" {
         PyObject* res = PyNumber_Lshift(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -972,7 +874,7 @@ extern "C" {
         PyObject* res = PyNumber_Rshift(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -984,7 +886,7 @@ extern "C" {
         PyObject* res = PyNumber_Or(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -996,7 +898,7 @@ extern "C" {
         PyObject* res = PyNumber_Xor(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -1008,7 +910,7 @@ extern "C" {
         PyObject* res = PyNumber_And(lhs, rhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -1020,7 +922,7 @@ extern "C" {
         PyObject* res = PyNumber_Invert(lhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -1032,7 +934,7 @@ extern "C" {
         PyObject* res = PyNumber_Positive(lhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -1044,7 +946,7 @@ extern "C" {
         PyObject* res = PyNumber_Negative(lhs);
 
         if (!res) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;
@@ -1055,7 +957,7 @@ extern "C" {
 
         int64_t res = PyObject_Not(lhs);
         if (res == -1) {
-            nativepython_runtime_throw_python_exception_set();
+            throw PythonExceptionSet();
         }
 
         return res;

@@ -244,6 +244,11 @@ class SimpleAlternativeWrapper(Wrapper):
             return ret and ret.toBool()
         return super().convert_bin_op_reverse(context, r, op, l, inplace)
 
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
 class ConcreteSimpleAlternativeWrapper(Wrapper):
     """Wrapper around alternatives with all empty arguments, after choosing a specific alternative."""
@@ -315,6 +320,12 @@ class ConcreteSimpleAlternativeWrapper(Wrapper):
     def convert_builtin(self, f, context, expr, a1=None):
         altWrapper = typeWrapper(self.alternativeType)
         return altWrapper.convert_builtin(f, context, expr, a1)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
 
 class AlternativeWrapper(RefcountedWrapper):
@@ -600,6 +611,12 @@ class AlternativeWrapper(RefcountedWrapper):
             ret = self.generate_method_call(context, "__contains__", (r, l))
             return ret and ret.toBool()
         return super().convert_bin_op_reverse(context, r, op, l, inplace)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
 
 class ConcreteAlternativeWrapper(RefcountedWrapper):

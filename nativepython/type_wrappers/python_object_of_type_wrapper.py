@@ -253,28 +253,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
     def convert_to_type_with_target(self, context, e, targetVal, explicit):
         target_type = targetVal.expr_type
 
-        arith_calls = {
-            Int64: runtime_functions.pyobj_to_int64,
-            Int32: runtime_functions.pyobj_to_int32,
-            Int16: runtime_functions.pyobj_to_int16,
-            Int8: runtime_functions.pyobj_to_int8,
-            UInt64: runtime_functions.pyobj_to_uint64,
-            UInt32: runtime_functions.pyobj_to_uint32,
-            UInt16: runtime_functions.pyobj_to_uint16,
-            UInt8: runtime_functions.pyobj_to_uint8,
-            Float64: runtime_functions.pyobj_to_float64,
-            Float32: runtime_functions.pyobj_to_float32,
-            Bool: runtime_functions.pyobj_to_bool
-        }
-
         t = target_type.typeRepresentation
-        if t in arith_calls and explicit:
-            context.pushEffect(
-                targetVal.expr.store(
-                    arith_calls[t].call(e.nonref_expr)
-                )
-            )
-            return context.constant(True)
 
         tp = context.getTypePointer(t)
 
@@ -295,27 +274,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
         if not explicit:
             return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
 
-        arith_calls = {
-            Int64: runtime_functions.int64_to_pyobj,
-            Int32: runtime_functions.int32_to_pyobj,
-            Int16: runtime_functions.int16_to_pyobj,
-            Int8: runtime_functions.int8_to_pyobj,
-            UInt64: runtime_functions.uint64_to_pyobj,
-            UInt32: runtime_functions.uint32_to_pyobj,
-            UInt16: runtime_functions.uint16_to_pyobj,
-            UInt8: runtime_functions.uint8_to_pyobj,
-            Float64: runtime_functions.float64_to_pyobj,
-            Float32: runtime_functions.float32_to_pyobj,
-        }
-
         t = sourceVal.expr_type.typeRepresentation
-        if t in arith_calls:
-            context.pushEffect(
-                targetVal.expr.store(
-                    arith_calls[t].call(sourceVal.nonref_expr)
-                )
-            )
-            return context.constant(True)
 
         tp = context.getTypePointer(t)
 
@@ -331,3 +290,7 @@ class PythonObjectOfTypeWrapper(Wrapper):
             return context.constant(True)
 
         return super().convert_to_self_with_target(context, targetVal, sourceVal, explicit)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        return context.constant(self.typeRepresentation.PyType).convert_call(args, kwargs)
+

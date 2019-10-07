@@ -120,7 +120,7 @@ def dict_remove_key(instance, item, itemHash):
     slots = instance._hash_table_slots
 
     if not slots:
-        raise Exception("Key doesn't exist")
+        raise KeyError(item)
 
     if instance._items_reserved > (instance._hash_table_count + 2) * 4:
         instance._compressItemTableUnsafe()
@@ -137,7 +137,7 @@ def dict_remove_key(instance, item, itemHash):
         slotIndex = int((slots + offset).get())
 
         if slotIndex == EMPTY:
-            raise Exception("Key doesn't exist")
+            raise KeyError(item)
 
         if slotIndex != DELETED and (instance._hash_table_hashes + offset).get() == itemHash:
             if instance.getKeyByIndexUnsafe(slotIndex) == item:
@@ -170,7 +170,7 @@ def dict_getitem(instance, item):
     slot = dict_slot_for_key(instance, itemHash, item)
 
     if slot == -1:
-        raise Exception("Key doesn't exist")
+        raise KeyError(item)
 
     return instance.getValueByIndexUnsafe(slot)
 
@@ -601,6 +601,15 @@ class DictWrapper(DictWrapperBase):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_to_type(self, True)
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
 
 class DictMakeIteratorWrapper(DictWrapperBase):

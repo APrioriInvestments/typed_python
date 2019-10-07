@@ -23,6 +23,7 @@ from nativepython.conversion_exception import ConversionException
 from typed_python import NoneType, Alternative, OneOf, Int32, ListOf, String
 from typed_python._types import getTypePointer
 
+builtinValueIdToNameAndValue = {id(v): (k, v) for k, v in __builtins__.items()}
 
 NoneExprType = NoneWrapper()
 
@@ -85,7 +86,19 @@ class ExpressionConversionContext(object):
             return TypedExpression(self, native_ast.const_float_expr(x), float, False)
         if x is None:
             return TypedExpression(self, native_ast.nullExpr, type(None), False)
-        assert False
+
+        if id(x) in builtinValueIdToNameAndValue and builtinValueIdToNameAndValue[id(x)][1] is x:
+            return self.push(
+                object,
+                lambda oPtr:
+                oPtr.expr.store(
+                    runtime_functions.builtin_pyobj_by_name.call(
+                        native_ast.const_utf8_cstr(builtinValueIdToNameAndValue[id(x)][0])
+                    )
+                )
+            )
+
+        raise Exception(f"Couldn't convert {x} to a constant expression.")
 
     def pushVoid(self, t=None):
         if t is None:
@@ -574,18 +587,61 @@ class ExpressionConversionContext(object):
     def pushComment(self, c):
         self.pushEffect(native_ast.nullExpr.with_comment(c))
 
-    def pushException(self, type, value):
-        self.pushEffect(
-            # as a short-term hack, use a runtime function to stash this where the callsite can pick it up.
-            runtime_functions.stash_exception_ptr.call(
-                native_ast.const_utf8_cstr(str(value))
-            )
-            >> native_ast.Expression.Throw(
-                expr=native_ast.Expression.Constant(
-                    val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+    def pushException(self, excType, *args, **kwargs):
+        """Push a side-effect that throws an exception of type 'excType'.
+
+        Args:
+            excType - either a TypedExpression containing the type of the
+                exception, or an actual builtin type.
+            args - a list of TypedExpressions or constants that make
+                up the arguments to the exception
+            kwargs - like args, but keyword arguments for the Exception
+                to throw.
+
+        Returns:
+            None
+        """
+
+        def toTyped(x):
+            if isinstance(x, TypedExpression):
+                return x
+            return self.constant(x)
+
+        excType = toTyped(excType)
+        args = [toTyped(x) for x in args]
+        kwargs = {k: toTyped(v) for k, v in kwargs.items()}
+
+        if excType is None:
+            return None
+
+        exceptionVal = excType.convert_call(args, kwargs)
+
+        if exceptionVal is None:
+            return None
+
+        return self.pushExceptionObject(exceptionVal)
+
+    def pushExceptionObject(self, exceptionObject, filename=None, lineNumber=None):
+        nativeExpr = (
+            runtime_functions.initialize_exception.call(exceptionObject.nonref_expr)
+        )
+
+        if filename is not None:
+            nativeExpr = nativeExpr >> (
+                runtime_functions.add_traceback.call(
+                    native_ast.const_utf8_cstr(self.functionContext.name),
+                    native_ast.const_utf8_cstr(filename),
+                    native_ast.const_int_expr(lineNumber)
                 )
             )
+
+        nativeExpr = nativeExpr >> native_ast.Expression.Throw(
+            expr=native_ast.Expression.Constant(
+                val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+            )
         )
+
+        self.pushEffect(nativeExpr)
 
     def isInitializedVarExpr(self, name):
         if self.functionContext.variableIsAlwaysEmpty(name):

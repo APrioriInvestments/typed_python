@@ -14,7 +14,6 @@
 
 from nativepython.type_wrappers.refcounted_wrapper import RefcountedWrapper
 from nativepython.type_wrappers.wrapper import Wrapper
-from nativepython.type_wrappers.exceptions import generateThrowException
 import nativepython.type_wrappers.runtime_functions as runtime_functions
 from nativepython.typed_expression import TypedExpression
 
@@ -250,15 +249,15 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             )
         )
 
+        with context.ifelse(((actualItem >= 0) & (actualItem < self.convert_len(context, expr))).nonref_expr) as (ifTrue, ifFalse):
+            with ifFalse:
+                context.pushException(IndexError, ("tuple" if self.is_tuple else "list") + " index out of range")
+
         return context.pushReference(
             self.underlyingWrapperType,
-            native_ast.Expression.Branch(
-                cond=((actualItem >= 0) & (actualItem < self.convert_len(context, expr))).nonref_expr,
-                true=expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
+            expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
                     self.underlyingWrapperType.getNativeLayoutType().pointer()
-                ).elemPtr(actualItem.toInt64().nonref_expr),
-                false=generateThrowException(context, IndexError(("tuple" if self.is_tuple else "list") + " index out of range"))
-            )
+            ).elemPtr(actualItem.toInt64().nonref_expr)
         )
 
     def convert_getitem_unsafe(self, context, expr, item):
@@ -313,6 +312,12 @@ class TupleOrListOfWrapper(RefcountedWrapper):
             return context.constant(True)
 
         return super().convert_to_type_with_target(context, e, targetVal, explicit)
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 0 and not kwargs:
+            return context.push(self, lambda x: x.convert_default_initialize())
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
 
 
 class TupleOrListOfIteratorWrapper(Wrapper):
@@ -386,3 +391,13 @@ class TupleOfWrapper(TupleOrListOfWrapper):
         context.pushEffect(
             tgt.expr.store(tgt.expr_type.getNativeLayoutType().zero())
         )
+
+    def convert_type_call(self, context, typeInst, args, kwargs):
+        if len(args) == 1 and args[0].expr_type == self and not kwargs:
+            return args[0]
+
+        if len(args) == 1 and not kwargs:
+            return args[0].convert_to_type(self, True)
+
+        return super().convert_type_call(context, typeInst, args, kwargs)
+
