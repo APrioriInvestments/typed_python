@@ -212,11 +212,29 @@ def pickSpecializationTypeFor(x):
 
     return type(x)
 
+
 def pickSpecializationValueFor(x):
     if isinstance(x, types.FunctionType):
         return Function(x)
 
     return x
+
+
+def NotCompiled(pyFunc):
+    """Decorate 'pyFunc' to prevent it from being compiled.
+
+    Any type annotations on this function will apply, but the function's body itself
+    will stay in the interpreter. This lets us avoid accidentally compiling code that
+    we can't understand but still use the functions when we need them (and provide type
+    hints).
+
+    The actual python object for the function gets used, so it can have references
+    to global state in the program.
+    """
+    assert isinstance(pyFunc, types.FunctionType), "Can't apply NotCompiled to anything but functions."
+
+    pyFunc.__typed_python_no_compile__ = True
+    return Function(pyFunc)
 
 
 def Entrypoint(pyFunc):

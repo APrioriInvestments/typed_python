@@ -14,7 +14,7 @@
 
 from typed_python import ListOf, Class, Member
 from typed_python._types import touchCompiledSpecializations
-from typed_python import Entrypoint
+from typed_python import Entrypoint, NotCompiled
 from typed_python.compiler.runtime import Runtime
 import traceback
 import threading
@@ -229,4 +229,32 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         # make sure it's fast
         t0 = time.time()
         sumOver(100000000, addsOne)
+        self.assertLess(time.time() - t0, .4)
+
+    def test_nocompile_works(self):
+        thisWouldNotBeVisible = set()
+
+        @NotCompiled
+        def f(x: float) -> float:
+            thisWouldNotBeVisible.add(x)
+            return x
+
+        @Entrypoint
+        def sumOver(count, x):
+            # we should know this is a float
+            seed = f(x)
+
+            for i in range(count):
+                seed += i * 1.0
+
+            return seed
+
+        sumOver(100, 3.0)
+
+        self.assertEqual(thisWouldNotBeVisible, set([3.0]))
+
+        t0 = time.time()
+        sumOver(100000000, 3.0)
+        time.time() - t0
+
         self.assertLess(time.time() - t0, .4)

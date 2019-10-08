@@ -37,6 +37,22 @@ class PythonTypedFunctionWrapper(Wrapper):
         if kwargs:
             raise NotImplementedError("can't dispatch to native code with kwargs yet as our matcher doesn't understand it")
 
+        if len(self.typeRepresentation.overloads) == 1:
+            overload = self.typeRepresentation.overloads[0]
+            functionObj = overload.functionObj
+
+            if hasattr(functionObj, "__typed_python_no_compile__"):
+                returnType = overload.returnType or object
+
+                callRes = context.constantPyObject(functionObj).convert_call(
+                    args, kwargs
+                )
+
+                if callRes is None:
+                    return None
+
+                return callRes.convert_to_type(returnType)
+
         callTarget = self.compileCall(
             context.functionContext.converter,
             None,

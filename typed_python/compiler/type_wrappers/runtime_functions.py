@@ -195,7 +195,7 @@ get_pyobj_None = externalCallTarget(
 
 incref_pyobj = externalCallTarget(
     "nativepython_runtime_incref_pyobj",
-    Void,
+    Void.pointer(),
     Void.pointer()
 )
 

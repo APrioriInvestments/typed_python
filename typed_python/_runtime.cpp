@@ -173,10 +173,12 @@ extern "C" {
         return PyObject_GetAttrString(module, utf8_name);
     }
 
-    void nativepython_runtime_incref_pyobj(PyObject* p) {
+    PyObject* nativepython_runtime_incref_pyobj(PyObject* p) {
         PyEnsureGilAcquired getTheGil;
 
         incref(p);
+
+        return p;
     }
 
     PyObject* nativepython_runtime_get_pyobj_None() {
@@ -962,6 +964,8 @@ extern "C" {
 
         return res;
     }
+
+
 
 }
 

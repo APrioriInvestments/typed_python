@@ -37,6 +37,8 @@ ExpressionIntermediate = Alternative(
     StackSlot={"name": str, "expr": native_ast.Expression}
 )
 
+_memoizedThingsById = {}
+
 
 class ExpressionConversionContext(object):
     """Context class when we're converting a single compound expression.
@@ -72,6 +74,27 @@ class ExpressionConversionContext(object):
         T = typeWrapper(T)
 
         return TypedExpression(self, T.getNativeLayoutType().zero(), T, False)
+
+    def constantPyObject(self, x):
+        """Get a TypedExpression that represents a specific python object as 'object'.
+
+        We do this (at the moment) by encoding the pointer value directly in the generated
+        code. Later, when we want our compiled code to be reusable, we'll have to have
+        a secondary link stage for this.
+        """
+
+        # this guarantees the object stays alive as long as this module
+        _memoizedThingsById[id(x)] = x
+
+        return self.push(
+            object,
+            lambda oExpr:
+            oExpr.expr.store(
+                runtime_functions.incref_pyobj.call(
+                    native_ast.const_uint64_expr(id(x)).cast(native_ast.Void.pointer())
+                )
+            )
+        )
 
     def constant(self, x):
         if isinstance(x, str):
