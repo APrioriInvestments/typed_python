@@ -13,13 +13,9 @@ VIRTUAL_ENV ?= .venv
 NODE_ENV ?= .nodeenv
 
 TP_SRC_PATH ?= typed_python
-ODB_SRC_PATH ?= object_database
 
 TP_BUILD_PATH ?= build/temp.linux-x86_64-3.6/typed_python
 TP_LIB_PATH ?= build/lib.linux-x86_64-3.6/typed_python
-
-ODB_BUILD_PATH ?= build/temp.linux-x86_64-3.6/object_database
-ODB_LIB_PATH ?= build/lib.linux-x86_64-3.6/object_database
 
 CPP_FLAGS = -std=c++14  -O2  -Wall  -pthread  -DNDEBUG  -g  -fwrapv         \
             -fstack-protector-strong  -D_FORTIFY_SOURCE=2  -fPIC            \
@@ -42,7 +38,6 @@ SHAREDLIB_FLAGS = -pthread -shared -g -fstack-protector-strong \
 
 UNICODEPROPS = $(TP_SRC_PATH)/UnicodeProps.hpp
 TP_O_FILES = $(TP_BUILD_PATH)/all.o
-ODB_O_FILES = $(ODB_BUILD_PATH)/all.o
 DT_SRC_PATH = $(TP_SRC_PATH)/direct_types
 TESTTYPES = $(DT_SRC_PATH)/GeneratedTypes1.hpp
 TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
@@ -54,35 +49,11 @@ TESTTYPES2 = $(DT_SRC_PATH)/ClientToServer0.hpp
 install: $(VIRTUAL_ENV) testcert.cert testcert.key
 	. $(VIRTUAL_ENV)/bin/activate; \
 		pip3 install pipenv==2018.11.26; \
-		pipenv install --dev --deploy; \
-		nodeenv -p --prebuilt --node=10.15.3 .nodeenv; \
-		npm install -g webpack webpack-cli; \
-		cd object_database/web/content; \
-		npm install; \
-	 	webpack
-
-.PHONY: node-install
-node-install:
-	pip3 install nodeenv; \
-	nodeenv --prebuilt --node=10.15.3 .nodeenv; \
-	. $(NODE_ENV)/bin/activate; \
-	npm install -g webpack webpack-cli; \
-	cd object_database/web/content; \
-	npm install
-
-.PHONY: build-js
-build-js:
-	. $(NODE_ENV)/bin/activate; \
-	cd object_database/web/content; \
-	npm run build
+		pipenv install --dev --deploy;
 
 .PHONY: test
 test: testcert.cert testcert.key js-test
 	. $(VIRTUAL_ENV)/bin/activate; pytest
-
-.PHONY:
-js-test:
-	cd object_database/web/content/; npm test
 
 .PHONY: lint
 lint:
@@ -94,32 +65,7 @@ vlint: $(VIRTUAL_ENV)
 		make lint
 
 .PHONY: lib
-lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so  object_database/_types.cpython-36m-x86_64-linux-gnu.so
-
-.PHONY: docker-build
-docker-build:
-	rm -rf build
-	rm -rf nativepython.egg-info
-	docker build . -t nativepython/cloud:"$(COMMIT)"
-	docker tag nativepython/cloud:"$(COMMIT)"  nativepython/cloud:latest
-
-.PHONY: docker-push
-docker-push:
-	docker push nativepython/cloud:"$(COMMIT)"
-	docker push nativepython/cloud:latest
-
-.PHONY: docker-test
-docker-test:
-	#run unit tests in the debugger
-	docker run -it --rm --privileged --entrypoint bash \
-		nativepython/cloud:"$(COMMIT)" \
-		-c "gdb -ex run --args  python -m pytest"
-
-.PHONY: docker-web
-docker-web:
-	#run a dummy webframework
-	docker run -it --rm --publish 8000:8000 --entrypoint object_database_webtest \
-		nativepython/cloud:"$(COMMIT)"
+lib: typed_python/_types.cpython-36m-x86_64-linux-gnu.so
 
 .PHONY: unicodeprops
 unicodeprops: ./unicodeprops.py
@@ -138,11 +84,8 @@ clean:
 	rm -rf nativepython.egg-info/
 	rm -f nose.*.log
 	rm -f typed_python/_types.cpython-*.so
-	rm -f object_database/_types.cpython-*.so
 	rm -f testcert.cert testcert.key
 	rm -rf $(VIRTUAL_ENV) .env
-	rm -rf .nodeenv
-	rm -f object_database/web/content/dist/main.bundle.js
 	rm -f .coverage*
 
 
@@ -160,36 +103,19 @@ $(VIRTUAL_ENV): $(PYTHON) .env
 $(TP_BUILD_PATH)/all.o: $(TP_SRC_PATH)/*.hpp $(TP_SRC_PATH)/*.cpp
 	$(CC) $(CPP_FLAGS) -c $(TP_SRC_PATH)/all.cpp $ -o $@
 
-$(ODB_BUILD_PATH)/all.o: $(ODB_SRC_PATH)/*.hpp $(ODB_SRC_PATH)/*.cpp $(TP_SRC_PATH)/*.hpp
-	$(CC) $(CPP_FLAGS) -c $(ODB_SRC_PATH)/all.cpp $ -o $@
-
 typed_python/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
 	cp $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so  typed_python
-
-object_database/_types.cpython-36m-x86_64-linux-gnu.so: $(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
-	cp $(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so  object_database
 
 $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(TP_LIB_PATH) $(TP_BUILD_PATH) $(TP_O_FILES)
 	$(CXX) $(SHAREDLIB_FLAGS) $(LINKER_FLAGS) \
 		$(TP_O_FILES) \
 		-o $(TP_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
 
-$(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so: $(ODB_LIB_PATH) $(ODB_BUILD_PATH) $(ODB_O_FILES)
-	$(CXX) $(SHAREDLIB_FLAGS) $(LINKER_FLAGS) \
-		$(ODB_O_FILES) \
-		-o $(ODB_LIB_PATH)/_types.cpython-36m-x86_64-linux-gnu.so
-
 $(TP_BUILD_PATH):
 	mkdir -p $(TP_BUILD_PATH)
 
-$(ODB_BUILD_PATH):
-	mkdir -p $(ODB_BUILD_PATH)
-
 $(TP_LIB_PATH):
 	mkdir -p $(TP_LIB_PATH)
-
-$(ODB_LIB_PATH):
-	mkdir -p $(ODB_LIB_PATH)
 
 testcert.cert testcert.key:
 	openssl req -x509 -newkey rsa:2048 -keyout testcert.key -nodes \

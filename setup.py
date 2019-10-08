@@ -46,16 +46,6 @@ extra_compile_args = [
 
 ext_modules = [
     Extension(
-        'object_database._types',
-        sources=[
-            'object_database/all.cpp',
-        ],
-        define_macros=[
-            ("_FORTIFY_SOURCE", 2)
-        ],
-        extra_compile_args=extra_compile_args
-    ),
-    Extension(
         'typed_python._types',
         sources=[
             'typed_python/all.cpp',
@@ -91,12 +81,6 @@ setuptools.setup(
     ],
 
     license="Apache Software License v2.0",
-    entry_points={
-        'console_scripts': [
-            'object_database_webtest=object_database.frontends.object_database_webtest:main',
-            'object_database_service_manager=object_database.frontends.service_manager:main',
-        ]
-    },
 
     include_package_data=True,
     data_files=[

@@ -24,7 +24,7 @@ from typed_python import sha_hash
 
 _lock = threading.RLock()
 _root_level_module_codebase_cache = {}
-_coreSerializationContext = [None]
+_coreSerializationContext = {}
 
 
 class Codebase:
@@ -64,22 +64,22 @@ class Codebase:
         return getattr(self.getModuleByName(modulename), classname)
 
     @staticmethod
-    def coreSerializationContext():
+    def coreSerializationContext(otherModules=()):
         with _lock:
-            if _coreSerializationContext[0] is None:
-                import object_database
+            if otherModules not in _coreSerializationContext:
                 import typed_python
-
-                context1 = SerializationContext.FromModules(
+                _coreSerializationContext[otherModules] = SerializationContext.FromModules(
                     Codebase._walkModuleDiskRepresentation(typed_python)[2].values()
                 )
-                context2 = SerializationContext.FromModules(
-                    Codebase._walkModuleDiskRepresentation(object_database)[2].values()
-                )
 
-                _coreSerializationContext[0] = context1.union(context2)
+                for otherModule in otherModules:
+                    context2 = SerializationContext.FromModules(
+                        Codebase._walkModuleDiskRepresentation(otherModule)[2].values()
+                    )
 
-            return _coreSerializationContext[0]
+                    _coreSerializationContext[otherModules] = _coreSerializationContext[otherModules].union(context2)
+
+            return _coreSerializationContext[otherModules]
 
     @staticmethod
     def FromRootlevelModule(module, **kwargs):
