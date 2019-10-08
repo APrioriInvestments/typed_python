@@ -208,3 +208,25 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
 
         self.assertEqual(AClass(x=23).g(10, 20.5), 30.5)
         self.assertEqual(AClass(x=23).g2(10, 20.5), 30.5)
+
+    def test_can_pass_functions_as_objects(self):
+        def addsOne(x):
+            return x + 1
+
+        def doubles(x):
+            return x * 2
+
+        @Entrypoint
+        def sumOver(count, f):
+            res = 0
+            for i in range(count):
+                res += f(i)
+            return res
+
+        self.assertEqual(sumOver(10, addsOne), 55)
+        self.assertEqual(sumOver(10, doubles), 90)
+
+        # make sure it's fast
+        t0 = time.time()
+        sumOver(100000000, addsOne)
+        self.assertLess(time.time() - t0, .4)

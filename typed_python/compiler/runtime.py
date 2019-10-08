@@ -14,6 +14,7 @@
 
 import threading
 import os
+import types
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
 from typed_python import Function, NoneType, OneOf, _types
@@ -40,7 +41,7 @@ class Runtime:
         if _singleton[0] is None:
             _singleton[0] = Runtime()
 
-        if os.getenv("NATIVEPYTHON_VERBOSE"):
+        if os.getenv("TP_COMPILER_VERBOSE"):
             _singleton[0].verboselyDisplayNativeCode()
 
         return _singleton[0]
@@ -205,6 +206,19 @@ class Runtime:
             assert False, f
 
 
+def pickSpecializationTypeFor(x):
+    if isinstance(x, types.FunctionType):
+        return Function(x)
+
+    return type(x)
+
+def pickSpecializationValueFor(x):
+    if isinstance(x, types.FunctionType):
+        return Function(x)
+
+    return x
+
+
 def Entrypoint(pyFunc):
     """Decorate 'pyFunc' to JIT-compile it based on the signature of the arguments.
 
@@ -228,7 +242,8 @@ def Entrypoint(pyFunc):
     signatures = set()
 
     def inner(*args):
-        signature = tuple(type(x) for x in args)
+        signature = tuple(pickSpecializationTypeFor(x) for x in args)
+        args = tuple(pickSpecializationValueFor(x) for x in args)
 
         with lock:
             if signature not in signatures:
