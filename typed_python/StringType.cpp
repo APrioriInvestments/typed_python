@@ -163,7 +163,7 @@ StringType::layout* StringType::upper(layout *l) {
     return new_layout;
 }
 
-uint32_t getpoint(StringType::layout *l, uint64_t i) {
+uint32_t StringType::getpoint(layout *l, uint64_t i) {
     if (l->bytes_per_codepoint == 1)
         return ((uint8_t *)l->data)[i];
     else if (l->bytes_per_codepoint == 2)
@@ -844,7 +844,17 @@ void StringType::repr(instance_ptr self, ReprAccumulator& stream) {
         } else if (isprint(base[k])) {
             stream << base[k];
         } else {
-            stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+            if (base[k] == '\n') {
+                stream << "\\n";
+            } else
+            if (base[k] == '\r') {
+                stream << "\\r";
+            } else
+            if (base[k] == '\t') {
+                stream << "\\t";
+            } else {
+                stream << "\\x" << hexDigits[base[k] / 16] << hexDigits[base[k] % 16];
+            }
         }
     }
 

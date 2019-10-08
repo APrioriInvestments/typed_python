@@ -205,7 +205,7 @@ public:
         return (*(layout**)left)->hash_cache;
     }
 
-
+    static uint32_t getpoint(layout *l, uint64_t i);
 
     bool cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions);
 

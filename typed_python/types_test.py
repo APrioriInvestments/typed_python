@@ -2825,3 +2825,11 @@ class NativeTypesTests(unittest.TestCase):
         NT = NamedTuple(x=int, y=str)
 
         self.assertEqual(NT((1, "2")), NT(x=1, y="2"))
+
+    def test_repr_of_string_in_named_tuple(self):
+        NT = NamedTuple(x=str)
+
+        self.assertEqual(repr(NT(x="asdf\nbsdf")), '(x="asdf\\nbsdf",)')
+        self.assertEqual(repr(NT(x="asdf\rbsdf")), '(x="asdf\\rbsdf",)')
+        self.assertEqual(repr(NT(x="asdf\tbsdf")), '(x="asdf\\tbsdf",)')
+        self.assertEqual(repr(NT(x="asdf\x12bsdf")), '(x="asdf\\x12bsdf",)')
