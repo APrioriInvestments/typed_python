@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class, Function
+from typed_python import Function, OneOf, TupleOf, ListOf, Tuple, NamedTuple, Class
 from nativepython.runtime import Runtime, SpecializedEntrypoint
 import unittest
 import traceback
@@ -449,8 +449,78 @@ class TestCompilationStructures(unittest.TestCase):
 
         try:
             aFunctionThatRaises("hihi")
-        except:
+        except Exception:
             trace = traceback.format_exc()
             # the traceback should know where we are
             self.assertIn('conversion_test', trace)
             self.assertIn('aFunctionThatRaises', trace)
+
+    def test_stacktraces_show_up(self):
+        @SpecializedEntrypoint
+        def f1(x):
+            return f2(x)
+
+        def f2(x):
+            return f3(x)
+
+        def f3(x):
+            return f4(x)
+
+        def f4(x):
+            raise Exception(f"X is {x}")
+
+        try:
+            f1("hihi")
+        except Exception:
+            trace = traceback.format_exc()
+            self.assertIn("f1", trace)
+            self.assertIn("f2", trace)
+            self.assertIn("f3", trace)
+            self.assertIn("f4", trace)
+
+    def test_inlining_is_fast(self):
+        def f1(x):
+            return f2(x)
+
+        def f2(x):
+            return f3(x)
+
+        def f3(x):
+            return f4(x)
+
+        def f4(x: int):
+            return x
+
+        @SpecializedEntrypoint
+        def callsF1(times: int):
+            res = 0.0
+            for i in range(times):
+                res += f1(i)
+            return res
+
+        @SpecializedEntrypoint
+        def callsF4(times: int):
+            res = 0.0
+            for i in range(times):
+                res += f4(i)
+            return res
+
+        # prime the compilation
+        callsF1(1)
+        callsF4(1)
+
+        t0 = time.time()
+        callsF1(100000000)
+        t1 = time.time()
+        callsF4(100000000)
+        t2 = time.time()
+
+        callsDeeply = t1 - t0
+        callsShallowly = t2 - t1
+        ratio = callsDeeply / callsShallowly
+
+        # we expect calling f1 to be slower, but not much.
+        # eventually we should be able to note that 'f4' can't throw
+        # which would get rid of some of the extra code we're generating.
+        self.assertTrue(1.0 <= ratio <= 2.0, ratio)
+        print(f"Deeper call tree code was {ratio} times slow.")

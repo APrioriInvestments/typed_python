@@ -46,17 +46,21 @@ def externalCallTarget(name, output, *inputs, varargs=False):
 
 
 def binaryPyobjCallTarget(name):
-    return externalCallTarget(name,
+    return externalCallTarget(
+        name,
         Void.pointer(),
         Void.pointer(),
         Void.pointer(),
     )
 
+
 def unaryPyobjCallTarget(name, retType=Void.pointer()):
-    return externalCallTarget(name,
+    return externalCallTarget(
+        name,
         retType,
-        Void.pointer(),
+        Void.pointer()
     )
+
 
 pyOpToBinaryCallTarget = {
     python_ast.BinaryOp.Add(): binaryPyobjCallTarget("np_pyobj_Add"),
@@ -74,8 +78,9 @@ pyOpToBinaryCallTarget = {
     python_ast.BinaryOp.BitAnd(): binaryPyobjCallTarget("np_pyobj_And"),
 }
 
-pyInplaceOpToBinaryCallTarget = {
-}
+
+pyInplaceOpToBinaryCallTarget = {}
+
 
 pyOpToUnaryCallTarget = {
     python_ast.UnaryOp.Not(): externalCallTarget("np_pyobj_Not", Bool, Void.pointer()),
@@ -83,6 +88,7 @@ pyOpToUnaryCallTarget = {
     python_ast.UnaryOp.UAdd(): unaryPyobjCallTarget("np_pyobj_Positive"),
     python_ast.UnaryOp.USub(): unaryPyobjCallTarget("np_pyobj_Negative"),
 }
+
 
 free = externalCallTarget("free", Void, UInt8Ptr)
 malloc = externalCallTarget("malloc", UInt8Ptr, Int64)
@@ -288,7 +294,8 @@ instance_to_bool = externalCallTarget(
     UInt64,
 )
 
-add_traceback = externalCallTarget("np_add_traceback",
+add_traceback = externalCallTarget(
+    "np_add_traceback",
     Void,
     UInt8.pointer(),
     UInt8.pointer(),

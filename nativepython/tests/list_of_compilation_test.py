@@ -356,7 +356,7 @@ class TestListOfCompilation(unittest.TestCase):
             return slowerThanNumpyRatio
 
         self.assertLess(timingComparison(addSafe), 10)  # 2.0 for me
-        self.assertLess(timingComparison(addUnsafe), 1.3)  # 1.07 for me
+        self.assertLess(timingComparison(addUnsafe), 2.0)  # 1.07 for me
 
     def test_list_duplicate_operation(self):
         @Compiled

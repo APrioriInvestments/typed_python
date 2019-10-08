@@ -225,7 +225,7 @@ class Wrapper(object):
         return context.pushException(
             TypeError,
             "Can't compile '%s' on instance of type '%s'%s"
-                % (str(f), str(self), " with additional parameter" if a1 else "")
+            % (str(f), str(self), " with additional parameter" if a1 else "")
         )
 
     def convert_repr(self, context, expr):
@@ -390,7 +390,7 @@ class Wrapper(object):
         return context.pushException(
             TypeError,
             "Can't apply op %s to expressions of type %s and %s" %
-                      (op, str(l.expr_type), str(r.expr_type))
+            (op, str(l.expr_type), str(r.expr_type))
         )
 
     def convert_format(self, context, instance, formatSpecOrNone=None):

@@ -577,11 +577,11 @@ class FunctionConversionContext(object):
             val_to_store = subcontext.convert_expression_ast(ast.value)
 
             if val_to_store is None:
-                return subcontext.finalize(None), False
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
             succeeds = self.convert_assignment(ast.target, ast.op, val_to_store)
 
-            return subcontext.finalize(None), succeeds
+            return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
 
         if ast.matches.Assign:
             subcontext = ExpressionConversionContext(self, variableStates)
@@ -589,14 +589,14 @@ class FunctionConversionContext(object):
             val_to_store = subcontext.convert_expression_ast(ast.value)
 
             if val_to_store is None:
-                return subcontext.finalize(None), False
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
             if len(ast.targets) == 1:
                 succeeds = self.convert_assignment(ast.targets[0], None, val_to_store)
-                return subcontext.finalize(None), succeeds
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
             else:
                 succeeds = self.convert_multi_assign(ast.targets, val_to_store)
-                return subcontext.finalize(None), succeeds
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), succeeds
 
         if ast.matches.Return:
             subcontext = ExpressionConversionContext(self, variableStates)
@@ -609,7 +609,7 @@ class FunctionConversionContext(object):
                 e = subcontext.convert_expression_ast(ast.value)
 
             if e is None:
-                return subcontext.finalize(None), False
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
             if not self._functionOutputTypeKnown:
                 if self._varname_to_type.get(FunctionOutput) is None:
@@ -622,27 +622,27 @@ class FunctionConversionContext(object):
                 e = e.convert_to_type(self._varname_to_type[FunctionOutput])
 
             if e is None:
-                return subcontext.finalize(None), False
+                return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
             subcontext.pushReturnValue(e)
 
-            return subcontext.finalize(None), False
+            return subcontext.finalize(None, exceptionsTakeFrom=ast), False
 
         if ast.matches.Expr:
             subcontext = ExpressionConversionContext(self, variableStates)
 
             result_expr = subcontext.convert_expression_ast(ast.value)
 
-            return subcontext.finalize(result_expr), result_expr is not None
+            return subcontext.finalize(result_expr, exceptionsTakeFrom=ast), result_expr is not None
 
         if ast.matches.If:
             cond_context = ExpressionConversionContext(self, variableStates)
             cond = cond_context.convert_expression_ast(ast.test)
             if cond is None:
-                return cond_context.finalize(None), False
+                return cond_context.finalize(None, exceptionsTakeFrom=ast), False
             cond = cond.toBool()
             if cond is None:
-                return cond_context.finalize(None), False
+                return cond_context.finalize(None, exceptionsTakeFrom=ast), False
 
             if cond.expr.matches.Constant:
                 truth_val = cond.expr.val.truth_value()
@@ -667,7 +667,7 @@ class FunctionConversionContext(object):
 
             return (
                 native_ast.Expression.Branch(
-                    cond=cond_context.finalize(cond.nonref_expr), true=true, false=false
+                    cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast), true=true, false=false
                 ),
                 true_returns or false_returns
             )
@@ -684,18 +684,18 @@ class FunctionConversionContext(object):
 
                 cond = cond_context.convert_expression_ast(ast.test)
                 if cond is None:
-                    return cond_context.finalize(None), False
+                    return cond_context.finalize(None, exceptionsTakeFrom=ast), False
 
                 cond = cond.toBool()
                 if cond is None:
-                    return cond_context.finalize(None), False
+                    return cond_context.finalize(None, exceptionsTakeFrom=ast), False
 
                 if cond.expr.matches.Constant:
                     truth_value = cond.expr.val.truth_value()
 
                     if not truth_value:
                         branch, flow_returns = self.convert_statement_list_ast(ast.orelse, variableStates)
-                        return cond_context.finalize(None) >> branch, flow_returns
+                        return cond_context.finalize(None, exceptionsTakeFrom=ast) >> branch, flow_returns
                     else:
                         isWhileTrue = True
                 else:
@@ -721,7 +721,7 @@ class FunctionConversionContext(object):
                 if variableStates == initVariableStates:
                     return (
                         native_ast.Expression.While(
-                            cond=cond_context.finalize(cond.nonref_expr), while_true=true, orelse=false
+                            cond=cond_context.finalize(cond.nonref_expr, exceptionsTakeFrom=ast), while_true=true, orelse=false
                         ),
                         (true_returns or false_returns) and not isWhileTrue
                     )
@@ -739,7 +739,7 @@ class FunctionConversionContext(object):
 
             to_iterate = iterator_setup_context.convert_expression_ast(ast.iter)
             if to_iterate is None:
-                return iterator_setup_context.finalize(to_iterate), False
+                return iterator_setup_context.finalize(to_iterate, exceptionsTakeFrom=ast), False
 
             iteration_expressions = to_iterate.get_iteration_expressions()
 
@@ -754,13 +754,13 @@ class FunctionConversionContext(object):
                     iterator_setup_context.pushEffect(thisOne)
 
                     if not thisOneReturns:
-                        return iterator_setup_context.finalize(None), False
+                        return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), False
 
                 thisOne, thisOneReturns = self.convert_statement_list_ast(ast.orelse, variableStates)
 
                 iterator_setup_context.pushEffect(thisOne)
 
-                return iterator_setup_context.finalize(None), thisOneReturns
+                return iterator_setup_context.finalize(None, exceptionsTakeFrom=ast), thisOneReturns
             else:
                 # create a variable to hold the iterator, and instantiate it there
                 iter_varname = target_var_name + ".iter." + str(ast.line_number)
@@ -770,7 +770,7 @@ class FunctionConversionContext(object):
 
                 iterator_object = to_iterate.convert_method_call("__iter__", (), {})
                 if iterator_object is None:
-                    return iterator_setup_context.finalize(iterator_object), False
+                    return iterator_setup_context.finalize(iterator_object, exceptionsTakeFrom=ast), False
 
                 self.assignToLocalVariable(iter_varname, iterator_object, variableStates)
 
@@ -782,11 +782,19 @@ class FunctionConversionContext(object):
 
                     iter_obj = cond_context.namedVariableLookup(iter_varname)
                     if iter_obj is None:
-                        return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
+                        return (
+                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
+                            >> cond_context.finalize(None, exceptionsTakeFrom=ast),
+                            False
+                        )
 
                     next_ptr, is_populated = iter_obj.convert_next()  # this conversion is special - it returns two values
                     if next_ptr is None:
-                        return iterator_setup_context.finalize(None) >> cond_context.finalize(None), False
+                        return (
+                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast)
+                            >> cond_context.finalize(None, exceptionsTakeFrom=ast),
+                            False
+                        )
 
                     with cond_context.ifelse(is_populated.nonref_expr) as (if_true, if_false):
                         with if_true:
@@ -808,9 +816,9 @@ class FunctionConversionContext(object):
                     if variableStates == initVariableStates:
                         # if nothing changed, the loop is stable.
                         return (
-                            iterator_setup_context.finalize(None) >>
+                            iterator_setup_context.finalize(None, exceptionsTakeFrom=ast) >>
                             native_ast.Expression.While(
-                                cond=cond_context.finalize(is_populated), while_true=true, orelse=false
+                                cond=cond_context.finalize(is_populated, exceptionsTakeFrom=ast), while_true=true, orelse=false
                             ),
                             true_returns or false_returns
                         )
@@ -819,8 +827,8 @@ class FunctionConversionContext(object):
             expr_context = ExpressionConversionContext(self, variableStates)
             toThrow = expr_context.convert_expression_ast(ast.exc)
 
-            expr_context.pushExceptionObject(toThrow, ast.exc.filename, ast.exc.line_number)
-            return expr_context.finalize(None), False
+            expr_context.pushExceptionObject(toThrow)
+            return expr_context.finalize(None, exceptionsTakeFrom=ast), False
 
         if ast.matches.Delete:
             exprs = None

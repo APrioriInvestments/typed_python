@@ -256,7 +256,7 @@ class TupleOrListOfWrapper(RefcountedWrapper):
         return context.pushReference(
             self.underlyingWrapperType,
             expr.nonref_expr.ElementPtrIntegers(0, 4).load().cast(
-                    self.underlyingWrapperType.getNativeLayoutType().pointer()
+                self.underlyingWrapperType.getNativeLayoutType().pointer()
             ).elemPtr(actualItem.toInt64().nonref_expr)
         )
 
@@ -400,4 +400,3 @@ class TupleOfWrapper(TupleOrListOfWrapper):
             return args[0].convert_to_type(self, True)
 
         return super().convert_type_call(context, typeInst, args, kwargs)
-

@@ -13,7 +13,6 @@
 #   limitations under the License.
 
 from nativepython.type_wrappers.wrapper import Wrapper
-from typed_python import Int64, Int32, Int16, Int8, UInt64, UInt32, UInt16, UInt8, Float32, Float64, Bool
 from nativepython.typed_expression import TypedExpression
 
 import nativepython.native_ast as native_ast
@@ -293,4 +292,3 @@ class PythonObjectOfTypeWrapper(Wrapper):
 
     def convert_type_call(self, context, typeInst, args, kwargs):
         return context.constant(self.typeRepresentation.PyType).convert_call(args, kwargs)
-

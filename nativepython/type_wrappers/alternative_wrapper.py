@@ -250,6 +250,7 @@ class SimpleAlternativeWrapper(Wrapper):
 
         return super().convert_type_call(context, typeInst, args, kwargs)
 
+
 class ConcreteSimpleAlternativeWrapper(Wrapper):
     """Wrapper around alternatives with all empty arguments, after choosing a specific alternative."""
     is_pod = True

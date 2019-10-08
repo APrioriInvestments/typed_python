@@ -483,7 +483,7 @@ class ExpressionConversionContext(object):
 
         return MainScope()
 
-    def finalize(self, expr):
+    def finalize(self, expr, exceptionsTakeFrom=None):
         if expr is None:
             expr = native_ast.nullExpr
         elif isinstance(expr, native_ast.Expression):
@@ -500,10 +500,25 @@ class ExpressionConversionContext(object):
             elif i.matches.Simple:
                 expr = native_ast.Expression.Let(var=i.name, val=i.expr, within=expr)
 
-        if not self.teardowns:
-            return expr
+        if self.teardowns:
+            expr = native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
 
-        return native_ast.Expression.Finally(expr=expr, teardowns=self.teardowns)
+        if exceptionsTakeFrom:
+            expr = native_ast.Expression.TryCatch(
+                expr=expr,
+                varname=self.functionContext.let_varname(),
+                handler=runtime_functions.add_traceback.call(
+                    native_ast.const_utf8_cstr(self.functionContext.name),
+                    native_ast.const_utf8_cstr(exceptionsTakeFrom.filename),
+                    native_ast.const_int_expr(exceptionsTakeFrom.line_number)
+                ) >> native_ast.Expression.Throw(
+                    expr=native_ast.Expression.Constant(
+                        val=native_ast.Constant.NullPointer(value_type=native_ast.UInt8.pointer())
+                    )
+                )
+            )
+
+        return expr
 
     def call_function_pointer(self, funcPtr, args, kwargs, returnType):
         if kwargs:
@@ -621,19 +636,10 @@ class ExpressionConversionContext(object):
 
         return self.pushExceptionObject(exceptionVal)
 
-    def pushExceptionObject(self, exceptionObject, filename=None, lineNumber=None):
+    def pushExceptionObject(self, exceptionObject):
         nativeExpr = (
             runtime_functions.initialize_exception.call(exceptionObject.nonref_expr)
         )
-
-        if filename is not None:
-            nativeExpr = nativeExpr >> (
-                runtime_functions.add_traceback.call(
-                    native_ast.const_utf8_cstr(self.functionContext.name),
-                    native_ast.const_utf8_cstr(filename),
-                    native_ast.const_int_expr(lineNumber)
-                )
-            )
 
         nativeExpr = nativeExpr >> native_ast.Expression.Throw(
             expr=native_ast.Expression.Constant(
