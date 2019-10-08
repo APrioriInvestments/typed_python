@@ -536,11 +536,7 @@ class Scenario:
         if self.op.expectCompilerDeviation(self.values, self.compileTypes):
             return True
 
-        try:
-            compiledForm = self.op.getCompiledLambda(self.compileTypes)
-        except Exception:
-            self.failureDesc = "Failed to compile at all:\n" + traceback.format_exc()
-            return False
+        compiledForm = self.op.getCompiledLambda(self.compileTypes)
 
         try:
             typedPythonVal = self.op.getLambda()(*self.values)

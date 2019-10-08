@@ -54,6 +54,8 @@ class NativeFunctionConversionContext:
         return self._output_type
 
     def getFunction(self):
+        self.varnames = 0
+
         try:
             subcontext = ExpressionConversionContext(self, None)
             output_type = self._output_type

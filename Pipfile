@@ -13,6 +13,7 @@ pre-commit = "*"
 flaky = "*"
 
 [packages]
+sortedcontainers = "*"
 llvmlite = "*"
 lz4 = "*"
 numpy = "*"

@@ -610,3 +610,58 @@ class TestCompilationStructures(unittest.TestCase):
         self.assertEqual(f(3, "", 1.5), "")
         self.assertEqual(f(3, "one", 0.0), 0.0)
         self.assertEqual(f(3, "one", 1.5), 1.5)
+
+    def test_conversion_of_deeply_nested_functions(self):
+        def g_0():
+            return 0
+
+        def f_0():
+            return 0
+
+        def g_1():
+            return g_0() + f_0()
+
+        def f_1():
+            return f_0() + g_0()
+
+        def g_2():
+            return g_1() + f_1()
+
+        def f_2():
+            return f_1() + g_1()
+
+        def g_3():
+            return g_2() + f_2()
+
+        def f_3():
+            return f_2() + g_2()
+
+        def g_4():
+            return g_3() + f_3()
+
+        def f_4():
+            return f_3() + g_3()
+
+        def g_5():
+            return g_4() + f_4()
+
+        def f_5():
+            return f_4() + g_4()
+
+        def g_6():
+            return g_5() + f_5()
+
+        def f_6():
+            return f_5() + g_5()
+
+        @Entrypoint
+        def compute():
+            return g_6() + f_6()
+
+        oldTimesCalculated = dict(Runtime.singleton().converter._times_calculated)
+
+        compute()
+
+        for identity, timesCalculated in Runtime.singleton().converter._times_calculated.items():
+            if identity not in oldTimesCalculated:
+                self.assertLessEqual(timesCalculated, 4, identity)

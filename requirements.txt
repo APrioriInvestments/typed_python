@@ -3,3 +3,4 @@ lz4
 numpy
 psutil
 pytz
+sortedcontainers

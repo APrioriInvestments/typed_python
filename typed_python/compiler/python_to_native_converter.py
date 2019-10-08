@@ -17,6 +17,8 @@ import typed_python.ast_util as ast_util
 import typed_python._types as _types
 import typed_python.compiler
 import typed_python.compiler.native_ast as native_ast
+from sortedcontainers import SortedSet
+from typed_python.compiler.directed_graph import DirectedGraph
 from typed_python.compiler.type_wrappers.none_wrapper import NoneWrapper
 from typed_python.compiler.type_wrappers.class_wrapper import ClassWrapper
 from typed_python.compiler.python_object_representation import typedPythonTypeToTypeWrapper
@@ -27,6 +29,9 @@ NoneExprType = NoneWrapper()
 
 
 typeWrapper = lambda t: typed_python.compiler.python_object_representation.typedPythonTypeToTypeWrapper(t)
+
+
+VALIDATE_FUNCTION_DEFINITIONS_STABLE = False
 
 
 class TypedCallTarget(object):
@@ -52,16 +57,90 @@ class TypedCallTarget(object):
         )
 
 
+class FunctionDependencyGraph:
+    def __init__(self):
+        self._dependencies = DirectedGraph()
+
+        # the search depth in the dependency to find 'identity'
+        # the _first_ time we ever saw it. We prefer to update
+        # nodes with higher search depth, so we don't recompute
+        # earlier nodes until their children are complete.
+        self._identity_levels = {}
+
+        # nodes that need to recompute
+        self._dirty_inflight_functions = set()
+
+        # (priority, node) pairs that need to recompute
+        self._dirty_inflight_functions_with_order = SortedSet(key=lambda pair: pair[0])
+
+    def getNextDirtyNode(self):
+        while self._dirty_inflight_functions_with_order:
+            priority, identity = self._dirty_inflight_functions_with_order.pop()
+
+            if identity in self._dirty_inflight_functions:
+                self._dirty_inflight_functions.discard(identity)
+
+                return identity
+
+    def addRoot(self, identity):
+        if identity not in self._identity_levels:
+            self._identity_levels[identity] = 0
+            self.markDirty(identity)
+
+    def addEdge(self, caller, callee):
+        if caller not in self._identity_levels:
+            raise Exception(f"unknown identity {caller} found in the graph")
+
+        if callee not in self._identity_levels:
+            self._identity_levels[callee] = self._identity_levels[caller] + 1
+
+            self.markDirty(callee, isNew=True)
+
+        self._dependencies.addEdge(caller, callee)
+
+    def markDirtyWithLowPriority(self, callee):
+        # mark this dirty, but call it back after new functions.
+        self._dirty_inflight_functions.add(callee)
+
+        level = self._identity_levels[callee]
+        self._dirty_inflight_functions_with_order.add((-1000000 + level, callee))
+
+    def markDirty(self, callee, isNew=False):
+        self._dirty_inflight_functions.add(callee)
+
+        if isNew:
+            # if its a new node, compute it with higher priority the _higher_ it is in the stack
+            # so that we do a depth-first search on the way down
+            level = 1000000 - self._identity_levels[callee]
+        else:
+            level = self._identity_levels[callee]
+
+        self._dirty_inflight_functions_with_order.add((level, callee))
+
+    def functionReturnSignatureChanged(self, identity):
+        for caller in self._dependencies.incoming(identity):
+            self.markDirty(caller)
+
+
 class PythonToNativeConverter(object):
     def __init__(self):
         object.__init__(self)
-        self._names_for_identifier = {}
+        self._link_name_for_identity = {}
         self._definitions = {}
         self._targets = {}
+        self._inflight_definitions = {}
         self._inflight_function_conversions = {}
+        self._times_calculated = {}
         self._new_native_functions = set()
         self._used_names = set()
         self._linktimeHooks = []
+
+        # the identity of the function we're currently evaluating.
+        # we use this to track which functions need to get rebuilt when
+        # other functions change types.
+        self._currentlyConverting = None
+
+        self._dependencies = FunctionDependencyGraph()
 
         self.verbose = False
 
@@ -75,7 +154,7 @@ class PythonToNativeConverter(object):
             name - the linker name of the native function this represents, or None
                 if the identity is unknown
         """
-        return self._names_for_identifier.get(identity)
+        return self._link_name_for_identity.get(identity)
 
     def extract_new_function_definitions(self):
         """Return a list of all new function definitions from the last conversion."""
@@ -147,12 +226,17 @@ class PythonToNativeConverter(object):
 
         identity = ("native", identity, output_type, tuple(input_types))
 
-        if identity in self._names_for_identifier:
-            return self._targets[self._names_for_identifier[identity]]
+        if self._currentlyConverting is not None:
+            self._dependencies.addEdge(self._currentlyConverting, identity)
+        else:
+            self._dependencies.addRoot(identity)
+
+        if identity in self._link_name_for_identity:
+            return self._targets[self._link_name_for_identity[identity]]
 
         new_name = self.new_name(name, "runtime.")
 
-        self._names_for_identifier[identity] = new_name
+        self._link_name_for_identity[identity] = new_name
         self._inflight_function_conversions[identity] = NativeFunctionConversionContext(
             self, input_types, output_type, generatingFunction, identity
         )
@@ -226,8 +310,8 @@ class PythonToNativeConverter(object):
         """
         identifier = ("call_converter", callTarget.name)
 
-        if identifier in self._names_for_identifier:
-            return self._names_for_identifier[identifier]
+        if identifier in self._link_name_for_identity:
+            return self._link_name_for_identity[identifier]
 
         args = []
         for i in range(len(callTarget.input_types)):
@@ -265,42 +349,65 @@ class PythonToNativeConverter(object):
         )
 
         new_name = self.new_name(callTarget.name + ".dispatch")
-        self._names_for_identifier[identifier] = new_name
+        self._link_name_for_identity[identifier] = new_name
 
         self._definitions[new_name] = definition
         self._new_native_functions.add(new_name)
 
         return new_name
 
-    def _resolveInflightOnePass(self):
-        oldCount = len(self._inflight_function_conversions)
-        repeat = False
+    def _resolveAllInflightFunctions(self):
+        while True:
+            identity = self._dependencies.getNextDirtyNode()
+            if not identity:
+                return
 
-        for identity, functionConverter in list(self._inflight_function_conversions.items()):
-            nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+            functionConverter = self._inflight_function_conversions[identity]
 
-            if nativeFunction is None:
-                repeat = True
-            else:
+            hasDefinitionBeforeConversion = identity in self._inflight_definitions
+
+            try:
+                self._currentlyConverting = identity
+
+                self._times_calculated[identity] = self._times_calculated.get(identity, 0) + 1
+
+                nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+
+                if nativeFunction is not None:
+                    self._inflight_definitions[identity] = (nativeFunction, actual_output_type)
+
+            finally:
+                self._currentlyConverting = None
+
+            dirtyUpstream = False
+
+            # figure out whether we ought to recalculate all the upstream nodes of this
+            # node. we do that if we get a definition and we didn't have one before, or if
+            # our type stability changed
+            if nativeFunction is not None:
+                if not hasDefinitionBeforeConversion:
+                    dirtyUpstream = True
+
                 if functionConverter.typesAreUnstable():
                     functionConverter.resetTypeInstabilityFlag()
-                    repeat = True
+                    self._dependencies.markDirtyWithLowPriority(identity)
+                    dirtyUpstream = True
 
-                name = self._names_for_identifier[identity]
-
+                name = self._link_name_for_identity[identity]
                 self._targets[name] = self.getTypedCallTarget(name, functionConverter._input_types, actual_output_type)
 
-        # when we define an entrypoint to a class, we actually need to compile
-        # a version of that function for every override of that function as well.
-        # typed_python keeps track of all the entries in all class vtables that
-        # need pointers (we generate one dispatch entry for each class that implements
-        # a function that gets triggered in a base class). As we resolve inflight
-        # functions, we trigger compilation on each of the individual instantiations
-        # we receive.
-        while self.compileClassDispatch():
-            repeat = True
+            if dirtyUpstream:
+                self._dependencies.functionReturnSignatureChanged(identity)
 
-        return repeat or len(self._inflight_function_conversions) != oldCount
+            # when we define an entrypoint to a class, we actually need to compile
+            # a version of that function for every override of that function as well.
+            # typed_python keeps track of all the entries in all class vtables that
+            # need pointers (we generate one dispatch entry for each class that implements
+            # a function that gets triggered in a base class). As we resolve inflight
+            # functions, we trigger compilation on each of the individual instantiations
+            # we receive.
+            while self.compileClassDispatch():
+                pass
 
     def compileClassDispatch(self):
         dispatch = _types.getNextUnlinkedClassMethodDispatch()
@@ -324,16 +431,6 @@ class PythonToNativeConverter(object):
 
         return True
 
-    def _resolveAllInflightFunctions(self):
-        passCt = 0
-        while self._resolveInflightOnePass():
-            passCt += 1
-            if passCt > 100:
-                print("We've done ", passCt, " with ", len(self._inflight_function_conversions))
-                for c in self._inflight_function_conversions.values():
-                    print("    ", c.identity[1].__name__, c.identity[2], "->", c._output_type)
-                raise Exception("Exceed max pass count")
-
     def convert(self, f, input_types, output_type, assertIsRoot=False, callback=None):
         """Convert a single pure python function using args of 'input_types'.
 
@@ -342,16 +439,16 @@ class PythonToNativeConverter(object):
         """
         input_types = tuple([typedPythonTypeToTypeWrapper(i) for i in input_types])
 
-        identifier = ("pyfunction", f, input_types, output_type)
+        identity = ("pyfunction", f, input_types, output_type)
 
         if callback is not None:
-            self.installLinktimeHook(identifier, callback)
+            self.installLinktimeHook(identity, callback)
 
-        if identifier in self._names_for_identifier:
-            name = self._names_for_identifier[identifier]
+        if identity in self._link_name_for_identity:
+            name = self._link_name_for_identity[identity]
         else:
             name = self.new_name(f.__name__)
-            self._names_for_identifier[identifier] = name
+            self._link_name_for_identity[identity] = name
 
         if name in self._targets:
             return self._targets[name]
@@ -361,18 +458,24 @@ class PythonToNativeConverter(object):
         if assertIsRoot:
             assert isRoot
 
-        if identifier not in self._inflight_function_conversions:
-            functionConverter = self.createConversionContext(identifier, f, input_types, output_type)
+        if self._currentlyConverting is not None:
+            self._dependencies.addEdge(self._currentlyConverting, identity)
+        else:
+            self._dependencies.addRoot(identity)
 
-            self._inflight_function_conversions[identifier] = functionConverter
+        if identity not in self._inflight_function_conversions:
+            functionConverter = self.createConversionContext(identity, f, input_types, output_type)
+
+            self._inflight_function_conversions[identity] = functionConverter
 
         if isRoot:
             try:
                 self._resolveAllInflightFunctions()
-                self._installInflightFunctions()
+                self._installInflightFunctions(name)
                 return self._targets[name]
             finally:
                 self._inflight_function_conversions.clear()
+
         else:
             # above us on the stack, we are walking a set of function conversions.
             # if we have ever calculated this function before, we'll have a call
@@ -384,14 +487,29 @@ class PythonToNativeConverter(object):
             else:
                 return None
 
-    def _installInflightFunctions(self):
-        for identifier, functionConverter in self._inflight_function_conversions.items():
-            nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+    def _installInflightFunctions(self, name):
+        if VALIDATE_FUNCTION_DEFINITIONS_STABLE:
+            # this should always be true, but its expensive so we have it off by default
+            for identifier, functionConverter in self._inflight_function_conversions.items():
+                try:
+                    self._currentlyConverting = identifier
 
-            assert nativeFunction is not None
-            name = self._names_for_identifier[identifier]
+                    nativeFunction, actual_output_type = functionConverter.convertToNativeFunction()
+
+                    assert nativeFunction == self._inflight_definitions[identifier]
+                finally:
+                    self._currentlyConverting = None
+
+        for identifier, functionConverter in self._inflight_function_conversions.items():
+            if identifier not in self._inflight_definitions:
+                raise Exception(
+                    f"Expected a definition for {identifier} depended on by:\n"
+                    + "\n".join("    " + str(i) for i in self._dependencies.incoming(identifier))
+                )
+
+            nativeFunction, actual_output_type = self._inflight_definitions.get(identifier)
+
+            name = self._link_name_for_identity[identifier]
 
             self._definitions[name] = nativeFunction
             self._new_native_functions.add(name)
-
-        self._inflight_function_conversions.clear()

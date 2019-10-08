@@ -125,6 +125,10 @@ class FunctionConversionContext(object):
         return True
 
     def convertToNativeFunction(self):
+        self._temp_let_var = 0
+        self._temp_stack_var = 0
+        self._temp_iter_var = 0
+
         variableStates = FunctionStackState()
 
         initializer_expr = self.initializeVariableStates(self._argnames, self._star_args_name, variableStates)
@@ -396,6 +400,16 @@ class FunctionConversionContext(object):
 
     def assignToLocalVariable(self, varname, val_to_store, variableStates):
         """Ensure we have appropriate storage allocated for 'varname', and assign 'val_to_store' to it."""
+
+        if varname not in self.variablesAssigned:
+            # make sure we know this variable is new. We'll have to
+            # re-execute this converter now that we know about this
+            # variable, because right now we generate initializers
+            # for our variables only when the converter excutes
+            # with a stable list of assigned varibles (and types)
+            self.variablesAssigned.add(varname)
+            self.markTypesAreUnstable()
+
         subcontext = val_to_store.context
 
         self.upsizeVariableType(varname, val_to_store.expr_type)
@@ -530,8 +544,6 @@ class FunctionConversionContext(object):
             iter_varname = f".anonymous_iter.{targets[0].line_number}"
 
             # we are going to assign this
-            self.variablesAssigned.add(iter_varname)
-
             iterator_object = val_to_store.convert_method_call("__iter__", (), {})
             if iterator_object is None:
                 return False
@@ -548,7 +560,6 @@ class FunctionConversionContext(object):
                         if targetIndex < len(targets):
                             with if_true:
                                 tempVarnames.append(f".anonyous_iter{targets[0].line_number}.{targetIndex}")
-                                self.variablesAssigned.add(tempVarnames[-1])
                                 self.assignToLocalVariable(tempVarnames[-1], next_ptr, variableStates)
 
                             with if_false:
@@ -579,7 +590,10 @@ class FunctionConversionContext(object):
             }
 
             newMessage = f"\n{ast.filename}:{ast.line_number}\n" + "\n".join(f"    {k}={v}" for k, v in types.items())
-            e.args = (str(e.args[0]) + newMessage,)
+            if e.args:
+                e.args = (str(e.args[0]) + newMessage,)
+            else:
+                e.args = (newMessage,)
             raise
 
     def _convert_statement_ast(self, ast, variableStates: FunctionStackState):
@@ -778,9 +792,6 @@ class FunctionConversionContext(object):
             else:
                 # create a variable to hold the iterator, and instantiate it there
                 iter_varname = target_var_name + ".iter." + str(ast.line_number)
-
-                # we are going to assign this
-                self.variablesAssigned.add(iter_varname)
 
                 iterator_object = to_iterate.convert_method_call("__iter__", (), {})
                 if iterator_object is None:
