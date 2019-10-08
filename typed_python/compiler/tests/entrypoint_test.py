@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import ListOf
+from typed_python import ListOf, Class, Member
 from typed_python._types import touchCompiledSpecializations
 from typed_python import Entrypoint
 from typed_python.compiler.runtime import Runtime
@@ -143,3 +143,68 @@ class TestCompileSpecializedEntrypoints(unittest.TestCase):
         for x in test_cases:
             r = specialized_f(x)
             self.assertTrue(r)
+
+    def test_can_use_entrypoints_from_functions(self):
+        @Entrypoint
+        def f(x):
+            if x <= 0:
+                return 0
+            return g(x-1) + 1
+
+        @Entrypoint
+        def g(x):
+            if x <= 0:
+                return 0
+            return g(x-1) + 1
+
+        self.assertEqual(f(100), 100)
+
+    def test_can_use_entrypoints_on_class_methods(self):
+        class ARandomPythonClass:
+            def __init__(self, x=10):
+                self.x = x
+
+            @Entrypoint
+            def f(self, x: int):
+                return self.x + x
+
+            @Entrypoint
+            @staticmethod
+            def g(x: int, y: int):
+                return x + y
+
+            @staticmethod
+            @Entrypoint
+            def g2(x: int, y: int):
+                return x + y
+
+        self.assertEqual(ARandomPythonClass(23).f(10), 33)
+
+    def test_can_use_entrypoints_on_typed_class_methods(self):
+        class AClass(Class):
+            x = Member(int)
+
+            @Entrypoint
+            def f(self, x: int):
+                res = 0
+                for i in range(x):
+                    res += self.x
+                return res
+
+            @staticmethod
+            @Entrypoint
+            def g(x: int, y: float):
+                return x + y
+
+            @Entrypoint
+            @staticmethod
+            def g2(x: int, y: float):
+                return x + y
+
+        self.assertEqual(AClass(x=23).f(10), 230)
+        t0 = time.time()
+        AClass(x=23).f(100000000)
+        self.assertLess(time.time() - t0, 2.0)
+
+        self.assertEqual(AClass(x=23).g(10, 20.5), 30.5)
+        self.assertEqual(AClass(x=23).g2(10, 20.5), 30.5)

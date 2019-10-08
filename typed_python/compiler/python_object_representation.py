@@ -12,6 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+import types
+
 from typed_python.compiler.typed_expression import TypedExpression
 import typed_python.compiler.native_ast as native_ast
 from typed_python.compiler.type_wrappers.wrapper import Wrapper
@@ -152,6 +154,9 @@ def _typedPythonTypeToTypeWrapper(t):
 def pythonObjectRepresentation(context, f):
     if isinstance(f, type) and issubclass(f, CompilableBuiltin):
         return TypedExpression(context, native_ast.nullExpr, f(), False)
+
+    if isinstance(f, types.FunctionType) and hasattr(f, '__typed_python_function__'):
+        f = f.__typed_python_function__
 
     if f is len:
         return TypedExpression(context, native_ast.nullExpr, LenWrapper(), False)

@@ -16,7 +16,7 @@ import threading
 import os
 import typed_python.compiler.python_to_native_converter as python_to_native_converter
 import typed_python.compiler.llvm_compiler as llvm_compiler
-from typed_python import Function, NoneType, OneOf
+from typed_python import Function, NoneType, OneOf, _types
 from typed_python.internals import FunctionOverload
 
 _singleton = [None]
@@ -205,16 +205,24 @@ class Runtime:
             assert False, f
 
 
-def Entrypoint(f):
-    """Indicate that a function is a natural entrypoint into compiled code,
-    and that we want to specialize on the exact types of the given arguments.
+def Entrypoint(pyFunc):
+    """Decorate 'pyFunc' to JIT-compile it based on the signature of the arguments.
+
+    Each time you call 'pyFunc', we look at the argument signature and see whether
+    we have already compiled a form of that function. If so, we dispatch to that.
+    Otherwise, we compile a new form (which blocks) and then use that when
+    compilation has completed.
     """
-    if not hasattr(f, '__typed_python_category__'):
-        if isinstance(f, staticmethod):
-            f = f.__func__
-        if not callable(f):
-            raise Exception(f"Can only compile functions, not {f}")
-        f = Function(f)
+    wrapInStatic = False
+    if not isinstance(pyFunc, _types.Function):
+        if isinstance(pyFunc, staticmethod):
+            pyFunc = pyFunc.__func__
+            wrapInStatic = True
+
+        if not callable(pyFunc):
+            raise Exception(f"Can only compile functions, not {pyFunc}")
+
+        pyFunc = Function(pyFunc)
 
     lock = threading.RLock()
     signatures = set()
@@ -224,15 +232,18 @@ def Entrypoint(f):
 
         with lock:
             if signature not in signatures:
-                for o in f.overloads:
+                for o in pyFunc.overloads:
                     if o.matchesTypes(signature):
                         argTypes = {o.args[i].name: signature[i] for i in range(len(args))}
                         Runtime.singleton().compile(o, argTypes)
                 signatures.add(signature)
 
-        return f(*args)
+        return pyFunc(*args)
 
-    inner.__qualname__ = str(f)
-    inner.__typed_python_function__ = f
+    inner.__qualname__ = str(pyFunc)
+    inner.__typed_python_function__ = pyFunc
+
+    if wrapInStatic:
+        inner = staticmethod(inner)
 
     return inner
