@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 Nativepython Authors
+   Copyright 2017-2019 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -116,7 +116,7 @@ public:
         catConstDict = 22,
         catAlternative = 23,
         catConcreteAlternative = 24, //concrete Alternative subclass
-        catPythonSubclass = 25, //subclass of a nativepython type
+        catPythonSubclass = 25, //subclass of a typed_python type
         catPythonObjectOfType = 26, //a python object that matches 'isinstance' on a particular type
         catBoundMethod = 27,
         catClass = 28,

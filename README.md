@@ -1,34 +1,29 @@
-[![Build Status](https://travis-ci.com/APrioriInvestments/nativepython.svg?branch=dev)](https://travis-ci.com/APrioriInvestments/nativepython.svg?branch=dev)
+[![Build Status](https://travis-ci.com/APrioriInvestments/typed_python.svg?branch=dev)](https://travis-ci.com/APrioriInvestments/typed_python.svg?branch=dev)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-# `nativepython`
+# `typed_python`
 
-The `nativepython` project is a framework for building high-performance software in Python.
+The `typed_python` module provides strong runtime types to Python and a compiler
+that can take advantage of them.
 
 It gives you new types you can use to build strongly- and semi-strongly-typed
 datastructures, so that your program is easier to understand, and a compiler toolchain
 that can take advantage of those datastructures to generate machine code that's
 fast, and that doesn't need the GIL.
 
-It consists of three modules:
-
-* `typed_python`, a runtime library for expressing type constraints (not just hints) in Python programs
-* `nativepython`, a compiler for Python programs that takes advantage of `typed_python` constraints to generate very efficient code.
-* `object_database`, distributed software transactional memory, and a suite of tools to build distributed applications
-
-These are standard modules that run on Python 3.6 and higher. You can use them
+`typed_python` is a standard modules that run on Python 3.6 and higher. You can use it
 incrementally throughout your project -  add a few type constraints here and
 there, or compile a couple of small but performance-critical functions. As you
 add more type information, more of your program can be compiled. Everything
 can still run in interpreter without compilation if you want.
 
-`nativepython` is generously supported by [A Priori Investments](www.aprioriinvestments.com), a quantitative
+`typed_python` is generously supported by [A Priori Investments](www.aprioriinvestments.com), a quantitative
 hedge fund in New York.  If you're interested in working with us, drop us a line at info@aprioriinvestments.com.
 
 ## Getting started
 
-You can read the [introductory tutorial](docs/introduction.md) for using `nativepython` or
-check out the documentation for [typed_python](docs/typed_python.md) or [nativepython](docs/nativepython.md).
+You can read the [introductory tutorial](docs/introduction.md) for using `typed_python` or
+check out the documentation [typed_python](docs/typed_python.md).
 
 ## Where did this come from?
 
@@ -49,7 +44,7 @@ cycle, the safety you get from having bad code throw an exception instead of
 producing a segfault.  And of course, nobody likes looking through a ten page
 error log just to find out that a template parameter is missing.
 
-I developed `nativepython` to try to have the best of both worlds.  `nativepython`
+I developed `typed_python` to try to have the best of both worlds.  `typed_python`
 lets me have a single codebase, written entirely in Python, where I can
 choose, depending on the context, which style of code I want, from totally
 free-form Python with total type chaos, to statically typed, highly performant

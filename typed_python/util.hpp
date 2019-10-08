@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 Nativepython Authors
+   Copyright 2017-2019 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -24,8 +24,8 @@
 class Type;
 class Instance;
 
-static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
-static_assert(PY_MINOR_VERSION >= 6, "nativepython is a python3.6 project only");
+static_assert(PY_MAJOR_VERSION >= 3, "typed_python is a python3 project only");
+static_assert(PY_MINOR_VERSION >= 6, "typed_python is a python3.6 project only");
 
 // thread-local counter for how many times we've disabled native dispatch
 extern thread_local int64_t native_dispatch_disabled;

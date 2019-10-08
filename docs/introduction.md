@@ -1,12 +1,12 @@
-## An introduction to nativepython
+## An introduction to typed_python
 
-`nativepython` consists of two modules: `typed_python`, a library of new
-datastructures that express different kinds of type semantics, and `nativepython`,
-a library for compiling python code written against `typed_python`.
+`typed_python` provides a library of new datastructures that express different
+kinds of type semantics, and a compiler for compiling python
+code written using `typed_python`.
 
-These two libraries can be used entirely incrementally - you can use a
+The library can be used entirely incrementally - you can use a
 `typed_python` datastructure in just one part of your program and affect
-nothing else, and you can use `nativepython` to compile specific functions in
+nothing else, and you can use `typed_python.Entrypoint` to compile specific functions in
 your program that are slow.
 
 `typed_python` provides a collection of datastructures that look and feel like
@@ -39,7 +39,7 @@ d["deleted"] = None
 ```
 
 By using strongly typed datastructures like this, you can catch errors in your
-program early.  This is far better than littering your program with isinstance
+program early.  This is far better than littering your program with `isinstance`
 checks everywhere, and it also gives the reader of your code more information
 about what's in your program.
 
@@ -67,7 +67,7 @@ m = MyClass(x=10, y=20)
 print(m.f())
 ```
 
-`Class` objects support inheritance the same way python does. However, they
+`Class` objects support inheritance the same way normal Python classes do. However, they
 also support function overloading for their methods. For instance, you can
 write
 
@@ -93,18 +93,18 @@ overload in turn to see whether its types match your desired signature.
 Using these pieces, you can take pretty much any python program, incrementally add
 type annotations to it, and end up with a program that has runtime type safety.
 
-The real power of `nativepython`, however, is that any python code operating
+The real power of `typed_python`, however, is that any python code operating
 on typed_python Class instances and datastructrures is inherently easier
 to reason about, because we can make strong assumptions about the kinds of
 values flowing through the program.
 
 This lets us generate efficient, compiled code, on a per-function basis.
-Simply stick the `nativepython.SpecializedEntrypoint` decorator around
+Simply stick the `typed_python.Entrypoint` decorator around
 any function that uses `typed_python` primitives to get a fast version
 of it:
 
 ```
-@SpecializedEntrypoint
+@Entrypoint
 def sum(someList, zero):
     for x in someList:
         zero += x

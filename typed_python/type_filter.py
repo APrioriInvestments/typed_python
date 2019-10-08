@@ -1,4 +1,4 @@
-#   Copyright 2017-2019 Nativepython Authors
+#   Copyright 2017-2019 typed_python Authors
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.

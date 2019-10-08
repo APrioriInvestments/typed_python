@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 Nativepython Authors
+   Copyright 2017-2019 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@
 #include "DeserializationBuffer.hpp"
 #include "PythonSerializationContext.hpp"
 #include "UnicodeProps.hpp"
-#include "direct_types/DirectTypesTest.hpp"
 #include "_types.hpp"
 
 PyObject *MakeTupleOrListOfType(PyObject* nullValue, PyObject* args, bool isTuple) {
@@ -1406,11 +1405,6 @@ PyObject *deserializeStream(PyObject* nullValue, PyObject* args) {
     }
 }
 
-PyObject *cpp_tests(PyObject* nullValue, PyObject* args) {
-    std::cerr << __FUNCTION__ << std::endl;
-    return incref(direct_cpp_tests() ? Py_True : Py_False);
-}
-
 PyObject *isSimple(PyObject* nullValue, PyObject* args) {
     if (PyTuple_Size(args) != 1) {
         PyErr_SetString(PyExc_TypeError, "isSimple takes 1 positional argument");
@@ -1731,7 +1725,7 @@ PyObject *MakeAlternativeType(PyObject* nullValue, PyObject* args, PyObject* kwa
         }
     };
 
-    static_assert(PY_MAJOR_VERSION >= 3, "nativepython is a python3 project only");
+    static_assert(PY_MAJOR_VERSION >= 3, "typed_python is a python3 project only");
 
     if (PY_MINOR_VERSION <= 5) {
         //we cannot rely on the ordering of 'kwargs' here because of the python version, so
@@ -1778,7 +1772,6 @@ static PyMethodDef module_methods[] = {
     {"disableNativeDispatch", (PyCFunction)disableNativeDispatch, METH_VARARGS, NULL},
     {"enableNativeDispatch", (PyCFunction)enableNativeDispatch, METH_VARARGS, NULL},
     {"refcount", (PyCFunction)refcount, METH_VARARGS, NULL},
-    {"cpp_tests", (PyCFunction)cpp_tests, METH_VARARGS, NULL},
     {"getOrSetTypeResolver", (PyCFunction)getOrSetTypeResolver, METH_VARARGS, NULL},
     {"getTypePointer", (PyCFunction)getTypePointer, METH_VARARGS, NULL},
     {"_vtablePointer", (PyCFunction)getVTablePointer, METH_VARARGS, NULL},

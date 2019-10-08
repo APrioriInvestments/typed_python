@@ -1,5 +1,5 @@
 /******************************************************************************
-   Copyright 2017-2019 Nativepython Authors
+   Copyright 2017-2019 typed_python Authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -66,13 +66,13 @@ public:
 
     /**
      * Function implementing python's dict::setdefault.
-     * 
+     *
      * https://docs.python.org/3/library/stdtypes.html#dict.setdefault
-     * 
+     *
      * setdefault(key[, default])
-     *      If key is in the dictionary, return its value. 
+     *      If key is in the dictionary, return its value.
      *      If not, insert key with a value of default and return default. default defaults to None.
-     * 
+     *
      */
     static PyObject* setDefault(PyObject* o, PyObject* args);
 };
