@@ -3,7 +3,7 @@
 *.so
 __pycache__
 build/
-nativepython.egg-info
+typed_python.egg-info
 
 # Ignore node modules
 # and evironments EVERYWHERE

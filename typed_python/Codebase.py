@@ -24,7 +24,7 @@ from typed_python import sha_hash
 
 _lock = threading.RLock()
 _root_level_module_codebase_cache = {}
-_coreSerializationContext = {}
+_coreSerializationContext = [None]
 
 
 class Codebase:
@@ -45,9 +45,6 @@ class Codebase:
     def hash(self):
         return sha_hash(self.filesToContents).hexdigest
 
-    def getIsolatedSerializationContext(self):
-        return SerializationContext.FromModules(self.modules.values())
-
     def allModuleLevelValues(self):
         """Iterate over all module-level values. Yields (name, object) pairs."""
         for mname, module in self.modules.items():
@@ -64,22 +61,28 @@ class Codebase:
         return getattr(self.getModuleByName(modulename), classname)
 
     @staticmethod
-    def coreSerializationContext(otherModules=()):
+    def coreSerializationContext():
         with _lock:
-            if otherModules not in _coreSerializationContext:
+            if _coreSerializationContext[0] is None:
                 import typed_python
-                _coreSerializationContext[otherModules] = SerializationContext.FromModules(
+
+                _coreSerializationContext[0] = SerializationContext.FromModules(
                     Codebase._walkModuleDiskRepresentation(typed_python)[2].values()
                 )
 
-                for otherModule in otherModules:
+                try:
+                    import object_database
+                except ImportError:
+                    object_database = None
+
+                if object_database is not None:
                     context2 = SerializationContext.FromModules(
-                        Codebase._walkModuleDiskRepresentation(otherModule)[2].values()
+                        Codebase._walkModuleDiskRepresentation(object_database)[2].values()
                     )
 
-                    _coreSerializationContext[otherModules] = _coreSerializationContext[otherModules].union(context2)
+                    _coreSerializationContext[0] = _coreSerializationContext[0].union(context2)
 
-            return _coreSerializationContext[otherModules]
+            return _coreSerializationContext[0]
 
     @staticmethod
     def FromRootlevelModule(module, **kwargs):
