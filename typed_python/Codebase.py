@@ -150,7 +150,7 @@ class Codebase:
                     walkDisk(fullpath, so_far_with_name)
                 else:
                     if os.path.splitext(name)[1] in extensions:
-                        with open(fullpath, "r") as f:
+                        with open(fullpath, "r", encoding='utf-8') as f:
                             try:
                                 contents = f.read()
                             except UnicodeDecodeError:
