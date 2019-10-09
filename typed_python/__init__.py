@@ -12,7 +12,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-__version__ = "0.2"
+__version__ = "0.1.1"
 
 from typed_python.internals import Member, Final, Function, UndefinedBehaviorException, makeNamedTuple
 from typed_python.type_function import TypeFunction

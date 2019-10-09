@@ -7,7 +7,6 @@ verify_ssl = true
 autopep8 = "*"
 beautifulsoup4 = "*"
 flake8 = "*"
-nose = "*"
 coverage = "*"
 pytest = "*"
 
@@ -17,7 +16,6 @@ lz4 = "*"
 numpy = "*"
 psutil = "*"
 pytz = "*"
-pyyaml = "*"
 typed_python = {editable = true,path = "."}
 
 [requires]

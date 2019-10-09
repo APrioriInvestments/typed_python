@@ -87,6 +87,7 @@ clean:
 	rm -f testcert.cert testcert.key
 	rm -rf $(VIRTUAL_ENV) .env
 	rm -f .coverage*
+	rm -f dist/
 
 
 ##########################################################################
@@ -122,6 +123,16 @@ testcert.cert testcert.key:
 		-out testcert.cert -sha256 -days 1000 \
 		-subj '/C=US/ST=New York/L=New York/CN=localhost'
 
+.PHONY: testpypi-upload
+testpypi-upload: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	rm -rf dist
+	python setup.py sdist
+	twine upload --repository-url https://test.pypi.org/legacy/  dist/*
 
-
-
+.PHONY: pypi-upload
+pypi-upload: $(VIRTUAL_ENV)
+	. $(VIRTUAL_ENV)/bin/activate; \
+	rm -rf dist
+	python setup.py sdist
+	twine upload dist/*
