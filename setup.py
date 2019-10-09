@@ -38,10 +38,14 @@ extra_compile_args = [
     '-Wformat',
     '-Wdate-time',
     '-Werror=format-security',
-    '-Wno-reorder',
     '-std=c++14',
     '-Wno-sign-compare',
-    '-Wno-narrowing'
+    '-Wno-narrowing',
+    '-Wno-sign-compare',
+    '-Wno-terminate',
+    '-Wno-reorder',
+    '-Wno-bool-compare',
+    '-Wno-cpp'
 ]
 
 ext_modules = [
