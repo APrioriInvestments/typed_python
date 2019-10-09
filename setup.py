@@ -60,9 +60,9 @@ ext_modules = [
 INSTALL_REQUIRES = [line.strip() for line in open('requirements.txt')]
 
 setuptools.setup(
-    name='nativepython',
-    version='0.0.1',
-    description='Tools for generating machine code using python.',
+    name='typed_python',
+    version='0.1',
+    description='opt-in strong typing at runtime for python, plus a compiler.',
     author='Braxton Mckee',
     author_email='braxton.mckee@gmail.com',
     url='https://github.com/aprioriinvestments/nativepython',

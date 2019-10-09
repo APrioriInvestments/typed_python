@@ -12,25 +12,13 @@ coverage = "*"
 pytest = "*"
 
 [packages]
-boto3 = "*"
-flask = "*"
-flask-cors = "*"
-flask-login = "*"
-flask-sockets = "*"
-flask-wtf = "*"
-gevent = "*"
-ldap3 = "*"
 llvmlite = "*"
 lz4 = "*"
 numpy = "*"
 psutil = "*"
 pytz = "*"
 pyyaml = "*"
-redis = "*"
-requests = "*"
-websockets = "*"
-nodeenv = "*"
-nativepython = {editable = true,path = "."}
+typed_python = {editable = true,path = "."}
 
 [requires]
 python_version = "3.6"
