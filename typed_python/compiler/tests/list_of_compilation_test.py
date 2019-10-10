@@ -356,8 +356,10 @@ class TestListOfCompilation(unittest.TestCase):
 
             return slowerThanNumpyRatio
 
-        self.assertLess(timingComparison(addSafe), 10)  # 2.0 for me
-        self.assertLess(timingComparison(addUnsafe), 2.0)  # 1.07 for me
+        # numpy sped up between 1.16 and 1.17 somehow. I suspect it's using a more native set of
+        # SIMD instructions that we're not persuading LLVM to emit.
+        self.assertLess(timingComparison(addSafe), 10)  # 2.0 for me with numpy 1.16, but 4.0 with numpy 1.17?
+        self.assertLess(timingComparison(addUnsafe), 4.0)  # 1.07 for me against numpy 1.16 but 4.0 against numpy 1.17
 
     def test_list_duplicate_operation(self):
         @Compiled

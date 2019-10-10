@@ -74,6 +74,7 @@ class ClassMetaNamespace:
         self.ns[k] = v
         self.order.append((k, v))
 
+
 magicMethodTypes = {
     '__init__': type(None),
     '__repr__': str,
@@ -96,6 +97,7 @@ magicMethodTypes = {
     '__setitem__': type(None),
     '__delitem__': type(None),
 }
+
 
 def makeFunction(name, f, classType=None):
     spec = inspect.getfullargspec(f)
