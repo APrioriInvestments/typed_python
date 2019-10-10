@@ -15,10 +15,12 @@ import unittest
 import operator
 import time
 import gc
+import math
 from typed_python.test_util import currentMemUsageMb
 
 from typed_python import (
-    ListOf, TupleOf, OneOf, NamedTuple, Class, Member, _types, Forward, Final
+    Int16, UInt64, Float32, ListOf, TupleOf, OneOf, NamedTuple, Class, Alternative,
+    ConstDict, PointerTo, Member, _types, Forward, Final
 )
 
 
@@ -766,14 +768,86 @@ class NativeClassTypesTests(unittest.TestCase):
         self.assertEqual(repr(ClassWithReprAndStr()), "repr")
         self.assertEqual(str(ClassWithReprAndStr()), "str")
 
-    def test_missing_inplace_operators_fall_back(self):
+    def test_class_missing_inplace_operators_fallback(self):
+
         class ClassWithoutInplaceOp(Class, Final):
             def __add__(self, other):
                 return "worked"
 
+            def __sub__(self, other):
+                return "worked"
+
+            def __mul__(self, other):
+                return "worked"
+
+            def __matmul__(self, other):
+                return "worked"
+
+            def __truediv__(self, other):
+                return "worked"
+
+            def __floordiv__(self, other):
+                return "worked"
+
+            def __mod__(self, other):
+                return "worked"
+
+            def __pow__(self, other):
+                return "worked"
+
+            def __lshift__(self, other):
+                return "worked"
+
+            def __rshift__(self, other):
+                return "worked"
+
+            def __and__(self, other):
+                return "worked"
+
+            def __or__(self, other):
+                return "worked"
+
+            def __xor__(self, other):
+                return "worked"
+
         c = ClassWithoutInplaceOp()
         c += 10
-
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c -= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c *= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c @= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c /= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c //= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c %= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c **= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c <<= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c >>= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c &= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c |= 10
+        self.assertEqual(c, "worked")
+        c = ClassWithoutInplaceOp()
+        c ^= 10
         self.assertEqual(c, "worked")
 
     def test_class_with_property(self):
@@ -929,3 +1003,409 @@ class NativeClassTypesTests(unittest.TestCase):
         with self.assertRaisesRegex(Exception, "Can't subclass ChildClass because it's marked 'final'."):
             class BadClass(ChildClass):
                 pass
+
+    def test_callable_class(self):
+        class CallableClass(Class, Final):
+            x = Member(int)
+
+            def __call__(self, x):
+                return self.x + x
+
+            def __call__(self):  # noqa: F811
+                return -1
+
+        class RegularClass(Class, Final):
+            x = Member(int)
+
+            def call(self, x):
+                return self.x + x
+
+        obj = CallableClass(x=42)
+        self.assertEqual(obj(0), 42)
+        self.assertEqual(obj(1), 43)
+        self.assertEqual(obj(), -1 )
+
+        exceptionMsg = "Cannot find a valid overload of '__call__' with arguments of type"
+        with self.assertRaisesRegex(TypeError, exceptionMsg):
+            obj(1, 2, 3)
+
+        obj = RegularClass(x=42)
+        self.assertEqual(obj.call(5), 47)
+        with self.assertRaises(TypeError):
+            obj()
+
+    def test_recursive_classes_repr(self):
+        A0 = Forward("A0")
+
+        class ASelfRecursiveClass(Class, Final):
+            x = Member(OneOf(None, A0))
+
+        A0 = A0.define(ASelfRecursiveClass)
+
+        a = ASelfRecursiveClass()
+        a.x = a
+
+        b = ASelfRecursiveClass()
+        b.x = b
+
+        print(repr(a))
+
+    def test_dispatch_tries_without_conversion_first(self):
+        class ClassWithForcedConversion(Class, Final):
+            def f(self, x: float):
+                return "float"
+
+        class ClassWithBoth(Class, Final):
+            def f(self, x: float):
+                return "float"
+
+            def f(self, x: int):  # noqa: F811
+                return "int"
+
+            def f(self, x: bool):  # noqa: F811
+                return "bool"
+
+        # swap the order
+        class ClassWithBoth2(Class, Final):
+            def f(self, x: bool):
+                return "bool"
+
+            def f(self, x: int):  # noqa: F811
+                return "int"
+
+            def f(self, x: float):  # noqa: F811
+                return "float"
+
+        self.assertEqual(ClassWithForcedConversion().f(10), "float")
+        self.assertEqual(ClassWithForcedConversion().f(10.5), "float")
+        self.assertEqual(ClassWithForcedConversion().f(True), "float")
+
+        self.assertEqual(ClassWithBoth().f(10), "int")
+        self.assertEqual(ClassWithBoth().f(10.5), "float")
+        self.assertEqual(ClassWithBoth().f(True), "bool")
+
+        self.assertEqual(ClassWithBoth2().f(10), "int")
+        self.assertEqual(ClassWithBoth2().f(10.5), "float")
+        self.assertEqual(ClassWithBoth2().f(True), "bool")
+
+    def test_class_magic_methods(self):
+
+        class AClass(Class, Final):
+            _n = Member(str)
+
+            def __init__(self, n=""):
+                self._n = n
+            __bool__ = lambda self: bool(self._n)
+            __str__ = lambda self: "str"
+            __repr__ = lambda self: "repr"
+            __call__ = lambda self: "call"
+            __len__ = lambda self: 42
+            __contains__ = lambda self, item: not not item
+
+            __add__ = lambda lhs, rhs: AClass("add")
+            __sub__ = lambda lhs, rhs: AClass("sub")
+            __mul__ = lambda lhs, rhs: AClass("mul")
+            __matmul__ = lambda lhs, rhs: AClass("matmul")
+            __truediv__ = lambda lhs, rhs: AClass("truediv")
+            __floordiv__ = lambda lhs, rhs: AClass("floordiv")
+            __mod__ = lambda lhs, rhs: AClass("mod")
+            __pow__ = lambda lhs, rhs: AClass("pow")
+            __lshift__ = lambda lhs, rhs: AClass("lshift")
+            __rshift__ = lambda lhs, rhs: AClass("rshift")
+            __and__ = lambda lhs, rhs: AClass("and")
+            __or__ = lambda lhs, rhs: AClass("or")
+            __xor__ = lambda lhs, rhs: AClass("xor")
+
+            __neg__ = lambda self: AClass("neg")
+            __pos__ = lambda self: AClass("pos")
+            __invert__ = lambda self: AClass("invert")
+
+            __abs__ = lambda self: AClass("abs")
+            __int__ = lambda self: 123
+            __float__ = lambda self: 234.5
+            __index__ = lambda self: 124
+            __complex__ = lambda self: complex(1, 2)
+            __round__ = lambda self: 6
+            __trunc__ = lambda self: 7
+            __floor__ = lambda self: 8
+            __ceil__ = lambda self: 9
+
+            __bytes__ = lambda self: b'bytes'
+            __format__ = lambda self, spec: "format"
+
+        self.assertEqual(AClass().__bool__(), False)
+        self.assertEqual(bool(AClass()), False)
+        self.assertEqual(AClass("a").__bool__(), True)
+        self.assertEqual(bool(AClass("a")), True)
+        self.assertEqual(AClass().__str__(), "str")
+        self.assertEqual(str(AClass()), "str")
+        self.assertEqual(AClass().__repr__(), "repr")
+        self.assertEqual(repr(AClass()), "repr")
+        self.assertEqual(AClass().__call__(), "call")
+        self.assertEqual(AClass()(), "call")
+        self.assertEqual(AClass().__contains__(0), False)
+        self.assertEqual(AClass().__contains__(1), True)
+        self.assertEqual(0 in AClass(), False)
+        self.assertEqual(1 in AClass(), True)
+        self.assertEqual(AClass().__len__(), 42)
+        self.assertEqual(len(AClass()), 42)
+
+        self.assertEqual(AClass().__add__(AClass())._n, "add")
+        self.assertEqual((AClass() + AClass())._n, "add")
+        self.assertEqual(AClass().__sub__(AClass())._n, "sub")
+        self.assertEqual((AClass() - AClass())._n, "sub")
+        self.assertEqual((AClass() * AClass())._n, "mul")
+        self.assertEqual((AClass() @ AClass())._n, "matmul")
+        self.assertEqual((AClass() / AClass())._n, "truediv")
+        self.assertEqual((AClass() // AClass())._n, "floordiv")
+        self.assertEqual((AClass() % AClass())._n, "mod")
+        self.assertEqual((AClass() ** AClass())._n, "pow")
+        self.assertEqual((AClass() >> AClass())._n, "rshift")
+        self.assertEqual((AClass() << AClass())._n, "lshift")
+        self.assertEqual((AClass() & AClass())._n, "and")
+        self.assertEqual((AClass() | AClass())._n, "or")
+        self.assertEqual((AClass() ^ AClass())._n, "xor")
+        self.assertEqual((+AClass())._n, "pos")
+        self.assertEqual((-AClass())._n, "neg")
+        self.assertEqual((~AClass())._n, "invert")
+        self.assertEqual(abs(AClass())._n, "abs")
+        self.assertEqual(int(AClass()), 123)
+        self.assertEqual(float(AClass()), 234.5)
+        self.assertEqual(range(1000)[1:AClass():2], range(1, 124, 2))
+        self.assertEqual(complex(AClass()), 1+2j)
+        self.assertEqual(round(AClass()), 6)
+        self.assertEqual(math.trunc(AClass()), 7)
+        self.assertEqual(math.floor(AClass()), 8)
+        self.assertEqual(math.ceil(AClass()), 9)
+
+        self.assertEqual(bytes(AClass()), b"bytes")
+        self.assertEqual(format(AClass()), "format")
+        d = dir(AClass())
+        self.assertEqual(len(d), 98)  # this is the default dir
+
+    def test_class_magic_methods_attr(self):
+
+        A_attrs = {"q": "value-q", "z": "value-z"}
+
+        def A_getattr(s, n):
+            if n not in A_attrs:
+                raise AttributeError(f"no attribute {n}")
+            return A_attrs[n]
+
+        def A_setattr(s, n, v):
+            A_attrs[n] = v
+
+        def A_delattr(s, n):
+            A_attrs.pop(n, None)
+
+        class AClass(Class, Final):
+            __getattr__ = A_getattr
+            __setattr__ = A_setattr
+            __delattr__ = A_delattr
+
+        self.assertEqual(AClass().q, "value-q")
+        self.assertEqual(AClass().z, "value-z")
+        AClass().q = "changedvalue for q"
+        self.assertEqual(AClass().q, "changedvalue for q")
+        with self.assertRaises(AttributeError):
+            print(AClass().invalid)
+        del AClass().z
+        with self.assertRaises(AttributeError):
+            print(AClass().z)
+        AClass().MemberNames = "can't change MemberNames"
+        self.assertEqual(AClass().MemberNames, tuple())
+
+        A2_items = dict()
+
+        def A2_setitem(self, i, v):
+            A2_items[i] = v
+
+        class AClass2(Class, Final):
+            __getattribute__ = A_getattr
+            __setattr__ = A_setattr
+            __delattr__ = A_delattr
+            __dir__ = lambda self: list(A_attrs.keys())
+            __getitem__ = lambda self, i: A2_items.get(i, i)
+            __setitem__ = A2_setitem
+
+        self.assertEqual(AClass2().q, "changedvalue for q")
+        AClass2().MemberNames = "can change MemberNames"
+        self.assertEqual(AClass2().MemberNames, "can change MemberNames")
+        self.assertEqual(dir(AClass2()), ["MemberNames", "q"])
+        self.assertEqual(AClass2()[123], 123)
+        AClass2()[123] = 7
+        self.assertEqual(AClass2()[123], 7)
+
+    def test_class_magic_methods_iter(self):
+
+        class A_iter():
+            def __init__(self):
+                self._cur = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur >= 10:
+                    raise StopIteration
+                self._cur += 1
+                return self._cur
+
+        class A_reversed():
+            def __init__(self):
+                self._cur = 11
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur <= 1:
+                    raise StopIteration
+                self._cur -= 1
+                return self._cur
+
+        class AClass(Class, Final):
+            __iter__ = lambda self: A_iter()
+            __reversed__ = lambda self: A_reversed()
+
+        self.assertEqual([x for x in AClass()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([x for x in reversed(AClass())], [10, 9, 8, 7, 6, 5, 4, 3, 2, 1])
+
+    def test_class_magic_methods_as_iterator(self):
+
+        class B_iter():
+            def __init__(self):
+                self._cur = 0
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._cur >= 10:
+                    raise StopIteration
+                self._cur += 1
+                return self._cur
+
+        x = B_iter()
+
+        class Iterator(Class, Final):
+            __iter__ = lambda self: self
+            __next__ = lambda self: x.__next__()
+
+        A = Alternative("A", a={'a': int},
+                        __iter__=lambda self: Iterator()
+                        )
+        # this is a one-time iterator
+        self.assertEqual([x for x in A.a()], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
+        self.assertEqual([x for x in A.a()], [])
+
+    def test_class_magic_methods_with(self):
+        depth = 0
+
+        def A_enter(s):
+            nonlocal depth
+            depth += 1
+            return depth
+
+        def A_exit(s, t, v, b):
+            nonlocal depth
+            depth -= 1
+            return True
+
+        class AClass(Class, Final):
+            __enter__ = A_enter
+            __exit__ = A_exit
+
+        self.assertEqual(depth, 0)
+        with AClass():
+            self.assertEqual(depth, 1)
+            with AClass():
+                self.assertEqual(depth, 2)
+        self.assertEqual(depth, 0)
+
+    def test_class_comparison_methods(self):
+        class C(Class, Final):
+            x = Member(int)
+            __eq__ = lambda self, other: self.x % 3 == other.x % 3
+            __ne__ = lambda self, other: self.x % 3 != other.x % 3
+            __lt__ = lambda self, other: self.x % 3 < other.x % 3
+            __gt__ = lambda self, other: self.x % 3 > other.x % 3
+            __le__ = lambda self, other: self.x % 3 <= other.x % 3
+            __ge__ = lambda self, other: self.x % 3 >= other.x % 3
+            __hash__ = lambda self: self.x % 3
+
+        self.assertEqual(hash(C(x=1)), 1)
+        self.assertEqual(hash(C(x=3)), 0)
+        self.assertEqual(hash(C(x=5)), 2)
+        self.assertEqual(C(x=1) == C(x=4), True)
+        self.assertEqual(C(x=2) == C(x=6), False)
+        self.assertEqual(C(x=2) != C(x=4), True)
+        self.assertEqual(C(x=1) != C(x=4), False)
+        self.assertEqual(C(x=6) < C(x=1), True)
+        self.assertEqual(C(x=6) < C(x=3), False)
+        self.assertEqual(C(x=2) > C(x=7), True)
+        self.assertEqual(C(x=4) > C(x=1), False)
+        self.assertEqual(C(x=6) <= C(x=0), True)
+        self.assertEqual(C(x=5) <= C(x=3), False)
+        self.assertEqual(C(x=2) >= C(x=7), True)
+        self.assertEqual(C(x=0) >= C(x=1), False)
+
+    def test_class_reverse_operators(self):
+        class C(Class, Final):
+            __radd__ = lambda lhs, rhs: "radd" + str(rhs)
+            __rsub__ = lambda lhs, rhs: "rsub" + str(rhs)
+            __rmul__ = lambda lhs, rhs: "rmul" + str(rhs)
+            __rmatmul__ = lambda lhs, rhs: "rmatmul" + str(rhs)
+            __rtruediv__ = lambda lhs, rhs: "rtruediv" + str(rhs)
+            __rfloordiv__ = lambda lhs, rhs: "rfloordiv" + str(rhs)
+            __rmod__ = lambda lhs, rhs: "rmod" + str(rhs)
+            __rpow__ = lambda lhs, rhs: "rpow" + str(rhs)
+            __rlshift__ = lambda lhs, rhs: "rlshift" + str(rhs)
+            __rrshift__ = lambda lhs, rhs: "rrshift" + str(rhs)
+            __rand__ = lambda lhs, rhs: "rand" + str(rhs)
+            __rxor__ = lambda lhs, rhs: "rxor" + str(rhs)
+            __ror__ = lambda lhs, rhs: "ror" + str(rhs)
+
+        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+        for v in values:
+            self.assertEqual(v + C(), "radd" + str(v))
+            self.assertEqual(v - C(), "rsub" + str(v))
+            self.assertEqual(v * C(), "rmul" + str(v))
+            self.assertEqual(v @ C(), "rmatmul" + str(v))
+            self.assertEqual(v / C(), "rtruediv" + str(v))
+            self.assertEqual(v // C(), "rfloordiv" + str(v))
+            if type(v) != str:
+                self.assertEqual(v % C(), "rmod" + str(v))
+            self.assertEqual(v ** C(), "rpow" + str(v))
+            self.assertEqual(v << C(), "rlshift" + str(v))
+            self.assertEqual(v >> C(), "rrshift" + str(v))
+            self.assertEqual(v & C(), "rand" + str(v))
+            self.assertEqual(v ^ C(), "rxor" + str(v))
+            self.assertEqual(v | C(), "ror" + str(v))
+            with self.assertRaises(TypeError):
+                C() + v
+            with self.assertRaises(TypeError):
+                C() - v
+            with self.assertRaises(TypeError):
+                C() * v
+            with self.assertRaises(TypeError):
+                C() @ v
+            with self.assertRaises(TypeError):
+                C() / v
+            with self.assertRaises(TypeError):
+                C() // v
+            with self.assertRaises(TypeError):
+                C() % v
+            with self.assertRaises(TypeError):
+                C() ** v
+            with self.assertRaises(TypeError):
+                C() << v
+            with self.assertRaises(TypeError):
+                C() >> v
+            with self.assertRaises(TypeError):
+                C() & v
+            with self.assertRaises(TypeError):
+                C() ^ v
+            with self.assertRaises(TypeError):
+                C() | v

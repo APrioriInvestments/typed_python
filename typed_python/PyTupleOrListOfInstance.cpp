@@ -93,7 +93,11 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
     }
 
     //generic path to add any kind of iterable.
-    if (PyObject_Length(rhs) != -1) {
+    if (PyObject_Length(rhs) == -1) {
+        // if not iterable, we want to fall through to Py_NotImplemented, which will try reverse operator,
+        // instead of generating an actual error
+        PyErr_Clear();
+    } else {
         Type* eltType = type()->getEltType();
 
         return PyInstance::initialize(type(), [&](instance_ptr data) {
@@ -121,13 +125,7 @@ PyObject* PyTupleOrListOfInstance::pyOperatorAdd(PyObject* rhs, const char* op, 
         });
     }
 
-    PyErr_SetString(
-        PyExc_TypeError,
-        (std::string("cannot concatenate ") + type()->name() + " and "
-                + rhs->ob_type->tp_name).c_str()
-        );
-
-    return NULL;
+    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
 
 
@@ -846,7 +844,7 @@ int PyListOfInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* value)
         }
     }
 
-    return ((PyInstance*)this)->mp_ass_subscript_concrete(item, value);
+    return PyInstance::mp_ass_subscript_concrete(item, value);
 }
 
 PyMethodDef* PyListOfInstance::typeMethodsConcrete(Type* t) {

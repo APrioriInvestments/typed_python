@@ -12,9 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import Dict, ListOf, Tuple, TupleOf
+from typed_python import Dict, ListOf, Tuple, TupleOf, Entrypoint
 import typed_python._types as _types
-from typed_python import Entrypoint
 import unittest
 import time
 import threading
@@ -83,6 +82,18 @@ class TestDictCompilation(unittest.TestCase):
 
         with self.assertRaisesRegex(KeyError, "2"):
             dict_getitem(x, 2)
+
+    def test_dict_get_default(self):
+        @Entrypoint
+        def dict_get(x, y):
+            return x.get(y, -1)
+
+        x = Dict(int, int)()
+
+        x[1] = 2
+
+        self.assertEqual(dict_get(x, 1), 2)
+        self.assertEqual(dict_get(x, 2), -1)
 
     def test_dict_setitem(self):
         @Entrypoint

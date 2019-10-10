@@ -25,122 +25,60 @@ ConcreteAlternative* PyConcreteAlternativeInstance::type() {
     return (ConcreteAlternative*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-PyObject* PyAlternativeInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* thirdArg, const char* op, const char* opErr) {
-    auto it = type()->getMethods().find(op);
-
-    if (it != type()->getMethods().end()) {
-        Function* f = it->second;
-
-        // for now, restrict usage to only 2 arguments
-        PyObjectStealer argTuple(
-            PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
-            );
-
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
-        if (res.first) {
-            return res.second;
-        }
-    }
-
-    return ((PyInstance*)this)->pyTernaryOperatorConcrete(rhs, thirdArg, op, opErr);
-}
 PyObject* PyConcreteAlternativeInstance::pyTernaryOperatorConcrete(PyObject* rhs, PyObject* thirdArg, const char* op, const char* opErr) {
-    auto it = type()->getAlternative()->getMethods().find(op);
-
-    if (it != type()->getAlternative()->getMethods().end()) {
-        Function* f = it->second;
-
-        // for now, restrict usage to only 2 arguments
-        PyObjectStealer argTuple(
-            PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
-            );
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
-        if (res.first) {
-            return res.second;
-        }
+    if (thirdArg == Py_None) {
+        return pyOperatorConcrete(rhs, op, opErr);
     }
 
-    return ((PyInstance*)this)->pyTernaryOperatorConcrete(rhs, thirdArg, op, opErr);
-}
-
-PyObject* PyAlternativeInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
-    auto it = type()->getMethods().find(op);
-
-    if (it != type()->getMethods().end()) {
-        Function* f = it->second;
-
-        PyObjectStealer argTuple(
-            PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
-            );
-
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
-        if (res.first) {
-            return res.second;
-        }
+    auto res = callMethod(op, rhs, thirdArg);
+    if (!res.first) {
+        return PyInstance::pyTernaryOperatorConcrete(rhs, thirdArg, op, opErr);
     }
-
-    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+    return res.second;
 }
+
 PyObject* PyConcreteAlternativeInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
-    auto it = type()->getAlternative()->getMethods().find(op);
+    auto res = callMethod(op, rhs);
 
-    if (it != type()->getAlternative()->getMethods().end()) {
-        Function* f = it->second;
-
-        PyObjectStealer argTuple(
-            PyTuple_Pack(2, (PyObject*)this, (PyObject*)rhs)
-            );
-
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
-        if (res.first) {
-            return res.second;
-        }
+    if (res.first) {
+        return res.second;
     }
 
-    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
-}
+    if (strlen(op) > 2 && strlen(op) < 16 && op[2] == 'i') { // an inplace operator should fall back to the regular operator
+        char reg_op[16] = "__";
+        strcpy(&reg_op[2], op + 3);
 
-PyObject* PyAlternativeInstance::pyUnaryOperatorConcrete(const char* op, const char* opErr) {
-    auto it = type()->getMethods().find(op);
-
-    if (it != type()->getMethods().end()) {
-        Function* f = it->second;
-
-        PyObjectStealer argTuple(
-            PyTuple_Pack(1, (PyObject*)this)
-            );
-
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
-        if (res.first) {
+        auto res = callMethod(reg_op, rhs);
+        if (res.first)
             return res.second;
-        }
     }
 
-    return ((PyInstance*)this)->pyUnaryOperatorConcrete(op, opErr);
+    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
+
+PyObject* PyConcreteAlternativeInstance::pyOperatorConcreteReverse(PyObject* rhs, const char* op, const char* opErr) {
+    if (strlen(op) < 2 || strlen(op) > 14) {
+        return PyInstance::pyOperatorConcrete(rhs, op, opErr);
+    }
+    char rev_op[16] = "__r";
+    strcpy(&rev_op[3], op + 2);
+    auto res = callMethod(rev_op, rhs);
+
+    if (!res.first) {
+        return PyInstance::pyOperatorConcrete(rhs, op, opErr);
+    }
+
+    return res.second;
+}
+
 PyObject* PyConcreteAlternativeInstance::pyUnaryOperatorConcrete(const char* op, const char* opErr) {
-    auto it = type()->getAlternative()->getMethods().find(op);
+    auto res = callMethod(op);
 
-    if (it != type()->getAlternative()->getMethods().end()) {
-        Function* f = it->second;
-
-        PyObjectStealer argTuple(
-            PyTuple_Pack(1, (PyObject*)this)
-            );
-
-        std::pair<bool, PyObject*> res =
-            PyFunctionInstance::tryToCallAnyOverload(f, nullptr, argTuple, nullptr);
-        if (res.first) {
-            return res.second;
-        }
+    if (!res.first) {
+        return PyInstance::pyUnaryOperatorConcrete(op, opErr);
     }
 
-    return ((PyInstance*)this)->pyUnaryOperatorConcrete(op, opErr);
+    return res.second;
 }
 
 void PyConcreteAlternativeInstance::constructFromPythonArgumentsConcrete(ConcreteAlternative* alt, uint8_t* data, PyObject* args, PyObject* kwargs) {
@@ -236,7 +174,7 @@ PyObject* PyAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrName, const char* attrName) {
-    std::pair<bool, PyObject*> p = callMethod("__getattribute__", pyAttrName);
+    auto p = callMethod("__getattribute__", pyAttrName);
     if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
     }
@@ -288,7 +226,7 @@ PyObject* PyConcreteAlternativeInstance::tp_getattr_concrete(PyObject* pyAttrNam
     PyObject* ret = PyInstance::tp_getattr_concrete(pyAttrName, attrName);
     if (PyErr_Occurred() && PyErr_ExceptionMatches(PyExc_AttributeError)) {
         PyErr_Clear();
-        std::pair<bool, PyObject*> p = callMethod("__getattr__", pyAttrName);
+        auto p = callMethod("__getattr__", pyAttrName);
         if (p.first) {
             return p.second;
         }
@@ -380,12 +318,12 @@ int PyAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* att
 
 int PyConcreteAlternativeInstance::tp_setattr_concrete(PyObject* attrName, PyObject* attrVal) {
     if (!attrVal) {
-        std::pair<bool, PyObject*> p = callMethod("__delattr__", attrName);
+        auto p = callMethod("__delattr__", attrName);
         if (p.first)
             return 0;
     }
     else {
-        std::pair<bool, PyObject*> p = callMethod("__setattr__", attrName, attrVal);
+        auto p = callMethod("__setattr__", attrName, attrVal);
         if (p.first)
             return 0;
     }
@@ -479,9 +417,9 @@ std::pair<bool, PyObject*> PyConcreteAlternativeInstance::callMethod(const char*
 
 int PyConcreteAlternativeInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
     // op == '__bool__'
-    std::pair<bool, PyObject*> p = callMethod("__bool__");
+    auto p = callMethod("__bool__");
     if (!p.first) {
-        p = callMethod("__len__", nullptr, nullptr);
+        p = callMethod("__len__");
         // if neither __bool__ nor __len__ is available, return True
         if (!p.first)
             return 1;
@@ -490,7 +428,7 @@ int PyConcreteAlternativeInstance::pyInquiryConcrete(const char* op, const char*
 }
 
 int PyConcreteAlternativeInstance::sq_contains_concrete(PyObject* item) {
-    std::pair<bool, PyObject*> p = callMethod("__contains__", item);
+    auto p = callMethod("__contains__", item);
     if (!p.first) {
         return 0;
     }
@@ -498,19 +436,18 @@ int PyConcreteAlternativeInstance::sq_contains_concrete(PyObject* item) {
 }
 
 Py_ssize_t PyConcreteAlternativeInstance::mp_and_sq_length_concrete() {
-    std::pair<bool, PyObject*> p = callMethod("__len__");
+    auto p = callMethod("__len__");
     if (!p.first) {
-        return 0;
+        return -1;
     }
     if (!PyLong_Check(p.second)) {
-        return 0;
+        return -1;
     }
     return PyLong_AsLong(p.second);
 }
 
-PyObject* PyConcreteAlternativeInstance::sq_item_concrete(Py_ssize_t ix) {
-    PyObjectStealer arg0(PyLong_FromUnsignedLong(ix));
-    std::pair<bool, PyObject*> p = callMethod("__getitem__", arg0);
+PyObject* PyConcreteAlternativeInstance::mp_subscript_concrete(PyObject* item) {
+    auto p = callMethod("__getitem__", item);
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__getitem__ not defined for type %s", type()->name().c_str());
         return NULL;
@@ -518,22 +455,17 @@ PyObject* PyConcreteAlternativeInstance::sq_item_concrete(Py_ssize_t ix) {
     return p.second;
 }
 
-int PyConcreteAlternativeInstance::sq_ass_item_concrete(Py_ssize_t ix, PyObject* v) {
-    PyObjectStealer arg0(PyLong_FromUnsignedLong(ix));
-    std::pair<bool, PyObject*> p = callMethod("__setitem__", arg0, v);
+int PyConcreteAlternativeInstance::mp_ass_subscript_concrete(PyObject* item, PyObject* v) {
+    auto p = callMethod("__setitem__", item, v);
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__setitem__ not defined for type %s", type()->name().c_str());
         return -1;
     }
-    if (!PyLong_Check(p.second)) {
-        PyErr_Format(PyExc_TypeError, "__setitem__ returned non-integer");
-        return -1;
-    }
-    return PyLong_AsLong(p.second);
+    return 0;
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_iter_concrete() {
-    std::pair<bool, PyObject*> p = callMethod("__iter__");
+    auto p = callMethod("__iter__");
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__iter__ not defined for type %s", type()->name().c_str());
         return NULL;
@@ -542,7 +474,7 @@ PyObject* PyConcreteAlternativeInstance::tp_iter_concrete() {
 }
 
 PyObject* PyConcreteAlternativeInstance::tp_iternext_concrete() {
-    std::pair<bool, PyObject*> p = callMethod("__next__");
+    auto p = callMethod("__next__");
     if (!p.first) {
         PyErr_Format(PyExc_TypeError, "__next__ not defined for type %s", type()->name().c_str());
         return NULL;
@@ -559,7 +491,7 @@ bool PyConcreteAlternativeInstance::compare_to_python_concrete(ConcreteAlternati
     }
     PyConcreteAlternativeInstance *self_inst = (PyConcreteAlternativeInstance*)(PyObject*)self_object;
 
-    std::pair<bool, PyObject*> p = self_inst->callMethod(pyCompareFlagToMethod(pyComparisonOp), other);
+    auto p = self_inst->callMethod(pyCompareFlagToMethod(pyComparisonOp), other);
     if (p.first)
         return PyObject_IsTrue(p.second);
 

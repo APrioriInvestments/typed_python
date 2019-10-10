@@ -12,7 +12,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-from typed_python import TypeFunction, Function, Alternative, Forward, Dict, ListOf
+from typed_python import TypeFunction, Int16, UInt64, Float32, Function, Alternative, Forward, \
+    Dict, ConstDict, ListOf, PointerTo
 import typed_python._types as _types
 from typed_python.compiler.runtime import Runtime
 from typed_python import Entrypoint
@@ -351,22 +352,74 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
 
-    @pytest.mark.skip(reason="not supported yet")
     def test_compile_alternative_reverse_methods(self):
 
         A = Alternative("A", a={'a': int}, b={'b': str},
-                        __radd__=lambda self, other: A.b("radd")
+                        __radd__=lambda self, other: "radd" + repr(other),
+                        __rsub__=lambda self, other: "rsub" + repr(other),
+                        __rmul__=lambda self, other: "rmul" + repr(other),
+                        __rmatmul__=lambda self, other: "rmatmul" + repr(other),
+                        __rtruediv__=lambda self, other: "rtruediv" + repr(other),
+                        __rfloordiv__=lambda self, other: "rfloordiv" + repr(other),
+                        __rmod__=lambda self, other: "rmod" + repr(other),
+                        __rpow__=lambda self, other: "rpow" + repr(other),
+                        __rlshift__=lambda self, other: "rlshift" + repr(other),
+                        __rrshift__=lambda self, other: "rrshift" + repr(other),
+                        __rand__=lambda self, other: "rand" + repr(other),
+                        __rxor__=lambda self, other: "rxor" + repr(other),
+                        __ror__=lambda self, other: "ror" + repr(other),
                         )
 
-        def f_radd(x: A):
-            return 1 + x
+        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+        for v in values:
+            T = type(v)
 
-        test_cases = [f_radd]
-        for f in test_cases:
-            r1 = f(A.a())
-            compiled_f = Compiled(f)
-            r2 = compiled_f(A.a())
-            self.assertEqual(r1, r2)
+            def f_radd(v: T, x: A):
+                return v + x
+
+            def f_rsub(v: T, x: A):
+                return v - x
+
+            def f_rmul(v: T, x: A):
+                return v * x
+
+            def f_rmatmul(v: T, x: A):
+                return v @ x
+
+            def f_rtruediv(v: T, x: A):
+                return v * x
+
+            def f_rfloordiv(v: T, x: A):
+                return v * x
+
+            def f_rmod(v: T, x: A):
+                return v * x
+
+            def f_rpow(v: T, x: A):
+                return v * x
+
+            def f_rlshift(v: T, x: A):
+                return v * x
+
+            def f_rrshift(v: T, x: A):
+                return v * x
+
+            def f_rand(v: T, x: A):
+                return v * x
+
+            def f_rxor(v: T, x: A):
+                return v * x
+
+            def f_ror(v: T, x: A):
+                return v * x
+
+            for f in [f_radd, f_rsub, f_rmul, f_rmatmul, f_rtruediv, f_rfloordiv, f_rmod, f_rpow,
+                      f_rlshift, f_rrshift, f_rand, f_rxor, f_ror]:
+                r1 = f(v, A.a())
+                compiled_f = Compiled(f)
+                r2 = compiled_f(v, A.a())
+                self.assertEqual(r1, r2)
 
     def test_compile_alternative_format(self):
         A1 = Alternative("A1", a={'a': int}, b={'b': str})
@@ -503,7 +556,6 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(f_getattr2(v), "4")
             self.assertEqual(f_getattr2(v), c_getattr2(v))
             f_delattr1(v)
-            # exception types are different
             with self.assertRaises(KeyError):
                 f_getattr1(v)
             with self.assertRaises(KeyError):
@@ -596,7 +648,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(B.a())
             self.assertEqual(r1, r2)
 
-    def test_compile_dir(self):
+    def test_compile_alternative_dir(self):
         # The interpreted dir() calls __dir__() and sorts the result.
         # I expected the compiled dir() to do the same thing, but it doesn't sort.
         # So if you append these elements out of order, the test will fail.
@@ -726,6 +778,43 @@ class TestAlternativeCompilation(unittest.TestCase):
             r1 = f(C.a())
             r2 = compiled_f(C.a())
             self.assertEqual(r1, r2)
+
+    def test_compile_alternative_getsetitem(self):
+
+        def A2_getitem(self, i):
+            if i not in self.d:
+                return i
+            return self.d[i]
+
+        def A2_setitem(self, i, v):
+            self.d[i] = v
+
+        A2 = Alternative("A2", d={'d': Dict(int, int)},
+                         __getitem__=A2_getitem,
+                         __setitem__=A2_setitem
+                         )
+
+        def f_getitem(a: A2, i: int) -> int:
+            return a[i]
+
+        def f_setitem(a: A2, i: int, v: int):
+            a[i] = v
+
+        c_getitem = Compiled(f_getitem)
+        c_setitem = Compiled(f_setitem)
+
+        a = A2.d()
+        a[123] = 7
+        self.assertEqual(a[123], 7)
+        for i in range(10, 20):
+            self.assertEqual(f_getitem(a, i), i)
+            self.assertEqual(c_getitem(a, i), i)
+            f_setitem(a, i, i + 100)
+            self.assertEqual(f_getitem(a, i), i + 100)
+            self.assertEqual(c_getitem(a, i), i + 100)
+            c_setitem(a, i, i + 200)
+            self.assertEqual(f_getitem(a, i), i + 200)
+            self.assertEqual(c_getitem(a, i), i + 200)
 
     def test_compile_simple_alternative_magic_methods(self):
 
@@ -923,21 +1012,74 @@ class TestAlternativeCompilation(unittest.TestCase):
             r2 = compiled_f(A.a())
             self.assertEqual(r1, r2)
 
-    @pytest.mark.skip(reason="not supported yet")
     def test_compile_simple_alternative_reverse_methods(self):
+
         A = Alternative("A", a={}, b={},
-                        __radd__=lambda self, other: A.b("radd")
+                        __radd__=lambda self, other: "radd" + repr(other),
+                        __rsub__=lambda self, other: "rsub" + repr(other),
+                        __rmul__=lambda self, other: "rmul" + repr(other),
+                        __rmatmul__=lambda self, other: "rmatmul" + repr(other),
+                        __rtruediv__=lambda self, other: "rtruediv" + repr(other),
+                        __rfloordiv__=lambda self, other: "rfloordiv" + repr(other),
+                        __rmod__=lambda self, other: "rmod" + repr(other),
+                        __rpow__=lambda self, other: "rpow" + repr(other),
+                        __rlshift__=lambda self, other: "rlshift" + repr(other),
+                        __rrshift__=lambda self, other: "rrshift" + repr(other),
+                        __rand__=lambda self, other: "rand" + repr(other),
+                        __rxor__=lambda self, other: "rxor" + repr(other),
+                        __ror__=lambda self, other: "ror" + repr(other),
                         )
 
-        def f_radd(x: A):
-            return 1 + x
+        values = [1, Int16(1), UInt64(1), 1.234, Float32(1.234), True, "abc",
+                  ListOf(int)((1, 2)), ConstDict(str, str)({"a": "1"}), PointerTo(int)()]
+        for v in values:
+            T = type(v)
 
-        test_cases = [f_radd]
-        for f in test_cases:
-            r1 = f(A.a())
-            compiled_f = Compiled(f)
-            r2 = compiled_f(A.a())
-            self.assertEqual(r1, r2)
+            def f_radd(v: T, x: A):
+                return v + x
+
+            def f_rsub(v: T, x: A):
+                return v - x
+
+            def f_rmul(v: T, x: A):
+                return v * x
+
+            def f_rmatmul(v: T, x: A):
+                return v @ x
+
+            def f_rtruediv(v: T, x: A):
+                return v * x
+
+            def f_rfloordiv(v: T, x: A):
+                return v * x
+
+            def f_rmod(v: T, x: A):
+                return v * x
+
+            def f_rpow(v: T, x: A):
+                return v * x
+
+            def f_rlshift(v: T, x: A):
+                return v * x
+
+            def f_rrshift(v: T, x: A):
+                return v * x
+
+            def f_rand(v: T, x: A):
+                return v * x
+
+            def f_rxor(v: T, x: A):
+                return v * x
+
+            def f_ror(v: T, x: A):
+                return v * x
+
+            for f in [f_radd, f_rsub, f_rmul, f_rmatmul, f_rtruediv, f_rfloordiv, f_rmod, f_rpow,
+                      f_rlshift, f_rrshift, f_rand, f_rxor, f_ror]:
+                r1 = f(v, A.a())
+                compiled_f = Compiled(f)
+                r2 = compiled_f(v, A.a())
+                self.assertEqual(r1, r2)
 
     def test_compile_simple_alternative_format(self):
         A1 = Alternative("A1", a={}, b={})
@@ -1075,7 +1217,7 @@ class TestAlternativeCompilation(unittest.TestCase):
             self.assertEqual(f_getattr2(v), "4")
             self.assertEqual(f_getattr2(v), c_getattr2(v))
             f_delattr1(v)
-            # exception types are different
+            # TODO: exception types are different.  Should this be made consistent?
             with self.assertRaises(KeyError):
                 f_getattr1(v)
             with self.assertRaises(TypeError):
@@ -1296,3 +1438,123 @@ class TestAlternativeCompilation(unittest.TestCase):
             r1 = f(C.a())
             r2 = compiled_f(C.a())
             self.assertEqual(r1, r2)
+
+    def test_compile_alternative_float_conv(self):
+
+        A0 = Alternative("A0", a={}, b={},
+                         __int__=lambda self: 123,
+                         __float__=lambda self: 1234.5
+                         )
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __int__=lambda self: 123,
+                        __float__=lambda self: 1234.5
+                        )
+
+        def f(x: float):
+            return x
+
+        def g(x: int):
+            return x
+
+        c_f = Compiled(f)
+        c_g = Compiled(g)
+        with self.assertRaises(TypeError):
+            c_f(A.a())
+        with self.assertRaises(TypeError):
+            c_f(A0.a())
+        with self.assertRaises(TypeError):
+            c_g(A.a())
+        with self.assertRaises(TypeError):
+            c_g(A0.a())
+
+    def test_compile_alternative_missing_inplace_fallback(self):
+        def A_add(self, other):
+            return A.b(" add" + other.b)
+
+        def A_sub(self, other):
+            return A.b(" sub" + other.b)
+
+        def A_mul(self, other):
+            self.s += " mul" + other.s
+            return self
+
+        def A_matmul(self, other):
+            self.s += " matmul" + other.s
+            return self
+
+        def A_truediv(self, other):
+            self.s += " truediv" + other.s
+            return self
+
+        def A_floordiv(self, other):
+            self.s += " floordiv" + other.s
+            return self
+
+        def A_mod(self, other):
+            self.s += " mod" + other.s
+            return self
+
+        def A_pow(self, other):
+            self.s += " pow" + other.s
+            return self
+
+        def A_lshift(self, other):
+            self.s += " lshift" + other.s
+            return self
+
+        def A_rshift(self, other):
+            self.s += " rshift" + other.s
+            return self
+
+        def A_and(self, other):
+            self.s += " and" + other.s
+            return self
+
+        def A_or(self, other):
+            self.s += " or" + other.s
+            return self
+
+        def A_xor(self, other):
+            self.s += " xor" + other.s
+            return self
+
+        A = Alternative("A", a={'a': int}, b={'b': str},
+                        __add__=lambda x, y: A.b(x.b + " add" + y.b),
+                        __sub__=lambda x, y: A.b(x.b + " sub" + y.b),
+                        __mul__=lambda x, y: A.b(x.b + " mul" + y.b),
+                        __matmul__=lambda x, y: A.b(x.b + " matmul" + y.b),
+                        __truediv__=lambda x, y: A.b(x.b + " truediv" + y.b),
+                        __floordiv__=lambda x, y: A.b(x.b + " floordiv" + y.b),
+                        __mod__=lambda x, y: A.b(x.b + " mod" + y.b),
+                        __pow__=lambda x, y: A.b(x.b + " pow" + y.b),
+                        __lshift__=lambda x, y: A.b(x.b + " lshift" + y.b),
+                        __rshift__=lambda x, y: A.b(x.b + " rshift" + y.b),
+                        __and__=lambda x, y: A.b(x.b + " and" + y.b),
+                        __or__=lambda x, y: A.b(x.b + " or" + y.b),
+                        __xor__=lambda x, y: A.b(x.b + " xor" + y.b)
+                        )
+
+        def inplace(x: A):
+            x += A.b()
+            x -= A.b()
+            x *= A.b()
+            x @= A.b()
+            x /= A.b()
+            x //= A.b()
+            x %= A.b()
+            x **= A.b()
+            x <<= A.b()
+            x >>= A.b()
+            x &= A.b()
+            x |= A.b()
+            x ^= A.b()
+            return x
+
+        expected = A.b("start add sub mul matmul truediv floordiv mod pow lshift rshift and or xor")
+        v = A.b("start")
+        r1 = inplace(v)
+        self.assertEqual(r1, expected)
+        v = A.b("start")
+        r2 = Compiled(inplace)(v)
+        self.assertEqual(r2, expected)

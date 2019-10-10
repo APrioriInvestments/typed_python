@@ -136,6 +136,8 @@ PyObject* PyPointerToInstance::pointerCast(PyObject* o, PyObject* args) {
 
 PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op, const char* opErr) {
     if (strcmp(op, "__add__") == 0) {
+        if (!PyLong_Check(rhs))
+            return PyInstance::pyOperatorConcrete(rhs, op, opErr);
         int64_t ix = PyLong_AsLongLong(rhs);
         void* output;
 
@@ -149,7 +151,7 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
 
         if (otherPointer != type()) {
             //call 'super'
-            return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+            return PyInstance::pyOperatorConcrete(rhs, op, opErr);
         }
 
         PyInstance* other_w = (PyPointerToInstance*)rhs;
@@ -160,7 +162,7 @@ PyObject* PyPointerToInstance::pyOperatorConcrete(PyObject* rhs, const char* op,
         return PyLong_FromLong((ptr-other_ptr) / type()->getEltType()->bytecount());
     }
 
-    return ((PyInstance*)this)->pyOperatorConcrete(rhs, op, opErr);
+    return PyInstance::pyOperatorConcrete(rhs, op, opErr);
 }
 
 PyMethodDef* PyPointerToInstance::typeMethodsConcrete(Type* t) {
@@ -182,4 +184,7 @@ void PyPointerToInstance::mirrorTypeInformationIntoPyTypeConcrete(PointerTo* poi
             );
 }
 
-
+int PyPointerToInstance::pyInquiryConcrete(const char* op, const char* opErrRep) {
+    // op == '__bool__'
+    return *(void**)dataPtr() != nullptr;
+}

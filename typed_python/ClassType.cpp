@@ -53,6 +53,12 @@ bool Class::checkInitializationFlag(instance_ptr self, int64_t ix) const {
     return m_heldClass->checkInitializationFlag(l.data, ix);
 }
 
+//static
+bool Class::cmpStatic(Class* t, instance_ptr left, instance_ptr right, int64_t pyComparisonOp) {
+    // TODO: assert that t is a Class pointer
+    return t->cmp(left, right, pyComparisonOp, false);
+}
+
 bool Class::cmp(instance_ptr left, instance_ptr right, int pyComparisonOp, bool suppressExceptions) {
     const char* method = nullptr;
     switch (pyComparisonOp) {

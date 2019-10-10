@@ -175,6 +175,17 @@ def dict_getitem(instance, item):
     return instance.getValueByIndexUnsafe(slot)
 
 
+def dict_get(instance, item, default):
+    itemHash = hash(item)
+
+    slot = dict_slot_for_key(instance, itemHash, item)
+
+    if slot == -1:
+        return default
+
+    return instance.getValueByIndexUnsafe(slot)
+
+
 def dict_contains(instance, item):
     itemHash = hash(item)
 
@@ -470,6 +481,8 @@ class DictWrapper(DictWrapperBase):
                     return item.expr_type.refAs(context, item, 1)
 
         if len(args) == 2:
+            if methodname == "get":
+                return self.convert_get(context, instance, args[0], args[1])
             if methodname in ("initializeValueByIndexUnsafe", 'assignValueByIndexUnsafe'):
                 index = args[0].convert_to_type(int)
                 if index is None:
@@ -534,6 +547,20 @@ class DictWrapper(DictWrapperBase):
             return None
 
         return context.call_py_function(dict_getitem, (expr, item), {})
+
+    def convert_get(self, context, expr, item, default):
+        if item is None or expr is None:
+            return None
+
+        item = item.convert_to_type(self.keyType)
+        if item is None:
+            return None
+
+        default = default.convert_to_type(self.valueType)
+        if default is None:
+            return None
+
+        return context.call_py_function(dict_get, (expr, item, default), {})
 
     def convert_setitem(self, context, expr, key, value):
         if key is None or expr is None or value is None:

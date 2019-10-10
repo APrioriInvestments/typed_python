@@ -21,8 +21,6 @@ BoundMethod* PyBoundMethodInstance::type() {
     return (BoundMethod*)extractTypeFrom(((PyObject*)this)->ob_type);
 }
 
-
-
 PyObject* PyBoundMethodInstance::tp_call_concrete(PyObject* args, PyObject* kwargs) {
     Function* f = type()->getFunction();
     Type* c = type()->getFirstArgType();
